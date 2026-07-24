@@ -33,6 +33,12 @@ class ReferenceUpsertCurrentViewTest {
         return "md5(concat_ws(chr(31), COALESCE(CAST('" + customerId + "' AS VARCHAR), '')))";
     }
 
+    /** The canonical payload hash the write path stamps over the (non-system) payload columns. */
+    private static String rowHash(String customerId, String region) {
+        return "md5(concat_ws(chr(31), COALESCE(CAST('" + customerId + "' AS VARCHAR), ''), "
+                + "COALESCE(CAST('" + region + "' AS VARCHAR), '')))";
+    }
+
     /** Append one version file to an upsert reference store, stamped with the system columns. */
     private static void appendBatch(Connection c, java.nio.file.Path refdb, String fileStem,
                                     String batchId, String validFrom,
@@ -42,13 +48,14 @@ class ReferenceUpsertCurrentViewTest {
             String[] r = rows.get(i);
             if (i > 0) values.append(", ");
             values.append("('").append(r[0]).append("', '").append(r[1]).append("', ")
-                  .append(keyHash(r[0])).append(", TIMESTAMP '").append(validFrom).append("', '")
+                  .append(keyHash(r[0])).append(", ").append(rowHash(r[0], r[1]))
+                  .append(", TIMESTAMP '").append(validFrom).append("', '")
                   .append(r[2]).append("', '").append(batchId).append("')");
         }
         String target = refdb.resolve(fileStem + ".parquet").toString().replace("\\", "/");
         try (Statement st = c.createStatement()) {
             st.execute("COPY (SELECT * FROM (VALUES " + values + ") "
-                    + "t(customer_id, region, __key_hash, __valid_from, __op, __batch_id)) "
+                    + "t(customer_id, region, __key_hash, __row_hash, __valid_from, __op, __batch_id)) "
                     + "TO '" + target + "' (FORMAT PARQUET)");
         }
     }

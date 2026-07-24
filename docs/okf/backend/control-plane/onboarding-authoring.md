@@ -129,10 +129,44 @@ latest-version-wins**, the current view derived at read time. `load: replace` (d
   latest version per key, tombstoned keys dropped, system columns stripped. `path:` refs and `replace`
   stores read verbatim (today's behaviour).
 - **Deferred:** how a `delete` tombstone *enters* the store on the ingest path is **not** built (D5) —
-  P1 always stamps `'upsert'`; the current view merely honours a `delete` version if one exists. SCD-2
-  as-of history is P2; compaction + `refresh_seconds` timer is P3.
-- Tests: `ReferenceVersionStampTest` (stamp + within-batch dedup) · `ReferenceUpsertCurrentViewTest`
-  (two batches — changed + unchanged + new key + delete tombstone → current view = expected).
+  the ingest path always stamps `'upsert'`; the views merely honour a `delete` version if one exists.
+  Compaction + the `refresh_seconds` timer are still P3.
+- Tests: `ReferenceVersionStampTest` (stamp + within-batch dedup + unchanged-row skip) ·
+  `ReferenceUpsertCurrentViewTest` (two batches — changed + unchanged + new key + delete tombstone →
+  current view = expected).
+
+### Reference Phase-2 P2 — `scd2` as-of history + unchanged-row skip (2026-07-25)
+
+P2 makes the versioned store *readable as history* and stops it growing on no-op re-deliveries.
+
+- **`scd2` writes the same store as `upsert`.** The write gate moved from `load()==UPSERT` to
+  `load().versionedStore()` (`PipelineConfig.Load`, = non-`REPLACE`) — before this, an `scd2` pipeline
+  silently fell through to plain full-replace. The two modes differ only in what is *readable*
+  (`scd2` also serves as-of) and, later, in what compaction retains (P3 `history_days`).
+- **`__row_hash`** is a fifth §2.1 system column: md5 over the payload columns, with `__src_id`
+  **excluded** — it is per-batch lineage bookkeeping and would make every re-delivery look changed.
+  The column list is read from the staged table's `ResultSetMetaData`, not a DuckDB `COLUMNS(*)` star
+  expression, so the hash expression is explicit and order-stable.
+- **Unchanged-row skip:** when the store already has files, `stampReferenceVersions` anti-joins the
+  staged batch against the store's own current view on `__key_hash || __row_hash` (both fixed-length
+  md5 hex and never null, so a scalar `IN`-list is safe where a row-constructor `IN` is not) — an
+  identical re-delivery appends no version; a changed payload, a new key, and a key whose current
+  version is a tombstone all still append. First batch (empty store) skips the join: a glob matching
+  no file is an error in DuckDB, so `existingStoreReader` returns `null` after a filesystem probe,
+  and an unreadable tree degrades to "no skip" rather than failing the write.
+- **As-of read:** `EnrichmentEngine.currentView` generalised to `versionedView(reader, asOf)` — with
+  `asOf == null` it is P1's latest-wins current view verbatim; with an `asOf` the candidate set is cut
+  to `__valid_from <= TIMESTAMP '…'` **before** the `QUALIFY`, so the winner is the version valid then.
+  A key created later is absent; a key deleted later is still present.
+- **Authoring:** `references.<name>.as_of` on the *enrichment* binding (`EnrichmentConfig.Reference.asOf`),
+  not the pipeline — an ISO-8601 date or date-time, canonicalised to `yyyy-MM-dd HH:mm:ss` at parse
+  because the value is spliced into SQL; anything else is rejected. No `${}` resolvers (deliberate cut).
+  Not in `ConfigSpecs.enrichment()` — the `references` block is a dynamic per-name map, so `path`/`ref`/
+  `format` aren't declared there either. **Fail-closed** on `as_of` against a `replace`/`upsert` producer
+  (an upsert store's superseded versions are compaction fodder, not a queryable surface) or a plain
+  `path:` reference (a file carries no version history).
+- Tests: `ReferenceScd2AsOfTest` (6 — as-of state at t · current view unaffected · both fail-closed
+  rejections · parse validation incl. bare-date start-of-day).
 
 ## Engine fixes the live walks surfaced (apply beyond onboarding)
 

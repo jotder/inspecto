@@ -1,8 +1,13 @@
 # Reference Phase-2 Engine Semantics — implementation plan
 
-**Status: IN FLIGHT — P0 + P1 + P4 SHIPPED 2026-07-24 (config model + `upsert` engine + Catalog Stream
-grouping, all GAUNTLET-green). P2 (`scd2` as-of view) + P3 (compaction + `refresh_seconds` timer)
-remain. Multi-session build; plan stays in `superpower/` until the last phase lands.**
+**Status: IN FLIGHT — P0 + P1 + P4 SHIPPED 2026-07-24, P2 SHIPPED 2026-07-25 (config model + `upsert`
+engine + Catalog Stream grouping + `scd2` as-of history & unchanged-row skip, all GAUNTLET-green).
+Only P3 (compaction + `refresh_seconds` timer) remains. Plan stays in `superpower/` until it lands.**
+
+_Shipped 2026-07-25 (P2): the versioned write path now covers `scd2` as well as `upsert` and stamps
+`__row_hash`, skipping a re-delivered row identical to its key's current version; the read side gained
+the as-of view behind an authorable `references.<name>.as_of` on the enrichment binding (fail-closed
+against a `replace`/`upsert` producer or a plain `path:` reference). See §7 P2 for the as-built._
 
 _Shipped this shift (P0+P4): the `reference:` block (`load: replace|upsert|scd2` + `key` + `refresh_seconds`)
 and the `stream:` membership key on `PipelineConfig`, mirrored in `ConfigSpecs.pipeline()` (enum +
@@ -56,7 +61,8 @@ Three candidates were weighed:
 
 ### 2.1 System columns & views (design (c) mechanics)
 
-Appended rows carry: `__key_hash` (canonical hash of declared key columns), `__valid_from`
+Appended rows carry: `__key_hash` (canonical hash of declared key columns), `__row_hash` (canonical hash
+of the payload columns, `__src_id` excluded — added in P2 for the unchanged-row skip), `__valid_from`
 (TIMESTAMP, load instant), `__op` (`upsert` | `delete` — tombstones), `__batch_id`.
 
 - **Current view** (what enrichment and default consumers read):
@@ -126,7 +132,7 @@ Purely a **Catalog model** change, orthogonal to load semantics:
 |---|---|---|
 | **P0 ✅** | Config model: `reference:` block + `stream:` key, spec validation, parsing — `load: replace` default, no engine behavior change | ✅ SHIPPED 2026-07-24 — `PipelineConfigReferenceTest` (14) + `ConfigSpecsTest`/`ConfigLoaderTest` (declarative mirror) + column-exists + back-compat all green. Column-exists check enforced parser-side when a schema is resolved (skipped for draft-without-schema). |
 | **P1 ✅** | `upsert`: system columns on append, within-batch dedup fold, current-view read in `EnrichmentEngine.referenceReader` | ✅ SHIPPED 2026-07-24 — `BatchIngestStrategy.stampReferenceVersions` (system cols + within-batch dedup + batch-unique file stem ⇒ append) gated on `producesReference() && reference().load()==UPSERT`; `EnrichmentEngine.currentView` (latest-per-`__key_hash`, `__op='delete'` dropped, system cols stripped) on the by-name read. `ReferenceVersionStampTest` (2) + `ReferenceUpsertCurrentViewTest` (1: two batches, changed+unchanged+new+tombstone) green. |
-| **P2** | `scd2` history surface: as-of view + `EnrichmentConfig.Reference.asOf`; row content-hash skip | as-of query returns the version valid at t; identical re-delivery adds no version |
+| **P2 ✅** | `scd2` history surface: as-of view + `EnrichmentConfig.Reference.asOf`; row content-hash skip | ✅ SHIPPED 2026-07-25 — the append-only write path now covers **both** `upsert` and `scd2` (`Load.versionedStore()`; `scd2` previously fell through to full-replace) and stamps a fifth system column `__row_hash` (md5 over the payload columns, `__src_id` excluded — it is per-batch bookkeeping and would make every re-delivery look changed); `stampReferenceVersions` anti-joins the incoming batch against the existing store's current view on `(__key_hash, __row_hash)`, so an identical re-delivery appends no version. Read side: `currentView` generalised to `versionedView(reader, asOf)` — `asOf == null` = latest-wins (P1, unchanged), otherwise the candidate set is cut to `__valid_from <= asOf` first, so the winner is the version valid then. `EnrichmentConfig.Reference` gained `asOf`, authored as `references.<name>.as_of`. `ReferenceScd2AsOfTest` (6) + `ReferenceVersionStampTest` (3) green; full reactor green. |
 | **P3** | Compaction task (MaterializeTask idiom) + `refresh_seconds` timer + cache read-path switch | compacted store = current view exactly; timer cancel-on-unregister test; read amplification bounded |
 | **P4 ✅** | Stream grouping (catalog) — separable | ✅ SHIPPED 2026-07-24 — collapse model in `MetadataGraphBuilder`; `MetadataGraphServiceTest` proves shared `stream:` → one node + `members[]`, and 1:1 default keeps label/attrs byte-for-byte (no `members[]`). Applies to STREAM origins only (references keep `ref:<pipeline>`). `/catalog/streams` is a separate per-collector projection, untouched. |
 

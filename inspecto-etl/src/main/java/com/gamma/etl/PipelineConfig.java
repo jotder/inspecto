@@ -547,6 +547,14 @@ public final class PipelineConfig {
 
         /** Whether this load mode needs a declared {@code reference.key} (upsert/scd2 do). */
         public boolean requiresKey() { return this != REPLACE; }
+
+        /**
+         * Whether the produced store is the append-only versioned one (§2.1 system columns, one
+         * version row per key per batch) rather than a full-replace snapshot. Both {@code upsert} and
+         * {@code scd2} write it identically — they differ only in what is <em>readable</em>
+         * ({@code scd2} additionally serves as-of history) and in what compaction retains.
+         */
+        public boolean versionedStore() { return this != REPLACE; }
     }
 
     /**

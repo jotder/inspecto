@@ -87,16 +87,18 @@ interface BatchIngestStrategy {
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
 
-        // Reference Phase-2 P1: a `produces: reference` pipeline with `load: upsert` writes an
-        // append-only versioned store — each batch stamps system columns (__key_hash/__valid_from/
-        // __op/__batch_id), folds out within-batch key duplicates, and reveals under a batch-unique
-        // file stem so prior versions survive (latest-version-wins is derived at read time by the
-        // enrichment current view). `load: replace` (the default) is untouched — plain overwrite.
+        // Reference Phase-2 P1/P2: a `produces: reference` pipeline with `load: upsert|scd2` writes an
+        // append-only versioned store — each batch stamps system columns (__key_hash/__row_hash/
+        // __valid_from/__op/__batch_id), folds out within-batch key duplicates, skips rows identical to
+        // the store's current version, and reveals under a batch-unique file stem so prior versions
+        // survive (latest-version-wins / as-of are derived at read time by the enrichment views).
+        // `load: replace` (the default) is untouched — plain overwrite.
         String writeTable = table;
         String writeBase  = baseName;
-        if (cfg.producesReference() && cfg.reference().load() == PipelineConfig.Load.UPSERT) {
+        if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
             writeTable = "__ref_versioned";
-            stampReferenceVersions(conn, table, writeTable, cfg.reference().key(), batchId);
+            stampReferenceVersions(conn, table, writeTable, cfg.reference().key(), batchId,
+                    existingStoreReader(dbDir, cfg.output().format()));
             writeBase = baseName + "__v_" + batchId;   // batch-unique ⇒ append, never overwrite
         }
         List<PartitionOutput> mainOut = PartitionWriter.write(conn, writeTable, dbDir,
@@ -112,41 +114,105 @@ interface BatchIngestStrategy {
         return new Written(outputs, lineage);
     }
 
+    /** The reference system columns a versioned store carries (§2.1) — never part of the payload hash. */
+    List<String> REF_SYSTEM_COLUMNS =
+            List.of("__key_hash", "__row_hash", "__valid_from", "__op", "__batch_id");
+
     /**
-     * Reference Phase-2 P1 (design (c) — append-only, latest-version-wins): materialise {@code dst}
+     * Reference Phase-2 P1/P2 (design (c) — append-only, latest-version-wins): materialise {@code dst}
      * from {@code src} with the reference system columns appended and within-batch key duplicates
      * folded out. Each surviving row carries {@code __key_hash} (canonical hash of the declared
-     * {@code reference.key} columns), {@code __valid_from} (load instant), {@code __op} ({@code 'upsert'}
-     * on the ingest path — {@code 'delete'} tombstones are honoured by the read-side current view but
-     * are not produced here in P1) and {@code __batch_id}. The lineage tag {@code __src_id} is kept so
-     * {@link PartitionWriter}'s default exclude and {@link LineageCollector} keep working unchanged.
+     * {@code reference.key} columns), {@code __row_hash} (canonical hash of the whole payload),
+     * {@code __valid_from} (load instant), {@code __op} ({@code 'upsert'} on the ingest path —
+     * {@code 'delete'} tombstones are honoured by the read-side views but are not produced here) and
+     * {@code __batch_id}. The lineage tag {@code __src_id} is kept so {@link PartitionWriter}'s default
+     * exclude and {@link LineageCollector} keep working unchanged — but it is excluded from
+     * {@code __row_hash}, since it is per-batch bookkeeping and would make every re-delivery look changed.
      *
      * <p>Within-batch dedup keeps one row per {@code __key_hash} ({@code QUALIFY row_number() = 1}); a
-     * batch that delivers the same key twice writes a single version. The winner is arbitrary in P1
+     * batch that delivers the same key twice writes a single version. The winner is arbitrary
      * (no {@code order_by} column yet — the plan's optional latest-by-column is a later refinement).
+     *
+     * <p><b>P2 unchanged-row skip:</b> when {@code existingStoreReader} is non-null (the store already
+     * has files), a row whose {@code (__key_hash, __row_hash)} equals its key's <em>current</em> version
+     * in that store writes no new version — a re-delivered identical dimension row does not grow the
+     * history. A changed payload, a new key, and a key whose current version is a tombstone all still
+     * append.
      */
     static void stampReferenceVersions(Connection conn, String src, String dst,
-                                       List<String> keyCols, String batchId) throws SQLException {
+                                       List<String> keyCols, String batchId,
+                                       String existingStoreReader) throws SQLException {
         if (keyCols == null || keyCols.isEmpty())
             throw new IllegalStateException(
-                    "reference load 'upsert' requires a non-empty reference.key (config validation should "
-                    + "have rejected this pipeline before execution)");
-        StringBuilder hash = new StringBuilder("md5(concat_ws(chr(31)");
-        for (String k : keyCols)
-            hash.append(", COALESCE(CAST(\"").append(k.replace("\"", "\"\"")).append("\" AS VARCHAR), '')");
-        hash.append("))");
-        String hashExpr = hash.toString();
-        String sql = "CREATE TABLE \"" + dst + "\" AS SELECT *, "
-                + hashExpr + " AS __key_hash, "
+                    "reference load 'upsert'/'scd2' requires a non-empty reference.key (config validation "
+                    + "should have rejected this pipeline before execution)");
+        String keyHash = md5Of(keyCols);
+        String rowHash = md5Of(payloadColumns(conn, src));
+        String staged = "SELECT *, " + keyHash + " AS __key_hash, " + rowHash + " AS __row_hash, "
                 + "now()::TIMESTAMP AS __valid_from, "
                 + "'upsert' AS __op, "
                 + "'" + batchId.replace("'", "''") + "' AS __batch_id "
                 + "FROM \"" + src + "\" "
-                + "QUALIFY row_number() OVER (PARTITION BY " + hashExpr + ") = 1";
+                + "QUALIFY row_number() OVER (PARTITION BY " + keyHash + ") = 1";
+        String sql = "CREATE TABLE \"" + dst + "\" AS SELECT * FROM (" + staged + ") AS _staged";
+        if (existingStoreReader != null)
+            // Both are fixed-length md5 hex and never null, so the concatenation is unambiguous —
+            // and a scalar IN-list is portable where a row-constructor IN is not.
+            sql += " WHERE __key_hash || __row_hash NOT IN ("
+                    + "SELECT __key_hash || __row_hash FROM (SELECT * FROM " + existingStoreReader
+                    + " QUALIFY row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC) = 1"
+                    + ") WHERE __op != 'delete')";
         try (Statement st = conn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"" + dst + "\"");
             st.execute(sql);
         }
+    }
+
+    /** {@code md5(concat_ws(chr(31), COALESCE(CAST(c AS VARCHAR), ''), …))} over {@code cols}, in order. */
+    private static String md5Of(List<String> cols) {
+        StringBuilder hash = new StringBuilder("md5(concat_ws(chr(31)");
+        for (String c : cols)
+            hash.append(", COALESCE(CAST(\"").append(c.replace("\"", "\"\"")).append("\" AS VARCHAR), '')");
+        return hash.append("))").toString();
+    }
+
+    /**
+     * The columns of {@code src} that make up the reference payload — everything except the lineage tag
+     * {@code __src_id} and any already-present system column. Read from the table metadata (not a
+     * {@code COLUMNS(*)} star expression) so the hash expression is explicit and order-stable.
+     */
+    private static List<String> payloadColumns(Connection conn, String src) throws SQLException {
+        List<String> cols = new java.util.ArrayList<>();
+        try (Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM \"" + src + "\" LIMIT 0")) {
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) {
+                String c = md.getColumnName(i);
+                if (!"__src_id".equals(c) && !REF_SYSTEM_COLUMNS.contains(c)) cols.add(c);
+            }
+        }
+        if (cols.isEmpty())
+            throw new IllegalStateException("reference batch '" + src + "' has no payload columns to hash");
+        return cols;
+    }
+
+    /**
+     * The table-function expression reading a versioned reference store's already-written files, or
+     * {@code null} when the store is still empty (first batch — nothing to compare against, and a glob
+     * matching no file is an error in DuckDB).
+     */
+    private static String existingStoreReader(String dbDir, String format) {
+        String fmt = (format == null || format.isBlank()) ? "CSV" : format.toUpperCase(java.util.Locale.ROOT);
+        String ext = com.gamma.sql.SqlViews.ext(fmt);
+        java.nio.file.Path root = Paths.get(dbDir);
+        if (!java.nio.file.Files.isDirectory(root)) return null;
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(root)) {
+            if (walk.noneMatch(p -> java.nio.file.Files.isRegularFile(p)
+                    && p.getFileName().toString().endsWith("." + ext))) return null;
+        } catch (IOException e) {
+            return null;   // unreadable tree ⇒ skip the optimisation, never fail the write
+        }
+        return com.gamma.sql.SqlViews.reader(fmt, dbDir.replace("\\", "/") + "/**/*." + ext, true);
     }
 
     /**

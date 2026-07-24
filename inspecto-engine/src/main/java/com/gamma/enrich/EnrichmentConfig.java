@@ -75,13 +75,22 @@ public record EnrichmentConfig(String name,
      * {@code produces: reference}, whose Hive-partitioned output becomes the view (format taken
      * from that pipeline). Exactly one of {@code path}/{@code ref} is set.
      */
-    public record Reference(String name, String path, String format, String ref) {
+    public record Reference(String name, String path, String format, String ref, String asOf) {
         /** Direct-path reference (the pre-5.1 shape). */
         public Reference(String name, String path, String format) {
-            this(name, path, format, null);
+            this(name, path, format, null, null);
+        }
+        /** Current-view by-name/path reference (the pre-Phase-2 shape — no as-of). */
+        public Reference(String name, String path, String format, String ref) {
+            this(name, path, format, ref, null);
         }
         /** Whether this reference binds by name to a pipeline-produced Reference Dataset. */
         public boolean byName() { return ref != null && !ref.isBlank(); }
+        /**
+         * Whether this binding reads the reference <em>as of</em> a point in time (Reference Phase-2 P2)
+         * instead of its current view. Only meaningful against a {@code load: scd2} producer.
+         */
+        public boolean hasAsOf() { return asOf != null && !asOf.isBlank(); }
     }
 
     /** Where and how enriched output is written, and at what partition grain. */
@@ -169,9 +178,13 @@ public record EnrichmentConfig(String name,
                         throw new IllegalArgumentException(
                                 "references." + rname + " needs exactly one of 'path' or 'ref'");
                     if (hasRef) Identifiers.validate(ref, "references." + rname + ".ref");
+                    String asOf = canonicalAsOf(rv.get("as_of"), rname);
+                    if (asOf != null && !hasRef)
+                        throw new IllegalArgumentException("references." + rname
+                                + ".as_of needs a by-name 'ref' — a plain 'path' file carries no version history");
                     refs.add(new Reference(rname, hasPath ? path : null,
                             (fmt == null ? "PARQUET" : fmt.toString()).toUpperCase(),
-                            hasRef ? ref : null));
+                            hasRef ? ref : null, asOf));
                 }
             }
         }
@@ -202,6 +215,27 @@ public record EnrichmentConfig(String name,
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Parse and canonicalise a reference {@code as_of} instant (Reference Phase-2 P2): an ISO-8601
+     * local date-time ({@code 2026-07-24T10:00:00}) or a bare date ({@code 2026-07-24}, = start of day).
+     * Returned as a canonical {@code yyyy-MM-dd HH:mm:ss} literal so it can be spliced into the as-of
+     * view's SQL, and rejected outright otherwise — the value reaches a query, so it is never passed
+     * through unvalidated. {@code null}/blank ⇒ no as-of (read the current view).
+     */
+    private static String canonicalAsOf(Object raw, String rname) {
+        if (raw == null || raw.toString().isBlank()) return null;
+        String s = raw.toString().trim();
+        try {
+            java.time.LocalDateTime t = s.length() == 10
+                    ? java.time.LocalDate.parse(s).atStartOfDay()
+                    : java.time.LocalDateTime.parse(s.replace(' ', 'T'));
+            return t.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalArgumentException("references." + rname + ".as_of must be an ISO-8601 "
+                    + "date or date-time (2026-07-24 or 2026-07-24T10:00:00), got: '" + s + "'");
+        }
+    }
 
     private static String req(Map<String, Object> m, String key, String where) {
         Object v = m.get(key);

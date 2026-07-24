@@ -260,7 +260,7 @@ public final class EnrichmentEngine {
      * Hive-partitioned Stage-1 output (its {@code dirs.database} glob, its output format).
      */
     private static String referenceReader(EnrichmentConfig.Reference r, List<PipelineConfig> pipelines) {
-        if (!r.byName()) return SqlViews.reader(r.format(), r.path(), false);
+        if (!r.byName()) return SqlViews.reader(r.format(), r.path(), false);   // as_of rejected at parse
         PipelineConfig p = (pipelines == null ? List.<PipelineConfig>of() : pipelines).stream()
                 .filter(c -> c.identity().pipelineName().equals(r.ref()))
                 .findFirst()
@@ -275,25 +275,43 @@ public final class EnrichmentEngine {
                 ? "CSV" : p.output().format().toUpperCase(Locale.ROOT);
         String glob = p.dirs().database() + "/**/*." + SqlViews.ext(format);
         String reader = SqlViews.reader(format, glob, true);
-        // Reference Phase-2 P1: an `upsert` reference store is append-only (a version row per batch);
-        // derive the current view at read time — latest __valid_from wins per key, delete tombstones
-        // dropped, system columns stripped. A `replace` store is read verbatim (today's behaviour).
-        return (p.reference().load() == PipelineConfig.Load.UPSERT) ? currentView(reader) : reader;
+        // Reference Phase-2 P1/P2: an `upsert`/`scd2` reference store is append-only (a version row per
+        // key per batch); derive the view at read time — latest __valid_from wins per key, delete
+        // tombstones dropped, system columns stripped. `scd2` additionally serves history: an `as_of`
+        // binding sees the version that was valid at that instant. A `replace` store is read verbatim.
+        if (!p.reference().load().versionedStore()) {
+            if (r.hasAsOf())
+                throw new IllegalArgumentException("reference '" + r.name() + "' declares as_of but pipeline '"
+                        + r.ref() + "' has reference.load: replace — only 'scd2' keeps version history");
+            return reader;
+        }
+        if (!r.hasAsOf()) return versionedView(reader, null);
+        if (p.reference().load() != PipelineConfig.Load.SCD2)
+            throw new IllegalArgumentException("reference '" + r.name() + "' declares as_of but pipeline '"
+                    + r.ref() + "' has reference.load: upsert — as-of history needs 'scd2' (an upsert store's "
+                    + "superseded versions are compaction fodder, not a queryable surface)");
+        return versionedView(reader, r.asOf());
     }
 
-    /** The system columns an `upsert` reference store carries (§2.1) — stripped from the current view. */
-    private static final String REF_SYSTEM_COLUMNS = "__key_hash, __valid_from, __op, __batch_id";
+    /** The system columns a versioned reference store carries (§2.1) — stripped from every derived view. */
+    private static final String REF_SYSTEM_COLUMNS =
+            "__key_hash, __row_hash, __valid_from, __op, __batch_id";
 
     /**
-     * The current-view read over an append-only upsert reference store: pick the latest version per
+     * The read over an append-only versioned reference store: pick the winning version per
      * {@code __key_hash} ({@code QUALIFY row_number() ORDER BY __valid_from DESC = 1}), drop keys whose
      * winning version is a {@code delete} tombstone, and strip the system columns — so downstream
-     * transforms see exactly the current dimension rows. Returned as an aliased subquery the caller
-     * splices after {@code SELECT * FROM }.
+     * transforms see plain dimension rows. With {@code asOf == null} the winner is the latest version
+     * (the <b>current view</b>); with an {@code asOf} literal the candidate set is first cut to versions
+     * valid at that instant (the <b>as-of view</b>), so the result is the state the dimension had then —
+     * including a key that did not exist yet being absent, and a key deleted later still being present.
+     * Returned as an aliased subquery the caller splices after {@code SELECT * FROM }.
      */
-    private static String currentView(String reader) {
+    private static String versionedView(String reader, String asOf) {
+        String candidates = "SELECT * FROM " + reader;
+        if (asOf != null) candidates += " WHERE __valid_from <= TIMESTAMP '" + asOf + "'";
         return "(SELECT * EXCLUDE (" + REF_SYSTEM_COLUMNS + ") FROM ("
-                + "SELECT * FROM " + reader
+                + candidates
                 + " QUALIFY row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC) = 1"
                 + ") WHERE __op != 'delete') AS _ref_current";
     }
