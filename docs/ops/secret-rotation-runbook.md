@@ -1,8 +1,10 @@
 # Runbook — rotating the SEC-INCIDENT-1 OAuth client secrets
 
 > **Status:** rotation **NOT YET PERFORMED** as of 2026-07-25 — but **the code-side blocker is now
-> cleared**: `4.x` P0+P1 shipped (`481a68d5`, `89cb3cce`), so `4.x` no longer sends a client secret and a
-> rotation no longer breaks a running SPA *once the new bundle is deployed*. Read §"The complication"
+> cleared**: `4.x` P0+P1 shipped (`481a68d5`, `89cb3cce`, **plus the mandatory follow-up `8c3a7654`**), so
+> `4.x` no longer sends a client secret and a rotation no longer breaks a running SPA *once the new bundle
+> is deployed*. ⚠ **The bundle you deploy must include `8c3a7654`** — `89cb3cce` on its own breaks login
+> depending on the IdP's callback parameter order. Check `git log --oneline 4.x` before cutting the build. Read §"The complication"
 > below with that in mind — the deploy-then-rotate ordering still applies, the design blocker does not.
 > This runbook is the execution checklist;
 > [`../BACKLOG.md`](../BACKLOG.md) §5 is the incident record and closes only on *confirmed* rotation.

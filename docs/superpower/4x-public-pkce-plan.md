@@ -85,9 +85,22 @@ still uses `environment.appClientSecret` — so P1 is still required.
 > in `4.x` source** — not in `app.properties.ts`, not in any of the four `environments/*.ts`.
 > Verified: `npm run test:ci` 42 pass / 5 skip (incl. the ported `pkce.spec.ts`), `npm run build` clean.
 > ⚠ **Not yet verified against a live IdP** — step 7's "real login round trip" is a P2/deploy-time check.
-> ⚠ **The `state` param is generated and sent but not yet validated on callback.** `default-callback`
-> still only parses `code=` out of the URL. That is a CSRF gap worth closing — tracked as a residual, and
-> it does not block rotation (the secret is what the incident is about).
+>
+> **⚠ P1 shipped with a login-breaking defect; `8c3a7654` fixes it. Deploy the two together.** Adding
+> `state` to the `/authorize` redirect changed the *shape of the callback URL*, and P1 did not touch the
+> callback, which read the code as `href.substring(indexOf('code=') + 5)` — everything to the end of the
+> string. With `state` echoed back, `?code=abc&state=xyz` yields the code `"abc&state=xyz"` and the token
+> exchange fails; `?state=xyz&code=abc` works. Parameter order is the IdP's choice, so P1 alone is a
+> coin flip on whether login works at all.
+>
+> `8c3a7654` parses with `URLSearchParams` (exported `authParamsFrom`, order-agnostic, tolerates hash
+> routing), **validates `state`** against the sessionStorage copy before exchanging — arming the CSRF
+> defence P1 only pretended to have — and moves `pageManager.redirectPath` before the first `await` in the
+> now-async `redirectToAuthServer` (a guard returning false can revert the address bar while we yield).
+> 8 tests cover it, including both parameter orderings. `test:ci` 50 pass / 5 skip.
+>
+> **The transferable lesson:** the defect lived precisely in the gap this plan already named — "verified
+> by compiler and jsdom, never by an IdP." A green build on an auth change means less here than it looks.
 
 3. Copy `pkce.ts` + `pkce.spec.ts` from `master` into `4.x` (path suits `4.x` layout, e.g.
    `modules/auth/pkce.ts`). Verbatim — no edits; it has no imports.

@@ -179,11 +179,17 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > - **`tools/check-secrets.mjs` can now be merged forward to `4.x`** — the "would pin `4.x` CI
 >   permanently red" objection below is **no longer true**, because `4.x` no longer holds live values.
 >   Do it as its own change and confirm `4.x` CI is green.
-> - **⚠ The OAuth `state` param is generated and sent but never validated on callback.**
->   `default-callback.component.ts` still only parses `code=` out of the URL, so the CSRF defence PKCE's
->   `state` exists to provide is not actually armed. Not a rotation blocker (the incident is about the
->   secret), but it should not sit indefinitely. Fix = compare the returned `state` against the
->   `sessionStorage` copy before calling `retrieveToken`, and refuse the exchange on mismatch.
+> - **✅ Callback `state` validation — FIXED (`8c3a7654`), and it caught a worse bug.** P1 generated and
+>   sent a `state` but never checked it, so the CSRF defence was not armed. Closing that exposed a
+>   **login-breaking regression P1 had introduced**: the callback read the code as
+>   `href.substring(indexOf('code=') + 5)` — everything to the end of the URL — which was correct only
+>   while `code` was the last param. Once `state` was echoed back, `?code=abc&state=xyz` parsed the code
+>   as `"abc&state=xyz"` and the token exchange fails; `?state=xyz&code=abc` still worked. **Parameter
+>   order is the IdP's choice, so `89cb3cce` alone is a coin-flip login break — never deploy it without
+>   `8c3a7654`.** Neither the build nor the unit suite could have caught it (nothing covered callback
+>   parsing; no live-IdP round trip runs in CI) — now covered by 8 tests including both orderings.
+>   ⚠ **The lesson generalizes: this line of work is verified only against a compiler and jsdom.** Treat
+>   any further `4.x` auth change as unverified until it survives a real IdP.
 > - **⚠ The refresh grant now sends `client_id` with no client authentication** — an assumption about the
 >   IdP that has not been tested against the real issuer. If wrong, sessions break at *first token
 >   expiry*, not at login, so a sign-in-only smoke test will not catch it. Verify a refresh explicitly
