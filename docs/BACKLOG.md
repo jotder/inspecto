@@ -1,457 +1,218 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-21 (AGT-5 embedded intelligence **P0–P5 COMPLETE** + polish — the giant shipped
-blob collapsed to a `COMPLETE` pointer per this doc's "shipped work is not recorded here" rule; the
-four remaining AGT-5 follow-ons promoted to first-class rows) · prior 2026-07-20 (D-ETL quarantine UI,
-Job pack unavailable-flip, Email/SMTP channel, `record_split`, R8 pivot-bar) · **Owner:** whole team
-(update at every handoff that closes/opens an item)
+**Updated:** 2026-07-25 (compaction pass — shipped strikethrough narrative removed in favour of OKF
+pointers; all decision-gated items consolidated into §2) · **Owner:** whole team (update at every
+handoff that closes/opens an item)
 
 > **What this is.** The single index of ALL pending/deferred/open work: one line + status + where the
 > detail lives. Detail stays in the linked source doc. **Shipped work is not recorded here** — it
-> lives in git history, `REQUIREMENTS.md` status columns, and the archived plans under
+> lives in git history, `REQUIREMENTS.md` status columns, the OKF concept docs under
+> [`okf/`](okf/), and the archived plans under
 > [`archived-documents/plans-archive/`](archived-documents/plans-archive/).
 >
-> **Where we are (2026-07-16):** roughly **75% of the chartered scope has shipped** — the
-> REQUIREMENTS MUST + SHOULD engineering backlogs are empty; what remains is the COULD tier,
-> externally-gated items (deployment, product decisions, the security module), feature follow-ons,
-> and polish. Compiled from REQUIREMENTS §5 + the deferral sections of every archived plan
-> (2026-07-16 sweep) + the live session notes.
+> **Where we are (2026-07-25):** the REQUIREMENTS MUST + SHOULD engineering backlogs are empty, the
+> RBAC/ABAC plan is complete, and the fast/low-risk/independent seam has been drained across four
+> shifts. What remains is: a handful of **product decisions** (§2 — cheapest unblock on the board),
+> one large **schedulable feature** (AGT-6a), externally-gated soaks, and deliberate won't-do/
+> trigger-gated tech debt (§6).
 
 ---
 
 ## 1. Act first / in-flight repo state
 
-_(no in-flight repo state — the `package.ps1` bundle smoke-test row closed 2026-07-20, see §3 note below)_
+_(no in-flight repo state — working tree clean as of 2026-07-25)_
 
-**Dependency-ordered priority (triaged 2026-07-23).** Order of attack across the open rows below,
-by dependency fan-out — each row's detail stays in its own section; this is only the ordering:
+**Dependency-ordered priority.** Order of attack across the open rows below, by dependency fan-out;
+each row's detail stays in its own section.
 
-1. **Root enablers (largest downstream fan-out — start here):**
-   - **§6 RBAC/ABAC R-workstreams** (`superpower/rbac-abac-plan.md`) — unblocks Lens Access P3,
-     SPC-5 ABAC, X-Actor retirement, auth-gated notification prefs, and the NFR-7 access-control
-     evidence. *(R0 remainder + R1–R5 + A1/A2 shipped 2026-07-23; A3 + A4 + A5 shipped 2026-07-24 —
-     **the whole RBAC/ABAC plan is now COMPLETE**; plan is archive-ready.)*
-   - ~~**Bound job concurrency** (semaphore on the `JobService` executor)~~ **SHIPPED 2026-07-24**
-     (`-Djobs.maxConcurrentRuns`, default 0=unbounded) — the stated prerequisite (§5 DuckDB issue) for the
-     on-by-default memory cap (which in turn gates the chunking default) is now cleared.
-   - ~~Incidents I1 backend workflow resolution-gate~~ **SHIPPED 2026-07-24** (`e3ee50ab`). ~~`ObjectStore` delete~~ **SHIPPED 2026-07-24** — `delete(String id)` added to the `ObjectStore` SPI + both `InMemoryObjectStore`/`DbObjectStore` impls (hard delete, no link/note cascade). MNT-14 itself is still blocked on (a) a backend Incident workflow `Archived` lifecycle state (today only OPEN→…→CLOSED) and (b) an unresolved product question — retention tier vs. archive-is-terminal — before the sweep can be built as a `MaintenanceJob` task.
-   - ~~**v1-only triggers** — the *inline-ingest hazard* half~~ **SHIPPED 2026-07-24** (legacy trigger/notify
-     now run off the request thread via `runPipelineOffThread`; see §5). The *meter→zero* half (client
-     migration to `/api/v1`, which starts the API-5 30-day soak clock) is a separate, already-built soak
-     mechanism gated on client migration + sign-off, not code.
-2. **Cheap decision gates (product calls, near-zero build):** NFR-7 C1 sequencing sign-off ·
-   secret-in-bundle policy (sole blocker on the bundle `connection` kind) · API-5 soak sign-off
-   once the meter reads zero.
-3. **Dependent chains (sequence behind tier 1):** ~~SPC-5 ABAC~~ *(shipped as A4)*, ~~sharing RBAC~~ *(shipped as R3)*, Lens Access P3, and
-   NFR-7 SOC 2 execution → after RBAC R1–R2 · MNT-14 → after I1 · API-5 physical deletion → after
-   the soak · Postgres multi-user (write the `docs/superpower/` plan first, then store pooling) —
-   pairs with RBAC for the multi-user story and gives notifications a persistent backend.
-4. **Independent — schedule by value, no ordering constraint:** **AGT-6a** inline AI authoring
-   *(scoped 2026-07-25 → `superpower/agt-6-plan.md`; promoted Could→`Should`; the agent-graph half
-   split out as AGT-6b → tier 5)* · Geo Phase 4 backend (also
-   feeds the `spatial` QueryType + ComponentStore view-kind widening) · link-analysis V2 ·
-   ~~Reference Phase-2 engine semantics~~ *(COMPLETE 2026-07-25)* · ~~T15 adaptive back-pressure~~ *(SHIPPED
-   2026-07-25)* · ~~M5 coverage baseline~~ *(shipped 2026-07-21 — the mention below was stale)* · notification follow-ons
-   (~~digest~~ SHIPPED 2026-07-24 · delivery-status webhooks RE-SCOPED 2026-07-24 = inbound provider
-   callbacks, gated on a delivery-status model + product call · ~~authorable rules~~ SHIPPED 2026-07-24
-   backend+HTTP, UI editor still open) ·
-   M4 Fuse remainder *(2026-07-24 TRIAGED, deferred: the dead `src/@gamma/lib/mock-api/` (8 files, `GammaMockApiService`/`mockApiInterceptor` — never wired; the live mock is the app-owned `app/inspecto/mock/`) is functionally orphaned but NOT a clean delete — `@gamma/gamma.provider.ts` still imports `GAMMA_MOCK_API_DEFAULT_DELAY`/`mockApiInterceptor` + has the `mockApi` provider branch/type. Removing it means editing vendored `@gamma` shell code, which the angular-ui skill declares out of scope. Defer unless the team explicitly accepts touching `gamma.provider.ts`)* · ~~onboarding
-   per-stage `/validate`~~ *(SHIPPED 2026-07-24 as fieldPath→stage attribution — no new endpoint needed)* ·
-   menu O1/O2/O3 · eoiagent DryRunProvider *(2026-07-25: **reclassified** by `agt-6-plan.md` §4.2 G2 —
-   it is a prerequisite for AGT-6b, not merely a parity refactor; still not urgent while 6b is parked)*.
+1. **Root enablers — DRAINED.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound, Incidents I1
+   resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
+   2026-07-23/24. The one survivor is **MNT-14**, now blocked on a backend Incident `Archived`
+   lifecycle state + a retention product call (§2 D5).
+2. **Cheap decision gates** — see **§2**. Near-zero build, largest unblock-per-hour on the board.
+3. **Dependent chains (sequence behind a decision):** Lens Access P3 · NFR-7 SOC 2 execution
+   (after C1 sign-off) · MNT-14 (after the `Archived` state) · API-5 physical deletion (after the
+   soak) · Postgres multi-user (write the `docs/superpower/` plan first, then store pooling).
+4. **Independent — schedule by value, no ordering constraint:**
+   - **AGT-6a inline AI authoring** — largest schedulable item; no new backend capability. *(Ready
+     pending decision asks D1–D4 in its plan.)*
+   - **Case-analytics dataset** — plan drafted, all 5 decisions resolved, sized as one session.
+   - Link-analysis V2 (b)/(c)/(d) · notification delivery-status webhooks · M4 Fuse remainder ·
+     eoiagent `DryRunProvider` · DuckDB `spatial` extension.
+   - ⚠ **"Geo Phase 4 backend" is effectively closed** — the projection/aggregation endpoints
+     shipped 2026-07-24 and the `ComponentStore` view-kind widening landed 2026-07-08. All that
+     survives under that heading is the `spatial` extension decision (§3 Geo row) and the
+     `spatial` QueryType (§3 Queries row). Retire the phrase rather than re-scoping it.
 5. **Externally gated (parked — not schedulable by us):** OPS-5 live soak (deployment) · EOI-7b
-   (infra) · E1 (demand) · **AGT-6b** agent graphs (demand beyond the three seeded runbooks, **plus** the
-   eoiagent `DryRunProvider` prerequisite — `superpower/agt-6-plan.md` §4.2) · parser field tiers (UX
-   session) · `package.ps1` ACL fix (admin access) · remaining connector workbenches (demand) ·
-   C6 (profiling evidence).
+   (infra) · E1 (demand) · **AGT-6b** agent graphs (demand + the `DryRunProvider` prerequisite) ·
+   parser field tiers (UX session) · C6 (profiling evidence).
 
-## 2. Product remainder (MoSCoW of record: `REQUIREMENTS.md` §5)
+## 2. Open decisions — the cheapest unblock on the board
+
+Every item here is blocked on a **call, not a build**. Batch them into one product session.
+
+| # | Decision | Blocks | Detail |
+|---|---|---|---|
+| D1 | NFR-7 C1 **sequencing sign-off** (SOC 2 first?) | all NFR-7 execution | `superpower/compliance-certifications-plan.md` |
+| D2 | **Secret-in-bundle policy** — may a `connection` carry secrets through a bundle? | the sole missing `BundleRoutes` kind | §3 Bundle/Exchange |
+| D3 | **API-5 soak sign-off** once `inspecto_legacy_api_requests_total` reads zero for 30 days | legacy-route physical deletion | `docs/ops/legacy-api-sunset-runbook.md` |
+| D4 | Split **`canCurateMenus`** out of `canAuthorWorkbench`? Today every `pipeline-developer`/`app-developer`/`developer`/`power` seed role gets menu curation free — conflating "may edit a pipeline" with "may change what the space's business users see". Needs a call on the split **and** on default grants. Touch list if taken: `Roles.java` constant + seed grant · `CapabilityManifest.java` `/nav/menus` entry (its test enforces manifest↔registration congruence both ways) · `NavRoutes.java` gate · a `LensService` signal · an `ACCESS_ACTION_NODES.settings` node | nothing (surfaced by O1, not a defect) | §3 Menu builder |
+| D5 | **MNT-14 retention model** — retention tier vs. archive-is-terminal — plus a backend Incident `Archived` lifecycle state (today only OPEN→…→CLOSED) | MNT-14 archived-Incident sweep | §3 Job framework |
+| D6 | **Findings sections config source** (C3) — reuse the C6 workflow/TOON pattern + `attribute-spec` renderer, or a new endpoint? Not UI-only | configurable Findings sections | `mail-model.ts:133` |
+| D7 | Is **`tags`** a first-class `OperationalObject` concept? Nothing writes `attributes.tags` today, so a `GET /objects` filter would silently match nothing | `category`/`tags` query params | §3 Incidents/cases |
+| D8 | **Delivery-status model** — which inbound provider statuses (bounce/complaint/delivery) do we track? | notification delivery-status webhooks | §3 Notifications |
+| D9 | **Saved views in the Exchange?** Sharing a link-analysis view needs the Exchange seam widened backend-side (`OfferShareDialog`/`ExchangeService.offer` are hard-typed to `dataset`/`widget`) | link-analysis V2 (b) sharing | §3 Link analysis |
+| D10 | **Component-attached note model** — re-key `ObjectNote` by component `type`+`id`, or generalize it? | link-analysis per-view comments | §3 Link analysis |
+| D11 | **On-by-default DuckDB memory cap** — a computed cap accounting for both semaphores, or a conservative fixed per-instance cap + spill? Prerequisite (`-Djobs.maxConcurrentRuns`) shipped 2026-07-24 | the chunking default (D12) | §6 DuckDB capping |
+| D12 | **On-by-default chunking value** for pathological single files (`processing.chunking.max_file_bytes = 0` today) | — | §6 DuckDB capping |
+| D13 | **Parser required-vs-advanced field tiers** — genuine UX judgment; needs someone who has watched real onboarding sessions, NOT an engineering guess (a placeholder bakes in an arbitrary answer that's expensive to unwind once forms ship) | parser `AttributeSpec` tiers, §4 attribute tiers | interview #2 |
+| D14 | Product review of the **R1 seed grant set** for the five previously-ungranted route capabilities (`canConfigureAccess`, `canAuthorAlertRules`, `canOfferDatasets`, `canRequestShares`, `canApproveShares`) — seeded to builder/ops/admin/super to break a bootstrap deadlock, never product-reviewed | — | §5 |
+| D15 | Final **IdP/gateway vendor split** — Keycloak + WSO2 APIM vs. WSO2 IS (ops/evidence, not code) | — | §5 |
+| D16 | Which **Space + schema** for domain-seeded link-analysis pattern packs | link-analysis V2 (c) | §3 Link analysis |
+| D17 | **`record_split`** (blank-line/delimiter block records for `text_regex`) — genuinely unsupported; needs a DuckDB block-reading approach | `text_regex` block records | `FEATURE_INVENTORY.md` |
+
+## 3. Product remainder (MoSCoW of record: `REQUIREMENTS.md` §5)
 
 | ID | Item | Status / blocker |
 |---|---|---|
-| ACQ-4 | Object-storage connectors — S3/MinIO/GCS-interop + SDK-free Azure Blob + **GCS-native (JSON API, service-account OAuth2) all shipped** (2026-07-22) | **DONE.** The "offline-blocked (no SDK jars)" tag was stale — OAuth2 JWT signing is the same JDK-crypto category as SigV4/SharedKey, no SDK needed. `okf/backend/acquisition/connectors.md` |
-| OPS-5 | Provenance conservation on live data (built, off by default) | Needs a live deployment to verify. **Offline de-risk done 2026-07-22:** feature integrity re-confirmed post engine-refactor + synthetic tests added for the imbalance→ALERT promotion and the run→check→emit bridge; `docs/ops/provenance-conservation-verification.md` corrected (alerting path = ALERT object via `EventObjectBridge`, Sankey via `JobRoutes`). ~~⚠ Open product Q: should an imbalance also fire a `NotificationRule`?~~ **RESOLVED + SHIPPED 2026-07-23 — yes:** `NotificationRules.defaults()` now carries a `FLOW_CONSERVATION_IMBALANCE` rule (category `ops`, `minLevel=WARN` → both LOSS/ERROR and AMPLIFICATION/WARN notify, matching the ALERT bridge). The remaining OPS-5 work is still the live-feed soak (no code left). |
-| NFR-7 | Compliance certifications | PARTIAL (not started) — **plan drafted 2026-07-23: `superpower/compliance-certifications-plan.md`** (SOC 2 first; C1 sequencing sign-off pending) |
-| API-5 | Legacy route **physical deletion** — sunset mechanism + `inspecto_legacy_api_requests_total` meter shipped (W8); delete after the signed **30-days-at-zero soak** | Soak-gated policy call |
-| EOI-7b | Publish eoiagent `0.1.0` artifacts to a registry (v0.1.0 cut + pinned 2026-07-08; CI rebuilds from tag meanwhile) | Infra/product call |
-| AGT-5 P0–P5 | Embedded-intelligence agent — QA → author (L1) → gated action (L2) → bounded autonomy (L3) → learning | **COMPLETE 2026-07-21** (+ polish). Roadmap fully shipped; history in git + the plan archived 2026-07-25 at `archived-documents/plans-archive/embedded-intelligence-plan.md` §8, distilled in `okf/backend/agent/embedded-intelligence.md`. Only the follow-ons below remain OPEN. |
-| AGT-5 · embedding recall | P5 upgrade: replace `CaseSimilarity` Jaccard with embedding/vector recall (eoiagent `LlmGateway.embed` + `Retriever`/`VectorStore`) | **PARKED — not warranted.** `CaseStore` is a 256-cap ring; Jaccard is adequate. Drop-in seam preserved behind `CaseSimilarity.score`; revisit only if the corpus grows unbounded. |
-| AGT-5 · eoiagent DryRunProvider seam | Cross-repo (`jotder/inspect-agent`): add a per-tool `DryRunProvider`/preview seam to `PlatformBuilder` so the framework populates `ApprovalRequest.preview`, letting inspecto drop its parallel `AgentApprovals` previewer | **OPEN — low priority.** Pure refactor; functional parity today. Push-first discipline applies (CI rebuilds eoiagent from `main`). Precedent: the P3 `approvalDecisionStore` seam (`d6fabb3`). |
-| AGT-5 cuts | QA-only (`incident_explain` waits on the eoiagent host seam); local-models-only | Open scope cuts — same |
-| AGT-6a | **AI behind every screen** — inline NL authoring on every console pane | **SCOPED 2026-07-25, promoted Could→`Should`** — `superpower/agt-6-plan.md` §3 (phases A1 shared inline surface → A2 four-pane adoption wave → A3 context grounding → A4 explain-everywhere). Reuses the shipped L1 draft tools, so **no new backend capability**; draft-only, human applies through the normal validated route. Ready to schedule pending decision asks D1–D4. |
-| AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) | **PLANNED, demand-gated** — `superpower/agt-6-plan.md` §4. Blockers: the eoiagent approval gate is synchronous per-call (nested gates deadlock) and there is no per-tool `DryRunProvider` seam (a **prerequisite** — a model-composed plan can't be previewed per step without it). First cut when demand lands = generalize `RunbookActions` ("authored graph, approved whole, executed stepwise"), never free-form ReAct over mutating tools. |
-| SPC-5 | Per-tenant ABAC (rides the SEC-7 grants model; absorbs per-resource ACLs/ownership) | **SHIPPED 2026-07-24 as ABAC A4** — engine-resident seeded space-isolation policies in `PolicyEngine.SEED` (deny when home-space claim ≠ bound space; `canConfigureAccess` operator exemption; authored-doc per-name override). As-built in `superpower/rbac-abac-plan.md` §4 A4. Per-resource ACLs/ownership landed earlier as R3 sharing. |
+| OPS-5 | Provenance conservation on live data (built, off by default) | **Live-feed soak only — no code left.** Offline de-risk + the imbalance→`NotificationRule` question both closed 2026-07-22/23. `docs/ops/provenance-conservation-verification.md` |
+| NFR-7 | Compliance certifications | PARTIAL (not started) — gated on **D1**; `superpower/compliance-certifications-plan.md` |
+| API-5 | Legacy route **physical deletion** (sunset mechanism + meter shipped W8) | Gated on **D3** (30-days-at-zero soak) |
+| EOI-7b | Publish eoiagent `0.1.0` artifacts to a registry | Infra/product call; CI rebuilds from tag meanwhile |
+| AGT-6a | **AI behind every screen** — inline NL authoring on every console pane | **SCOPED, promoted Could→`Should`** — `superpower/agt-6-plan.md` §3 (A1 shared inline surface → A2 four-pane adoption → A3 context grounding → A4 explain-everywhere). Reuses the shipped L1 draft tools ⇒ **no new backend capability**; draft-only, human applies through the normal validated route. Ready to schedule pending its own D1–D4 |
+| AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) | **PLANNED, demand-gated** — `superpower/agt-6-plan.md` §4. Blockers: the eoiagent approval gate is synchronous per-call (nested gates deadlock) + no per-tool `DryRunProvider` seam (a **prerequisite** — a composed plan can't be previewed per step without it). First cut = generalize `RunbookActions`, never free-form ReAct over mutating tools |
+| AGT-5 · DryRunProvider | Cross-repo (`jotder/inspect-agent`): per-tool `DryRunProvider`/preview seam on `PlatformBuilder`, letting inspecto drop its parallel `AgentApprovals` previewer | **OPEN, low priority** — functional parity today, but reclassified 2026-07-25 as an **AGT-6b prerequisite** (`agt-6-plan.md` §4.2 G2), not merely a refactor. Push-first discipline applies |
+| AGT-5 · embedding recall | Replace `CaseSimilarity` Jaccard with embedding/vector recall | **PARKED — not warranted.** `CaseStore` is a 256-cap ring; Jaccard is adequate. Drop-in seam preserved behind `CaseSimilarity.score` |
+| AGT-5 cuts | QA-only (`incident_explain` waits on the eoiagent host seam); local-models-only | Open scope cuts |
 | E1 | Enterprise distributed tier / Stage-2 streaming | Demand-gated |
 
-## 3. Feature follow-ons (deferral sections of shipped work)
+## 4. Feature follow-ons (deferral sections of shipped work)
 
-> _Reconciled against live backend routes 2026-07-18. Struck as already-shipped: `/settings/branding`
-> (→ removed the Branding row), `/signals`, sink→`ViewStore` auto-registration, legacy-alias usage logging.
-> **2026-07-20 re-reconcile:** this note's "genuinely un-implemented" list had gone stale — most of it
-> shipped in the 2026-07-18/19/20 sweeps below and was just never cleared here. Grep-verified as of
-> 2026-07-20, only two items from that list are **still actually open**: the Email/SMTP notification
-> channel (Notifications row) and the `graph`/`spatial`/`search`/`api` QueryTypes (Queries/BI row).
-> Confirmed already shipped (see their rows below for the as-built): `/notifications/channels*` CRUD,
-> a backend navigation endpoint, the `recon.run` Job + Alert Rule→Incident wiring, the workflow-override
-> boot-scan into `ObjectService`, cursor pagination (mechanism + 4 adopters), and the enrichment
-> sample-preview endpoint (`POST /enrichment/preview`, `EnrichmentRoutes.java:42`)._
+As-built detail for each area lives in its OKF concept (right column) — **not here**.
 
-| Area | Open items | Source (detail) |
+| Area | Open items | OKF home |
 |---|---|---|
-| **API v1** | X-Actor full retirement on Standard · UI sign-out affordance · ~~UI↔backend `ContentHash` float-parity conformance test~~ *(2026-07-23 SHIPPED: shared golden-hex vectors across `ContentHashTest.java` + `content-hash.spec.ts` lock the two hashes together. Finding: non-integer floats agree (JDK 19+ `Double.toString` = JS shortest round-trip), but an **integer-valued double diverges** — Jackson keeps `1.0` as `"1.0"`, JS emits `"1"` — now pinned as an explicit boundary on both sides + noted in `ContentHash` javadoc. Config both sides hash should avoid integer-valued floats.)* · ~~ETag beyond components+bootstrap~~ *(2026-07-24 SHIPPED: an `ETags.respond(ex, body)` read-side wrapper collapsing the 3-line `of`/`isFresh`/`set` idiom, applied to the per-space authored config/metadata singleton documents the UI re-reads — `GET /nav/menus`, `/settings/branding`, `/settings/geo`, `/config/icon-map`, `/access/roles|policies|catalog|profiles`. Registration-lambda-only change (read methods untouched); real-HTTP coverage via `ControlApiMetadataV1Test.configDocumentsAreConditionalGets`. List/paginated routes deliberately excluded (per-query cursor bodies); further singleton reads adopt the wrapper as demanded. `okf/.../api-v1.md`)* · cursor pagination *(2026-07-18 SHIPPED the mechanism + first adopter: opaque keyset cursors via `metadata.pagination` `{cursor,nextCursor,limit,total}` — `ApiContext.pagination` seam + `Envelope` emit + `com.gamma.control.Cursor` (decode-total, URL-safe Base64/JSON) on `GET /jobs/runs` over `DbJobRunStore` (new keyset `recentRuns`+`countRuns`); v1-only, legacy list unchanged; `okf/.../api-v1.md`. 2026-07-19 SHIPPED second adopter `GET /objects` — keyset over the SEC-7d-visible set, in-route not
-SQL-side, since objects are low-volume and the visibility filter would otherwise leak/mis-size `total`.
-2026-07-19 also SHIPPED third+fourth adopters `GET /jobs` (in-route, name keyset over the in-memory registry) + `GET /events` (store-side `(ts,eventId)` keyset — `EventStore.page/count`, exact impls in both bundled stores; v1 pages the full retained Parquet history, not just the live-tail ring). Remaining: adopt the seam on further list families as demanded)* · Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed) | `archived-documents/plans-archive/api-contract-design.md` |
-| **Bundle / Exchange** | *(2026-07-18 SHIPPED: `authored-pipeline`/`job`/`saved-view` now bundle-eligible via a uniform `BundleSource` seam — job import hot-registers via `upsertJob`; as-built in `okf/backend/control-plane/metadata-bundle.md`.)* `BundleRoutes` remaining missing kind: `connection` (secret-in-bundle policy call unmade) · `requires` present-but-different classification · per-editor "load as draft" import *(2026-07-23 TRIAGED — NOT a small buildable, deferred: `BundleTransferService.write` commits every kind straight through its store's create/update; there is no generic draft/unpublished seam, and "per-editor" means opening each kind's own editor pre-filled-but-unsaved (editors open by route/id, not injected content). A real per-editor integration (router-state seam + draft-vs-inactive semantics) — design-first, likely multi-session; do NOT fake it with a cross-kind `enabled:false` stamp)* · ~~UI Exchange-surfaces track §3.6~~ *(2026-07-19 VERIFIED-DONE + last piece SHIPPED: catalog Shared-with/by-me, offer/request flow, scope badges, pin/expiry governance were all already live in `sharing.component`; this row **undersold** shipped work. The one genuine gap — the **pin-drift "Behind" chip** (an active grant pinned behind the owner's current `freshness.version`) — shipped client-computed in `sharing.component`, no backend. Full as-built: `okf/backend/control-plane/exchange-sharing.md`; the design-of-record plan is now archived (fully shipped))* | `okf/backend/control-plane/exchange-sharing.md` · `archived-documents/plans-archive/storage-layout-and-sharing-plan.md` · `archived-documents/plans-archive/transportability-plan.md` |
-| **Job framework** | ~~Pack in-flight-Run quiesce~~ *(2026-07-20 SHIPPED the classloader half: `JobPackManager.acquireRun`/`releaseRun` pin a pack's active-run count for a Run's `Job.run(ctx)` duration; `unload()` defers closing the old classloader/staged jar until the count hits zero instead of closing it immediately underneath an in-flight Run. 2026-07-20 SHIPPED the remaining half: `JobService` now records each Job's owning pack at build time (`jobPackOwner`) and `JobPackManager.unload()` notifies it via a new `UnloadListener` callback; a notified pack's Jobs flip into an `unavailableJobs` set, and the shared `runJob` lifecycle rejects (`REJECTED`, fail-closed) any Run on a still-registered-but-flagged job instead of executing the stale cached `Job` — cleared again on rebuild/`removeJob`)* · ~~`args`/`bind` type-inference~~ *(2026-07-20 SHIPPED: `ParameterResolver.resolve` now validates a resolved value against its declared `ParamType`; a mismatch REJECTS the Run via a new `Resolution.invalidType()` bucket instead of a malformed string reaching Job code — `okf/backend/control-plane/jobs.md`)* · MNT-14 Archived-Incident sweep (**blocked** on backend Incident `Archived` lifecycle state + a product decision on retention-tier-vs-terminal-archive; `ObjectStore.delete` SHIPPED 2026-07-24) · maintenance COULD tier (~~trends~~ **growth-trend analysis SHIPPED 2026-07-23**: `storage_trend` task + `storage_report` now appends a queryable per-axis sample to the `maintenance_storage` catalog Dataset — per-axis/total bytes/day, projected `warn_bytes` breach ETA, archive candidates, `maintenance.storage.trend` signal; `okf/.../jobs.md`. Still open: space-to-space comparison, predictive maintenance — the latter is AGT-5/self-healing territory, deliberately deferred) *(2026-07-18 §3-reconcile: struck "sink→`ViewStore` auto-registration" — already shipped, `PipelineJobRunner.registerViews` writes a `ViewDefinition` per `sink.view` node after every flow run)* *(2026-07-20 SHIPPED: `Scheduler.cron()` now returns a `CronHandle`; `JobService.removeJob` cancels it, so a deleted/replaced job's cron chain actually stops instead of ticking as an inert no-op forever — `okf/backend/control-plane/jobs.md`)* | `okf/backend/control-plane/jobs.md` · `archived-documents/plans-archive/system-maintenance-plan.md` |
-| **Queries / BI** | ~~Structured-query editor UI (SQL is the only authoring surface)~~ *(2026-07-19 SHIPPED: the Query Library's `type` toggle wires `<inspecto-query-panel>` — the existing projection+filter Query Core builder, already reused by Decision/Alert Rules/Expectations — in for `structured` queries; the panel gained an `@Input initialModel` so editing a saved structured query round-trips its filter back in. `$`-parameters stay SQL-only, a deliberate cut. `okf/backend/control-plane/queries.md`)* · `graph`/`spatial`/`search`/`api` QueryTypes · more `$`-resolvers · ~~responsive dashboard tiles (ResizeObserver re-render)~~ *(2026-07-19 SHIPPED: `InspectoChartComponent` now observes its host box and calls `chart.resize()` on container-only changes — tile span toggle, side-pane collapse, flex reflow — mirroring the GraphView/MapView RO pattern; Chart.js `responsive` only covered window resize)* · ~~dataset/widget/dashboard **sharing RBAC**~~ *(2026-07-23 SHIPPED as RBAC R3 — optional `owner`+`shares` envelope on registry components, enforced in `/components*` + `/bi/datasets|query` via core `ComponentAccess`; as-built in `superpower/rbac-abac-plan.md` §3 R3)* · ~~calculated-columns v2 = whitelist growth only (window/aggregate fns)~~ **SHIPPED 2026-07-24** (turned out to be more than a whitelist add: `ExpressionGuard` gained a `WINDOW_FUNCTIONS` set callable **only** when the call is immediately followed by a valid `OVER (…)` clause — `PARTITION BY`/`ORDER BY`, ASC/DESC/NULLS FIRST|LAST, no frame clauses. Bare aggregates stay rejected (absent from the scalar `FUNCTIONS` set); the `DENIED` deny-set is still checked ahead of the window-keyword rule so `OVER` can't smuggle a subquery. State-machine grammar extension + the TS mirror `calculated-column-guard.ts` kept in lockstep + exhaustive accept/reject tests both sides; `okf/backend/control-plane/queries.md`) | `archived-documents/plans-archive/query-kind-plan.md` · `studio-bi-improvements-plan.md` · `calculated-columns-design.md` |
-| **Notifications** | ~~Email channel impl~~ + delivery-status webhooks *(2026-07-24 RE-SCOPED, not buildable now: per the archived plan this means **inbound** provider bounce/complaint/delivery callbacks for sent email (SES/SendGrid-style), NOT outbound push — the outbound `webhook` channel already shipped 2026-07-22 (`151f560e`). Needs a delivery-status model on `Notification`/store + a product call on which statuses to track; Standard/Enterprise flavor territory)* · ~~digest batching~~ *(2026-07-24 SHIPPED: opt-in per-destination `ChannelConfig.digestMinutes` (0 = immediate, default; negative → 422) — dispatch buffers matching deliveries per destination, a one-shot timer flushes them as ONE combined "Digest: N notifications" delivery after the window, `close()` flushes pending instead of dropping; in-app feed copies stay per-event. `okf/.../events-metrics.md`)* · ~~time-based retention sweep~~ *(2026-07-23 SHIPPED: a `notification_prune` built-in `maintenance` task — cron-schedulable, `retention_days` (required), forgets feed entries older than the window whatever their read/archived state, mirroring `ledger_prune`/`runlog_prune`. Added `prune`/`countPrunable` to `NotificationStore`; the per-space feed is attached to `JobService` post-construction. NB the default feed is in-memory + self-caps at 1000, so this matters most once a persistent notification backend lands. `okf/.../jobs.md`)* · GeoIP · auth-gated per-user prefs/security triggers *(2026-07-18: **channels admin CRUD** SHIPPED backend — `GET/POST /notifications/channels` + `PUT/DELETE /notifications/channels/{id}` persist a `channel` ComponentStore kind (`ChannelConfig`); 503/422/409/404 gates, per-space, `canAuthorWorkbench`. 2026-07-19 SHIPPED: **persisted channels wired into dispatch** — `NotificationService.dispatch` delivers to enabled `ChannelConfig` entries through the matching SPI transport via a new `deliver(n, target)`; the "admin config only, inert" gap is closed. 2026-07-19 SHIPPED: `ChannelConfig` gained a per-channel `template` field (Signal Backbone S2), rendered via the shared `DottedPath` grammar, falling back to the rule's default body when blank. 2026-07-20 SHIPPED: **email channel impl** — `SmtpEmailChannel` (already present in `inspecto-connectors`, `javax.mail`-based, ServiceLoader-discovered) now overrides `deliver(Notification n, String target)` to send to a persisted `ChannelConfig`'s own `target` instead of only the fixed `notify.smtp.to`; `ChannelConfig.fromMap` fails closed (422) at creation time when `kind=EMAIL` and `target` isn't a valid email address. 2026-07-24 SHIPPED: **authorable notification rules** — `NotificationRule` gained an `id`+`enabled` and `fromMap`/`toMap`; `/notifications/rules*` admin CRUD (`GET/POST` + `PUT/DELETE /{id}`, `canAuthorWorkbench`, 503/422/409/404 gates) persists a new `notification-rule` ComponentStore kind, mirroring channels. `NotificationRules` now takes a `Supplier<List<NotificationRule>>` overlay checked **ahead of** the built-in `defaults()` in `forEvent`, wired from `CollectorService.persistedRules()` (per-space, live-reloaded, best-effort) — an operator can now override a built-in rule's copy/routing or add a rule for a new event type at runtime, and disable one without a code change. Chose a ComponentStore kind over a boot-scanned TOON file to match the adjacent `channel` CRUD precedent. 2026-07-24 (same day) SHIPPED the **UI editor** too: a "Rules" tab in the Notification center — data-table + edit/toggle/delete, SchemaForm-driven `RuleFormDialog` mirroring the channels dialog (immutable id on edit, inline duplicate guard, dirty-close guard; ⚠ the server PUT is a full replace, so toggle/edit always send the whole rule), `NotificationsService.rules/createRule/updateRule/deleteRule`, mock parity in `demo.handler` with the same 422/409/404 gates)* | `archived-documents/plans-archive/notification-system-and-audit-trail-plan.md` · `okf/backend/control-plane/events-metrics.md` |
-| **Signal / Decision networks** | *(2026-07-18: raw `/signals` read endpoint was already live (`SignalRoutes` + static `Signals.query`); completed its query surface — added in-store `until` + `severity`-floor filters (400 on a bad severity) and the first test coverage (`SignalsTest` + `ControlApiSignalsTest`). No stateful `SignalsService` object — house style is the static utility called straight from the route, like `/events`. 2026-07-22 SHIPPED server-side causation-tree assembly — `GET /signals/tree?correlationId=` returns the correlation chain as a parent→child forest (roots oldest-first, orphans surfaced as roots, cycle-safe) via a shared pure `Signals.assembleTree`; the flat `/signals` view is unchanged. ⚠ No producer threads `causationId` yet, so trees are flat (all roots) today — the HTTP peer of the agent's already-shipped `signal_timeline` tool, whose duplicate `InspectoTools.causationOrder` ordering logic is a noted dedup follow-on (§5). 2026-07-22 SHIPPED the `source` filter — `GET /signals` + `/signals/stream` filter by the emitter Ref, matching its `kind` or compact `kind:id`, via a shared `Signals.matchesSource` predicate; route post-filters the page so `Signals.query`'s callers are untouched.)* · LLM-backed Assist proposal *(2026-07-18 SHIPPED end-to-end: real condition-tree evaluator `ConditionTree` — decision-rule `simulate` evaluates `when` over `sampleRows` with query-eval.ts parity (backend); the **UI** Simulate action fetches a bounded sample from the target store via `/db/table` and sends it (preview-verified: real `total`, not the stub); the **mock** `decision-rules.handler.ts` simulate now evaluates `when` over `sampleRows` (`evaluateRows`), demo counts as no-sample fallback. 2026-07-18 also SHIPPED: routing consequences `route`/`tag`/`quarantine`/`drop` now apply during live pipeline runs (`DecisionRuleApplier` in `writeAndTrace`, `ConditionSql` predicate compiler, per-space `DecisionRules` registry; `okf/backend/control-plane/decision-rules.md`), and the "GROSS simulates 0" finding was root-caused to the db-browser globbing the raw `backup/` tree instead of the pipeline's `dirs.database` output — fixed, plus the demo threshold recalibrated to a reachable `GROSS > 100`. 2026-07-18 also SHIPPED: both recorded deferrals — `targetType: job` rules now check `sql.template` job output (pre-snapshot, in `SqlTemplateJob`) and Stage-2 enrichment output on every recompute trigger (in `EnrichmentEngine`, matched by enrichment name + wrapping job name), via the generalized `DecisionRuleApplier.Subject`/`RouteSink` seam). 2026-07-18 also SHIPPED: **Expectation/Alert-Rule ComponentKind promotion** — Alert Rule moved off raw `*_alert.toon` files onto `ComponentStore` (`alert-rule` kind, same CRUD contract as Expectation/Decision Rule); Expectation gained a `condition` kind (`when` tree as the violation predicate, via `ConditionSql`); Alert Rule gained an optional `when` row-scoping filter over ledger rows (via `ConditionTree.filter`, new alongside `matched`). UI: both dialogs wire `<inspecto-query-condition-group>` (a new `AttributeSpec.dependsOn.notEquals` variant hides Expectation's `column` for the `condition` kind); live-verified end-to-end against the real backend (real `orders` columns probed, real `GROSS>100` → 1 violation; real alert-rule persisted to `registry/alert-rules/*.toon`). Full reactor 1567/0/0/3, UI test:ci 1403/0/5)* · *(2026-07-19 SHIPPED: `create-alert` consequence now opens a deduped `INCIDENT` for `critical`/`error` severities instead of a signal-only stub; see `decision-rules.md`)* · *(2026-07-19 SHIPPED the full Signal Backbone combined plan, S0–S7: canonical 13-field `Signal` envelope (`Ref`, 6-level `Severity`, structured payload, no version bump — 4.x unreleased); one bus + type catalog + `DottedPath` addressing grammar; `GET /signals/stream` SSE + `AgUiProjection`; the A2UI artifact channel (`AgentAskResult.artifact`, closed kind allowlist, `<inspecto-a2ui-render>` host) + the first agent chat surface; the `signals_query`/`signal_timeline` agent tools + `ContextBroker` situation frame; the gated agentic write path (A2UI `invoke` → existing-Decision-Rule dry-run/confirm/apply, `actor=agent:*` audit, `create-alert` wired to real Alert authoring); and the reflex-layer/editor-resolver unification (assist-panel renders through the generic host, `editorKey`→route resolver retiring two hardcoded tables). Full as-built: `okf/backend/control-plane/signal-backbone.md`; design-of-record archived. Open/deferred: optional S8 (connector-direct emission + cross-space controller); ~~generalizing the hardwired ALERT→INCIDENT promotion into a Decision Rule~~ **SHIPPED 2026-07-24** (a new author-selectable `create-incident` consequence in `DecisionRoutes.executeOne` opens a managed Incident at any severity, deduped one-per-rule, non-breaking alongside `create-alert`'s existing auto-promotion; backend + UI author picker (`consequence.ts`) + mock parity (`decision.ts`) + tests; `okf/.../decision-rules.md`); a general event-triggered consequence policy gate (still `/apply`-only); RFC 6902 JSON Patch state deltas for AG-UI (no diffing dependency, no consumer yet))* | `archived-documents/plans-archive/signal-network-plan.md` · `decision-network-plan.md` · `archived-documents/plans-archive/event-signal-backbone-plan.md` · `archived-documents/plans-archive/a2ui-agent-rendered-ui-spike.md` · `okf/backend/control-plane/decision-rules.md` · `okf/backend/control-plane/signal-backbone.md` |
-| **Link analysis** | *(2026-07-20: V1 fully shipped — multi-entity mapping, multi-root, incremental expand, all-paths, layout save, widget/dashboard placement, SVG/GraphML export, undo/redo, `attrCols`, schema-relationship model.)* **2026-07-24 SHIPPED four V2 tracks** (`286daf23`,`080892f3`; `okf/.../link-analysis.md`): **advanced traversal** (`weightedShortestPath` Dijkstra-by-tie-strength, `findCycles`, `articulationPoints`/`bridges` Tarjan, `egoNetwork`); **algorithm library** (`pageRank`, closeness/eigenvector/katz, `hits`, `kCore`, `triangleCount`, `cliques` Bron–Kerbosch, `maxFlow`+min-cut, `maximumSpanningForest`, `jaccardSimilarity`, `linkPrediction`); **suspicion scoring** (explainable 0–100 composite + factor breakdown); **pattern packs** (parameterized starter motifs pre-filling the matcher). All pure drop-ins in `graph-analysis.ts` + toolbox groups; 53 lib tests + 11 toolbox specs; lint:tokens + prod build green. ~~**(a) timeline** — a time slider filtering edges by a temporal `attrs` column~~ **SHIPPED 2026-07-24**: pure `filterByTime(g, attrCol, cutoff)` in `graph-analysis.ts` (edges only, nodes untouched) + a toolbar "Timeline" menu (column picker + `mat-slider` cutoff) wired into the existing kind-filter → time-filter → collapse-branches pipeline, driving the shared `displayed()`/`emphasis` graph-view path — no new filtering mechanism, no backend. **Open V2 (need studio-shell UI or a decision):** (b) **collaboration** — split three ways now: ~~**version history**~~ **SHIPPED 2026-07-24** (each saved view in the toolbar "Saved views" menu is a submenu (Load · Version history); the history action reuses the shared `ComponentHistoryDialog` with `{type:'link-analysis-view',…}`, works as-is because the kind is a `ComponentStore` WRITABLE_TYPE, reloads on restore — frontend-only, `ComponentsService.versions/restore` were already wired); **sharing is NOT frontend-only** after all (⚠ the backlog's earlier "sharing is frontend-only" claim was wrong — the UI share path `OfferShareDialog`→`ExchangeService.offer`+mock `exchange.handler` is hard-typed to `dataset`/`widget`, and `ComponentsService` carries no owner/shares field; sharing a saved view needs the Exchange seam widened backend-side + a product call on whether saved views belong in the Exchange — the R3 RBAC component-shares envelope is a separate server-side mechanism, not surfaced in the UI); **per-view comments need new backend** (no Component-attached note model — re-key `ObjectNote` by component `type`+`id`, or generalize it — needs a product/backend call). (c) domain-seeded pattern packs bound to a specific Space's dataset kinds (needs a product call on which Space + schema). (d) AI assist (routes through the Assist seam). | `archived-documents/plans-archive/link-analysis-studio-plan.md` §6–7 · `okf/frontend/features/link-analysis.md` |
-| **Geo map** | *(2026-07-24 SHIPPED the server-side projection/aggregation endpoint — `GeoRoutes`: `POST /geo/projection` (valid-WGS84 point fold via `TRY_CAST`, `skipped` count, optional entity/kind/time/`attrCols`) + `POST /geo/routes` (O/D endpoint+kind fold as a DuckDB `GROUP BY` with summed weight), the DuckDB-side peer of `projectPoints`/`projectRoutes`, scaling past the ~5k browser cap; mirrors `InvRoutes`' fail-closed gates; `ControlApiGeoProjectionTest` 7/7. `ComponentStore` widening for geo/link view-kinds was **already done** 2026-07-08 (INV-1/2). `okf/frontend/features/geo-map.md`.)* **Deferred (needs a decision / larger appetite):** DuckDB **`spatial` extension** — plain SQL covers today's projection/aggregation, so it's deliberately deferred; loading it means bypassing the hardened `SqlSandbox` extension lockdown **and** bundling the per-platform native binary for offline installs (same class as the DuckDB native-access flag). Only worth it once a real geometry op (ST_Distance/ST_Contains, spatial join) is demanded. ~~Also open: progressive loading, worker binning.~~ *(2026-07-24 CLOSED as obsoleted — both were premised on large point arrays reaching the client, but the server-side aggregation fold (`POST /geo/projection`) + the hard `GEO_POINT_CAP = 5000` (`geo-projection.ts:22`, enforced on BOTH the backend-trusted and client-fallback paths) mean the client renders ≤5k features in a single `setData`, which MapLibre + its native GPU heatmap + internal clustering worker handle trivially — no render-path bottleneck exists at this cap. `gridDensity()` (`geo-analysis.ts:193`) is a tested pure binner but is wired into nothing (the live heatmap is 100% MapLibre-native), so there is no client binning to offload; the UI has zero Web Worker infra, so worker-izing would be greenfield build wiring for a non-problem. Progressive loading changes the `GeoSource.query()→Promise<GeoData>` single-materialization contract and only pays off if the 5k cap is deliberately RAISED — a product decision that would itself defeat the point of the backend aggregation. Revisit ONLY if that cap is raised; the modest remaining candidate then is worker-izing the O(n²) toolbox analyses (co-location/frequent-location/stay-point), not binning.)* ~~the UI still calls the client-side fold — wiring the studio/geo-widget to the new endpoints is a frontend follow-on~~ *(2026-07-24 SHIPPED: `DatasetGeoSource`/`RouteProjectionGeoSource` (`geo-projection.ts`) now call the new `GeoService` (`POST /geo/projection`|`/geo/routes`) backend-first, falling back to the client-side sample fold on any failure — mirrors `EntityProjectionGraphSource`/`InvService`; mock parity via `geo.handler.ts` (501, same as `inv.handler.ts`))* | `archived-documents/plans-archive/geo-map-analysis-plan.md` |
-| **Pipeline graph** | ~~T15 adaptive back-pressure~~ **SHIPPED 2026-07-25 — both halves, T15 is closed** (design doc T15 + §3.5 rewritten): **(a) the per-cycle intake cap** — the lever that genuinely didn't exist (`batch.max_files` only *groups* an already-collected list; `collect()` admitted everything) — `CollectorProcessor.admit` truncates the run-path candidate set **oldest-first** to `IntakeGovernor.shared().capFor(pipeline)`, unadmitted files waiting in the durable inbox for the next cycle; the read-only `countPending` scan stays deliberately **un**capped so the cap bounds admission, not observability. **(b) the controller** — `IntakeGovernor` (`com.gamma.acquire`, `CircuitBreaker.shared()` idiom) halves/doubles a per-pipeline cap, floored at `minCap`, clamped at `baseCap`, fed each cycle's wall time by `PipelineScheduler.governCycle` + an `inspecto_intake_cap` gauge; `forget(id)` wired into the unregister path so the map can't leak under churn. **⚠ Deliberate deviation:** §3.5 specified halving on `oldestInboxAge > 3 × pollInterval` **or** `pending > 10 × cap` — both **positive feedback** (capping intake *raises* inbox age and pending depth), which would ratchet the cap to the floor and pin a backlogged-but-healthy pipeline there, deepening the backlog. The trip is therefore **cycle overrun** (cycle wall time vs. poll interval — §3.5's own second pressure-source row), which is negative feedback: admit less ⇒ cycle shortens ⇒ cap restores; the 2× gap between trip and restore thresholds is the hysteresis. Inbox lag stays an alert/observability surface only. **Off by default** (`-Dingest.maxFilesPerCycle=0`; `+ -Dingest.minFilesPerCycle`, `-Dingest.backpressure.adaptive`), matching `-Djobs.maxConcurrentRuns`/`-Dprocessing.duckdb.*` precedent — the default ingest path is byte-for-byte pre-T15. 19 tests. *Residual deferrals (non-blocking):* per-flow TOON override of the thresholds (globals only) · flipping the cap on by default (needs a soak) · remote-fetch economy (cap applies post-dedup, so a remote source still materialises its full ready set first — unchanged from pre-T15 fetch volume, but a pre-materialise cap would save bandwidth). *(2026-07-24 had shipped the prerequisite lag signal `CollectorProcessor.oldestInboxAgeSeconds`, now used for observability rather than as the throttle input.)* · ~~T19 topology-editor wiring into live executor~~ **the live-executor half shipped under T32 (2026-07-18)**; ~~only the G6-canvas node/edge authoring **UI** remains~~ *(2026-07-19 second correction: the G6 authoring canvas **was already shipped** — it's the Pipelines pane's Edit mode, `pipeline-editor.component.ts` + `pipeline-editor-graph.component.ts`: palette node-add, two-click/Shift-drag edges, per-node config dialogs, dry-run/validate/activate, full `/pipelines/authored` CRUD persistence; live-verified end-to-end. The 07-19 morning correction fixed the executor clause but carried this stale remainder forward — design doc T19 now `[x]`)* · mock-only: run-to-here `POST …/run` (path reserved — see below), ~~`/config/icon-map`~~ *(SHIPPED 2026-07-23: real per-space `GET/PUT /config/icon-map` in `SettingsRoutes`, persisted as `icon-map.toon` under the space write root; `okf/.../control-api.md`)*, `/asn1/modules` (stays mock-only — no backend ASN.1 capability exists) *(2026-07-18: T16/T17 checklist corrected — both were already shipped/closed, see the design doc §14 for the as-built; T17's live last-run overlay closed this pass by wiring the existing-but-unused `/provenance` endpoints into the editor canvas + inspector. 2026-07-18 also SHIPPED: the T32 config-less ad-hoc run — `POST /pipelines/authored/{id}/trigger` via `JobService.triggerFlowRun`, a synthetic never-registered PIPELINE config through the full run lifecycle (fence tracking, non-overlap, ledger, `runId` polling); deliberately `…/trigger` not `…/run`, which stays reserved for the editor's scratch-only run-to-here contract. The row's earlier `sink.view` `derived_sql` clause was stale — shipped 2026-06-19 per the design doc §14. 2026-07-18 also SHIPPED T32's last open item — the **UI consumer for views**: a `ViewsService` (`GET /views\|/views/{name}\|/views/{name}/data`) + a "Preview data" action on `sink.view` nodes in the pipeline inspector, opening a `ViewPreviewDialog` (bounded rows via `<inspecto-data-table>`, surfaces the backend's 409 "no derived_sql yet" as an inline error). Mock-backed (`pipelines.handler.ts` `/views*` routes over authored `sink.view` nodes) — T32 is now fully closed)* | `okf/backend/pipeline-graph/pipeline-graph-design.md` §14 · `archived-documents/plans-archive/flow-live-execution-plan.md` |
-| **Acquisition / connections** | *(2026-07-18 both prior rows SHIPPED: `proxy` is now a `ConnectionProfile` sub-block — `target=proxy` on `/connections/test` probes the proxy hop; and the connection workbench `probe`/`explore`/`sample` routes are real — `ConnectionWorkbench` SPI + `ConnectionProber`, built-in local impl, SFTP/FTP/FTPS impls in `inspecto-connectors`, as-built in `okf/backend/acquisition/connectors.md`.)* *(2026-07-18 SHIPPED: the `db` workbench — `DbConnectionWorkbench` walks schema/table/column via `DatabaseMetaData` + bounded `SELECT` sample; read-only, WRITE always skipped.)* ~~Open: workbench impls for the remaining connectors (`s3`/`gcs`/`azure`/`kafka`)~~ *(2026-07-24 SHIPPED all four, adopting the `CollectorConnectorFactory.workbench` hook: **S3/GCS/Azure** share a new `AbstractObjectStoreWorkbench` — delimiter-based single-level explore (each store's own listing call with `delimiter=/`, common-prefixes as pseudo-dirs), sample fetches an object only when ≤8 MiB, WRITE always skipped (never writes a scratch object into a production bucket); **Kafka**'s `KafkaConnectionWorkbench` browses the whole broker (topic→partition tree, independent of any one bound topic) and samples via a throwaway assign+seek consumer that never touches the acquisition ledger watermark, WRITE always skipped (never produces a probe record). 4 new test classes (`S3ConnectionWorkbenchTest`/`GcsConnectionWorkbenchTest`/`AzureBlobConnectionWorkbenchTest` over an in-process `HttpServer` stub, `KafkaConnectionWorkbenchTest` over kafka-clients' `MockConsumer`); full reactor green. `okf/backend/acquisition/connectors.md`.)* · ~~connectors don't dial through a configured `proxy` yet (probe-only)~~ *(2026-07-20 SHIPPED first slice: `SftpConnector` now dials through a `SOCKS5` proxy via a new `SocksProxySocketFactory`, rejecting `HTTP` fail-closed rather than silently ignoring it. **2026-07-24 SHIPPED FTP/FTPS**: `FtpConnector.applyProxy` reuses the same `SocksProxySocketFactory` via commons-net's `setSocketFactory` — same SOCKS5-only / HTTP-fail-closed contract, skipped when a bastion tunnel is active; covers both `ftp` and `ftps` (shared client). `MiniSocks5Relay` (test helper) extracted to a shared class and made multi-connection, since FTP's separate passive data channel also routes through the factory (SFTP multiplexes over one connection so this wasn't needed there) — `okf/backend/acquisition/connectors.md`. Still open: the JDBC-based connectors each need their own library-specific proxy wiring, and an actual HTTP CONNECT handshake for any connector)* | `okf/backend/acquisition/connectors.md` |
-| **Incidents / cases** | ~~I1 backend workflow resolution-gate~~ *(SHIPPED 2026-07-24, `e3ee50ab`: `ObjectService.commit()` now hard-blocks (422) any INCIDENT transition to RESOLVED whose `attributes.postmortem` JSON lacks a timeline/cause-analysis/corrective-action entry or whose `dueAt` is unset — server-side mirror of `mail-model.ts`'s `postmortemGaps` soft-warn, closing the gap an API caller could previously bypass. `ObjectStore.delete` SHIPPED 2026-07-24 — MNT-14 now blocked instead on the backend `Archived` workflow state + a retention-policy product decision.)* · ~~`CaseRule` scheduler auto-evaluation~~ *(SHIPPED 2026-07-23: the `caserule.evaluate` built-in Job Type — a cron-schedulable wrapper over `ObjectService.evaluateCaseRule`, mirroring `recon.run`; emits `caserule.evaluate.completed`, requires the Object Engine, idempotent. `okf/backend/control-plane/jobs.md`)* · Studio-dataset binding of case analytics *(2026-07-24 TRIAGED, deferred — not a thin add: `ObjectService.analytics()` returns a nested rollup **map**, not rows, and `OperationalObject`s live in the `inspecto_ops_objects` JDBC table (no Parquet/view surface a `dataset` `physicalRef`/`view` could bind to). Needs a NEW row-shaped materialization job — a `storage_report`-style periodic Parquet snapshot of per-status/category/priority counts under a catalog dir, then `ComponentStore.write("dataset",…)` — with an undecided sampling cadence. Design decision first. **2026-07-24 PLAN DRAFTED** →
-`superpower/case-analytics-dataset-plan.md`: `objects.analytics` built-in Job Type (recon.run pattern,
-in-process `ObjectService` via the `Supplier` seam — never a 2nd conn to `inspecto-ops.db`), tall
-`(sampled_at, object_type, axis, key, value)` rows appended `storage_report`-style under
-`<dataDir>/ops_analytics/` + result-stamped `dataset` component; cadence dissolved to operator-authored
-cron + demo seed; all 5 decisions resolved — one-session build, ready to schedule)* · C3 configurable Findings sections + auto member-timeline *(2026-07-24 TRIAGED, deferred + should split: two loosely-related features. **Findings sections** is fixed in a hardcoded TS interface (`mail-model.ts` `Findings`); making it configurable needs a new section-definition config source (reuse the C6 workflow/TOON pattern + `attribute-spec` renderer, or a new endpoint) — a backend/config model decision, not UI-only, `mail-model.ts:133` flags it as the documented follow-up. ~~**Auto member-timeline**~~ SHIPPED 2026-07-24 UI-only — a "Member timeline" tab on the shared `object-detail` component merges each depth-1 `CONTAINS` member's comment thread (`ObjectsService.graph` + per-member `comments`, forkJoin, newest-first, attributed + click-through to the member). Built from **comments**, not events: `ObjectGraphNode` carries no `correlationId` and `/events/search` only filters by `correlationId`, so an events-based timeline would need N+1 fetches — the comment thread is the clean id-keyed slice. Empty-states for a member-less object)* · first-class `category`/`tags` params on `GET /objects` (low value — 2026-07-24 TRIAGED, deferred: neither is a real `OperationalObject` field. `category` lives only in `attributes` (prefix-match precedent = `TagRule.Filter`), so a filter is an imprecise `attributes` JSON `LIKE` in `DbObjectStore`; `tags` has **no producer at all** — nothing writes `attributes.tags`, so the filter would silently match nothing. Needs a producer/product decision on whether `tags` is a first-class concept before it's worth building, not a thin filter add) *(2026-07-18 SHIPPED: workflow TOON overrides — `ServiceBootstrap` now scans `*_workflow.toon` at boot (both the legacy CLI and per-space `SpaceBootstrap` paths) and installs each via the new `ObjectService.registerWorkflow`, so `GET /workflows/{type}` serves the authored state machine instead of the frozen `Workflow.defaultFor` default; last file wins per type, malformed skipped. `okf/.../operations-reference.md`)* | `archived-documents/plans-archive/case-management-design.md` · `incidents-mail-ui-design.md` |
-| **Reconciliation** | *(2026-07-18 SHIPPED the scheduled `recon.run` Job — `ReconRunJob` built-in Job Type runs a saved `reconciliation` on a cron and emits `recon.run.completed` with Break counts (WARNING on breach), building the identical `ReconService.Spec` the route does via the new shared `ReconConfigLoader`; `okf/frontend/features/reconciliation.md`.)* *(2026-07-19 SHIPPED: a breach also opens a deduped `INCIDENT`, one per reconciliation)* explicit non-goals: N>3, non-additive aggs, fuzzy keys | `okf/frontend/features/reconciliation.md` · `archived-documents/plans-archive/reconciliation-board-design.md` |
-| **Menu builder** | M5: ~~favorites~~, polish, a11y, seeded example · real backend navigation endpoint *(2026-07-18 backend SHIPPED: `GET/PUT /nav/menus` (`NavRoutes`+`NavMenus`) persists the frozen `MenuTree` contract as per-space `nav-menus.toon` — settings-doc discipline, whitelist-canonicalizing 422 walk, `space` stamped from the request seam; as-built in `okf/backend/control-plane/control-api.md`. 2026-07-19: UI SHIPPED — `MenuService` hydrates from `GET /nav/menus` on load and write-throughs every mutation via `PUT` (`NavMenusService`); the localStorage mirror is kept for instant paint + the synchronous sidebar merge + offline; a `nav.handler` gives `mockDemo` offline parity. Live-verified end-to-end: server persistence survives a cleared mirror + reload)* *(2026-07-19 SHIPPED: M5 a11y — ARIA tree roles on the builder (role=tree/treeitem/group, aria-selected/aria-expanded) — and a generic opt-in seed example (`MenuStore.seedExample()` + "Load example" button, empty-tree only); O3's Telecom-themed seed and the favorites/`/design` gallery entry stay open)* *(2026-07-23 SHIPPED — favorites: a personal, client-local per-space overlay (`menu-favorites.ts`, localStorage `inspecto.menuFavorites.v1`, never PUT to the server), a star toggle on leaf rows in the builder tree (mirrors the sql-editor favorites idiom, `aria-pressed`), and a virtual top-of-sidebar "Favorites" group (`favoritesNavGroup` in `menu-nav.ts`, prepended in `NavigationService`; resolves ids to the current tree, drops stale/deleted, distinct `fav-…` ids); `MenuService.favoriteIds/isFavorite/toggleFavorite`. ~~O3 Telecom seed~~ *(2026-07-24 SHIPPED: `seedExample()` now builds the plan's motivating Telecom shape — `Revenue › {Overview, TopX › {Top usages, Top billed, Top roamers}}` + `FMS › {Fraud categories, Suspicious usage}` — groups, sub-groups, and both dashboard/widget bindings; illustrative componentIds, a missing component just routes to its placeholder)*. ~~a `/design` gallery entry for the menu/favorites pattern~~ *(2026-07-24 SHIPPED: a "Menu favorites" section in the `/design` gallery — live star-toggle leaf rows + the virtual Favorites chip group + a snippet documenting the client-local overlay/`favoritesNavGroup` pattern)*)* · ~~open point O1 (curator)~~ *(2026-07-25 SHIPPED — and it was covering a real defect, not just an unanswered question: the server has always gated `PUT /nav/menus` on `canAuthorWorkbench`, but the pane offered curation to **everyone** (no route guard, no capability read), so a Business-lens user could build a whole tree and only then be 403'd at save — or, in Personal edition where `ApiContext.requireCapability` fail-opens with no `Subject`, silently succeed. The UI now mirrors the server gate: `MenuBuilderComponent.canCurate = lens.canAuthorWorkbench()` hides Add menu / Load example and drives a new fail-closed `[canCurate]` input on `MenuTreeNodeComponent` that hides each row's actions menu, with all six mutating methods guarded too (angular-ui §7 defense-in-depth). ⚠ **The pane deliberately stays reachable read-only for a non-curator** rather than being route-guarded, because **favorites are personal** (a client-local overlay, never PUT) and their star toggles live in this very tree — guarding the route would have stripped a personal feature from Business users. Header copy + empty-state swap to a consumer voice. Answers O1's product question the way the shipped RBAC model already implied (seed `business` role holds only `canTriageRequirements`): **Business consumes a builder-authored tree and curates only its own favorites.** Live-verified both states in the offline preview — builder lens 10 tree items / 10 action menus / 6 stars, business lens 0 action menus / no Add-menu / same 10 items / 6 stars, star toggle still persists and the virtual Favorites sidebar group still appears, no console errors.)* · **Open product question this surfaced (not a defect):** whether menu curation deserves its **own** capability (`canCurateMenus`) split out from `canAuthorWorkbench` — every `pipeline-developer`/`app-developer`/`developer`/`power` seed role currently gets menu curation for free simply by being able to edit a pipeline, which conflates "may edit a pipeline" with "may change what the whole space's business users see in their sidebar". Deferred because it needs a product call on the split **and** on default grants, not because it is hard; touch list if taken: `Roles.java` constant + seed grant · `CapabilityManifest.java` `/nav/menus` entry (`CapabilityManifestTest` enforces manifest↔registration congruence both ways) · `NavRoutes.java` gate · a `LensService` signal · an `ACCESS_ACTION_NODES.settings` action node so it shows in Settings ▸ Access · ~~O2 (icons)~~ *(2026-07-24 SHIPPED: the menu-node dialog's icon field is now a searchable autocomplete over the **full** heroicons-outline set (`heroicons-outline-ids.ts`, ~292 ids generated from the sprite), replacing the 12-item `mat-select`; curated names surface first, free text filters, a validator rejects any non-blank value that isn't a real icon id, blank stays allowed)* | `archived-documents/plans-archive/menu-builder-plan.md` |
-| **Onboarding (Stream/Reference)** | ~~findings → `blocked` chip state~~ *(2026-07-23 SHIPPED the small version — a `blocked` StageStatus + rail chip driven by the existing save-time `POST /config/write` findings: a stage whose last save returned an ERROR-severity Finding shows a "⚠ Blocked" chip (first message in a tooltip) and can no longer read as Ready; `OnboardingStateService.stageFindings`/`blockingMessage`. 2026-07-24 SHIPPED the precise attribution: `saveBlock` now routes each finding to its stage by `fieldPath` prefix — `collector.*`→collection, `parsing.*`→parsing, `processing.*`→schema/keys by kind, `output.*`/`active`→publish, blank/cross-field→the saving stage — and a clean save clears every pipeline stage's bucket, not just the active one. No new backend endpoint needed: `POST /config/write` already returns whole-config findings with `fieldPath`s, and the pure `POST /validate` seam already exists for a future pre-save probe)* · ~~"View as graph" link~~ *(2026-07-19 SHIPPED: onboarding header "View as graph" button → `/catalog?tab=graph&from=stream:|ref:<name>`; the catalog now honours `?tab`/`?from` deep-links (opens the Lineage tab + runs the traversal); the graph lift includes draft pipelines, so it works pre-go-live. Live-verified end-to-end)* · ~~discard: unregister the live registry entry (ghost row ≤60s)~~ *(2026-07-19: the companion-TOON cascade SHIPPED — `discardDraft()` now best-effort deletes `<name>_schema` + `<name>_enrich` after the pipeline. 2026-07-20 SHIPPED the registry-unregister itself: `CollectorService.unregisterPipeline` drops the config path and rebuilds the read surface synchronously, wired from `DELETE /config/pipeline/{name}` — no more ghost row)* · ~~enrichment deregister (deleted-on-disk job runs until restart) + schedule-interval change needs restart~~ *(2026-07-20 SHIPPED: `Scheduler.everySeconds` now returns a cancellable `ScheduledFuture` (mirroring `cron()`'s `CronHandle`); `EnrichmentService.unregister` (wired from `DELETE /config/enrichment/{name}`) cancels a removed job's timer immediately instead of it running until restart, and `register`'s re-arm cancels the prior timer before starting a new one so a changed `schedule_seconds` on an existing name applies immediately too)* · enrichment stage's `Validated` state *(2026-07-18: backend SHIPPED — `POST /enrichment/preview` runs the draft transform over an inline sample via `EnrichmentEngine.preview` (seeds `input`, real reference views, `{columns,rows,truncated}`, persists nothing); `okf/.../onboarding-authoring.md`. 2026-07-19: UI SHIPPED — the enrichment pane's **Preview** button samples the stream's Stage-1 output via `/db/table` and renders `/enrichment/preview` results in a shared `<inspecto-query-panel>`; live-verified end-to-end against the real backend)* · ~~`read_json array|auto` preview timestamp-serialization edge~~ *(2026-07-19 SHIPPED: `jsonSelect` now casts every column to VARCHAR (`COLUMNS(*)::VARCHAR`), keeping an auto-detected timestamp a plain string like every other format; partition-key hint UI-copy also now explains the `year=1900` sentinel — the sentinel itself is a deliberate, documented behavior, left unchanged)* · Reference Phase-2 engine semantics: cache/upsert/SCD versioning + refresh scheduling, row-level dedup, Stream grouping (GLOSSARY §3/§6-B roadmap) *(2026-07-24 PLAN DRAFTED → `archived-documents/plans-archive/reference-phase2-plan.md`: `load: replace|upsert|scd2` on the `produces: reference` producer via append-only Parquet + latest-version-wins (`QUALIFY` current view) + `MaterializeTask`-idiom compaction — SCD as data, not storage mutation, preserving the immutable-Parquet/`PartitionWriter` model; within-batch `DISTINCT`-on-key dedup; `refresh_seconds` timer reusing `armSchedule`; Stream grouping = separable catalog-only P4 (`stream:` key, default 1:1). **2026-07-24 SHIPPED P0+P4** (`3444e9a2`,`fb496c82`, full-reactor green 2026/0): the `reference:`/`stream:` config model (dual-mirror parser+`ConfigSpecs` validation) + `MetadataGraphBuilder` Stream-collapse grouping — both additive/inert, no engine behavior change. **2026-07-24 SHIPPED P1** (`upsert` engine): `BatchIngestStrategy.stampReferenceVersions` (append-only versioned write — §2.1 system columns + within-batch dedup + batch-unique file stem) gated on `load: upsert`, and `EnrichmentEngine.currentView` (latest-per-key, `__op='delete'` dropped, system cols stripped) on the by-name read; `ReferenceVersionStampTest`+`ReferenceUpsertCurrentViewTest` green (D5 delete-input convention + D6 dedup tie-break deferred, see plan). **2026-07-25 SHIPPED P2** (`scd2` as-of + unchanged-row skip): the versioned write path now covers `scd2` too (`Load.versionedStore()` — `scd2` previously fell through to full-replace) and stamps a fifth system column `__row_hash` (payload md5, `__src_id` excluded), with `stampReferenceVersions` anti-joining the batch against the store's own current view on `__key_hash||__row_hash` so an identical re-delivery appends no version; `currentView`→`versionedView(reader, asOf)` cuts candidates to `__valid_from <= asOf` before the `QUALIFY`, authored as `references.<name>.as_of` on the enrichment binding (ISO literal canonicalised at parse; fail-closed against a `replace`/`upsert` producer or a `path:` ref). `ReferenceScd2AsOfTest` (6) green, full reactor green. **2026-07-25 SHIPPED P3 — Reference Phase-2 is COMPLETE and the plan is ARCHIVED**: `ReferenceCompactor` + a `reference_compact` `maintenance` sub-task (not a new Job Type — house pattern) reusing `PartitionCompactor`'s journal/hide/`ATOMIC_MOVE` safety model, winner derived **store-wide** then each partition dir rewritten to its slice, `history_days` = `0` winners-only / `>0` horizon / negative keep-forever (D4 resolved); `CollectorService.armReferenceRefresh` arms/cancels the per-pipeline timer (`start()`+`registerPipeline` → `unregisterPipeline`). `ReferenceCompactorTest` (7) + a timer-cancel regression green, full reactor green (0 failures). Durable as-built → `okf/backend/control-plane/onboarding-authoring.md`; plan `git mv`'d to `archived-documents/plans-archive/`. **Residual deferrals, non-blocking:** D5 — how a `delete` tombstone *enters* the store on the ingest path is undefined (the write path always stamps `'upsert'`; the views only *honour* an existing tombstone), needs a product call on the input signal (reserved column? Decision Rule consequence?) when a real delete-feed use case lands · D6 — within-batch same-key tie-break is arbitrary; add the optional latest-by-`order_by` column only when a batch can legitimately carry ordered same-key versions)* · optional templates entry (space-template-gallery precedent) | `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md` · `archived-documents/plans-archive/stream-onboarding-design.md` |
+| **API v1** | X-Actor **full removal** (already rejected outright on Standard/Enterprise; removal is client-migration-gated with the API-v1 sunset) · UI sign-out affordance (absorbed by the §5 gateway topology) · adopt the cursor-pagination seam on further list families **as demanded** (4 adopters live) · adopt the `ETags.respond` wrapper on further singleton reads **as demanded** (list/paginated routes deliberately excluded) · Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed) | `okf/backend/api/api-v1.md` |
+| **Bundle / Exchange** | missing kind `connection` (gated on **D2**) · `requires` present-but-different classification · per-editor "load as draft" import — **not a small buildable**: `BundleTransferService.write` commits straight through each store, there is no generic draft seam, and editors open by route/id (not injected content); design-first, likely multi-session, **do not fake it with a cross-kind `enabled:false` stamp** | `okf/backend/control-plane/exchange-sharing.md` |
+| **Job framework** | MNT-14 archived-Incident sweep (**blocked on D5**) · maintenance COULD tier: space-to-space comparison · predictive maintenance (AGT-5/self-healing territory, deliberately deferred) | `okf/backend/control-plane/jobs.md` |
+| **Queries / BI** | `graph`/`spatial`/`search`/`api` QueryTypes · more `$`-resolvers | `okf/backend/control-plane/queries.md` |
+| **Notifications** | delivery-status webhooks — **inbound** provider bounce/complaint/delivery callbacks (the outbound `webhook` channel shipped 2026-07-22); gated on **D8**, Standard/Enterprise flavor territory · GeoIP · auth-gated per-user prefs / security triggers | `okf/backend/control-plane/events-metrics.md` |
+| **Signal / Decision networks** | optional S8 (connector-direct emission + cross-space controller) · a general **event-triggered consequence policy gate** (still `/apply`-only) · RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet) · ⚠ **no producer threads `causationId`**, so `/signals/tree` is flat today | `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md` |
+| **Link analysis** | V1 + four V2 tracks + timeline + version history all shipped. **Open V2:** (b) **sharing** a saved view — needs the Exchange seam widened backend-side, **D9** *(⚠ the old "sharing is frontend-only" claim was wrong)* · (b) **per-view comments** — needs **D10** · (c) domain-seeded pattern packs — needs **D16** · (d) AI assist (routes through the Assist seam) | `okf/frontend/features/link-analysis.md` |
+| **Geo map** | DuckDB **`spatial` extension** — deliberately deferred: plain SQL covers today's projection/aggregation, and loading it means bypassing the hardened `SqlSandbox` extension lockdown **and** bundling a per-platform native binary for offline installs. Only worth it once a real geometry op (ST_Distance/ST_Contains, spatial join) is demanded. *(Progressive loading + worker binning CLOSED 2026-07-24 as obsoleted by the server-side fold + the hard `GEO_POINT_CAP = 5000`. Revisit ONLY if that cap is raised — the candidate then is worker-izing the O(n²) toolbox analyses, not binning.)* | `okf/frontend/features/geo-map.md` |
+| **Pipeline graph** | T15 residuals (non-blocking): per-flow TOON override of the back-pressure thresholds (globals only) · flipping the intake cap on by default (needs a soak) · remote-fetch economy (the cap applies post-dedup, so a remote source still materialises its full ready set — unchanged from pre-T15, but a pre-materialise cap would save bandwidth) · mock-only: run-to-here `POST …/run` (path deliberately reserved for the editor's scratch-only contract) · `/asn1/modules` **stays mock-only** — no backend ASN.1 capability exists | `okf/backend/pipeline-graph/pipeline-graph-design.md` §14 |
+| **Acquisition / connections** | the JDBC-based connectors each need their own library-specific proxy wiring · an actual **HTTP CONNECT** handshake for any connector (SOCKS5 is wired for SFTP/FTP/FTPS; HTTP fails closed) | `okf/backend/acquisition/connectors.md` |
+| **Incidents / cases** | **Case-analytics dataset — READY TO SCHEDULE**, `superpower/case-analytics-dataset-plan.md`: an `objects.analytics` built-in Job Type (recon.run pattern, in-process `ObjectService` via the `Supplier` seam — **never** a 2nd conn to `inspecto-ops.db`), tall `(sampled_at, object_type, axis, key, value)` rows appended `storage_report`-style under `<dataDir>/ops_analytics/` + a result-stamped `dataset` component; cadence = operator-authored cron + demo seed; all 5 decisions resolved, one-session build · C3 configurable Findings sections (**D6**) · `category`/`tags` params on `GET /objects` (**D7**, low value) | `okf/backend/control-plane/operations-reference.md` |
+| **Menu builder** | the `canCurateMenus` capability split (**D4**) — a product question O1 surfaced, not a defect | `archived-documents/plans-archive/menu-builder-plan.md` |
+| **Onboarding (Stream/Reference)** | Reference Phase-2 is **COMPLETE** (P0–P4, plan archived). Residual non-blocking deferrals: **D5-ref** — how a `delete` tombstone *enters* the reference store is undefined (the write path always stamps `'upsert'`; the views only *honour* an existing tombstone) — needs a call on the input signal (reserved column? Decision Rule consequence?) when a real delete-feed use case lands · **D6-ref** — within-batch same-key tie-break is arbitrary; add the optional latest-by-`order_by` column only when a batch can legitimately carry ordered same-key versions · optional templates entry (space-template-gallery precedent) | `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md` |
 | **Collector rename residual** | Pipeline TOON config-key `source:` block kept (renaming breaks authored TOON) — separate migration if ever wanted; `'SOURCE'` stage category unchanged | `okf/backend/gotchas/cross-cutting.md` |
-| ~~**`package.ps1` docs-copy `Access denied`**~~ | **RESOLVED 2026-07-24** — the broken/explicit-deny ACL on the 13 `docs/archived-documents/plans-archive/` files is gone: all 13 now read cleanly, `git diff` succeeds, and `icacls` shows the normal inherited `SYSTEM/Administrators/<user>:(F)` with **zero deny ACEs** on every file (verified across all 13). Some intervening elevated shift evidently reset them; the working tree is clean (no "M" rows). `package.ps1`'s per-file copy-with-skip degradation (2026-07-20, `be50ad8`/`b1ad6f8`) stays as a defensive backstop but no longer skips these docs — they land in `file-processor-deploy/docs/` again. _(Root cause of the original broken ACL was never identified; if it recurs, the fix still needs elevated `takeown.exe /f <file>` + `icacls <file> /grant <admin>:F` per file.)_ | `inspecto/package.ps1:407` (backstop) |
+| **Quarantine / D-ETL** | reprocess is **whole-batch only** — no record-level replay (tracked only if prioritized) | `okf/frontend/features/run-detail.md` |
 
-## 4. UI residuals (small, valuable)
+## 5. UI residuals + security-module residuals
 
-| Item | Source |
-|---|---|
-| ui-design-review residuals — R2 column suggestions, R2 object-create chips, R3 command registry + `/`-focus + j/k nav all SHIPPED 2026-07-17; R6 true offset paging (events/audit/object-mail offset-append + mock `pageSlice`) SHIPPED 2026-07-19; ~~R8 pivot-bar (design-only until demanded twice — no second demand as of 2026-07-19)~~ SHIPPED 2026-07-20 — `PivotService` (`inspecto/investigation/pivot.service.ts`) + pivot buttons on `ElementDetailDialog`, wired into the two hosts (link-analysis ⇄ geo-map); `table` stays covered by the pre-existing "Open record" action | `archived-documents/plans-archive/ui-design-review.md` · `okf/frontend/log.md` · `okf/frontend/features/investigation-pivot.md` |
-| `ComponentKind.deriveParts` seam — formalize when a 3rd composite kind needs it | same |
-| Minor: parser/node attribute tiers best-guess pending firm backend specs *(2026-07-17 sweep SHIPPED: `<inspecto-chip>` · mock `/alerts/evaluate` real ledger math · live-tail selectable cadence · mock audit trail records authoring mutations — ops-side rule authoring (alert/tag/case rules) can adopt the same `emitAudit` seam if wanted)*. ~~pipeline-editor dry-run panel extraction (may be moot)~~ **SHIPPED 2026-07-22** — was NOT moot (751-line component still had it inline); extracted to `PipelineDryRunPanelComponent` (self-contained sample/result/error state, `[pipelineId]` input), its own spec incl. a11y; host keeps only the open/closed toggle | same |
-| ~~Dev-mode mount flake: the vendored `GammaLoadingBarComponent` NG0100 (progress −1→0 mid-tick) intermittently aborts the CD pass that activates routed content on fresh loads~~ FIXED 2026-07-19 — subscribe callbacks defer assignment to a microtask (`Promise.resolve().then`) so a synchronous first value lands after the current CD tick | observed 2026-07-17 preview walks |
+**UI residuals (small, valuable):**
+- `ComponentKind.deriveParts` seam — formalize when a 3rd composite kind needs it.
+- Parser/node attribute tiers are a best guess pending firm backend specs — same call as **D13**.
 
-## 5. Engineering / tech-debt
+**Security module.** The RBAC/ABAC plan is **COMPLETE** (R0–R5 + A1–A5); the plan was archived and the
+durable as-builts now live in **`okf/backend/editions/auth-security.md`** — read them there, not the
+archived plan. Direction of record: external OIDC IdP (Keycloak) + WSO2 APIM gateway; RBAC = Standard,
+ABAC = Enterprise; standards-only. **Residual opens, all non-blocking:**
+- **Policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility + a
+  "why denied?" explain endpoint + a read-only Policies tab all shipped 2026-07-24).
+- Product review of the R1 seed grant set — **D14**.
+- Final IdP/gateway vendor split — **D15**.
+- `package.ps1 -Edition Enterprise` packaging flavor — was deferred while the file was another
+  session's uncommitted edit; **the tree is clean now, so this is unblocked and buildable.**
+- X-Actor **full removal** — client-migration-gated (see §4 API v1).
 
-The engineering MoSCoW (build hygiene, `SourceService` decomposition, `agent.spi` facade,
-Fuse-leftover removal, reactor split, shutdown robustness, `@PublicApi` freezing) lived in
-**`archived-documents/plans-archive/modularization-optimization-plan.md`** §4 — **COMPLETE 2026-07-21
-and archived**; as-built facts distilled to `okf/backend/modules/reactor.md`. Headline Musts:
-~~M1 parent `dependencyManagement`~~ **SHIPPED 2026-07-21** (`73ea9a1`) · M2 `CollectorService`
-decomposition **CLOSED — won't-do (maintainability-only; see §5 triage 2026-07-22)** ·
-~~M3 `agent.spi` facade~~ **SHIPPED 2026-07-21** (`fc772f0d` + `f7d148a4` — as a `@PublicApi` contract
-freeze on the agent-consumed core surface, deliberately NOT a wrapping facade) ·
-~~M4 UI Fuse-leftover removal (~25.8k lines)~~ **SHIPPED 2026-07-21** (`80d6366` + `427e240`) ·
-~~M5 coverage baseline~~ **SHIPPED 2026-07-21** (`eeb4d5f` — jacoco `coverage` profile hoisted to the
-parent POM so every module instruments under `mvn -Pcoverage test`; +30 deterministic unit tests on the
-near-untested intelligence/hosted modules) · ~~M6 repo-clutter sweep~~ **SHIPPED 2026-07-21**
-(`b554048` — most already done by prior shifts; only the stale `HANDOVER-multi-space.md` + a mangled
-root build-log remained).
+> **Do not partially implement security concerns elsewhere** — this section stays the single scope.
 
-~~M7 **agent durable-store consolidation**~~ **SHIPPED 2026-07-21** (`0865cb4`): extracted a generic
-`DurableJsonlRing<T>` base (per-payload `Codec<T>`) + a shared `AgentWriteRoot` resolver in a new
-`com.gamma.intelligence.store` package; `ApprovalStore`/`CaseStore`/`FeedbackStore`/`RunbookRunStore`
-now subclass it and the ~6 copies of the `assist.write.root` → `<root>/agent/<file>` resolver collapsed
-to one helper. No behavior change (intelligence 135/0/0/0).
+## 6. Engineering / tech-debt
 
-**SHOULD tier — DRAINED 2026-07-21** (full detail in the archived plan §SHOULD): ~~S2~~ (both studio god
-components split), ~~S3~~ (chart/grid consolidation), ~~S4~~ (PipelineScheduler map-leak fix), ~~S6~~
-(ControlApi.dispatch → middleware chain), ~~S7~~ (shutdown robustness), ~~S8~~ (`@PublicApi` SPI freeze),
-~~S9~~ (intelligence↔agent decoupled via core model-settings bridge). **S1 skipped by design**
-(RouteModule→ServiceLoader would widen 39 types). ~~S5 steps ①②~~ **SHIPPED 2026-07-21** (`bc4d5f4d` +
-`0398a02b`): leaf **`inspecto-api`** (`file-processor-api`, just `com.gamma.api.PublicApi`) and
-**`inspecto-config`** (`file-processor-config`, `com.gamma.config` moved verbatim) extracted; reactor is
-8 modules; `package.ps1` builds `-pl inspecto -am` from the root. COULD tier resolved the same day:
-~~C3~~ ag-Grid trim (audited 12-module registration, grid chunk 1.17 MB→970 kB raw / 262→219 kB transfer,
-`aa87b2c3`) · ~~C5~~ was already shipped (`defb1281`, stale row) · ~~C7~~ `PipelineNodeType` documented
-as a reserved ServiceLoader seam (`1ec510d9`).
-
-✅ **SHIPPED — `fp-engine` extraction (WS-D COMPLETE; 2026-07-22):** the 15-package engine SCC (`etl,
-event, signal, query, pipeline, inspector, acquire, ingester, ops, job, enrich, alert, metrics, notify,
-catalog`) extracted whole into **`inspecto-engine`** (`file-processor-engine`) below core; reactor now
-**10 modules**. Full reactor `mvn -o clean test` green (**1884 tests**, build order proves acyclicity:
-engine at 5, core at 6); shaded fat JAR verified (Main-Class + logback.xml + both service files + engine
-classes bundled). Two build-clean-only issues resolved: fp-engine publishes a **test-jar** for the shared
-`com.gamma.etl.TestConfigs` fixture (~45 core tests); `logback.xml` moved to engine with its
-`EventStoreAppender`. As-built facts + the extended playbook (rules 7–8) distilled into
-[`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md); plan archived. Prior tail (both `job`
-edges cut) shipped `ee3e618f..33fa51ca`.
-
-✅ **SHIPPED — increment 1: `etl` → foundation leaf (2026-07-22):** an intra-engine dependency map found
-a **10-package SCC** (`etl, event, metrics, pipeline, job, acquire, signal, query, enrich, ops`). Its
-main-code back-edges from `etl` lived in just two files, both cut without behavior change:
-`etl.DecisionRuleApplier` → relocated to `com.gamma.pipeline`; `etl.BatchAuditWriter`'s `pipeline.batch.*`
-Signal build+emit → new `com.gamma.signal.PipelineBatchSignal`, injected via `setTerminalBatchSink` wired
-in `CollectorProcessor`. **`etl` is now a foundation leaf** (out-degree 0 within engine); the SCC
-fragmented to **`{pipeline, job, query, enrich}`** + **`{event, metrics}`**, and **`acquire, signal, ops,
-catalog` dropped out** (simple downward deps now). Full reactor green (1884 tests, 0 failures). Map +
-before/after: [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
-
-✅ **SHIPPED — increment 2: `fp-etl` module extraction (2026-07-22):** `com.gamma.etl` extracted into
-its own leaf module (`inspecto-etl` / `file-processor-etl`) below `fp-engine`; reactor now **12
-modules**. The "test sources import up" blocker was worse than the import-line scan showed — 3 test
-methods reached up via fully-qualified inline calls with no import line (playbook rule 5 struck again):
-`SourceConfigTest` (a genuine acquire+etl+event+inspector integration suite, moved whole to
-`fp-engine`'s `acquire` package per operator call), plus one-liners in `CommitLogTest`/`PhaseFConfigTest`
-split into new `inspector.CommitLogIntegrationTest`/`acquire.PostActionTest`. Full reactor green — 1884
-tests, 0 failures, exact match to baseline. Detail: [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md#fp-etl-module-extraction-ws-d-increment-2-shipped-2026-07-22).
-
-✅ **SHIPPED — increment 3: `fp-event` module extraction (2026-07-22):** `com.gamma.event`+`metrics`
-(mutually cyclic with each other only) extracted into `inspecto-event`/`file-processor-event` below
-`fp-etl`; reactor now **13 modules**. `logback.xml`+`EventStoreAppender` moved together; dropped
-`fp-engine`'s now-unused `logback-classic` dep and unused test-jar publish (verified no consumer
-before removing). Full reactor green — 1884 tests, 0 failures.
-
-✅ **SHIPPED — increment 4: `fp-acquire` module extraction (2026-07-22):** `com.gamma.acquire`
-extracted into `inspecto-acquire`/`file-processor-acquire` below `fp-event`, now no longer SCC-trapped;
-reactor now **14 modules** (101 tests standalone). Turned out to require increment 3 first (acquire's
-only up-dep is `event`) — scoped as "just fp-acquire", corrected mid-session once the transitive dep
-was traced. `SourceConfigTest` (moved into `acquire`'s package in increment 2) moved a second time,
-into `fp-engine`'s `inspector` package as `SourceConfigIntegrationTest` — same test, same "don't split
-it" call, second address since `inspector` stays behind while `acquire` moved out. Full reactor green
-— 1884 tests, 0 failures. Detail: [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
-
-**`{pipeline, job, query, enrich}` SCC fragmentation SHIPPED (2026-07-22, same-day follow-up)** — empirical
-scan found the whole cycle held together by exactly 2 back-edges out of `pipeline`
-(`PipelineJobRunner implements job.Job`, `DecisionRuleApplier`→`query.ConditionSql`); relocated both to
-their natural homes (`job`, `query`), which also dropped `enrich` out of the SCC as a side effect
-(it only touched `pipeline` via the relocated `DecisionRuleApplier`). `pipeline` is now a clean base;
-`query`/`enrich` sit above it; `job` sits above all three — no more cross-cycle. Full reactor green,
-1884/0/0/3. Package-level layering only (still one `fp-engine` module) — prerequisite for a future
-`fp-query`/`fp-job`/`fp-enrich` module split, not the split itself. Detail:
+The engineering MoSCoW (build hygiene, `CollectorService` decomposition, `agent.spi` facade,
+Fuse-leftover removal, reactor split, shutdown robustness, `@PublicApi` freezing) is **COMPLETE and
+archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
-**Remaining follow-on — TRIAGED 2026-07-22 (deferred, not to build now):**
-- **Actual module extraction of `fp-query`/`fp-job`/`fp-enrich`** below `fp-engine` — **deferred pending
-  an actual desire for finer module granularity** (nobody has asked for it; it is a preference, not a
-  need). Mechanically re-assessed this triage: main-code layering is clean and acyclic (`pipeline` base
-  → `query`→`pipeline`, `enrich`→`query` one-way with no `query↔enrich` cycle → `job` on top; the only
-  consumers — `inspector`/`catalog`/`alert` — reach downward only, incl. two inline-FQN calls in
-  `alert` (`DatasetMeasureProbe`/`ConditionTree`) that a plain import grep misses, rule 5). But it is
-  **NOT a single clean increment**: (a) `query`/`job` also depend on `signal` and `ops`, which sit
-  outside the four-package group and would have to be co-extracted below/alongside the new modules
-  (their own test-side up-imports were not scanned — an unknown), and (b) a known test cut is required —
-  `job`'s `SharedDottedPathGrammarTest` imports `com.gamma.notify.NotificationTemplate` (notify stays
-  behind), the same rule-5 test-up-import class that bit `fp-etl`. Same deadlock-prone reactor work as
-  the prior increments, for granularity no one has requested — **build only on explicit request.**
+**Open:**
+- **`fp-query`/`fp-job`/`fp-enrich` module extraction** — **build only on explicit request.** Nobody
+  has asked; it is a preference, not a need. Main-code layering is already clean and acyclic, but it
+  is **not a single clean increment**: `query`/`job` also depend on `signal` + `ops` (outside the
+  group, test-side up-imports unscanned), and a known test cut is required (`job`'s
+  `SharedDottedPathGrammarTest` imports `com.gamma.notify.NotificationTemplate`; playbook rule 5).
+- **M4 Fuse remainder** — the dead `src/@gamma/lib/mock-api/` (8 files, `GammaMockApiService`/
+  `mockApiInterceptor`, never wired; the live mock is the app-owned `app/inspecto/mock/`) is
+  functionally orphaned but **not a clean delete**: `@gamma/gamma.provider.ts` still imports
+  `GAMMA_MOCK_API_DEFAULT_DELAY`/`mockApiInterceptor` and has the `mockApi` provider branch. Removing
+  it means editing vendored `@gamma` shell code, which the angular-ui skill declares out of scope.
+  **Defer unless the team explicitly accepts touching `gamma.provider.ts`.**
+- **DuckDB capping remainder** — all scratch connections are now cappable by one operator knob
+  (`-Dprocessing.duckdb.memory_limit`/`.temp_directory`/`.max_temp_directory_size`/`.threads`) and
+  job concurrency is boundable (`-Djobs.maxConcurrentRuns`, default `0`=unbounded). Still open, both
+  policy calls: an **on-by-default memory value** (**D11**) and an **on-by-default chunking value**
+  (**D12**). Unset `memory_limit` ⇒ DuckDB defaults to ≈80% RAM *per instance* ⇒ concurrent runs
+  overcommit ⇒ the whole box (incl. the HTTP API) can go unresponsive. Read-path is **not** the risk
+  (see C6 below). `okf/backend/engine/duckdb.md`
+- **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
+  `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
+  `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
+  `ObjectStore` rows, and `PostgresStateStoreTest` round-trips all 7 JDBC stores against embedded
+  Postgres. **The real multi-user gap is connection pooling** — every `Db*Store` holds ONE
+  `synchronized` connection. Build items: pool the stores (HikariCP/PgBouncer) · **schema**-per-space
+  URL wiring (NOT db-per-space — a PG conn binds to one DB, fragmenting pools) · a `CaseStore`
+  interface + PG impl (JSONL ring today, no seam) · keep events on Parquet (right fit). **Don't route
+  all reads through the postgres-duckdb plugin** (wire-protocol scans compete with OLTP) — read PG
+  directly for OLTP, reserve the plugin (or a materialize-to-Parquet CQRS split) for cross-engine
+  analytical joins. Editions: DuckDB-file stays the Personal default (zero external deps / jlink),
+  Postgres for Standard/Enterprise via the existing toggle. `okf/backend/engine/db-layer.md`
 
-**Triage verdicts — 2026-07-22 (the rest are CLOSED or stay trigger-gated; none to build now):**
-- **M2 `CollectorService` decomposition — CLOSED (won't-do).** `CollectorService`
-  (`inspecto/src/main/java/com/gamma/service/CollectorService.java`, 1266 lines) already reads as a
-  composition-root/facade: its constructor wires ~15 already-extracted collaborators rather than
-  implementing their logic, and it is covered by 6 focused test files. Maintainability-only, not a
-  split blocker (old premise corrected). No god-class emergency → deliberately not pursued.
-- **M3 `agent.spi` facade — SHIPPED 2026-07-21** (`fc772f0d` + `f7d148a4`), as a `@PublicApi` contract
-  freeze on the ~31 agent-consumed core types, deliberately NOT a wrapping facade (access already
-  funnels through `UccAgentContext`). Item was stale on the tracking list; recorded here for the record.
-- **C2 store-pair generic base — CLOSED (won't-do, 2026-07-23).** Distinct from the shipped M7
-  (`DurableJsonlRing`/`AgentWriteRoot`, agent-side JSONL stores): the candidate duplication is the JDBC
-  `Db*Store` family — 5 in `inspecto-engine`
-  (`DbObjectStore`/`DbLinkStore`/`DbNoteStore`/`DbJobRunStore`/`DbProvenanceStore`) + `DbStatusStore` in
-  the separate `inspecto` module. **Scoped 2026-07-23 and judged not worth it:** a `DbBackedStore` base
-  could absorb only the `conn` field, `close()` (also unifying a minor split — 2 of 5 mark it
-  `synchronized`, 3 don't), `browseConnection()`, and the `initSchema()` try/catch wrapper (DDL text
-  differs per class) — roughly **30–40 lines across 5 classes**. It can't absorb the `open(...)` static
-  factories (return concrete types, not inheritable), the per-class DDL/tables/row-mapping/domain APIs, or
-  the maintenance methods; and the duplication that actually mattered is **already** de-duped by
-  `JdbcDrivers` (connect + dialect), `JdbcRows` (ResultSet→Map), and `BrowsableStore`'s default methods.
-  `DbStatusStore` is a different module and materially more complex (5 tables, transactional `sync()`,
-  legacy migration) — folding it in would add cross-module coupling for little gain. Net a wash for a new
-  inheritance coupling + abstract hooks. Convention is consistent and correct today. **Reopen only if the
-  `Db*Store` family grows materially** (a 7th+ store, or the shared shape starts drifting/bugging).
-- **Signal causation-assembly dedup — DONE (2026-07-22).** Folded `InspectoTools.causationOrder` onto a new
-  shared engine primitive `Signals.causationOrder(List<Signal>)`, a depth-first (pre-order) flatten of the
-  same `assembleTree` forest that backs `GET /signals/tree`; the private flat DFS in `inspecto-intelligence`
-  is gone and `signal_timeline` delegates. Canonical cycle behavior is now `assembleTree`'s (members surface
-  as roots at their oldest-first position) — the one deliberate divergence from the retired impl, which
-  appended cycle remnants at the end; cycles never occur in real data, and the happy-path output is
-  byte-identical. Locked with two engine-level tests (`SignalsTest.causationOrder*`); the existing
-  `InspectoToolsTest` `signal_timeline` cases stay green. Pure dedup, no behavior change.
-- **C4 BOM — CLOSED (moot).** The precondition (artifacts consumed OUTSIDE this reactor) does not exist —
-  the project ships as a fat-JAR deployable, not a published library, and M1 (`73ea9a1`) already gave the
-  reactor modules shared version hygiene via parent `dependencyManagement`. Reopen only if an external
-  consumer of these artifacts ever appears.
-- **C6 DuckDB per-run connection reuse — stays trigger-gated** (profiling-gated; no profiling evidence
-  exists). Current code already opens ONE connection per run against a fresh unique temp scratch DB and
-  shares it across all ops in that run (`PipelineJobRunner.run`, `EnrichmentEngine.runResult`). The
-  proposal is cross-RUN reuse — a real re-architecture that is actively risky (per-run scratch DBs are
-  deliberately ephemeral/isolated, JDBC connections aren't thread-safe, jobs run concurrently). Build
-  only after profiling shows open cost matters. **Read-only connection/instance sharing investigated
-  2026-07-22 and does NOT apply:** the query/measure/recon/enrichment read paths are ephemeral-instance
-  over immutable Parquet globs (`read_parquet`, e.g. `DatasetRelation`/`SqlViews`/`SqlSandbox`) with NO
-  persistent catalog to amortize, and each connection issues `CREATE VIEW`/`CREATE TABLE` scratch DDL
-  (opened deliberately *unsealed*), so `access_mode=READ_ONLY` can't be used as-is. Sharing would save
-  only cheap instance-init, not the scan; concurrent reads over immutable Parquet are already safe/
-  isolated for free. If read-path open cost ever shows up (measure-heavy dashboards / recon boards open
-  one temp DuckDB per measure/call), the cheap fix is switching `SqlSandbox` from a temp *file* to
-  `:memory:` — not connection sharing.
+**Closed — do not re-propose without the stated trigger:**
+- **M2 `CollectorService` decomposition — won't-do.** Already reads as a composition-root/facade
+  (wires ~15 extracted collaborators, 6 focused test files). Maintainability-only, not a split
+  blocker. No god-class emergency.
+- **C2 store-pair generic base — won't-do.** A `DbBackedStore` base could absorb only ~30–40 lines
+  across 5 classes; the duplication that mattered is already de-duped by `JdbcDrivers`/`JdbcRows`/
+  `BrowsableStore`. **Reopen only if the `Db*Store` family grows materially** (a 7th+ store, or the
+  shared shape starts drifting).
+- **C4 BOM — moot.** The precondition (artifacts consumed outside this reactor) doesn't exist — we
+  ship a fat JAR, not a library, and M1 gave shared version hygiene via parent
+  `dependencyManagement`. Reopen only if an external consumer appears.
+- **C6 DuckDB cross-run connection reuse — trigger-gated on profiling evidence that doesn't exist.**
+  Code already opens ONE connection per run against a fresh unique temp scratch DB. Cross-*run* reuse
+  is a genuinely risky re-architecture (per-run scratch DBs are deliberately ephemeral/isolated, JDBC
+  connections aren't thread-safe, jobs run concurrently). Read-only sharing was investigated
+  2026-07-22 and does **not** apply (ephemeral instances over immutable Parquet globs, each connection
+  issues scratch DDL so `READ_ONLY` can't be used as-is). If read-path open cost ever shows up, the
+  cheap fix is switching `SqlSandbox` from a temp *file* to `:memory:` — not connection sharing.
+- The intra-module `ops↔ops.link/workflow` and `catalog↔catalog.spi` cycles are same-family, **not**
+  reactor-split blockers.
 
-**C-series DRAINED (2026-07-23).** C3/C5/C7 shipped, C4 closed (moot), C2 closed (won't-do, above), and C6
-stays gated on profiling evidence that does not exist (a re-architecture that is actively risky to build
-speculatively). Nothing in the C-series is buildable now; C6 is the only one that could ever reopen, and
-only on real profiling evidence.
+## 7. Docs & ongoing
 
-The intra-module `ops↔ops.link/workflow` and `catalog↔catalog.spi` cycles are same-family, not
-reactor-split blockers.
-
-**⚠️ ISSUE — DuckDB large-file responsiveness / resource-capping (raised 2026-07-22; the two uncapped paths
-+ a global `-D` knob SHIPPED 2026-07-22, remainder open).**
-Investigated after a "will a GB file choke responsiveness?" concern. JVM-heap axis is safe (ingest
-streams through DuckDB — `read_csv` lazy VIEW → `COPY … PARTITION_BY`, no Java-side row
-materialization; generation-mode flushes every `flush_records`). The exposure is **aggregate memory/CPU
-under concurrency**, because the caps that prevent it are off-by-default:
-- ~~**`PipelineJobRunner` and `EnrichmentEngine` run fully uncapped**~~ **SHIPPED 2026-07-22** — both run
-  scratch connections now call `DuckDbUtil.applyGlobalDuckDbSettings(conn)` (which the batch path already
-  did via `configure`), and a global JVM fallback (`DuckDbUtil.globalOr` + `-Dprocessing.duckdb.memory_limit`/
-  `.temp_directory`/`.max_temp_directory_size`/`.threads`) now lets **one operator knob cap every DuckDB
-  scratch connection** — batch, flow-job, enrichment. As-built in `okf/backend/engine/duckdb.md`.
-- **`memory_limit`/`temp_directory` remain opt-in (no on-by-default value yet).** Unset → DuckDB default ≈
-  **80% RAM per instance** → concurrent runs overcommit → OS thrash/OOM → whole box (incl. HTTP API)
-  unresponsive. Operators can now cap all paths with `-Dprocessing.duckdb.memory_limit` (+ `.temp_directory`
-  for spill), but there is **no computed default** — deliberately, because the backlog's suggested
-  `RAM×0.7 / maxConcurrentRuns` premise was **wrong for the job path**: batch-ingest's `maxConcurrentRuns`
-  only bounds that semaphore; flow-jobs ran on `JobService`'s unbounded virtual-thread pool. ~~bounding job
-  concurrency (a semaphore on the `JobService` executor)~~ **SHIPPED 2026-07-24** (`-Djobs.maxConcurrentRuns`,
-  default `0`=unbounded; `runPermits` acquired on the worker thread inside `submitRun`/`submitAdhocRun`,
-  deadlock-safe — all triggering is fire-and-forget; `okf/.../jobs.md`). With that prerequisite in place, an
-  on-by-default memory value is now unblocked but **still not shipped** — it needs a computed cap that accounts
-  for both semaphores (batch `maxConcurrentRuns` + `jobs.maxConcurrentRuns`) or a conservative fixed
-  per-instance cap + spill. Deferred by the "no new defaults" scope decision (2026-07-22); reopen when an
-  operator sets the concurrency bound and wants a matching memory default.
-- ~~**Legacy (pre-v1) trigger routes run ingest INLINE on the HTTP request thread**~~ **SHIPPED 2026-07-24.**
-  `POST /runs/{name}/trigger` + `POST /collectors/{id}/notify` legacy branches now call the new
-  `CollectorService.runPipelineOffThread`, which submits `runPipeline` to the `triggerWorkers` virtual-thread
-  pool and blocks for the result — so `ingestLock` is acquired on a worker, not the request thread (closing the
-  documented sync-bus/ingest-lock-on-request-thread hazard), while the pre-v1 synchronous `200 RunResult` body
-  is unchanged (existing `legacyPipelineTriggerResponseIsUnchanged`/`legacyNotifyIsSynchronousRunResult` still
-  green). NB this only removes the inline-ingest hazard — it does **not** move `inspecto_legacy_api_requests_total`
-  (that meter counts every unversioned hit sync-or-async; driving it to zero is client migration to `/api/v1`,
-  the separate already-shipped soak mechanism — see the API-5 row + `docs/ops/legacy-api-sunset-runbook.md`).
-- **Single GB file isn't auto-chunked** — `processing.chunking.max_file_bytes = 0` (disabled by default;
-  the knob IS documented — `okf/backend/config/configuration.md` §"Large files", + referenced in
-  `okf/backend/engine/stage1-architecture.md` and `plugins.md`; the "undocumented" tag was stale, corrected
-  2026-07-22). The open part is a *policy* call — ship an on-by-default safety-net value for pathological
-  single files (needs a sensible fixed cap; ties to the memory-cap decision above). **[open]**
-Order of value: ~~cap the two uncapped paths~~ (done) → ~~bound job concurrency~~ (done 2026-07-24) →
-on-by-default memory value → v1-only triggers → chunking. Read-path is NOT the risk here (see C6 note). Cheap
-open-cost instrumentation is the gate.
-
-**Postgres multi-user transactional backend (raised 2026-07-22 — DIRECTION captured, deferred by
-operator).** Idea: move the transactional surface (`event→alert→incident/Case` + objects/links/notes/
-job-runs/status/provenance) onto PostgreSQL to serve many concurrent users, keeping bulk ingestion +
-analytical reads on DuckDB/Parquet. **Most of it already exists:** the stores are interface-seamed
-(`ObjectStore`/`LinkStore`/`NoteStore`/`StatusStore`/`EventStore`) with a `-D*.backend` toggle in
-`ServiceStores` and dialect-aware JDBC (`JdbcDrivers` duckdb-vs-postgresql); alerts/incidents/cases are
-`ObjectType.*` rows through `ObjectStore` (already swappable); **`PostgresStateStoreTest` already
-round-trips all 7 JDBC stores against embedded Postgres**; as-built in `okf/backend/engine/db-layer.md`
-("essentially a configuration change"). **The real gap for multi-user is NOT the engine — it's
-connection pooling:** every `Db*Store` holds ONE `synchronized` connection, so PG gives concurrency only
-once the store layer is pool-backed (HikariCP/PgBouncer). Remaining build items: pool the stores;
-**schema-per-space** URL wiring (NOT db-per-space — a PG conn binds to one DB, fragmenting pools);
-`CaseStore` interface + PG impl (it's a JSONL ring today, no seam); keep events on Parquet (no PG impl,
-right fit). **Don't route all reads through the postgres-duckdb plugin** (wire-protocol scans compete
-with OLTP; bundling concern) — read PG directly for OLTP, reserve the plugin (or a materialize-to-Parquet
-CQRS split) for cross-engine analytical joins. **Editions:** keep DuckDB-file the Personal default (zero
-external deps / jlink), Postgres for Standard/Enterprise — via the existing toggle, editions-as-build-
-flavor. Full options analysis in this session's transcript; write up as a `docs/superpower/` plan before
-building.
-
-## 6. Security-module scope (deferred wholesale — do not partially implement elsewhere)
-
-**PLAN FINALIZED 2026-07-23 → `superpower/rbac-abac-plan.md`** (authorable `roles.toon` · Access
-Policy engine · RBAC=Standard / ABAC=Enterprise; workstreams R1–R5 + A1–A5 — that doc is now the
-authoritative scope for everything in this section). **Auth-stack direction added 2026-07-23:
-Keycloak / WSO2** (external OIDC IdP + WSO2 APIM gateway) — groundwork captured as **R0** + plan
-§5-B (gateway topology: OpenAPI import, SSE passthrough, SPA PKCE login — absorbs the §3 "UI
-sign-out affordance" row); standards-only. **R0 reality-check (same day): the OIDC validator +
-Keycloak PKCE relay already existed in `inspecto-security` (Nimbus JWKS, W6)**; **R0 remainder
-SHIPPED 2026-07-23:** WSO2 gateway signed-JWT trust mode (`X-JWT-Assertion` as a second configured
-issuer/JWKS, `-Dauth.oidc.gateway.*`, Bearer decides first, unsigned never trusted — flag table in
-`docs/api/deployment/README.md`); the `identity:` claim allowlist rides with A1 (see plan).
-**R1 SHIPPED 2026-07-23:** authorable `roles.toon` (`GET/PUT /access/roles`, core `Roles` seed +
-per-request overlay, restart-free; `RoleMapper` switch retired). ⚠ Seed table corrected — five
-route capabilities (`canConfigureAccess`, `canAuthorAlertRules`, `canOfferDatasets`,
-`canRequestShares`, `canApproveShares`) were granted by NO role (access-config writes unreachable
-under OIDC; bootstrap deadlock) — now seeded to builder/ops/admin/super per the plan's R1 note;
-**product review of the new seed pending** (fold into Q3). **R4 SHIPPED 2026-07-23:**
-`CapabilityManifest` (70 declared gates) + two-way source-scan congruence test; `KNOWN_CAPABILITIES`
-now derives from it; catalog action nodes 422 on unknown capabilities. **R2 backend SHIPPED
-2026-07-23:** `AccessGrants` — role Access-Profiles enforced server-side by shaping Subject
-capabilities at authentication (union-of-access across roles, nearest-ancestor grants, fail-closed
-unreadable docs, claim path-jail); no authorize middleware needed, `requireCapability` + envelope
-`permissions` do the rest. **R2 UI half SHIPPED 2026-07-23:** LensService capability signals now
-intersect the lens view with `/bootstrap` effective grants under OIDC (Personal honor-system
-byte-identical); lens-switcher constrained to the lenses the grants project onto (Business always;
-Builder ⇐ canAuthorWorkbench; Ops ⇐ canOperateRuns) with the stored preference preserved across
-revoke/restore; nav shaping rides the per-lens Access-Profile filter now that subjects can only
-occupy granted lenses. **R3 SHIPPED 2026-07-23:** component sharing RBAC — optional
-`owner` + `shares: [{subjectType: role|user, subjectId, access: view|edit}]` envelope on registry
-components, enforced fail-closed (404 existence-hiding, list filtering, owner-only envelope/delete)
-in `/components*` + the BI dataset surface via core `ComponentAccess`; role shares match the
-authenticator-stamped held-roles exchange attribute, Subject stays capabilities-only (as-built in
-the plan §3 R3). **R5 SHIPPED 2026-07-23:** Settings ▸ Access is tabbed — Lenses (matrix,
-unchanged) + Roles: role cards with source badges, the R1 editor (authored-overlay semantics:
-edit moves a seed role into the overlay, Revert drops it), and the read-only effective-grants
-strike-through (role capabilities ∘ its Access-Profile denies over the catalog action nodes);
-mock `/access/roles` handler for offline (as-built in the plan §3 R5). **R0 remainder SHIPPED
-2026-07-23** (see the auth-stack note above). **A1+A2 SHIPPED 2026-07-23** (authoring + grammar;
-evaluation = A3): shared `com.gamma.util.Conditions` (parse-once, fail-closed truthiness — the
-"one policy engine, many policy kinds" library), `Subject.attributes()` + the `identity:
-{attributeClaims}` allowlist on `roles.toon` (OIDC copies allowlisted verified claims only), and
-core `AccessPolicies` + `GET/PUT /access/policies` (`when` parse-gates 422; unreadable doc =
-deny-loudly marker) — as-built in the plan §4. **A3 SHIPPED 2026-07-24:** core `AccessDecider`
-SPI + authorize stage + `RowScope` (objects wired); `inspecto-policy` Enterprise module
-(`edition-enterprise` profile) with the deny-overrides `PolicyEngine` — as-built + deliberate
-deviations in the plan §4 A3. ⚠ Follow-up: `package.ps1 -Edition Enterprise` packaging flavor
-deferred (the file is another session's uncommitted edit — add the flavor once it's released).
-**A4 SHIPPED 2026-07-24** (SPC-5): engine-resident seeded space-isolation policies
-(`PolicyEngine.SEED`, per-name authored override, `canConfigureAccess` operator exemption,
-engages only when a `space` home-space claim is mapped) — as-built in the plan §4 A4.
-**A5 SHIPPED 2026-07-24** (decision audit): `PolicyEngine` stamps the matched policy name on the
-exchange; core `AuditTrail.policyDecision` emits `access.denied`/`access.granted` (with actor,
-ABAC action, route, row kind/id, matched policy) via the existing event seam — route-level deny+allow,
-row-level deny only (row allow omitted as list-read noise) — read back via
-`GET /events?type=ACCESS_DENIED|AUDIT`. **The RBAC/ABAC plan is COMPLETE — R0–R5 + A1–A5 all shipped;
-the plan was archived to `archived-documents/plans-archive/rbac-abac-plan.md` and the durable as-builts
-now live in the OKF concept `okf/backend/editions/auth-security.md`** (the current-knowledge home for
-this whole area — read it there, not the archived plan). **Residual opens (non-blocking, carried
-forward):** ~~Q3 `canTriageRequirements` grant set~~ **SHIPPED 2026-07-24** (Business+Power+Admin+Super in
-`Roles.SEED`, product sign-off) · ~~X-Actor header retirement~~ **already shipped** — the header is
-rejected outright on Standard/Enterprise (SEC-7a spoof guard in `ControlApi.authenticate`); only its full
-*removal* remains, client-migration-gated with the API-v1 legacy sunset · ~~seed-policy visibility in
-`GET /access/policies` + a "why denied?" explain endpoint~~ **SHIPPED 2026-07-24** (`AccessDecider.
-seededPolicies()`/`explain()` default-empty seams; `GET /access/explain` GET-not-POST dry-run;
-Settings ▸ Access ▸ Policies read-only tab) — the remaining policy-authoring UX (a matrix/create editor
-beyond TOON) is still open · final IdP/gateway vendor split (Keycloak + WSO2 APIM vs. WSO2 IS —
-ops/evidence, not code) · `package.ps1 -Edition Enterprise` packaging flavor (deferred while the file was
-another session's uncommitted edit — add once released).
-~~Q1 `canOnboardConnections` → Admin split~~ RESOLVED+IMPLEMENTED 2026-07-22 · ~~Q4 Requirements SLA~~
-declined (revisit with roles).
-
-## 7. Docs & open product questions
-
-| Item | Status | Source |
-|---|---|---|
-| ~~User-guide audit P1~~ *(2026-07-20 SHIPPED: #8 — added the KPI-authoring path + an honest Measure-reuse answer (reuse is real, per-Dataset, `NamedMeasure`) to `USER_GUIDE.md`. #10 — documented the real quarantine→fix→reprocess workflow (`GET /runs/{name}/quarantine` + `POST /runs/{name}/reprocess`), but honestly flagged the **product gap** it surfaced: reprocess has no UI action today, and there's no record-level "replay just the quarantined rows" — filed as D-ETL below, not silently glossed over)* | Shipped | `archived-documents/superpower-reviews/user-guide-audit.md` |
-| ~~User-guide audit P2~~ *(2026-07-20 SHIPPED: #11 — dropped "pro"/"pro max" tier-name jargon from the Data Table section and "Stage-2" from Enrichment, both in `USER_GUIDE.md`. #12 — corrected the Parser-node "nine formats" claim to distinguish the 4 backend-wired frontends (delimited/DSV, fixed-width/text_regex, JSON, plugin/"other") from the 5 UI-only scaffolded ones (ASN.1, HTML, Parquet, XLSX, XML — confirmed via `parser-types.ts`'s own "best-guess" doc-comment); fixed `GLOSSARY.md`'s Matrix entry from present-tense ("is the label...") to honest not-yet-shipped wording (zero `Matrix` occurrences in the Angular source))* | Shipped | same |
-| ~~D-ETL~~ *(2026-07-20 SHIPPED: the Quarantine tab's row-action set now includes **Reprocess this batch** (previously Batches-tab only), gated behind `lens.canOperateRuns()` and a confirm step before `POST /runs/{name}/reprocess`; `okf/frontend/features/run-detail.md`. Remaining known gap: still whole-batch only, no record-level replay — tracked separately if ever prioritized)* | Shipped | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` · `okf/frontend/features/run-detail.md` |
-| ~~Open product questions + interview backlog Qs~~ **RESOLVED 2026-07-22** (product sign-off; recs plan archived). Outcomes: `canOnboardConnections` split+implemented · sunset timing = per-deployment · structured queries accepted-as-design (R6 closed) · case-type grants = SEC-7d as-shipped · Incident/Case = direct assignment + title/≥1-link mandatory · Space Template = config-only + opt-in sample data · KPI targets = Business-authored Requirement field (`target`/`comparator`/`unit`). | Resolved | `archived-documents/plans-archive/product-decisions-recommendations.md` (outcome table) |
-| **Parser required-vs-advanced field tiers** (interview #2) — which options are `required` vs `advanced` in each parser format's `AttributeSpec`. A genuine UX judgment ("a new user is blocked without it"), needs someone who has watched real onboarding sessions — NOT an engineering guess (a placeholder heuristic would bake in an arbitrary answer that's expensive to unwind once forms ship). | Open — needs UX session | `inspecto-ui/.../parser-types.ts` |
-| FEATURE_INVENTORY gaps: *(2026-07-20 SHIPPED: json/text_regex example files added under `examples/02-parsing/` — `json-frontend` + `text-regex-frontend`, each with `samples/`, verified end-to-end)*. ~~`record_split` (blank-line/delimiter block records for `text_regex`) remains genuinely unsupported (`PipelineConfigParser` rejects anything but one-record-per-line) — needs a DuckDB block-reading strategy change in `DuckDbCsvIngester`, a real engine feature not a quick fix; deliberately deferred.~~ *(2026-07-20 SHIPPED: `record_split: blank_line` or a literal delimiter string is now accepted; `DuckDbCsvIngester.buildTextRegexBlockReadSpec` reads via `read_text`/`str_split` and matches the `(?s)`-prefixed pattern per multi-line record; `ComponentPreview` mirrors it for previews)*. The `package.ps1` dir-pre-creation claim was **stale, corrected in the doc** (no adapter-specific dir creation exists; that's the `ura` CLI's `prepare-inbox`) | Shipped | `FEATURE_INVENTORY.md` §6 |
-| Template seed-pack enrichment (frontend C7) — continuous, not discrete | Ongoing | — |
+| Item | Status |
+|---|---|
+| `record_split` for `text_regex` block records | Open — **D17** |
+| Parser required-vs-advanced field tiers | Open — **D13** |
+| Template seed-pack enrichment (frontend C7) | Ongoing, continuous — not a discrete item |
+| Reconciliation explicit **non-goals** (N>3, non-additive aggs, fuzzy keys) | Recorded, not open work — `okf/frontend/features/reconciliation.md` |
 
 ## 8. Duplicate map (same work, multiple IDs — update all sources when closing)
 
 | Canonical | Also recorded as |
 |---|---|
-| API-5 legacy sunset | w7-ui-v1-migration deferred follow-ons · legacy-alias logging row (§3 misc) |
+| API-5 legacy sunset | w7-ui-v1-migration deferred follow-ons · X-Actor full removal (§4, §5) |
 | EOI-7b eoiagent publish | agent-kernel-replacement §open-items |
-| Geo-map Phase 4 backend | INV-2 Phase 4 · ComponentStore view-kind widening |
-| INV-1 Entity Projection backend | link-analysis V1 backend rows |
-| MNT-14 archived-incident sweep | blocked-on = Incidents I1 backend workflow row |
+| eoiagent `DryRunProvider` | AGT-5 follow-on (§3) · AGT-6b prerequisite (§3) |
+| MNT-14 archived-Incident sweep | blocked-on = D5 (retention model + `Archived` state) |
+| Parser field tiers | D13 · §5 UI attribute tiers · interview #2 |
+| ~~Geo-map Phase 4 backend~~ | **RETIRED 2026-07-25** — the endpoints + `ComponentStore` widening shipped; only the `spatial` extension + `spatial` QueryType survive, tracked in their own §4 rows |
+| ~~INV-1 Entity Projection backend~~ | **RETIRED** — shipped |
 
 ---
 
 **Maintenance rule:** when an item ships, mark it in its *source* doc first (that stays
-authoritative), then delete the row here. New pending items discovered mid-shift get a row here at
+authoritative), then **delete the row here** — do not leave a strikethrough as-built narrative behind
+(that is what the OKF concept docs and git history are for; this page had grown to ~40k tokens that
+way before the 2026-07-25 compaction). New pending items discovered mid-shift get a row here at
 handoff time (see the `handoff` skill). This page lists **open work only** — no DONE rows.
