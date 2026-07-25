@@ -272,6 +272,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **`ObjectStore.delete` is unwired SPI surface** (found 2026-07-25 while researching D7). `12cf20eb`
+  added `void delete(String)` to `com.gamma.ops.ObjectStore` (`:50`) with both impls and unit tests, but
+  it has **no production caller and no route** — there is no `DELETE /objects/{id}`; Incidents/Cases are
+  only closed, merged, or split. Either wire it or drop it; leaving a tested-but-unreachable delete on an
+  SPI invites someone to assume hard-delete is a supported operation and build cascade logic against it.
+  ⚠ Corrects a breadcrumb that recorded this as a shipped capability — the *SPI method* shipped.
 - **`fp-query`/`fp-job`/`fp-enrich` module extraction** — **build only on explicit request.** Nobody
   has asked; it is a preference, not a need. Main-code layering is already clean and acyclic, but it
   is **not a single clean increment**: `query`/`job` also depend on `signal` + `ops` (outside the

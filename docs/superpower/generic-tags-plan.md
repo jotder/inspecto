@@ -1,6 +1,7 @@
 # Generic tags — cross-entity labelling plan (BACKLOG D7)
 
-**Status:** DRAFT 2026-07-25 — scope + storage decided, phasing open. **Owner:** unassigned.
+**Status:** DRAFT 2026-07-25 — scope + storage decided; **§3 Q1–Q4 answered from the code 2026-07-25**,
+**Q5 + Q6 still need the operator**; phasing open until they are. **Owner:** unassigned.
 **Origin:** BACKLOG **D7**, rescoped by the operator during the 2026-07-25 decision session from
 "a `tags` filter on `GET /objects`" to *"use tags for grouping different items from lists, generic
 functionality, applied to most groupable items — streams, rules, alerts, etc., like a mail tag in Gmail."*
@@ -18,9 +19,15 @@ functionality, applied to most groupable items — streams, rules, alerts, etc.,
 |---|---|---|
 | Tag registry | `inspecto-engine/…/ops/tag/Tag.java` | `record Tag(String name, long createdAt)`; authored as a `*_tag.toon` (`tag { … }` block) loaded at bootstrap, or created at runtime via `POST /tags` which persists the same file under the write root. Rejects blank names and commas |
 | Auto-application rules | `inspecto-engine/…/ops/tag/TagRule.java` | Evaluated when an object opens |
-| Assignment storage | `ObjectService.ATTR_TAGS` (`= "tags"`) | **A comma-separated CSV string in the object's own `attributes` map.** Written on manual apply (~line 405), tag-rule merge (~414–422), rule-raised creation (~495), merge union (~792–816), and split (~850) |
+| Assignment storage | `ObjectService.ATTR_TAGS` (`= "tags"`) | **A comma-separated CSV string in the object's own `attributes` map.** Five write sites, all in `ObjectService`: `applyTagRule` :416, `autoApplyTagRules` :433, rule-raised Case creation :506, `mergeCases` union :827, `splitCase` :863. **All reads funnel through one private helper, `csvTags()` :437-445** |
 | HTTP surface | `inspecto/…/control/TagRoutes.java` | `/tags` + `/tags/rules`; capability-gated via `CapabilityManifest` |
 | UI | `objects.md` — Tags folder in the mail nav, bulk `tag` verb (optimistic) | Incidents/Cases only |
+
+> **⚠ Correction to an earlier draft of this table (verified 2026-07-25):** there is **no single-object
+> "manually apply a tag" endpoint** — no `/objects/{id}/tags` route exists. Tagging happens only via
+> `applyTagRule` (bulk, `POST /tags/rules/{name}/apply`) and the four internal lifecycle paths. If v1 is
+> meant to let a user tag one thing from a list, **that endpoint is new work**, not a generalization of
+> something shipped. This is the single biggest scope correction in this plan.
 
 **The constraint that forces this plan:** tags live *inside the tagged object*, as CSV, in a store that only
 `OperationalObject`s use. Nothing about that generalizes — a Stream or an Alert Rule has no
@@ -41,26 +48,87 @@ store and splitting strings.
   **D10** generalizes notes to any `(kind, id)` target. Tags and notes should address components the same
   way; if one of them ships an addressing scheme, the other adopts it rather than inventing a second.
 
-## 3. Open questions — answer before building
+## 3. Open questions
 
-1. **Is the assignment store a new `ComponentStore` kind, or its own store?** A `tag-assignment` kind gets
-   CRUD/versioning/bundle transport free, but assignments are high-cardinality edges, not authored
-   components — likely the wrong fit. Needs a look at how `ComponentStore.WRITABLE_TYPES` behaves at edge
-   volume.
-2. **Migration of the existing CSV.** `ATTR_TAGS` has live data. Options: (a) one-time backfill into the
-   assignment store then stop writing CSV; (b) dual-write for a release. **(a) is preferred** — dual-write
-   invites the two representations to diverge, which is the exact failure the central store exists to
-   prevent. Either way the read path must be switched in one change, not per-caller.
-3. **Space scoping.** Is a tag installation-wide or per-Space? Almost certainly per-Space (Spaces are the
-   isolation boundary), but the current `*_tag.toon` under the write root needs checking against that.
-4. **Does a tag survive its entity's deletion?** The assignment must be cleaned up, so the store needs a
-   delete hook per kind — or a periodic reconcile. Do not leave dangling assignments; the "everything tagged
-   X" query is exactly where they surface.
-5. **Capability model.** One `canAuthorTags` for the registry, or per-kind (tagging a Dataset ≠ tagging an
-   Incident)? Note the **D4** precedent from the same session: a capability that spans two genuinely
-   different activities should be split, not bundled.
-6. **Does the Gmail metaphor extend to filtering/saved searches**, or is v1 just apply + list-by-tag? Keep
-   v1 narrow.
+**Q1–Q4 were answered by codebase investigation on 2026-07-25** (findings + line refs below). **Q5 and Q6
+remain genuine product calls and still need the operator** — they are not derivable from the code.
+
+### ✅ Q1 — assignment store shape: **a dedicated ops store, NOT a `ComponentStore` kind**
+
+Mirror `ops.note`, which D10 built for the structurally identical problem three weeks ago: a new
+`com.gamma.ops.tag` package with a `TagAssignment` record, a `TagStore` interface, `InMemoryTagStore` +
+`DbTagStore` (table `inspecto_ops_tag_assignments`), reached via `ObjectService.tagStore()` exactly as
+`noteStore()` is (`ObjectService.java:967-969`). It joins the established `inspecto_ops_*` family
+alongside `DbObjectStore` and `DbLinkStore`.
+
+`ComponentStore` is the wrong fit on every axis at assignment cardinality — it is **file-per-component**
+(`registry/<typeDir>/<id>.toon`, `ComponentStore.java:24-36`), `list()` does a **full directory walk on
+every call** (:100-104), and `write()` **copies the entire prior file into `.history/` before every save**
+(:121-143, keep-10 pruning at :75-88). That design is right for a small population of authored,
+individually-versioned artifacts and actively wrong for 50k high-cardinality edges: per-save history
+copies are pure waste (assignments are not edited versions of each other), there is no query-by-entity,
+and bundle transport would ship 50k tiny files instead of one queryable table.
+
+### ✅ Q2 — CSV migration: **option (a), and it is much cheaper than this plan assumed**
+
+Take the one-time backfill; do not dual-write. The plan's worry that "the read path must be switched in
+one change, not per-caller" turns out to be nearly free: **every read already funnels through a single
+private helper**, `ObjectService.csvTags()` (`:437-445`), called from :413, :425, :803, :807. There is no
+second CSV parser anywhere in the backend. Switching reads means reimplementing one helper.
+
+**There is also no server-side tag filter to migrate** — `TagRule.Filter` (`TagRule.java:97-157`) filters
+on `type/q/status/priority/severity/category` only, and `ObjectQuery`/`DbObjectStore`/
+`InMemoryObjectStore` have **zero** tag-aware query support. Two consequences: the migration surface is
+smaller than feared, **and** "show me everything tagged X" — the feature's entire point — is genuinely new
+query work, not a rewiring. ⚠ Any tag filtering visible in the UI today is therefore client-side over the
+`tags` string already in each object's JSON; confirm on the UI side before assuming a server filter exists
+to preserve.
+
+### ✅ Q3 — Space scoping: **already per-Space, correctly, via the standard mechanism — no new work**
+
+`ObjectService` (which holds the `tags`/`tagRules` maps) is a field of `CollectorService`
+(`CollectorService.java:118`), and one `CollectorService` is constructed per `SpaceContext` by
+`ServiceBootstrap`, which scans that Space's own `*_tag.toon` / `*_tagrule.toon`
+(`ServiceBootstrap.java:82-85, 203-226`). Runtime creation via `POST /tags` (`TagRoutes.java:44-57`)
+persists under `api.writeRoot()`, which resolves to the bound Space's `config()` root
+(`ControlApi.java:769-771, 784-788`, keyed on the request's `SpaceId`). This is the same idiom connections
+and notification channels use. **The only requirement on D7 is not to break it**: wire the new store
+per-`CollectorService`/per-`SpaceContext`, never as a static or global registry.
+
+### ✅ Q4 — deletion: **follow D10's precedent (leave them), because no delete hook exists to attach to**
+
+Two findings, and both point the same way:
+
+- **Component deletion has no seam.** `DELETE /components/{type}/{id}` (`ComponentRoutes.java:154-177`)
+  runs its pipeline-reference and Exchange-consumer 409 fences and then calls `store.delete(type, id)`
+  directly. There is no listener, no hook, nothing pluggable. A cascade would mean **inventing a new seam**.
+- **Object deletion is not reachable at all.** `com.gamma.ops.ObjectStore.delete(String)` exists
+  (`ObjectStore.java:50`, added by `12cf20eb` "add physical delete to the ObjectStore SPI") and is
+  exercised by `DbObjectStoreTest` / `InMemoryObjectStoreTest` — but it has **no production caller and no
+  route**. Incidents/Cases are closed, merged, or split; never hard-deleted through the API. ⚠ *This
+  corrects a breadcrumb claiming `ObjectStore.delete` "shipped" — the SPI method shipped, the capability
+  did not.*
+
+So the dangling-assignment scenario the question worries about is **mostly unreachable today**, and where
+it is reachable (components), D10 already made the call: notes are deliberately **not** cascade-deleted,
+which is why "re-creating an id resurrects the thread" is a documented D10 residual. D7 should match that
+— **filter at read time against target existence rather than cascade on delete.** Reasons to prefer it:
+it needs no new seam, it degrades safely (a stale row is invisible, not wrong), and it keeps tags and
+notes behaving identically, which was the stated goal in §2. Revisit only if a hard-delete route lands,
+at which point notes and tags should get the same cleanup in one change.
+
+### ⏳ Q5 — capability model — **NEEDS THE OPERATOR**
+
+One `canAuthorTags` for the registry, or per-kind (tagging a Dataset ≠ tagging an Incident)? The **D4**
+precedent from the same session says a capability spanning two genuinely different activities should be
+split, not bundled. Note also the shipped constraint: **a capability change must land its manifest entry
+and its route gate in one commit** (`CapabilityManifestTest` checks congruence on the string literal).
+
+### ⏳ Q6 — does the Gmail metaphor extend to filtering / saved searches? — **NEEDS THE OPERATOR**
+
+⚠ Q2 raises the stakes on this one: there is **no server-side tag query today**, so "list everything
+tagged X" is net-new work in v1 regardless of how narrowly it is scoped. The answer changes the size of
+the build materially, so it should be settled before phasing.
 
 ## 4. Non-goals (v1)
 
