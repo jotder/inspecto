@@ -166,9 +166,9 @@ class ControlApiNavMenusTest {
     @Test
     void menuCurationRequiresCanCurateMenus(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            // Create the space BEFORE arming the Authenticator. With one active, authenticate()
-            // resolves writeRoot() → SpaceManager.current(), which throws "No spaces are hosted" on a
-            // root that has none — and POST /spaces is the very call that creates the first one.
+            // (The zero-hosted-spaces trap that once forced this ordering is fixed — authenticate() no
+            // longer resolves writeRoot() when no space is hosted; see ControlApiSpacesTest. Creating the
+            // space first is now just the natural order for a menu-curation test, not a workaround.)
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             Authenticators.forTest(SEED_ROLES);
             String base = "/spaces/acme/nav/menus";

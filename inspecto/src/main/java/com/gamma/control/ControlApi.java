@@ -615,7 +615,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         Authenticators.active().ifPresent(a -> {
             // RBAC R1: hand the authenticator the bound space's config root so it can resolve the
             // authored roles.toon (Roles.effective) for THIS request — per-space, restart-free.
-            java.nio.file.Path rolesRoot = writeRoot();
+            // A multi-space server can legitimately host ZERO spaces (its last one was just deleted), and
+            // writeRoot() -> SpaceManager.current() throws there. Authentication itself needs no space, so
+            // resolve the roles root only when one is hosted: Roles.effective(null) degrades to the seeded
+            // roles, and the recovery route (POST /spaces) stays reachable instead of 500ing in the gate.
+            java.nio.file.Path rolesRoot = spaces.size() == 0 ? null : writeRoot();
             if (rolesRoot != null) ex.setAttribute(Roles.ATTR_CONFIG_ROOT, rolesRoot);
             // SEC-7(a): on Standard the acting identity is authoritative from the authenticated Subject; a
             // client-supplied X-Actor header is an attempted actor spoof and is rejected outright. (Personal
