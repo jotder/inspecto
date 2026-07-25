@@ -27,6 +27,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Committed-secret guard (SEC-INCIDENT-1, docs/BACKLOG.md §5): a secret-ish key assigned a long
+      # literal fails the build. Five OAuth client secrets reached a public remote this way — four of
+      # them from THIS branch's environments/*.ts — and history keeps leaked values forever, so
+      # blocking REINTRODUCTION is the only durable control. Pure Node, ~1s. Brought forward from
+      # master once PKCE P0+P1 emptied `appClientSecret` here; keep the script identical on both.
+      - name: Guard — no committed secrets
+        run: node tools/check-secrets.mjs
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
