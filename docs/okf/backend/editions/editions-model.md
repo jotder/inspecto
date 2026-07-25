@@ -23,7 +23,9 @@ Assembly mechanisms:
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
   optional [assist agent](../agent/assist-agent.md) and [connectors](../modules/connectors.md)).
 * **`-D` flags** — e.g. `-Dauth.mode=none` (Personal) vs `-Dauth.mode=oidc` (Standard).
-* **`package.ps1 -Edition …`** — emits per-edition bundles from one build (see [build & run](../build-run/build-test.md)).
+* **`package.ps1 -Edition …`** — emits per-edition bundles from one build (`Personal` | `Standard` |
+  `Enterprise`, the last a superset of Standard bundling the ABAC `policy` jar as well; see
+  [build & run](../build-run/build-test.md)).
 
 One version spans all editions; artifacts differ by classifier. The matching branch policy is in
 [branching & release](branching-release.md).

@@ -121,8 +121,6 @@ ABAC = Enterprise; standards-only. **Residual opens, all non-blocking:**
   "why denied?" explain endpoint + a read-only Policies tab all shipped 2026-07-24).
 - Product review of the R1 seed grant set — **D14**.
 - Final IdP/gateway vendor split — **D15**.
-- `package.ps1 -Edition Enterprise` packaging flavor — was deferred while the file was another
-  session's uncommitted edit; **the tree is clean now, so this is unblocked and buildable.**
 - X-Actor **full removal** — client-migration-gated (see §4 API v1).
 
 > **Do not partially implement security concerns elsewhere** — this section stays the single scope.

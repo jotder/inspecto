@@ -7,7 +7,7 @@
 
 ## Matrix
 
-| Aspect | **Personal** | **Standard** | **Enterprise (future)** |
+| Aspect | **Personal** | **Standard** | **Enterprise (partially shipped)** |
 |---|---|---|---|
 | Transport | Plain HTTP, **bind localhost only** | HTTPS (`HttpsServer` + keystore; FIPS provider for Gov) | HTTPS, TLS at LB/gateway |
 | AuthN | **None** | **Delegated to an external IAM** (Keycloak / WSO2 / Okta / Entra) — app is an OIDC/OAuth2 **resource server** | Same, centralized IAM + token introspection |
@@ -19,14 +19,14 @@
 | State | local disk | local disk (or optional Postgres) | **shared backends** (Postgres / object store / Vault) |
 | Scheduler | in-JVM | in-JVM | **distributed coordination** (leader election / locks) |
 | Compliance scope | none | SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI | inherits Standard + multi-node controls |
-| Packaging | core fat-JAR, `-Dauth.mode=none` | core + `security` module, `-Dauth.mode=oidc`, TLS on | + shared-store modules, coordinator |
+| Packaging | core fat-JAR, `-Dauth.mode=none` | core + `security` module, `-Dauth.mode=oidc`, TLS on | + `policy` module (ABAC; shipped) — later + shared-store modules, coordinator |
 
 ## Assembly model (how an edition is produced)
 
 | Mechanism | Used for |
 |---|---|
 | **Separate Maven module** (e.g. `inspecto-security`) | Standard-only code (OIDC resource-server, TLS, RBAC). Personal simply doesn't bundle it. |
-| **Maven profiles** (`-Pedition-personal` / `-Pedition-standard`) | Which modules + shade includes go into the fat-JAR. |
+| **Maven profiles** (`-Pedition-personal` / `-Pedition-standard` / `-Pedition-enterprise`) | Which modules + shade includes go into the fat-JAR. `edition-enterprise` = `edition-standard` + `inspecto-policy`. |
 | **`ServiceLoader`** | Runtime discovery — absent module ⇒ the no-op impl is the only one found (mirrors the optional assist agent). |
 | **`-D` flags** (`-Dauth.mode`, TLS on/off) | Runtime toggles within an edition. |
 | **`package.ps1 -Edition …`** | Emits the per-edition bundles from one build. |
@@ -77,6 +77,16 @@ assessment + 7-phase hardening roadmap is maintained alongside this repo's plann
 stage (deny = 403) and the row-level `RowScope` filter (deny = the SEC-7d 404/filtered contract).
 Personal and Standard never bundle the module and behave byte-identically. Build/test:
 `mvn -o clean test -Pedition-enterprise`.
+
+**Shipped 2026-07-25 — the packaging flavor.** `package.ps1 -Edition Enterprise` now emits a deployable
+Enterprise bundle, closing the last gap between "the profile builds" and "an operator can ship it". It is
+a **superset of Standard** (mirroring the profile relation), so it builds `inspecto-security` *and*
+`inspecto-policy` under `-Pedition-enterprise` and bundles both `file-processor-security.jar` and
+`file-processor-policy.jar`. The generated `serve.sh`/`serve.bat` auto-detect edition from the bundle
+contents exactly as they already did for Standard: security jar ⇒ `Standard` (+ `-Dauth.mode=oidc`),
+plus policy jar ⇒ `Enterprise`. **No new runtime flag exists or is needed** — `inspecto-policy` is found
+solely through `META-INF/services/com.gamma.control.AccessDecider`, so the classpath entry *is* the
+switch. Personal bundles remain byte-for-byte unchanged.
 
 **Shipped 2026-07-24 — per-tenant space isolation (A4 = SPC-5):** `PolicyEngine.SEED` carries two
 engine-resident seeded policies (`space-isolation`, `space-isolation-rows`) denying access outside

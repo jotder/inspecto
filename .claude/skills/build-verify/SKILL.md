@@ -58,9 +58,17 @@ pwsh -File inspecto\package.ps1 -NoBuild        # reuse target/ JAR
 pwsh -File inspecto\package.ps1 -NoUi           # skip Angular UI
 pwsh -File inspecto\package.ps1 -NoRuntime      # skip embedded JVM (target must provide Java 24+)
 ```
-Editions are build flavors (Personal HTTP/no-auth vs Standard HTTPS/OIDC) — see [docs/EDITIONS.md](../../docs/EDITIONS.md).
-When the edition Maven profiles (`-Pedition-personal` / `-Pedition-standard`) and `package.ps1 -Edition`
-exist, build each edition; otherwise default build is Personal-equivalent.
+Editions are build flavors (Personal HTTP/no-auth · Standard HTTPS/OIDC · Enterprise = Standard + ABAC
+policy) — see [docs/EDITIONS.md](../../docs/EDITIONS.md). All three flavors exist today:
+
+```powershell
+pwsh -File inspecto\package.ps1 -Edition Standard    # + file-processor-security.jar (OIDC)
+pwsh -File inspecto\package.ps1 -Edition Enterprise  # + security AND file-processor-policy.jar (ABAC)
+```
+
+Enterprise is a **superset** of Standard, matching `-Pedition-enterprise` = `edition-standard` + policy;
+`serve.sh`/`serve.bat` auto-detect the edition from which jars are in the bundle. Default build (no
+`-Edition`) is Personal-equivalent.
 
 ## Run
 

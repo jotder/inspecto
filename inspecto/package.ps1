@@ -1,7 +1,15 @@
 # package.ps1 — Build and bundle file-processor for remote server deployment.
 #
 # Usage (run from inside inspecto/ or from the sandbox root):
-#   powershell -ExecutionPolicy Bypass -File inspecto\package.ps1 [-NoBuild] [-Edition Standard]
+#   pwsh -File inspecto\package.ps1 [-NoBuild] [-Edition Standard|Enterprise]
+#
+# Run under pwsh 7: this file is BOM-less UTF-8 and Windows PowerShell 5.1 garbles its non-ASCII
+# characters (see .claude/skills/build-verify/SKILL.md).
+#
+# -Edition Enterprise is Standard + inspecto-policy (the ABAC AccessDecider SPI implementation),
+# bundled as file-processor-policy.jar. It needs NO extra flag: the module is discovered purely
+# through META-INF/services/com.gamma.control.AccessDecider, so being on the classpath is what
+# turns policy evaluation on. serve.sh/serve.bat auto-detect it the same way they do the security jar.
 #
 # -Edition Standard (default: Personal) additionally builds inspecto-security (W6, the OIDC
 # Authenticator SPI implementation) and bundles it as file-processor-security.jar; serve.sh/
@@ -33,7 +41,9 @@ param(
     # Editions are build flavors (docs/EDITIONS.md), never branches. 'Standard' additionally builds
     # and bundles inspecto-security (W6, the Authenticator SPI's OIDC implementation) alongside the
     # core jar; serve.sh/serve.bat auto-detect its presence and wire -Dauth.mode=oidc from env vars.
-    [ValidateSet('Personal', 'Standard')]
+    # 'Enterprise' is Standard PLUS inspecto-policy (the ABAC AccessDecider SPI impl) — the same
+    # superset relation the -Pedition-enterprise Maven profile encodes, so it bundles BOTH extra jars.
+    [ValidateSet('Personal', 'Standard', 'Enterprise')]
     [string]$Edition = 'Personal',
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally
@@ -99,23 +109,37 @@ if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
     throw "JAR not found matching $targetDir\file-processor-*.jar.  Run without -NoBuild or build manually first."
 }
 
-# ── step 1c: Standard edition — build inspecto-security (W6, OIDC Authenticator SPI impl) ──────
-# A separate optional module (docs/EDITIONS.md), NOT in the default reactor <modules> — only built
-# when this profile is requested, from the repo root (it is a sibling of inspecto/, not a submodule).
+# ── step 1c: Standard/Enterprise editions — build the optional edition modules ─────────────────
+# Separate optional modules (docs/EDITIONS.md), NOT in the default reactor <modules> — only built
+# when the profile is requested, from the repo root (they are siblings of inspecto/, not submodules).
+# Enterprise is a SUPERSET of Standard (the -Pedition-enterprise profile = edition-standard + policy),
+# so it bundles the security jar too — an Enterprise deployment authenticates AND authorizes.
 $securityJarSrc = $null
-if ($Edition -eq 'Standard') {
+$policyJarSrc   = $null
+if ($Edition -ne 'Personal') {
+    # NB: not $profile — that is a PowerShell automatic variable.
+    $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-standard' }
+    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy' } else { 'inspecto-security' }
     if (-not $NoBuild) {
-        Write-Host "Building inspecto-security (Standard edition — OIDC Authenticator)..." -ForegroundColor Cyan
+        Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
-        & mvn clean package -Pedition-standard -pl inspecto-security -am -DskipTests -q
-        if ($LASTEXITCODE -ne 0) { throw "mvn build of inspecto-security failed" }
+        & mvn clean package "-P$editionProfile" -pl $modules -am -DskipTests -q
+        if ($LASTEXITCODE -ne 0) { throw "mvn build of the $Edition edition modules failed" }
         Pop-Location
     }
     $securityTargetDir = Join-Path $sandboxRoot 'inspecto-security\target'
     $securityJarSrc = Get-ChildItem -Path $securityTargetDir -Filter 'file-processor-security-*.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $securityJarSrc -or -not (Test-Path $securityJarSrc)) {
-        throw "Standard edition requested but no JAR found matching $securityTargetDir\file-processor-security-*.jar."
+        throw "$Edition edition requested but no JAR found matching $securityTargetDir\file-processor-security-*.jar."
+    }
+    if ($Edition -eq 'Enterprise') {
+        $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
+        $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'file-processor-policy-*.jar' -ErrorAction SilentlyContinue |
+                         Select-Object -First 1 -ExpandProperty FullName
+        if (-not $policyJarSrc -or -not (Test-Path $policyJarSrc)) {
+            throw "Enterprise edition requested but no JAR found matching $policyTargetDir\file-processor-policy-*.jar."
+        }
     }
 }
 
@@ -135,6 +159,10 @@ Copy-Item $jarSrc "$bundleDir\file-processor.jar"
 if ($securityJarSrc) {
     Copy-Item $securityJarSrc "$bundleDir\file-processor-security.jar"
     Write-Host "Bundled Standard-edition security module → file-processor-security.jar" -ForegroundColor Green
+}
+if ($policyJarSrc) {
+    Copy-Item $policyJarSrc "$bundleDir\file-processor-policy.jar"
+    Write-Host "Bundled Enterprise-edition policy module → file-processor-policy.jar" -ForegroundColor Green
 }
 
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
@@ -319,7 +347,8 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
 # Edition auto-detects from the bundle (W6, docs/EDITIONS.md): file-processor-security.jar present
 # ⇒ Standard — put it on the classpath and turn on OIDC (issuer/JWKS/audience from env, never baked
-# into the bundle). Absent ⇒ Personal, byte-for-byte the historic auth-free classpath/flags.
+# into the bundle); + file-processor-policy.jar ⇒ Enterprise. Neither ⇒ Personal, byte-for-byte the
+# historic auth-free classpath/flags.
 CP="file-processor.jar"
 EDITION="Personal"
 if [ -f file-processor-security.jar ]; then
@@ -333,6 +362,12 @@ if [ -f file-processor-security.jar ]; then
     # Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value —
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
+    # file-processor-policy.jar present ⇒ Enterprise (Standard + ABAC). No flag: the module is found
+    # via META-INF/services/com.gamma.control.AccessDecider, so the classpath entry IS the switch.
+    if [ -f file-processor-policy.jar ]; then
+        CP="${CP}:file-processor-policy.jar"
+        EDITION="Enterprise"
+    fi
 fi
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})"
@@ -356,8 +391,9 @@ if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
 if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%"
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
 rem Edition auto-detects from the bundle (W6, docs/EDITIONS.md): file-processor-security.jar present
-rem => Standard - put it on the classpath and turn on OIDC (issuer/JWKS/audience from env). Absent
-rem => Personal, byte-for-byte the historic auth-free classpath/flags.
+rem => Standard - put it on the classpath and turn on OIDC (issuer/JWKS/audience from env);
+rem + file-processor-policy.jar => Enterprise. Neither => Personal, byte-for-byte the historic
+rem auth-free classpath/flags.
 set "CP=file-processor.jar"
 set "EDITION=Personal"
 if exist file-processor-security.jar (
@@ -370,6 +406,12 @@ if exist file-processor-security.jar (
     if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
     rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
     if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
+    rem file-processor-policy.jar present => Enterprise (Standard + ABAC). No flag needed: the module
+    rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
+    if exist file-processor-policy.jar (
+        set "CP=file-processor.jar;file-processor-security.jar;file-processor-policy.jar"
+        set "EDITION=Enterprise"
+    )
 )
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
