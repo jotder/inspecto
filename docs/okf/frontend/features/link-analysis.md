@@ -88,7 +88,7 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     which buys the same feature and guarantees a third caller becomes a third special case. This aligns with
     the generic-tag direction (BACKLOG D7) — grouping and annotation should both address components uniformly.
 
-    **Backend SHIPPED 2026-07-25 (`56ca3559`); the UI half is still open.** As built:
+    **SHIPPED end-to-end 2026-07-25** — backend (`56ca3559`), UI half same day. As built:
     `ObjectNote` carries a **`targetKind`** — ⚠ *not* its pre-existing `kind`, which is `NoteKind`
     (COMMENT/ATTACHMENT) and an orthogonal axis; the two must never be conflated. The vocabulary is
     `NoteTargets` = `"object"` + `ComponentStore.WRITABLE_TYPES`, which already contains
@@ -106,6 +106,9 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     Deliberate residuals: `objectId` was **not** renamed (`targetId()` is an alias; keeps ~30 call sites and
     the JSON stable) · `GET /notes/object/{absent}` 404s while `GET /objects/{absent}/comments` still returns
     `200 []` · **notes are not deleted with their component**, so re-creating an id resurrects the thread.
+    UI: a "Comments" action sits next to "Version history" in the saved-views per-row menu, opening
+    `LinkAnalysisCommentsDialog` (modeled on `ComponentHistoryDialog`) over a new `NotesService` — no
+    "currently loaded view" state needed, since both actions already operate per-row on the views list.
   * **D16 pattern packs — a dedicated system Space owns the domain-seeded packs**, not the
     space-template-gallery seeding path. Rationale: packs are installation-wide reference content, and seeding
     them into user Spaces would fork them per Space, so a fix to a shipped pattern could never reach the

@@ -57,6 +57,7 @@ import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { ProjectedGraph } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
+import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
 import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analysis-query-panel.component';
@@ -840,5 +841,10 @@ export class LinkAnalysisComponent implements OnInit {
             .subscribe((restored) => {
                 if (restored) this.reloadViews();
             });
+    }
+
+    /** Per-view comments (D10) — a collaboration thread on the saved view, not an edit of its content. */
+    openComments(view: LinkAnalysisView): void {
+        this.dialog.open(LinkAnalysisCommentsDialog, { data: { id: view.id, label: view.name } });
     }
 }

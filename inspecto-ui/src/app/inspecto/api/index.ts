@@ -29,6 +29,7 @@ export * from './autonomy.service';
 export * from './learning.service';
 export * from './alerts.service';
 export * from './objects.service';
+export * from './notes.service';
 export * from './connections.service';
 export * from './connection-probe.service';
 export * from './components.service';

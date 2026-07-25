@@ -150,6 +150,10 @@
                         <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
                         <span>Version history</span>
                     </button>
+                    <button mat-menu-item (click)="openComments(view)" [attr.aria-label]="'Comments for ' + view.name">
+                        <mat-icon svgIcon="heroicons_outline:chat-bubble-left-right"></mat-icon>
+                        <span>Comments</span>
+                    </button>
                 </ng-template>
             </mat-menu>
 
