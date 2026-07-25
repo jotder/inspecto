@@ -29,9 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * and walking the opaque {@code nextCursor} pages the retained event history newest-first (keyset
  * {@code (ts, eventId)} — including a shared-timestamp pair, which the id tiebreak must resume through
  * unambiguously) with no overlap. (The null terminator is covered by the {@code /jobs} adopter's walk —
- * here service-generated events trail the fixtures, so the history has no fixed end.) The legacy
- * (unversioned) view stays the bare live-tail JSON array. Events are appended straight onto the store
- * the route reads.
+ * here service-generated events trail the fixtures, so the history has no fixed end.) Events are appended
+ * straight onto the store the route reads.
  */
 class ControlApiEventsPageTest {
 
@@ -95,11 +94,6 @@ class ControlApiEventsPageTest {
             walked.addAll(ids(e2.get("data")));
             walked.addAll(ids(e3.get("data")));
             assertEquals(walked.size(), new HashSet<>(walked).size(), "no event appears on two pages");
-
-            // legacy (unversioned) view is unchanged — the bare live-tail JSON array
-            JsonNode legacy = json(get(c.port, "/events?limit=2"));
-            assertTrue(legacy.isArray(), "legacy stays a raw list");
-            assertEquals(2, legacy.size());
         }
     }
 
@@ -113,5 +107,5 @@ class ControlApiEventsPageTest {
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
 }

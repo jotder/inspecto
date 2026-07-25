@@ -46,12 +46,12 @@ class AssistEndToEndTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.GET().build(), BodyHandlers.ofString());
     }
 
@@ -64,7 +64,7 @@ class AssistEndToEndTest {
                      "userText":"what does this table contain?"}""";
             HttpResponse<String> r = post(c.port, "/assist/explain-entity", body);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("explain-entity", out.get("intent").asText());
             assertEquals("OK", out.get("status").asText());
             assertEquals("The mini table holds mini events.", out.get("answer").asText());
@@ -86,7 +86,7 @@ class AssistEndToEndTest {
             String body = "{\"userText\":\"every weekday at 6am\"}";
             HttpResponse<String> r = post(c.port, "/assist/nl-to-schedule", body);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("nl-to-schedule", out.get("intent").asText());
             assertEquals("OK", out.get("status").asText());
             assertTrue(out.get("validated").asBoolean(), "ran through the oracle");
@@ -128,7 +128,7 @@ class AssistEndToEndTest {
             HttpResponse<String> r = post(c.port, "/assist/suggest-config",
                     "{\"screenContext\":{\"configType\":\"job\"}}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("suggest-config", out.get("intent").asText());
             assertTrue(out.get("applyVia").isNull(), "draft-only (V-9): no write endpoint");
             JsonNode data = out.get("data");
@@ -149,7 +149,7 @@ class AssistEndToEndTest {
             HttpResponse<String> r = post(c.port, "/assist/diagnose-and-alert",
                     "{\"userText\":\"warn when the error rate exceeds 5%\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("diagnose-and-alert", out.get("intent").asText());
             assertTrue(out.get("validated").asBoolean(), "ran through the alert-rule oracle");
             assertTrue(out.get("applyVia").isNull(), "draft-only (V-9): no write endpoint, ever");
@@ -169,7 +169,7 @@ class AssistEndToEndTest {
                 "Input columns no longer match the configured schema; reconcile the selectors."));
         try (Ctx c = open(dir, router)) {
             assertEquals(200, get(c.port, "/assist/diagnoses").statusCode());
-            assertEquals(0, JSON.readTree(get(c.port, "/assist/diagnoses").body()).size(),
+            assertEquals(0, json(get(c.port, "/assist/diagnoses").body()).size(),
                     "no failures yet");
 
             c.svc.eventBus().publish(new BatchEvent("MINI_ETL", "B1", "FAILED", List.of(),
@@ -179,7 +179,7 @@ class AssistEndToEndTest {
             JsonNode arr = null;
             long deadline = System.nanoTime() + 5_000_000_000L;
             while (System.nanoTime() < deadline) {
-                arr = JSON.readTree(get(c.port, "/assist/diagnoses").body());
+                arr = json(get(c.port, "/assist/diagnoses").body());
                 if (arr.size() > 0) break;
                 Thread.sleep(20);
             }
@@ -207,7 +207,7 @@ class AssistEndToEndTest {
                      "userText":"how many batches per status?"}""";
             HttpResponse<String> r = post(c.port, "/assist/report-sql", body);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("report-sql", out.get("intent").asText());
             assertTrue(out.get("validated").asBoolean(), "ran through the SQL sandbox oracle");
             assertTrue(out.get("applyVia").isNull(), "draft-only (V-9): no write endpoint, ever");
@@ -230,7 +230,7 @@ class AssistEndToEndTest {
             HttpResponse<String> r = post(c.port, "/assist/report-narrative",
                     "{\"screenContext\":{\"reportType\":\"service\"}}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("report-narrative", out.get("intent").asText());
             assertTrue(out.get("applyVia").isNull(), "draft-only");
             JsonNode data = out.get("data");
@@ -255,5 +255,12 @@ class AssistEndToEndTest {
             HttpResponse<String> r = post(c.port, "/assist/explain-entity", body);
             assertEquals(503, r.statusCode(), r.body());
         }
+    }
+
+    /** Parse a v1 response and peel the envelope's {@code data} — the control module's V1Body, inlined
+     *  here because that test helper is package-private to com.gamma.control. */
+    private static JsonNode json(String raw) throws Exception {
+        JsonNode n = JSON.readTree(raw);
+        return n.has("data") ? n.get("data") : n;
     }
 }

@@ -36,19 +36,25 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $spaceDir = Join-Path $repo "spaces/$Space"
-$api = "$Base/spaces/$Space"
+# API-5: business routes are served only under /api/v1 ($Base/health stays unversioned).
+$apiRoot = "$Base/api/v1"
+$api = "$apiRoot/spaces/$Space"
 
 # ── helpers ─────────────────────────────────────────────────────────────────────
 
 function Invoke-Api {
     # Resilient wrapper: seeding must not die on one 4xx — warn and carry on.
+    # v1 success bodies are envelope-wrapped, so peel 'data' here and callers keep reading the resource.
     param([string]$Method, [string]$Url, $Body = $null)
     try {
         if ($null -ne $Body) {
-            return Invoke-RestMethod -Method $Method -Uri $Url -ContentType 'application/json' `
+            $r = Invoke-RestMethod -Method $Method -Uri $Url -ContentType 'application/json' `
                 -Body ($Body | ConvertTo-Json -Depth 6)
+        } else {
+            $r = Invoke-RestMethod -Method $Method -Uri $Url
         }
-        return Invoke-RestMethod -Method $Method -Uri $Url
+        if ($null -ne $r -and $r.PSObject.Properties.Name -contains 'data') { return $r.data }
+        return $r
     } catch {
         Write-Warning "$Method $Url failed: $($_.Exception.Message)"
         return $null
@@ -144,7 +150,7 @@ created_at: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))
 function Invoke-UatDrive {
     try { Invoke-RestMethod -Uri "$Base/health" | Out-Null }
     catch { throw "Backend not reachable at $Base — start it first (launch config 'inspector-backend')." }
-    $spaces = Invoke-Api GET "$Base/spaces"
+    $spaces = Invoke-Api GET "$apiRoot/spaces"
     if (-not ($spaces | Where-Object { $_.id -eq $Space })) {
         throw "Space '$Space' not registered — run -Phase files first, then RESTART the backend (spaces are discovered at boot)."
     }

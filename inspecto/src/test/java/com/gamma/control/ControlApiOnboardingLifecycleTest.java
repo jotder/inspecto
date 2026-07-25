@@ -115,7 +115,7 @@ class ControlApiOnboardingLifecycleTest {
             HttpResponse<String> w2 = post(c.port, "/config/write", withParsing);
             assertEquals(200, w2.statusCode(), w2.body());
             assertTrue(V1Body.of(w2.body()).get("overwritten").asBoolean());
-            JsonNode reread = JSON.readTree(get(c.port, "/config/pipeline/orders_feed").body());
+            JsonNode reread = V1Body.of(get(c.port, "/config/pipeline/orders_feed").body());
             assertEquals("delimited", reread.get("config").get("parsing").get("frontend").asText());
 
             // 6. Discard: an inactive draft deletes cleanly.

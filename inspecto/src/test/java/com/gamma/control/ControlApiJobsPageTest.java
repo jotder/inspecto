@@ -28,8 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * surface the v1 envelope's {@code metadata.pagination} block carries {@code cursor/nextCursor/limit/total},
  * and walking the opaque {@code nextCursor} pages the job registry name-ordered (single-part keyset —
  * names are unique) with no overlap, covering the whole set, and a null terminator on the last page.
- * The legacy (unversioned) view stays a bare JSON array with its {@code ?limit=&offset=} slice. Jobs are
- * hot-registered straight onto the live {@link JobService}, then exercised over the wire.
+ * Jobs are hot-registered straight onto the live {@link JobService}, then exercised over the wire.
  */
 class ControlApiJobsPageTest {
 
@@ -83,11 +82,6 @@ class ControlApiJobsPageTest {
             assertEquals(List.of("job_a", "job_b", "job_c", "job_d", "job_e"), walked,
                     "no overlap, nothing dropped, name-ordered end to end");
             assertEquals(walked.size(), new HashSet<>(walked).size(), "no name appears on two pages");
-
-            // legacy (unversioned) view is unchanged — a bare JSON array with the offset slice
-            JsonNode legacy = json(get(c.port, "/jobs?limit=2"));
-            assertTrue(legacy.isArray(), "legacy stays a raw list");
-            assertEquals(2, legacy.size());
         }
     }
 
@@ -101,5 +95,5 @@ class ControlApiJobsPageTest {
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
 }

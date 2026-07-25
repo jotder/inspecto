@@ -105,7 +105,7 @@ class ControlApiAuthV1Test {
             HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
                     "Authorization", "Bearer valid");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode permissions = V1Body.of(r.body()).get("permissions");
+            JsonNode permissions = V1Body.envelope(r.body()).get("permissions");
             assertTrue(permissions.isArray());
             assertTrue(streamText(permissions).contains("canAuthorWorkbench"));
         }
@@ -147,7 +147,7 @@ class ControlApiAuthV1Test {
         try (Ctx c = open(cfg, root)) {
             HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
             assertEquals(200, r.statusCode(), "no credential required when no Authenticator is present");
-            assertNull(V1Body.of(r.body()).get("permissions"), "no Subject ⇒ no permissions block");
+            assertNull(V1Body.envelope(r.body()).get("permissions"), "no Subject ⇒ no permissions block");
         }
     }
 

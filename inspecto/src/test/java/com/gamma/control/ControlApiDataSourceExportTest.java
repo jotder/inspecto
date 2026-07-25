@@ -64,7 +64,7 @@ class ControlApiDataSourceExportTest {
     void listsExportsADataSourceBundleAndAWholeSpace(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // ── list ──
-            JsonNode list = JSON.readTree(sendText(c.port, "/spaces/alpha/datasources").body());
+            JsonNode list = V1Body.of(sendText(c.port, "/spaces/alpha/datasources").body());
             assertTrue(list.isArray() && list.size() == 1 && "test_etl".equals(list.get(0).asText()),
                     "the one pipeline is listed as a data source (lowercased name)");
 

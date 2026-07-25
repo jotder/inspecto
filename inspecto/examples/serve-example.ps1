@@ -128,9 +128,11 @@ try {
         Start-Sleep -Seconds $wait
     }
 
+    # API-5: business routes are served only under /api/v1, so the version is applied here (the single
+    # choke point) and probes.txt keeps listing version-free route paths. /health stays unversioned.
     function Probe([string]$path) {
         Write-Host "# GET $path" -ForegroundColor Yellow
-        try { (Invoke-RestMethod "$base$path" -TimeoutSec 5) | ConvertTo-Json -Depth 6 }
+        try { (Invoke-RestMethod "$base/api/v1$path" -TimeoutSec 5) | ConvertTo-Json -Depth 6 }
         catch { Write-Host "  (request failed: $_)" -ForegroundColor DarkYellow }
         Write-Host ''
     }
@@ -145,7 +147,7 @@ try {
         Write-Host "Demo complete; stopping server." -ForegroundColor Cyan
     } else {
         Write-Host "--- Server is running at $base ---" -ForegroundColor Cyan
-        Write-Host "  Explore:  curl $base/pipelines   |   curl `"$base/events?limit=20`""
+        Write-Host "  Explore:  curl $base/api/v1/pipelines   |   curl `"$base/api/v1/events?limit=20`""
         Write-Host "  Drop more files into:  $(Join-Path (Get-Location) 'out\inbox')"
         Write-Host "  Press Enter to stop."
         [void](Read-Host)

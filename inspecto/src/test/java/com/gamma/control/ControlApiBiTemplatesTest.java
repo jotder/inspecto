@@ -64,7 +64,7 @@ class ControlApiBiTemplatesTest {
             HttpResponse<String> applied = post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"sales_ds\"}");
             assertEquals(200, applied.statusCode(), applied.body());
-            assertEquals(4, V1Body.of(applied.body()).at("/data/created").size(),
+            assertEquals(4, V1Body.of(applied.body()).at("/created").size(),
                     "3 widgets + 1 dashboard");
 
             // The applied dashboard is a real, editable component bound to the caller's dataset.

@@ -117,14 +117,17 @@ class ApiContractTest {
 
                     String probePath = probe.get("path").asText();
                     int expected = probe.get("status").asInt();
+                    // x-probe paths are absolute and already carry the /api/v1 prefix — see the contract's
+                    // description. Do not prefix again.
                     HttpResponse<String> r = client.send(
-                            HttpRequest.newBuilder(URI.create("http://localhost:" + api.port() + "/api/v1" + probePath))
+                            HttpRequest.newBuilder(URI.create("http://localhost:" + api.port() + probePath))
                                     .GET().build(),
                             BodyHandlers.ofString());
                     assertEquals(expected, r.statusCode(),
                             "probe " + probePath + " (documented on " + pathEntry.getKey() + ")");
 
-                    JsonNode body = V1Body.of(r.body());
+                    // Envelope/ErrorResponse are the *transport* shapes, so check the un-peeled body.
+                    JsonNode body = V1Body.envelope(r.body());
                     assertSatisfies(contract, expected < 400 ? "Envelope" : "ErrorResponse", body,
                             "live " + probePath);
                     probed.add(probePath);

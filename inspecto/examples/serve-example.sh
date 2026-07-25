@@ -103,7 +103,9 @@ if [ -d phase2 ]; then
   sleep "$W"
 fi
 
-probe(){ echo "# GET $1"; curl -fsS "$BASE$1" 2>/dev/null || echo "  (request failed)"; echo; echo; }
+# API-5: business routes are served only under /api/v1, so the version is applied here (the single
+# choke point) and probes.txt keeps listing version-free route paths. /health stays unversioned.
+probe(){ echo "# GET $1"; curl -fsS "$BASE/api/v1$1" 2>/dev/null || echo "  (request failed)"; echo; echo; }
 probe "/pipelines"
 probe "/events?limit=20"
 if [ -f probes.txt ]; then
@@ -117,7 +119,7 @@ if [ "$DEMO" = 1 ]; then
   echo "Demo complete; stopping server."
 else
   echo "--- Server is running at $BASE ---"
-  echo "  Explore:  curl $BASE/pipelines   |   curl \"$BASE/events?limit=20\""
+  echo "  Explore:  curl $BASE/api/v1/pipelines   |   curl \"$BASE/api/v1/events?limit=20\""
   echo "  Drop more files into:  $(pwd)/out/inbox"
   echo "  Press Enter to stop."
   read -r _

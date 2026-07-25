@@ -54,7 +54,7 @@ class ControlApiCatalogTest {
     @Test
     void catalogListsEmittedTables(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            JsonNode body = JSON.readTree(get(c.port, "/catalog").body());
+            JsonNode body = V1Body.of(get(c.port, "/catalog").body());
             assertTrue(body.isArray());
             boolean hasEvent = false;
             for (JsonNode n : body) if ("event:mini_etl/mini".equals(n.get("id").asText())) hasEvent = true;
@@ -90,7 +90,7 @@ class ControlApiCatalogTest {
     @Test
     void kpisEndpointReturnsCatalogAndDomain(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            JsonNode body = JSON.readTree(get(c.port, "/catalog/kpis").body());
+            JsonNode body = V1Body.of(get(c.port, "/catalog/kpis").body());
             JsonNode kpis = body.get("kpis");
             assertEquals(1, kpis.size());
             assertEquals("daily", kpis.get(0).get("name").asText());

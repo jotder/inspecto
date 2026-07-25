@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code GET /jobs/runs} cursor pagination over real HTTP (api-contract-design §7): the v1 envelope's
  * {@code metadata.pagination} block carries {@code cursor/nextCursor/limit/total}, and walking the opaque
  * {@code nextCursor} pages the DuckDB run projection newest-first with no overlap and a null terminator.
- * The legacy (unversioned) view stays a bare JSON array. Uses an in-memory DuckDB job backend
+ * Uses an in-memory DuckDB job backend
  * ({@code -Djobs.backend=duckdb}, {@code jobs.db.url=jdbc:duckdb:}); runs are injected straight into the
  * store the route reads.
  */
@@ -90,11 +90,6 @@ class ControlApiJobRunsPageTest {
             JsonNode e3 = json(get(c.port, "/jobs/runs?limit=2&cursor=" + next2));
             assertEquals(List.of("r1"), ids(e3.get("data")));
             assertTrue(e3.get("metadata").get("pagination").get("nextCursor").isNull(), "last page ⇒ null nextCursor");
-
-            // legacy (unversioned) view is unchanged — a bare JSON array, no envelope/pagination
-            JsonNode legacy = json(get(c.port, "/jobs/runs?limit=2"));
-            assertTrue(legacy.isArray(), "legacy stays a raw list");
-            assertEquals(2, legacy.size());
         }
     }
 
@@ -108,5 +103,5 @@ class ControlApiJobRunsPageTest {
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
 }

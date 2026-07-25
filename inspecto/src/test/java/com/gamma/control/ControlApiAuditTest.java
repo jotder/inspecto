@@ -50,7 +50,10 @@ class ControlApiAuditTest {
     @Test
     void mutatingRequestEmitsAuditEvent(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            assertEquals(200, send(c.port, "POST", "/runs/" + c.name + "/trigger", null).statusCode());
+            // W5b: the trigger is accepted asynchronously — wait for the run before reading its audit event.
+            HttpResponse<String> run = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            assertEquals(202, run.statusCode(), run.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(run).get("runId").asText()));
 
             JsonNode events = json(send(c.port, "GET", "/events?limit=200", null));
             JsonNode audit = null;
@@ -127,5 +130,16 @@ class ControlApiAuditTest {
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
         return V1Body.of(r.body());
+    }
+
+    /** Poll an accepted run (W5b) to its terminal status, or fail after 10s. */
+    private String awaitRun(int port, String runPath) throws Exception {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            String status = json(send(port, "GET", runPath, null)).get("status").asText();
+            if (!"RUNNING".equals(status)) return status;
+            Thread.sleep(50);
+        }
+        return fail("run " + runPath + " did not reach a terminal status within 10s");
     }
 }

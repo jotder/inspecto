@@ -117,18 +117,6 @@ class ControlApiAsyncV1Test {
         }
     }
 
-    @Test
-    void legacyJobTriggerResponseIsUnchanged(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
-        try (Ctx c = open(cfg, root, List.of(hb))) {
-            HttpResponse<String> r = post(c.port, "/jobs/hb/trigger", null);   // unversioned surface
-            assertEquals(200, r.statusCode());
-            JsonNode body = V1Body.of(r.body());
-            assertEquals("triggered", body.get("status").asText());
-            assertEquals("hb", body.get("job").asText());
-            assertNull(body.get("data"), "legacy surface stays un-enveloped and un-changed (200, no runId/202)");
-        }
-    }
 
     @Test
     void dryRunTriggerPreviewsWithoutMutating(@TempDir Path cfg, @TempDir Path root, @TempDir Path junk) throws Exception {
@@ -221,7 +209,7 @@ class ControlApiAsyncV1Test {
     void jobTypesRegistryIsListableWithParameterDescriptors(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
         try (Ctx c = open(cfg, root, List.of(hb))) {
-            JsonNode types = JSON.readTree(get(c.port, "/jobs/types").body());
+            JsonNode types = V1Body.of(get(c.port, "/jobs/types").body());
             assertTrue(types.isArray(), types.toString());
             List<String> ids = new ArrayList<>();
             types.forEach(n -> ids.add(n.get("id").asText()));
@@ -293,12 +281,12 @@ class ControlApiAsyncV1Test {
             String runId = triggerAndAwait(c, "globjob");
 
             // Exact filter admits ONLY that type; unique runId isolates this run's single started signal.
-            JsonNode exact = JSON.readTree(get(c.port, "/signals?type=job.run.started&correlationId=" + runId).body());
+            JsonNode exact = V1Body.of(get(c.port, "/signals?type=job.run.started&correlationId=" + runId).body());
             assertEquals(1, exact.size(), "exact type filter isolates one signal: " + exact);
             exact.forEach(n -> assertEquals("job.run.started", n.get("type").asText()));
 
             // Prefix glob matches the whole job.run.* family (started + completed) — a strict superset.
-            JsonNode glob = JSON.readTree(get(c.port, "/signals?type=job.run.*&correlationId=" + runId).body());
+            JsonNode glob = V1Body.of(get(c.port, "/signals?type=job.run.*&correlationId=" + runId).body());
             assertTrue(glob.size() >= 2, "prefix glob matches all job.run.* : " + glob);
             List<String> globTypes = new ArrayList<>();
             glob.forEach(n -> globTypes.add(n.get("type").asText()));
@@ -308,11 +296,11 @@ class ControlApiAsyncV1Test {
 
     // ── on-signal triggers + when guard (job-framework P1c, §8.2) ────────────────────
 
-    /** Poll GET /jobs/{job}/runs (unversioned raw array) until a run matches, or fail after 10s. */
+    /** Poll GET /jobs/{job}/runs (the envelope's run array) until a run matches, or fail after 10s. */
     private JsonNode awaitRun(Ctx c, String job, java.util.function.Predicate<JsonNode> match) throws Exception {
         long deadline = System.nanoTime() + 10_000_000_000L;
         while (System.nanoTime() < deadline) {
-            JsonNode runs = JSON.readTree(get(c.port, "/jobs/" + job + "/runs").body());
+            JsonNode runs = V1Body.of(get(c.port, "/jobs/" + job + "/runs").body());
             if (runs.isArray()) for (JsonNode r : runs) if (match.test(r)) return r;
             Thread.sleep(50);
         }
@@ -349,7 +337,7 @@ class ControlApiAsyncV1Test {
             assertTrue(skipped.get("trigger").asText().startsWith("signal:"), skipped.toString());
             assertTrue(skipped.get("message").asText().contains("guard"), skipped.toString());
 
-            JsonNode runs = JSON.readTree(get(c.port, "/jobs/listenguard/runs").body());
+            JsonNode runs = V1Body.of(get(c.port, "/jobs/listenguard/runs").body());
             boolean anySuccess = false;
             for (JsonNode r : runs) if ("SUCCESS".equals(r.get("status").asText())) anySuccess = true;
             assertFalse(anySuccess, "a guard-false listener never executes the job: " + runs);
@@ -388,7 +376,7 @@ class ControlApiAsyncV1Test {
             post(c.port, "/jobs/failhead/trigger", null);
             JsonNode skipped = awaitRun(c, "failfollow", r -> "SKIPPED".equals(r.get("status").asText()));
             assertTrue(skipped.get("message").asText().contains("guard"), skipped.toString());
-            JsonNode runs = JSON.readTree(get(c.port, "/jobs/failfollow/runs").body());
+            JsonNode runs = V1Body.of(get(c.port, "/jobs/failfollow/runs").body());
             for (JsonNode r : runs)
                 assertNotEquals("SUCCESS", r.get("status").asText(),
                         "a failed predecessor halts the chain — the follower never executes: " + runs);
@@ -426,17 +414,6 @@ class ControlApiAsyncV1Test {
         }
     }
 
-    @Test
-    void legacyPipelineTriggerResponseIsUnchanged(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root, List.of())) {
-            String pipe = c.svc.pipelines().get(0).name();
-            HttpResponse<String> r = post(c.port, "/runs/" + pipe + "/trigger", null);   // unversioned surface
-            assertEquals(200, r.statusCode(), r.body());
-            JsonNode body = V1Body.of(r.body());
-            assertTrue(body.has("total") && body.has("failed"), "legacy body is the raw RunResult");
-            assertNull(body.get("data"), "legacy surface stays un-enveloped (200, no runId/202)");
-        }
-    }
 
     @Test
     void unknownPipelineTriggerIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {

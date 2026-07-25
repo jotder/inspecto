@@ -117,7 +117,7 @@ class ControlApiObjectsTest {
             // already set via dueInMinutes above, so only the postmortem blob is missing here).
             var blockedResp = send(c.port, "POST", "/objects/" + id + "/resolve", null);
             assertEquals(422, blockedResp.statusCode());
-            assertTrue(json(blockedResp).get("error").asText().contains("timeline"), blockedResp.body());
+            assertTrue(json(blockedResp).get("error").get("message").asText().contains("timeline"), blockedResp.body());
 
             String postmortem = "{\"timeline\":[{\"time\":\"10:00\",\"text\":\"detected\"}],"
                     + "\"causeAnalysis\":[\"root cause found\"],"

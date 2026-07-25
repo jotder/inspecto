@@ -87,15 +87,6 @@ class ControlApiCollectorNotifyTest {
         }
     }
 
-    @Test
-    void legacyNotifyIsSynchronousRunResult(@TempDir Path cfg) throws Exception {
-        try (Ctx c = open(cfg)) {
-            HttpResponse<String> r = post(c.port, "/collectors/" + sourceId(c) + "/notify");   // unversioned surface
-            assertEquals(200, r.statusCode(), r.body());
-            JsonNode body = V1Body.of(r.body());
-            assertTrue(body.has("total") && body.has("failed"), "legacy body is the raw RunResult");
-        }
-    }
 
     @Test
     void unknownSourceIs404(@TempDir Path cfg) throws Exception {

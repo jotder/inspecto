@@ -103,6 +103,17 @@ class ControlApiTest {
         return V1Body.of(r.body());
     }
 
+    /** Poll an accepted run (W5b) to its terminal status, or fail after 10s. */
+    private String awaitRun(int port, String runPath) throws Exception {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            String status = json(send(port, "GET", runPath, null)).get("status").asText();
+            if (!"RUNNING".equals(status)) return status;
+            Thread.sleep(50);
+        }
+        return fail("run " + runPath + " did not reach a terminal status within 10s");
+    }
+
     @Test
     void healthAndReadyAreOpen(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
@@ -153,10 +164,11 @@ class ControlApiTest {
     @Test
     void triggerRunsPipelineThenAuditQueriesReturnData(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            // W5b: the trigger is accepted asynchronously — poll the run to a terminal status before
+            // asserting on the audit trail it produces.
             HttpResponse<String> run = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
-            assertEquals(200, run.statusCode());
-            assertEquals(1, json(run).get("total").asInt());
-            assertEquals(0, json(run).get("failed").asInt());
+            assertEquals(202, run.statusCode(), run.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(run).get("runId").asText()));
 
             assertFalse(json(send(c.port, "GET", "/runs/" + c.name + "/commits", null)).isEmpty(),
                     "a committed batch should be visible");
@@ -230,7 +242,10 @@ class ControlApiTest {
     @Test
     void statusAndBatchReportEndpoints(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            // W5b: the trigger is accepted asynchronously — wait for the run before reading its results.
+            HttpResponse<String> triggered = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            assertEquals(202, triggered.statusCode(), triggered.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(triggered).get("runId").asText()));
 
             JsonNode status = json(send(c.port, "GET", "/status", null));
             assertEquals(1, status.get("pipelineCount").asInt());
@@ -257,7 +272,10 @@ class ControlApiTest {
     @Test
     void reportDateRangeAndPercentiles(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            // W5b: the trigger is accepted asynchronously — wait for the run before reading its results.
+            HttpResponse<String> triggered = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            assertEquals(202, triggered.statusCode(), triggered.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(triggered).get("runId").asText()));
 
             // unbounded report carries the new percentile + window fields
             JsonNode all = json(send(c.port, "GET", "/runs/" + c.name + "/report", null));
@@ -293,8 +311,8 @@ class ControlApiTest {
             assertEquals("maintenance", list.get(0).get("type").asText());   // P2b: type is the lowercased registry id
 
             HttpResponse<String> trig = send(c.port, "POST", "/jobs/hb/trigger", null);
-            assertEquals(200, trig.statusCode());
-            assertEquals("triggered", json(trig).get("status").asText());
+            assertEquals(202, trig.statusCode(), trig.body());
+            assertEquals("running", json(trig).get("status").asText());
 
             // history populates asynchronously — poll briefly
             long deadline = System.nanoTime() + 5_000_000_000L;
@@ -367,7 +385,10 @@ class ControlApiTest {
     @Test
     void reprocessReplaysACommittedBatch(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            // W5b: the trigger is accepted asynchronously — wait for the run before reading its results.
+            HttpResponse<String> triggered = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            assertEquals(202, triggered.statusCode(), triggered.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(triggered).get("runId").asText()));
             JsonNode commits = json(send(c.port, "GET", "/runs/" + c.name + "/commits", null));
             assertFalse(commits.isEmpty());
             String batchId = commits.get(0).asText();

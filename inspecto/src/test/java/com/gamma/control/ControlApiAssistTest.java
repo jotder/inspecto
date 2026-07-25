@@ -90,7 +90,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, false)) {
             HttpResponse<String> r = post(c.port, "/assist/echo", "{\"userText\":\"hi\"}");
             assertEquals(503, r.statusCode(), "auth passes, but no agent on the classpath");
-            assertTrue(V1Body.of(r.body()).get("error").asText().contains("not available"));
+            assertTrue(V1Body.of(r.body()).get("error").get("message").asText().contains("not available"));
         }
     }
 
@@ -134,7 +134,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = post(c.port, "/assist/no-such-skill", "{}");
             assertEquals(404, r.statusCode());
-            assertTrue(V1Body.of(r.body()).get("error").asText().contains("unknown assist intent"));
+            assertTrue(V1Body.of(r.body()).get("error").get("message").asText().contains("unknown assist intent"));
         }
     }
 
@@ -143,7 +143,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = post(c.port, "/assist/down", "{}");
             assertEquals(503, r.statusCode());
-            assertEquals("model offline", V1Body.of(r.body()).get("error").asText());
+            assertEquals("model offline", V1Body.of(r.body()).get("error").get("message").asText());
         }
     }
 

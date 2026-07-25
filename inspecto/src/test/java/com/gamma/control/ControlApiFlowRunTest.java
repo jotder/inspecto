@@ -90,7 +90,7 @@ class ControlApiFlowRunTest {
             assertEquals(202, r.statusCode(), r.body());
             String runId = json(r).get("runId").asText();
             assertEquals("evt_rollup", json(r).get("pipeline").asText());
-            assertEquals("/jobs/runs/" + runId, r.headers().firstValue("Location").orElseThrow());
+            assertEquals("/api/v1/jobs/runs/" + runId, r.headers().firstValue("Location").orElseThrow());
 
             JsonNode run = awaitTerminal(c.port, runId);
             assertEquals("SUCCESS", run.get("status").asText(), run.toString());

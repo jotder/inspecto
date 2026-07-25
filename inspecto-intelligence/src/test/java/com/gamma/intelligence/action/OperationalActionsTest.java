@@ -82,7 +82,7 @@ class OperationalActionsTest {
         assertEquals(1, requests.size());
         Recorded post = requests.get(0);
         assertEquals("POST", post.method());
-        assertEquals("/jobs/nightly-rollup/trigger", post.path());
+        assertEquals("/api/v1/jobs/nightly-rollup/trigger", post.path());
         assertEquals("sess-1", post.agentSession(), "every write carries X-Agent-Session");
     }
 
@@ -108,7 +108,7 @@ class OperationalActionsTest {
 
         Recorded post = requests.get(0);
         assertEquals("POST", post.method());
-        assertEquals("/runs/orders_etl/reprocess", post.path());
+        assertEquals("/api/v1/runs/orders_etl/reprocess", post.path());
         assertTrue(post.body().contains("B-42"), "reprocess body must carry the batchId");
         assertEquals("sess-3", post.agentSession());
     }
@@ -125,7 +125,7 @@ class OperationalActionsTest {
 
         Recorded post = requests.get(0);
         assertEquals("POST", post.method());
-        assertEquals("/objects/alert-9001/ack", post.path());
+        assertEquals("/api/v1/objects/alert-9001/ack", post.path());
         assertEquals("sess-4", post.agentSession());
     }
 
@@ -141,7 +141,7 @@ class OperationalActionsTest {
 
         Recorded post = requests.get(0);
         assertEquals("POST", post.method());
-        assertEquals("/jobs/hourly-sync/reschedule", post.path());
+        assertEquals("/api/v1/jobs/hourly-sync/reschedule", post.path());
         assertTrue(post.body().contains("0 0 * * * *"), "reschedule body must carry the cron");
         assertEquals("sess-5", post.agentSession());
     }

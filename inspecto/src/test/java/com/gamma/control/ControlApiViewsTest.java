@@ -141,7 +141,7 @@ class ControlApiViewsTest {
     @Test
     void emptyWithoutAWriteRoot(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
-            assertEquals(List.of(), JSON.readValue(send(c.port, "GET", "/views", null).body(), List.class));
+            assertEquals(0, V1Body.of(send(c.port, "GET", "/views", null).body()).size());
             assertEquals(404, send(c.port, "GET", "/views/orders_view", null).statusCode());
         }
     }

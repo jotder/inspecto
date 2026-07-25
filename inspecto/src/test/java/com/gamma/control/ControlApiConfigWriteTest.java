@@ -106,7 +106,7 @@ class ControlApiConfigWriteTest {
                     {"type":"pipeline","overwrite":true,"config":{
                        "name":"dup","dirs":{"poll":"in","database":"out"},
                        "processing":{"threads":1}}}""";
-            JsonNode out = JSON.readTree(post(c.port, "/config/write", withFlag).body());
+            JsonNode out = V1Body.of(post(c.port, "/config/write", withFlag).body());
             assertTrue(out.get("written").asBoolean());
             assertTrue(out.get("overwritten").asBoolean(), "overwrite:true replaces");
         }
@@ -122,7 +122,8 @@ class ControlApiConfigWriteTest {
                        "processing":{"ingester":"com.x.Plugin","threads":1}}}""";
             HttpResponse<String> r = post(c.port, "/config/write", bad);
             assertEquals(422, r.statusCode(), r.body());
-            JsonNode out = V1Body.of(r.body());
+            // v1 errors carry the rejected write's payload under error.details.
+            JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
             assertFalse(out.get("written").asBoolean());
             assertTrue(out.get("findings").size() > 0, "findings returned");
             assertFalse(Files.exists(root.resolve("broken.toon")), "nothing written on a rejected config");
@@ -169,7 +170,7 @@ class ControlApiConfigWriteTest {
                     {"type":"pipeline","subdir":"team/etl","config":{
                        "name":"nested","dirs":{"poll":"in","database":"out"},
                        "processing":{"threads":1}}}""";
-            JsonNode out = JSON.readTree(post(c.port, "/config/write", inSub).body());
+            JsonNode out = V1Body.of(post(c.port, "/config/write", inSub).body());
             assertEquals("team/etl/nested_pipeline.toon", out.get("path").asText());
             assertTrue(Files.exists(root.resolve("team").resolve("etl").resolve("nested_pipeline.toon")));
         }

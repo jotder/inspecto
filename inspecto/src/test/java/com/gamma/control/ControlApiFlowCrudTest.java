@@ -170,7 +170,7 @@ class ControlApiFlowCrudTest {
     void writesAreGatedOnTheWriteRoot(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
             assertEquals(503, send(c.port, "POST", "/pipelines/authored", VALID).statusCode());
-            assertEquals(List.of(), JSON.readValue(send(c.port, "GET", "/pipelines/authored", null).body(), List.class));
+            assertEquals(0, V1Body.of(send(c.port, "GET", "/pipelines/authored", null).body()).size());
         }
     }
 

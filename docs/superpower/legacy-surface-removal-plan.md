@@ -106,22 +106,50 @@ then distil this plan into `api-v1.md` and archive it.
 - Mechanical sweep across the control tests: v1 prefix on every request helper, `readTree(x.body())` →
   `V1Body.of(x.body())`, redundant manual `.get("data")` removed.
 
-**Remaining: 64 failures in `inspecto` only** (`Tests run: 533, Failures: 40, Errors: 24`). Every other
-module is green. These are genuine per-test semantic migrations, not URL bugs — a scripted pass cannot
-finish them safely:
-
-| Category | Cause | Fix |
-|---|---|---|
-| Residual `data`-NPEs | bodies parsed by a route the regex didn't cover (body stored in a local first, `readTree` on a non-`.body()` expression, streamed/SSE bodies) | unwrap per site |
-| `expected 200 but was 202` (5) | the v1 async contract answers **202 Accepted** where the unversioned surface answered 200 | assert 202 |
-| `no matching run within 10s` | polling helpers keyed on the 200/body shape above | downstream of the 202 fix |
-| "legacy stays a raw list" / parity assertions | tests that existed only to pin unversioned parity | delete |
-| infra probes now enveloped | a probe literal picked up the helper's v1 prefix, so `/api/v1/health` returns an envelope where the test wants raw | send probes unprefixed |
-| error-shape assertions (10 sites, 4 files) | `{"error":"msg"}` → `{"error":{errorCode,message,…}}` | read `error.message` |
-
 **Lessons already paid for (do not repeat):** running the "prefix the helper" pass a second time
 double-prefixed 61 files, and the collapse regex missed the `"/api/v1" + "/api/v1/"` (trailing-slash)
 variant — always verify with `grep -l '/api/v1/api/v1'` after any scripted prefix pass.
+
+## Progress (2026-07-25, shift 2 — the 64 failures are FIXED; reactor GREEN)
+
+`mvn -o clean test -Pedition-enterprise`: **all 16 modules SUCCESS, 2119 tests, 0 failures, 0 errors.**
+Every remaining failure was a *test-side* migration; `ControlApi`/`ControlPlaneClient` needed no further
+change, which confirms the routing design landed correctly in shift 1.
+
+Root causes, in the order they were worth attacking (all were mechanical *classes*, not per-file work):
+
+| Class | Cause | Fix |
+|---|---|---|
+| **Double unwrap** (~35 failures) | the sweep rewrote `readTree(x)` → `V1Body.of(x)` but left the old `.at("/data/…")` / `.get("data")` behind, so reads resolved `data.data.…` → missing node (`size()==0`, or NPE) | drop the extra `data` hop |
+| **Envelope vs resource** | `JSON.readTree(r.body())` kept as the *resource* now yields the envelope, so `.size()` counted its 4 fields — the "expected 1 but was 4" family | `V1Body.of` |
+| **Resource vs envelope** (the mirror) | `metadata.pagination` / `permissions` read *through* `V1Body.of`, which had already peeled them off | `V1Body.envelope` — the 4 pagination tests assert on both halves, so their `json()` must NOT peel |
+| **Async 202** | trigger routes answer **202 + runId**; tests asserted 200 + a synchronous `RunResult`, or fired and immediately read results they now race | assert 202, then poll the run (an `awaitRun` helper per test class) |
+| **`awaitRun` in `ControlApiAsyncV1Test`** | polled for a raw array; the enveloped body is never `isArray()`, so it spun out — the single cause of all 4 "no matching run within 10s" | `V1Body.of` |
+| **Error shape** | `{"error":"msg"}` → `{"error":{errorCode,message,…}}`, and a rejected write's payload moved under `error.details` | read `error.message` / `error.details` |
+| **Legacy-parity tests** | existed only to pin the unversioned surface, each already shadowed by a v1 test on the same route | deleted (6) |
+
+**Two blast-radius misses in this plan's own inventory** — it counted only
+`inspecto/src/test/java/com/gamma/control/`, so a `-pl inspecto -am` run reported green while the full
+reactor was still red in **three further modules**: `inspecto-agent` (11 E2E tests),
+`inspecto-intelligence` (11 `ControlPlaneClient` recorded-path assertions — stale expectations, the
+production prefix is correct), and `inspecto-policy` (8). **Always verify with the full reactor**, never
+`-pl inspecto -am`.
+
+Also corrected: `ApiContractTest` was double-prefixing because the OpenAPI `x-probe` paths **already
+carry** `/api/v1` (a split concat the `grep '/api/v1/api/v1'` check cannot catch), and its
+`Envelope`/`ErrorResponse` schema checks must run against the *un-peeled* body. `ControlApiV1Test`'s gzip
+test must compare the **resource**, not the envelope — `metadata.timestamp` and
+`diagnostics.correlationId` are minted per request, so two responses never have equal envelopes.
+
+**Callers migrated (step 4 done):** `serve-example.{ps1,sh}` (versioned at the single `Probe` choke point,
+so the 6 tracked `probes.txt` files keep listing version-free paths, and the `/health` readiness wait
+stays unversioned), `tools/seed-uat.ps1`, `.claude/skills/smoke/SKILL.md`, plus **two more callers this
+plan never listed**: `spaces/demo/data/samples/seed-ops.{ps1,sh}`. The three PowerShell seeders peel the
+envelope inside their own `Invoke-Api` wrapper, so their many call sites keep reading the resource.
+
+**Still open (commit 2 — docs):** the file list in *Commits* above, plus one this plan missed —
+`docs/okf/backend/build-run/operations-reference.md` has ~20 unversioned `curl localhost:8080/…`
+examples.
 
 ## Verification
 

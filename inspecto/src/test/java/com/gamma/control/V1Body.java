@@ -27,6 +27,11 @@ final class V1Body {
         return node.has("data") ? node.get("data") : node;
     }
 
+    /** As {@link #of(String)}, for the byte[]-bodied responses used where a route may answer binary. */
+    static JsonNode of(byte[] raw) throws Exception {
+        return of(new String(raw, java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     /** The envelope itself, un-peeled — for tests that assert on {@code metadata}/{@code links}/
      *  {@code permissions} rather than on the resource. */
     static JsonNode envelope(String raw) throws Exception {

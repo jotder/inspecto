@@ -173,7 +173,7 @@ class ControlApiV1Test {
     @Test
     void gzipNegotiatedOnLargeJsonBodies(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg, null)) {
-            HttpResponse<String> plain = get(c.port, "/config/spec/pipeline");
+            HttpResponse<String> plain = get(c.port, "/api/v1/config/spec/pipeline");
             assertEquals(200, plain.statusCode());
             assertTrue(plain.headers().firstValue("Content-Encoding").isEmpty(),
                     "no compression without Accept-Encoding");
@@ -181,7 +181,7 @@ class ControlApiV1Test {
                     "fixture sanity: the pipeline spec is large enough to trigger compression");
 
             HttpResponse<byte[]> zipped = client.send(
-                    req(c.port, "/config/spec/pipeline", "Accept-Encoding", "gzip").GET().build(),
+                    req(c.port, "/api/v1/config/spec/pipeline", "Accept-Encoding", "gzip").GET().build(),
                     BodyHandlers.ofByteArray());
             assertEquals(200, zipped.statusCode());
             assertEquals("gzip", zipped.headers().firstValue("Content-Encoding").orElse(null));
@@ -189,7 +189,9 @@ class ControlApiV1Test {
             try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(zipped.body()))) {
                 inflated = in.readAllBytes();
             }
-            assertEquals(V1Body.of(plain.body()), JSON.readTree(inflated),
+            // Compare the resource, not the envelope: metadata.timestamp and diagnostics.correlationId are
+            // minted per request, so two responses never have byte-identical envelopes.
+            assertEquals(V1Body.of(plain.body()), V1Body.of(inflated),
                     "gzipped body inflates to the identical JSON");
         }
     }

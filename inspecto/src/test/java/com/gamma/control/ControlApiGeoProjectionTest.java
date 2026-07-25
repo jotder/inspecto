@@ -94,7 +94,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection",
                     "{\"dataset\":\"sights_ds\",\"latCol\":\"lat\",\"lonCol\":\"lon\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode points = V1Body.of(r.body()).at("/data/points");
+            JsonNode points = V1Body.of(r.body()).at("/points");
             assertEquals(3, points.size());
             assertEquals("point", points.get(0).get("kind").asText(), "no kindCol → the 'point' default");
         }
@@ -121,7 +121,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","attrCols":["who"]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode points = V1Body.of(r.body()).at("/data/points");
+            JsonNode points = V1Body.of(r.body()).at("/points");
             assertEquals("alice", points.get(0).get("attrs").get("who").asText());
         }
     }

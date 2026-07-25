@@ -5,7 +5,8 @@
 # Run AFTER the backend is up. Durable across restarts only with -Dobjects.backend=db.
 set -uo pipefail
 BASE="${1:-http://localhost:8080}"
-API="$BASE/spaces/${2:-demo}"
+# API-5: business routes are served only under /api/v1.
+API="$BASE/api/v1/spaces/${2:-demo}"
 
 api() { # method path [json]
   local m="$1" p="$2" b="${3:-}"

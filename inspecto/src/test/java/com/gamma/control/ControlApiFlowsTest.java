@@ -100,7 +100,7 @@ class ControlApiFlowsTest {
     @Test
     void nodeTypesCatalogIsServed(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            JsonNode arr = JSON.readTree(get(c.port, "/pipelines/node-types").body());
+            JsonNode arr = V1Body.of(get(c.port, "/pipelines/node-types").body());
             assertTrue(arr.isArray());
             boolean hasView = false, hasAcq = false;
             for (JsonNode t : arr) {

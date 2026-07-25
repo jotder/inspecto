@@ -95,7 +95,7 @@ class ControlApiEnrichmentRegisterTest {
             assertTrue(r.get("job").get("eventTriggered").asBoolean());
 
             // The running service hosts it immediately.
-            JsonNode list = JSON.readTree(get(c.port, "/enrichment").body());
+            JsonNode list = V1Body.of(get(c.port, "/enrichment").body());
             assertEquals(1, list.size());
             assertEquals("orders_daily", list.get(0).get("name").asText());
         }
@@ -104,7 +104,7 @@ class ControlApiEnrichmentRegisterTest {
     @Test
     void reRegisterReplacesByName(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String path = JSON.readTree(post(c.port, "/config/write",
+            String path = V1Body.of(post(c.port, "/config/write",
                     draft("orders_daily", "orders_feed")).body()).get("path").asText();
             assertEquals(200, post(c.port, "/enrichment", "{\"configPath\":\"" + path + "\"}").statusCode());
 
@@ -115,7 +115,7 @@ class ControlApiEnrichmentRegisterTest {
             HttpResponse<String> reg2 = post(c.port, "/enrichment", "{\"configPath\":\"" + path + "\"}");
             assertEquals(200, reg2.statusCode(), reg2.body());
 
-            JsonNode list = JSON.readTree(get(c.port, "/enrichment").body());
+            JsonNode list = V1Body.of(get(c.port, "/enrichment").body());
             assertEquals(1, list.size(), "replaced, not duplicated: " + list);
             assertEquals("other_feed", list.get(0).get("onPipeline").asText());
         }

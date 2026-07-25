@@ -65,7 +65,8 @@ class ControlApiBundleImportTest {
             // re-import without overwrite → 409 listing the clash, nothing changes
             HttpResponse<String> clash = post(c.port, "/spaces/beta/import", bundle);
             assertEquals(409, clash.statusCode());
-            assertTrue(V1Body.of(clash.body()).get("conflicts").toString().contains("test_etl"));
+            assertTrue(V1Body.envelope(clash.body()).get("error").get("details")
+                    .get("conflicts").toString().contains("test_etl"));
 
             // re-import with overwrite → 200
             assertEquals(200, post(c.port, "/spaces/beta/import?on_conflict=overwrite", bundle).statusCode());
@@ -98,7 +99,7 @@ class ControlApiBundleImportTest {
             assertEquals("gamma", V1Body.of(created.body()).get("id").asText());
 
             // the new space is hosted and carries alpha's data source
-            JsonNode spaces = JSON.readTree(getBytes(c.port, "/spaces").body());
+            JsonNode spaces = V1Body.of(getBytes(c.port, "/spaces").body());
             boolean hasGamma = false;
             for (JsonNode s : spaces) if ("gamma".equals(s.get("id").asText())) hasGamma = true;
             assertTrue(hasGamma, "gamma is now hosted");
@@ -115,7 +116,7 @@ class ControlApiBundleImportTest {
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
 
     private java.util.List<String> idList(int port, String path) throws Exception {
-        JsonNode arr = JSON.readTree(getBytes(port, path).body());
+        JsonNode arr = V1Body.of(getBytes(port, path).body());
         java.util.List<String> out = new java.util.ArrayList<>();
         arr.forEach(n -> out.add(n.asText()));
         return out;

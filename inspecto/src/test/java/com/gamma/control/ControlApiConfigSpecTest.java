@@ -68,7 +68,7 @@ class ControlApiConfigSpecTest {
     @Test
     void specExposesCrossFieldRuleCatalogWithoutThePredicate(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            JsonNode spec = JSON.readTree(get(c.port, "/config/spec/pipeline").body());
+            JsonNode spec = V1Body.of(get(c.port, "/config/spec/pipeline").body());
             JsonNode rules = spec.get("rules");
             assertTrue(rules.size() >= 1);
             JsonNode rule = rules.get(0);
@@ -106,7 +106,7 @@ class ControlApiConfigSpecTest {
                        "name":"X",
                        "dirs":{"poll":"/in","database":"/out"},
                        "processing":{"threads":1}}}""";
-            JsonNode out = JSON.readTree(post(c.port, "/validate", body).body());
+            JsonNode out = V1Body.of(post(c.port, "/validate", body).body());
             assertTrue(out.get("clean").asBoolean(), "clean draft: " + out.get("findings"));
             assertEquals(0, out.get("findings").size());
         }
@@ -144,7 +144,7 @@ class ControlApiConfigSpecTest {
                        "name":"X",
                        "dirs":{"poll":"/in","database":"/out","backup":"//evil/share"},
                        "processing":{"threads":1}}}""";
-            JsonNode out = JSON.readTree(post(c.port, "/validate", body).body());
+            JsonNode out = V1Body.of(post(c.port, "/validate", body).body());
             assertFalse(out.get("safetyChecked").asBoolean(), "gate not run by default");
             assertTrue(out.get("clean").asBoolean(), "spec-only path is unchanged: " + out.get("findings"));
         }

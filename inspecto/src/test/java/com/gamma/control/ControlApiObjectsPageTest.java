@@ -27,9 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code GET /objects} cursor pagination over real HTTP (api-contract-design §7): on the {@code /api/v1}
  * surface the v1 envelope's {@code metadata.pagination} block carries {@code cursor/nextCursor/limit/total},
  * and walking the opaque {@code nextCursor} pages the objects newest-first (keyset {@code (createdAt, id)})
- * with no overlap, covering the whole set, and a null terminator on the last page. The legacy (unversioned)
- * view stays a bare JSON array with its {@code ?limit=&offset=} slice. Objects are seeded through the
- * service API, then exercised over the wire.
+ * with no overlap, covering the whole set, and a null terminator on the last page. Objects are seeded
+ * through the service API, then exercised over the wire.
  */
 class ControlApiObjectsPageTest {
 
@@ -83,11 +82,6 @@ class ControlApiObjectsPageTest {
             assertEquals(5, walked.size(), "no overlap and nothing dropped");
             assertEquals(allIds, new HashSet<>(walked), "the pages cover the whole set");
             assertEquals(walked.size(), new HashSet<>(walked).size(), "no id appears on two pages");
-
-            // legacy (unversioned) view is unchanged — a bare JSON array, no envelope/pagination
-            JsonNode legacy = json(get(c.port, "/objects?type=ALERT&limit=2"));
-            assertTrue(legacy.isArray(), "legacy stays a raw list");
-            assertEquals(2, legacy.size());
         }
     }
 
@@ -101,5 +95,5 @@ class ControlApiObjectsPageTest {
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
 }
