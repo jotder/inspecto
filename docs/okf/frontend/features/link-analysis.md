@@ -74,6 +74,23 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
   "View on map" (pivots to Geo Map Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.
+* **V2 decisions of record — 2026-07-25 product session (BACKLOG D9 / D10 / D16).** All three remaining V2
+  blockers were product calls, and all three were answered in favour of generalizing an existing seam rather
+  than adding a link-analysis-specific one:
+  * **D9 sharing — yes, saved views belong in the Exchange**, and the Exchange `kind` axis is widened
+    backend-side to carry them. Detail and the constraints a view grant must respect (live-mode only, must
+    require its datasets' grants) live in
+    [exchange-sharing.md](../../backend/control-plane/exchange-sharing.md) — the widening is a backend change,
+    so that doc is authoritative, not this one.
+  * **D10 per-view comments — generalize the note model**, do not re-key `ObjectNote` by component
+    `type`+`id`. A note becomes attachable to any `(kind, id)` target, so Incidents/Cases stay one adopter
+    instead of the special case the model is currently shaped around. Rejected alternative: the narrow re-key,
+    which buys the same feature and guarantees a third caller becomes a third special case. This aligns with
+    the generic-tag direction (BACKLOG D7) — grouping and annotation should both address components uniformly.
+  * **D16 pattern packs — a dedicated system Space owns the domain-seeded packs**, not the
+    space-template-gallery seeding path. Rationale: packs are installation-wide reference content, and seeding
+    them into user Spaces would fork them per Space, so a fix to a shipped pattern could never reach the
+    copies. A reserved system Space keeps one authoritative copy that every Space reads.
 
 Design (archived):
 [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)

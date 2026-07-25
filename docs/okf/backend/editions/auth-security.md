@@ -133,11 +133,50 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   Super (`Roles.SEED`) — requirement triage is a business-analyst activity; Pipeline Developer/Operations
   build/run rather than triage.
 
+## Decisions of record — 2026-07-25 product session (BACKLOG D4 / D14 / D15)
+
+- **D15 — no IdP/gateway vendor of record; the vendor is a per-client deployment choice.** The question
+  "Keycloak + WSO2 APIM vs. WSO2 IS" is **withdrawn, not answered**: we do not pick, we stay configurable and
+  let the client decide. This ratifies the standards-only posture the module already has — `OidcAuthenticator`
+  is vendor-agnostic (`-Dauth.oidc.issuer` / `.jwksUri` / `.audience` / `.rolesClaim`, generic RS256 Nimbus
+  processing, no vendor SDK). Two **vendor-shaped residuals** are therefore now defects against this decision
+  rather than neutral details, both non-blocking:
+  * `KeycloakTokenRelay` is a Keycloak-*named* class implementing the generic `TokenRelay` SPI, and its
+    `auth.oidc.tokenEndpoint` default falls back to Keycloak's path shape
+    (`<issuer>/protocol/openid-connect/token`). Overridable, so not lock-in — but the name implies a vendor of
+    record that no longer exists. Rename to a neutral `OidcTokenRelay` when next touched.
+  * The gateway trust header defaults to `X-JWT-Assertion` (WSO2 APIM's convention). Keep the default — it is
+    a sensible one — but document it as *a* convention, not *the* expected gateway.
+  Litmus test for future work: any new auth code that cannot be pointed at a different compliant IdP by
+  configuration alone is wrong.
+- **D14 — the R1 seed grant set is ratified with one tightening.** The five previously-unreviewed route
+  capabilities were checked against `Roles.SEED` in this session. `canConfigureAccess` and `canApproveShares`
+  were **already** admin/super-only, so the "bootstrap deadlock left them over-granted" concern was unfounded
+  — no change needed there. `canAuthorAlertRules` and `canRequestShares` are ratified as developer/ops-tier
+  (authoring a rule and *asking* for access are both reversible and gated downstream — a request still needs
+  an owner's approval). **`canOfferDatasets` was tightened to admin/super (implemented same day)**: offering a
+  Dataset cross-space is a data-*exposure* decision with no second gate behind it, so it does not belong with
+  the build-time capabilities granted to `pipeline-developer`/`app-developer`/`developer`/`power`. It left the
+  `builder` set and `power`, and joined `admin` (`super` holds the whole vocabulary via `KNOWN_CAPABILITIES`).
+  ⚠ **`Roles.SEED` is asserted by an *equality* check** in `OidcAuthenticatorTest`
+  (`adminRoleGrantsOnboardConnectionsAndNotWorkbench`) — every future grant addition must update that test, and
+  it must be run under **`-Pedition-enterprise`**: the default reactor omits `inspecto-security` entirely, so a
+  plain `mvn -o clean test` cannot see a failure there. That gap had already left this assertion red on
+  `master` since `7e90f53d`; see `.claude/skills/build-verify/SKILL.md`.
+- **D4 — split `canCurateMenus` out of `canAuthorWorkbench`.** Today every `pipeline-developer`/
+  `app-developer`/`developer`/`power` seed role gets menu curation free, conflating "may edit a pipeline" with
+  "may change what this space's business users see" — a navigation change is visible to every user in the
+  space and is not a build activity. Touch list (from the O1 survey, unchanged): `Roles.java` constant + seed
+  grant · `CapabilityManifest.java` `/nav/menus` entry (**its test enforces manifest↔registration congruence
+  in both directions, so the manifest entry and the route gate must land together**) · `NavRoutes.java` gate ·
+  a `LensService` signal · an `ACCESS_ACTION_NODES.settings` node. Default grant for the new capability:
+  admin/super plus `power` — curation is a space-owner activity, and `power` is the seeded role closest to
+  "owns this space's presentation".
+
 Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): a policy-**authoring** UX beyond
 TOON+validation (a matrix/create editor — the read-only visibility + explain above shipped, authoring did
 not); X-Actor is already rejected on Standard (the SEC-7a spoof guard), so only its full removal remains,
-client-migration-gated with the API-v1 legacy sunset; final IdP/gateway vendor split (Keycloak + WSO2 APIM
-vs. WSO2 IS).
+client-migration-gated with the API-v1 legacy sunset.
 
 `package.ps1 -Edition Enterprise` **shipped 2026-07-25** — a superset of Standard (both the `security` and
 `policy` jars are bundled), with `serve.sh`/`serve.bat` deriving the edition from bundle contents. No

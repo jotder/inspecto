@@ -1,6 +1,7 @@
 # NFR-7 — Compliance certifications plan (SOC 2 Type I/II → ISO 27001 → FedRAMP alignment; HIPAA/PCI scoped)
 
-**Status:** DRAFT 2026-07-23 — sequencing decision pending (§6 Q1). Expanded same day to
+**Status:** DRAFT 2026-07-23 — **sequencing ANSWERED 2026-07-25 (§6 Q1: parallel, SOC 2 is not a gate).**
+Expanded same day to
 control-level coverage for SOC 2 / ISO 27001 / FedRAMP (§2b, C6). · **Owner:** enterprise-PM track
 (org-side controls are Gamma Analytics', not this repo's — §5 boundary). · **Companions:**
 `../REQUIREMENTS.md` NFR-7 (PARTIAL: posture shipped, certifications not started) ·
@@ -180,8 +181,19 @@ the evidence" for every technical control an auditor asks about.
 
 ## 6. Open questions
 
-1. **Sequence sign-off (product):** SOC 2 Type I → II → ISO 27001, with FedRAMP/HIPAA/PCI as
-   scoping statements only — confirm, or reorder against actual prospect demand.
+1. ~~**Sequence sign-off (product):**~~ **ANSWERED 2026-07-25 (BACKLOG D1): no strict sequence — NFR-7 work
+   proceeds in parallel; SOC 2 is not a gate on the rest.** The plan is *not* re-ordered (SOC 2 Type I → II →
+   ISO 27001 remains the expected certification order where certifications interact), but engineering
+   execution is explicitly unblocked from waiting on it. Rationale: most of C1–C6 is shared control evidence
+   that every framework consumes — an SBOM, release signing, audit-log coverage, access-control evidence do
+   not become different artifacts because SOC 2 goes first — so serializing behind one certification would
+   idle work that all of them need. Consequence: **C1 is no longer a blocking predecessor.** Two caveats that
+   survive the parallelism:
+   * Q6 stands unchanged — the SOC 2 **Type II observation window** still cannot open until the RBAC/ABAC
+     R-workstreams are live, because CC6 controls must *operate* during the window (they are now complete, so
+     this is ready to schedule, but it is a real ordering constraint, not a preference).
+   * Anything requiring an **external party** (3PAO, auditor, certification body) is still sequential in
+     practice and paced by them, not us — parallelism applies to the evidence work we own.
 2. **SBOM format:** CycloneDX JSON (recommended; widest tool acceptance) vs SPDX.
 3. **Where does the GPG release key live** (org secret management — blocks C3 release signing
    being *routine* rather than merely possible).

@@ -174,5 +174,19 @@ fail-closed) / `restore` (manifest validation before any write, zip-slip jail, c
   Read-only, fail-soft on <2 samples. The catalog's `created_ms` (epoch millis) is the sortable/filterable key —
   ISO strings aren't reliably chronological across variable precision. Open COULD follow-ons: space-to-space
   comparison, predictive maintenance (the latter is AGT-5/self-healing territory, deliberately deferred).
-* **Deferred:** the Archived-Incident sweep (MNT-14) is blocked until the backend Incident workflow gains the
-  Identified→Archived lifecycle + an `ObjectStore` delete API. Runbook: `docs/ops/backup-restore-runbook.md`.
+* **Archived-Incident sweep (MNT-14) — retention model DECIDED 2026-07-25 (BACKLOG D5): a retention tier,
+  NOT archive-is-terminal.** `Archived` is a real lifecycle state (today the workflow is only
+  OPEN→…→CLOSED) but it is **not** the end of the line: an archived Incident carries a **retention window**,
+  and expiry of that window is what makes it eligible for purge/cold-store. Rationale: archive-is-terminal
+  would have made "archived" mean "kept forever", which is exactly the posture the NFR-7 compliance work
+  (see `superpower/compliance-certifications-plan.md`) has to be able to bound and evidence — a retention
+  tier lets a deployment answer "how long do we keep incident records" with configuration instead of a code
+  change. Consequences for the build:
+  * Retention is **per-tier, operator-configured**, and the sweep is the *enforcer* of a tier, not the owner
+    of a hardcoded age. CLOSED→`Archived` and `Archived`→purge are two separate windows.
+  * Purge is a **real deletion** and needs the `ObjectStore` delete API (shipped 2026-07-24) — so the
+    surviving blocker is the `Archived` lifecycle state itself, no longer the delete seam.
+  * The sweep must be **dry-run-first and report what it would purge** before it purges; a retention sweep
+    that silently deletes case history is the one failure here nobody can undo.
+  * A legal-hold / exempt escape hatch is required, otherwise retention expiry can destroy records that an
+    open investigation still needs. Runbook: `docs/ops/backup-restore-runbook.md`.

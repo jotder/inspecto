@@ -102,8 +102,22 @@ timestamp: 2026-07-16T00:00:00Z
 * **Delivery-status webhooks re-scoped** (2026-07-24) — per the archived plan this means **inbound**
   provider callbacks (bounce/complaint/delivered for sent email, SES/SendGrid-style event webhooks),
   not outbound push (the outbound `webhook` channel shipped 2026-07-22, `channel/WebhookChannel`).
-  Gated on a delivery-status model (`Notification`/store carry no status field) + a product call on
-  which statuses to track; Standard/Enterprise flavor territory. Not scheduled.
+  **Status model DECIDED 2026-07-25 (BACKLOG D8): track all three of `delivered` / `bounce` /
+  `complaint`.** Rationale: bounce alone tells you a send failed but not whether the rest are landing, and
+  `complaint` is the one class with a *deliverability* consequence (ignoring spam complaints degrades the
+  sending domain for every other notification), so it cannot be the thing we drop. The build shape this
+  implies:
+  * `Notification`/its store gain a **status field plus a per-status timestamp** — a single mutable status
+    enum loses ordering when a provider sends `delivered` then `complaint` for the same message, which is
+    the normal case for a spam-button click.
+  * Provider vocabularies differ (SES `Bounce`/`Complaint`/`Delivery` vs SendGrid `bounce`/`spamreport`/
+    `delivered`), so normalize at the adapter edge into our three canonical values; an unrecognized
+    provider event is **recorded as unknown, never dropped silently and never mapped to a guess**.
+  * Distinguish hard vs soft bounce — a soft bounce is retryable and must not disable a destination that is
+    merely full or briefly unavailable.
+  * The inbound callback route is **unauthenticated by origin**, so it must verify the provider's signature
+    and fail closed; an unverified callback must not be allowed to mark a destination dead (that is a cheap
+    denial-of-notification vector). Still Standard/Enterprise flavor territory; still not scheduled.
 * Deferred to editions/follow-ons: delivery-status webhooks (above), time-based retention
   sweep, GeoIP, auth-gated security-event triggers / per-user prefs.
 

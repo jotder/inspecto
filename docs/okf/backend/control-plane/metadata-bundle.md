@@ -45,9 +45,14 @@ of its backing store:
 * **Secrets never travel** — connection secrets export masked (`${ENV:…}` references only).
 * **Data never travels** — a dataset item is metadata (columns/roles/measures/query); runtime state (runs,
   batches, Incidents, watermarks) and server TOON config are out of scope by design.
-* **Not yet server-side:** `connection` stays out of scope on purpose — its profiles carry secret references,
-  and whether a bundle may carry a masked or reference-only credential is an unmade policy call; promote a
-  connection via the UI path or the whole-space zip until that call is made.
+* **`connection` — policy DECIDED 2026-07-25 (BACKLOG D2): reference-only, secrets stripped.** A bundle may
+  carry a `connection`, but **never a secret value in any form** — not plaintext, not bundle-encrypted. Only
+  the `${ENV:…}` reference travels (the same masking the invariant above already applies), so an importing
+  installation must have the referenced env/secret provisioned independently; if it does not, the connection
+  imports with an unresolvable reference and fails closed at first use rather than at import. Rationale: a
+  bundle is a promotion/transport artifact that lands in git, CI, and support tickets, so an encrypted-secret
+  option would put credential material in all three for the sake of convenience. This unblocks `connection` as
+  the last missing `BundleRoutes` kind — implementing it is now a build, not a decision.
 * `requires` classify `satisfied | different | missing` — *present-but-different* (2026-07-18) compares the
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.

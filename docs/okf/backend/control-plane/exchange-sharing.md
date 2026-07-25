@@ -96,6 +96,23 @@ split — no new color owner, still passes `lint:tokens`.
 (`_server` pseudo-space ledgers), gated on `mockExchange`; its seed pins the demo "Shared with me" grant
 at `v2` against a `v3` snapshot so drift is visible with no backend.
 
+## Decided 2026-07-25 (BACKLOG D9) — widen the kind axis to saved views
+
+`kind` is to become a **third value: a saved view** (the link-analysis saved view is the first adopter), not
+just `dataset`/`widget`. Today `OfferShareDialog` and `ExchangeService.offer` are **hard-typed** to
+`dataset`/`widget`, so link-analysis V2 (b) sharing was blocked backend-side — the earlier "sharing is
+frontend-only" claim in the backlog was wrong. The call: widen the seam rather than build a parallel
+sharing mechanism for views, so grants, expiry, revocation, and the audit ledger stay in one place.
+
+Constraints the widening must respect, because a view is not a dataset:
+
+* A saved view is **metadata that references datasets**, so a view grant must **require the grants of every
+  dataset it reads** — the existing widget→dataset auto-pairing/cascade is the precedent to generalize, not
+  to special-case a second time. A view whose underlying dataset grant is revoked must stop resolving.
+* Snapshot delivery is meaningless for a view (there are no rows of its own) ⇒ a view offer is **live-mode
+  only**; `mode: snapshot` must be rejected rather than silently treated as live.
+* Fail-closed stays: no active grant ⇒ the view ref does not resolve even if the files exist.
+
 ## What is deliberately out of scope
 
 No Schema sharing (a Dataset's own Result Set is self-describing). No sharing of Dashboards, Pipelines,

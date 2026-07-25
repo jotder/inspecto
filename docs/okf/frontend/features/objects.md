@@ -42,12 +42,30 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
   then reconciles each row with the authoritative server object; failures reload
   ([forms & state](../conventions/forms-and-state.md)). Merge/split/create stay request→refetch.
 * **Tags & Tag Rules** — `/tags` + `/tags/rules`, auto-applied when an object opens; TOON-persisted,
-  survive restart.
+  survive restart. **Scope note (2026-07-25):** this is an *object-scoped* tag system — the registry and the
+  rules both assume the tagged thing is an Incident/Case. BACKLOG **D7** decided tags become a **generic
+  cross-entity** grouping concept (streams, Alert Rules, datasets, …) backed by a central registry plus a
+  `(tag, entity_kind, entity_id)` assignment store, i.e. **this system generalized**, not a second one built
+  beside it. ⚠ Note for anyone reading the old backlog row: its claim that "nothing writes `attributes.tags`"
+  was **simply false** — `ObjectService.ATTR_TAGS` (`= "tags"`) is written on manual apply, tag-rule merge,
+  rule-raised creation, merge union, and split. The narrow `GET /objects` tag filter that row dismissed as
+  "would silently match nothing" would in fact have worked. Plan:
+  [`superpower/generic-tags-plan.md`](../../../superpower/generic-tags-plan.md).
 * **Case management** — case **Contents** (member incidents) with **Split & Merge**; variable **Cause
   Analysis** (`postmortem.causeAnalysis[]` + `causeMethod`); **Findings** (disposition/impact/records,
   soft no-disposition prompt); team `assignees` + `targetDate`. **Rule-raised cases**: `CaseRule`
   (`/cases/rules`, evaluate-on-demand, opens-or-attaches idempotently); **case analytics** via
   `GET /objects/analytics?type=` (stat tiles + by-category bar; Studio-dataset binding is a follow-up).
+* **Configurable Findings sections (C3) — config source DECIDED 2026-07-25 (BACKLOG D6): reuse the C6
+  workflow/TOON pattern + the `attribute-spec` renderer; no new endpoint.** Findings today are a fixed
+  disposition/impact/records shape (`mail-model.ts`); making the section set configurable follows the
+  precedent already set two lines up — the **Lifecycle** bullet reads `GET /workflows/{type}` rather than
+  hardcoding states, and TOON overrides drive the same panes. Findings sections get the same treatment, so a
+  deployment configures them the way it already configures workflows, and the existing `attribute-spec`
+  renderer draws them. Rejected: a purpose-built Findings-config endpoint — it would be a third
+  configuration idiom for the same class of problem, and the pattern that exists already covers it. **This is
+  not a UI-only change**: the section definitions must be server-authored TOON and served like workflows are,
+  otherwise each client re-invents the schema.
 
 As-built designs (archived):
 [`incidents-mail-ui-design.md`](../../../archived-documents/plans-archive/incidents-mail-ui-design.md) ·
