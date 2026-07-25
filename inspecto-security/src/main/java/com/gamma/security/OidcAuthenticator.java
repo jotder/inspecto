@@ -32,14 +32,16 @@ import java.util.Set;
  * yields an empty result (the caller gets 401), never an exception with detail the caller could learn
  * from.
  *
- * <p><b>Gateway trust mode (RBAC R0).</b> When an API gateway (WSO2 APIM) terminates end-user auth
- * and forwards a <em>gateway-signed</em> backend JWT in a header (APIM default:
- * {@code X-JWT-Assertion}), configuring {@code -Dauth.oidc.gateway.issuer} +
+ * <p><b>Gateway trust mode (RBAC R0).</b> When an API gateway terminates end-user auth and forwards a
+ * <em>gateway-signed</em> backend JWT in a header, configuring {@code -Dauth.oidc.gateway.issuer} +
  * {@code -Dauth.oidc.gateway.jwksUri} (optional {@code .audience}, {@code .header}) enables a second
  * {@link DefaultJWTProcessor} that validates that header through the exact same signature/issuer/
- * audience/expiry pipeline. A {@code Bearer} token, when present, always decides first; the assertion
- * is consulted only when no valid Bearer subject resolves (APIM may pass the client's opaque gateway
- * token through in {@code Authorization}). Identity from a plain <em>unsigned</em> header is never
+ * audience/expiry pipeline. The header name defaults to {@code X-JWT-Assertion} — <em>a</em> convention
+ * (WSO2 APIM's, and a widely copied one), <b>not</b> an expected gateway of record: there is no gateway
+ * vendor of record (BACKLOG D15), and any gateway is accommodated by setting
+ * {@code -Dauth.oidc.gateway.header}. A {@code Bearer} token, when present, always decides first; the
+ * assertion is consulted only when no valid Bearer subject resolves (a gateway may pass the client's
+ * opaque token through in {@code Authorization}). Identity from a plain <em>unsigned</em> header is never
  * trusted — that is the X-Actor lesson. Both paths tolerate Nimbus's default bounded clock skew
  * (60&nbsp;s, {@code DefaultJWTClaimsVerifier}) on {@code exp}/{@code nbf}.
  */

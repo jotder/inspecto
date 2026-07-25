@@ -22,9 +22,17 @@ import java.util.Optional;
  * short-lived access token while the refresh token stays in the control plane's {@code httpOnly}
  * cookie. Registered via {@code META-INF/services/com.gamma.control.TokenRelay}.
  *
+ * <p>Vendor-neutral by construction (BACKLOG D15: there is no IdP of record — the IdP is a per-client
+ * deployment choice). Nothing here knows a vendor's URL layout: the token endpoint is <b>required
+ * configuration</b>, never guessed from a product's path shape, so pointing the relay at any compliant
+ * OIDC provider is a config-only change.
+ *
  * <p><b>Config</b> ({@code -D} flags, alongside {@code OidcAuthenticator}'s {@code auth.oidc.*}):
- * {@code auth.oidc.tokenEndpoint} (defaults to the Keycloak layout
- * {@code <auth.oidc.issuer>/protocol/openid-connect/token}), {@code auth.oidc.clientId} (default
+ * {@code auth.oidc.tokenEndpoint} — <b>mandatory, no default</b>; take it from the provider's
+ * {@code token_endpoint} in its {@code /.well-known/openid-configuration} discovery document (this
+ * module deliberately does no discovery fetch at boot, matching {@code auth.oidc.jwksUri}, which is
+ * likewise configured explicitly). A missing value fails fast at startup. Then
+ * {@code auth.oidc.clientId} (default
  * {@code inspecto-spa}), and optional {@code auth.oidc.clientSecret} for a confidential client — its
  * value goes through {@link SecretResolver}, so pass a <b>reference</b> ({@code ${ENV:NAME}} /
  * {@code ${SYS:prop}}), never the raw secret on the command line (the shipped secrets seam; the
@@ -34,7 +42,7 @@ import java.util.Optional;
  * <p>Any IAM error (rejected code, revoked refresh token, 5xx, timeout) yields an empty result —
  * the caller 401s without learning the IAM's error detail.
  */
-public final class KeycloakTokenRelay implements TokenRelay {
+public final class OidcTokenRelay implements TokenRelay {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
@@ -45,15 +53,15 @@ public final class KeycloakTokenRelay implements TokenRelay {
     private final String clientSecret;   // null ⇒ public client (PKCE only)
 
     /** No-arg constructor required by {@code ServiceLoader}; reads {@code -Dauth.oidc.*}. */
-    public KeycloakTokenRelay() {
+    public OidcTokenRelay() {
         this(HttpClient.newBuilder().connectTimeout(TIMEOUT).build(),
-                URI.create(System.getProperty("auth.oidc.tokenEndpoint", defaultTokenEndpoint())),
+                URI.create(requireTokenEndpoint()),
                 System.getProperty("auth.oidc.clientId", "inspecto-spa"),
                 resolveSecret(System.getProperty("auth.oidc.clientSecret")));
     }
 
     /** Explicit-config seam (tests point this at a local stand-in for the IAM). */
-    KeycloakTokenRelay(HttpClient http, URI tokenEndpoint, String clientId, String clientSecret) {
+    OidcTokenRelay(HttpClient http, URI tokenEndpoint, String clientId, String clientSecret) {
         this.http = http;
         this.tokenEndpoint = tokenEndpoint;
         this.clientId = clientId;
@@ -108,11 +116,18 @@ public final class KeycloakTokenRelay implements TokenRelay {
         return out.toString();
     }
 
-    private static String defaultTokenEndpoint() {
-        String issuer = System.getProperty("auth.oidc.issuer");
-        if (issuer == null || issuer.isBlank())
-            throw new IllegalStateException("KeycloakTokenRelay requires -Dauth.oidc.tokenEndpoint or -Dauth.oidc.issuer");
-        return issuer.replaceAll("/$", "") + "/protocol/openid-connect/token";
+    /**
+     * The token endpoint is required, never derived: guessing it from {@code auth.oidc.issuer} would bake
+     * one vendor's path layout into the product (BACKLOG D15). Read the real value from the provider's
+     * {@code /.well-known/openid-configuration} ({@code token_endpoint}) and pass it explicitly.
+     */
+    private static String requireTokenEndpoint() {
+        String endpoint = System.getProperty("auth.oidc.tokenEndpoint");
+        if (endpoint == null || endpoint.isBlank())
+            throw new IllegalStateException("inspecto-security requires -Dauth.oidc.tokenEndpoint"
+                    + " (the OIDC provider's token_endpoint, from its /.well-known/openid-configuration;"
+                    + " it is not derived from -Dauth.oidc.issuer — no vendor path layout is assumed)");
+        return endpoint;
     }
 
     private static String resolveSecret(String ref) {

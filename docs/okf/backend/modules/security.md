@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Security module (inspecto-security)
-description: Standard-edition OIDC resource server behind the Authenticator/Subject/TokenRelay SPIs — Nimbus JWKS, RoleMapper, Keycloak token relay; reactor-gated behind the edition-standard profile.
+description: Standard-edition OIDC resource server behind the Authenticator/Subject/TokenRelay SPIs — Nimbus JWKS, RoleMapper, vendor-neutral OIDC token relay; reactor-gated behind the edition-standard profile.
 resource: inspecto-security/
 tags: [module, security, oidc, editions, standard, spi]
 timestamp: 2026-07-07T00:00:00Z
@@ -16,7 +16,7 @@ The fifth Maven module (`file-processor-security`), shipped W6 (2026-07-06). It 
   `TokenRelay`, discovered via `ServiceLoader`. **No-op wins**: with no provider on the classpath the
   Personal edition is byte-for-byte unchanged.
 * **Contents** — `OidcAuthenticator` (OIDC resource server on Nimbus JOSE+JWT / JWKS),
-  `RoleMapper` (token claims → Roles/Capabilities), `KeycloakTokenRelay`.
+  `RoleMapper` (token claims → Roles/Capabilities), `OidcTokenRelay`.
 * **Reactor gating** — the module only builds under the `edition-standard` Maven profile; the default
   `mvn -o clean test` never compiles it (verify with `-Pedition-standard`, 41 tests).
 * **Around it (in core, W6/W6d)** — the AuthN gate + per-route capability checks

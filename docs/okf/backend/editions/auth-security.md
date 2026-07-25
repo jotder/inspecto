@@ -18,7 +18,7 @@ is no token paste / guard / interceptor. The removed hand-rolled bearer-token pl
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
 `id` + capabilities), and **`TokenRelay`**. `inspecto-security/` (artifactId `file-processor-security`, 41
 tests) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
-`KeycloakTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
+`OidcTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
 build never compiles it (verify with `-Pedition-standard`); because it's a
 [build flavor](editions-model.md), the core still carries zero auth code.
 
@@ -139,14 +139,20 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   "Keycloak + WSO2 APIM vs. WSO2 IS" is **withdrawn, not answered**: we do not pick, we stay configurable and
   let the client decide. This ratifies the standards-only posture the module already has — `OidcAuthenticator`
   is vendor-agnostic (`-Dauth.oidc.issuer` / `.jwksUri` / `.audience` / `.rolesClaim`, generic RS256 Nimbus
-  processing, no vendor SDK). Two **vendor-shaped residuals** are therefore now defects against this decision
-  rather than neutral details, both non-blocking:
-  * `KeycloakTokenRelay` is a Keycloak-*named* class implementing the generic `TokenRelay` SPI, and its
-    `auth.oidc.tokenEndpoint` default falls back to Keycloak's path shape
-    (`<issuer>/protocol/openid-connect/token`). Overridable, so not lock-in — but the name implies a vendor of
-    record that no longer exists. Rename to a neutral `OidcTokenRelay` when next touched.
-  * The gateway trust header defaults to `X-JWT-Assertion` (WSO2 APIM's convention). Keep the default — it is
-    a sensible one — but document it as *a* convention, not *the* expected gateway.
+  processing, no vendor SDK). Two **vendor-shaped residuals** were defects against this decision; both are
+  now **fixed (2026-07-25)**:
+  * **`KeycloakTokenRelay` → `OidcTokenRelay`** (class + `META-INF/services/com.gamma.control.TokenRelay` +
+    `OidcTokenRelayTest`), matching `OidcAuthenticator`'s neutral naming.
+  * **`auth.oidc.tokenEndpoint` is now mandatory with no default.** The old fallback derived
+    `<auth.oidc.issuer>/protocol/openid-connect/token` — one vendor's path layout baked into the product.
+    There is no discovery fetch to derive it from (this module configures `auth.oidc.jwksUri` explicitly
+    too, by design), so the relay **fails fast** at construction with a message naming the property:
+    take `token_endpoint` from the provider's `/.well-known/openid-configuration` and pass
+    `-Dauth.oidc.tokenEndpoint=…`. ⚠ **Deployment-breaking for anyone who relied on the derived default** —
+    Keycloak deployments must now set the flag explicitly (same value as before).
+  * The gateway trust header still defaults to `X-JWT-Assertion` — **unchanged behaviour**, now documented in
+    `OidcAuthenticator`'s javadoc as *a* convention (WSO2 APIM's, widely copied), not *the* expected gateway;
+    any gateway is accommodated via `-Dauth.oidc.gateway.header`.
   Litmus test for future work: any new auth code that cannot be pointed at a different compliant IdP by
   configuration alone is wrong.
 - **D14 — the R1 seed grant set is ratified with one tightening.** The five previously-unreviewed route

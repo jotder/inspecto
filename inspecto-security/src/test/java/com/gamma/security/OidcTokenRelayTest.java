@@ -20,11 +20,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Offline tests for {@link KeycloakTokenRelay}: a local {@link HttpServer} stands in for Keycloak's
+ * Offline tests for {@link OidcTokenRelay}: a local {@link HttpServer} stands in for the IAM's
  * token endpoint, capturing the form the relay sends and returning canned OIDC token responses — the
  * real {@code java.net.http.HttpClient} wire path is exercised with no IAM and no network.
  */
-class KeycloakTokenRelayTest {
+class OidcTokenRelayTest {
 
     private HttpServer iam;
     private final AtomicReference<Map<String, String>> lastForm = new AtomicReference<>();
@@ -52,8 +52,8 @@ class KeycloakTokenRelayTest {
         iam.stop(0);
     }
 
-    private KeycloakTokenRelay relay(String clientSecret) {
-        return new KeycloakTokenRelay(HttpClient.newHttpClient(),
+    private OidcTokenRelay relay(String clientSecret) {
+        return new OidcTokenRelay(HttpClient.newHttpClient(),
                 URI.create("http://localhost:" + iam.getAddress().getPort() + "/token"),
                 "inspecto-spa", clientSecret);
     }
@@ -115,7 +115,7 @@ class KeycloakTokenRelayTest {
 
     @Test
     void unreachableIamIsEmpty() {
-        KeycloakTokenRelay dead = new KeycloakTokenRelay(HttpClient.newHttpClient(),
+        OidcTokenRelay dead = new OidcTokenRelay(HttpClient.newHttpClient(),
                 URI.create("http://localhost:1/token"), "inspecto-spa", null);   // port 1: nothing listens
         assertTrue(dead.exchangeCode("c", "v", "r").isEmpty());
     }

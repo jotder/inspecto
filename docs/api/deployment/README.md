@@ -54,7 +54,7 @@ The blueprint's realm/client names map to the `-Dauth.oidc.*` flags `OidcAuthent
 | `-Dauth.oidc.jwksUri` | `https://<keycloak-host>/realms/inspecto/protocol/openid-connect/certs` |
 | `-Dauth.oidc.audience` | `inspecto-api` |
 | `-Dauth.oidc.rolesClaim` | `roles` (default — falls back to `realm_access.roles` automatically) |
-| `-Dauth.oidc.tokenEndpoint` | derived from the issuer (Keycloak layout) — override for other IAMs |
+| `-Dauth.oidc.tokenEndpoint` | **REQUIRED** (BACKLOG D15) — the provider's `token_endpoint`, copied from its `/.well-known/openid-configuration`. No longer derived from the issuer: no vendor path layout is assumed, so a missing value fails fast at startup rather than guessing a Keycloak shape |
 | `-Dauth.oidc.clientId` | `inspecto-spa` (default) |
 | `-Dauth.oidc.clientSecret` | *optional* (public PKCE client needs none). Pass a **`SecretResolver` reference** — `${ENV:NAME}` / `${SYS:prop}` — never the raw value |
 
