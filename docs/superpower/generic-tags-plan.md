@@ -1,7 +1,10 @@
 # Generic tags — cross-entity labelling plan (BACKLOG D7)
 
-**Status:** DRAFT 2026-07-25 — scope + storage decided; **§3 Q1–Q4 answered from the code 2026-07-25**,
-**Q5 + Q6 still need the operator**; phasing open until they are. **Owner:** unassigned.
+**Status:** **PHASE 1 SHIPPED 2026-07-26** — backend store + routes are in (`ops.tag.TagAssignment*`,
+`/tags/assignments/…`, `/tags/{name}/targets`). Q1–Q4 were answered from the code; **Q5 dissolved and Q6
+was scoped down** at build time (see §3). **Phase 2 — the CSV reconciliation, the rename/delete routes,
+and the UI — is NOT built**; residuals are in BACKLOG §6. Concept home:
+[`../okf/backend/control-plane/tags.md`](../okf/backend/control-plane/tags.md). **Owner:** unassigned.
 **Origin:** BACKLOG **D7**, rescoped by the operator during the 2026-07-25 decision session from
 "a `tags` filter on `GET /objects`" to *"use tags for grouping different items from lists, generic
 functionality, applied to most groupable items — streams, rules, alerts, etc., like a mail tag in Gmail."*
@@ -117,18 +120,51 @@ it needs no new seam, it degrades safely (a stale row is invisible, not wrong), 
 notes behaving identically, which was the stated goal in §2. Revisit only if a hard-delete route lands,
 at which point notes and tags should get the same cleanup in one change.
 
-### ⏳ Q5 — capability model — **NEEDS THE OPERATOR**
+### ✅ Q5 — capability model — **the question dissolved: NO new capability, gate per target**
 
-One `canAuthorTags` for the registry, or per-kind (tagging a Dataset ≠ tagging an Incident)? The **D4**
-precedent from the same session says a capability spanning two genuinely different activities should be
-split, not bundled. Note also the shipped constraint: **a capability change must land its manifest entry
-and its route gate in one commit** (`CapabilityManifestTest` checks congruence on the string literal).
+Neither option. Investigating D10 for the addressing scheme surfaced that **`NoteRoutes` has no capability
+gate at all** — it authorizes per *target*, delegating `object` targets to the SEC-7d/ABAC scope check and
+component targets to the R3 sharing gate. Tags took the same route, and it is strictly better than either
+Q5 option for the reason §4 already stated: **a capability would make "can tag" independent of "can see"**,
+which is precisely how a tag becomes an access grant. Per-target gating makes "you can only tag, and only
+*find*, what you could already see" a structural property instead of a rule someone has to remember.
 
-### ⏳ Q6 — does the Gmail metaphor extend to filtering / saved searches? — **NEEDS THE OPERATOR**
+Implemented as `control/AnnotationTargets` — extracted from `NoteRoutes` when tags became the second
+consumer, so the two features cannot drift into disagreeing about who may touch what. `CapabilityManifest`
+needed no entry, and `CapabilityManifestTest` stayed green unchanged, which is the congruence proof.
 
-⚠ Q2 raises the stakes on this one: there is **no server-side tag query today**, so "list everything
-tagged X" is net-new work in v1 regardless of how narrowly it is scoped. The answer changes the size of
-the build materially, so it should be settled before phasing.
+Registry writes (`POST /tags`, Tag Rule CRUD) keep their existing `canAuthorWorkbench` gate — creating
+vocabulary really is an authoring act.
+
+### ✅ Q6 — filtering — **split in two; the read ships, the Gmail layer does not**
+
+Answered by the operator as "no filtering in v1", refined at build time into a distinction the question
+had conflated:
+
+- **`GET /tags/{name}/targets` — the plain "everything tagged X" read — SHIPPED.** It is not optional: a
+  central assignment store buys nothing over the pre-existing CSV without it, §2's whole architectural
+  argument rests on it, and §5 requires it as a verification. Deferring it would have meant building the
+  store and none of its payoff.
+- **The Gmail layer — saved searches, tag-scoped views, filter chips in list surfaces — DEFERRED.** That
+  is the part that materially sized the build, and it is additive later.
+
+## 3b. What phase 1 actually shipped (2026-07-26)
+
+`TagAssignment` · `TagAssignmentStore` + in-memory and DuckDB/Postgres implementations · per-Space wiring
+on `CollectorService.tagAssignments()` · four routes · `AnnotationTargets` (extracted shared gate) · 14
+store tests driving **both** implementations through identical assertions + 4 HTTP route tests.
+
+**Deliberately deferred, all in BACKLOG §6:**
+
+- **The CSV path was not migrated.** Q2 called for a one-time backfill; phase 1 skipped it so the shipped
+  Incidents/Cases behaviour could not regress. ⚠ **The consequence is a real split-brain**: a tag applied
+  by a Tag Rule lands in `attributes.tags` and does **not** appear in `GET /tags/{name}/targets`, and one
+  applied through the new routes does not appear in the object's `tags` string. Phase 2 must reconcile
+  them, and until it does this is the single most confusing thing about the feature.
+- **`rename()` and `removeTag()` have no route.** They are implemented and tested — the architecture is
+  justified by rename, so it needed a test that would fail under the per-entity shape — but nothing calls
+  them, so deleting a tag from the registry leaves its assignments behind.
+- **No UI.**
 
 ## 4. Non-goals (v1)
 

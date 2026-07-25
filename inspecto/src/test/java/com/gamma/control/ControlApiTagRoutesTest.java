@@ -146,6 +146,95 @@ class ControlApiTagRoutesTest {
         return V1Body.of(r.body());
     }
 
+
+    // ── cross-entity tag assignments (BACKLOG D7) ────────────────────────────────────────────────
+
+    @Test
+    void appliesATagToAnObjectAndListsItBothWays(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+                    "HIGH", "CRITICAL", null, null, "corr", Map.of());
+            assertEquals(200, send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}").statusCode());
+
+            HttpResponse<String> applied = send(c.port, "POST",
+                    "/tags/assignments/object/" + inc.id(), "{\"tag\":\"q3-audit\",\"actor\":\"alice\"}");
+            assertEquals(200, applied.statusCode());
+            assertEquals("q3-audit", JSON.readTree(applied.body()).at("/data/tag").asText());
+
+            JsonNode on = JSON.readTree(send(c.port, "GET",
+                    "/tags/assignments/object/" + inc.id(), null).body());
+            assertEquals("q3-audit", on.at("/data/tags/0").asText());
+
+            JsonNode targets = JSON.readTree(send(c.port, "GET", "/tags/q3-audit/targets", null).body());
+            assertEquals(1, targets.at("/data").size());
+            assertEquals(inc.id(), targets.at("/data/0/targetId").asText());
+            assertEquals("object", targets.at("/data/0/targetKind").asText());
+        }
+    }
+
+    @Test
+    void reapplyingIsIdempotentAndUnassignIsToo(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+                    "HIGH", "CRITICAL", null, null, "corr", Map.of());
+            send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}");
+            String path = "/tags/assignments/object/" + inc.id();
+
+            send(c.port, "POST", path, "{\"tag\":\"q3-audit\"}");
+            assertEquals(200, send(c.port, "POST", path, "{\"tag\":\"q3-audit\"}").statusCode());
+            assertEquals(1, JSON.readTree(send(c.port, "GET", "/tags/q3-audit/targets", null).body())
+                    .at("/data").size(), "re-applying must not create a second edge");
+
+            HttpResponse<String> first = send(c.port, "DELETE", path + "/q3-audit", null);
+            assertEquals(200, first.statusCode());
+            assertTrue(JSON.readTree(first.body()).at("/data/removed").asBoolean());
+            // Already gone is success with removed=false, not a 404 — the UI may retry a failed request.
+            assertFalse(JSON.readTree(send(c.port, "DELETE", path + "/q3-audit", null).body())
+                    .at("/data/removed").asBoolean());
+        }
+    }
+
+    @Test
+    void refusesAnUnknownTagAnUnknownKindAndAnAbsentTarget(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+                    "HIGH", "CRITICAL", null, null, "corr", Map.of());
+
+            // A typo must not silently mint a tag — that is how a tag vocabulary rots.
+            assertEquals(404, send(c.port, "POST", "/tags/assignments/object/" + inc.id(),
+                    "{\"tag\":\"nope\"}").statusCode());
+            assertEquals(400, send(c.port, "POST", "/tags/assignments/not-a-kind/x",
+                    "{\"tag\":\"nope\"}").statusCode());
+            assertEquals(404, send(c.port, "POST", "/tags/assignments/object/NOPE-404",
+                    "{\"tag\":\"nope\"}").statusCode());
+            assertEquals(400, send(c.port, "POST", "/tags/assignments/object/" + inc.id(),
+                    "{}").statusCode(), "missing 'tag' is a 400");
+        }
+    }
+
+    @Test
+    void oneTagSpansKindsAndAnUnknownTagListsEmpty(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            OperationalObject a = c.svc.objects().open(ObjectType.INCIDENT, "one", "d",
+                    "HIGH", "CRITICAL", null, null, "corr", Map.of());
+            OperationalObject b = c.svc.objects().open(ObjectType.INCIDENT, "two", "d",
+                    "LOW", "LOW", null, null, "corr", Map.of());
+            send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}");
+            send(c.port, "POST", "/tags/assignments/object/" + a.id(), "{\"tag\":\"q3-audit\"}");
+            send(c.port, "POST", "/tags/assignments/object/" + b.id(), "{\"tag\":\"q3-audit\"}");
+
+            assertEquals(2, JSON.readTree(send(c.port, "GET", "/tags/q3-audit/targets", null).body())
+                    .at("/data").size());
+            // An unknown tag is an empty list, not a 404: "nothing is labelled that" is a valid answer.
+            assertEquals(0, JSON.readTree(send(c.port, "GET", "/tags/never-used/targets", null).body())
+                    .at("/data").size());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

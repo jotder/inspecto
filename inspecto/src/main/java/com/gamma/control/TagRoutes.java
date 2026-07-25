@@ -38,6 +38,79 @@ final class TagRoutes implements RouteModule {
         api.delete("/tags/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteTagRule(api, ApiContext.name(m))));
         // Bulk apply mutates OBJECTS (an operational action, like transition/assign) — not config; ungated.
         api.post("/tags/rules/([^/]+)/apply", (e, m) -> applyTagRule(api, ApiContext.name(m)));
+
+        // ── cross-entity assignments (BACKLOG D7) ────────────────────────────────────────────────
+        // Gated per TARGET via AnnotationTargets, not by a capability: labelling a thing you can already
+        // see is a collaboration act, and a capability gate would make "can tag" independent of "can see"
+        // — which is exactly how a tag would turn into an access grant. See AnnotationTargets.
+        api.get("/tags/([^/]+)/targets", (e, m) -> targetsOf(api, e, ApiContext.name(m)));
+        api.get("/tags/assignments/([^/]+)/([^/]+)", (e, m) ->
+                tagsOn(api, e, ApiContext.name(m), ApiContext.param(m, 2)));
+        api.post("/tags/assignments/([^/]+)/([^/]+)", (e, m) ->
+                assign(api, e, ApiContext.name(m), ApiContext.param(m, 2), api.body(e)));
+        api.delete("/tags/assignments/([^/]+)/([^/]+)/([^/]+)", (e, m) ->
+                unassign(api, e, ApiContext.name(m), ApiContext.param(m, 2), ApiContext.param(m, 3)));
+    }
+
+    /**
+     * {@code GET /tags/{name}/targets} — everything carrying this tag, across kinds. The point of D7.
+     *
+     * <p>The result is filtered to what the caller may actually see. Two consequences worth keeping:
+     * a tag cannot be used to discover the existence of something otherwise hidden, and two users can
+     * legitimately get different counts for the same tag.
+     */
+    private Object targetsOf(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String name) {
+        return AnnotationTargets.mapErrors(() -> api.service().tagAssignments().forTag(name).stream()
+                .filter(a -> AnnotationTargets.visible(api, ex, a.targetKind(), a.targetId()))
+                .map(com.gamma.ops.tag.TagAssignment::toMap)
+                .toList());
+    }
+
+    /** {@code GET /tags/assignments/{targetKind}/{targetId}} — the tags on one thing, alphabetical. */
+    private Object tagsOn(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
+                          String targetKind, String targetId) {
+        return AnnotationTargets.mapErrors(() -> {
+            requireVisibleTarget(api, ex, targetKind, targetId);
+            return Map.of("targetKind", targetKind, "targetId", targetId,
+                    "tags", api.service().tagAssignments().tagsOf(targetKind, targetId));
+        });
+    }
+
+    /**
+     * {@code POST /tags/assignments/{targetKind}/{targetId}} — apply a tag; body {@code {tag, actor?}}.
+     * Idempotent, so the UI may apply optimistically without checking first. The tag must already exist
+     * in the registry (404 otherwise) — silently creating one on a typo is how a tag vocabulary rots.
+     */
+    private Object assign(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
+                          String targetKind, String targetId, Map<String, Object> body) {
+        String tag = ApiContext.str(body, "tag");
+        if (tag == null) throw new ApiException(400, "body must include 'tag'");
+        return AnnotationTargets.mapErrors(() -> {
+            requireVisibleTarget(api, ex, targetKind, targetId);
+            if (api.service().objects().tag(tag).isEmpty())
+                throw new ApiException(404, "no tag named '" + tag + "' — create it via POST /tags first");
+            return api.service().tagAssignments()
+                    .add(com.gamma.ops.tag.TagAssignment.of(tag, targetKind, targetId,
+                            ApiContext.str(body, "actor")))
+                    .toMap();
+        });
+    }
+
+    /** {@code DELETE /tags/assignments/{targetKind}/{targetId}/{tag}} — remove one label; idempotent. */
+    private Object unassign(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
+                            String targetKind, String targetId, String tag) {
+        return AnnotationTargets.mapErrors(() -> {
+            requireVisibleTarget(api, ex, targetKind, targetId);
+            boolean removed = api.service().tagAssignments().remove(tag, targetKind, targetId);
+            return Map.of("tag", tag, "targetKind", targetKind, "targetId", targetId, "removed", removed);
+        });
+    }
+
+    /** 404 when the target is absent or invisible — existence-hiding, same as the notes surface. */
+    private static void requireVisibleTarget(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
+                                             String targetKind, String targetId) {
+        if (AnnotationTargets.gate(api, ex, targetKind, targetId) == null)
+            throw new ApiException(404, "no " + targetKind + " '" + targetId + "'");
     }
 
     /** {@code POST /tags} — create a tag; body {@code {name}}. Duplicate → 409; persisted as {@code <name>_tag.toon}. */

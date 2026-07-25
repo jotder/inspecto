@@ -63,6 +63,9 @@ public interface SpaceRoot {
     /** Default JDBC URL for the evidence/notes store. */
     String notesDbUrl();
 
+    /** Default JDBC URL for the cross-entity tag-assignment store (BACKLOG D7). */
+    String tagAssignmentsDbUrl();
+
     /** Default JDBC URL for the status projection store. */
     String statusDbUrl();
 
@@ -108,6 +111,8 @@ final class LegacySpaceRoot implements SpaceRoot {
     public String linksDbUrl() { return "jdbc:duckdb:inspecto-ops-links.db"; }
 
     public String notesDbUrl() { return "jdbc:duckdb:inspecto-ops-notes.db"; }
+
+    public String tagAssignmentsDbUrl() { return "jdbc:duckdb:inspecto-ops-tags.db"; }
 
     public String statusDbUrl() {
         // Pre-rebrand default file is honoured when present and the new-name file is absent.
@@ -161,6 +166,8 @@ final class DirSpaceRoot implements SpaceRoot {
     public String linksDbUrl() { return duckdb("inspecto-ops-links.db"); }
 
     public String notesDbUrl() { return duckdb("inspecto-ops-notes.db"); }
+
+    public String tagAssignmentsDbUrl() { return duckdb("inspecto-ops-tags.db"); }
 
     public String statusDbUrl() { return duckdb("inspecto-status.db"); }
 

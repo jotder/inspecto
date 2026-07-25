@@ -180,6 +180,28 @@ final class ServiceStores {
     }
 
     /**
+     * Select the cross-entity tag-assignment backend (BACKLOG D7), mirroring {@link #openNoteStore(SpaceRoot)}:
+     * in-memory by default, or durable JDBC under {@code -Dobjects.backend=db} in its own DuckDB file
+     * ({@code -Dobjects.tags.db.url}, default {@link SpaceRoot#tagAssignmentsDbUrl()}) — a separate file for
+     * the same single-writer-lock reason as the note and link stores. A DB open that fails degrades to
+     * in-memory rather than blocking startup: losing durable tags is bad, refusing to boot over labels is worse.
+     */
+    static com.gamma.ops.tag.TagAssignmentStore openTagAssignmentStore(SpaceRoot root) {
+        String backend = System.getProperty("objects.backend", "memory");
+        if (!"db".equalsIgnoreCase(backend)) return new com.gamma.ops.tag.InMemoryTagAssignmentStore();
+        String url = System.getProperty("objects.tags.db.url", root.tagAssignmentsDbUrl());
+        try {
+            com.gamma.ops.tag.TagAssignmentStore db = com.gamma.ops.tag.DbTagAssignmentStore.open(url,
+                    System.getProperty("objects.db.user"), System.getProperty("objects.db.password"));
+            log.info("Tag assignment backend: database ({})", url);
+            return db;
+        } catch (Exception e) {
+            log.warn("Could not open tag DB at {} — falling back to in-memory: {}", url, e.getMessage());
+            return new com.gamma.ops.tag.InMemoryTagAssignmentStore();
+        }
+    }
+
+    /**
      * The in-app notification feed (Phase B2) for the single {@code appUser}. The feed is low-volume, so
      * the lean {@link com.gamma.notify.InMemoryNotificationStore} is the default and currently the only
      * backend; a durable DuckDB backend would mirror {@link #openObjectStore(SpaceRoot)} when needed.

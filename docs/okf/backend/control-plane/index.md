@@ -13,6 +13,9 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
   `POST /queries/{id}/run` on DuckDB.
 * [Decision rules](decision-rules.md) - `/decision-rules` CRUD + sample-driven `simulate` over the
   `query-types` condition tree, evaluated by the shared `ConditionTree` engine (query-eval.ts parity).
+* [Tags](tags.md) - the cross-entity label graph (D7): Tag vs Tag Assignment, the central
+  `(tag, targetKind, targetId)` store, rename propagation, and the per-target gate that keeps a tag from
+  ever becoming an access grant.
 * [Events & metrics](events-metrics.md) - `EventLog` (synchronous bus), `MetricRegistry`, `StabilityGate`.
 * [Signal backbone](signal-backbone.md) - the canonical `Signal` envelope (`Ref`, 6-level `Severity`), projected to notification templating, AG-UI streaming, A2UI artifacts, agent context tools, and the gated agentic write path (`invoke` confirm-then-apply).
 * [Jobs](jobs.md) - `JobService` cron/event/manual scheduling, the off-bus trigger handoff, and the

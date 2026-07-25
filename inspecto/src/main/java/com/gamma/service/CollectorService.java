@@ -114,6 +114,11 @@ public final class CollectorService implements AutoCloseable {
     /** Append-only evidence/notes store (Phase 4 follow-up, v4.6.0) — comments + attachment refs behind
      *  {@code /objects/{id}/comments|attachments}. Same {@code -Dobjects.backend} toggle; closed in {@link #close()}. */
     private final com.gamma.ops.note.NoteStore noteStore;
+    /** Cross-entity tag assignments (BACKLOG D7) — the {@code (tag, targetKind, targetId)} graph behind
+     *  {@code /tags/assignments/…}. Deliberately NOT inside {@code ObjectService}: a tag spans Datasets,
+     *  Widgets and Expectations as readily as Incidents, so hanging it off the object engine would scope it
+     *  to one family. Same {@code -Dobjects.backend} toggle; closed in {@link #close()}. */
+    private final com.gamma.ops.tag.TagAssignmentStore tagAssignmentStore;
     /** Object Engine + Workflow Engine over {@link #objectStore} + {@link #linkStore} + {@link #noteStore}. */
     private final com.gamma.ops.ObjectService objects;
     /** Loaded {@code *_rca.toon} templates by name (Phase 4) — backs {@code GET /rca/templates} and
@@ -344,6 +349,7 @@ public final class CollectorService implements AutoCloseable {
         this.objectStore = ServiceStores.openObjectStore(root);
         this.linkStore = ServiceStores.openLinkStore(root);
         this.noteStore = ServiceStores.openNoteStore(root);
+        this.tagAssignmentStore = ServiceStores.openTagAssignmentStore(root);
         this.objects = new com.gamma.ops.ObjectService(objectStore, java.util.Map.of(), linkStore, noteStore);
         // Give the Job engine this space's Object Engine so the recon.run built-in can promote a breach to
         // an Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
@@ -536,6 +542,11 @@ public final class CollectorService implements AutoCloseable {
      *  {@code /objects} API and is where fired alerts are persisted as ALERT objects. */
     public com.gamma.ops.ObjectService objects() {
         return objects;
+    }
+
+    /** This Space's cross-entity tag-assignment graph (BACKLOG D7). Never static — see {@link #tagAssignmentStore}. */
+    public com.gamma.ops.tag.TagAssignmentStore tagAssignments() {
+        return tagAssignmentStore;
     }
 
     /** Register an RCA template (Phase 4), keyed by {@link com.gamma.ops.rca.RcaTemplate#name()}; {@code null} ignored. */
@@ -998,7 +1009,7 @@ public final class CollectorService implements AutoCloseable {
      */
     public List<com.gamma.util.BrowsableStore> browsableStores() {
         List<com.gamma.util.BrowsableStore> out = new ArrayList<>();
-        for (Object s : new Object[]{objectStore, linkStore, noteStore, status})
+        for (Object s : new Object[]{objectStore, linkStore, noteStore, tagAssignmentStore, status})
             if (s instanceof com.gamma.util.BrowsableStore b) out.add(b);
         jobService().ifPresent(js -> {
             js.runStore().ifPresent(out::add);
@@ -1351,6 +1362,7 @@ public final class CollectorService implements AutoCloseable {
         try { objectStore.close(); } catch (Exception e) { log.warn("Error closing object store: {}", e.getMessage()); }
         try { linkStore.close(); } catch (Exception e) { log.warn("Error closing link store: {}", e.getMessage()); }
         try { noteStore.close(); } catch (Exception e) { log.warn("Error closing note store: {}", e.getMessage()); }
+        try { tagAssignmentStore.close(); } catch (Exception e) { log.warn("Error closing tag store: {}", e.getMessage()); }
         log.info("CollectorService stopped");
         // Close last so the "stopped" log line above is itself captured, then flushed to disk.
         try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }
