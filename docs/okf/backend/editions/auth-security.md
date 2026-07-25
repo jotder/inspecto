@@ -169,15 +169,27 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   it must be run under **`-Pedition-enterprise`**: the default reactor omits `inspecto-security` entirely, so a
   plain `mvn -o clean test` cannot see a failure there. That gap had already left this assertion red on
   `master` since `7e90f53d`; see `.claude/skills/build-verify/SKILL.md`.
-- **D4 — split `canCurateMenus` out of `canAuthorWorkbench`.** Today every `pipeline-developer`/
-  `app-developer`/`developer`/`power` seed role gets menu curation free, conflating "may edit a pipeline" with
-  "may change what this space's business users see" — a navigation change is visible to every user in the
-  space and is not a build activity. Touch list (from the O1 survey, unchanged): `Roles.java` constant + seed
-  grant · `CapabilityManifest.java` `/nav/menus` entry (**its test enforces manifest↔registration congruence
-  in both directions, so the manifest entry and the route gate must land together**) · `NavRoutes.java` gate ·
-  a `LensService` signal · an `ACCESS_ACTION_NODES.settings` node. Default grant for the new capability:
-  admin/super plus `power` — curation is a space-owner activity, and `power` is the seeded role closest to
-  "owns this space's presentation".
+- **D4 — `canCurateMenus`, split out of `canAuthorWorkbench`. SHIPPED end-to-end 2026-07-25**
+  (`c8a40a24` server, `96f8ca4f` UI). Rationale: the `pipeline-developer`/`app-developer`/`developer`/`power`
+  seeds got menu curation free, conflating "may edit a pipeline" with "may change what this space's business
+  users see" — a navigation change is visible to every user in the space and is not a build activity.
+  As built: `Roles.java` constant + seed grant to **admin/power/super** (curation is a space-owner activity;
+  `power` is the seeded role closest to "owns this space's presentation") · `CapabilityManifest.java`
+  `/nav/menus` entry · `NavRoutes.java` gate · `LensService.canCurateMenus` · the `menus.curate`
+  `ACCESS_ACTION_NODES.settings` node · the mock `access.handler.ts` vocabulary + seed table.
+  ⚠ **The manifest entry and the route gate must land in the same commit** — `CapabilityManifestTest`
+  enforces manifest↔registration congruence in *both* directions, matching on the capability **string
+  literal** at the registration site.
+  ⚠ **Bootstrap-order trap, hit writing the gate test:** with an `Authenticator` active,
+  `ControlApi.authenticate` resolves `writeRoot()` → `SpaceManager.current()`, which throws on a root with no
+  spaces — so `POST /spaces` (the call that creates the first one) 500s with an empty body. `ControlApiNavMenusTest`
+  works around it by creating the space *before* arming the authenticator; whether it is reachable in a real
+  deployment is [BACKLOG](../../../BACKLOG.md) §6.
+  ⚠ **UI caveat, pre-existing and NOT introduced here:** every `LensService` capability is
+  `granted && !readOnly && allows(…)`, and `allowedLenses` qualifies Builder/Ops only via
+  `canAuthorWorkbench`/`canOperateRuns`. An OIDC subject holding *only* the admin seed is therefore snapped to
+  the read-only Business lens and evaluates **all** its capabilities false client-side while the server
+  authorizes them. Invisible in Personal mode (`granted()` short-circuits true). BACKLOG §5.
 
 Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): a policy-**authoring** UX beyond
 TOON+validation (a matrix/create editor — the read-only visibility + explain above shipped, authoring did
