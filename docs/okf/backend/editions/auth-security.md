@@ -195,11 +195,33 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   negation of `main()`'s boot condition. Deregister-only on the last space stays allowed. Regression tests:
   `ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet` and
   `purgingTheLastSpaceOnDiskIsRefused`.
-  ⚠ **UI caveat, pre-existing and NOT introduced here:** every `LensService` capability is
-  `granted && !readOnly && allows(…)`, and `allowedLenses` qualifies Builder/Ops only via
-  `canAuthorWorkbench`/`canOperateRuns`. An OIDC subject holding *only* the admin seed is therefore snapped to
-  the read-only Business lens and evaluates **all** its capabilities false client-side while the server
-  authorizes them. Invisible in Personal mode (`granted()` short-circuits true). BACKLOG §5.
+
+### Identity vs lens-scoped UI capabilities (`651ca48e`, 2026-07-25)
+
+`LensService` capabilities used to be uniformly `granted && !readOnly && allows(…)`, while `allowedLenses`
+qualifies Builder/Ops only via `canAuthorWorkbench`/`canOperateRuns`. An OIDC subject holding neither — **the
+entire admin seed** — was snapped to the read-only Business lens and evaluated *every* capability false
+client-side while the server authorized the calls. Worst case was a bootstrap deadlock: a fresh deployment's
+admin saw the Access matrix read-only and could not author the roles that grant access.
+
+The rule is now split, and the split is the durable fact:
+
+| | Predicate | Members |
+|---|---|---|
+| **Identity** — who the subject *is* | `granted && allows` | `canConfigureAccess`, `canCurateMenus`, `canOnboardConnections`, `canTriageRequirements` |
+| **Lens-scoped** — the activity a lens *represents* | `granted && !readOnly && allows` | `canAuthorWorkbench`, `canOperateRuns`, `canAuthorAlertRules` |
+
+Three things a future change must not undo:
+
+- **`readOnly` is presentation, never a boundary.** No component reads it; the server (`CapabilityManifest`
+  + `withCapability`) is the enforcement point. That is *why* dropping the conjunct cannot escalate privilege.
+- **Identity capabilities are still lens-suppressed off OIDC.** The exemption is justified by the subject's
+  identity, and in honor-system mode there is none (`granted()` short-circuits true for everyone), so the lens
+  is the only signal. Without that clause Personal mode's Business lens starts showing Connections and
+  Requirements affordances and the "View as" preview stops meaning anything.
+- **`canTriageRequirements` is identity by operator call** — it is the `business` seed's *only* capability, so
+  lens-scoping it revoked the single grant that role has. Consequence, accepted deliberately:
+  **"Business lens ⇒ read-only" is no longer a true statement about the product.**
 
 Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): a policy-**authoring** UX beyond
 TOON+validation (a matrix/create editor — the read-only visibility + explain above shipped, authoring did

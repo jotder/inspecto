@@ -87,6 +87,25 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     instead of the special case the model is currently shaped around. Rejected alternative: the narrow re-key,
     which buys the same feature and guarantees a third caller becomes a third special case. This aligns with
     the generic-tag direction (BACKLOG D7) — grouping and annotation should both address components uniformly.
+
+    **Backend SHIPPED 2026-07-25 (`56ca3559`); the UI half is still open.** As built:
+    `ObjectNote` carries a **`targetKind`** — ⚠ *not* its pre-existing `kind`, which is `NoteKind`
+    (COMMENT/ATTACHMENT) and an orthogonal axis; the two must never be conflated. The vocabulary is
+    `NoteTargets` = `"object"` + `ComponentStore.WRITABLE_TYPES`, which already contains
+    `link-analysis-view` — **no new enum, and no competing vocabulary**, since `BundleRoutes.OWN_STORE_KINDS`
+    and the Exchange axis use the same strings. **D7 inherits this scheme.** New surface is
+    `GET/POST /notes/{targetKind}/{targetId}/comments|attachments`; the existing `/objects/{id}/comments`
+    and `/attachments` are untouched shipped routes.
+    Invariants worth preserving: **one gate serves reads and writes** (`NoteRoutes.targetGate` *is* the
+    `TargetResolver`) so existence and authorization cannot diverge between paths; `object` reuses
+    `ObjectRoutes`' SEC-7d + `RowScope` check verbatim, answering 404 out-of-scope, so the generic path is
+    not a way around it; component kinds gate on `ComponentAccess.requireView`, not edit — **commenting is
+    collaboration and writes nothing under `registry/`, so a view-only sharee may comment**.
+    Migration follows the `DbAcquisitionLedger` (ACQ-7) precedent: in-place `ALTER TABLE ADD COLUMN IF NOT
+    EXISTS` + backfill to `'object'` in `initSchema`, idempotent on DuckDB and Postgres.
+    Deliberate residuals: `objectId` was **not** renamed (`targetId()` is an alias; keeps ~30 call sites and
+    the JSON stable) · `GET /notes/object/{absent}` 404s while `GET /objects/{absent}/comments` still returns
+    `200 []` · **notes are not deleted with their component**, so re-creating an id resurrects the thread.
   * **D16 pattern packs — a dedicated system Space owns the domain-seeded packs**, not the
     space-template-gallery seeding path. Rationale: packs are installation-wide reference content, and seeding
     them into user Spaces would fork them per Space, so a fix to a shipped pattern could never reach the
