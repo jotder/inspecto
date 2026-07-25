@@ -213,7 +213,8 @@ AI-driven autonomy without redesign.
 | AGT-3 | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds (`EgressGuardTest` invariant) | Must | SHIPPED | All |
 | AGT-4 | Model Settings pane + per-tier connectivity probes | Should | SHIPPED | All |
 | AGT-5 | **Embedded intelligence** (`inspecto-intelligence` module): ContextBroker grounding, tool belt L0–L3, autonomy ladder (Explain → Draft → Act-with-approval → bounded autonomy) | Should | P0 SHIPPED 2026-07-07 (sign-off given); P1–P5 open | All (L3 = S+, opt-in) |
-| AGT-6 | AI behind every screen; multi-step agent graphs | Could | PLANNED | All |
+| AGT-6a | **AI behind every screen** — inline natural-language authoring on every console pane, reusing the shipped L1 draft tools (no new backend capability) | Should | PLANNED — **scoped 2026-07-25** (`superpower/agt-6-plan.md` §3); ready to schedule pending D1–D4 | All |
+| AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) beyond the code-defined seeded runbooks | Could | PLANNED — demand-gated (`superpower/agt-6-plan.md` §4); upstream prerequisite = the eoiagent per-tool `DryRunProvider` seam | All (L3 = S+, opt-in) |
 
 ### 3.14 Agentic framework as a product (EOI) — eoiagent, separate repo
 
@@ -306,6 +307,11 @@ caveat (live e2e via `examples/06-serve/pipeline-job`).*
 - **OPS-5** Provenance conservation on live data — *not code: the verification protocol is written
   and signed (`docs/ops/provenance-conservation-verification.md`); running it needs the first live
   deployment. Owner: ops, first live deployment.*
+- **AGT-6a** AI behind every screen (inline NL authoring) — *promoted Could→Should 2026-07-25 and scoped
+  in `superpower/agt-6-plan.md` §3: phases A1 (one shared inline surface) → A2 (four-pane adoption wave:
+  Pipelines/Expectations/Dashboards/Queries) → A3 (pane-context grounding) → A4 (read-only "explain this
+  screen" breadth). **No new backend capability** — it reuses the shipped L1 draft tools, so the risk is
+  UI-side only and drafts persist nothing. Ready to schedule pending decision asks D1–D4.*
 
 *Closed 2026-07-08: **ACQ-7** etag/version dedup · **ACQ-6** push discovery (notify + watch) ·
 **PIP-7** maintenance library (ledger_prune/db_maintenance/compact) · **PIP-6** job templates ·
@@ -336,8 +342,15 @@ P1–P5 remaining).*
   do not start before the SEC-7 product decision lands.*
 - **AGT-5 P1–P5** — *phased per `embedded-intelligence-plan.md` §8; the EOI-7(a) gate lifted
   2026-07-08 (pinned v0.1.0, no moving SNAPSHOT) — P1 is now unblocked engineering.*
-- **AGT-6** AI behind every screen / agent graphs — *sequenced after AGT-5 P2 (needs the tool belt +
-  autonomy ladder in place); not scoped further on purpose.*
+- **AGT-6b** Multi-step agent graphs — *scoped 2026-07-25 in `superpower/agt-6-plan.md` §4 and kept
+  demand-gated. Today's `runbook_operator` already runs **code-defined** seeded sequences as one
+  approval-gated unit; 6b is the model-**composed** graph. Two upstream blockers recorded: the eoiagent
+  approval gate is synchronous per-call (nesting gated calls deadlocks — hence one approval per plan),
+  and there is no per-tool `DryRunProvider` seam, without which a model-composed plan cannot be previewed
+  per step (that seam is therefore a **prerequisite**, not just a refactor). Recommended first cut when
+  demand lands: "authored graph, approved whole, executed stepwise" — generalize `RunbookActions`, never
+  free-form ReAct over mutating tools. Trigger: a named client needing orchestration beyond the three
+  seeded runbooks.*
 - **E1** Enterprise distributed tier · Stage-2 streaming — *demand-gated strategy items, unchanged.*
 
 *Closed 2026-07-08: **BI-5** measure alerts · **BI-7** headless BI API · **PIP-6** job templates ·

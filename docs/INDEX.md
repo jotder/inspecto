@@ -77,6 +77,12 @@ former root reference docs** (each index lists them):
   spine + **P1 investigation tier SHIPPED** (2026-07-20, distilled into
   [`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md));
   **P2–P5 open** (§8 = live phasing).
+- [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan, DRAFT 2026-07-25** — splits the
+  requirement: **AGT-6a** inline AI authoring (`Should`, schedulable — one shared inline surface + a
+  four-pane adoption wave reusing the shipped L1 draft tools, phases A1–A4) vs **AGT-6b** model-composed
+  agent graphs (`Could`, demand-gated behind the eoiagent `DryRunProvider` seam). Also carries the
+  ladder-as-packaging commercial framing (Tiers A/B/C ↔ edition flavors, air-gap moat, SHADOW-first
+  adoption). Decision asks D1–D7 pending.
 - [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md) —
   **NFR-7 certifications plan, DRAFT 2026-07-23** (SOC 2 Type I → II → ISO 27001 → FedRAMP
   800-53 alignment/ATO-support; HIPAA/PCI scoping statements only); control-level coverage in
@@ -112,4 +118,4 @@ Move a doc back up and re-list it here if it becomes current again.
 
 ---
 
-**Last Updated**: 2026-07-16
+**Last Updated**: 2026-07-25

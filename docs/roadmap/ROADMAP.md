@@ -79,8 +79,8 @@ The single most important item for commercialization.
 | ID | Item | Effort | Trigger |
 |---|---|---|---|
 | L1 | **Enterprise distributed tier** — shared-state backends (Postgres status store, object-store events, shared secrets), distributed scheduler coordination, work distribution, per-tenant ABAC | XL | A deployment whose scale or multi-tenancy actually exceeds the single-node design |
-| L2 | **Richer "AI behind every screen" UX** — inline natural-language authoring across the console | L | Parallel track; benefits from GPU availability on the deployment |
-| L3 | **Multi-step agent graphs** — provision → watch → roll back orchestration | L | Demand beyond single-shot generate→validate→return skills |
+| L2 | **Richer "AI behind every screen" UX** — inline natural-language authoring across the console | M | **Promoted 2026-07-25 → AGT-6a, MoSCoW `Should`, scoped in [`../superpower/agt-6-plan.md`](../superpower/agt-6-plan.md) §3** — no longer demand-gated: it reuses the shipped L1 draft tools (no new backend capability) and local models suffice, so GPU availability is not a gate. Still listed here pending a horizon refresh of this table. |
+| L3 | **Multi-step agent graphs** — provision → watch → roll back orchestration | L | **= AGT-6b**, scoped in [`../superpower/agt-6-plan.md`](../superpower/agt-6-plan.md) §4. Demand beyond the three code-defined seeded runbooks — **plus** one upstream prerequisite: the eoiagent per-tool `DryRunProvider` seam, without which a model-composed plan cannot be previewed per step. |
 | L4 | **Push/event-notification discovery** — react to source-side notifications instead of polling | M | A source that emits change notifications |
 | L5 | **Cross-unit parallelism / Stage-2 streaming** — finer-grained parallelism within a run | M | A workload bottlenecked on per-unit sequencing |
 
