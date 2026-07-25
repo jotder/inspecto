@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { NavigationService } from 'app/core/navigation/navigation.service';
+import { LensService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { MenuService } from 'app/inspecto/menu';
 import { MenuArtifactComponent } from './menu-artifact.component';
@@ -32,8 +33,13 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
             <div class="mb-6">
                 <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Menus</h1>
                 <p class="text-secondary mt-1 max-w-3xl">
-                    Build your own menus and place reports under them for business users. These appear in the
-                    sidebar alongside the platform navigation; the platform menus themselves aren’t changed.
+                    @if (canCurate()) {
+                        Build your own menus and place reports under them for business users. These appear in the
+                        sidebar alongside the platform navigation; the platform menus themselves aren’t changed.
+                    } @else {
+                        The menus curated for this space. Star the reports you use most to pin them to the top of
+                        your sidebar — your favorites are personal and visible only to you.
+                    }
                 </p>
             </div>
 
@@ -42,18 +48,20 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
                 <div class="bg-card shrink-0 rounded-2xl p-4 shadow lg:w-96">
                     <div class="mb-2 flex items-center justify-between">
                         <h2 class="text-sm font-semibold uppercase tracking-wider opacity-60">Your menus</h2>
-                        <div class="flex items-center gap-2">
-                            @if (!nodes().length) {
-                                <button mat-stroked-button (click)="loadExample()">
-                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:sparkles"></mat-icon>
-                                    <span class="ml-1">Load example</span>
+                        @if (canCurate()) {
+                            <div class="flex items-center gap-2">
+                                @if (!nodes().length) {
+                                    <button mat-stroked-button (click)="loadExample()">
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:sparkles"></mat-icon>
+                                        <span class="ml-1">Load example</span>
+                                    </button>
+                                }
+                                <button mat-stroked-button (click)="addMenu()">
+                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
+                                    <span class="ml-1">Add menu</span>
                                 </button>
-                            }
-                            <button mat-stroked-button (click)="addMenu()">
-                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
-                                <span class="ml-1">Add menu</span>
-                            </button>
-                        </div>
+                            </div>
+                        }
                     </div>
 
                     @if (nodes().length) {
@@ -64,6 +72,7 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
                                     [parentId]="null"
                                     [siblings]="nodes()"
                                     [selectedId]="selectedId()"
+                                    [canCurate]="canCurate()"
                                     (select)="selectedId.set($event)"
                                     (changed)="onChanged()"
                                 />
@@ -73,7 +82,11 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
                         <inspecto-empty-state
                             icon="heroicons_outline:queue-list"
                             title="No menus yet"
-                            message="Add a top-level menu (e.g. Revenue), then add sub-menus and reports under it."
+                            [message]="
+                                canCurate()
+                                    ? 'Add a top-level menu (e.g. Revenue), then add sub-menus and reports under it.'
+                                    : 'Nobody has curated menus for this space yet. Ask a workbench author to set them up.'
+                            "
                         />
                     }
                 </div>
@@ -103,6 +116,15 @@ export class MenuBuilderComponent {
     private readonly menuApi = inject(MenuService);
     private readonly dialog = inject(MatDialog);
     private readonly navigation = inject(NavigationService);
+    private readonly lens = inject(LensService);
+
+    /**
+     * Whether this viewer may curate the space's shared menu tree (open point O1) — the client mirror of the
+     * server's existing `canAuthorWorkbench` gate on `PUT /nav/menus`, so a non-curator no longer edits a tree
+     * only to be 403'd at save. A non-curator still gets the pane read-only, because **favorites are personal**
+     * (a client-local overlay, never PUT) and their star toggles live in this tree.
+     */
+    readonly canCurate = computed(() => this.lens.canAuthorWorkbench());
 
     readonly nodes = this.menuApi.nodes;
     readonly selectedId = signal<string | null>(null);
@@ -112,6 +134,7 @@ export class MenuBuilderComponent {
     });
 
     addMenu(): void {
+        if (!this.canCurate()) return;
         const data: MenuNodeDialogData = { heading: 'Add menu', takenTitles: this.nodes().map((n) => n.title) };
         this.dialog
             .open<MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult>(MenuNodeDialog, {
@@ -130,6 +153,7 @@ export class MenuBuilderComponent {
 
     /** Populate a starter example tree (opt-in; only offered on an empty tree, so it never clobbers edits). */
     loadExample(): void {
+        if (!this.canCurate()) return;
         const id = this.menuApi.mutate((s) => s.seedExample());
         this.selectedId.set(id);
         this.onChanged();

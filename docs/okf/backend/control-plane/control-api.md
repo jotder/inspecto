@@ -35,7 +35,12 @@ spaces (`/spaces`,`/spaces/_meta`), pipelines, jobs (`/jobs/{name}/runs|trigger`
 (`/events/search|export|views`), connections, components ([registry](../components/component-registry.md)),
 objects (ops), catalog, config/assist, enrichment, per-space settings docs (`/settings/branding|geo` and
 `/nav/menus` — the Menu Builder tree; each a fixed-filename TOON in the space's config tree, PUT gated by
-write-root 503 + `canAuthorWorkbench`, no jail/conflict gates since nothing caller-supplied touches a path)
+write-root 503 + `canAuthorWorkbench`, no jail/conflict gates since nothing caller-supplied touches a path.
+**`canAuthorWorkbench` is deliberately the menu-curation gate too** (menu-builder open point O1, settled
+2026-07-25): curating the tree every business user sees is space config-authoring, so it reuses that
+capability rather than minting a distinct one — the UI now mirrors this gate instead of offering edits that
+the server would 403. Splitting curation into its own capability stays an open product question, see
+`BACKLOG.md` §3 Menu builder)
 — plus the v1-era additions: `GET /bootstrap`
 (server capabilities incl. `features.authMode`), `/auth/*` (the Standard-edition BFF session routes),
 `POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling

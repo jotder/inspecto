@@ -61,14 +61,16 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
                 </button>
             }
 
-            <button
-                mat-icon-button
-                class="opacity-0 group-hover:opacity-100 focus:opacity-100"
-                [matMenuTriggerFor]="menu"
-                [attr.aria-label]="'Actions for ' + node().title"
-            >
-                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
-            </button>
+            @if (canCurate()) {
+                <button
+                    mat-icon-button
+                    class="opacity-0 group-hover:opacity-100 focus:opacity-100"
+                    [matMenuTriggerFor]="menu"
+                    [attr.aria-label]="'Actions for ' + node().title"
+                >
+                    <mat-icon class="icon-size-5" svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
+                </button>
+            }
             <mat-menu #menu="matMenu">
                 <button mat-menu-item (click)="edit()">
                     <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon><span>Rename / icon</span>
@@ -102,6 +104,7 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
                         [siblings]="node().children ?? []"
                         [depth]="depth() + 1"
                         [selectedId]="selectedId()"
+                        [canCurate]="canCurate()"
                         (select)="select.emit($event)"
                         (changed)="changed.emit()"
                     />
@@ -120,6 +123,13 @@ export class MenuTreeNodeComponent {
     readonly siblings = input<MenuNode[]>([]);
     readonly depth = input(0);
     readonly selectedId = input<string | null>(null);
+    /**
+     * Whether this viewer may curate the shared tree (menu-builder open point O1) — the client mirror of the
+     * server's `canAuthorWorkbench` gate on `PUT /nav/menus`. Defaults to **false** (fail-closed) so a host
+     * that forgets to pass it renders a read-only row rather than silently offering edits the server will 403.
+     * Favoriting is deliberately NOT gated: it is a personal, client-local overlay, never PUT to the server.
+     */
+    readonly canCurate = input(false);
 
     readonly select = output<string>();
     readonly changed = output<void>();
@@ -138,6 +148,7 @@ export class MenuTreeNodeComponent {
     readonly canMoveDown = computed(() => this.index() >= 0 && this.index() < this.siblings().length - 1);
 
     edit(): void {
+        if (!this.canCurate()) return;
         const takenTitles = this.siblings()
             .filter((s) => s.id !== this.node().id)
             .map((s) => s.title);
@@ -154,6 +165,7 @@ export class MenuTreeNodeComponent {
     }
 
     addSubMenu(): void {
+        if (!this.canCurate()) return;
         const takenTitles = (this.node().children ?? []).map((c) => c.title);
         this.open({ heading: 'Add sub-menu', takenTitles }).subscribe((r) => {
             if (!r) return;
@@ -163,6 +175,7 @@ export class MenuTreeNodeComponent {
     }
 
     addReport(): void {
+        if (!this.canCurate()) return;
         this.dialog
             .open(MenuAttachDialog, { width: '620px', autoFocus: false })
             .afterClosed()
@@ -174,6 +187,7 @@ export class MenuTreeNodeComponent {
     }
 
     move(delta: -1 | 1): void {
+        if (!this.canCurate()) return;
         const ids = this.siblings().map((s) => s.id);
         const i = this.index();
         const j = i + delta;
@@ -184,6 +198,7 @@ export class MenuTreeNodeComponent {
     }
 
     async remove(): Promise<void> {
+        if (!this.canCurate()) return;
         const hasChildren = (this.node().children?.length ?? 0) > 0;
         const ok = await this.confirm.confirmDestructive(
             `Delete “${this.node().title}”${hasChildren ? ' and everything under it' : ''}?`,
