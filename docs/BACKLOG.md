@@ -41,9 +41,10 @@ each row's detail stays in its own section.
    rationale lives. Several rows below changed shape as a result, and three had **wrong premises**
    corrected (D3 legacy-route framing, D7 tags-are-greenfield, D14 already-tightened) — trust §2 over
    any older phrasing you remember.
-3. **Small, concrete, newly unblocked (do these first — each is hours, not sessions):** `canOfferDatasets`
-   → admin/super (D14) · the `canCurateMenus` split (D4) · the DuckDB memory-cap default then the
-   chunking default (D11 → D12, in that order) · rename `KeycloakTokenRelay` → vendor-neutral (D15).
+3. **Small, concrete quick wins — DRAINED 2026-07-25.** `canOfferDatasets` → admin (D14, `2b1e7e9d`) ·
+   the `canCurateMenus` split (D4) · `KeycloakTokenRelay` → `OidcTokenRelay` + no derived
+   `tokenEndpoint` (D15) · chunking on by default at 8 GiB (D12). **One deliberate deviation: D11's
+   on-by-default `memory_limit` was NOT shipped** — operator call, see §6.
 4. **Dependent chains (sequence behind a build, no longer behind a decision):** Lens Access P3 · NFR-7
    execution (now parallel — C1 is not a predecessor, D1) · MNT-14 (after the `Archived` state) ·
    Postgres multi-user (write the `docs/superpower/` plan first, then store pooling).
@@ -78,18 +79,18 @@ you remember the old framing, re-read those three.
 | D1 | NFR-7 runs **in parallel — SOC 2 is not a gate**; C1 is no longer a blocking predecessor. The Type II observation window still needs CC6 controls live (they are), and external-party steps stay paced by the third party | `superpower/compliance-certifications-plan.md` §6 Q1 |
 | D2 | A bundle may carry a `connection` **reference-only, secrets stripped** — `${ENV:…}` travels, no secret value in any form (not even bundle-encrypted: bundles land in git, CI, and support tickets). Unblocks the last missing `BundleRoutes` kind | `okf/…/metadata-bundle.md` |
 | D3 | **Delete the legacy surface; soak criterion consciously overridden** — justified: no live deployment and the SPA was already fully v1-migrated. **BUILT AND SHIPPED 2026-07-25** (`be498f35` code+tests, `bbf569df` docs) — `/api/v1` is the only business surface, the four infra probes stay unversioned, `isInfraRoute` is now the allow-list | `okf/…/api-v1.md` |
-| D4 | **Split `canCurateMenus`** out of `canAuthorWorkbench` — a nav change is visible to every business user in the space and is not a build activity. Default grant: admin/super + `power`. Touch list unchanged; the manifest entry and the route gate must land **together** (the congruence test runs both directions) | `okf/…/auth-security.md` |
+| D4 | **Split `canCurateMenus`** out of `canAuthorWorkbench` — a nav change is visible to every business user and is not a build activity. **SHIPPED 2026-07-25**: granted to admin/power/super, `PUT /nav/menus` re-gated, manifest + gate landed together. ⚠ Residual: the touch list's **`LensService` signal + `ACCESS_ACTION_NODES.settings` node are UI-side (`inspecto-ui/`) and are NOT done** — menu curation still appears under the workbench-authoring grouping in the Access Catalog UI | `okf/…/auth-security.md` |
 | D5 | **Retention tier, not archive-is-terminal** — `Archived` becomes a real state but carries a retention window, and expiry is what makes an Incident purge-eligible. Needs a dry-run-first sweep + a legal-hold exemption. `ObjectStore.delete` already shipped, so the one remaining blocker is the `Archived` state itself | `okf/…/jobs.md` |
 | D6 | **Reuse the C6 workflow/TOON pattern + the `attribute-spec` renderer**; no new endpoint — it would be a third config idiom for a problem the shipped `GET /workflows/{type}` precedent (same pane) already solves. **Not UI-only**: sections must be server-authored TOON | `okf/frontend/features/objects.md` |
 | D7 | **Rescoped by the operator** from "a `tags` filter on `GET /objects`" to a **generic Gmail-label-style grouping concept** spanning streams/rules/alerts/datasets, on a central registry + `(tag, entity_kind, entity_id)` assignments. ⚠ **Not greenfield, and the old row was wrong twice** — object-scoped tags already ship (`Tag` registry + `TagRule` + `/tags` + `/tags/rules` + a Tags folder in the mail nav), and `attributes.tags` **is** written (`ObjectService.ATTR_TAGS`, five call sites), so the dismissed narrow filter would have worked. This is that system *generalized*: CSV-inside-the-entity → central registry + assignment store, and beyond `OperationalObject` | `superpower/generic-tags-plan.md` |
 | D8 | Track **all three** of `delivered`/`bounce`/`complaint` — complaint is the only class with a *deliverability* consequence, so it can't be the one dropped. Needs per-status timestamps (not one mutable enum — `delivered` then `complaint` is the normal spam-button case), adapter-edge normalization of provider vocabularies, a hard/soft bounce split, and a signature-verified fail-closed callback | `okf/…/events-metrics.md` |
 | D9 | **Yes — widen the Exchange `kind` axis** to carry saved views rather than build parallel sharing. A view grant must **require its datasets' grants** (generalize the widget→dataset cascade, don't special-case it twice) and is **live-mode only** (a view has no rows of its own, so `snapshot` must be rejected, not silently treated as live) | `okf/…/exchange-sharing.md` |
 | D10 | **Generalize the note model** to any `(kind, id)` target — do not re-key `ObjectNote` by component `type`+`id`. The narrow re-key buys the same feature and guarantees a third caller becomes a third special case | `okf/frontend/features/link-analysis.md` |
-| D11 | **Conservative fixed per-instance cap + spill, on by default.** A semaphore-computed cap was rejected: `jobs.maxConcurrentRuns` defaults to `0`/unbounded so the divisor is usually unknown, and batch-ingest has a second independent limiter — any formula is wrong in exactly the overcommit case it was meant to prevent | `okf/…/duckdb.md` |
-| D12 | **Chunking on with a large threshold** — the cap exists for *pathological* single files, so the default must be high enough that normal workloads never change shape. Lands after D11 (a memory cap makes the failure mode "spill", which makes the threshold easier to pick) | `okf/…/duckdb.md` |
+| D11 | **Conservative fixed per-instance cap + spill, on by default.** ⚠ **NOT IMPLEMENTED — deliberately declined by the operator 2026-07-25** in favour of "spill routing only". No default `processing.duckdb.memory_limit` ships, so **the overcommit exposure this decision existed to close is still open**: each concurrent run still gets DuckDB's ~80%-of-RAM-per-instance default. Spill *routing* already shipped independently (`BatchIngestStrategy.scratchDir` → `dirs.temp` on the data volume), and `max_temp_directory_size` has no fixed default because none is defensible without knowing the volume size (DuckDB uses ~90% of disk). **Reopen with a measured value** — see §6 | `okf/…/duckdb.md` |
+| D12 | **Chunking on with a large threshold.** **SHIPPED 2026-07-25** at **8 GiB** (`processing.chunking.max_file_bytes`, was `0`/disabled) — far above routine inputs so normal workloads never change shape. ⚠ It was meant to land *after* D11, because a memory cap turns the failure mode into "spill" and makes a high threshold safe. D11 was declined, so **chunking is now the only bound on a pathological single file** | `okf/…/duckdb.md` |
 | D13 | **Confirmed parked** — stays gated on a real onboarding-observation session (interview #2). An engineering placeholder would bake in an arbitrary answer that is expensive to unwind once forms ship | §7 · interview #2 |
-| D14 | **Ratified with one tightening.** ⚠ `canConfigureAccess` + `canApproveShares` were **already** admin/super-only in `Roles.SEED`, so the "bootstrap deadlock left them over-granted" premise was unfounded — nothing to fix there. `canAuthorAlertRules`/`canRequestShares` ratified as developer/ops-tier (a *request* still needs an owner's approval). **`canOfferDatasets` → admin/super**: cross-space data exposure with no second gate behind it | `okf/…/auth-security.md` |
-| D15 | **Withdrawn, not answered — there is no vendor of record.** The IdP/gateway is a per-client deployment choice; we stay standards-only and configurable. Two vendor-shaped residuals are now defects against this decision: `KeycloakTokenRelay`'s name + its Keycloak-shaped `tokenEndpoint` default, and the WSO2 `X-JWT-Assertion` header default (keep the default, document it as *a* convention). Litmus test: new auth code that can't be pointed at a different compliant IdP by config alone is wrong | `okf/…/auth-security.md` |
+| D14 | **Ratified with one tightening — SHIPPED 2026-07-25 (`2b1e7e9d`).** ⚠ `canConfigureAccess` + `canApproveShares` were **already** admin/super-only in `Roles.SEED`, so the "bootstrap deadlock left them over-granted" premise was unfounded. `canAuthorAlertRules`/`canRequestShares` ratified as developer/ops-tier. `canOfferDatasets` moved to admin (cross-space data exposure with no second gate) | `okf/…/auth-security.md` |
+| D15 | **Withdrawn, not answered — there is no vendor of record.** The IdP/gateway is a per-client deployment choice; standards-only and configurable. Litmus test: new auth code that can't be pointed at a different compliant IdP by config alone is wrong. **Both residuals SHIPPED 2026-07-25**: `KeycloakTokenRelay` → **`OidcTokenRelay`** (incl. the `META-INF/services` entry), and the Keycloak-shaped `tokenEndpoint` default deleted. ⚠ **BREAKING for existing deployments** — `-Dauth.oidc.tokenEndpoint` is now **required** and fails fast at startup; it is no longer derived from the issuer, so a Keycloak deployment that relied on the derived path will not boot until the flag is set from the provider's `/.well-known/openid-configuration`. `X-JWT-Assertion` default kept, now documented as *a* convention | `okf/…/auth-security.md` |
 | D16 | **A dedicated system Space** owns the domain-seeded pattern packs — the space-template-gallery path would fork packs per Space, so a fix to a shipped pattern could never reach the copies | `okf/frontend/features/link-analysis.md` |
 | D17 | **Open, unscheduled** — acknowledged gap, no demand pressure, no build time committed | §7 |
 
@@ -124,7 +125,7 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 | **Pipeline graph** | T15 residuals (non-blocking): per-flow TOON override of the back-pressure thresholds (globals only) · flipping the intake cap on by default (needs a soak) · remote-fetch economy (the cap applies post-dedup, so a remote source still materialises its full ready set — unchanged from pre-T15, but a pre-materialise cap would save bandwidth) · mock-only: run-to-here `POST …/run` (path deliberately reserved for the editor's scratch-only contract) · `/asn1/modules` **stays mock-only** — no backend ASN.1 capability exists | `okf/backend/pipeline-graph/pipeline-graph-design.md` §14 |
 | **Acquisition / connections** | the JDBC-based connectors each need their own library-specific proxy wiring · an actual **HTTP CONNECT** handshake for any connector (SOCKS5 is wired for SFTP/FTP/FTPS; HTTP fails closed) | `okf/backend/acquisition/connectors.md` |
 | **Incidents / cases** | C3 configurable Findings sections — **decided (D6: reuse the C6 workflow/TOON pattern + `attribute-spec` renderer; server-authored TOON, not UI-only)**, now a build · ⚠ the old `category`/`tags` params row is **superseded** — D7 rescoped tags into a generic cross-entity concept with its own plan (`superpower/generic-tags-plan.md`); do not build an `attributes.tags` filter. *(Case-analytics dataset SHIPPED 2026-07-25 as the `objects.analytics` Job Type — plan archived, as-built in `okf/backend/control-plane/jobs.md`.)* | `okf/frontend/features/objects.md` · `okf/backend/build-run/operations-reference.md` |
-| **Menu builder** | the `canCurateMenus` capability split — **DECIDED (D4: split it; default grant admin/super + `power`)**, now a small build. Land the `CapabilityManifest` entry and the `NavRoutes` gate **together** — the congruence test runs both directions | `okf/backend/editions/auth-security.md` · `archived-documents/plans-archive/menu-builder-plan.md` |
+| **Menu builder** | the `canCurateMenus` split **SHIPPED 2026-07-25** (server-side). Remaining: the **UI half** — the `LensService` signal + `ACCESS_ACTION_NODES.settings` node in `inspecto-ui/`, without which menu curation still groups under workbench-authoring in the Access Catalog | `okf/backend/editions/auth-security.md` · `archived-documents/plans-archive/menu-builder-plan.md` |
 | **Onboarding (Stream/Reference)** | Reference Phase-2 is **COMPLETE** (P0–P4, plan archived). Residual non-blocking deferrals: **D5-ref** — how a `delete` tombstone *enters* the reference store is undefined (the write path always stamps `'upsert'`; the views only *honour* an existing tombstone) — needs a call on the input signal (reserved column? Decision Rule consequence?) when a real delete-feed use case lands · **D6-ref** — within-batch same-key tie-break is arbitrary; add the optional latest-by-`order_by` column only when a batch can legitimately carry ordered same-key versions · optional templates entry (space-template-gallery precedent) | `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md` |
 | **Collector rename residual** | Pipeline TOON config-key `source:` block kept (renaming breaks authored TOON) — separate migration if ever wanted; `'SOURCE'` stage category unchanged | `okf/backend/gotchas/cross-cutting.md` |
 | **Quarantine / D-ETL** | reprocess is **whole-batch only** — no record-level replay (tracked only if prioritized) | `okf/frontend/features/run-detail.md` |
@@ -197,12 +198,9 @@ standards-only. *(Keycloak + WSO2 APIM are a supported example, not the answer.)
 non-blocking:**
 - **Policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility + a
   "why denied?" explain endpoint + a read-only Policies tab all shipped 2026-07-24).
-- **`canOfferDatasets` → admin/super** (D14) — small, concrete, ready. The rest of the R1 seed set is
-  ratified; ⚠ `canConfigureAccess`/`canApproveShares` were **already** admin/super-only, so the
-  "over-granted" premise behind the old row was unfounded.
-- **Vendor-shaped residuals, now defects against D15** (both non-blocking): rename `KeycloakTokenRelay` →
-  vendor-neutral and stop defaulting `auth.oidc.tokenEndpoint` to Keycloak's path shape; keep the
-  `X-JWT-Assertion` gateway-header default but document it as *a* convention, not *the* gateway.
+- **D4 UI residual** — the capability split shipped server-side, but the touch list's `LensService` signal
+  and `ACCESS_ACTION_NODES.settings` node are `inspecto-ui/` work and are **not done**, so menu curation
+  still shows under workbench-authoring in the Access Catalog UI.
 - X-Actor **full removal** — client-migration-gated (see §4 API v1).
 
 > **Do not partially implement security concerns elsewhere** — this section stays the single scope.
@@ -215,6 +213,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **⚠ Possible auth bootstrap trap — `POST /spaces` 500s when an `Authenticator` is active and no space
+  is hosted yet.** Surfaced 2026-07-25 while writing the D4 gate test: `ControlApi.authenticate`
+  (`ControlApi.java:618`) resolves `writeRoot()` → `SpaceManager.current()`
+  (`SpaceManager.java:393`), which throws `IllegalStateException: No spaces are hosted` — and
+  `POST /spaces` is the very call that creates the first one. The result is a **500 with an empty body**,
+  not a 4xx. **Not confirmed against a real deployment** — it may be unreachable if Standard/Enterprise
+  always host a space by the time auth is armed. Worth 20 minutes to confirm: if a fresh multi-space
+  deployment with auth on and an empty spaces root can hit it, the first space can never be created.
+  Fix direction (needs a call): make the authenticate step resolve `writeRoot()` lazily, or exempt the
+  space-creation route. The D4 test works around it by creating the space before arming the authenticator.
 - **`fp-query`/`fp-job`/`fp-enrich` module extraction** — **build only on explicit request.** Nobody
   has asked; it is a preference, not a need. Main-code layering is already clean and acyclic, but it
   is **not a single clean increment**: `query`/`job` also depend on `signal` + `ops` (outside the
@@ -229,12 +237,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 - **DuckDB capping remainder** — all scratch connections are now cappable by one operator knob
   (`-Dprocessing.duckdb.memory_limit`/`.temp_directory`/`.max_temp_directory_size`/`.threads`) and
   job concurrency is boundable (`-Djobs.maxConcurrentRuns`, default `0`=unbounded). Still open, both
-  **DECIDED 2026-07-25 — both are now builds, not calls**: a **conservative fixed per-instance cap +
-  spill, on by default** (**D11** — a semaphore-computed cap was rejected because `maxConcurrentRuns`
-  defaults to unbounded and batch-ingest has a second limiter), then **chunking on with a large
-  threshold** (**D12**), in that order. Unset `memory_limit` ⇒ DuckDB defaults to ≈80% RAM *per instance* ⇒ concurrent runs
-  overcommit ⇒ the whole box (incl. the HTTP API) can go unresponsive. Read-path is **not** the risk
-  (see C6 below). `okf/backend/engine/duckdb.md`
+  **D12 SHIPPED, D11 DECLINED (2026-07-25).** Chunking is now on by default at **8 GiB**. The
+  **on-by-default `memory_limit` (D11) was deliberately not shipped** — operator call, "spill routing
+  only". ⚠ **The exposure D11 existed to close therefore remains open:** unset `memory_limit` ⇒ DuckDB
+  defaults to ≈80% RAM *per instance* ⇒ concurrent runs overcommit ⇒ the whole box (incl. the HTTP API)
+  can go unresponsive, and chunking is now the only bound on a pathological file. **To reopen, bring a
+  measured value** — that is what blocked it, not the decision. A semaphore-computed cap stays rejected
+  (`maxConcurrentRuns` defaults to unbounded; batch-ingest has a second limiter). Spill *routing* already
+  ships (`scratchDir` → `dirs.temp` on the data volume); `max_temp_directory_size` has no fixed default
+  because none is defensible without the volume size. Read-path is **not** the risk (see C6 below).
+  `okf/backend/engine/duckdb.md`
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
