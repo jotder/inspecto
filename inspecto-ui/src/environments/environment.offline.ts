@@ -28,30 +28,18 @@ export const environment = {
     authVersion: '/oauth',
     appName: 'inspecto',
     appLogo: 'assets/images/logo/inspecto-logo.svg',
-    kibanaBase: 'http://p21.pr.pronto/monitoring',
-    documentationFrameworkBase: 'http://p20.prod.pronto:3000',
+
     gatewayUrl: 'http://localhost:4204/',
-    appUrl: 'https://demo.gammadev.io/prontoapiserver',
 
-    promptoServerUrl: 'https://demo.gammadev.io/promtoapiserver',
-    gatewayServerUrl: 'http://68.183.16.242:6601',
-    authServerUrl: 'http://68.183.16.242:6600/auth',
-    ruleServerUrl: 'https://demo.gammadev.io/fmapiserver',
-    caseServerUrl: 'https://demo.gammadev.io/ctapiserver',
-    chatUrl: 'http://68.183.16.242:5000/',
-
-    mlstudio: 'https://demo.gammadev.io/mlapiserver',
-    mlstudioGui: 'https://demo.gammadev.io/mlstudio/',
-    agenticAiUrl: 'https://demo.gammadev.io/agenticaiapiserver',
     authenticationType: 'token',
     footerText: ' © Powered By Gamma Analytics LLC',
     appLogoutUri: 'logout',
-    appClientId: '8825302933668759552',
+    appClientId: '',
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     chatLogo: 'assets/images/logos/assistant.png',
     authServerAuthentication: true,
     // iam details. No client secret here — this file ships inside the browser bundle (public).
-    iamClientId: '1070682796450139008',
+    iamClientId: '',
     dataFormat: 'YYYYMMDD',
     notificationSount: 'assets/sound/notification_2.mp3',
 };
