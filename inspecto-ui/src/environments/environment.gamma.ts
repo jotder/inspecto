@@ -30,8 +30,6 @@ export const environment = {
     promptoUrl:'http://68.183.16.242/apps/newchat',
     caseTrackerGuiUrl: "/casetracker/",
     authServerAuthentication: true,
-    iamClientId:"1070682796450139008",
-    iamClientSecret:"REDACTED-SEC-INCIDENT-1",
     dataFormat:"YYYYMMDD",
     notificationSount:'assets/sound/notification_2.mp3'
 

@@ -28,8 +28,6 @@ export const environment = {
     authServerAuthentication: true,
     agenticAiUrl: "https://demo.gammadev.io/agenticaiapiserver",
     //iam details
-    iamClientId:"1070682796450139008",
-    iamClientSecret:"REDACTED-SEC-INCIDENT-1",
     dataFormat:"YYYYMMDD",
     chatLogo: 'assets/images/logos/assistant.png',
      notificationSount:'assets/sound/notification_2.mp3'
