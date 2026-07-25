@@ -17,13 +17,24 @@ WSO2-style gateway + external IAM can front it later without reshaping routes. D
   `errorCode` from the catalog in `ErrorCodes.java`; authenticated envelopes include `permissions[]`.
   Write routes pass through fail-closed `WriteGates`. Every response carries a `Correlation-ID`;
   responses are gzip-compressed when accepted.
-* **Legacy compatibility + sunset (W8, API-5)** — the unversioned routes stay **byte-for-byte unchanged**;
-  each legacy hit is counted by `inspecto_legacy_api_requests_total{route}`
-  (see [events & metrics](events-metrics.md)). Legacy responses carry `Deprecation` +
-  `Link: rel="successor-version"` headers; `-Dapi.legacy.sunset=YYYY-MM-DD` adds a `Sunset` header, and
-  `-Dapi.legacy.routes=off` flips the whole unversioned surface to **410 Gone** (infra probes exempt; the
-  metric keeps counting). Runbook: soak to 30 consecutive days at zero → flip `off` → physical route deletion
-  one release later. Physical removal is the only part still outstanding, deliberately soak-gated.
+* **`/api/v1` is the only business surface (W8, API-5 — completed 2026-07-25, BACKLOG D3)** — a bare
+  unversioned business path is **no longer served**. `ControlApi.normalizePath` strips the `/api/v1`
+  prefix into the route table; anything else under `/api/…` gets a **JSON 404** (never the SPA shell),
+  and a bare non-`/api` deep link (`GET /objects`) falls through to `serveStatic` — correct, those are
+  SPA deep links. The allow-list of routes that stay unversioned is `ControlApi.isInfraRoute`:
+  **`/health`, `/ready`, `/metrics`, `/metrics/acquisition`** — they have no v1 semantics.
+  `isInfraRoute` is therefore the allow-list, no longer a metric exemption.
+  The whole sunset apparatus is **gone**: `legacyRoutesOff`, `legacySunset`, `recordLegacyUsage`,
+  `markDeprecated`, `sunsetHeader`, the `-Dapi.legacy.routes` / `-Dapi.legacy.sunset` flags, and the
+  `inspecto_legacy_api_requests_total` metric. (The 30-day-at-zero soak criterion was deliberately
+  overridden: there is no live deployment and every in-repo caller was migrated in the same change.)
+  Contract for callers: responses are envelope-wrapped and errors are
+  `{error:{errorCode, message, recoverable, correlationId, details?}}`, so a client that merely adds the
+  prefix without unwrapping `data` compiles and fails at runtime — the trap that caught
+  `inspecto-intelligence`'s `ControlPlaneClient`, which now prefixes **and** unwraps (server-side what the
+  SPA's `v1Interceptor` does). `ControlApi.LOCAL_BASE_URL_PROP` stays a **root** base URL with no version —
+  the version belongs to the client, matching how the SPA composes `apiBaseUrl + /v1 + path`.
+  Contract test: `ControlApiVersionedSurfaceTest`.
 * **Per-resource `permissions[]` (SEC-7b)** — a single-resource handler declares its applicable capability
   set via `ApiContext.resourcePermissions(ex, Set)`; `Envelope.success` emits
   `subject.capabilities() ∩ applicable` (fail-closed affordance signal, never the security boundary —
@@ -57,13 +68,14 @@ WSO2-style gateway + external IAM can front it later without reshaping routes. D
   decode-total — a garbage cursor means "from the top", never a 400). First adopter: `GET /jobs/runs`
   over the DuckDB run projection (`DbJobRunStore.recentRuns(limit, job, afterStartTime, afterRunId)` +
   `countRuns`, `ORDER BY start_time DESC, run_id DESC`, keyset SQL dialect-neutral for DuckDB + Postgres).
-  Legacy/unversioned callers get the same bare list as before. Other list families adopt the same seam
+  (At the time this shipped an unversioned caller still got the same bare list; that surface has since
+  been retired, so the paginated view is the only view.) Other list families adopt the same seam
   on demand. **Second adopter (2026-07-19): `GET /objects`** — with a twist: unlike `/jobs/runs`, this
   route has a SEC-7d visibility post-filter (`ObjectRoutes.visibleOnly`), so an SQL-side keyset would
   make `total`/page sizing wrong or leaky under that filter. The keyset (`createdAt DESC, id DESC`)
   instead runs **in-route over the already-visibility-filtered set** — acceptable because operational
   objects are explicitly low-volume by design (`ObjectQuery.unbounded()` widens the query, the route
-  slices/encodes the cursor itself). Legacy offset view unchanged. **Third + fourth adopters
+  slices/encodes the cursor itself). **Third + fourth adopters
   (2026-07-19): `GET /jobs` and `GET /events`** — one of each variant. `/jobs` follows the `/objects`
   in-route pattern (the registry is an in-memory materialized `JobView` list, low-volume; single-part
   keyset `name` — unique, so name order is total; `JobRoutes.jobsPage`). `/events` follows the
@@ -71,8 +83,8 @@ WSO2-style gateway + external IAM can front it later without reshaping routes. D
   `page(limit, afterTs, afterId)` + `count()` (defaults for API compat; exact overrides in both bundled
   stores — ring walk in `InMemoryEventStore`, SQL keyset predicate
   `(ts_ms < ? OR (ts_ms = ? AND event_id < ?)) ORDER BY ts_ms DESC, event_id DESC` merged with the
-  unflushed buffer in `ParquetEventStore`). Note the v1 `/events` view pages the **full retained
-  history**, unlike the legacy view which only serves the live-tail ring. Tests:
+  unflushed buffer in `ParquetEventStore`). Note `/events` pages the **full retained history**, not just
+  the live-tail ring the pre-v1 view served. Tests:
   `ControlApiJobsPageTest` · `ControlApiEventsPageTest` (incl. a shared-timestamp id-tiebreak resume).
 * **Multi-space** — the space segment sits **after** the version: `/api/v1/spaces/{id}/…`
   (see [multi-space](multi-space.md)).

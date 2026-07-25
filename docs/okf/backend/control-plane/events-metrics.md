@@ -20,9 +20,9 @@ timestamp: 2026-07-16T00:00:00Z
 * **`MetricRegistry`** (`inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/
   histograms keyed by name + sorted labels; `scrape()` runs registered collectors then renders Prometheus
   text. The per-space `space` label is supplied by callers as a label (no registry-level space awareness).
-  Notable counter: **`inspecto_legacy_api_requests_total{route}`** — incremented by
-  `ControlApi.recordLegacyUsage` on every hit to a legacy *unversioned* route that also exists under
-  [`/api/v1`](control-api.md); it is the sunset signal for retiring the legacy surface.
+  The scrape endpoint `/metrics` (with `/metrics/acquisition`, `/health`, `/ready`) is one of the four
+  routes that stay **unversioned** — see [versioned API](api-v1.md). *(The sunset counter
+  `inspecto_legacy_api_requests_total` was removed 2026-07-25 with the unversioned business surface.)*
 * **`StabilityGate`** (`inspecto-acquire/src/main/java/com/gamma/acquire/StabilityGate.java`) — the acquisition
   file-readiness gate (not a health gate); one shared instance per space (see [acquisition](../acquisition/framework.md)).
 

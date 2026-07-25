@@ -90,10 +90,12 @@ file-processor-deploy/
   are set; otherwise plain HTTP. ⚠️ **Binds all interfaces** — there is no bind-address flag today
   (`EDITIONS.md` claims Personal is "localhost only"; the code does not enforce it). Until GAP-1 (§10)
   ships, T1 relies on the OS firewall.
-- **Ops endpoints**: `GET /health` (open, liveness `{"status":"UP"}`) · `GET /ready` (readiness + pipeline
-  count) · `GET /health/details` (per-subsystem UP/DOWN/NOT_CONFIGURED — auth-gated on Standard) ·
-  `GET /metrics` (Prometheus text, **open by design**: scrapers don't carry tokens → restrict by network
-  path, §3.6) · `GET /bootstrap` (edition + feature discovery, public even on Standard — the SPA's OIDC
+- **Ops endpoints** — the probes are the only unversioned paths; everything else needs the `/api/v1`
+  prefix and answers in the v1 envelope: `GET /health` (open, liveness `{"status":"UP"}`) ·
+  `GET /ready` (readiness + pipeline count) · `GET /metrics` (Prometheus text, **open by design**:
+  scrapers don't carry tokens → restrict by network path, §3.6) · `GET /metrics/acquisition` (JSON) ·
+  `GET /api/v1/health/details` (per-subsystem UP/DOWN/NOT_CONFIGURED — auth-gated on Standard) ·
+  `GET /api/v1/bootstrap` (edition + feature discovery, public even on Standard — the SPA's OIDC
   redirect discovery, and our post-deploy edition probe).
 - **Per-space on-disk state** (`spaces/<id>/`): `config/` (authored TOON incl. `flows/` pipelines,
   `roles.toon`, `access-policies.toon` — hot-reloaded by mtime, fail-closed) · `data/` (Dataset partitions,
@@ -343,8 +345,9 @@ resolve against the JVM working directory, not the space root (PROJECT_NOTES got
 fixes arrive via merge-forward per [`BRANCHING.md`](../BRANCHING.md). Procedure: pre-upgrade `config_backup`
 → keep the N-1 bundle beside the new one → stop service → swap bundle (state lives in `spaces/` + DB, outside
 the bundle) → start → §9 verify. Rollback = start N-1 bundle + restore the pre-upgrade backup if config
-migrated. Legacy-API sunset (`-Dapi.legacy.routes=off`) follows the soak-gated
-[`ops/legacy-api-sunset-runbook.md`](../ops/legacy-api-sunset-runbook.md), never a flag flipped during upgrade.
+migrated. Note for estates upgrading across 2026-07-25: the unversioned API surface is **gone** —
+business routes require `/api/v1` (probes stay unversioned), so any client still calling bare paths
+must be repointed before the upgrade, not after.
 
 ---
 
@@ -399,9 +402,9 @@ Basis: the existing smoke harness + e2e suite, productized as SCR-6. Evidence ta
 body extract) attached to the acceptance sign-off. **Basic block (every tier)**:
 
 - **VER-1 liveness/readiness**: `/health` = 200 `{"status":"UP"}`; `/ready` reports the expected pipeline count.
-- **VER-2 edition probe**: `/bootstrap` `edition` matches intent (`personal` vs `standard`) — catches a
-  missing security jar or `auth.mode` immediately.
-- **VER-3 backend assertion**: `/health/details` shows every intended subsystem `UP` (not silently
+- **VER-2 edition probe**: `/api/v1/bootstrap` `data.edition` matches intent (`personal` vs `standard`) —
+  catches a missing security jar or `auth.mode` immediately.
+- **VER-3 backend assertion**: `/api/v1/health/details` shows every intended subsystem `UP` (not silently
   `NOT_CONFIGURED`/in-memory fallback) — the graceful-degradation counter-check.
 - **VER-4 telemetry**: `/metrics` scrapes and parses (Prometheus text 0.0.4).
 - **VER-5 functional round-trip**: seed the inbox (`seed-inbox`) → poll → Dataset partitions written →

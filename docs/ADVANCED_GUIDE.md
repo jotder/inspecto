@@ -433,16 +433,15 @@ Secrets: `SecretResolver` resolves `SYS:<key>` via `System.getProperty(key)` —
 Auth-free in the common core. **503 = write-root gated** (set `-Dassist.write.root`; the gate chain
 write-root 503 → unsafe name 422 → path jail 403 → conflict 409 is shared, `control/WriteGates.java`).
 
-**Versioned surface (v4.8.0):** every route below is also served under an `/api/v1/…` prefix with the
-v1 transport contract (`docs/superpower/api-contract-design.md`): responses wrapped in the
-`{data, metadata, links, diagnostics}` envelope, errors as structured objects with machine-readable
-codes (`control/ErrorCodes.java`), gzip negotiated ≥ 1 KiB. Every request (legacy included) gets a
-`Correlation-ID` (caller-supplied or issued), echoed as a response header and inherited by events
-logged during the request. Since W7 the SPA speaks `/api/v1` end-to-end; the unversioned routes below
-remain as **legacy aliases** — byte-for-byte unchanged — for external/older clients. A successful non-v1
-call to a versioned route increments `inspecto_legacy_api_requests_total{route}` (the W7 **sunset
-signal**; infra probes health/ready/metrics excluded), so a deployment can see whether anything still
-depends on them before they are removed — removal stays gated on that soak.
+**Versioned surface:** every business route below is served **only** under the `/api/v1/…` prefix —
+the paths are written version-free for brevity, so read `GET /jobs` as `GET /api/v1/jobs`. A bare
+unversioned business path is not served, and `/api/<anything-not-v1>` returns a JSON 404 rather than
+the SPA shell. The v1 transport contract (`docs/superpower/api-contract-design.md`): responses wrapped
+in the `{data, metadata, links, permissions, diagnostics}` envelope, errors as
+`{error:{errorCode, message, …}}` with machine-readable codes (`control/ErrorCodes.java`), gzip
+negotiated ≥ 1 KiB. Every request gets a `Correlation-ID` (caller-supplied or issued), echoed as a
+response header and inherited by events logged during the request. The only unversioned routes are the
+infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 
 - **Health/metrics:** `GET /health`, `GET /ready`, `GET /metrics` (Prometheus), `GET /metrics/acquisition` (JSON).
 - **Bootstrap (v4.8.0):** `GET /bootstrap` — one ETag'd call: edition + feature flags, all config specs, platform
@@ -455,13 +454,13 @@ depends on them before they are removed — removal stays gated on that soak.
   (typed columns + roles + cardinality, rows, statistics, candidate renderings, export options). Query/dataset
   authoring reuses `/components/{query|dataset}/{id}`. Read-path only (not Matrices materialization).
 - **Pipelines (ingest runs):** `GET /runs`, `POST /runs` *(503)*, `POST /runs/{n}/trigger`
-  *(v4.8.0: on `/api/v1` returns **202 + {runId} + Location** async; legacy stays 200 + `RunResult`)*,
+  *(async: **202 + {runId} + Location**)*,
   `GET /runs/runs/{runId}` *(poll a run — RUNNING then terminal; 404 once evicted)*,
   `POST /runs/{n}/pause|resume|reprocess`,
   `GET /runs/{n}/commits|batches|files|lineage|quarantine|pending|report`, `POST /trigger` (all).
 - **Status/report:** `GET /status`, `GET /report`.
 - **Jobs:** `GET /jobs`, `GET /jobs/metrics|runs|failures`, `GET /jobs/{n}/runs`, `POST /jobs/{n}/trigger`
-  *(v4.8.0: on `/api/v1` returns **202 + {runId} + Location**; legacy stays 200)*, `GET /jobs/runs/{runId}`
+  *(async: **202 + {runId} + Location**)*, `GET /jobs/runs/{runId}`
   *(poll a run — RUNNING then terminal; 404 once evicted)*.
 - **Idempotency (v4.8.0):** any `POST/PUT/DELETE` may carry an `Idempotency-Key` header; a retry with the same
   key replays the first response (`Idempotency-Replayed: true`) instead of re-running (per-instance, ~10 min TTL).

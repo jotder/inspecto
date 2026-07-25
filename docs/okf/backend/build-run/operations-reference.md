@@ -316,13 +316,21 @@ removed). The **Standard** edition re-adds authentication out-of-band via the `A
 server, HTTPS, BFF `/auth/*` routes) — see [`EDITIONS.md`](../../../EDITIONS.md). Separate from auth and always on:
 **write routes are fail-closed** behind the `-Dassist.write.root` gate (`503` when unset).
 
-**Versioned contract.** Every route below is also served under the versioned **`/api/v1`** prefix with a
-response envelope, an error-code catalog, ETag/`If-Match` concurrency on components, `GET /bootstrap`,
-`POST /queries/{id}/run`, and **async** job/pipeline triggers (`202` + `runId` + poll, `Idempotency-Key`
-replay). The legacy unversioned routes remain byte-for-byte compatible until a soak-gated sunset. The
+**Versioned contract.** Every business route below is served **only** under the versioned **`/api/v1`**
+prefix (since 2026-07-25) with a response envelope
+(`{data, metadata, links, permissions, diagnostics}`), an error-code catalog
+(`{error:{errorCode, message, recoverable, correlationId, details?}}`), ETag/`If-Match` concurrency on
+components, `GET /bootstrap`, `POST /queries/{id}/run`, and **async** job/pipeline triggers (`202` +
+`runId` + poll, `Idempotency-Key` replay). A bare unversioned business path is no longer served, and
+`/api/<anything-not-v1>` returns a JSON `404`. Only the four infra probes stay unversioned:
+`GET /health`, `GET /ready`, `GET /metrics`, `GET /metrics/acquisition`. The
 authoritative surface is [`ADVANCED_GUIDE.md`](../../../ADVANCED_GUIDE.md) §Control API and the OpenAPI contract
-[`api/openapi-v1.json`](../../../api/openapi-v1.json). With multi-space enabled, routes may be prefixed
-`/spaces/{id}/…`.
+[`api/openapi-v1.json`](../../../api/openapi-v1.json). With multi-space enabled, the space segment sits
+**after** the version: `/api/v1/spaces/{id}/…`.
+
+Paths in the table below are written **relative to `/api/v1`** — e.g. `GET /pipelines` is requested as
+`GET /api/v1/pipelines`. The two probe rows (`/health`, `/ready`) are the exception: they are absolute
+and unversioned.
 
 | Method & path | Purpose |
 |---|---|
@@ -355,8 +363,8 @@ authoritative surface is [`ADVANCED_GUIDE.md`](../../../ADVANCED_GUIDE.md) §Con
 | `POST /config/write` | body `{type, config, subdir?, overwrite?}` — persist a validated draft as `.toon` under `-Dassist.write.root` (`assist.write` scope; v4.1) |
 
 ```bash
-curl -s localhost:8080/pipelines
-curl -s -X POST localhost:8080/pipelines/adjustment_etl/trigger
+curl -s localhost:8080/api/v1/pipelines
+curl -s -X POST localhost:8080/api/v1/pipelines/adjustment_etl/trigger   # 202 + {runId}
 ```
 
 **Authoring → save → register (v4.1).** With `-Dassist.write.root=<dir>` set, a validated config
@@ -371,8 +379,9 @@ inside the config tree the service was launched with so the pipeline also surviv
 Angular SPA as static files, so one process hosts both the API and the UI (v4.1):
 
 - `-Dui.dir=<path>` — serve a built SPA bundle (the folder containing `index.html`). Unknown
-  **GET** paths with no file extension fall back to `index.html` (SPA deep links), while unmatched
-  **API** paths still return JSON `404` — routes always win over the static fallback. Static assets
+  **GET** paths with no file extension fall back to `index.html` (SPA deep links — this is why a bare
+  `GET /objects` still serves the shell), while anything under `/api/…` never falls back: an unmatched
+  or non-`v1` API path returns JSON `404`. Routes always win over the static fallback. Static assets
   are served without restriction so the shell loads before the operator connects. A path-traversal guard
   confines reads under the root.
 - `-Dcontrol.cors=<origin>` (e.g. `http://localhost:4204`, or `*`) — enable CORS headers + `OPTIONS`
@@ -412,11 +421,11 @@ day. The rollup (counts, percentiles, first/last time) is computed over just the
 identically over the file and DB backends.
 
 ```bash
-curl -s -H "Authorization: Bearer secret" localhost:8080/status
-curl -s -H "Authorization: Bearer secret" localhost:8080/pipelines/adjustment_etl/report
+curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/status
+curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/pipelines/adjustment_etl/report
 # just last month, with p50/p95/p99 over that window:
 curl -s -H "Authorization: Bearer secret" \
-  "localhost:8080/pipelines/adjustment_etl/report?from=2026-04-01&to=2026-04-30"
+  "localhost:8080/api/v1/pipelines/adjustment_etl/report?from=2026-04-01&to=2026-04-30"
 ```
 
 ### Enrichment run audit over the API (`EnrichmentAuditReader`)
@@ -443,8 +452,8 @@ All four require auth and return `404` when no enrichment is registered, or the 
 is unknown.
 
 ```bash
-curl -s -H "Authorization: Bearer secret" localhost:8080/enrichment
-curl -s -H "Authorization: Bearer secret" localhost:8080/enrichment/EVENTS_DAILY_KPI/report
+curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/enrichment
+curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/enrichment/EVENTS_DAILY_KPI/report
 ```
 
 ### Config-driven jobs — cron / event / manual (`JobService`)
@@ -484,9 +493,10 @@ semantics). Every run is recorded to `jobs_audit/jobs_runs.csv` (override with
 `-Djobs.audit.dir`) and a short in-memory history the API serves.
 
 ```bash
-curl -s -H "Authorization: Bearer secret" localhost:8080/jobs
-curl -s -X POST -H "Authorization: Bearer secret" localhost:8080/jobs/nightly-clean/trigger
-curl -s -H "Authorization: Bearer secret" localhost:8080/jobs/nightly-clean/runs
+curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs
+# trigger is async: 202 + {runId}; poll the run by id
+curl -s -X POST -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs/nightly-clean/trigger
+curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs/nightly-clean/runs
 ```
 
 ### Status backend — file (default) or database (`DbStatusStore`)
@@ -551,9 +561,9 @@ event, and every transition emits an `OBJECT_OPENED`/`OBJECT_ACTIVITY` event so 
 the event log. Operate the objects over the Control API (CONTROL scope):
 
 ```bash
-curl -s -H "Authorization: Bearer secret" "localhost:8080/objects?type=ALERT&status=OPEN"
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/ack
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/resolve
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects?type=ALERT&status=OPEN"
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/ack
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/resolve
 ```
 
 > **Future / distributed:** like the status backend, point `-Dobjects.db.url` at
@@ -575,13 +585,13 @@ richer lifecycle `OPEN → ASSIGNED → IN_PROGRESS → RESOLVED → CLOSED` (ac
 
 ```bash
 # create an issue with a 2-hour SLA (dueInMinutes; or pass an absolute dueAt in epoch millis)
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects \
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects \
   -d '{"title":"reconcile mismatch on pipeX","severity":"HIGH","assignee":"alice","priority":"P1","dueInMinutes":120}'
 # walk the lifecycle
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/transition -d '{"action":"assign","actor":"alice"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/transition -d '{"action":"start"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/transition -d '{"action":"resolve"}'
-curl -s -H "Authorization: Bearer secret" "localhost:8080/objects?type=ISSUE&status=IN_PROGRESS"
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"assign","actor":"alice"}'
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"start"}'
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/transition -d '{"action":"resolve"}'
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects?type=ISSUE&status=IN_PROGRESS"
 ```
 
 **SLA tracking** is opt-in per issue: set `dueAt` (epoch millis) or `dueInMinutes` at creation. A
@@ -595,7 +605,7 @@ to disable):
 java -cp file-processor.jar com.gamma.control.ControlApi \
      -Dcontrol.token=secret -Dobjects.sla.sweep.seconds=30 config/
 # find breached issues via the event feed
-curl -s -H "Authorization: Bearer secret" "localhost:8080/events/search?type=OBJECT_SLA_BREACH"
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_SLA_BREACH"
 ```
 
 ### Case Management (Phase 4) — correlation links & graph
@@ -609,15 +619,15 @@ to it. Links follow the same `-Dobjects.backend` toggle (durable in their own Du
 
 ```bash
 # create a case, then link the issue it contains
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects \
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects \
   -d '{"type":"CASE","title":"Q2 reconciliation incident","severity":"HIGH"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<caseId>/links \
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<caseId>/links \
   -d '{"to":"<issueId>","relationship":"contains","actor":"alice"}'
 # the case's neighbourhood, and a 2-hop correlation subgraph (nodes + edges)
-curl -s -H "Authorization: Bearer secret" "localhost:8080/objects/<caseId>/links"
-curl -s -H "Authorization: Bearer secret" "localhost:8080/objects/<caseId>/graph?depth=2"
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<caseId>/links"
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<caseId>/graph?depth=2"
 # every correlation also lands in the event feed
-curl -s -H "Authorization: Bearer secret" "localhost:8080/events/search?type=OBJECT_LINKED"
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_LINKED"
 ```
 
 > Links are immutable facts (append-only — no edit/delete), like events.
@@ -630,15 +640,15 @@ config paths, listed at `GET /rca/templates`, applied by `{template:"<name>"}`).
 `-Dobjects.backend` toggle (their own DuckDB file `inspecto-ops-notes.db` when durable).
 
 ```bash
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/comments \
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/comments \
   -d '{"author":"alice","body":"reproduced on pipeX; investigating the reconciler"}'
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/attachments \
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/attachments \
   -d '{"name":"trace.log","uri":"s3://evidence/trace.log","contentType":"text/plain","author":"alice"}'
 # seed an RCA skeleton (one comment per section), then read the thread
-curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/objects/<id>/rca \
+curl -s -H "Authorization: Bearer secret" -X POST localhost:8080/api/v1/objects/<id>/rca \
   -d '{"sections":["Summary","Timeline","Root cause","Impact","Remediation"],"actor":"alice"}'
-curl -s -H "Authorization: Bearer secret" "localhost:8080/objects/<id>/comments"
-curl -s -H "Authorization: Bearer secret" "localhost:8080/objects/<id>/attachments"
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<id>/comments"
+curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/objects/<id>/attachments"
 ```
 
 ### Observability — metrics & structured events

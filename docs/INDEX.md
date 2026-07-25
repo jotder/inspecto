@@ -119,6 +119,15 @@ Archived 2026-07-25: [`plans-archive/embedded-intelligence-plan.md`](archived-do
 [`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md), open follow-ons in
 [`BACKLOG.md`](BACKLOG.md) §2. Retained as the **§8 phasing record**.
 
+Archived 2026-07-25: [`legacy-api-sunset-runbook.md`](archived-documents/legacy-api-sunset-runbook.md)
+— the unversioned control-plane API surface was retired (BACKLOG **D3** / **API-5**), so the sunset
+runbook is history, not current guidance. `/api/v1` is the only surface; no migration window remains.
+
+Archived 2026-07-25: [`plans-archive/legacy-surface-removal-plan.md`](archived-documents/plans-archive/legacy-surface-removal-plan.md)
+— API-5 / BACKLOG **D3** COMPLETE; as-built distilled into
+[`okf/backend/control-plane/api-v1.md`](okf/backend/control-plane/api-v1.md). Retained as the record of
+the **blast-radius and failure taxonomy** behind the migration.
+
 ---
 
 **Last Updated**: 2026-07-25

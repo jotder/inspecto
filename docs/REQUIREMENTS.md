@@ -142,7 +142,7 @@ AI-driven autonomy without redesign.
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
 | OPS-1 | One **Signal** ledger; **Events**, Alerts, Notifications as *views* over it; live tail, saved views, CSV export | Must | SHIPPED (R4) | All |
-| OPS-2 | **Metrics** (Prometheus-compatible), incl. `inspecto_legacy_api_requests_total` sunset signal | Must | SHIPPED | All |
+| OPS-2 | **Metrics** (Prometheus-compatible) — throughput, error rate, lag, run durations | Must | SHIPPED | All |
 | OPS-3 | Three-layer audit: file/batch audit, provenance rows, immutable who-did-what **Audit Log** | Must | SHIPPED (actor attribution hardening on Standard — see SEC-7) | All |
 | OPS-4 | Durable Run reporting (success rate, p50/p95) | Should | SHIPPED (off by default) | All |
 | OPS-5 | Per-edge **Provenance** + conservation invariant → Alerts + Sankey overlay | Should | PARTIAL (built/tested; off by default; verified vs synthetic data only. Executable verification protocol signed 2026-07-08: `docs/ops/provenance-conservation-verification.md` — enable on a real feed, soak through natural variation, cross-check invariants against ground truth, log the outcome. Cannot close offline; needs the first live deployment to run it) | All |
@@ -182,11 +182,11 @@ AI-driven autonomy without redesign.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| API-1 | Versioned **`/api/v1`** business contract: response envelope, error-code catalog, Correlation-ID, gzip; legacy routes byte-for-byte until sunset | Must | SHIPPED (W1) | All |
+| API-1 | Versioned **`/api/v1`** business contract: response envelope, error-code catalog, Correlation-ID, gzip; the only surface for business routes since API-5 | Must | SHIPPED (W1) | All |
 | API-2 | OpenAPI 3.1 contract (`docs/api/openapi-v1.json`) enforced by `ApiContractTest` | Must | SHIPPED (W2) | All |
 | API-3 | Optimistic concurrency: `ContentHash` + ETag / If-None-Match / If-Match on Components | Must | SHIPPED (W3) | All |
 | API-4 | `GET /bootstrap` metadata-first boot (features, `authMode`, permissions) | Must | SHIPPED (W3/W6) | All |
-| API-5 | Legacy (unversioned) route sunset — **soak-gated** on the usage metric | Should | SHIPPED (2026-07-08: mechanism — `Deprecation`/`Link`/`Sunset` headers + `-Dapi.legacy.routes=off` → 410 (infra exempt, metric keeps counting) — plus the **soak criterion signed** the same day: **30 consecutive days at zero `inspecto_legacy_api_requests_total` on a deployment ⇒ flip that deployment `off`**. Executable runbook: `docs/ops/legacy-api-sunset-runbook.md` (PromQL query, flip procedure, verification curls). Remaining is pure per-deployment ops execution — no engineering, no open decision) | All |
+| API-5 | Retire the unversioned route surface — business routes require `/api/v1` | Should | SHIPPED (2026-07-25, BACKLOG D3: business routes are served **only** under `/api/v1/…`; a bare unversioned business path is no longer served and `/api/<non-v1>` returns a JSON 404 rather than the SPA shell. Infra probes stay unversioned: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`. The sunset machinery is gone with the surface — `Deprecation`/`Link`/`Sunset` headers, `-Dapi.legacy.routes=off` and `inspecto_legacy_api_requests_total` no longer exist, and the soak criterion was deliberately overridden: no live deployment, every in-repo caller migrated in the same change) | All |
 | API-6 | Gateway/IAM drop-in: WSO2 gateway + Keycloak blueprints for Standard | Must (S) | SHIPPED (design + security module seams) | S |
 | API-7 | Java embedding API stability policy (SemVer, `@PublicApi`) | Must | SHIPPED | All |
 
@@ -261,7 +261,7 @@ AI-driven autonomy without redesign.
 | NFR-3 | **Resilience** | Crash-isolated, idempotent Runs; batch-atomic commit; quarantine semantics | SHIPPED |
 | NFR-4 | **Air-gap operation** | Full function without egress; hosted-AI SDKs physically absent; offline basemap/geocoder | SHIPPED |
 | NFR-5 | **Accessibility** | WCAG 2.2 AA; axe-core CI gate | SHIPPED |
-| NFR-6 | **API compatibility** | SemVer; versioned `/api/v1`; legacy routes byte-for-byte until soak-gated sunset; `@PublicApi` embedding policy | SHIPPED |
+| NFR-6 | **API compatibility** | SemVer; versioned `/api/v1` as the sole business surface (unversioned routes retired 2026-07-25, API-5); `@PublicApi` embedding policy | SHIPPED |
 | NFR-7 | **Compliance posture (Standard)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) |
 | NFR-8 | **Scale ceiling** | Single-node by design; Enterprise distributed tier is the opt-in escape hatch | ACCEPTED CONSTRAINT |
 | NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, a11y gate, live smoke | SHIPPED (process) |
@@ -382,9 +382,9 @@ template gallery + apply).*
    2026-07-08; the mock-first UI surfaces now all have real backends.
 5. **AGT-5 (embedded intelligence)** — P0 shipped 2026-07-07 on product-owner sign-off; **EOI-7(a)**
    landed 2026-07-08 (pinned v0.1.0), so P1 no longer builds on a moving SNAPSHOT.
-6. **API-5 legacy sunset — CLOSED 2026-07-08**: mechanism + signed soak criterion (30 days at zero)
-   + executable runbook (`docs/ops/legacy-api-sunset-runbook.md`); every remaining step is per-deployment
-   ops execution, not a decision or an engineering task.
+6. **API-5 unversioned surface — CLOSED 2026-07-25**: the surface itself is gone (business routes
+   require `/api/v1`, infra probes stay unversioned), and the sunset mechanism, its metric and its
+   runbook went with it. Nothing is left pending per deployment.
 
 ---
 
@@ -399,7 +399,7 @@ template gallery + apply).*
 | R5 | Provenance conservation checks unproven on live data | OPS-5 live verification alongside R1's seeded run |
 | R6 | ~~Structured (non-SQL) Queries still client-compiled~~ **ACCEPTED AS DESIGN 2026-07-22** (product sign-off) — not a risk. The builder UI emits valid SQL that `QueryExecutor` runs; a server-side structured compiler would duplicate that for no functional gain. Server 422 on non-SQL bodies stays the explicit, deliberate contract. Revisit only if an external API consumer must submit structured bodies directly. | Closed — `okf/backend/control-plane/queries.md` |
 | R7 | Prompt injection / data egress once intelligence deepens | AGT-5 design: context-as-data, privacy classes P0–P3, approval gates, kill switch |
-| R8 | ~~Open product questions: case-type data-scoped grants, `canOnboardConnections` split, sunset timing~~ **RESOLVED 2026-07-22** (product sign-off): case-type grants = SEC-7d attribute-scope model (shipped, no further per-type role UI); `canOnboardConnections` = split out + implemented (Admin-only grant on the connection write routes); sunset timing = **per-deployment** (no global soak number, W8 mechanism stands). | Closed — `okf/backend/editions/auth-security.md` |
+| R8 | ~~Open product questions: case-type data-scoped grants, `canOnboardConnections` split, sunset timing~~ **RESOLVED 2026-07-22** (product sign-off): case-type grants = SEC-7d attribute-scope model (shipped, no further per-type role UI); `canOnboardConnections` = split out + implemented (Admin-only grant on the connection write routes); sunset timing = moot — the unversioned surface was **retired outright** 2026-07-25 (API-5), mechanism and all. | Closed — `okf/backend/editions/auth-security.md` |
 | R9 | Feature matrix (2026-07-02) drifting from reality | This document is the reconciled view; update **both** on the next planning pass |
 
 ---

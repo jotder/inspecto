@@ -13,6 +13,10 @@
   [build & run](../okf/backend/build-run/operations.md).
 - **Editions** — Personal boots open (no login); Standard needs the IAM/OIDC settings and HTTPS
   keystore. Run the Standard bundle with `-NoRuntime` until the jlink/Nimbus verification closes.
+- **API prefix** — every business route is served only under `/api/v1/…`; only the probes
+  (`/health`, `/ready`, `/metrics`, `/metrics/acquisition`) are unversioned. Responses are
+  envelope-wrapped (`{data, metadata, links, permissions, diagnostics}`), errors are
+  `{error:{errorCode, message, …}}`.
 - **Spaces** — everything lives under `spaces/<id>/…`; single-space installs use `default`. Migrate
   legacy flat layouts once with `SpaceMigrator`.
 
@@ -21,7 +25,7 @@
 | Signal | Where |
 |---|---|
 | Liveness / readiness | `GET /health` · `GET /ready` |
-| Metrics (Prometheus) | `GET /metrics` — throughput, error rate, lag, plus `inspecto_legacy_api_requests_total` (legacy-API sunset meter) |
+| Metrics (Prometheus) | `GET /metrics` — throughput, error rate, lag |
 | Operational activity | the **Signal ledger** (`/events` page; live tail, saved views, CSV export) |
 | Fired alerts → incidents | Alerts / Incidents / Cases panes (SLA, comments, correlation ids) |
 | Run health | Runs + Run detail panes; durable run reporting (success rate, p50/p95) |
@@ -35,7 +39,7 @@
   pipeline, or replay from quarantine; markers make re-ingest safe.
   Playbooks: [`../ADVANCED_GUIDE.md`](../ADVANCED_GUIDE.md) §troubleshooting ·
   [`../okf/backend/build-run/troubleshooting.md`](../okf/backend/build-run/troubleshooting.md) (DuckDB/pg_duckdb quirks).
-- **Config changes** — validated drafts only (`POST /validate` → `/config/write` under the fail-closed
+- **Config changes** — validated drafts only (`POST /api/v1/validate` → `/api/v1/config/write` under the fail-closed
   write root); the safety validator blocks dangerous specs (`422`).
 - **Backup / move** — whole-Space zip export/import (dry-run preview), or artifact-level **Metadata
   Bundles** (config only, secrets masked, drift fit-check on import).
