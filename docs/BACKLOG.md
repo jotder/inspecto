@@ -28,6 +28,10 @@ _(no in-flight repo state — working tree clean as of 2026-07-25)_
 **Dependency-ordered priority.** Order of attack across the open rows below, by dependency fan-out;
 each row's detail stays in its own section.
 
+0. 🔴 **SEC-INCIDENT-1 — rotate the leaked client secrets (§5).** Ahead of everything else and not an
+   engineering task: five OAuth secrets, one of them a named-customer production credential, were public
+   on GitHub for six weeks. The code is clean as of 2026-07-25 but **rotation at the issuer is
+   outstanding** — history keeps the values, so deletion remediated nothing.
 1. **Root enablers — DRAINED.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound, Incidents I1
    resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
    2026-07-23/24. The one survivor is **MNT-14**; its retention question is now answered (§2 D5 —
@@ -127,6 +131,59 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 | **Quarantine / D-ETL** | reprocess is **whole-batch only** — no record-level replay (tracked only if prioritized) | `okf/frontend/features/run-detail.md` |
 
 ## 5. UI residuals + security-module residuals
+
+> ### 🔴 SEC-INCIDENT-1 — leaked client secrets, ROTATION OUTSTANDING (opened 2026-07-25)
+>
+> Five OAuth client secrets sat in `inspecto-ui/src/environments/*.ts` and were pushed to a **PUBLIC**
+> GitHub remote (`jotder/ucc-file-processor`, `isPrivate:false`) from **2026-06-12** until removed in
+> `<this commit>` — roughly six weeks, 4 commits. **Removing them from HEAD did not remediate anything:**
+> the values remain in git history, in every clone and fork, and in GitHub's caches. **Treat all five as
+> compromised and rotate at the issuer.** This row closes only when rotation is confirmed, not when the
+> code edit landed.
+>
+> | Secret | Scope | Values |
+> |---|---|---|
+> | `iamClientSecret` | IAM server — **same value reused in all 5 environment files** | 1 (`f6f6…e65c1`) |
+> | `appClientSecret` | dev · gamma · gammadev | 3 |
+> | `appClientSecret` | **`app1.pronto.lebara.sa`** — named-customer production (`environment.prod.ts`) | 1 |
+>
+> Rotate the production `appClientSecret` first, then the shared `iamClientSecret` (one rotation covers
+> every environment). Client IDs are retained in-repo — they are not secrets — so the issuer-side entries
+> are identifiable: `appClientId` 8738429453654150144 (prod), 8825302933668759552 (dev/offline),
+> 5829657973124606976 (gamma), 2826856297262914560 (gammadev); `iamClientId` 1070682796450139008.
+>
+> **Why deletion was safe:** the only consumer, `app/app-component.service.ts` (HTTP Basic with
+> `clientId:clientSecret`), was removed with the dead Fuse code — nothing in `src/` has read these keys
+> since. UI verify after removal: `test:ci` 1642 pass, `ng build` clean.
+>
+> **Deliberately NOT done** (operator call 2026-07-25): no `git-filter-repo` history rewrite — it
+> invalidates every clone and breaks the shared-sandbox shift model while still not purging GitHub's cache
+> or forks; rotation is the real fix. No CI guard against reintroduction yet — worth adding beside the
+> `lint:tokens` colour guard.
+>
+> **⚠ `4.x` IS NOT FIXED, AND THERE THE SECRETS ARE LIVE.** On `master` the removal was a no-op because
+> the consumer was already gone; on `4.x` `app/app-component.service.ts` still exists, is wired into
+> `app.component.ts` + `modules/commons/page.manager.ts`, and actively sends `client_secret` in a token
+> request plus `Authorization: Basic btoa(clientId:clientSecret)` — with the IAM secret **hardcoded inline
+> as a literal at line 26**, not even read from the environment file. So:
+>
+> - **Rotation will break running `4.x` SPAs.** They authenticate with exactly these values and will fail
+>   until rebuilt with new config. Rotation needs a deployment-coordination window, not a quiet swap.
+> - **The `4.x` fix is a design change, not a deletion** — a browser bundle cannot hold a confidential
+>   client secret, so re-issuing a secret that still ships in the SPA just reproduces this incident with
+>   fresh values. The line needs a public-PKCE (or server-side token exchange) path first.
+> - Merge-forward was therefore **deliberately not followed** here (operator call 2026-07-25): the
+>   `master` fix shipped alone, and the `4.x` remediation is tracked as its own item rather than
+>   improvised inside a shift.
+>
+> Retired lines `1.x`–`3.x` very likely carry the values too; policy forbids committing there, and
+> rotation covers them.
+>
+> **Also still on disk, outside git:** the orphaned `.claude/worktrees/quirky-lalande-a4a696/` directory
+> (not in `git worktree list`) holds unversioned copies of all five secrets.
+>
+> Lower severity, same files, unaddressed: internal hostnames/IPs are published in-repo
+> (`68.183.16.242`, `p20.prod.pronto`, `app1.pronto.lebara.sa`).
 
 **UI residuals (small, valuable):**
 - `ComponentKind.deriveParts` seam — formalize when a 3rd composite kind needs it.

@@ -17,7 +17,6 @@ export const environment = {
     footerText: 'Powered by Gamma Analytics',
     appLogoutUri: 'pronto/logout',
     appClientId: '2826856297262914560',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     promptoUrl: "https://demo.gammadev.io/prompto/",
     promptoServerUrl: "https://demo.gammadev.io/promtoapiserver",
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
@@ -27,9 +26,8 @@ export const environment = {
     caseTrackerGuiUrl: "/casetracker/",
     authServerAuthentication: true,
     agenticAiUrl: "https://demo.gammadev.io/agenticaiapiserver",
-    //iam details
+    // iam details. No client secret here — this file ships inside the browser bundle (public).
     iamClientId:"1070682796450139008",
-    iamClientSecret:"REDACTED-SEC-INCIDENT-1",
     dataFormat:"YYYYMMDD",
     chatLogo: 'assets/images/logos/assistant.png',
      notificationSount:'assets/sound/notification_2.mp3'

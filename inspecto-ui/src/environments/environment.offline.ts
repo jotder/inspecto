@@ -47,13 +47,11 @@ export const environment = {
     footerText: ' © Powered By Gamma Analytics LLC',
     appLogoutUri: 'logout',
     appClientId: '8825302933668759552',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     chatLogo: 'assets/images/logos/assistant.png',
     authServerAuthentication: true,
-    //iam details
+    // iam details. No client secret here — this file ships inside the browser bundle (public).
     iamClientId: '1070682796450139008',
-    iamClientSecret: 'REDACTED-SEC-INCIDENT-1',
     dataFormat: 'YYYYMMDD',
     notificationSount: 'assets/sound/notification_2.mp3',
 };

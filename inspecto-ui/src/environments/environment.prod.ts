@@ -17,15 +17,13 @@ export const environment = {
     footerText: 'Powered by Latro',
     appLogoutUri: 'pronto/logout',
     appClientId: '8738429453654150144',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     chatUrl: "http://68.183.16.242:5000/",
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     iamAppUrl: 'https://app1.pronto.lebara.sa/iam-server',
     caseTrackerGuiUrl: "/casetracker/",
     authServerAuthentication: true,
-    //iam details
+    // iam details. No client secret here — this file ships inside the browser bundle (public).
     iamClientId:"1070682796450139008",
-    iamClientSecret:"REDACTED-SEC-INCIDENT-1",
     dataFormat:"YYYYMMDD",
      notificationSount:'assets/sound/notification_2.mp3'
 

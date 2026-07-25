@@ -24,21 +24,17 @@ export const environment = {
     footerText: ' © Powered By Gamma Analytics LLC 2024',
     appLogoutUri: 'logout',
     appClientId: '5829657973124606976',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     iamAppUrl: 'https://app1.pronto.lebara.sa/iam-server',
     promptoUrl:'http://68.183.16.242/apps/newchat',
     caseTrackerGuiUrl: "/casetracker/",
     authServerAuthentication: true,
+    // no client secret here — this file ships inside the browser bundle (public by construction)
     iamClientId:"1070682796450139008",
-    iamClientSecret:"REDACTED-SEC-INCIDENT-1",
     dataFormat:"YYYYMMDD",
     notificationSount:'assets/sound/notification_2.mp3'
 
 };
-
-// REDACTED-SEC-INCIDENT-1
-
 
 /*
  * For easier debugging in development mode, you can import the following file
