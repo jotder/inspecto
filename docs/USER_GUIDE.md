@@ -6,7 +6,7 @@ Inspecto turns raw source files into clean, queryable data and then helps you mo
 and present it. This guide walks the web app screen by screen: how to get around, what each page
 is for, what you can do there, and how the pieces connect. Every term is used exactly as defined
 in [`GLOSSARY.md`](GLOSSARY.md) — the canonical vocabulary — so if a word here looks deliberate
-(Pipeline, Dataset, Expectation, Source, Widget…), it is.
+(Pipeline, Dataset, Expectation, Collector, Widget…), it is.
 
 > **How to read this.** Each screen entry has the same shape: **what it is → what you can do →
 > what to notice → how it connects** to the rest of the app. If you're brand new, read
@@ -28,7 +28,7 @@ The app serves three kinds of people. Find yourself, and start with your five sc
   (**Catalog** lineage) → raise a **Requirement** for what's missing → check two systems agree
   in **Reconciliation**. Start at [Business](#2-business).
 - **Builder** (data & BI engineers — *author*). Your Lens opens on **Pipelines**. Your loop:
-  **Connection → Source → Pipeline → Runs** to get data in and shaped, then **Studio**
+  **Connection → Collector → Pipeline → Runs** to get data in and shaped, then **Studio**
   (Query → Widget → Dashboard) to turn it into insight. Start at [Workbench](#41-workbench)
   and [Studio](#42-studio).
 - **Ops** (operators, on-call — *monitor*). Your Lens opens on **Events**. Your loop: watch
@@ -42,7 +42,7 @@ Inspecto is **ELT**, not ETL: the *load* is a plain write of parsed rows to Parq
 file to a dashboard tile is a chain of the nouns this guide defines:
 
 ```
-  Connection ─▶ Source ─▶ Run ⊇ Batch ⊇ File ─▶ Pipeline (parse → shape)
+  Connection ─▶ Collector ─▶ Run ⊇ Batch ⊇ File ─▶ Pipeline (parse → shape)
        │            │                                   │
    how to reach  what/when to                     ┌─────▼─────┐
    the system    collect                          │  Table    │  partitioned Parquet (the "load")
@@ -118,13 +118,13 @@ current page stays highlighted.
   it does **not** reload the app. Your Lens also chooses where the app opens: Business lands on
   **KPI & Reports**, Builder on **Pipelines**, Ops on **Events**.
 - **Space switcher** — shows the active **Space** and lets you jump to another or create one. A
-  Space is a fully isolated project environment: its own Connections, Sources, Pipelines, Datasets,
+  Space is a fully isolated project environment: its own Connections, Collectors, Pipelines, Datasets,
   dashboards, and custom menus. It appears only when the server hosts more than one Space. Choosing
   a different Space **reloads the whole app** in that context (each screen re-fetches its data), so
   you always see a clean, correctly-scoped view.
 - **Notifications bell** — recent Signals delivered to you (Alerts, notable Events). Opens the
   notification history; what you subscribe to is set in **Settings → Notifications**.
-- **Search** — a global jump-to palette across *named artifacts* — Pipelines, Sources, Datasets,
+- **Search** — a global jump-to palette across *named artifacts* — Pipelines, Collectors, Datasets,
   Widgets, Dashboards, Queries. Use this to find *a thing*; use the sidebar menu-search to find *a
   screen*.
 - **User menu** — your profile, appearance/preferences, and (in the Standard edition) sign-out.
@@ -207,7 +207,7 @@ Events records *system activity* (Signals), Audit records *human and access acti
 be edited or deleted.
 
 **Diagnoses** — AI-assisted root-cause analysis for things that went wrong. Each diagnostic record
-examines a failing Run or Source and proposes a likely cause and a suggested fix, often linking to
+examines a failing Run or Collector and proposes a likely cause and a suggested fix, often linking to
 (or offering to raise) an **Incident**. Open a row to read the full analysis. The model behind this
 is chosen in **Settings → Model Settings**.
 
@@ -240,7 +240,7 @@ have and how it's related).
 ### 4.1 Workbench
 
 Workbench is where data engineers and builders do their authoring. The natural order is: define a
-**Connection** to a remote system, point a **Source** at it to collect files, author a **Pipeline**
+**Connection** to a remote system, point a **Collector** at it to collect files, author a **Pipeline**
 that parses and shapes those files, guard quality with **Expectations**, route with **Decision
 Rules**, and watch the results as **Runs**. **Jobs**, **Components**, **Enrichment**, and the
 Pipeline editor round out the toolkit.
@@ -250,7 +250,7 @@ Pipeline editor round out the toolkit.
 >
 > | What runs | Where you set the timing | Options |
 > |---|---|---|
-> | A **Source** (collection) | on the Source itself | a polling schedule ("how often to collect") |
+> | A **Collector** (collection) | on the Collector itself | a polling schedule ("how often to collect") |
 > | A **Pipeline** | its **Trigger** | `cron` · `event` · `manual` (run-now) · `on-pipeline` (chain after another Pipeline) |
 > | A **Job** (enrichment, maintenance, export) | its **Trigger** | `cron` · `event` · `manual` |
 > | A **Report** (scheduled Dashboard export) | its schedule on **KPI & Reports** | `cron` (a Job under the hood) |
@@ -311,12 +311,12 @@ system — one of Database, FTP, FTPS, SFTP, or Local. Connections are shown as 
 each is built from a schema-driven form with optional, default-collapsed **SSH tunnel/bastion** and
 **proxy** sections, each with its own **Test** button, plus a routing/failover popover. Probe and
 sample actions validate connectivity and preview the paths or tables you can reach. One Connection
-is reused by many Sources, so you configure credentials once.
+is reused by many Collectors, so you configure credentials once.
 
-**Sources** — A **Source** is a configured collection task bound to one Connection: *what* to
+**Collectors** — A **Collector** is a configured collection task bound to one Connection: *what* to
 collect (file paths or database queries), *how often*, which filename patterns to match, and the
-deduplication policy. Browse Sources in a table, create and edit them, and **run now** to collect on
-demand. A Source is the noun (the configured task); the runtime that executes it is just its role.
+deduplication policy. Browse Collectors in a table, create and edit them, and **run now** to collect on
+demand. A Collector is the noun (the configured task); the runtime that executes it is just its role.
 
 ### 4.2 Studio
 
@@ -506,7 +506,7 @@ End-to-end paths that tie the screens together. Each references the screens abov
 
 **Bring in a new data feed.**
 1. **Platform → Workbench → Connections** — create a Connection to the remote system and **Test** it.
-2. **Sources** — add a Source on that Connection: paths/patterns, schedule, dedup policy. **Run now**
+2. **Collectors** — add a Collector on that Connection: paths/patterns, schedule, dedup policy. **Run now**
    to collect once.
 3. **Pipelines** — author a Pipeline that parses and shapes the collected files (configure the
    parser node, **Test** each step).
@@ -570,9 +570,9 @@ avoided — see [`GLOSSARY.md`](GLOSSARY.md)):
 |---|---|---|
 | **Pipeline** | A named DAG of Steps that processes source files | ~~Flow~~ |
 | **Dataset** | Any queryable relation: Table / Derived Table / View | ~~Data Store~~ |
-| **Source** | A configured collection task | ~~Collector~~ (noun) |
-| **Connection** | A named remote endpoint + credentials, reused by Sources | |
-| **Stream** | A named data origin in the Catalog, populated by a Connection + its Sources | ~~Data Source~~ |
+| **Collector** | A configured collection task | ~~Source~~ (acquisition entity) |
+| **Connection** | A named remote endpoint + credentials, reused by Collectors | |
+| **Stream** | A named data origin in the Catalog, populated by a Connection + its Collectors | ~~Data Source~~ |
 | **Run / Batch / File** | An execution and its nested units, each with a status | |
 | **Expectation** | A data-quality rule against a Schema | bare ~~Rule~~ |
 | **Alert Rule** | A rule that watches an observability Metric against a threshold | bare ~~Rule~~ |

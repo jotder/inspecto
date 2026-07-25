@@ -40,7 +40,12 @@ const USER_FACING = [
 const RULES = [
     {
         id: 'measure-threshold',
-        test: (line) => (/measure/i.test(line) && /threshold/i.test(line) ? 'measure … threshold' : null),
+        // A2 is specifically *alerting* on a Measure. A **KPI** legitimately is "a single-number Measure
+        // with a target/threshold" (GLOSSARY §8) — so only fire when the line is also about alerting.
+        test: (line) =>
+            /measure/i.test(line) && /threshold/i.test(line) && /\balert(s|ing)?\b/i.test(line)
+                ? 'measure … threshold … alert'
+                : null,
         msg: 'An Alert Rule watches an observability **Metric** against a threshold, never a BI **Measure** (GLOSSARY §4/§8). This is the A2 confusion.',
     },
     {
@@ -56,9 +61,19 @@ const RULES = [
         msg: 'The authored DAG is a **Pipeline**, never a "Flow" (GLOSSARY §5).',
     },
     {
-        id: 'collector-noun',
-        test: (line) => { const m = line.match(/\bcollectors?\b/i); return m ? m[0] : null; },
-        msg: 'The configured collection task is a **Source** (⛔ "Collector" as a noun; "collect" as a verb is fine — GLOSSARY §2).',
+        id: 'source-acquisition-entity',
+        // Flipped 2026-07-14 (GLOSSARY §2/§3, rename map §13 row "Source (acquisition entity)"): the
+        // acquisition entity is a **Collector**; "Source" now belongs to the data-origin axis only.
+        // Case-sensitive and word-bounded on purpose, so the deliberate keeps still pass:
+        //   · CamelCase type names — `Source` followed by a word char is not a match (SourceStoreReader,
+        //     SourceConfigIntegrationTest, SourceFinalize) — see BACKLOG "Collector rename residual";
+        //   · the TOON config key `source:` and any other backticked term (inline code is stripped above);
+        //   · lowercase prose senses — "source files", "graph source", "single source of truth".
+        test: (line) => {
+            const m = line.match(/\bSources?\b(?!\s+(?:of|files?|code|data|system))/);
+            return m ? m[0] : null;
+        },
+        msg: 'The configured collection task is a **Collector** (⛔ "Source" as the acquisition entity — GLOSSARY §2/§3, flipped 2026-07-14). A *data origin* is a **Stream** or **Reference**.',
     },
 ];
 
