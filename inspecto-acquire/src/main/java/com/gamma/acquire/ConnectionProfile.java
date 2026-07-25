@@ -26,6 +26,12 @@ import java.util.TreeMap;
  * value as {@code ***}, so the profile can be displayed without leaking a credential a user may have inlined.
  * {@link #toBundleMap()} (the metadata-bundle view) is stricter still — it <em>omits</em> a non-reference
  * secret rather than masking it.
+ *
+ * <h3>Key spelling</h3>
+ * Every key is spelled identically in every view except {@link #basePath}: persisted forms (an
+ * {@code *_connection.toon} and {@link #toBundleMap()}) use {@code base_path}; the JSON API
+ * {@link #toMap()} the SPA consumes uses {@code basePath}. {@link #fromMap(Map)} accepts <b>either</b>,
+ * so both views round-trip losslessly.
  */
 @com.gamma.api.PublicApi(since = "4.2.0")
 public record ConnectionProfile(String id, String connector, String host, int port, String database,
@@ -113,8 +119,19 @@ public record ConnectionProfile(String id, String connector, String host, int po
                     str(pm.get("username")), str(pm.get("password")));
         }
         return new ConnectionProfile(str(c.get("id")), str(c.get("connector")), str(c.get("host")),
-                toInt(c.get("port")), str(c.get("database")), str(c.get("base_path")),
+                toInt(c.get("port")), str(c.get("database")), basePath(c),
                 str(c.get("username")), str(c.get("password")), options, tunnel, proxy);
+    }
+
+    /**
+     * The one field whose two views spell it differently: {@code base_path} on disk (every
+     * {@code *_connection.toon} and metadata bundle) vs. {@code basePath} in the JSON API {@link #toMap()} the
+     * SPA consumes. Reading <b>both</b> is what makes {@code fromMap(toMap(p))} lossless — without it a
+     * {@code toMap()} → {@code fromMap()} round-trip silently dropped the path.
+     */
+    private static String basePath(Map<String, Object> c) {
+        String snake = str(c.get("base_path"));
+        return snake != null ? snake : str(c.get("basePath"));
     }
 
     /** JSON-ready, <b>secret-masked</b> view (stable key order) for the {@code /connections} API + UI. */
@@ -125,7 +142,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         if (host != null) m.put("host", host);
         if (port > 0) m.put("port", port);
         if (database != null) m.put("database", database);
-        if (basePath != null) m.put("basePath", basePath);
+        if (basePath != null) m.put("basePath", basePath);     // camelCase — the SPA's contract, see class javadoc
         if (username != null) m.put("username", username);
         if (password != null) m.put("password", mask(password));
         if (!options.isEmpty()) {
@@ -172,7 +189,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         if (host != null) m.put("host", host);
         if (port > 0) m.put("port", port);
         if (database != null) m.put("database", database);
-        if (basePath != null) m.put("basePath", basePath);
+        if (basePath != null) m.put("base_path", basePath);   // on-disk spelling — a bundle is a file, not the API
         if (username != null) m.put("username", username);
         if (refOnly(password) != null) m.put("password", password);
         if (!options.isEmpty()) {

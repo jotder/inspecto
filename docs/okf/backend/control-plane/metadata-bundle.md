@@ -57,6 +57,12 @@ of its backing store:
     key entirely. A `***` sentinel would be a persisted lie that round-trips back into the target as a
     literal-looking value. `SecretResolver.isReference` is the predicate; `ConnectionProfile.isSecretKey`
     (widened from the private `looksSecret`) is the one rule both views share.
+  * ⚠ **The bundle uses the on-disk key spelling `base_path`, not the API's `basePath`** (corrected
+    2026-07-25, one day after the kind shipped). A bundle is a file, so it follows the `*_connection.toon`
+    canon; `ConnectionProfile.fromMap` accepts either spelling, so bundles exported by the original
+    2026-07-25 build (camelCase) still import. The local key translation `ConnectionBundleSource.parse` used
+    as a workaround is gone. **Cosmetic consequence:** re-exporting an unchanged profile differs by that one
+    line from a bundle stored before the fix, which can read as spurious drift for bundles kept in git.
   * **Import is defence in depth** — a secret-looking field that is present, non-blank and not a `${…}`
     reference (including `***`) fails *that item*, so a bundle can never smuggle a raw secret in.
   * `connection` is **first in `APPLY_ORDER`** (no outbound refs; an authored pipeline's source may reference

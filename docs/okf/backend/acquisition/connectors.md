@@ -73,7 +73,16 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
 * Connection profiles are `<name>_connection.toon` (`ConnectionProfile`): `id`, `connector`, `host`, `port`,
   `base_path`, `username`, `password`, an `options` map, an optional `tunnel` sub-block, and an optional
   `proxy` sub-block (`type` HTTP|SOCKS5, `host`, `port`, `username`, `password` — added 2026-07-18; the UI
-  authored it first). The proxy hop is probed by `POST /connections/test?target=proxy`, and it deliberately
+  authored it first).
+* ⚠ **`base_path` has two spellings on purpose, and `fromMap` accepts both** (fixed 2026-07-25). Persisted
+  forms — every `*_connection.toon` and `toBundleMap()` — use snake_case **`base_path`**; the JSON API
+  `toMap()` the SPA consumes uses camelCase **`basePath`** (`connections.service.ts`, `ConnTarget`), so
+  neither can be unified away. Until the fix, `toMap()` wrote `basePath` while `fromMap` read only
+  `base_path`, so `fromMap(toMap(p))` **silently dropped the path** — a latent data-loss bug for every
+  caller round-tripping a profile through its own map view. `ConnectionProfileTest`'s
+  `everyFieldSurvivesAMapRoundTrip` asserts whole-record equality and is the guard against a repeat: add a
+  key to one view and misspell it in the other, and it fails. Round-trip equality only holds for `${…}`
+  secret **references** — masking (`toMap`) and omitting (`toBundleMap`) a literal is deliberate loss. The proxy hop is probed by `POST /connections/test?target=proxy`, and it deliberately
   does not change `testEndpoint()` (the saved-profile test still prioritises the tunnel hop, else the
   target). **2026-07-20 SHIPPED first dial-through: `SftpConnector` only.** A `SOCKS5` proxy routes the
   real SFTP connect via `SocksProxySocketFactory` (a `javax.net.SocketFactory` wrapping a `java.net.Proxy` —
