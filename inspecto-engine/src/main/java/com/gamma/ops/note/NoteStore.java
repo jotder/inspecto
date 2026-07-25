@@ -11,8 +11,10 @@ import java.util.List;
  *
  * <h3>Contract</h3>
  * <ul>
- *   <li>{@link #forObject(String, NoteKind)} returns an object's notes <b>newest-first</b>; a
- *       {@code null} {@code kind} means "all kinds".</li>
+ *   <li>{@link #forTarget(String, String, NoteKind)} returns one target's notes <b>newest-first</b>; a
+ *       {@code null} {@code kind} means "all note kinds". Reads are scoped to the
+ *       {@code (targetKind, targetId)} pair (BACKLOG D10) — never to the id alone, so two families
+ *       can share an id without bleeding into each other.</li>
  *   <li>Implementations must be thread-safe.</li>
  * </ul>
  *
@@ -24,8 +26,13 @@ public interface NoteStore extends AutoCloseable {
     /** Append a note and return it. */
     ObjectNote add(ObjectNote note);
 
-    /** An object's notes, newest-first; {@code kind} {@code null} returns every kind. */
-    List<ObjectNote> forObject(String objectId, NoteKind kind);
+    /** One target's notes, newest-first; {@code kind} {@code null} returns every note kind. */
+    List<ObjectNote> forTarget(String targetKind, String targetId, NoteKind kind);
+
+    /** An {@link NoteTargets#OBJECT} target's notes, newest-first — the pre-D10 shorthand. */
+    default List<ObjectNote> forObject(String objectId, NoteKind kind) {
+        return forTarget(NoteTargets.OBJECT, objectId, kind);
+    }
 
     /** Release resources (e.g. the DuckDB connection). Idempotent; no-op for in-memory. */
     @Override

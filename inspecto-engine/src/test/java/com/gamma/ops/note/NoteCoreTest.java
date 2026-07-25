@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -59,6 +60,98 @@ class NoteCoreTest {
             assertEquals("log.txt", atts.get(0).attributes().get("name"), "attachment metadata round-trips");
             assertEquals("cap", atts.get(0).body());
             assertEquals(1, store.forObject("O", NoteKind.COMMENT).size());
+        }
+    }
+
+    // ── D10: any (kind, id) target ────────────────────────────────────────────────
+
+    @Test
+    void targetKindDefaultsToObjectAndIsCarriedByTheGenericFactories() {
+        ObjectNote legacy = ObjectNote.comment("CASE-1", "alice", "hi");
+        assertEquals(NoteTargets.OBJECT, legacy.targetKind(), "the pre-D10 factory still targets an object");
+        assertEquals("CASE-1", legacy.targetId());
+        assertEquals(NoteTargets.OBJECT,
+                new ObjectNote("N", "CASE-1", NoteKind.COMMENT, "a", "b", null, 1).targetKind(),
+                "the pre-D10 constructor still targets an object");
+        assertEquals(NoteTargets.OBJECT,
+                new ObjectNote("N", "CASE-1", null, NoteKind.COMMENT, "a", "b", null, 1).targetKind(),
+                "a blank targetKind normalises to 'object', never to null");
+
+        ObjectNote onView = ObjectNote.comment("link-analysis-view", "ring-1", "alice", "odd cluster");
+        assertEquals("link-analysis-view", onView.targetKind());
+        assertEquals("ring-1", onView.targetId());
+        assertEquals(NoteKind.COMMENT, onView.kind(), "note kind and target kind stay orthogonal");
+        assertEquals("link-analysis-view", onView.toMap().get("targetKind"));
+        assertEquals("ring-1", onView.toMap().get("objectId"), "the shipped objectId key is unchanged");
+
+        ObjectNote att = ObjectNote.attachment("widget", "w1", "bob", "f.png", "image/png", "s3://x", "cap");
+        assertEquals("widget", att.targetKind());
+        assertEquals("f.png", att.attributes().get("name"));
+    }
+
+    @Test
+    void targetVocabularyIsTheComponentTypeSetPlusObject() {
+        assertTrue(NoteTargets.isKnown("object"));
+        assertTrue(NoteTargets.isKnown("LINK-ANALYSIS-VIEW"), "case-insensitive");
+        assertTrue(NoteTargets.KINDS.containsAll(com.gamma.pipeline.ComponentStore.WRITABLE_TYPES),
+                "one vocabulary — widening the component registry widens note targets");
+        assertFalse(NoteTargets.isKnown("banana"));
+        assertFalse(NoteTargets.isKnown(null));
+        assertThrows(IllegalArgumentException.class, () -> NoteTargets.require("banana"));
+    }
+
+    @Test
+    void inMemoryReadsAreScopedToTheKindIdPair() {
+        InMemoryNoteStore store = new InMemoryNoteStore();
+        store.add(new ObjectNote("N1", "X", NoteTargets.OBJECT, NoteKind.COMMENT, "a", "on the object", null, 100));
+        store.add(new ObjectNote("N2", "X", "link-analysis-view", NoteKind.COMMENT, "a", "on the view", null, 200));
+
+        assertEquals(1, store.forObject("X", null).size(), "same id, different family — no bleed");
+        assertEquals("N1", store.forObject("X", null).get(0).id());
+        assertEquals("N2", store.forTarget("link-analysis-view", "X", null).get(0).id());
+        assertTrue(store.forTarget("widget", "X", null).isEmpty());
+    }
+
+    @Test
+    void noteServiceFailsClosedOnUnknownKindAndAbsentTarget() {
+        InMemoryNoteStore store = new InMemoryNoteStore();
+        // a resolver that knows exactly one view
+        NoteService notes = new NoteService(store,
+                (kind, id) -> "link-analysis-view".equals(kind) && "ring-1".equals(id) ? "" : null);
+
+        ObjectNote n = notes.comment("link-analysis-view", "ring-1", "alice", "odd cluster");
+        assertEquals("link-analysis-view", n.targetKind());
+        assertEquals(1, notes.notesOf("link-analysis-view", "ring-1", NoteKind.COMMENT).size());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> notes.comment("banana", "ring-1", "a", "b"), "unknown kind rejected");
+        assertThrows(NoSuchElementException.class,
+                () -> notes.comment("link-analysis-view", "nope", "a", "b"), "absent target ⇒ no orphan note");
+        assertThrows(NoSuchElementException.class,
+                () -> notes.notesOf("link-analysis-view", "nope", null));
+        assertTrue(store.forTarget("link-analysis-view", "nope", null).isEmpty(), "nothing was written");
+    }
+
+    @Test
+    void dbNoteStoreSeparatesTargetKindsAndMigratesLegacyRows() throws Exception {
+        try (java.sql.Connection conn = com.gamma.util.JdbcDrivers.connect("jdbc:duckdb:", null, null)) {
+            // a pre-D10 table + row, exactly as an installed 4.6 deployment has it
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("CREATE TABLE inspecto_ops_notes (id VARCHAR PRIMARY KEY, object_id VARCHAR, "
+                        + "kind VARCHAR, author VARCHAR, body VARCHAR, attributes VARCHAR, created_at BIGINT)");
+                st.execute("INSERT INTO inspecto_ops_notes VALUES ('OLD','CASE-1','COMMENT','alice','legacy','',50)");
+            }
+
+            DbNoteStore store = new DbNoteStore(conn);          // ← runs the migration
+            List<ObjectNote> migrated = store.forObject("CASE-1", null);
+            assertEquals(1, migrated.size(), "the legacy row backfilled to targetKind 'object'");
+            assertEquals(NoteTargets.OBJECT, migrated.get(0).targetKind());
+
+            store.add(ObjectNote.comment("link-analysis-view", "CASE-1", "bob", "on the view"));
+            assertEquals(1, store.forObject("CASE-1", null).size(), "the view note is not an object note");
+            List<ObjectNote> onView = store.forTarget("link-analysis-view", "CASE-1", null);
+            assertEquals(1, onView.size());
+            assertEquals("on the view", onView.get(0).body());
         }
     }
 }

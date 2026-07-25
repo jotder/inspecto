@@ -177,6 +177,19 @@ final class ObjectRoutes implements RouteModule {
         };
     }
 
+    /**
+     * D10: the same SEC-7d/ABAC visibility gate {@link #scoped} applies, exposed so the kind-addressed
+     * note routes ({@link NoteRoutes}) cannot become a way to read an object's notes around it.
+     * Returns the object's correlation id ({@code ""} when it has none), or {@code null} when the id is
+     * absent — out-of-scope throws the same 404 an absent id does (existence-hiding).
+     */
+    static String visibleObjectCorrelationId(ApiContext api, HttpExchange ex, String id) {
+        OperationalObject o = api.service().objects().get(id).orElse(null);
+        if (o == null) return null;
+        if (!visibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
+        return o.correlationId() == null ? "" : o.correlationId();
+    }
+
     private static List<Map<String, Object>> toObjectMaps(List<OperationalObject> objs) {
         return objs.stream().map(OperationalObject::toMap).toList();
     }

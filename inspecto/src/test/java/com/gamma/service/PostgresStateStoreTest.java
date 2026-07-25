@@ -133,6 +133,36 @@ class PostgresStateStoreTest {
         }
     }
 
+    /**
+     * D10 on Postgres: the {@code target_kind} column + backfill land through the same
+     * {@code ADD COLUMN IF NOT EXISTS} migration, a legacy row reads back as {@code object}, and two
+     * families sharing an id stay separated.
+     */
+    @Test
+    void noteStore_mixedTargetKindsAndLegacyRowMigration() throws Exception {
+        String legacyTable = "inspecto_ops_notes";
+        try (java.sql.Connection conn = com.gamma.util.JdbcDrivers.connect(url, null, null);
+             java.sql.Statement st = conn.createStatement()) {
+            st.execute("DROP TABLE IF EXISTS " + legacyTable);
+            st.execute("CREATE TABLE " + legacyTable + " (id VARCHAR PRIMARY KEY, object_id VARCHAR, "
+                    + "kind VARCHAR, author VARCHAR, body VARCHAR, attributes VARCHAR, created_at BIGINT)");
+            st.execute("INSERT INTO " + legacyTable
+                    + " VALUES ('PG-OLD','PG-VIEW-1','COMMENT','alice','legacy note','',50)");
+        }
+
+        try (DbNoteStore store = DbNoteStore.open(url, null, null)) {          // ← runs the migration
+            List<ObjectNote> migrated = store.forObject("PG-VIEW-1", null);
+            assertEquals(1, migrated.size(), "legacy row survives the migration");
+            assertEquals("object", migrated.get(0).targetKind(), "and is backfilled to 'object'");
+
+            store.add(ObjectNote.comment("link-analysis-view", "PG-VIEW-1", "bob", "odd cluster"));
+            assertEquals(1, store.forObject("PG-VIEW-1", null).size(), "same id, other family — no bleed");
+            List<ObjectNote> onView = store.forTarget("link-analysis-view", "PG-VIEW-1", null);
+            assertEquals(1, onView.size());
+            assertEquals("odd cluster", onView.get(0).body());
+        }
+    }
+
     @Test
     void provenanceStore_recordAndQueryRoundTrip() throws Exception {
         try (DbProvenanceStore store = DbProvenanceStore.open(url)) {

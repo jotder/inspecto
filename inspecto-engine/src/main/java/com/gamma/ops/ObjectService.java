@@ -10,7 +10,9 @@ import com.gamma.ops.link.LinkStore;
 import com.gamma.ops.link.ObjectLink;
 import com.gamma.ops.note.InMemoryNoteStore;
 import com.gamma.ops.note.NoteKind;
+import com.gamma.ops.note.NoteService;
 import com.gamma.ops.note.NoteStore;
+import com.gamma.ops.note.NoteTargets;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.ops.queue.InMemoryQueueStore;
 import com.gamma.ops.queue.Queue;
@@ -72,6 +74,7 @@ public final class ObjectService {
     private final ObjectStore store;
     private final LinkStore links;
     private final NoteStore notes;
+    private final NoteService noteService;                          // D10: kind-agnostic note path
     private final QueueStore queues = new InMemoryQueueStore();     // INC-4: work queues (config-authored)
     private volatile EscalationPolicy escalationPolicy;             // INC-4: applied on SLA breach; null = breach-only
     private final Map<ObjectType, Workflow> workflows = new EnumMap<>(ObjectType.class);
@@ -103,6 +106,14 @@ public final class ObjectService {
         this.store = store;
         this.links = links;
         this.notes = notes;
+        // D10: the object family's plug-in to the kind-agnostic note path — resolve the object (this is
+        // what used to be require(objectId)) and hand back its correlation id; null ⇒ "no such target".
+        this.noteService = new NoteService(notes, (targetKind, targetId) -> {
+            if (!NoteTargets.OBJECT.equals(targetKind)) return null;   // fail closed: not our family
+            OperationalObject o = store.get(targetId).orElse(null);
+            if (o == null) return null;
+            return o.correlationId() == null ? "" : o.correlationId();
+        });
         for (ObjectType t : ObjectType.values()) {
             Workflow wf = overrides == null ? null : overrides.get(t);
             workflows.put(t, wf != null ? wf : Workflow.defaultFor(t));
@@ -948,10 +959,18 @@ public final class ObjectService {
 
     // ── evidence: comments / attachments / RCA (Phase 4 follow-up) ───────────────────
 
+    /**
+     * The engine-side note store, for a caller that needs the kind-agnostic D10 path (a
+     * {@link NoteService} over a wider {@link NoteService.TargetResolver}). Object-targeted notes should
+     * keep using {@link #comment}/{@link #attach} here.
+     */
+    public NoteStore noteStore() {
+        return notes;
+    }
+
     /** Add a free-text comment to an object (unknown id → {@link NoSuchElementException}); emits OBJECT_NOTE. */
     public ObjectNote comment(String objectId, String author, String body) {
-        OperationalObject o = require(objectId);
-        return addNote(ObjectNote.comment(objectId, author, body), author, o.correlationId());
+        return noteService.comment(NoteTargets.OBJECT, objectId, author, body);
     }
 
     /**
@@ -960,12 +979,12 @@ public final class ObjectService {
      */
     public ObjectNote attach(String objectId, String author, String name, String contentType,
                              String uri, String caption) {
-        OperationalObject o = require(objectId);
-        return addNote(ObjectNote.attachment(objectId, author, name, contentType, uri, caption), author,
-                o.correlationId());
+        return noteService.attach(NoteTargets.OBJECT, objectId, author, name, contentType, uri, caption);
     }
 
-    /** An object's notes, newest-first; {@code kind} {@code null} returns comments and attachments alike. */
+    /** An object's notes, newest-first; {@code kind} {@code null} returns comments and attachments alike.
+     *  Unlike the writes this stays permissive on an unknown id (an absent object simply has no notes) —
+     *  the shipped {@code GET /objects/{id}/comments} contract. */
     public List<ObjectNote> notesOf(String objectId, NoteKind kind) {
         return notes.forObject(objectId, kind);
     }
@@ -976,26 +995,11 @@ public final class ObjectService {
      * {@link NoSuchElementException}. Returns the seeded notes in section order.
      */
     public List<ObjectNote> applyRca(String objectId, RcaTemplate template, String actor) {
-        OperationalObject o = require(objectId);
+        String correlationId = noteService.require(NoteTargets.OBJECT, objectId);
         List<ObjectNote> seeded = new ArrayList<>();
         for (String section : template.sections())
-            seeded.add(addNote(ObjectNote.comment(objectId, actor, "## " + section), actor, o.correlationId()));
+            seeded.add(noteService.append(ObjectNote.comment(objectId, actor, "## " + section), actor, correlationId));
         return seeded;
-    }
-
-    private ObjectNote addNote(ObjectNote note, String actor, String correlationId) {
-        ObjectNote stored = notes.add(note);
-        EventLog.current().emit(Event.builder(EventType.OBJECT_NOTE)
-                .level(EventLevel.INFO)
-                .source(SOURCE)
-                .correlationId(correlationId)
-                .message(stored.kind() + " on " + stored.objectId()
-                        + (actor == null || actor.isBlank() ? "" : " by " + actor))
-                .attr("objectId", stored.objectId())
-                .attr("noteId", stored.id())
-                .attr("noteKind", stored.kind().name())
-                .attr("author", actor));
-        return stored;
     }
 
     // ── internals ──────────────────────────────────────────────────────────────────

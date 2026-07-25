@@ -305,4 +305,20 @@ class ObjectServiceTest {
         assertEquals(3, svc.notesOf(caseObj.id(), NoteKind.COMMENT).size());
         assertThrows(NoSuchElementException.class, () -> svc.applyRca("missing", template, "x"));
     }
+
+    /**
+     * D10: the object path now runs through the kind-agnostic {@code NoteService}, so it must still
+     * stamp {@code targetKind: object} and stay invisible to any other target family sharing the id.
+     */
+    @Test
+    void objectNotesStayOnTheObjectTargetKind() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        OperationalObject caseObj = svc.open(ObjectType.CASE, "investigation", "d", "HIGH", null, Map.of());
+
+        ObjectNote c = svc.comment(caseObj.id(), "alice", "hi");
+        assertEquals(com.gamma.ops.note.NoteTargets.OBJECT, c.targetKind());
+        assertEquals(1, svc.noteStore().forTarget(com.gamma.ops.note.NoteTargets.OBJECT, caseObj.id(), null).size());
+        assertTrue(svc.noteStore().forTarget("link-analysis-view", caseObj.id(), null).isEmpty(),
+                "an object note is not readable as a view note");
+    }
 }

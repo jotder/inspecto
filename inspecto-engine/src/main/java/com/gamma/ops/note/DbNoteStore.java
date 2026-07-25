@@ -29,7 +29,8 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
     private static final Logger log = LoggerFactory.getLogger(DbNoteStore.class);
 
     private static final String TABLE = "inspecto_ops_notes";
-    private static final String COLS = "id, object_id, kind, author, body, attributes, created_at";
+    private static final String COLS =
+            "id, object_id, target_kind, kind, author, body, attributes, created_at";
 
     private final Connection conn;
 
@@ -55,15 +56,16 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
 
     @Override
     public synchronized ObjectNote add(ObjectNote note) {
-        String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?)";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, note.id());
             ps.setString(2, note.objectId());
-            ps.setString(3, note.kind().name());
-            ps.setString(4, note.author());
-            ps.setString(5, note.body());
-            ps.setString(6, JsonAttributes.toJson(note.attributes()));
-            ps.setLong(7, note.createdAt());
+            ps.setString(3, note.targetKind());
+            ps.setString(4, note.kind().name());
+            ps.setString(5, note.author());
+            ps.setString(6, note.body());
+            ps.setString(7, JsonAttributes.toJson(note.attributes()));
+            ps.setLong(8, note.createdAt());
             ps.executeUpdate();
             return note;
         } catch (SQLException e) {
@@ -72,19 +74,22 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
     }
 
     @Override
-    public synchronized List<ObjectNote> forObject(String objectId, NoteKind kind) {
-        String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE object_id = ?"
+    public synchronized List<ObjectNote> forTarget(String targetKind, String targetId, NoteKind kind) {
+        String tk = targetKind == null || targetKind.isBlank()
+                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+        String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE object_id = ? AND target_kind = ?"
                 + (kind == null ? "" : " AND kind = ?") + " ORDER BY created_at DESC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, objectId);
-            if (kind != null) ps.setString(2, kind.name());
+            ps.setString(1, targetId);
+            ps.setString(2, tk);
+            if (kind != null) ps.setString(3, kind.name());
             List<ObjectNote> out = new ArrayList<>();
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) out.add(mapRow(rs));
             }
             return out;
         } catch (SQLException e) {
-            log.warn("note query failed for {}: {}", objectId, e.getMessage());
+            log.warn("note query failed for {}/{}: {}", tk, targetId, e.getMessage());
             return List.of();
         }
     }
@@ -105,6 +110,13 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
             st.execute("CREATE TABLE IF NOT EXISTS " + TABLE + " ("
                     + "id VARCHAR PRIMARY KEY, object_id VARCHAR, kind VARCHAR, author VARCHAR, "
                     + "body VARCHAR, attributes VARCHAR, created_at BIGINT)");
+            // D10 migration: a notes table created before the target-kind dimension gains the column in
+            // place (the ACQ-7 idiom in DbAcquisitionLedger — supported by bundled DuckDB and Postgres).
+            // Every pre-D10 note targets an OperationalObject, so existing rows backfill to 'object';
+            // the same UPDATE also normalises a NULL written by any older writer.
+            st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS target_kind VARCHAR");
+            st.execute("UPDATE " + TABLE + " SET target_kind = '" + NoteTargets.OBJECT + "' "
+                    + "WHERE target_kind IS NULL OR target_kind = ''");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise note DB schema", e);
         }
@@ -114,6 +126,7 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
         return new ObjectNote(
                 rs.getString("id"),
                 rs.getString("object_id"),
+                rs.getString("target_kind"),
                 NoteKind.valueOf(rs.getString("kind")),
                 rs.getString("author"),
                 rs.getString("body"),
