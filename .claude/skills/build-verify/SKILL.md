@@ -68,6 +68,29 @@ default-profile run skipped the module. Two lessons: run the enterprise profile 
 `Roles.SEED` change, and remember the reactor is **fail-fast** — a failure in `inspecto-security`
 leaves `inspecto-policy` **SKIPPED**, i.e. unverified, not passing.
 
+### ⚠ …and `-pl <module> -am` is a false green for everything DOWNSTREAM
+
+`-pl X -am` builds X plus its **upstream** dependencies — never its **dependents**. So a control-plane
+change verified with `-pl inspecto -am` leaves every module that consumes `inspecto` unbuilt, and
+reports BUILD SUCCESS.
+
+Observed 2026-07-25 (API-5, retiring the unversioned API surface): `-pl inspecto -am` went green at
+`inspecto` 530/0/0 while **three downstream modules were still red** — `inspecto-agent` (11 E2E tests),
+`inspecto-intelligence` (11 recorded-path assertions) and `inspecto-policy` (8). Each round-trip through
+the narrow command cost a full run and still under-reported.
+
+**Use `-pl X -am` only to iterate on a failure you have already located.** To decide "is this change
+done", run the whole reactor:
+
+```powershell
+mvn -o clean test -Pedition-enterprise          # the verdict
+mvn -o clean test -Pedition-enterprise -fae     # add -fae to see EVERY module's failures in one pass
+```
+
+Plain `-Pedition-enterprise` is fail-fast, so a single broken module hides the rest; `-fae`
+(`--fail-at-end`) is what you want while draining a multi-module breakage. Note `-fae` still skips
+modules that *depend* on a failed one — those are unverified, not passing.
+
 ## Deployment bundle (per edition)
 
 ```powershell
