@@ -33,8 +33,11 @@ const KNOWN_CAPABILITIES = new Set([
     'canApproveShares',
 ]);
 
-/** The shipped seed defaults (mirrors backend `Roles.SEED`, corrected 2026-07-23). */
-const BUILDER = ['canAuthorWorkbench', 'canAuthorAlertRules', 'canOfferDatasets', 'canRequestShares'];
+/**
+ * The shipped seed defaults (mirrors backend `Roles.SEED`). `canOfferDatasets` moved from
+ * BUILDER/power to admin 2026-07-25 (BACKLOG D14) — keep this table in step with `Roles.seed()`.
+ */
+const BUILDER = ['canAuthorWorkbench', 'canAuthorAlertRules', 'canRequestShares'];
 const OPS = ['canOperateRuns', 'canRequestShares'];
 const SEED_ROLES: { name: string; capabilities: string[] }[] = [
     { name: 'pipeline-developer', capabilities: BUILDER },
@@ -42,8 +45,8 @@ const SEED_ROLES: { name: string; capabilities: string[] }[] = [
     { name: 'developer', capabilities: BUILDER },
     { name: 'operations', capabilities: OPS },
     { name: 'support', capabilities: OPS },
-    { name: 'admin', capabilities: ['canOnboardConnections', 'canConfigureAccess', 'canApproveShares', 'canTriageRequirements'] },
-    { name: 'power', capabilities: ['canAuthorWorkbench', 'canAuthorAlertRules', 'canOperateRuns', 'canOfferDatasets', 'canRequestShares', 'canTriageRequirements'] },
+    { name: 'admin', capabilities: ['canOnboardConnections', 'canConfigureAccess', 'canApproveShares', 'canOfferDatasets', 'canTriageRequirements'] },
+    { name: 'power', capabilities: ['canAuthorWorkbench', 'canAuthorAlertRules', 'canOperateRuns', 'canRequestShares', 'canTriageRequirements'] },
     { name: 'super', capabilities: [...KNOWN_CAPABILITIES] },
     { name: 'business', capabilities: ['canTriageRequirements'] },
 ];

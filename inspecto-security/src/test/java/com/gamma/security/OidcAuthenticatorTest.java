@@ -129,20 +129,27 @@ class OidcAuthenticatorTest {
         Optional<Subject> subject = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt);
         assertTrue(subject.isPresent());
         assertEquals("jdoe", subject.get().id());
-        // Seed table (Roles.SEED, corrected 2026-07-23): builder roles author the workbench, alert
-        // rules, and dataset offers, and may request shares.
+        // Seed table (Roles.SEED): builder roles author the workbench and alert rules, and may request
+        // shares. canOfferDatasets moved to Admin 2026-07-25 (BACKLOG D14) — offering exposes data
+        // cross-space with no second gate, while a request still needs an owner's approval.
         assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES,
-                Roles.CAN_OFFER_DATASETS, Roles.CAN_REQUEST_SHARES), subject.get().capabilities());
+                Roles.CAN_REQUEST_SHARES), subject.get().capabilities());
     }
 
     @Test
     void adminRoleGrantsOnboardConnectionsAndNotWorkbench() throws Exception {
         // rbac-groundwork §3/§4.1 Q1 (product sign-off 2026-07-22): Connection onboarding is its own
         // Admin-owned grant — Admin gets canOnboardConnections and NOT canAuthorWorkbench (Builder-only).
+        // Admin's set has since grown twice, and this assertion tracks Roles.SEED exactly (it is an
+        // equality check, so every addition must land here too):
+        //   canTriageRequirements — Q3 seed, 2026-07-24 (7e90f53d)
+        //   canOfferDatasets      — BACKLOG D14, 2026-07-25 (offering exposes data cross-space with no
+        //                           second gate, so it left Builder/Power for Admin)
         String jwt = token(Instant.now().plusSeconds(60), List.of("admin"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
-                Roles.CAN_APPROVE_SHARES), admin.capabilities());
+                Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
+                Roles.CAN_OFFER_DATASETS), admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
     }

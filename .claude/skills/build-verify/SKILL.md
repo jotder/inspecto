@@ -49,6 +49,25 @@ is required with `-am`, since upstream modules contain none of the named classes
 fail the reactor before it reaches the module under test. **A narrowed run is never "verified"** —
 `mvn -o clean test` is.
 
+### ⚠ …and `mvn -o clean test` alone is a false green for the edition modules
+
+`inspecto-security` and `inspecto-policy` enter the reactor **only** under `-Pedition-standard` /
+`-Pedition-enterprise` (root `pom.xml`, the profile-gated `<modules>`). So a plain `mvn -o clean test`
+does not compile or run them at all and still reports **BUILD SUCCESS** — the module-level analogue of
+the `-Dtest` trap above. **If a change touches auth, roles/capabilities, OIDC, or ABAC policy, the
+default-profile green means nothing:**
+
+```powershell
+mvn -o clean test -Pedition-enterprise   # superset: pulls in BOTH security and policy
+```
+
+Observed 2026-07-25: `OidcAuthenticatorTest.adminRoleGrantsOnboardConnectionsAndNotWorkbench` had been
+**failing on `master` since 7e90f53d (2026-07-24)** — that commit added `canTriageRequirements` to
+`admin`'s seed without updating the test's *equality* assertion, and nobody saw it because every
+default-profile run skipped the module. Two lessons: run the enterprise profile for any
+`Roles.SEED` change, and remember the reactor is **fail-fast** — a failure in `inspecto-security`
+leaves `inspecto-policy` **SKIPPED**, i.e. unverified, not passing.
+
 ## Deployment bundle (per edition)
 
 ```powershell

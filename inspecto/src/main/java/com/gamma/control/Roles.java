@@ -87,17 +87,21 @@ public final class Roles {
      * cover the full route capability vocabulary (the old {@code RoleMapper} switch predated the
      * access-config / alert-rule / exchange-sharing gates, leaving five capabilities no role granted —
      * including {@code canConfigureAccess}, without which a fresh deployment could never author this
-     * very table). Builder roles author (workbench, alert rules, dataset offers); Ops operate and
-     * request shares; Admin owns the credential/governance surface (connections, access config, share
-     * approval); {@code business} triages requirements (Q3, product sign-off 2026-07-24 — requirement
+     * very table). Builder roles author (workbench, alert rules); Ops operate and request shares; Admin
+     * owns the credential/governance surface (connections, access config, share approval + offers);
+     * {@code business} triages requirements (Q3, product sign-off 2026-07-24 — requirement
      * triage is a business-analyst activity, so Business owns it and Power/Admin/Super inherit it;
      * Pipeline Developer and Operations build/run rather than triage).
+     *
+     * <p>{@code canOfferDatasets} moved from Builder/Power to Admin on 2026-07-25 (BACKLOG D14):
+     * <em>offering</em> a Dataset cross-space is a data-exposure decision with no second gate behind it, unlike
+     * {@code canRequestShares}, where an owner still has to approve. Requesting stays broadly granted;
+     * exposing does not.
      */
     static final Map<String, Def> SEED = seed();
 
     private static Map<String, Def> seed() {
-        Set<String> builder = Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES,
-                CAN_OFFER_DATASETS, CAN_REQUEST_SHARES);
+        Set<String> builder = Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_REQUEST_SHARES);
         Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES);
         Map<String, Def> m = new LinkedHashMap<>();
         m.put("pipeline-developer", new Def(builder, null));
@@ -106,9 +110,9 @@ public final class Roles {
         m.put("operations", new Def(ops, null));
         m.put("support", new Def(ops, null));
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
-                CAN_TRIAGE_REQUIREMENTS), null));
+                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
-                CAN_OFFER_DATASETS, CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS), null));
+                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order
