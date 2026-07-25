@@ -30,7 +30,8 @@ a model transport, *not* the full eoiagent host embed:
   `/agent/sessions` routes (SSE `/ask/stream`); ONNX one-doc RAG corpus proven offline; UI
   navigation catalog auto-derived from `app.routes.ts`. Open scope cuts: **QA-only**
   (`incident_explain` waits on an eoiagent host seam) and **local-models-only** — tracked in the
-  active plan [`embedded-intelligence-plan.md`](../../superpower/embedded-intelligence-plan.md) §8.
+  archived plan [`embedded-intelligence-plan.md`](../../archived-documents/plans-archive/embedded-intelligence-plan.md) §8
+  and in [`BACKLOG.md`](../../BACKLOG.md) §2.
 * **Air-gap invariant** — `langchain4j-open-ai` is excluded in `inspecto-agent`; the `EgressGuardTest`
   invariant holds; hosted model SDKs stay in `inspecto-agent-hosted`.
 * **Runtime floor** — eoiagent jars are class-file v69 ⇒ the agent modules need a **JDK 25+ runtime**

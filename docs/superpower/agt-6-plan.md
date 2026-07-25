@@ -8,7 +8,8 @@
 >
 > Companions: [`okf/backend/agent/embedded-intelligence.md`](../okf/backend/agent/embedded-intelligence.md)
 > (AGT-5 as-built — the substrate this plan assembles) ·
-> [`superpower/embedded-intelligence-plan.md`](embedded-intelligence-plan.md) (AGT-5 phasing, §8) ·
+> [`plans-archive/embedded-intelligence-plan.md`](../archived-documents/plans-archive/embedded-intelligence-plan.md)
+> (AGT-5 phasing, §8 — archived 2026-07-25, retained as the phasing record) ·
 > [`REQUIREMENTS.md`](../REQUIREMENTS.md) (§3.13 AGT rows, §5 MoSCoW) ·
 > [`roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) (L2/L3) · [`EDITIONS.md`](../EDITIONS.md) (edition flavors) ·
 > `.claude/skills/angular-ui` (binding for every inspecto-ui artifact below).

@@ -73,10 +73,6 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/embedded-intelligence-plan.md`](superpower/embedded-intelligence-plan.md) — AGT-5: P0
-  spine + **P1 investigation tier SHIPPED** (2026-07-20, distilled into
-  [`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md));
-  **P2–P5 open** (§8 = live phasing).
 - [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan, DRAFT 2026-07-25** — splits the
   requirement: **AGT-6a** inline AI authoring (`Should`, schedulable — one shared inline surface + a
   four-pane adoption wave reusing the shipped L1 draft tools, phases A1–A4) vs **AGT-6b** model-composed
@@ -115,6 +111,11 @@ api-contract-design, component-model, the vocabulary renames, and ~60 more),
 [`superpower-reviews/`](archived-documents/superpower-reviews/) (all 37 screen review sheets, incl.
 `user-guide-audit.md`), the `consolidated-2026-06-13/` stakeholder snapshot, and the pre-4.x planning sets.
 Move a doc back up and re-list it here if it becomes current again.
+
+Archived 2026-07-25: [`plans-archive/embedded-intelligence-plan.md`](archived-documents/plans-archive/embedded-intelligence-plan.md)
+— AGT-5 P0–P5 COMPLETE (2026-07-21 + polish); as-built distilled into
+[`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md), open follow-ons in
+[`BACKLOG.md`](BACKLOG.md) §2. Retained as the **§8 phasing record**.
 
 ---
 

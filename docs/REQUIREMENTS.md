@@ -212,7 +212,7 @@ AI-driven autonomy without redesign.
 | AGT-2 | Pluggable model transport: **eoiagent** gateway bridge + native Ollama provider; hosted providers isolated in `inspecto-agent-hosted` | Must | SHIPPED | All |
 | AGT-3 | Air-gap guarantee: hosted SDKs physically absent from air-gapped builds (`EgressGuardTest` invariant) | Must | SHIPPED | All |
 | AGT-4 | Model Settings pane + per-tier connectivity probes | Should | SHIPPED | All |
-| AGT-5 | **Embedded intelligence** (`inspecto-intelligence` module): ContextBroker grounding, tool belt L0–L3, autonomy ladder (Explain → Draft → Act-with-approval → bounded autonomy) | Should | P0 SHIPPED 2026-07-07 (sign-off given); P1–P5 open | All (L3 = S+, opt-in) |
+| AGT-5 | **Embedded intelligence** (`inspecto-intelligence` module): ContextBroker grounding, tool belt L0–L3, autonomy ladder (Explain → Draft → Act-with-approval → bounded autonomy) | Should | SHIPPED — P0 2026-07-07 (sign-off given), **P1–P5 COMPLETE 2026-07-21** (+ polish); as-built in `okf/backend/agent/embedded-intelligence.md`, follow-ons in `BACKLOG.md` §2 | All (L3 = S+, opt-in) |
 | AGT-6a | **AI behind every screen** — inline natural-language authoring on every console pane, reusing the shipped L1 draft tools (no new backend capability) | Should | PLANNED — **scoped 2026-07-25** (`superpower/agt-6-plan.md` §3); ready to schedule pending D1–D4 | All |
 | AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) beyond the code-defined seeded runbooks | Could | PLANNED — demand-gated (`superpower/agt-6-plan.md` §4); upstream prerequisite = the eoiagent per-tool `DryRunProvider` seam | All (L3 = S+, opt-in) |
 
@@ -328,8 +328,8 @@ decision/deliver + UI on the dedicated routes; shipped alongside SEC-7(c)) · **
 intelligence spine (new `inspecto-intelligence` module: `IntelligenceAgent` SPI, `/agent/sessions`
 + `/agent/sessions/{id}/ask` control-plane routes, `InspectoPack` on the eoiagent platform with a
 3-tool read belt + navigation catalog + policy/prompt profiles; QA-only, OFFLINE-only, no RAG corpus
-yet — see `docs/superpower/embedded-intelligence-plan.md` §8 for the documented P0 scope cuts and
-P1–P5 remaining).*
+yet — see `docs/archived-documents/plans-archive/embedded-intelligence-plan.md` §8 for the documented P0
+scope cuts and the P1–P5 phasing, all since shipped).*
 
 ### COULD (remaining — each scoped)
 
@@ -340,8 +340,11 @@ P1–P5 remaining).*
 - **MET-5** Component version history — *scoped (see §3.10 row): ~1 shift, no migration.*
 - **SPC-5** Per-tenant ABAC — *Enterprise-tier, demand-gated; design rides SEC-7's grants model —
   do not start before the SEC-7 product decision lands.*
-- **AGT-5 P1–P5** — *phased per `embedded-intelligence-plan.md` §8; the EOI-7(a) gate lifted
-  2026-07-08 (pinned v0.1.0, no moving SNAPSHOT) — P1 is now unblocked engineering.*
+- ~~**AGT-5 P1–P5**~~ — **COMPLETE 2026-07-21** (+ polish): phased per the now-archived
+  `plans-archive/embedded-intelligence-plan.md` §8; the EOI-7(a) gate lifted 2026-07-08 (pinned v0.1.0, no
+  moving SNAPSHOT) and P1–P5 all shipped. As-built in `okf/backend/agent/embedded-intelligence.md`; only the
+  follow-ons in `BACKLOG.md` §2 remain open (embedding recall PARKED, eoiagent `DryRunProvider` seam, the
+  QA-only/local-models-only scope cuts).
 - **AGT-6b** Multi-step agent graphs — *scoped 2026-07-25 in `superpower/agt-6-plan.md` §4 and kept
   demand-gated. Today's `runbook_operator` already runs **code-defined** seeded sequences as one
   approval-gated unit; 6b is the model-**composed** graph. Two upstream blockers recorded: the eoiagent
@@ -409,7 +412,7 @@ template gallery + apply).*
 | [`archived-documents/plans-archive/api-contract-design.md`](archived-documents/plans-archive/api-contract-design.md) | 33 product-owner API guidelines; W1–W7 delivery worklog |
 | [`superpower/living-operational-system.md`](superpower/living-operational-system.md) | Seven-network north star; R1–R6 rework (shipped) |
 | [`archived-documents/plans-archive/backend-backlog.md`](archived-documents/plans-archive/backend-backlog.md) | Component-store seam history; Matrix/job-template sequencing |
-| [`superpower/embedded-intelligence-plan.md`](superpower/embedded-intelligence-plan.md) | AGT-5 phases P0–P5, autonomy ladder |
+| [`archived-documents/plans-archive/embedded-intelligence-plan.md`](archived-documents/plans-archive/embedded-intelligence-plan.md) | AGT-5 phases P0–P5, autonomy ladder (COMPLETE 2026-07-21; archived) |
 | [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) · [`roadmap/STAKEHOLDER_OVERVIEW.md`](roadmap/STAKEHOLDER_OVERVIEW.md) | Horizons; value proposition; maturity |
 | [`EDITIONS.md`](EDITIONS.md) | Edition capability tiers |
 | [`GLOSSARY.md`](GLOSSARY.md) | Binding vocabulary (§0 rules; §13 rename status) |

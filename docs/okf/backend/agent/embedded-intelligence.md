@@ -320,7 +320,7 @@ case-similarity recall + the learning dashboard UI). With it, the full AGT-5 P0�
   vs. the legacy `BatchEventBus` (`FailureReactor`) — no migration, per the standing `ingestLock`
   decision.
 
-## Still open (parent plan `embedded-intelligence-plan.md`, §8)
+## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)
 
 The AGT-5 phased roadmap **P0–P5 is complete**, plus P4 polish (2nd pilot class `alert_triage` +
 periodic state-watch, shipped 2026-07-21) — and the P2 authoring tier is now complete (`kpi_report_builder`

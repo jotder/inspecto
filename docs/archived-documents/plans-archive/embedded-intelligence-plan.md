@@ -1,5 +1,12 @@
 # Embedded Intelligence — execution plan
 
+**Status: COMPLETE — ALL PHASES SHIPPED.** AGT-5 P0 on 2026-07-07; P1–P5 complete 2026-07-21, plus P4 polish
+and the P2 `kpi_report_builder` tier on 2026-07-22. **Durable as-built home is now
+[`docs/okf/backend/agent/embedded-intelligence.md`](../../okf/backend/agent/embedded-intelligence.md)**; this
+plan is retained for provenance and as the **§8 phasing record** only. Deliberate deferrals that outlived it
+(embedding recall — assessed *not warranted*; the eoiagent `DryRunProvider` seam; the QA-only /
+local-models-only scope cuts) live in [`docs/BACKLOG.md`](../../BACKLOG.md) §2. Archived 2026-07-25.
+
 *2026-07-07. Vision: the model lives INSIDE Inspecto and drives it — it knows the metadata network,
 business Sources, operational and situational context; it explains Incidents, performs root-cause
 analysis, authors and executes rules and queries, builds Pipelines, KPIs, reports and dashboards,
