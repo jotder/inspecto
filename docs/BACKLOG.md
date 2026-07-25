@@ -158,8 +158,15 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 >
 > **Deliberately NOT done** (operator call 2026-07-25): no `git-filter-repo` history rewrite — it
 > invalidates every clone and breaks the shared-sandbox shift model while still not purging GitHub's cache
-> or forks; rotation is the real fix. No CI guard against reintroduction yet — worth adding beside the
-> `lint:tokens` colour guard.
+> or forks; rotation is the real fix.
+>
+> **✅ Reintroduction guard SHIPPED** (2026-07-25): `tools/check-secrets.mjs`, wired into `ci.yml` beside
+> the vocabulary guard (~1s, pure Node). Flags a secret-ish key assigned a ≥16-char literal; ignores
+> `${ENV:…}`/`%VAR%`/`process.env`, placeholders, `*Ref`/`*File`/`*Name` indirection keys, `token`-suffixed
+> keys (D15 made `tokenEndpoint` required config), and anything containing `EXAMPLE` (AWS's published SigV4
+> vectors). Line hatch: `secret-allow`. Verified both ways — green on the repo, and red on a synthetic
+> fixture in the incident's exact shape. ⚠ **Master-only by design: do NOT merge it forward** until the
+> `4.x` PKCE fix lands, or `4.x` CI pins permanently red.
 >
 > **⚠ `4.x` IS NOT FIXED, AND THERE THE SECRETS ARE LIVE.** On `master` the removal was a no-op because
 > the consumer was already gone; on `4.x` `app/app-component.service.ts` still exists, is wired into
@@ -179,8 +186,20 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > Retired lines `1.x`–`3.x` very likely carry the values too; policy forbids committing there, and
 > rotation covers them.
 >
-> **Also still on disk, outside git:** the orphaned `.claude/worktrees/quirky-lalande-a4a696/` directory
-> (not in `git worktree list`) holds unversioned copies of all five secrets.
+> **Also still on disk, outside git — OPEN, needs one operator command.** Verified 2026-07-25: there are
+> **two** orphaned dirs under `.claude/worktrees/` (present on disk, absent from `git worktree list`), not
+> one. `quirky-lalande-a4a696/` holds live copies of four `inspecto-ui/src/environments/*.ts` files —
+> including the named-customer prod `appClientSecret` — **plus further copies in its `.angular/` build
+> cache**, which the original row missed. `vigorous-ptolemy-911ed7/` is 11 files of run artifacts with no
+> secrets (its one unique-looking doc, `.claude/completions/2026-06-15-ui-ux-audit-remediation.md`, already
+> exists in the main tree). Both are safe to delete; the path is gitignored so nothing is version-tracked:
+>
+> ```
+> rm -rf .claude/worktrees/quirky-lalande-a4a696 .claude/worktrees/vigorous-ptolemy-911ed7
+> ```
+>
+> Deletion does **not** reduce the incident's severity (the values are already public via git history) —
+> it just stops a local grep from handing them out. Rotation remains the fix.
 >
 > Lower severity, same files, unaddressed: internal hostnames/IPs are published in-repo
 > (`68.183.16.242`, `p20.prod.pronto`, `app1.pronto.lebara.sa`).

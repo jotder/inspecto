@@ -28,6 +28,14 @@ jobs:
       - name: Guard — canonical vocabulary in user-facing docs
         run: node tools/check-vocabulary.mjs
 
+      # Committed-secret guard (SEC-INCIDENT-1, docs/BACKLOG.md §5): a secret-ish key assigned a long
+      # literal fails the build. Five OAuth client secrets reached a public remote this way; history
+      # keeps leaked values forever, so blocking REINTRODUCTION is the only durable control. Pure Node,
+      # ~1s. Master-only by design — `4.x` still carries the live values (its fix is a public-PKCE
+      # design change), so do not merge this forward until that lands or `4.x` CI pins red.
+      - name: Guard — no committed secrets
+        run: node tools/check-secrets.mjs
+
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
