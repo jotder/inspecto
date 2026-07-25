@@ -89,10 +89,6 @@ former root reference docs** (each index lists them):
   edition flavors, security overlay matrix (TLS, IAM-delegated Kerberos/SSO, secrets/KMS), scaling + RPO/RTO
   posture, per-tier deployment plans, script workstreams SCR-1..11, preflight + post-deploy verification
   blocks; decision asks D1–D8 pending stakeholder sign-off.
-- [`superpower/case-analytics-dataset-plan.md`](superpower/case-analytics-dataset-plan.md) — **case
-  analytics → Studio Dataset plan, DRAFT 2026-07-24** — an `objects.analytics` built-in Job Type
-  materializing tall Parquet samples (`ops_analytics` dataset) from `ObjectService.analytics()`,
-  mirroring `storage_report`; decisions D1–D5 resolved, one-session build.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5

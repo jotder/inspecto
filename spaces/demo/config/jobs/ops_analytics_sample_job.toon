@@ -1,0 +1,6 @@
+job:
+  name: ops_analytics_sample
+  type: objects.analytics
+  cron: 0 * * * *
+  enabled: true
+  retention_days: "90"

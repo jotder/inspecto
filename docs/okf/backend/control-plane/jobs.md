@@ -105,6 +105,43 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   Run fails closed if it is not wired (unlike `recon.run`, where the Object Engine only adds an optional
   Incident promotion). Mirrors the `recon.run` built-in's shape (a schedulable wrapper over a
   manual-trigger-only service call).
+* **`objects.analytics`** (shipped 2026-07-25) — samples `ObjectService.analytics(type)` for Alerts /
+  Incidents / Cases / Tasks into **tall Parquet rows** under `<dataDir>/ops_analytics/` and result-stamps an
+  `ops_analytics` **Dataset**, making the operational rollups bindable in Studio/BI (widgets, dashboards,
+  queries, Alert Rules) — previously they were reachable only through `GET /objects/analytics`, which the mail
+  UI renders directly. Optional params `types` (CSV filter, default all four; an unknown name fails the Run
+  closed rather than silently sampling a subset) and `retention_days` (`0` = keep forever). Emits
+  `objects.analytics.completed` (rows, types, durationMs, purged) and records a `dataset` Run Artifact.
+  Requires the space Object Engine — fails closed like `caserule.evaluate`.
+  * **Why a materialization job, not a view.** `OperationalObject`s live only in the JDBC
+    `inspecto_ops_objects` table (single-writer `inspecto-ops.db`), so no Parquet/view surface exists for a
+    `dataset` `physicalRef`/`view` to bind to, and a second connection to that DB is not allowed. The
+    analytics are therefore computed **in-process** via the post-construction `Supplier<ObjectService>` seam
+    and written out as an aggregate sample.
+  * **Row shape is tall** — `(sampled_at TIMESTAMP, object_type, axis, "key", value DOUBLE)` — because the
+    breakdown keys (status / L1-category / priority) are open-ended, so wide columns would be unstable across
+    runs and spaces. `axis` ∈ `scalar` (total/backlog) · `status` · `category` · `priority` · `cycle_time`
+    (count/avg_ms) · `impact` (impact_amount/records_affected). `value` is DOUBLE because `impactAmount`
+    isn't a count. `key` is **quoted** in the DDL — a column name deliberately kept, quoted so no dialect's
+    reserved-word list can bite (cf. the `day`/`trigger` gotchas in PROJECT_NOTES).
+  * **Append per run, not full-refresh swap** — the `storage_report` catalog idiom (one timestamped file,
+    readers glob the dir), *not* `MaterializeTask`'s stage/atomic-swap, because the time dimension is the
+    entire gain over the live endpoint. Current-state consumers filter
+    `sampled_at = (SELECT max(sampled_at) …)`; trends group by a bucket. Inline retention (epoch parsed from
+    the filename, the same sortable key `storage_report` chose over an ISO string) bounds the glob; a file
+    that doesn't match the pattern is left alone.
+  * **Read path needed zero new code** — `DatasetRelation.relationSql` already resolves
+    `physicalRef → read_parquet('<dataRoot>/ops_analytics/**/*.parquet')`, so the dataset shows up in Studio
+    pickers, `/db/query`, `/bi/datasets`, widgets and Alert Rules for free. `ObjectsAnalyticsJobTest` reads
+    back through that real seam rather than a hand-written glob — that is what proves the binding.
+  * **Cadence is operator-authored** (the deferred product question dissolved rather than answered): the
+    built-in registers only the *type*; a space schedules it with its own `cron:` in a `*_job.toon`. Demo seed:
+    `spaces/demo/config/jobs/ops_analytics_sample_job.toon` (hourly, `retention_days: "90"`).
+  * A write failure emits `objects.analytics.completed` at `WARN` **and rethrows** — the write *is* the work,
+    so a swallowed failure would report a silent no-op success. Dry run computes the rows and writes nothing.
+  * **Deliberate non-goals:** no Parquet/view surface for *raw* `inspecto_ops_objects` rows (row-level export
+    has PII/ACL implications; these are aggregates) · no change to `GET /objects/analytics` or the mail UI ·
+    no UI work at all.
 
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 

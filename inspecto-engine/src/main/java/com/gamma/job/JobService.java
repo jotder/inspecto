@@ -293,6 +293,19 @@ public final class JobService implements AutoCloseable {
                 List.of(ParameterDecl.required("rule", ParamType.STRING, "Saved case rule name")),
                 List.of("caserule.evaluate.completed"), List.of()),
                 c -> new CaseRuleEvalJob(c, () -> this.objects)));
+        // objects.analytics: materialize the Alert/Incident/Case/Task rollups as tall Parquet samples under
+        // <dataDir>/ops_analytics/ + result-stamp the ops_analytics Dataset, so Studio/BI can bind them (there
+        // is no view surface over the live inspecto_ops_objects table, and a 2nd connection to it is not
+        // allowed — so the analytics are computed in-process via objects()). Append-per-run, because the time
+        // dimension is the whole point over GET /objects/analytics. Requires the Object Engine; fails closed.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor("objects.analytics", "Object Analytics Sample",
+                "Samples Alert/Incident/Case/Task analytics into the ops_analytics Dataset for Studio/BI.",
+                List.of(ParameterDecl.optional("types", ParamType.STRING, null,
+                                "CSV of ALERT | INCIDENT | CASE | TASK (default: all four)"),
+                        ParameterDecl.optional("retention_days", ParamType.INTEGER, "0",
+                                "Forget samples older than N days (0 = keep forever)")),
+                List.of("objects.analytics.completed"), List.of()),
+                c -> new ObjectsAnalyticsJob(c, dataDir, () -> this.objects)));
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds
         // none in the base build; a provider whose id collides with a built-in (registered first) is
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
