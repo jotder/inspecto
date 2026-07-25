@@ -253,18 +253,27 @@ throttling**, and the levers already exist:
 
 | Pressure source | Bounded by (today) |
 |---|---|
-| Input faster than processed | Files accumulate **durably at the source**; each cycle admits a bounded set (`batch.max_files`/`max_bytes` + a per-cycle intake cap). Unadmitted work waits on disk, never in memory. |
+| Input faster than processed | Files accumulate **durably at the source**; `batch.max_files`/`max_bytes` bound how candidates are *grouped into batches*, and (when `-Dingest.maxFilesPerCycle` is set — T15) a per-cycle **intake cap** bounds how many are *admitted at all*. Unadmitted work waits on disk, never in memory. |
 | Cycle overrun | The poll scheduler is **fixed-delay + non-overlapping** (`ingestLock`) — a slow cycle delays the next, never runs concurrently. Slow downstream ⇒ fewer cycles ⇒ inbox grows ⇒ visible lag, not memory blowup. |
 | Worker pressure | Semaphores: `sources.max × processing.threads × duckdb_threads` is a fixed ceiling; a shared global permit budget caps the whole graph. |
 | Per-batch memory / spill | DuckDB `memory_limit`, `max_temp_directory_size`, auto-chunking bound peak memory regardless of batch size. |
 | Slow / failing branch (sink) | Per-source `CircuitBreaker` trips and stops feeding it (records dead-letter / stay at source); per-sink `RateLimiter` (token bucket, already used for fetch) caps egress. |
 
-**Adaptive throttling (lag-driven).** The engine already exposes queue depth — pending count (`inboxStatus`) and
-`oldestInboxAgeSeconds`. When lag crosses a threshold, the admission cap is reduced (pull less) and/or a soft
-circuit trips, surfaced as an event/alert. That is back-pressure expressed as adaptive admission, not blocking.
-The thresholds ship as a **conservative default** and are **configurable** (decided 2026-06-16) — never hard-coded.
-Default policy (overridable per flow): halve the per-cycle admission cap when `oldestInboxAge > 3 × pollInterval`
-**or** `pending > 10 × perCycleCap`; restore once both fall below half their trip points (hysteresis avoids flapping).
+**Adaptive throttling (overrun-driven).** *(Shipped 2026-07-25 — T15. This paragraph originally specified a
+lag-driven trip; that policy was found to be positive feedback during implementation and was replaced. See the
+T15 checklist row for the full reasoning.)* Back-pressure is expressed as **adaptive admission, not blocking**:
+`IntakeGovernor` holds a per-pipeline per-cycle admission cap, and `CollectorProcessor.collect` admits at most
+that many candidates per cycle (oldest-first; the rest wait in the durable inbox). The controller halves a
+pipeline's cap when a poll cycle **overruns the poll interval** and doubles it back once a cycle fits in under
+half the interval — the 2× gap between the two thresholds *is* the hysteresis, so a cycle landing near the
+interval neither halves nor restores and the cap cannot flap. Cycle overrun is the signal that means "this cycle
+admitted more work than it could process", and it is *negative* feedback: admit less ⇒ the cycle shortens ⇒ the
+cap restores. **Inbox lag is deliberately not a throttle input** — capping intake raises inbox age and pending
+depth rather than lowering them, so throttling on either would pin a backlogged-but-healthy pipeline at the
+floor; both stay observability/alert surfaces (`inspecto_inbox_oldest_seconds`, `InboxStatus`). Thresholds are
+**configurable, never hard-coded** (decided 2026-06-16) and ship **off by default**: `-Dingest.maxFilesPerCycle`
+(0 = off) · `-Dingest.minFilesPerCycle` · `-Dingest.backpressure.adaptive`. Current caps are exported as the
+`inspecto_intake_cap` gauge. Per-flow overrides remain a deferral.
 
 **Fan-out accounting (`route` clone, `split`).** Cloning/splitting multiplies downstream volume, so the per-batch
 byte/row budget is charged the **amplified** volume; if it would exceed, the batch chunks (existing mechanism) and
@@ -631,7 +640,7 @@ these answers; what we *won't* do in v1 is collected separately in §12 (boundar
 | D4 | **Fan-in** = `transform.merge`, SQL over predecessors-as-relations; v1 = `UNION` + join-against-reference (§3.4). |
 | D5 | **External/streaming sources** = an `adapter` node that windows records and lands a file (land-then-ack) (§3.6). |
 | D6 | **Triggers** on entry nodes = `schedule`/`cron`/`event`/`manual` + event coalescing; downstream is data-driven (§3.6). |
-| D7 | **Back-pressure** = pull/admission + bounded resources + adaptive throttle (conservative configurable default); no inter-node queues (§3.5). |
+| D7 | **Back-pressure** = pull/admission + bounded resources + adaptive throttle, tripped on **cycle overrun** (not inbox lag — that would be positive feedback; T15/§3.5), configurable and off by default; no inter-node queues (§3.5). |
 | D8 | **Clone failure** = `(batch, branch)` commit; source finalised only when all branches commit; idempotent sinks (§3.7). |
 | D9 | **Component identity** = in-file `<type>/<name>` (not filename), reusing `ConfigRegistry` reconciliation; **no version pinning in v1** (§4.1). |
 | D10 | **Validity** = flows are DAGs over `data` edges; the validator rejects cycles (control edges to terminal nodes are not part of the DAG walk). |
@@ -882,13 +891,45 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   `on_commit` rejected** (`ON_COMMIT_SAME_GRAPH`, R5), duplicate ids, no-entry-node, empty-graph (warning).
   `validateOrThrow` for the execution path. **Deferred:** validating a rel against a node type's emitted/accepted
   relations needs the node-output contract (T9) — there is a seam for it. 8 tests. Additive, full suite 695 green.
-- [ ] **T15.** Adaptive back-pressure defaults (§3.5) as configurable, not hard-coded. **Scope clarified
-  2026-07-19:** the §3.5 *levers* are already configurable — worker ceiling (`-Dsources.max` ×
-  `processing.threads` × `processing.duckdb_threads`), per-cycle admission (`batch.max_files`/`max_bytes`),
-  DuckDB `memory_limit`, and the per-source `CircuitBreaker`/`RateLimiter`. What is genuinely **unbuilt** is
-  the *adaptive lag-driven throttling* itself (halve the admission cap when `oldestInboxAge > 3 × pollInterval`
-  or `pending > 10 × perCycleCap`, with hysteresis) — §3.5's last paragraph is a design, not shipped code. So
-  this row is a **new feature to build**, not a constant-extraction; the multipliers become its config once it exists.
+- [x] **T15 (done 2026-07-25).** Adaptive back-pressure (§3.5). **Scope clarified 2026-07-19:** the §3.5
+  *levers* were already configurable — worker ceiling (`-Dsources.max` × `processing.threads` ×
+  `processing.duckdb_threads`), batch sizing (`batch.max_files`/`max_bytes`), DuckDB `memory_limit`, and the
+  per-source `CircuitBreaker`/`RateLimiter`; the *adaptive throttle* itself was unbuilt. **2026-07-24** shipped
+  the lag-signal prerequisite (`CollectorProcessor.oldestInboxAgeSeconds`). **Shipped now, in two halves:**
+  - **(a) The per-cycle intake cap** — the lever that genuinely did not exist. `batch.max_files` only *groups*
+    an already-fully-collected candidate list into batches; `collect()` admitted every ready file every cycle,
+    so a 100k-file inbox dump planned 100k files into one cycle. `CollectorProcessor.admit` now truncates the
+    run-path candidate set to `IntakeGovernor.shared().capFor(pipeline)`, **oldest-first** so a bounded cycle
+    drains in arrival order instead of starving the most-behind files. Unadmitted files stay in the durable
+    inbox (uncommitted ⇒ no marker/ledger entry hides them) and the next cycle sees them again. The read-only
+    `collectCandidates`/`countPending` scan is deliberately **un**capped — the cap bounds admission, not
+    observability.
+  - **(b) The controller** — `IntakeGovernor` (`com.gamma.acquire`, the `CircuitBreaker.shared()`/
+    `StabilityGate.shared()` cross-cycle-state idiom) halves a pipeline's cap while cycles overrun and doubles
+    it back, floored at `minCap` and clamped at `baseCap`; `PipelineScheduler.governCycle` feeds it each
+    cycle's wall time and exports the `inspecto_intake_cap` gauge. `forget(id)` is wired into the scheduler's
+    unregister path so the cap map cannot leak under pipeline churn.
+
+  ⚠ **Deliberate deviation from §3.5's trip condition — read before "fixing" this.** §3.5 specifies *halve when
+  `oldestInboxAge > 3 × pollInterval` or `pending > 10 × perCycleCap`*. Both are **positive** feedback: admitting
+  fewer files cannot reduce inbox age or pending depth — it raises them — so a sustained backlog would ratchet
+  the cap to the floor and **pin it there**, throttling a backlogged-but-healthy pipeline and deepening the very
+  backlog it reacted to. The controller therefore trips on **cycle overrun** (cycle wall time vs. the poll
+  interval — §3.5's own second pressure-source row), which is what actually means "this cycle admitted more than
+  it could process" and closes the loop *negatively*: admit less ⇒ cycle shortens ⇒ cap restores. Inbox lag stays
+  an observability/alert surface (`inspecto_inbox_oldest_seconds`, `InboxStatus.oldestInboxAgeSeconds`), not a
+  throttle input. §3.5's last paragraph is updated to match.
+
+  **Config** (system properties, so no `-D` is hard-coded into the hot path): `-Dingest.maxFilesPerCycle`
+  (default **0 = off**; setting it enables both the cap and the controller) · `-Dingest.minFilesPerCycle` (1,
+  the halving floor — a capped pipeline always makes progress) · `-Dingest.backpressure.adaptive` (true; `false`
+  pins a hard static cap). **Opt-in by default** — with no base cap the ingest path is byte-for-byte pre-T15,
+  matching how the other risky ingest/resource knobs shipped (`-Djobs.maxConcurrentRuns` 0=unbounded,
+  `-Dprocessing.duckdb.*` caps). *Deferred:* per-flow TOON override of the thresholds (globals only today) ·
+  flipping the cap on by default (needs a soak) · remote-fetch economy — the cap is applied post-dedup, so a
+  remote source still materialises its full ready set before truncation (unchanged from pre-T15 fetch volume,
+  but a pre-materialise cap would save bandwidth). 19 tests (`IntakeGovernorTest` 10 +
+  `CollectorProcessorAdmissionCapTest` 3 + `CollectorProcessorPollTest` 6 regression).
 
 ### Phase 4 — Flow-graph API + G6 visualisation (read-first)
 - [x] **T16 (done — shipped by T31, checklist row was stale).** `GET /pipelines/{id}/graph` (`PipelineRoutes.java`,

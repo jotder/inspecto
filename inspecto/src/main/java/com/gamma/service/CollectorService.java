@@ -418,7 +418,7 @@ public final class CollectorService implements AutoCloseable {
         // what stays here: the sync run-by-name (runPipeline, same ingestLock) and the DB status sync.
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,
                 this.running, this.ingestLock, this.bus, this.triggerWorkers, this.maxConcurrentRuns,
-                this::runPipeline, this::syncStatus);
+                this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
     }
 
     /** The operator's persisted {@link com.gamma.notify.ChannelConfig} channel destinations for this space

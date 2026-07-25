@@ -3,6 +3,7 @@ package com.gamma.service;
 import com.gamma.etl.BatchEvent;
 import com.gamma.etl.BatchEventBus;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.acquire.IntakeGovernor;
 import com.gamma.inspector.MultiCollectorProcessor;
 import com.gamma.pipeline.PipelineTrigger;
 import com.gamma.pipeline.exec.TriggerCoalescer;
@@ -61,6 +62,9 @@ final class PipelineScheduler {
     private final BatchEventBus bus;
     private final ExecutorService triggerWorkers;
     private final int maxConcurrentRuns;
+    /** The scheduler's fixed poll delay (ms) — the budget one cycle is expected to fit inside, and so the
+     *  overrun threshold the T15 admission controller adjusts against ({@link #governCycle}). */
+    private final long pollIntervalMs;
     /** Run one registered pipeline by name (stays on {@link CollectorService}; locks the same ingestLock). */
     private final Consumer<String> runPipeline;
     /** Project the on-disk audit into the DB status store, if DB-backed (stays on {@link CollectorService}). */
@@ -81,7 +85,7 @@ final class PipelineScheduler {
 
     PipelineScheduler(List<Path> registry, ConfigRegistry configRegistry, Set<String> paused,
                       Set<String> running, ReentrantLock ingestLock, BatchEventBus bus,
-                      ExecutorService triggerWorkers, int maxConcurrentRuns,
+                      ExecutorService triggerWorkers, int maxConcurrentRuns, long pollIntervalMs,
                       Consumer<String> runPipeline, Runnable syncStatus) {
         this.registry          = registry;
         this.configRegistry    = configRegistry;
@@ -91,6 +95,7 @@ final class PipelineScheduler {
         this.bus               = bus;
         this.triggerWorkers    = triggerWorkers;
         this.maxConcurrentRuns = maxConcurrentRuns;
+        this.pollIntervalMs    = pollIntervalMs;
         this.runPipeline       = runPipeline;
         this.syncStatus        = syncStatus;
     }
@@ -132,6 +137,7 @@ final class PipelineScheduler {
             reg.setGauge("inspecto_active_runs", "Source runs currently executing", Map.of(), toRun.size());
             running.addAll(activeNames);
             MultiCollectorProcessor.RunResult r;
+            long cycleStartMs = System.currentTimeMillis();
             try {
                 r = MultiCollectorProcessor.runConfigs(toRun, maxConcurrentRuns, bus.sink());
                 if (r.failed() > 0) {
@@ -141,6 +147,7 @@ final class PipelineScheduler {
             } finally {
                 running.removeAll(activeNames);
                 reg.setGauge("inspecto_active_runs", "Source runs currently executing", Map.of(), 0);
+                governCycle(activeNames, System.currentTimeMillis() - cycleStartMs, reg);
             }
             // Refresh the status DB (if DB-backed) so this cycle's commits are queryable.
             syncStatus.run();
@@ -149,6 +156,28 @@ final class PipelineScheduler {
             // (Catalog invalidation already fired from configRegistry.rebuild at the top of the cycle.)
             ingestLock.unlock();
         }
+    }
+
+    /**
+     * T15 adaptive back-pressure (§3.5): feed this cycle's wall time to the {@link IntakeGovernor} so a cycle
+     * that overran the poll interval halves the per-cycle admission cap of every pipeline that ran in it, and a
+     * comfortably-fitting cycle restores it. Inert unless an operator set {@code -Dingest.maxFilesPerCycle}.
+     *
+     * <p>The signal is <b>cycle overrun</b>, not inbox lag: admitting fewer files cannot reduce inbox age or
+     * pending depth, so throttling on those would be positive feedback that pins a backlogged-but-healthy
+     * pipeline at the floor. See {@link IntakeGovernor}'s class doc for the full reasoning.
+     *
+     * <p>Cycle duration is measured for the cycle as a whole — {@code runConfigs} runs the due pipelines
+     * concurrently and reports no per-pipeline timing — which matches the fixed-delay scheduler this bounds:
+     * overrun is a property of the tick, and every pipeline in an overrunning tick contributed to it.
+     */
+    private void governCycle(List<String> ranNames, long cycleMillis, com.gamma.metrics.MetricRegistry reg) {
+        IntakeGovernor gov = IntakeGovernor.shared();
+        if (!gov.policy().active()) return;
+        gov.observeCycle(ranNames, cycleMillis, pollIntervalMs);
+        for (String id : ranNames)
+            reg.setGauge("inspecto_intake_cap", "Files one poll cycle may admit (T15 admission control)",
+                    Map.of("pipeline", id), gov.capFor(id));
     }
 
     /**
@@ -243,5 +272,6 @@ final class PipelineScheduler {
     void forget(String id) {
         lastRunAtMs.remove(id);
         eventCoalescers.remove(id);
+        IntakeGovernor.shared().forget(id);   // same leak-under-churn reason, one map further down
     }
 }

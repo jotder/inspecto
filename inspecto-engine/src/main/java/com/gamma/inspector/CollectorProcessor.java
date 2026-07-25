@@ -8,6 +8,7 @@ import com.gamma.acquire.DiscoveryContext;
 import com.gamma.acquire.DuplicatePolicy;
 import com.gamma.acquire.GapDetector;
 import com.gamma.acquire.GapTracker;
+import com.gamma.acquire.IntakeGovernor;
 import com.gamma.acquire.LedgerEntry;
 import com.gamma.acquire.RemoteFile;
 import com.gamma.acquire.CollectorConnector;
@@ -266,8 +267,29 @@ public class CollectorProcessor {
                 if (ready.isEmpty()) return List.of();
             }
 
-            return dedupLocal(cfg, ready, emitSignals);
+            List<File> candidates = dedupLocal(cfg, ready, emitSignals);
+            // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
+            // read-only pending scan must keep reporting the true backlog — and only when an operator set
+            // -Dingest.maxFilesPerCycle, so the default path is byte-for-byte the pre-T15 behaviour. Files
+            // beyond the cap are simply not admitted this cycle: they stay in the durable inbox (uncommitted,
+            // so no marker/ledger entry hides them) and the next cycle sees them again.
+            return emitSignals ? admit(cfg, candidates) : candidates;
         }
+    }
+
+    /**
+     * Truncate this cycle's candidate set to the {@link IntakeGovernor} cap, oldest-first so a bounded cycle
+     * still drains the inbox in arrival order rather than starving the most-behind files. Returns
+     * {@code candidates} untouched when admission control is off (the default).
+     */
+    private static List<File> admit(PipelineConfig cfg, List<File> candidates) {
+        int cap = IntakeGovernor.shared().capFor(cfg.identity().pipelineName());
+        if (cap == IntakeGovernor.UNBOUNDED || candidates.size() <= cap) return candidates;
+        List<File> ordered = new ArrayList<>(candidates);
+        ordered.sort(java.util.Comparator.comparingLong(File::lastModified));
+        log.info("Admission cap: taking {} of {} pending file(s) for {} this cycle; the rest wait in the inbox",
+                cap, candidates.size(), cfg.identity().pipelineName());
+        return new ArrayList<>(ordered.subList(0, cap));
     }
 
     /**
