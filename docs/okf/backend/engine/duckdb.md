@@ -34,24 +34,23 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   multi-tenant boxes to prevent overcommit, and pair with `temp_directory` so an over-limit query spills to
   disk instead of OOM-ing. (Preview / dry-run connections — `ComponentPreview`, `PipelineDryRun`, enrichment
   `preview` — run over bounded samples and are deliberately left uncapped.)
-* **Defaults DECIDED 2026-07-25 (BACKLOG D11 + D12) — still to be implemented.** Both knobs above become
-  **on by default** instead of opt-in, because the current unset behavior (≈80% RAM *per instance*) means
-  concurrent runs overcommit and can take the whole box down, including the HTTP API.
-  * **D11 — a conservative fixed per-instance cap + spill, not a cap computed from the concurrency
-    semaphores.** A computed cap (RAM ÷ `jobs.maxConcurrentRuns`) was rejected: `maxConcurrentRuns` defaults
-    to `0` (unbounded), so the divisor is routinely unknown, and the batch-ingest path has its own semaphore —
-    two independent limiters mean any "compute it" formula is wrong in exactly the overcommit case it was
-    meant to prevent. A fixed conservative value plus `temp_directory` spill degrades to slow-but-correct
-    rather than failing, which is the right trade for a default. Operators who know their box can still raise
-    it; the computed approach stays available to them as arithmetic they do once, not logic we guess at.
-  * **D12 — turn chunking on with a large threshold** (`processing.chunking.max_file_bytes`, `0`/disabled
-    today). The cap exists for *pathological* single files, so the default must be high enough that normal
-    workloads never change shape and only a genuinely outsized file chunks. This is a second, independent
-    safety net: D11 bounds memory per connection, D12 bounds what a single file can ask for in the first
-    place.
-  * Sequencing note: D11 lands first — it is the actual box-protecting change, and D12's threshold is easier
-    to pick once a memory cap makes the failure mode "spill" rather than "OOM". Read-path connection reuse is
-    explicitly **not** the lever here (see BACKLOG §6 C6).
+* **Defaults DECIDED 2026-07-25 (BACKLOG D11 + D12).** D12 has shipped; **D11 was not implemented** (operator
+  call, same day).
+  * **D12 — chunking is ON by default** (SHIPPED): `processing.chunking.max_file_bytes` now defaults to
+    **8 GiB** (`8589934592`) instead of `0`. The threshold exists for *pathological* single files, so it was
+    set far above any routine input — normal workloads never change shape, and only a genuinely outsized file
+    chunks. Setting the key to `0` still disables chunking.
+  * **D11 — NOT implemented.** There is still **no default `processing.duckdb.memory_limit`**: an uncapped run
+    gets DuckDB's own ≈80%-of-RAM-*per-instance* default, and concurrent runs can still overcommit the box.
+    The decision, if it is ever revisited, was for a conservative fixed per-instance cap + spill, **not** a cap
+    computed from the concurrency semaphores — a computed cap (RAM ÷ `jobs.maxConcurrentRuns`) was rejected
+    because `maxConcurrentRuns` defaults to `0` (unbounded), so the divisor is routinely unknown, and the
+    batch-ingest path has its own semaphore; two independent limiters mean any "compute it" formula is wrong in
+    exactly the overcommit case it was meant to prevent. Until then, set `-Dprocessing.duckdb.memory_limit`
+    explicitly on high-concurrency boxes. `processing.duckdb.max_temp_directory_size` likewise has no default
+    (DuckDB uses ≈90% of the disk), though spill already lands on the data volume via the batch scratch dir
+    (`BatchIngestStrategy.scratchDir` → `dirs.temp`). Read-path connection reuse is explicitly **not** the
+    lever here (see BACKLOG §6 C6).
 * **Reserved-word quoting.** `day` is a DuckDB keyword — alias it (`run_day`) in SQL; quote `"trigger"` too.
   Watch this whenever generating SQL with date/trigger columns. See [gotchas](../gotchas/cross-cutting.md).
 

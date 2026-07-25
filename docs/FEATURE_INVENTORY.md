@@ -96,7 +96,7 @@
 | Hive partitioning (automatic) | output always `year=/month=/day=` under `dirs.database` | `ADVANCED_GUIDE §8` · `PartitionWriter` |
 | DuckLake (PostgreSQL catalog) | `output:` / `  ducklake: { enabled: true, catalog_url: "postgresql://…" }` | `configuration.md` · adjustment pipeline |
 | DuckDB scratch/memory tuning | `processing:` / `  duckdb: { temp_directory: temp/big, memory_limit: "16GB" }` | `configuration.md` |
-| Auto-chunking (huge single files) | `processing:` / `  chunking: { max_file_bytes: 5000000000 }` | `configuration.md` |
+| Auto-chunking (huge single files) | `processing:` / `  chunking: { max_file_bytes: 8589934592 }` — on by default at 8 GiB; `0` disables | `configuration.md` |
 
 ### F — Jobs (`*_job.toon`)
 

@@ -139,11 +139,16 @@ public final class PipelineConfig {
     /**
      * Optional large-file auto-chunking (additive, 3.10.0). Parsed from {@code processing.chunking}.
      *
-     * <p>{@code maxFileBytes <= 0} disables chunking (the default — behaviour unchanged). When a
-     * single input file exceeds {@code maxFileBytes}, the CSV ingester streams it into bounded
-     * chunks of ~{@code targetChunkBytes} (defaulting to {@code maxFileBytes} when unset), so peak
-     * scratch stays bounded per chunk and chunks process concurrently — instead of materialising
-     * one multi-hundred-GB unit.
+     * <p>When a single input file exceeds {@code maxFileBytes}, the CSV ingester streams it into
+     * bounded chunks of ~{@code targetChunkBytes} (defaulting to {@code maxFileBytes} when unset),
+     * so peak scratch stays bounded per chunk and chunks process concurrently — instead of
+     * materialising one multi-hundred-GB unit. {@code maxFileBytes <= 0} disables chunking.
+     *
+     * <p><b>On by default since BACKLOG D12</b> at 8 GiB — chosen far above any routine input so
+     * normal workloads never change shape; the threshold exists for pathological single files. It
+     * is the only bound on such a file today, because D11's companion per-instance
+     * {@code memory_limit} default was deliberately NOT shipped (operator call 2026-07-25), so an
+     * uncapped run still sees DuckDB's own ~80%-of-RAM default.
      */
     @PublicApi(since = "3.10.0")
     public record Chunking(long maxFileBytes, long targetChunkBytes) {
@@ -862,7 +867,10 @@ public final class PipelineConfig {
         String duckMemoryLimit;
         String duckTempDirectory;
         String duckMaxTempSize;
-        long   chunkMaxFileBytes = 0;
+        // 8 GiB: on by default (BACKLOG D12). Deliberately far above any routine input so normal
+        // workloads never change shape — the threshold exists for pathological single files only.
+        // Set processing.chunking.max_file_bytes: 0 to disable.
+        long   chunkMaxFileBytes = 8_589_934_592L;
         long   chunkTargetBytes  = 0;
         String batchesFilePath;
         String lineageFilePath;

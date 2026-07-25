@@ -251,7 +251,7 @@ pin; the ceiling is the single JVM + its disks (NFR-8).
 |---|---|---|
 | `-Djobs.maxConcurrentRuns` | Global semaphore over job runs (default **0 = unbounded**) | **Always set on T2+** (start 2–4) |
 | `-Dprocessing.duckdb.memory_limit` / `.threads` / `.temp_directory` / `.max_temp_directory_size` | Caps every DuckDB scratch connection | **Always set on T2+** — unset, each instance assumes ~80% of RAM ⇒ concurrent runs overcommit ⇒ box-wide OOM. On-by-default value is a pending product call (D3) |
-| `processing.chunking.max_file_bytes` | Default 0 = a single multi-GB input is **not** auto-chunked | Size RAM for the largest expected file, or set explicitly |
+| `processing.chunking.max_file_bytes` | Auto-chunks any single input over the default **8 GiB** (`0` disables) | Default is deliberately far above routine inputs; lower it if the data volume can't hold ~1× the largest file |
 | `inspecto_inbox_oldest_seconds` (+ `InboxStatus` lag) | Ingest backpressure signal | Alert Rule at T2+; capacity review trigger |
 | `/metrics` catalog (`ADVANCED_GUIDE` §7) | Prometheus counters/gauges incl. run durations (OPS-4) | Wire into client monitoring from day one |
 

@@ -566,8 +566,9 @@ fixedwidth:
 Each batch runs on a per-batch **embedded DuckDB temp database**, and DuckDB **spills** intermediate
 data to disk when it exceeds its memory budget. By default both land in the JVM temp dir
 (`java.io.tmpdir`, i.e. the system `/tmp`) — which is often small or RAM-backed (`tmpfs`). A very large
-input (tens of GB to TB) will exhaust it with `No space left on device` / out-of-memory. Two additive,
-optional config blocks under `processing` make the engine handle big files without touching `/tmp`.
+input (tens of GB to TB) will exhaust it with `No space left on device` / out-of-memory. Two additive
+config blocks under `processing` make the engine handle big files without touching `/tmp`
+(`processing.duckdb` is opt-in; `processing.chunking` is on by default at an 8 GiB threshold).
 
 #### `processing.duckdb` — relocate & cap engine scratch
 
@@ -595,9 +596,13 @@ processing:
 ```yaml
 processing:
   chunking:
-    max_file_bytes: 5000000000               # 0/absent = disabled (default). Files larger than this are chunked.
+    max_file_bytes: 5000000000               # default 8589934592 (8 GiB). Files larger than this are chunked; 0 = disabled.
     target_chunk_bytes: 2000000000           # approx size of each chunk (default: max_file_bytes)
 ```
+
+Chunking is **on by default**: `max_file_bytes` defaults to **8 GiB** (`8589934592`), chosen far above any
+routine input so normal workloads never change shape — the threshold only catches pathological single files.
+Set it to `0` to disable chunking entirely.
 
 When a single input file exceeds `max_file_bytes`, the CSV ingester **streams it into bounded chunks**
 of ~`target_chunk_bytes` and processes them one at a time — so peak scratch stays ~one chunk regardless
@@ -614,8 +619,9 @@ of total file size, instead of materialising one multi-hundred-GB unit. Details:
   doesn't itself need room for the whole file.
 
 > **Rule of thumb:** if `/tmp` can't grow, set `processing.duckdb.temp_directory` to a big data-volume
-> path; if the data volume also can't hold ~1× the file, additionally enable `processing.chunking` to
-> cap peak scratch to a chunk. Both are off/inherited by default, so existing pipelines are unchanged.
+> path; if the data volume also can't hold ~1× the file, lower `processing.chunking.max_file_bytes` below
+> the default 8 GiB to cap peak scratch to a smaller chunk. `processing.duckdb` is off/inherited by default;
+> chunking is on but at a threshold no routine input reaches, so existing pipelines are unchanged.
 
 #### `processing.streaming` — plugin-ingester mode selection (the `StreamingFileIngester` path)
 

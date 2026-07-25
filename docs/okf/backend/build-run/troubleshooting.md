@@ -69,8 +69,9 @@ For a genuinely huge single file:
    Budget ~1–3× the decoded file size of free space there for the transform table + spill.
 2. **Cap memory and spill:** `processing.duckdb.memory_limit: "16GB"` and
    `processing.duckdb.max_temp_directory_size: "900GB"` (fail fast instead of filling the disk).
-3. **Bound scratch regardless of file size:** enable `processing.chunking` —
-   `max_file_bytes: 5000000000` streams the file in ~5GB chunks, so peak scratch is ~one chunk.
+3. **Bound scratch regardless of file size:** `processing.chunking` is on by default
+   (`max_file_bytes: 8589934592`, 8 GiB) — lower it (e.g. `5000000000` for ~5GB chunks) so peak scratch
+   is ~one chunk.
 
 See [Configuration → Large files](../config/configuration.md#large-files-scratch-location--auto-chunking). Note
 the single-pass streaming ingest still materialises the `transformed` table before `COPY TO`, so the
