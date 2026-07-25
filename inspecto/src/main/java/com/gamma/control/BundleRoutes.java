@@ -476,8 +476,6 @@ final class BundleRoutes implements RouteModule {
             rejectRawSecrets(content);
             Map<String, Object> c = new LinkedHashMap<>(content);
             c.put("id", id);                                    // in-file identity == item id, like the other sources
-            // toBundleMap emits the API's camelCase basePath; ConnectionProfile.fromMap reads base_path.
-            if (c.get("base_path") == null && c.get("basePath") != null) c.put("base_path", c.remove("basePath"));
             try {
                 return ConnectionProfile.fromMap(c);
             } catch (RuntimeException ex) {

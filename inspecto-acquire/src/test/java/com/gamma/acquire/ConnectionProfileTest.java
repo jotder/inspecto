@@ -83,6 +83,44 @@ class ConnectionProfileTest {
         assertEquals("h:22", c.testEndpoint(), "a proxy does not change the saved-test endpoint");
     }
 
+    /**
+     * The regression guard whose absence let a key-name asymmetry through: {@code toMap()} emitted the API's
+     * camelCase {@code basePath} while {@code fromMap} read only {@code base_path}, so a round-trip silently
+     * dropped the path. Asserted on the whole record — a record's {@code equals} covers <em>every</em>
+     * component, so any future key added to one side and misspelled on the other fails here.
+     *
+     * <p>Secrets are {@code ${…}} references on purpose: masking/stripping a <em>literal</em> is deliberate
+     * loss (see {@link ConnectionProfile#toBundleMap()}), so a literal could never round-trip and asserting it
+     * would encode the wrong contract.
+     */
+    @Test
+    void everyFieldSurvivesAMapRoundTrip() {
+        ConnectionProfile p = ConnectionProfile.fromMap(Map.ofEntries(
+                Map.entry("id", "RT"), Map.entry("connector", "sftp"), Map.entry("host", "h"),
+                Map.entry("port", "22"), Map.entry("database", "db"), Map.entry("base_path", "/cdr/outbox"),
+                Map.entry("username", "u"), Map.entry("password", "${ENV:PW}"),
+                Map.entry("options", Map.of("auth_method", "key", "api_token", "${ENV:TOK}")),
+                Map.entry("tunnel", Map.of("host", "bastion", "port", "2222", "username", "jump",
+                        "password", "${SYS:bastion.pw}")),
+                Map.entry("proxy", Map.of("type", "SOCKS5", "host", "proxy", "port", "1080",
+                        "username", "px", "password", "${ENV:PX_PW}"))));
+
+        assertEquals(p, ConnectionProfile.fromMap(p.toMap()), "toMap → fromMap loses nothing");
+        assertEquals(p, ConnectionProfile.fromMap(p.toBundleMap()), "toBundleMap → fromMap loses nothing");
+    }
+
+    @Test
+    void fromMapAcceptsBothBasePathSpellings() {
+        ConnectionProfile snake = ConnectionProfile.fromMap(Map.of(
+                "id", "S", "connector", "local", "base_path", "/in"));
+        ConnectionProfile camel = ConnectionProfile.fromMap(Map.of(
+                "id", "S", "connector", "local", "basePath", "/in"));
+        assertEquals("/in", snake.basePath(), "the on-disk spelling every *_connection.toon already uses");
+        assertEquals("/in", camel.basePath(), "the API spelling the SPA sends");
+        assertEquals("/in", ConnectionProfile.fromMap(Map.of("id", "S", "connector", "local",
+                "base_path", "/in", "basePath", "/other")).basePath(), "on-disk spelling wins when both appear");
+    }
+
     @Test
     void localProfileIsNotRemote() {
         ConnectionProfile c = ConnectionProfile.fromMap(Map.of("id", "L", "connector", "local"));
