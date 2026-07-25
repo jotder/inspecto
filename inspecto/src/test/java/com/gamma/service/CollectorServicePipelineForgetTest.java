@@ -68,6 +68,49 @@ class CollectorServicePipelineForgetTest {
         }
     }
 
+    /**
+     * Reference Phase-2 P3: a {@code produces: reference} pipeline with {@code refresh_seconds > 0} gets a
+     * periodic compaction timer, and deleting it must cancel that timer — otherwise compaction of a store
+     * whose pipeline is gone keeps firing forever (the same leak class as the cadence map above).
+     */
+    @Test
+    void unregisterCancelsTheReferenceRefreshTimer(@TempDir Path dir) throws Exception {
+        Path a = source(dir.resolve("plain"));
+        Path b = referenceSource(dir.resolve("ref"));
+        try (CollectorService svc = new CollectorService(List.of(a), 3600, 1)) {
+            String id = svc.registerPipeline(b);
+            Map<String, ?> timers = referenceRefreshTimers(svc);
+            assertTrue(timers.containsKey(id),
+                    "registering a reference producer with refresh_seconds should arm its compaction timer");
+            var future = (java.util.concurrent.ScheduledFuture<?>) timers.get(id);
+
+            assertTrue(svc.unregisterPipeline(b.toAbsolutePath().normalize()));
+            assertFalse(timers.containsKey(id), "unregisterPipeline must prune the timer entry");
+            assertTrue(future.isCancelled(), "…and actually cancel the scheduled task, not just forget it");
+        }
+    }
+
+    /** A {@code refresh_seconds > 0} Reference producer — a plain CSV pipeline plus the P0 `reference:` block. */
+    private static Path referenceSource(Path root) throws Exception {
+        Path toon = source(root);
+        Files.writeString(toon, Files.readString(toon).replace("name: TEST_ETL", "name: CUSTOMER_DIM")
+                + """
+                produces: reference
+                reference:
+                  load: upsert
+                  key[1]: ID
+                  refresh_seconds: 3600
+                """);
+        return toon;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, ?> referenceRefreshTimers(CollectorService svc) throws Exception {
+        Field f = CollectorService.class.getDeclaredField("referenceRefreshTimers");
+        f.setAccessible(true);
+        return (Map<String, ?>) f.get(svc);
+    }
+
     @SuppressWarnings("unchecked")
     private static Map<String, ?> cadenceMap(CollectorService svc) throws Exception {
         Field schedField = CollectorService.class.getDeclaredField("pipelineScheduler");

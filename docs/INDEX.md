@@ -91,10 +91,6 @@ former root reference docs** (each index lists them):
   analytics → Studio Dataset plan, DRAFT 2026-07-24** — an `objects.analytics` built-in Job Type
   materializing tall Parquet samples (`ops_analytics` dataset) from `ObjectService.analytics()`,
   mirroring `storage_report`; decisions D1–D5 resolved, one-session build.
-- [`superpower/reference-phase2-plan.md`](superpower/reference-phase2-plan.md) — **Reference Phase-2
-  engine semantics plan, DRAFT 2026-07-24** (GLOSSARY §3/§6-B roadmap) — `load: replace|upsert|scd2`
-  via append-only Parquet + latest-version-wins + compaction, row-level dedup, refresh scheduling,
-  Stream grouping (P4, separable); phases P0–P4, D1 storage decision resolved, 3–4 sessions.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5

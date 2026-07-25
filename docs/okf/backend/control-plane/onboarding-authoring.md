@@ -168,6 +168,49 @@ P2 makes the versioned store *readable as history* and stops it growing on no-op
 - Tests: `ReferenceScd2AsOfTest` (6 — as-of state at t · current view unaffected · both fail-closed
   rejections · parse validation incl. bare-date start-of-day).
 
+### Reference Phase-2 P3 — compaction + `refresh_seconds` timer (2026-07-25)
+
+The append-only store reveals one file per batch per partition dir, so a frequently-refreshed Reference
+accumulates files forever even though the current view only ever surfaces the latest version per key.
+P3 makes that derived view the *physical* truth — compaction output **is** the cache the fast path reads.
+
+- **`reference_compact`** is a new `maintenance` sub-task (`ReferenceCompactor`, `com.gamma.job`), i.e. a
+  `case` in `MaintenanceJob`'s `switch` — **not** a new Job Type; that is the house pattern for every
+  maintenance task. Params: `dir` (required, the store root) · `history_days`.
+- **`history_days` has three modes**, which is what makes one task serve both loads:
+  `0` (default) = winning versions only, **tombstoned keys dropped outright** (the current view already
+  hides them, and a later re-delivery just upserts again) — right for `upsert`; `> 0` = winners plus
+  versions inside the horizon, so `scd2` as-of keeps answering inside it; **negative = keep-forever**,
+  merging files while dropping no version — the D4 default for `scd2`. Keep-forever still pays, because
+  read amplification is a function of **file count**, not row count.
+- **The winner is derived store-wide, then each dir is rewritten to its slice.** A dimension row whose
+  *partition* value changed has versions in different partition dirs, so a per-dir "keep the latest here"
+  would resurrect a superseded version. A dir left with no retained rows loses its files entirely.
+  The retained-set window is character-for-character `EnrichmentEngine.versionedView`'s, so "compacted
+  store" and "current view" cannot drift.
+- **Safety model is `PartitionCompactor`'s, reused verbatim** (there is no lock between jobs and ingest):
+  `*.refcompact.tmp` / `*.parquet.refcompacting` / `.refcompact-journal` all sit outside the readers'
+  `*.parquet` glob, the merged file appears in one `ATOMIC_MOVE`, and a crash is repaired from the journal
+  on the next run. **Unlike `compact` there is no age cutoff** — it isn't needed: a concurrent batch commit
+  only ever creates a *new* uniquely-named file, which is simply not in this run's candidate set.
+  ⚠ **Gotcha found in build:** `heal()` must walk **every** directory before the work scan, not just dirs
+  that still hold live `*.parquet`. A dir a killed run left mid-swap has all its files hidden, so it looks
+  empty — healing only "populated" dirs left those versions both invisible *and* absent from the
+  store-wide retained set, silently losing rows (`aCrashedRunIsHealedOnTheNextPass` is the regression).
+- **`refresh_seconds` timer:** `CollectorService.armReferenceRefresh(cfg)` arms
+  `scheduler.everySeconds("ref-compact-"+id, …)` for a versioned producer with `refresh_seconds > 0` —
+  cancel-and-rearm keyed by pipeline id (mirroring `EnrichmentService.armSchedule`), so a changed interval
+  applies without a restart and dropping to `0`/`load: replace` disarms it. Called from `start()` (boot)
+  and `registerPipeline`; **cancelled in `unregisterPipeline`** beside `pipelineScheduler.forget(i)`.
+  The timer **compacts** — it never re-pulls from the origin, which stays the Collector's poll loop.
+  It re-reads the config each fire (so a stale timer acts on current settings) and never throws: a failed
+  compaction leaves the store readable, because the read-time view does not depend on it.
+  `-Dreference.compact.history.days` overrides the `scd2` keep-forever default with a horizon.
+- Tests: `ReferenceCompactorTest` (7 — compacted == current view + file-count collapse · keep-forever
+  merges without dropping · idempotent second pass · **versions split across partitions** ·
+  absent store · crash-heal · reachable as a `maintenance` task + dry-run-safe) ·
+  `CollectorServicePipelineForgetTest.unregisterCancelsTheReferenceRefreshTimer`.
+
 ## Engine fixes the live walks surfaced (apply beyond onboarding)
 
 1. `SqlBuilder.appendCoalesce` with empty `date_formats` emitted zero-arg `COALESCE()::DATE` —

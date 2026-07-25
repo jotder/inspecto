@@ -129,6 +129,13 @@ public final class CollectorService implements AutoCloseable {
     /** The read surface the Control API + observability query — file- or DB-backed (M5). */
     private final StatusStore status;
     private final Scheduler scheduler = new Scheduler();
+    /**
+     * Per-pipeline Reference compaction timers (Reference Phase-2 P3), keyed by pipeline id — armed for a
+     * {@code produces: reference} pipeline whose {@code reference.refresh_seconds > 0}, cancelled on
+     * unregister. Mirrors {@link EnrichmentService}'s {@code scheduledFutures} cancel-and-rearm bookkeeping.
+     */
+    private final Map<String, java.util.concurrent.ScheduledFuture<?>> referenceRefreshTimers =
+            new java.util.concurrent.ConcurrentHashMap<>();
     private final EnrichmentService enrichment;
     /** Aggregates audit into status / batch-audit reports for the Control API (v2.8.0). */
     private final ReportService reports = new ReportService(this);
@@ -725,6 +732,7 @@ public final class CollectorService implements AutoCloseable {
             int committed = fileStatus.committedBatches(e.config()).size();   // on-disk truth
             log.info("Registered '{}' ({}) — {} previously committed batch(es)",
                     e.id(), e.path(), committed);
+            armReferenceRefresh(e.config());   // Reference Phase-2 P3 (boot-time peer of registerPipeline)
         }
         // Project the on-disk audit into the status DB (if DB-backed) before serving any
         // query, so the API/observability see current state from the first scrape onward.
@@ -855,6 +863,7 @@ public final class CollectorService implements AutoCloseable {
         } finally {
             ingestLock.unlock();
         }
+        armReferenceRefresh(cfg);   // Reference Phase-2 P3: refresh_seconds > 0 ⇒ periodic compaction
         log.info("Registered pipeline '{}' from {} ({} pipeline(s) now active)", id, norm, registry.size());
         this.eventLog.emit(Event.builder(EventType.PIPELINE_REGISTERED)
                 .source(CollectorService.class.getName()).pipeline(id)
@@ -889,6 +898,8 @@ public final class CollectorService implements AutoCloseable {
             id.ifPresent(i -> {                 // prune per-pipeline bookkeeping so it can't leak under churn
                 pipelineScheduler.forget(i);    // cadence + coalescer maps (keyed by pipeline id)
                 paused.remove(i);               // a paused-then-deleted pipeline would otherwise linger here
+                var timer = referenceRefreshTimers.remove(i);   // else compaction of a deleted store keeps firing
+                if (timer != null) timer.cancel(false);
             });
             log.info("Unregistered pipeline{} from {} ({} pipeline(s) now active)",
                     id.map(i -> " '" + i + "'").orElse(""), norm, registry.size());
@@ -899,6 +910,56 @@ public final class CollectorService implements AutoCloseable {
             return true;
         } finally {
             ingestLock.unlock();
+        }
+    }
+
+    /**
+     * Arm (or re-arm) the periodic Reference compaction timer for {@code cfg} — Reference Phase-2 P3's
+     * {@code reference.refresh_seconds}. Only a {@code produces: reference} pipeline with a versioned
+     * store ({@code load: upsert|scd2}) and {@code refresh_seconds > 0} gets one; anything else has any
+     * prior timer cancelled, so lowering the value to 0 (or switching back to {@code load: replace}) on a
+     * re-registered config actually disarms it. The timer <b>compacts</b> the already-collected store — it
+     * never pulls from the origin, which stays the Collector's poll loop (plan §5).
+     *
+     * <p>Cancel-and-rearm keyed by pipeline id, mirroring {@link EnrichmentService}'s {@code armSchedule}:
+     * a changed interval on an existing name applies immediately instead of waiting for a restart.
+     */
+    private void armReferenceRefresh(PipelineConfig cfg) {
+        String id = cfg.identity().pipelineName();
+        java.util.concurrent.ScheduledFuture<?> prior = referenceRefreshTimers.remove(id);
+        if (prior != null) prior.cancel(false);
+        if (!cfg.producesReference() || !cfg.reference().load().versionedStore()
+                || !cfg.reference().refreshEnabled()) return;
+        long seconds = cfg.reference().refreshSeconds();
+        referenceRefreshTimers.put(id, scheduler.everySeconds("ref-compact-" + id, seconds, seconds,
+                () -> compactReferenceStore(id)));
+        log.info("Armed Reference compaction for '{}' every {}s (load: {})", id, seconds,
+                cfg.reference().load());
+    }
+
+    /**
+     * One compaction pass over a registered Reference producer's store. Re-reads the config so a timer
+     * armed earlier always acts on the current {@code load}/{@code dirs.database}; a vanished or
+     * no-longer-versioned pipeline is a silent no-op. Never throws — a failed compaction leaves the store
+     * readable (the read-time current view does not depend on it) and must not kill the timer.
+     */
+    private void compactReferenceStore(String id) {
+        try {
+            Optional<PipelineConfig> cur = configRegistry.all().stream()
+                    .filter(e -> e.id().equals(id)).map(ConfigRegistry.Entry::config).findFirst();
+            if (cur.isEmpty()) return;
+            PipelineConfig cfg = cur.get();
+            if (!cfg.producesReference() || !cfg.reference().load().versionedStore()) return;
+            // D4: scd2 defaults to keep-forever (-1 = merge files, drop no version) so as-of stays
+            // answerable over the whole history; -Dreference.compact.history.days sets a horizon instead.
+            // upsert has no history worth keeping, so it collapses to the current versions.
+            long historyDays = cfg.reference().load() == PipelineConfig.Load.SCD2
+                    ? Long.getLong("reference.compact.history.days", -1L) : 0L;
+            var r = com.gamma.job.ReferenceCompactor.compact(
+                    Path.of(cfg.dirs().database()), historyDays);
+            if (r.filesMerged() > 0) log.info("Reference '{}': {}", id, r.describe(Path.of(cfg.dirs().database())));
+        } catch (Exception e) {
+            log.warn("Reference compaction of '{}' failed (store still readable): {}", id, e.getMessage());
         }
     }
 

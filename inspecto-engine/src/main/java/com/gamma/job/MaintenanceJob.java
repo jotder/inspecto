@@ -78,6 +78,12 @@ import java.util.stream.Stream;
  *       small partitions alone). Readers glob {@code *.parquet}, so compaction is invisible to queries;
  *       the trade-off is that {@code reprocess} of a compacted-away batch is no longer supported (its
  *       manifest's outputFile is gone) — set {@code min_age_days} beyond your reprocess horizon.</li>
+ *   <li>{@code reference_compact} — rewrite an append-only versioned Reference store (a
+ *       {@code produces: reference} pipeline with {@code load: upsert|scd2}) to just the rows its read
+ *       views can still return, bounding the read amplification of one-file-per-batch appends. Params:
+ *       {@code dir} (required — the store root), {@code history_days} (default 0 = winning versions only,
+ *       tombstones dropped; positive keeps versions inside the horizon so scd2 as-of still answers).
+ *       See {@link ReferenceCompactor}.</li>
  *   <li>{@code materialize} — persist a summary Derived Table (a <b>Matrix</b>, DAT-4) from a measure
  *       spec over a source Dataset; the snapshot swaps in atomically and registers/refreshes a
  *       {@code dataset} component. See {@link MaterializeTask}.</li>
@@ -158,6 +164,7 @@ final class MaintenanceJob implements Job {
             // Safe by default (MNT-1): a task with no preview does NOTHING on a dry run — never falls
             // through to the real action.
             case "compact"            -> dryRun ? noPreview(task) : PartitionCompactor.run(cfg);
+            case "reference_compact"  -> dryRun ? noPreview(task) : ReferenceCompactor.run(cfg);
             case "materialize"        -> dryRun ? noPreview(task) : MaterializeTask.run(cfg, dataDir);
             case "heartbeat", "noop"  -> JobResult.ok("heartbeat", 0L);
             default -> throw new IllegalArgumentException("unknown maintenance task '" + task + "'");
