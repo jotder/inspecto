@@ -31,8 +31,8 @@ jobs:
       # Committed-secret guard (SEC-INCIDENT-1, docs/BACKLOG.md §5): a secret-ish key assigned a long
       # literal fails the build. Five OAuth client secrets reached a public remote this way; history
       # keeps leaked values forever, so blocking REINTRODUCTION is the only durable control. Pure Node,
-      # ~1s. Master-only by design — `4.x` still carries the live values (its fix is a public-PKCE
-      # design change), so do not merge this forward until that lands or `4.x` CI pins red.
+      # ~1s. Runs on `4.x` too since 2026-07-25 — PKCE P0+P1 removed `appClientSecret` from that
+      # branch, so the guard is green there. Keep both copies of the script identical.
       - name: Guard — no committed secrets
         run: node tools/check-secrets.mjs
 

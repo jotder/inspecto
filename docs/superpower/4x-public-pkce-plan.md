@@ -119,8 +119,9 @@ still uses `environment.appClientSecret` — so P1 is still required.
 8. Cut a `4.x` release containing P0+P1, deploy it, **then** rotate at the issuer (prod
    `appClientSecret` first, then the shared `iamClientSecret`). Order matters: the new bundle must be
    live before the old secret dies.
-9. Close the BACKLOG §5 row on **confirmed rotation**, and merge `tools/check-secrets.mjs` forward to
-   `4.x` — it is master-only today precisely because `4.x` still holds live values.
+9. Close the BACKLOG §5 row on **confirmed rotation**. ~~Merge `tools/check-secrets.mjs` forward to
+   `4.x`~~ — **done 2026-07-25 (`27780fee`)**, once P1 emptied the live values that had kept it
+   master-only.
 
 ## 4. Open questions — need the operator / IdP owner
 

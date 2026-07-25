@@ -166,8 +166,11 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > keys (D15 made `tokenEndpoint` required config), and anything containing `EXAMPLE` (AWS's published SigV4
 > vectors). Line hatch: `secret-allow`. Verified both ways — green on the repo, and red on a synthetic
 > fixture in the incident's exact shape. ~~Master-only by design: do NOT merge it forward until the `4.x`
-> PKCE fix lands~~ — **that gate is now satisfied** (P1 shipped `89cb3cce`); merging it forward to `4.x`
-> is an open follow-on, see the P0/P1 block below.
+> PKCE fix lands~~ — **that gate was satisfied by P1 (`89cb3cce`), and the guard now runs on `4.x` too**
+> (`27780fee`). The branch that leaked four of the five credentials is guarded against reintroducing them.
+> Re-verified on `4.x` both ways: green on the branch, and exit 1 on an injected 32-char `appClientSecret`
+> in `environment.gamma.ts`. **Keep the two copies of the script identical** — a divergence means one
+> branch is guarded by weaker rules than the other.
 >
 > **✅ `4.x` IS NOW FIXED CODE-SIDE (2026-07-25) — ROTATION IS UNBLOCKED.** P0 (`481a68d5`) removed the
 > dead confidential-client code holding the inline IAM literal; **P1 (`89cb3cce`) put the live path on
@@ -176,9 +179,8 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > as no-content `-s ours` merges (`54443256`, `37c98c6a`). **Nothing code-side blocks rotation any more;
 > what remains is P2 — deploy the `4.x` bundle, then rotate.** Two follow-ons this unlocked or exposed:
 >
-> - **`tools/check-secrets.mjs` can now be merged forward to `4.x`** — the "would pin `4.x` CI
->   permanently red" objection below is **no longer true**, because `4.x` no longer holds live values.
->   Do it as its own change and confirm `4.x` CI is green.
+> - **✅ `tools/check-secrets.mjs` now runs on `4.x`** (`27780fee`) — the "would pin `4.x` CI permanently
+>   red" objection died with P1. Done.
 > - **✅ Callback `state` validation — FIXED (`8c3a7654`), and it caught a worse bug.** P1 generated and
 >   sent a `state` but never checked it, so the CSRF defence was not armed. Closing that exposed a
 >   **login-breaking regression P1 had introduced**: the callback read the code as

@@ -104,8 +104,9 @@ For each credential, in the order fixed by Step 2:
 - [ ] All five secrets rotated **and old values revoked**.
 - [ ] Step 0 log review recorded in [`../BACKLOG.md`](../BACKLOG.md) §5, including a negative result.
 - [ ] BACKLOG §5 row closed — it closes on confirmed rotation, not on a merged commit.
-- [ ] `tools/check-secrets.mjs` merged forward to `4.x`. **The gate on this is now satisfied** — `4.x`
-      stopped holding live values in `89cb3cce` (P1), so merging it no longer pins `4.x` CI red.
+- [x] ~~`tools/check-secrets.mjs` merged forward to `4.x`~~ — **done 2026-07-25** (`27780fee`). `4.x`
+      stopped holding live values in `89cb3cce` (P1), so the guard runs green there; verified it also
+      goes red on an injected secret, i.e. it is guarding, not just passing.
 - [x] ~~Orphaned worktrees deleted~~ — **done 2026-07-25**; both dirs are gone from disk and from
       `git worktree list`.
 

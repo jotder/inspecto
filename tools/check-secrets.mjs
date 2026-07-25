@@ -24,9 +24,11 @@
 // Zero dependencies (pure Node). Run via `node tools/check-secrets.mjs`; wired into CI (ci.yml).
 // Escape hatch: append `secret-allow` in a comment on the offending line for a justified exception.
 //
-// NOTE ON BRANCHES: this guard is master-only by design. `4.x` still carries the live secrets in
-// its own copies of these files (see BACKLOG §5 — the fix there is a public-PKCE design change,
-// not a deletion), so merging this forward before that lands would pin `4.x` CI red.
+// NOTE ON BRANCHES: this guard now runs on BOTH `master` and `4.x`. It was master-only until
+// 2026-07-25 because `4.x` carried the live values in its own environments/*.ts; PKCE P0+P1
+// (`481a68d5`, `89cb3cce`, `8c3a7654`) removed `appClientSecret` from `4.x` entirely, so the guard
+// is green there and was brought forward. Keep the two copies IDENTICAL — a divergence means one
+// branch is guarded by weaker rules than the other, which is exactly how the incident recurs.
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
