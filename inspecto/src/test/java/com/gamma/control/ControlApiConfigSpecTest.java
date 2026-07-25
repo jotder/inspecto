@@ -42,12 +42,12 @@ class ControlApiConfigSpecTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
@@ -57,7 +57,7 @@ class ControlApiConfigSpecTest {
             for (String type : List.of("pipeline", "enrichment", "job", "schema", "meta")) {
                 HttpResponse<String> r = get(c.port, "/config/spec/" + type);
                 assertEquals(200, r.statusCode(), type);
-                JsonNode spec = JSON.readTree(r.body());
+                JsonNode spec = V1Body.of(r.body());
                 assertEquals(type, spec.get("type").asText());
                 assertTrue(spec.get("fields").size() > 0, type + " has fields");
             }
@@ -68,7 +68,7 @@ class ControlApiConfigSpecTest {
     @Test
     void specExposesCrossFieldRuleCatalogWithoutThePredicate(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            JsonNode spec = JSON.readTree(get(c.port, "/config/spec/pipeline").body());
+            JsonNode spec = V1Body.of(get(c.port, "/config/spec/pipeline").body());
             JsonNode rules = spec.get("rules");
             assertTrue(rules.size() >= 1);
             JsonNode rule = rules.get(0);
@@ -88,7 +88,7 @@ class ControlApiConfigSpecTest {
                        "processing":{"ingester":"com.x.Plugin","threads":1}}}""";
             HttpResponse<String> r = post(c.port, "/validate", body);
             assertEquals(200, r.statusCode());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertEquals("pipeline", out.get("type").asText());
             assertFalse(out.get("clean").asBoolean(), "violation present → not clean");
             boolean hasSegmentsErr = false;
@@ -106,7 +106,7 @@ class ControlApiConfigSpecTest {
                        "name":"X",
                        "dirs":{"poll":"/in","database":"/out"},
                        "processing":{"threads":1}}}""";
-            JsonNode out = JSON.readTree(post(c.port, "/validate", body).body());
+            JsonNode out = V1Body.of(post(c.port, "/validate", body).body());
             assertTrue(out.get("clean").asBoolean(), "clean draft: " + out.get("findings"));
             assertEquals(0, out.get("findings").size());
         }
@@ -124,7 +124,7 @@ class ControlApiConfigSpecTest {
                      "safety":true}""";
             HttpResponse<String> r = post(c.port, "/validate", body);
             assertEquals(200, r.statusCode());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertTrue(out.get("safetyChecked").asBoolean(), "safety gate ran");
             assertFalse(out.get("clean").asBoolean(), "unsafe path → not clean");
             boolean pathJail = false;
@@ -144,7 +144,7 @@ class ControlApiConfigSpecTest {
                        "name":"X",
                        "dirs":{"poll":"/in","database":"/out","backup":"//evil/share"},
                        "processing":{"threads":1}}}""";
-            JsonNode out = JSON.readTree(post(c.port, "/validate", body).body());
+            JsonNode out = V1Body.of(post(c.port, "/validate", body).body());
             assertFalse(out.get("safetyChecked").asBoolean(), "gate not run by default");
             assertTrue(out.get("clean").asBoolean(), "spec-only path is unchanged: " + out.get("findings"));
         }
@@ -167,7 +167,7 @@ class ControlApiConfigSpecTest {
             String body = "{\"configPath\":\"" + toon.toString().replace("\\", "/") + "\"}";
             HttpResponse<String> r = post(c.port, "/validate", body);
             assertEquals(200, r.statusCode());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertEquals(c.name, out.get("pipeline").asText());
             assertTrue(out.has("warnings"), "legacy warnings field preserved");
             assertTrue(out.has("findings"), "structured findings added");

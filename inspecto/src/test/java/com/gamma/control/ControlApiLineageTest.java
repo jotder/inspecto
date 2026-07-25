@@ -79,7 +79,7 @@ class ControlApiLineageTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
@@ -107,7 +107,7 @@ class ControlApiLineageTest {
 
             HttpResponse<String> r = get(c.port, "/lineage?store=events_raw");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertEquals("events_raw", body.get("store").asText());
             JsonNode up = body.get("upstream");
             assertTrue(up.isArray() && up.size() == 1, "one upstream row for events_raw: " + r.body());

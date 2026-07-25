@@ -79,7 +79,7 @@ class ControlApiFlowsTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
@@ -88,7 +88,7 @@ class ControlApiFlowsTest {
         try (Ctx c = open(dir)) {
             HttpResponse<String> r = get(c.port, "/pipelines");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode arr = JSON.readTree(r.body());
+            JsonNode arr = V1Body.of(r.body());
             assertTrue(arr.isArray() && arr.size() >= 1, "one entry per registered pipeline");
             JsonNode row = arr.get(0);
             assertEquals("flow_etl", row.get("name").asText());   // registry normalises the name
@@ -100,7 +100,7 @@ class ControlApiFlowsTest {
     @Test
     void nodeTypesCatalogIsServed(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            JsonNode arr = JSON.readTree(get(c.port, "/pipelines/node-types").body());
+            JsonNode arr = V1Body.of(get(c.port, "/pipelines/node-types").body());
             assertTrue(arr.isArray());
             boolean hasView = false, hasAcq = false;
             for (JsonNode t : arr) {
@@ -122,7 +122,7 @@ class ControlApiFlowsTest {
         try (Ctx c = open(dir)) {
             HttpResponse<String> r = get(c.port, "/pipelines/flow_etl/graph");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode g = JSON.readTree(r.body());
+            JsonNode g = V1Body.of(r.body());
             assertEquals("flow_etl", g.get("name").asText());
             assertTrue(g.get("nodes").isArray() && g.get("nodes").size() >= 4);
             assertTrue(g.get("edges").isArray() && g.get("edges").size() >= 3);
@@ -151,7 +151,7 @@ class ControlApiFlowsTest {
         try (Ctx c = open(dir)) {
             HttpResponse<String> r = get(c.port, "/pipelines/combined");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode g = JSON.readTree(r.body());
+            JsonNode g = V1Body.of(r.body());
             assertTrue(g.get("flows").isArray() && g.get("flows").size() >= 1);
             assertTrue(g.get("nodes").isArray() && g.get("nodes").size() >= 4);
             assertTrue(g.get("edges").isArray());

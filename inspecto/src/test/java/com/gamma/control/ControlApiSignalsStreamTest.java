@@ -58,7 +58,7 @@ class ControlApiSignalsStreamTest {
     void pushesLiveSignalOverSse(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpRequest req = HttpRequest.newBuilder(
-                    URI.create("http://localhost:" + c.port + "/signals/stream")).GET().build();
+                    URI.create("http://localhost:" + c.port + "/api/v1" + "/signals/stream")).GET().build();
             HttpResponse<InputStream> resp = client.send(req, BodyHandlers.ofInputStream());
 
             assertEquals(200, resp.statusCode());
@@ -79,7 +79,7 @@ class ControlApiSignalsStreamTest {
     void typeAndSeverityFilterExcludeNonMatchingSignal(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpRequest req = HttpRequest.newBuilder(
-                    URI.create("http://localhost:" + c.port
+                    URI.create("http://localhost:" + c.port + "/api/v1"
                             + "/signals/stream?type=job.run.failed&severity=CRITICAL")).GET().build();
             HttpResponse<InputStream> resp = client.send(req, BodyHandlers.ofInputStream());
             assertEquals(200, resp.statusCode());

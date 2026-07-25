@@ -90,7 +90,7 @@ class ControlApiFlowRunTest {
             assertEquals(202, r.statusCode(), r.body());
             String runId = json(r).get("runId").asText();
             assertEquals("evt_rollup", json(r).get("pipeline").asText());
-            assertEquals("/jobs/runs/" + runId, r.headers().firstValue("Location").orElseThrow());
+            assertEquals("/api/v1/jobs/runs/" + runId, r.headers().firstValue("Location").orElseThrow());
 
             JsonNode run = awaitTerminal(c.port, runId);
             assertEquals("SUCCESS", run.get("status").asText(), run.toString());
@@ -146,13 +146,13 @@ class ControlApiFlowRunTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

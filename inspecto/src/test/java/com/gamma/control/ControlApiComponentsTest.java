@@ -179,7 +179,7 @@ class ControlApiComponentsTest {
     void writesAreGatedOnTheWriteRoot(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {                       // no write root configured
             assertEquals(503, send(c.port, "POST", "/components/grammar", "{\"id\":\"pipe\"}").statusCode());
-            assertEquals(List.of(), JSON.readValue(send(c.port, "GET", "/components/grammar", null).body(), List.class));
+            assertEquals(0, V1Body.of(send(c.port, "GET", "/components/grammar", null).body()).size());
         }
     }
 
@@ -251,13 +251,13 @@ class ControlApiComponentsTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

@@ -62,12 +62,12 @@ class ControlApiConfigDeleteTest {
     }
 
     private HttpResponse<String> delete(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .DELETE().build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
@@ -134,7 +134,7 @@ class ControlApiConfigDeleteTest {
 
             HttpResponse<String> r = delete(c.port, "/config/pipeline/draft_stream");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertTrue(out.get("deleted").asBoolean());
             assertEquals("draft_stream_pipeline.toon", out.get("path").asText());
             assertFalse(Files.exists(root.resolve("draft_stream_pipeline.toon")), "file removed");

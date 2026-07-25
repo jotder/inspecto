@@ -83,14 +83,14 @@ class ControlApiScopedObjectsTest {
     void scopedSubjectSeesFilteredListAndUntypedObjects(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             Seed s = seed(c);
-            JsonNode list = JSON.readTree(get(c.port, "/objects?type=INCIDENT", "fraud").body());
+            JsonNode list = V1Body.of(get(c.port, "/objects?type=INCIDENT", "fraud").body());
             List<String> ids = list.findValuesAsText("id");
             assertTrue(ids.contains(s.fraud().id()), "in-scope case visible");
             assertTrue(ids.contains(s.untyped().id()), "untyped objects visible to everyone");
             assertFalse(ids.contains(s.billing().id()), "out-of-scope case filtered from the list");
 
             // the unscoped subject sees all three
-            assertEquals(3, JSON.readTree(get(c.port, "/objects?type=INCIDENT", "all").body()).size());
+            assertEquals(3, V1Body.of(get(c.port, "/objects?type=INCIDENT", "all").body()).size());
         }
     }
 
@@ -116,24 +116,24 @@ class ControlApiScopedObjectsTest {
     void correlationGraphPrunesOutOfScopeNeighbours(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             Seed s = seed(c);
-            JsonNode scoped = JSON.readTree(get(c.port, "/objects/" + s.fraud().id() + "/graph?depth=2", "fraud").body());
+            JsonNode scoped = V1Body.of(get(c.port, "/objects/" + s.fraud().id() + "/graph?depth=2", "fraud").body());
             assertEquals(1, scoped.get("nodes").size(), "billing neighbour pruned");
             assertEquals(s.fraud().id(), scoped.get("nodes").get(0).get("id").asText());
             assertEquals(0, scoped.get("edges").size(), "edges touching pruned nodes dropped");
 
-            JsonNode full = JSON.readTree(get(c.port, "/objects/" + s.fraud().id() + "/graph?depth=2", "all").body());
+            JsonNode full = V1Body.of(get(c.port, "/objects/" + s.fraud().id() + "/graph?depth=2", "all").body());
             assertEquals(2, full.get("nodes").size(), "unscoped subject keeps the full graph");
             assertEquals(1, full.get("edges").size());
         }
     }
 
     private HttpResponse<String> get(int port, String path, String bearer) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Authorization", "Bearer " + bearer).GET().build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(int port, String path, String body, String bearer) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Authorization", "Bearer " + bearer)
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());

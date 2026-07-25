@@ -27,9 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code GET /objects} cursor pagination over real HTTP (api-contract-design §7): on the {@code /api/v1}
  * surface the v1 envelope's {@code metadata.pagination} block carries {@code cursor/nextCursor/limit/total},
  * and walking the opaque {@code nextCursor} pages the objects newest-first (keyset {@code (createdAt, id)})
- * with no overlap, covering the whole set, and a null terminator on the last page. The legacy (unversioned)
- * view stays a bare JSON array with its {@code ?limit=&offset=} slice. Objects are seeded through the
- * service API, then exercised over the wire.
+ * with no overlap, covering the whole set, and a null terminator on the last page. Objects are seeded
+ * through the service API, then exercised over the wire.
  */
 class ControlApiObjectsPageTest {
 
@@ -57,7 +56,7 @@ class ControlApiObjectsPageTest {
                         Map.of()).id());
 
             // page 1 — total across all pages, first-page request cursor is null
-            JsonNode e1 = json(get(c.port, "/api/v1/objects?type=ALERT&limit=2"));
+            JsonNode e1 = json(get(c.port, "/objects?type=ALERT&limit=2"));
             JsonNode pg1 = e1.get("metadata").get("pagination");
             assertEquals(5, pg1.get("total").asInt(), "total spans every page, not just this one");
             assertEquals(2, pg1.get("limit").asInt());
@@ -72,7 +71,7 @@ class ControlApiObjectsPageTest {
             while (!pg.get("nextCursor").isNull()) {
                 assertTrue(++guard < 10, "pagination must terminate");
                 String next = pg.get("nextCursor").asText();
-                page = json(get(c.port, "/api/v1/objects?type=ALERT&limit=2&cursor=" + next));
+                page = json(get(c.port, "/objects?type=ALERT&limit=2&cursor=" + next));
                 pg = page.get("metadata").get("pagination");
                 assertEquals(next, pg.get("cursor").asText(), "request cursor echoed");
                 assertTrue(page.get("data").size() <= 2, "no page exceeds the limit");
@@ -83,11 +82,6 @@ class ControlApiObjectsPageTest {
             assertEquals(5, walked.size(), "no overlap and nothing dropped");
             assertEquals(allIds, new HashSet<>(walked), "the pages cover the whole set");
             assertEquals(walked.size(), new HashSet<>(walked).size(), "no id appears on two pages");
-
-            // legacy (unversioned) view is unchanged — a bare JSON array, no envelope/pagination
-            JsonNode legacy = json(get(c.port, "/objects?type=ALERT&limit=2"));
-            assertTrue(legacy.isArray(), "legacy stays a raw list");
-            assertEquals(2, legacy.size());
         }
     }
 
@@ -97,9 +91,9 @@ class ControlApiObjectsPageTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
 }

@@ -160,11 +160,11 @@ class ControlApiAccessRolesTest {
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
         assertEquals(200, r.statusCode(), () -> "expected 200 but got " + r.statusCode() + ": " + r.body());
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());

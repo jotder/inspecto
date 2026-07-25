@@ -84,7 +84,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = project(c.port, """
                     {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","linkKindCol":"channel"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             JsonNode rows = data.get("rows");
             assertEquals(2, rows.size(), "duplicates fold, the NULL-endpoint row is excluded: " + rows);
             // Heaviest first: alice→bob (sms) folded to count 2.
@@ -104,7 +104,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = project(c.port,
                     "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).at("/data/rows");
+            JsonNode rows = V1Body.of(r.body()).at("/rows");
             assertEquals(2, rows.size());
             assertTrue(rows.get(0).get("kind").isNull(), "no linkKindCol → kind is null");
         }
@@ -117,7 +117,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = project(c.port, """
                     {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","limit":1}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(1, data.get("rows").size());
             assertEquals(2, data.get("rows").get(0).get("count").asInt(), "the folded pair survives the cut");
             assertTrue(data.get("truncated").asBoolean());
@@ -131,7 +131,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = project(c.port, """
                     {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","attrCols":["channel"]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).at("/data/rows");
+            JsonNode rows = V1Body.of(r.body()).at("/rows");
             assertEquals(2, rows.size(), "channel is uniform per pair here, so the fold is unchanged: " + rows);
             JsonNode aliceBob = rows.get(0);
             assertEquals("alice", aliceBob.get("source").asText());
@@ -154,7 +154,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = project(c.port, """
                     {"dataset":"mixed_ds","sourceCol":"caller","targetCol":"callee","attrCols":["channel"]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).at("/data/rows");
+            JsonNode rows = V1Body.of(r.body()).at("/rows");
             assertEquals(2, rows.size(), "differing attr values fold into separate rows, not one merged row: " + rows);
             for (JsonNode row : rows) assertEquals(1, row.get("count").asInt());
         }
@@ -167,7 +167,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = neighbors(c.port, """
                     {"dataset":"calls_ds","sourceCol":"caller","targetCol":"callee","value":"bob"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).at("/data/rows");
+            JsonNode rows = V1Body.of(r.body()).at("/rows");
             assertEquals(1, rows.size(), "only alice->bob touches 'bob': " + rows);
             assertEquals("alice", rows.get(0).get("source").asText());
             assertEquals("bob", rows.get(0).get("target").asText());
@@ -186,7 +186,7 @@ class ControlApiInvProjectionTest {
             HttpResponse<String> r = neighbors(c.port, """
                     {"dataset":"names_ds","sourceCol":"caller","targetCol":"callee","value":"a'b"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).at("/data/rows");
+            JsonNode rows = V1Body.of(r.body()).at("/rows");
             assertEquals(2, rows.size(), "matches as both source and target: " + rows);
         }
     }
@@ -233,7 +233,7 @@ class ControlApiInvProjectionTest {
             seedOrdersAndCustomers(c);
             HttpResponse<String> r = schemaRelationships(c.port);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(2, data.get("datasetsScanned").asInt());
             JsonNode rels = data.get("relationships");
             boolean found = false;
@@ -257,7 +257,7 @@ class ControlApiInvProjectionTest {
             new ComponentStore(c.root.resolve("registry")).write("dataset", "ghost_ds", Map.of());   // unbound
             HttpResponse<String> r = schemaRelationships(c.port);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(2, data.get("datasetsScanned").asInt());
             assertEquals(1, data.get("datasetsSkipped").asInt());
         }

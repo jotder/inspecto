@@ -66,13 +66,13 @@ class ControlApiShareTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("POST", body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
                 BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
@@ -93,16 +93,16 @@ class ControlApiShareTest {
             seed(c);
             HttpResponse<String> issued = post(c.port, "/dashboards/exec_board/share", "{\"ttl_hours\":1}");
             assertEquals(200, issued.statusCode(), issued.body());
-            JsonNode data = JSON.readTree(issued.body()).has("data")
-                    ? JSON.readTree(issued.body()).get("data") : JSON.readTree(issued.body());
+            JsonNode data = V1Body.of(issued.body()).has("data")
+                    ? V1Body.of(issued.body()) : V1Body.of(issued.body());
             String token = data.get("token").asText();
             assertFalse(token.isBlank());
 
             // Anonymous resolve: dashboard + its widget come back read-only.
             HttpResponse<String> resolved = get(c.port, "/public/dashboards/" + token);
             assertEquals(200, resolved.statusCode(), resolved.body());
-            JsonNode pub = JSON.readTree(resolved.body()).has("data")
-                    ? JSON.readTree(resolved.body()).get("data") : JSON.readTree(resolved.body());
+            JsonNode pub = V1Body.of(resolved.body()).has("data")
+                    ? V1Body.of(resolved.body()) : V1Body.of(resolved.body());
             assertEquals("exec_board", pub.get("dashboard").get("id").asText());
             assertEquals(1, pub.get("widgets").size());
             assertEquals("sales_w", pub.get("widgets").get(0).get("id").asText());

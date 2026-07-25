@@ -50,12 +50,12 @@ class ControlApiEnrichmentRegisterTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .GET().build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
@@ -76,26 +76,26 @@ class ControlApiEnrichmentRegisterTest {
             // Fresh space: the service exists with zero jobs (used to be absent → 404).
             HttpResponse<String> before = get(c.port, "/enrichment");
             assertEquals(200, before.statusCode(), before.body());
-            assertEquals(0, JSON.readTree(before.body()).size(), "no jobs hosted yet");
+            assertEquals(0, V1Body.of(before.body()).size(), "no jobs hosted yet");
 
             // Author + persist: the filename must carry the *_enrich.toon boot-scan suffix, or
             // the job would silently drop out on the next service restart (the P2 pipeline trap).
             HttpResponse<String> w = post(c.port, "/config/write", draft("orders_daily", "orders_feed"));
             assertEquals(200, w.statusCode(), w.body());
-            String path = JSON.readTree(w.body()).get("path").asText();
+            String path = V1Body.of(w.body()).get("path").asText();
             assertTrue(path.endsWith("orders_daily_enrich.toon"), "scan-convention filename: " + path);
 
             // Hot-register — no restart.
             HttpResponse<String> reg = post(c.port, "/enrichment", "{\"configPath\":\"" + path + "\"}");
             assertEquals(200, reg.statusCode(), reg.body());
-            JsonNode r = JSON.readTree(reg.body());
+            JsonNode r = V1Body.of(reg.body());
             assertTrue(r.get("registered").asBoolean());
             assertEquals("orders_daily", r.get("name").asText());
             assertEquals("orders_feed", r.get("job").get("onPipeline").asText());
             assertTrue(r.get("job").get("eventTriggered").asBoolean());
 
             // The running service hosts it immediately.
-            JsonNode list = JSON.readTree(get(c.port, "/enrichment").body());
+            JsonNode list = V1Body.of(get(c.port, "/enrichment").body());
             assertEquals(1, list.size());
             assertEquals("orders_daily", list.get(0).get("name").asText());
         }
@@ -104,7 +104,7 @@ class ControlApiEnrichmentRegisterTest {
     @Test
     void reRegisterReplacesByName(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String path = JSON.readTree(post(c.port, "/config/write",
+            String path = V1Body.of(post(c.port, "/config/write",
                     draft("orders_daily", "orders_feed")).body()).get("path").asText();
             assertEquals(200, post(c.port, "/enrichment", "{\"configPath\":\"" + path + "\"}").statusCode());
 
@@ -115,7 +115,7 @@ class ControlApiEnrichmentRegisterTest {
             HttpResponse<String> reg2 = post(c.port, "/enrichment", "{\"configPath\":\"" + path + "\"}");
             assertEquals(200, reg2.statusCode(), reg2.body());
 
-            JsonNode list = JSON.readTree(get(c.port, "/enrichment").body());
+            JsonNode list = V1Body.of(get(c.port, "/enrichment").body());
             assertEquals(1, list.size(), "replaced, not duplicated: " + list);
             assertEquals("other_feed", list.get(0).get("onPipeline").asText());
         }

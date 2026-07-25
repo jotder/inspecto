@@ -50,7 +50,10 @@ class ControlApiAuditTest {
     @Test
     void mutatingRequestEmitsAuditEvent(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            assertEquals(200, send(c.port, "POST", "/runs/" + c.name + "/trigger", null).statusCode());
+            // W5b: the trigger is accepted asynchronously — wait for the run before reading its audit event.
+            HttpResponse<String> run = send(c.port, "POST", "/runs/" + c.name + "/trigger", null);
+            assertEquals(202, run.statusCode(), run.body());
+            assertEquals("SUCCESS", awaitRun(c.port, "/runs/runs/" + json(run).get("runId").asText()));
 
             JsonNode events = json(send(c.port, "GET", "/events?limit=200", null));
             JsonNode audit = null;
@@ -78,7 +81,7 @@ class ControlApiAuditTest {
     void honoursCustomActorHeader(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpRequest req = HttpRequest.newBuilder(
-                            URI.create("http://localhost:" + c.port + "/runs/" + c.name + "/pause"))
+                            URI.create("http://localhost:" + c.port + "/api/v1" + "/runs/" + c.name + "/pause"))
                     .header("X-Actor", "support_agent")
                     .POST(BodyPublishers.noBody()).build();
             assertEquals(200, client.send(req, BodyHandlers.ofString()).statusCode());
@@ -119,13 +122,24 @@ class ControlApiAuditTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
+    }
+
+    /** Poll an accepted run (W5b) to its terminal status, or fail after 10s. */
+    private String awaitRun(int port, String runPath) throws Exception {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            String status = json(send(port, "GET", runPath, null)).get("status").asText();
+            if (!"RUNNING".equals(status)) return status;
+            Thread.sleep(50);
+        }
+        return fail("run " + runPath + " did not reach a terminal status within 10s");
     }
 }

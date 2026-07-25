@@ -48,7 +48,7 @@ class ControlApiNotificationStreamTest {
     void pushesNotificationOverSse(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpRequest req = HttpRequest.newBuilder(
-                    URI.create("http://localhost:" + c.port + "/notifications/stream")).GET().build();
+                    URI.create("http://localhost:" + c.port + "/api/v1" + "/notifications/stream")).GET().build();
             HttpResponse<InputStream> resp = client.send(req, BodyHandlers.ofInputStream());
 
             assertEquals(200, resp.statusCode());

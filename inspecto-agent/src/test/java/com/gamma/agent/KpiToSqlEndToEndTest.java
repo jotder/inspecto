@@ -69,7 +69,7 @@ class KpiToSqlEndToEndTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
@@ -81,7 +81,7 @@ class KpiToSqlEndToEndTest {
                      "catalogRefs":["event:mini_etl/mini"]}}""";
             HttpResponse<String> r = post(c.port, "/assist/kpi-to-sql", body);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = json(r.body());
             assertEquals("kpi-to-sql", out.get("intent").asText());
             assertEquals("OK", out.get("status").asText());
             assertTrue(out.get("validated").asBoolean(), "the SQL planned in the sandbox oracle");
@@ -133,5 +133,12 @@ class KpiToSqlEndToEndTest {
             assertEquals(AgentResult.Status.OK, e.status());
             assertTrue(e.contextKeys().contains("kpiDescription"), "context keys recorded (not values)");
         }
+    }
+
+    /** Parse a v1 response and peel the envelope's {@code data} — the control module's V1Body, inlined
+     *  here because that test helper is package-private to com.gamma.control. */
+    private static JsonNode json(String raw) throws Exception {
+        JsonNode n = JSON.readTree(raw);
+        return n.has("data") ? n.get("data") : n;
     }
 }

@@ -80,8 +80,8 @@ class RunbookActionsTest {
         assertEquals(2, v.get("total"));
 
         assertEquals(2, requests.size(), "both steps hit the control plane");
-        assertEquals("/objects/alert-1/ack", requests.get(0).path(), "step 1 acks the alert first");
-        assertEquals("/runs/orders_etl/reprocess", requests.get(1).path(), "step 2 replays the batch");
+        assertEquals("/api/v1/objects/alert-1/ack", requests.get(0).path(), "step 1 acks the alert first");
+        assertEquals("/api/v1/runs/orders_etl/reprocess", requests.get(1).path(), "step 2 replays the batch");
         assertTrue(requests.stream().allMatch(rq -> "sess-1".equals(rq.agentSession())),
                 "every step carries X-Agent-Session");
     }
@@ -112,7 +112,7 @@ class RunbookActionsTest {
         assertEquals(2, v2.get("completed"));
         assertEquals(2, v2.get("resumedFromStep"));
         assertEquals(1, requests.size(), "only the previously-failed reprocess step re-runs");
-        assertEquals("/runs/orders/reprocess", requests.get(0).path());
+        assertEquals("/api/v1/runs/orders/reprocess", requests.get(0).path());
         List<Map<String, Object>> steps = (List<Map<String, Object>>) v2.get("steps");
         assertEquals(true, steps.get(0).get("skipped"), "step 1 is skipped (already completed)");
         assertEquals(true, steps.get(1).get("ok"));
@@ -162,7 +162,7 @@ class RunbookActionsTest {
         assertEquals(1, v.get("haltedAtStep"));
 
         assertEquals(1, requests.size(), "the reprocess step must NOT run after ack failed");
-        assertEquals("/objects/alert-2/ack", requests.get(0).path());
+        assertEquals("/api/v1/objects/alert-2/ack", requests.get(0).path());
         List<Map<String, Object>> steps = (List<Map<String, Object>>) v.get("steps");
         assertEquals(1, steps.size());
         assertEquals(false, steps.get(0).get("ok"));
@@ -178,8 +178,8 @@ class RunbookActionsTest {
         Map<String, Object> v = (Map<String, Object>) r.value();
         assertEquals(true, v.get("success"));
         assertEquals(2, requests.size());
-        assertEquals("/components/expectation/amt-nonneg/versions/3/restore", requests.get(0).path());
-        assertEquals("/jobs/nightly/trigger", requests.get(1).path());
+        assertEquals("/api/v1/components/expectation/amt-nonneg/versions/3/restore", requests.get(0).path());
+        assertEquals("/api/v1/jobs/nightly/trigger", requests.get(1).path());
     }
 
     @Test

@@ -103,7 +103,7 @@ class ComponentActionsTest {
         assertEquals("GET", requests.get(0).method());
         Recorded put = requests.get(1);
         assertEquals("PUT", put.method());
-        assertEquals("/components/expectation/amt-nonneg", put.path());
+        assertEquals("/api/v1/components/expectation/amt-nonneg", put.path());
         assertEquals("\"sha256:current\"", put.ifMatch(), "PUT must carry the current ETag as If-Match");
         assertEquals("sess-1", put.agentSession(), "every write carries X-Agent-Session");
     }
@@ -122,7 +122,7 @@ class ComponentActionsTest {
         assertEquals("GET", requests.get(0).method());
         Recorded post = requests.get(1);
         assertEquals("POST", post.method());
-        assertEquals("/components/expectation", post.path());
+        assertEquals("/api/v1/components/expectation", post.path());
         assertTrue(post.body().contains("brand-new"), "create body must carry the id");
         assertEquals("sess-2", post.agentSession());
     }
@@ -151,7 +151,7 @@ class ComponentActionsTest {
         assertEquals(1, requests.size());
         Recorded post = requests.get(0);
         assertEquals("POST", post.method());
-        assertEquals("/components/expectation/amt-nonneg/versions/2/restore", post.path());
+        assertEquals("/api/v1/components/expectation/amt-nonneg/versions/2/restore", post.path());
         assertEquals("sess-4", post.agentSession());
     }
 

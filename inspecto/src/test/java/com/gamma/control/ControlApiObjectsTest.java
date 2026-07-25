@@ -117,7 +117,7 @@ class ControlApiObjectsTest {
             // already set via dueInMinutes above, so only the postmortem blob is missing here).
             var blockedResp = send(c.port, "POST", "/objects/" + id + "/resolve", null);
             assertEquals(422, blockedResp.statusCode());
-            assertTrue(json(blockedResp).get("error").asText().contains("timeline"), blockedResp.body());
+            assertTrue(json(blockedResp).get("error").get("message").asText().contains("timeline"), blockedResp.body());
 
             String postmortem = "{\"timeline\":[{\"time\":\"10:00\",\"text\":\"detected\"}],"
                     + "\"causeAnalysis\":[\"root cause found\"],"
@@ -291,13 +291,13 @@ class ControlApiObjectsTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

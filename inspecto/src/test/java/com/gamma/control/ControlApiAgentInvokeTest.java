@@ -185,7 +185,7 @@ class ControlApiAgentInvokeTest {
 
     private HttpResponse<String> sendWithHeader(int port, String method, String path, String body,
                                                  String headerName, String headerValue) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headerName != null) b.header(headerName, headerValue);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
@@ -193,7 +193,7 @@ class ControlApiAgentInvokeTest {
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 
     /** Every {@code AUDIT}-type event mentioning {@code ruleName} in its message (the apply route's

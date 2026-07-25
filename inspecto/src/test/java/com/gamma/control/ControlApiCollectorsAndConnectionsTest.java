@@ -91,7 +91,7 @@ class ControlApiCollectorsAndConnectionsTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         HttpRequest.BodyPublisher pub = body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body);
         return client.send(b.method(method, pub).build(), BodyHandlers.ofString());
     }
@@ -103,7 +103,7 @@ class ControlApiCollectorsAndConnectionsTest {
         try (Ctx c = open(cfg, null)) {
             HttpResponse<String> r = send(c.port, "GET", "/collectors", null);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode arr = JSON.readTree(r.body());
+            JsonNode arr = V1Body.of(r.body());
             assertTrue(arr.isArray() && arr.size() >= 1, "one row per pipeline source");
             JsonNode row = arr.get(0);
             assertEquals("conn_etl", row.get("pipeline").asText());   // registry normalises the name
@@ -125,7 +125,7 @@ class ControlApiCollectorsAndConnectionsTest {
         try (Ctx c = open(cfg, null)) {
             HttpResponse<String> r = send(c.port, "GET", "/metrics/acquisition", null);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode m = JSON.readTree(r.body());
+            JsonNode m = V1Body.of(r.body());
             JsonNode disc = m.get("inspecto_files_discovered_total");
             assertNotNull(disc, "acquisition metric present");
             assertEquals("counter", disc.get("type").asText());
@@ -150,7 +150,7 @@ class ControlApiCollectorsAndConnectionsTest {
             assertTrue(Files.exists(root.resolve("spare_connection.toon")), "persisted under the write root");
 
             // get — the ${ENV:…} reference is shown verbatim (not masked)
-            JsonNode got = JSON.readTree(send(c.port, "GET", "/connections/spare", null).body());
+            JsonNode got = V1Body.of(send(c.port, "GET", "/connections/spare", null).body());
             assertEquals("h1.example", got.get("host").asText());
             assertEquals("${ENV:SFTP_PW}", got.get("password").asText());
 
@@ -159,7 +159,7 @@ class ControlApiCollectorsAndConnectionsTest {
                 {"id":"spare","connector":"sftp","host":"h2.example","port":22,"username":"svc","password":"***"}
                 """;
             assertEquals(200, send(c.port, "PUT", "/connections/spare", upd).statusCode());
-            JsonNode after = JSON.readTree(send(c.port, "GET", "/connections/spare", null).body());
+            JsonNode after = V1Body.of(send(c.port, "GET", "/connections/spare", null).body());
             assertEquals("h2.example", after.get("host").asText(), "host updated");
             assertEquals("${ENV:SFTP_PW}", after.get("password").asText(), "masked secret preserved, not clobbered");
 
@@ -181,7 +181,7 @@ class ControlApiCollectorsAndConnectionsTest {
             assertTrue(Files.readString(root.resolve("proxied_connection.toon")).contains("proxy"),
                     "proxy block persisted in the TOON doc");
 
-            JsonNode got = JSON.readTree(send(c.port, "GET", "/connections/proxied", null).body());
+            JsonNode got = V1Body.of(send(c.port, "GET", "/connections/proxied", null).body());
             assertEquals("proxy.example", got.get("proxy").get("host").asText());
             assertEquals("${ENV:PX_PW}", got.get("proxy").get("password").asText(),
                     "the ${…} reference is shown verbatim");
@@ -192,7 +192,7 @@ class ControlApiCollectorsAndConnectionsTest {
                  "proxy":{"type":"HTTP","host":"proxy2.example","port":3128,"username":"px","password":"***"}}
                 """;
             assertEquals(200, send(c.port, "PUT", "/connections/proxied", upd).statusCode());
-            JsonNode after = JSON.readTree(send(c.port, "GET", "/connections/proxied", null).body());
+            JsonNode after = V1Body.of(send(c.port, "GET", "/connections/proxied", null).body());
             assertEquals("proxy2.example", after.get("proxy").get("host").asText(), "proxy host updated");
             assertEquals("${ENV:PX_PW}", after.get("proxy").get("password").asText(),
                     "masked proxy secret preserved, not clobbered");

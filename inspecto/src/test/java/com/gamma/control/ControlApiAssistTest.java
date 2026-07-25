@@ -76,12 +76,12 @@ class ControlApiAssistTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.GET().build(), BodyHandlers.ofString());
     }
 
@@ -90,7 +90,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, false)) {
             HttpResponse<String> r = post(c.port, "/assist/echo", "{\"userText\":\"hi\"}");
             assertEquals(503, r.statusCode(), "auth passes, but no agent on the classpath");
-            assertTrue(JSON.readTree(r.body()).get("error").asText().contains("not available"));
+            assertTrue(V1Body.of(r.body()).get("error").get("message").asText().contains("not available"));
         }
     }
 
@@ -99,7 +99,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = post(c.port, "/assist/echo", "{\"userText\":\"hello\"}");
             assertEquals(200, r.statusCode());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertEquals("echo", out.get("intent").asText());
             assertEquals("OK", out.get("status").asText());
             assertEquals("you said: hello", out.get("answer").asText());
@@ -114,7 +114,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = post(c.port, "/assist/draft", "{\"userText\":\"weekdays 6am\"}");
             assertEquals(200, r.statusCode());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertEquals("OK", out.get("status").asText());
             assertTrue(out.get("validated").asBoolean(), "draft ran through the oracle");
             assertTrue(out.get("applyVia").isNull(), "draft-only: no write endpoint (V-9)");
@@ -134,7 +134,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = post(c.port, "/assist/no-such-skill", "{}");
             assertEquals(404, r.statusCode());
-            assertTrue(JSON.readTree(r.body()).get("error").asText().contains("unknown assist intent"));
+            assertTrue(V1Body.of(r.body()).get("error").get("message").asText().contains("unknown assist intent"));
         }
     }
 
@@ -143,7 +143,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = post(c.port, "/assist/down", "{}");
             assertEquals(503, r.statusCode());
-            assertEquals("model offline", JSON.readTree(r.body()).get("error").asText());
+            assertEquals("model offline", V1Body.of(r.body()).get("error").get("message").asText());
         }
     }
 
@@ -154,7 +154,7 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, true)) {
             HttpResponse<String> r = get(c.port, "/assist/diagnoses");
             assertEquals(200, r.statusCode());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertTrue(out.isArray() && out.size() == 1, "the agent's recent diagnoses come through as JSON");
             JsonNode d = out.get(0);
             assertEquals("B7", d.get("batchId").asText());
@@ -169,8 +169,8 @@ class ControlApiAssistTest {
         try (Ctx c = open(dir, false)) {
             HttpResponse<String> r = get(c.port, "/assist/diagnoses");
             assertEquals(200, r.statusCode(), "no agent -> empty list, not an error");
-            assertTrue(JSON.readTree(r.body()).isArray());
-            assertEquals(0, JSON.readTree(r.body()).size());
+            assertTrue(V1Body.of(r.body()).isArray());
+            assertEquals(0, V1Body.of(r.body()).size());
         }
     }
 }

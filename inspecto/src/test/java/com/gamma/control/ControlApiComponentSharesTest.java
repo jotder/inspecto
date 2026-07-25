@@ -205,7 +205,7 @@ class ControlApiComponentSharesTest {
     // ── plumbing ────────────────────────────────────────────────────────────────────
 
     private HttpResponse<String> send(int port, String method, String path, String body, String bearer) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method(method, body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body));
         if (body != null) b.header("Content-Type", "application/json");
         if (bearer != null) b.header("Authorization", "Bearer " + bearer);
@@ -213,6 +213,6 @@ class ControlApiComponentSharesTest {
     }
 
     private static JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

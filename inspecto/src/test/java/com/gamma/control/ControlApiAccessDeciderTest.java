@@ -143,7 +143,7 @@ class ControlApiAccessDeciderTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body, String subject) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (subject != null) b.header("Authorization", "Bearer " + subject);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());

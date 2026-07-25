@@ -131,26 +131,26 @@ class ControlApiRequirementTest {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, wr)) {
             // a Business subject (no capabilities) may submit
-            assertEquals(200, send(c.port, "POST", "/api/v1/requirements",
+            assertEquals(200, send(c.port, "POST", "/requirements",
                     "{\"id\":\"r1\",\"title\":\"t\",\"kind\":\"kpi\"}", "Authorization", "Bearer business").statusCode());
 
             // …but may NOT decide → 403 PERMISSION_DENIED
-            HttpResponse<String> denied = send(c.port, "POST", "/api/v1/requirements/r1/decision",
+            HttpResponse<String> denied = send(c.port, "POST", "/requirements/r1/decision",
                     "{\"accept\":true}", "Authorization", "Bearer business");
             assertEquals(403, denied.statusCode(), denied.body());
-            assertEquals("PERMISSION_DENIED", JSON.readTree(denied.body()).get("error").get("errorCode").asText());
+            assertEquals("PERMISSION_DENIED", V1Body.of(denied.body()).get("error").get("errorCode").asText());
 
             // a triager (canTriageRequirements) may decide; SEC-7(b): the accepted resource still has
             // a triage verb left (deliver), so the per-resource permissions keep the capability…
-            JsonNode decided = json(send(c.port, "POST", "/api/v1/requirements/r1/decision",
-                    "{\"accept\":true}", "Authorization", "Bearer triager"));
+            JsonNode decided = V1Body.envelope(send(c.port, "POST", "/requirements/r1/decision",
+                    "{\"accept\":true}", "Authorization", "Bearer triager").body());
             assertEquals("accepted", decided.get("data").get("status").asText());
             assertEquals(1, decided.get("permissions").size());
             assertEquals("canTriageRequirements", decided.get("permissions").get(0).asText());
 
             // …and a delivered requirement is terminal → the per-resource permissions are empty.
-            JsonNode delivered = json(send(c.port, "POST", "/api/v1/requirements/r1/deliver",
-                    "{}", "Authorization", "Bearer triager"));
+            JsonNode delivered = V1Body.envelope(send(c.port, "POST", "/requirements/r1/deliver",
+                    "{}", "Authorization", "Bearer triager").body());
             assertEquals("delivered", delivered.get("data").get("status").asText());
             assertEquals(0, delivered.get("permissions").size(),
                     "terminal state ⇒ no applicable verbs (grants ∩ resource state)");
@@ -158,7 +158,7 @@ class ControlApiRequirementTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body, String... headers) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
@@ -166,6 +166,6 @@ class ControlApiRequirementTest {
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

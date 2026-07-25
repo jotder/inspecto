@@ -21,8 +21,11 @@ Prove the built artifact actually serves, not just that tests pass.
         com.gamma.control.ControlApi
    ```
    Run in the background; default port :8080.
-3. **Probe** — `GET /health` must be 200, then the focus endpoints for this smoke
-   (e.g. `/spaces`, `/spaces/demo/jobs`, `/spaces/demo/views`). Use `curl -s` and capture status + body.
+3. **Probe** — `GET /health` must be 200 (infra probes stay unversioned), then the focus endpoints
+   for this smoke under the `/api/v1` prefix — since API-5 that is the only API surface, and a bare
+   business path answers 404, not the resource (e.g. `/api/v1/spaces`, `/api/v1/spaces/demo/jobs`,
+   `/api/v1/spaces/demo/views`). Use `curl -s` and capture status + body. Success bodies are
+   envelope-wrapped (`{data, metadata, links, …}`), so read the resource under `.data`.
 4. **Optional e2e** — `E2E_BASE_URL=http://localhost:8080 npm run test:ci -- --include src/e2e/**`
    in `inspecto-ui/` when the focus is UI-visible.
 5. **Always stop the server** — even on failure.

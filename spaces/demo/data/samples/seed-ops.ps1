@@ -10,17 +10,22 @@ param(
     [string]$Space = 'demo'
 )
 $ErrorActionPreference = 'Stop'
-$api = "$Base/spaces/$Space"
+# API-5: business routes are served only under /api/v1.
+$api = "$Base/api/v1/spaces/$Space"
 
 function Invoke-Api {
     # Resilient wrapper: seeding must not die on one 4xx — warn and carry on.
+    # v1 success bodies are envelope-wrapped, so peel 'data' here and callers keep reading the resource.
     param([string]$Method, [string]$Url, $Body = $null)
     try {
         if ($null -ne $Body) {
-            return Invoke-RestMethod -Method $Method -Uri $Url -ContentType 'application/json' `
+            $r = Invoke-RestMethod -Method $Method -Uri $Url -ContentType 'application/json' `
                 -Body ($Body | ConvertTo-Json -Depth 6)
+        } else {
+            $r = Invoke-RestMethod -Method $Method -Uri $Url
         }
-        return Invoke-RestMethod -Method $Method -Uri $Url
+        if ($null -ne $r -and $r.PSObject.Properties.Name -contains 'data') { return $r.data }
+        return $r
     } catch {
         Write-Warning "$Method $Url -> $($_.Exception.Message)"
         return $null

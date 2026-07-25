@@ -33,6 +33,12 @@ public final class ControlPlaneClient {
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String AGENT_SESSION_HEADER = "X-Agent-Session";
 
+    /** API-5 (2026-07-25): the control plane serves its route table only under {@code /api/v1} — the
+     *  unversioned aliases these tools used are retired. The version lives here rather than in
+     *  {@link ControlApi#LOCAL_BASE_URL_PROP} (which stays a bare origin), mirroring how the SPA composes
+     *  {@code apiBaseUrl + "/v1" + path}. */
+    private static final String API_PREFIX = "/api/v1";
+
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
     /** The loopback control-plane base URL (root, no {@code /api/v1}), or empty when none is running. */
@@ -43,7 +49,8 @@ public final class ControlPlaneClient {
 
     /**
      * Issue one request to a control-plane path (e.g. {@code /components/expectation/amt-nonneg}),
-     * attributed to {@code agentSession}. {@code jsonBody} is sent for non-GET (null for GET);
+     * attributed to {@code agentSession}. {@code path} is version-free — {@link #API_PREFIX} is prepended
+     * here, and the v1 envelope is unwrapped on the way back. {@code jsonBody} is sent for non-GET (null for GET);
      * {@code ifMatch} adds an optimistic-lock precondition when non-null. Never throws — a transport
      * failure or absent control plane surfaces as a {@code status<0} {@link Response}.
      */
@@ -54,7 +61,7 @@ public final class ControlPlaneClient {
             HttpRequest.BodyPublisher pub = jsonBody == null
                     ? HttpRequest.BodyPublishers.noBody()
                     : HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(jsonBody));
-            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base.get() + path))
+            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(base.get() + API_PREFIX + path))
                     .timeout(Duration.ofSeconds(20))
                     .header(AGENT_SESSION_HEADER, agentSession)
                     .method(method, pub);
@@ -68,12 +75,32 @@ public final class ControlPlaneClient {
         }
     }
 
+    /**
+     * Project the response body as the resource itself, unwrapping the v1 envelope.
+     *
+     * <p>Because requests now go to {@code /api/v1} (API-5), a success body is
+     * {@code {data, metadata, links, permissions, diagnostics}} rather than the bare resource — so
+     * {@code data} is lifted out and callers keep reading domain fields directly
+     * ({@code body().get("runId")}), exactly as they did against the unversioned surface. This is the
+     * server-side counterpart of the SPA's {@code v1Interceptor}. Error bodies are left alone: the v1
+     * error object ({@code {error:{errorCode, message, …}}}) has no {@code data}, and callers report
+     * failures from {@link Response#raw()} anyway.
+     */
     private static Map<String, Object> parse(String body) {
         if (body == null || body.isBlank()) return Map.of();
         try {
-            return JSON.readValue(body, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> parsed = JSON.readValue(body, new TypeReference<Map<String, Object>>() {});
+            if (parsed.containsKey("data")) {
+                // A v1 success envelope. `data` is null for no-content results and may be a non-object
+                // (list/scalar) for some routes — neither is projectable as a field map, so yield empty.
+                return parsed.get("data") instanceof Map<?, ?> data ? castMap(data) : Map.of();
+            }
+            return parsed;
         } catch (com.fasterxml.jackson.core.JacksonException e) {
             return Map.of(); // non-object bodies (rare on these routes) are simply not projected
         }
     }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Map<?, ?> m) { return (Map<String, Object>) m; }
 }

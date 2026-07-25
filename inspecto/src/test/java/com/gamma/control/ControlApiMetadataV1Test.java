@@ -49,7 +49,7 @@ class ControlApiMetadataV1Test {
     }
 
     private HttpRequest.Builder req(int port, String path, String... headers) {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         return b;
     }
@@ -61,12 +61,12 @@ class ControlApiMetadataV1Test {
         try (Ctx c = open(cfg, root)) {
             // CREATE — widget is now a WRITABLE_TYPE (was mock-only before W3).
             HttpResponse<String> created = client.send(
-                    req(c.port, "/api/v1/components/widget")
+                    req(c.port, "/components/widget")
                             .method("POST", BodyPublishers.ofString("{\"id\":\"sales\",\"kind\":\"bar\",\"title\":\"Sales\"}"))
                             .build(),
                     BodyHandlers.ofString());
             assertEquals(200, created.statusCode(), created.body());
-            JsonNode data = JSON.readTree(created.body()).get("data");
+            JsonNode data = V1Body.of(created.body());
             assertEquals("widget", data.get("type").asText());
             assertFalse(data.get("contentHash").asText().isBlank(), "W3: version metadata present");
             assertTrue(data.has("created") && data.has("modified"));
@@ -76,7 +76,7 @@ class ControlApiMetadataV1Test {
                     "ETag is the content hash");
 
             // READ — same ETag; body is enveloped with version metadata.
-            HttpResponse<String> got = client.send(req(c.port, "/api/v1/components/widget/sales").GET().build(),
+            HttpResponse<String> got = client.send(req(c.port, "/components/widget/sales").GET().build(),
                     BodyHandlers.ofString());
             assertEquals(200, got.statusCode());
             String etag = got.headers().firstValue("ETag").orElse(null);
@@ -84,7 +84,7 @@ class ControlApiMetadataV1Test {
 
             // If-None-Match → 304, no body.
             HttpResponse<String> fresh = client.send(
-                    req(c.port, "/api/v1/components/widget/sales", "If-None-Match", etag).GET().build(),
+                    req(c.port, "/components/widget/sales", "If-None-Match", etag).GET().build(),
                     BodyHandlers.ofString());
             assertEquals(304, fresh.statusCode());
             assertTrue(fresh.body().isEmpty(), "304 carries no body");
@@ -92,17 +92,17 @@ class ControlApiMetadataV1Test {
 
             // If-Match stale → 409 CONFLICT_STALE_VERSION.
             HttpResponse<String> stale = client.send(
-                    req(c.port, "/api/v1/components/widget/sales", "If-Match", "\"sha256:deadbeef\"")
+                    req(c.port, "/components/widget/sales", "If-Match", "\"sha256:deadbeef\"")
                             .method("PUT", BodyPublishers.ofString("{\"kind\":\"line\",\"title\":\"Sales\"}"))
                             .build(),
                     BodyHandlers.ofString());
             assertEquals(409, stale.statusCode());
             assertEquals("CONFLICT_STALE_VERSION",
-                    JSON.readTree(stale.body()).get("error").get("errorCode").asText());
+                    V1Body.of(stale.body()).get("error").get("errorCode").asText());
 
             // If-Match current → 200, new ETag differs.
             HttpResponse<String> ok = client.send(
-                    req(c.port, "/api/v1/components/widget/sales", "If-Match", etag)
+                    req(c.port, "/components/widget/sales", "If-Match", etag)
                             .method("PUT", BodyPublishers.ofString("{\"kind\":\"line\",\"title\":\"Sales\"}"))
                             .build(),
                     BodyHandlers.ofString());
@@ -117,10 +117,10 @@ class ControlApiMetadataV1Test {
     @Test
     void bootstrapAggregatesAndCaches(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = client.send(req(c.port, "/api/v1/bootstrap").GET().build(),
+            HttpResponse<String> r = client.send(req(c.port, "/bootstrap").GET().build(),
                     BodyHandlers.ofString());
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals("personal", data.get("edition").asText(), "auth-free core reports Personal");
             assertTrue(data.get("features").get("authoring").asBoolean(), "write root set ⇒ authoring on");
             // every config spec folded into one call
@@ -134,7 +134,7 @@ class ControlApiMetadataV1Test {
             String etag = r.headers().firstValue("ETag").orElse(null);
             assertNotNull(etag, "bootstrap is ETag'd (cacheable metadata)");
             HttpResponse<String> cached = client.send(
-                    req(c.port, "/api/v1/bootstrap", "If-None-Match", etag).GET().build(),
+                    req(c.port, "/bootstrap", "If-None-Match", etag).GET().build(),
                     BodyHandlers.ofString());
             assertEquals(304, cached.statusCode(), "unchanged bootstrap ⇒ 304 on the hot path");
         }
@@ -150,7 +150,7 @@ class ControlApiMetadataV1Test {
         try (Ctx c = open(cfg, root)) {
             for (String path : List.of("/nav/menus", "/settings/branding", "/settings/geo", "/config/icon-map",
                     "/access/roles", "/access/policies", "/access/catalog", "/access/profiles")) {
-                HttpResponse<String> got = client.send(req(c.port, "/api/v1" + path).GET().build(),
+                HttpResponse<String> got = client.send(req(c.port, "" + path).GET().build(),
                         BodyHandlers.ofString());
                 assertEquals(200, got.statusCode(), path + " → " + got.body());
                 String etag = got.headers().firstValue("ETag").orElse(null);
@@ -158,7 +158,7 @@ class ControlApiMetadataV1Test {
                 assertTrue(etag.startsWith("\"sha256:"), path + " ETag is a strong content hash: " + etag);
 
                 HttpResponse<String> cached = client.send(
-                        req(c.port, "/api/v1" + path, "If-None-Match", etag).GET().build(),
+                        req(c.port, "" + path, "If-None-Match", etag).GET().build(),
                         BodyHandlers.ofString());
                 assertEquals(304, cached.statusCode(), path + " unchanged ⇒ 304");
                 assertTrue(cached.body().isEmpty(), path + " 304 carries no body");

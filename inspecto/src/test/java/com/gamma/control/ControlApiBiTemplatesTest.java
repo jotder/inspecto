@@ -44,7 +44,7 @@ class ControlApiBiTemplatesTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
@@ -58,13 +58,13 @@ class ControlApiBiTemplatesTest {
                     URI.create("http://localhost:" + c.port + "/api/v1/bi/templates")).GET().build(),
                     BodyHandlers.ofString());
             assertEquals(200, gallery.statusCode());
-            JsonNode list = JSON.readTree(gallery.body()).get("data");
+            JsonNode list = V1Body.of(gallery.body());
             assertTrue(list.size() >= 2, "curated gallery ships at least two templates");
 
-            HttpResponse<String> applied = post(c.port, "/api/v1/bi/templates/kpi-overview/apply",
+            HttpResponse<String> applied = post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"sales_ds\"}");
             assertEquals(200, applied.statusCode(), applied.body());
-            assertEquals(4, JSON.readTree(applied.body()).at("/data/created").size(),
+            assertEquals(4, V1Body.of(applied.body()).at("/created").size(),
                     "3 widgets + 1 dashboard");
 
             // The applied dashboard is a real, editable component bound to the caller's dataset.
@@ -73,9 +73,9 @@ class ControlApiBiTemplatesTest {
             assertTrue(reg.get("dashboard", "kpi_board").isPresent());
 
             // Re-apply without a prefix → 409 (all-or-nothing); with a prefix → fresh ids.
-            assertEquals(409, post(c.port, "/api/v1/bi/templates/kpi-overview/apply",
+            assertEquals(409, post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"sales_ds\"}").statusCode());
-            assertEquals(200, post(c.port, "/api/v1/bi/templates/kpi-overview/apply",
+            assertEquals(200, post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"sales_ds\",\"prefix\":\"q3\"}").statusCode());
             assertTrue(reg.get("dashboard", "q3_kpi_board").isPresent());
         }
@@ -84,10 +84,10 @@ class ControlApiBiTemplatesTest {
     @Test
     void applyFailsClosed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            assertEquals(404, post(c.port, "/api/v1/bi/templates/ghost/apply",
+            assertEquals(404, post(c.port, "/bi/templates/ghost/apply",
                     "{\"dataset\":\"x\"}").statusCode());
-            assertEquals(422, post(c.port, "/api/v1/bi/templates/kpi-overview/apply", "{}").statusCode());
-            assertEquals(404, post(c.port, "/api/v1/bi/templates/kpi-overview/apply",
+            assertEquals(422, post(c.port, "/bi/templates/kpi-overview/apply", "{}").statusCode());
+            assertEquals(404, post(c.port, "/bi/templates/kpi-overview/apply",
                     "{\"dataset\":\"missing_ds\"}").statusCode(), "unknown dataset");
         }
     }

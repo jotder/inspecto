@@ -141,7 +141,7 @@ class ControlApiViewsTest {
     @Test
     void emptyWithoutAWriteRoot(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
-            assertEquals(List.of(), JSON.readValue(send(c.port, "GET", "/views", null).body(), List.class));
+            assertEquals(0, V1Body.of(send(c.port, "GET", "/views", null).body()).size());
             assertEquals(404, send(c.port, "GET", "/views/orders_view", null).statusCode());
         }
     }
@@ -158,13 +158,13 @@ class ControlApiViewsTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

@@ -34,7 +34,7 @@ class ControlApiStreamsTest {
                     HttpRequest.newBuilder(URI.create("http://localhost:" + api.port() + "/api/v1/catalog/streams"))
                             .GET().build(), BodyHandlers.ofString());
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(1, data.size(), "one pipeline → one stream node");
             JsonNode stream = data.get(0);
             assertEquals("STREAM", stream.get("kind").asText());
@@ -61,7 +61,7 @@ class ControlApiStreamsTest {
         ControlApi api = new ControlApi(svc, 0);
         api.start();
         try {
-            JsonNode streams = get(api.port(), "/api/v1/catalog/streams");
+            JsonNode streams = get(api.port(), "/catalog/streams");
             assertEquals(2, streams.size(), "reference pipeline excluded from streams: " + streams);
             boolean sawLive = false, sawDraft = false;
             for (JsonNode n : streams) {
@@ -73,7 +73,7 @@ class ControlApiStreamsTest {
             assertTrue(sawLive, "active pipeline exposed with active:true: " + streams);
             assertTrue(sawDraft, "inactive draft listed with active:false: " + streams);
 
-            JsonNode refs = get(api.port(), "/api/v1/catalog/references");
+            JsonNode refs = get(api.port(), "/catalog/references");
             boolean found = false;
             for (JsonNode n : refs) found |= "ref:region_dim".equals(n.get("id").asText());
             assertTrue(found, "produced Reference Dataset registered standalone: " + refs);
@@ -101,9 +101,9 @@ class ControlApiStreamsTest {
 
     private static JsonNode get(int port, String path) throws Exception {
         HttpResponse<String> r = HttpClient.newHttpClient().send(
-                HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), r.body());
-        return JSON.readTree(r.body()).get("data");
+        return V1Body.of(r.body());
     }
 }

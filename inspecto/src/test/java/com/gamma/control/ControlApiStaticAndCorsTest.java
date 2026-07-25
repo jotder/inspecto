@@ -59,7 +59,7 @@ class ControlApiStaticAndCorsTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
@@ -146,14 +146,15 @@ class ControlApiStaticAndCorsTest {
     }
 
     @Test
-    void apiPrefixIsStrippedToMatchRoutes(@TempDir Path dir) throws Exception {
-        // The SPA addresses routes as "/api/..."; served same-origin (no proxy) the backend must
-        // strip the prefix and hit the real route, returning JSON — not the index.html SPA shell.
+    void v1ApiPathResolvesToTheJsonRouteNotTheSpaShell(@TempDir Path dir) throws Exception {
+        // API-5: the SPA addresses routes as "/api/v1/…". Served same-origin (no proxy) the backend must
+        // strip the version prefix and hit the real route, returning JSON — never the index.html shell,
+        // which is the regression to guard against when a UI dir is configured.
         try (Ctx c = open(spaDir(dir).toString(), null)) {
-            HttpResponse<String> r = send(c.port, "GET", "/api/runs");
+            HttpResponse<String> r = send(c.port, "GET", "/runs");
             assertEquals(200, r.statusCode());
-            assertTrue(ctype(r).startsWith("application/json"), "/api/* resolves to the JSON route, not index.html");
-            assertFalse(r.body().contains("<html"), "must not serve the SPA shell for an /api path");
+            assertTrue(ctype(r).startsWith("application/json"), "/api/v1/* resolves to the JSON route, not index.html");
+            assertFalse(r.body().contains("<html"), "must not serve the SPA shell for an API path");
         }
     }
 

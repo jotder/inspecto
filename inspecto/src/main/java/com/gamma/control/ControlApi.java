@@ -54,13 +54,19 @@ import java.util.regex.Pattern;
  * an un-prefixed API path resolves the {@code default} (or sole) space, so single-space callers are unaffected.
  *
  * <h3>Versioned API (v1) — v4.8.0</h3>
- * The same route table is additionally served under {@code /api/v1/…} with the v1 transport
- * contract (docs/superpower/api-contract-design.md): responses wrapped in the
+ * The route table is served under {@code /api/v1/…} with the v1 transport contract
+ * (docs/superpower/api-contract-design.md): responses wrapped in the
  * {@code {data, metadata, links, diagnostics}} envelope ({@link Envelope}), errors as structured
  * objects with machine-readable codes ({@link ErrorCodes}), a per-request {@code Correlation-ID}
- * (issued when absent; echoed on every response, legacy included), and gzip content negotiation.
- * Unversioned routes are byte-for-byte unchanged (the SPA still calls them via the plain
- * {@code /api} alias) and are frozen as legacy aliases until the UI migrates to v1.
+ * (issued when absent; echoed on every response), and gzip content negotiation.
+ *
+ * <p><b>API-5 (2026-07-25): {@code /api/v1} is the only API surface.</b> The unversioned aliases that
+ * predated it are retired — {@link #routeDispatch} matches the route table only for a v1 request or an
+ * {@link #isInfraRoute} probe ({@code /health}, {@code /ready}, {@code /metrics},
+ * {@code /metrics/acquisition}), which stay unversioned because health checks and metric scrapers have
+ * no v1 semantics. A bare business path is no longer an API call: a GET falls through to the SPA (those
+ * paths double as Angular deep links), anything else is a {@code 404}. An {@code /api/…} path that is
+ * not {@code /api/v1} is an unmigrated client and gets a JSON {@code 404} from {@link #normalizePath}.
  *
  * <h3>Routes</h3>
  * <pre>
@@ -209,18 +215,6 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private final Idempotency.Store idempotency = new Idempotency.Store();
 
     /**
-     * API-5 sunset flip: {@code -Dapi.legacy.routes=off} answers <b>410 Gone</b> on the unversioned legacy
-     * route aliases once a deployment's soak shows zero residual demand (the
-     * {@code inspecto_legacy_api_requests_total} signal, which keeps counting through the off-window).
-     * Default {@code on} serves them unchanged. The always-unversioned infra probes
-     * (health/ready/metrics) are exempt — they have no v1 semantics.
-     */
-    private final boolean legacyRoutesOff;
-    /** Pre-formatted RFC 8594 {@code Sunset} header from {@code -Dapi.legacy.sunset=YYYY-MM-DD};
-     *  {@code null} until an operator signs a retirement date. */
-    private final String legacySunset;
-
-    /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
      * single-tenant entry point (and every test); behaviour is unchanged.
      *
@@ -246,8 +240,6 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         this.uiDir   = blank(ui) ? null : Path.of(ui.trim()).toAbsolutePath().normalize();
         String wr    = System.getProperty("assist.write.root");
         this.writeRoot = blank(wr) ? null : Path.of(wr.trim()).toAbsolutePath().normalize();
-        this.legacyRoutesOff = "off".equalsIgnoreCase(System.getProperty("api.legacy.routes", "on").trim());
-        this.legacySunset = sunsetHeader(System.getProperty("api.legacy.sunset"));
         this.http    = createServer(port);
         this.http.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         // Teach DatasetRelation to resolve shared/<owner>/<item> refs to the owner's Exchange snapshot,
@@ -495,9 +487,14 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     }
 
     /** Resolve the route-matching path: mark a "/api/v1/…" request for the v1 transport contract (Envelope +
-     *  structured errors, docs/superpower/api-contract-design.md) and strip the version/"/api" prefix so a
-     *  single SPA build works both behind the ng-serve dev proxy (which rewrites "/api" → "") and same-origin
-     *  (no proxy). Static assets never carry "/api", so they're untouched. */
+     *  structured errors, docs/superpower/api-contract-design.md) and strip the version prefix, so the route
+     *  table itself stays version-free. The ng-serve dev proxy forwards "/api" <em>unchanged</em> (proxy.conf.json
+     *  declares no pathRewrite), so a single SPA build sends "/api/v1/…" both in dev and same-origin.
+     *
+     *  <p>API-5 (2026-07-25): {@code /api/v1} is the only versioned prefix there has ever been, so any other
+     *  "/api/…" path is a caller that never migrated — answered here as a JSON 404 rather than falling through
+     *  to {@link #serveStatic}, which would hand an API client a 200 {@code text/html} SPA shell. Static assets
+     *  never carry "/api", so they're untouched. */
     private void normalizePath(HttpExchange ex, Chain next) throws Exception {
         String path = ex.getRequestURI().getPath();
         if (path.equals("/api/v1") || path.startsWith("/api/v1/")) {
@@ -505,8 +502,10 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             ex.setAttribute(ApiContext.ATTR_START_NANOS, System.nanoTime());
             ex.setAttribute(ApiContext.ATTR_SELF_PATH, path);
             path = path.length() == 7 ? "/" : path.substring(7);
-        } else if (path.startsWith("/api/")) path = path.substring(4);
-        else if (path.equals("/api")) path = "/";
+        } else if (path.equals("/api") || path.startsWith("/api/")) {
+            respond(ex, 404, Map.of("error", "unknown API version — every route is served under /api/v1"));
+            return;
+        }
         setPath(ex, path);
         next.proceed(ex);
     }
@@ -560,37 +559,35 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         }
     }
 
-    /** Terminal stage: match the resolved path against the route table (applying the API-5 legacy-surface
-     *  sunset + deprecation signalling and the auth gate), fall back to an SPA asset for an unmatched GET,
-     *  else answer 404/405. */
+    /** Terminal stage: match the resolved path against the route table (applying the auth gate), fall back to
+     *  an SPA asset for an unmatched GET, else answer 404/405.
+     *
+     *  <p>API-5 (2026-07-25): the route table is reachable <em>only</em> under {@code /api/v1}, plus the
+     *  always-unversioned infra probes ({@link #isInfraRoute}). Route patterns are registered version-free, so
+     *  a bare "/pipelines" would otherwise still match and serve the retired unversioned surface — the guard
+     *  below is what actually retires it. Such a request is treated as "not an API call at all": a GET falls
+     *  through to the SPA, because bare paths are genuinely ambiguous (Angular routes like "/objects" collide
+     *  with route patterns of the same name, and deep links must keep working); anything else is a 404. */
     private void routeDispatch(HttpExchange ex) throws Exception {
         String method = ex.getRequestMethod();
         String path = path(ex);
+        if (!ApiContext.v1(ex) && !isInfraRoute(path)) {
+            if ("GET".equals(method) && serveStatic(ex, path)) return;
+            if (!"GET".equals(method)) AuditTrail.accessDenied(ex, method, path, 404);
+            respond(ex, 404, Map.of("error", "not found — API routes are served under /api/v1"));
+            return;
+        }
         boolean pathMatched = false;
         for (Route r : routes) {
             Matcher m = r.pattern.matcher(path);
             if (!m.matches()) continue;
             pathMatched = true;
             if (!r.method.equals(method)) continue;
-            // API-5 sunset: a business route reached on the unversioned legacy surface either gets the
-            // deprecation signalling headers (default) or, once the deployment flips -Dapi.legacy.routes=off
-            // after its soak, a 410 pointing at /api/v1. The usage metric keeps counting either way, so
-            // residual demand stays visible through the off-window.
-            boolean legacySurface = !ApiContext.v1(ex) && !isInfraRoute(path);
-            if (legacySurface && legacyRoutesOff) {
-                recordLegacyUsage(ex, method, path, r);
-                if (!"GET".equals(method)) AuditTrail.accessDenied(ex, method, path, 410);
-                respond(ex, 410, Map.of("error",
-                        "the unversioned legacy API surface is retired here (api.legacy.routes=off) — use /api/v1"));
-                return;
-            }
-            if (legacySurface) markDeprecated(ex);
             authenticate(ex, path);
             authorize(ex, method, path);
             Object result = r.handler.handle(ex, m);
             if (result != HANDLED) respond(ex, 200, result);
             AuditTrail.record(ex, method, path, 200);   // audit successful state-changing requests
-            recordLegacyUsage(ex, method, path, r);     // W7 sunset signal (non-v1 calls to versioned routes)
             return;
         }
         // No API route matched the path: a GET may be an SPA asset / deep link (PUBLIC).
@@ -801,48 +798,15 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     @Override public void delete(String pattern, Handler h) { routes.add(new Route("DELETE", Pattern.compile("^" + pattern + "$"), h)); }
 
     /**
-     * W7 sunset signal: a successful call that matched a versioned business route but did NOT arrive on the
-     * {@code /api/v1} surface is a legacy-alias use. Counted per route (bounded cardinality — the route
-     * pattern) so an operator can see, per real deployment, whether anything still depends on the unversioned
-     * aliases before they are removed (removal stays gated on that soak — api-contract-design.md §10 W7). The
-     * always-unversioned infra probes (health/ready/metrics) are excluded — they have no v1 semantics.
+     * The always-unversioned infra probes: the <em>only</em> paths {@link #routeDispatch} will match outside
+     * {@code /api/v1}. They have no v1 semantics (no envelope, no error object) and are consumed by load
+     * balancers, container health checks and Prometheus scrapers that cannot be expected to version a probe
+     * URL — so API-5's move to a v1-only surface deliberately exempts them. Anything not listed here is
+     * reachable only under {@code /api/v1}.
      */
-    private void recordLegacyUsage(HttpExchange ex, String method, String path, Route r) {
-        if (ApiContext.v1(ex) || isInfraRoute(path)) return;
-        com.gamma.metrics.MetricRegistry.global().inc("inspecto_legacy_api_requests_total",
-                "Calls to the unversioned legacy route aliases (pre-/api/v1) — the W7 sunset signal",
-                Map.of("route", r.pattern.pattern()));
-        log.debug("legacy (non-v1) API call: {} {} — migrate to /api/v1", method, path);
-    }
-
     private static boolean isInfraRoute(String path) {
         return path.equals("/health") || path.equals("/ready")
                 || path.equals("/metrics") || path.equals("/metrics/acquisition");
-    }
-
-    /**
-     * API-5 sunset signalling on every legacy (non-v1) response: {@code Deprecation} (RFC 9745 — pinned to
-     * 2026-07-07, the day the SPA finished migrating to {@code /api/v1} and the unversioned aliases became
-     * legacy), a {@code Link} to the successor surface, and {@code Sunset} (RFC 8594) once an operator signs
-     * a retirement date. Set before the handler runs, so the headers ride whatever response it writes.
-     */
-    private void markDeprecated(HttpExchange ex) {
-        var h = ex.getResponseHeaders();
-        h.set("Deprecation", "@1783382400");   // 2026-07-07T00:00:00Z (W7 migration complete)
-        h.set("Link", "</api/v1>; rel=\"successor-version\"");
-        if (legacySunset != null) h.set("Sunset", legacySunset);
-    }
-
-    /** Parse {@code -Dapi.legacy.sunset=YYYY-MM-DD} into an RFC 8594 HTTP-date, or null (unset/unparsable). */
-    private static String sunsetHeader(String isoDate) {
-        if (blank(isoDate)) return null;
-        try {
-            return java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(
-                    java.time.LocalDate.parse(isoDate.trim()).atStartOfDay(java.time.ZoneOffset.UTC));
-        } catch (java.time.format.DateTimeParseException e) {
-            log.warn("[CONFIG] Ignoring unparsable -Dapi.legacy.sunset '{}' (want YYYY-MM-DD)", isoDate);
-            return null;
-        }
     }
 
     private record Route(String method, Pattern pattern, Handler handler) {}

@@ -84,12 +84,12 @@ class ControlApiDbBrowserTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
     private HttpResponse<String> postJson(int port, String path, String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
@@ -97,9 +97,9 @@ class ControlApiDbBrowserTest {
     @Test
     void catalogListsBusinessStores(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            HttpResponse<String> r = get(c.port, "/api/v1/spaces/s1/db/catalog");
+            HttpResponse<String> r = get(c.port, "/spaces/s1/db/catalog");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode groups = JSON.readTree(r.body()).get("data").get("groups");
+            JsonNode groups = V1Body.of(r.body()).get("groups");
             assertEquals(1, groups.size());
             JsonNode stores = groups.get(0);
             assertEquals("stores", stores.get("id").asText());
@@ -117,7 +117,7 @@ class ControlApiDbBrowserTest {
     void tableReturnsTypedColumnsAndPaginatesAndSorts(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // page of 2 of 3 rows → truncated
-            JsonNode data = JSON.readTree(get(c.port, "/api/v1/spaces/s1/db/table?name=orders&limit=2").body()).get("data");
+            JsonNode data = JSON.readTree(get(c.port, "/spaces/s1/db/table?name=orders&limit=2").body()).get("data");
             assertEquals(2, data.get("rows").size());
             assertTrue(data.get("statistics").get("truncated").asBoolean(), "3 rows, limit 2 → truncated");
             List<String> cols = new java.util.ArrayList<>();
@@ -126,7 +126,7 @@ class ControlApiDbBrowserTest {
 
             // sort id desc → first row is carol (id 3)
             JsonNode sorted = JSON.readTree(
-                    get(c.port, "/api/v1/spaces/s1/db/table?name=orders&sort=id:desc").body()).get("data");
+                    get(c.port, "/spaces/s1/db/table?name=orders&sort=id:desc").body()).get("data");
             assertEquals(3, sorted.get("rows").size());
             assertEquals("carol", sorted.get("rows").get(0).get("name").asText());
         }
@@ -135,10 +135,10 @@ class ControlApiDbBrowserTest {
     @Test
     void adHocReadOnlySqlRunsOverAStore(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            HttpResponse<String> r = postJson(c.port, "/api/v1/spaces/s1/db/query",
+            HttpResponse<String> r = postJson(c.port, "/spaces/s1/db/query",
                     "{\"table\":\"orders\",\"sql\":\"SELECT name FROM \\\"orders\\\" WHERE id = 2\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).get("data").get("rows");
+            JsonNode rows = V1Body.of(r.body()).get("rows");
             assertEquals(1, rows.size());
             assertEquals("bob", rows.get(0).get("name").asText());
         }
@@ -169,7 +169,7 @@ class ControlApiDbBrowserTest {
                 DuckDbUtil.deleteTempDb(db);
             }
 
-            JsonNode data = JSON.readTree(get(c.port, "/api/v1/spaces/s1/db/table?name=test_etl").body()).get("data");
+            JsonNode data = JSON.readTree(get(c.port, "/spaces/s1/db/table?name=test_etl").body()).get("data");
             List<String> cols = new java.util.ArrayList<>();
             for (JsonNode col : data.get("columns")) cols.add(col.get("name").asText());
             assertTrue(cols.contains("gross"), "mapped output columns are served, not the raw backup CSV: " + cols);
@@ -181,15 +181,15 @@ class ControlApiDbBrowserTest {
     void failsClosed(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // unknown store → 404
-            assertEquals(404, get(c.port, "/api/v1/spaces/s1/db/table?name=ghost").statusCode());
+            assertEquals(404, get(c.port, "/spaces/s1/db/table?name=ghost").statusCode());
             // unknown group (operational not yet browsable) → 404
-            assertEquals(404, get(c.port, "/api/v1/spaces/s1/db/table?group=ops:objects&name=x").statusCode());
+            assertEquals(404, get(c.port, "/spaces/s1/db/table?group=ops:objects&name=x").statusCode());
             // file-reading SQL is rejected by the guard → 422
-            HttpResponse<String> guarded = postJson(c.port, "/api/v1/spaces/s1/db/query",
+            HttpResponse<String> guarded = postJson(c.port, "/spaces/s1/db/query",
                     "{\"table\":\"orders\",\"sql\":\"SELECT * FROM read_csv('/etc/passwd')\"}");
             assertEquals(422, guarded.statusCode(), guarded.body());
             // a mutating statement is rejected by the guard → 422
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/db/query",
+            assertEquals(422, postJson(c.port, "/spaces/s1/db/query",
                     "{\"table\":\"orders\",\"sql\":\"DROP TABLE orders\"}").statusCode());
         }
     }
@@ -205,7 +205,7 @@ class ControlApiDbBrowserTest {
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             try {
-                assertEquals(503, get(api.port(), "/api/v1/db/catalog").statusCode());
+                assertEquals(503, get(api.port(), "/db/catalog").statusCode());
             } finally {
                 api.close();
             }
@@ -226,12 +226,12 @@ class ControlApiDbBrowserTest {
                     .open(ObjectType.INCIDENT, "link target", "d", "HIGH", "corr", java.util.Map.of());
 
             // seed one row via the API (POST /objects defaults to an INCIDENT)
-            HttpResponse<String> created = postJson(c.port, "/api/v1/spaces/s1/objects",
+            HttpResponse<String> created = postJson(c.port, "/spaces/s1/objects",
                     "{\"title\":\"DB browser probe\",\"type\":\"INCIDENT\",\"links\":[{\"to\":\"" + target.id() + "\"}]}");
             assertTrue(created.statusCode() < 300, created.body());
 
             // catalog now carries the operational objects group alongside the parquet stores
-            JsonNode groups = JSON.readTree(get(c.port, "/api/v1/spaces/s1/db/catalog").body()).get("data").get("groups");
+            JsonNode groups = JSON.readTree(get(c.port, "/spaces/s1/db/catalog").body()).get("data").get("groups");
             JsonNode ops = null;
             for (JsonNode g : groups) if ("ops:objects".equals(g.get("id").asText())) ops = g;
             assertNotNull(ops, "operational objects group present: " + groups);
@@ -242,21 +242,21 @@ class ControlApiDbBrowserTest {
 
             // browse the table through the live connection (the probe + its mandatory link target = 2 rows)
             JsonNode data = JSON.readTree(get(c.port,
-                    "/api/v1/spaces/s1/db/table?group=ops:objects&name=inspecto_ops_objects").body()).get("data");
+                    "/spaces/s1/db/table?group=ops:objects&name=inspecto_ops_objects").body()).get("data");
             assertEquals(2, data.get("rows").size());
             List<String> titles = new java.util.ArrayList<>();
             for (JsonNode row : data.get("rows")) titles.add(row.get("title").asText());
             assertTrue(titles.contains("DB browser probe"), titles.toString());
 
             // ad-hoc read-only SQL over the live connection
-            JsonNode q = JSON.readTree(postJson(c.port, "/api/v1/spaces/s1/db/query",
+            JsonNode q = JSON.readTree(postJson(c.port, "/spaces/s1/db/query",
                     "{\"group\":\"ops:objects\",\"sql\":\"SELECT title FROM inspecto_ops_objects WHERE title = 'DB browser probe'\"}").body()).get("data");
             assertEquals("DB browser probe", q.get("rows").get(0).get("title").asText());
 
             // unknown table for the group → 404; a mutating statement → 422
             assertEquals(404, get(c.port,
-                    "/api/v1/spaces/s1/db/table?group=ops:objects&name=inspecto_bogus").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/db/query",
+                    "/spaces/s1/db/table?group=ops:objects&name=inspecto_bogus").statusCode());
+            assertEquals(422, postJson(c.port, "/spaces/s1/db/query",
                     "{\"group\":\"ops:objects\",\"sql\":\"DELETE FROM inspecto_ops_objects\"}").statusCode());
         } finally {
             if (prior != null) System.setProperty("objects.backend", prior);

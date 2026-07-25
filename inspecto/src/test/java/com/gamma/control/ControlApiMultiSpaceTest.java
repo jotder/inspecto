@@ -83,8 +83,10 @@ class ControlApiMultiSpaceTest {
             // ── trigger alpha through the seam; only alpha sees the batch ──
             Files.writeString(inbox(root, "alpha").resolve("data.csv"), CSV);
             HttpResponse<String> run = send(c.port, "POST", "/spaces/alpha/runs/test_etl/trigger", null);
-            assertEquals(200, run.statusCode(), run.body());
-            assertTrue(json(run).get("total").asInt() >= 1, "alpha processed its file");
+            assertEquals(202, run.statusCode(), run.body());
+            assertEquals("SUCCESS",
+                    awaitRun(c.port, "/spaces/alpha/runs/runs/" + json(run).get("runId").asText()),
+                    "alpha processed its file");
 
             assertFalse(json(send(c.port, "GET", "/spaces/alpha/runs/test_etl/commits", null)).isEmpty(),
                     "alpha committed a batch");
@@ -98,7 +100,10 @@ class ControlApiMultiSpaceTest {
 
             // ── trigger beta too; now both labels exist, still partitioned ──
             Files.writeString(inbox(root, "beta").resolve("data.csv"), CSV);
-            assertEquals(200, send(c.port, "POST", "/spaces/beta/runs/test_etl/trigger", null).statusCode());
+            HttpResponse<String> betaRun = send(c.port, "POST", "/spaces/beta/runs/test_etl/trigger", null);
+            assertEquals(202, betaRun.statusCode(), betaRun.body());
+            assertEquals("SUCCESS",
+                    awaitRun(c.port, "/spaces/beta/runs/runs/" + json(betaRun).get("runId").asText()));
             assertFalse(json(send(c.port, "GET", "/spaces/beta/runs/test_etl/commits", null)).isEmpty(),
                     "beta now has its own committed batch");
             String both = awaitMetric(c.port, "inspecto_batches_total{pipeline=\"test_etl\",space=\"beta\"");
@@ -121,11 +126,22 @@ class ControlApiMultiSpaceTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
+
+    /** Poll an accepted run (W5b) to its terminal status, or fail after 10s. */
+    private String awaitRun(int port, String runPath) throws Exception {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            String status = json(send(port, "GET", runPath, null)).get("status").asText();
+            if (!"RUNNING".equals(status)) return status;
+            Thread.sleep(50);
+        }
+        return fail("run " + runPath + " did not reach a terminal status within 10s");
+    }
 }

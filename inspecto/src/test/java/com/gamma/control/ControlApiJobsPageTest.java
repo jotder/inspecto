@@ -28,8 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * surface the v1 envelope's {@code metadata.pagination} block carries {@code cursor/nextCursor/limit/total},
  * and walking the opaque {@code nextCursor} pages the job registry name-ordered (single-part keyset —
  * names are unique) with no overlap, covering the whole set, and a null terminator on the last page.
- * The legacy (unversioned) view stays a bare JSON array with its {@code ?limit=&offset=} slice. Jobs are
- * hot-registered straight onto the live {@link JobService}, then exercised over the wire.
+ * Jobs are hot-registered straight onto the live {@link JobService}, then exercised over the wire.
  */
 class ControlApiJobsPageTest {
 
@@ -58,7 +57,7 @@ class ControlApiJobsPageTest {
                         "name", name, "type", "maintenance", "task", "cleanup", "cron", "0 3 * * *"))));
 
             // page 1 — name-ordered, total across all pages, first-page request cursor is null
-            JsonNode e1 = json(get(c.port, "/api/v1/jobs?limit=2"));
+            JsonNode e1 = json(get(c.port, "/jobs?limit=2"));
             assertEquals(List.of("job_a", "job_b"), names(e1.get("data")), "name-ordered keyset");
             JsonNode pg1 = e1.get("metadata").get("pagination");
             assertEquals(5, pg1.get("total").asInt(), "total spans every page, not just this one");
@@ -72,7 +71,7 @@ class ControlApiJobsPageTest {
             while (!pg.get("nextCursor").isNull()) {
                 assertTrue(++guard < 10, "pagination must terminate");
                 String next = pg.get("nextCursor").asText();
-                JsonNode page = json(get(c.port, "/api/v1/jobs?limit=2&cursor=" + next));
+                JsonNode page = json(get(c.port, "/jobs?limit=2&cursor=" + next));
                 pg = page.get("metadata").get("pagination");
                 assertEquals(next, pg.get("cursor").asText(), "request cursor echoed");
                 assertTrue(page.get("data").size() <= 2, "no page exceeds the limit");
@@ -83,11 +82,6 @@ class ControlApiJobsPageTest {
             assertEquals(List.of("job_a", "job_b", "job_c", "job_d", "job_e"), walked,
                     "no overlap, nothing dropped, name-ordered end to end");
             assertEquals(walked.size(), new HashSet<>(walked).size(), "no name appears on two pages");
-
-            // legacy (unversioned) view is unchanged — a bare JSON array with the offset slice
-            JsonNode legacy = json(get(c.port, "/jobs?limit=2"));
-            assertTrue(legacy.isArray(), "legacy stays a raw list");
-            assertEquals(2, legacy.size());
         }
     }
 
@@ -97,9 +91,9 @@ class ControlApiJobsPageTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.envelope(r.body()); }
 }
