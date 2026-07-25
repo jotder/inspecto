@@ -350,7 +350,12 @@ public final class CollectorService implements AutoCloseable {
         this.linkStore = ServiceStores.openLinkStore(root);
         this.noteStore = ServiceStores.openNoteStore(root);
         this.tagAssignmentStore = ServiceStores.openTagAssignmentStore(root);
-        this.objects = new com.gamma.ops.ObjectService(objectStore, java.util.Map.of(), linkStore, noteStore);
+        this.objects = new com.gamma.ops.ObjectService(objectStore, java.util.Map.of(), linkStore, noteStore,
+                tagAssignmentStore);
+        // D7 phase 2: adopt tags that exist only in the legacy attributes CSV into the assignment store, so
+        // the two cannot disagree. Idempotent, and a no-op on a fresh Space; logged only when it does work.
+        int adopted = this.objects.backfillTagAssignments();
+        if (adopted > 0) log.info("Adopted {} legacy tag assignment(s) from object attributes (D7)", adopted);
         // Give the Job engine this space's Object Engine so the recon.run built-in can promote a breach to
         // an Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
         if (this.jobs != null) this.jobs.objects(this.objects);
@@ -544,7 +549,9 @@ public final class CollectorService implements AutoCloseable {
         return objects;
     }
 
-    /** This Space's cross-entity tag-assignment graph (BACKLOG D7). Never static — see {@link #tagAssignmentStore}. */
+    /** This Space's cross-entity tag-assignment graph (BACKLOG D7). Never static — see {@link #tagAssignmentStore}.
+     *  For {@code object} targets prefer {@link com.gamma.ops.ObjectService#applyTag} over writing here
+     *  directly: it also re-projects the object's {@code tags} attribute, which the Incidents UI reads. */
     public com.gamma.ops.tag.TagAssignmentStore tagAssignments() {
         return tagAssignmentStore;
     }

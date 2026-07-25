@@ -1,9 +1,11 @@
 # Generic tags — cross-entity labelling plan (BACKLOG D7)
 
-**Status:** **PHASE 1 SHIPPED 2026-07-26** — backend store + routes are in (`ops.tag.TagAssignment*`,
+**Status:** **PHASES 1 + 2 SHIPPED 2026-07-26** — backend store + routes are in (`ops.tag.TagAssignment*`,
 `/tags/assignments/…`, `/tags/{name}/targets`). Q1–Q4 were answered from the code; **Q5 dissolved and Q6
-was scoped down** at build time (see §3). **Phase 2 — the CSV reconciliation, the rename/delete routes,
-and the UI — is NOT built**; residuals are in BACKLOG §6. Concept home:
+was scoped down** at build time (see §3). **Phase 2 — the CSV reconciliation — is now
+built too**: the assignment store is the source of truth and `attributes.tags` is a projection of it, with
+an idempotent startup backfill. **Still open: the rename/delete routes and the UI**; residuals are in
+BACKLOG §6. Concept home:
 [`../okf/backend/control-plane/tags.md`](../okf/backend/control-plane/tags.md). **Owner:** unassigned.
 **Origin:** BACKLOG **D7**, rescoped by the operator during the 2026-07-25 decision session from
 "a `tags` filter on `GET /objects`" to *"use tags for grouping different items from lists, generic
@@ -156,11 +158,12 @@ store tests driving **both** implementations through identical assertions + 4 HT
 
 **Deliberately deferred, all in BACKLOG §6:**
 
-- **The CSV path was not migrated.** Q2 called for a one-time backfill; phase 1 skipped it so the shipped
-  Incidents/Cases behaviour could not regress. ⚠ **The consequence is a real split-brain**: a tag applied
-  by a Tag Rule lands in `attributes.tags` and does **not** appear in `GET /tags/{name}/targets`, and one
-  applied through the new routes does not appear in the object's `tags` string. Phase 2 must reconcile
-  them, and until it does this is the single most confusing thing about the feature.
+- ~~**The CSV path was not migrated.**~~ **DONE in phase 2** — Q2's one-time backfill shipped as
+  `ObjectService.backfillTagAssignments()`, run once per Space at startup by `CollectorService`. The
+  split-brain is gone: the store is authoritative and the CSV is re-projected from it on every mutation
+  path (open/adopt, `applyTagRule`, merge union, split carry-over, and the new `applyTag`/`removeTag`).
+  Q2 said "do not dual-write", and this is not dual-write — there is exactly one writer of record and one
+  derived copy kept for the object JSON the UI reads.
 - **`rename()` and `removeTag()` have no route.** They are implemented and tested — the architecture is
   justified by rename, so it needed a test that would fail under the per-entity shape — but nothing calls
   them, so deleting a tag from the registry leaves its assignments behind.

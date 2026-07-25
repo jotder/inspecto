@@ -1,0 +1,153 @@
+package com.gamma.ops.tag;
+
+import com.gamma.ops.InMemoryObjectStore;
+import com.gamma.ops.ObjectService;
+import com.gamma.ops.ObjectStore;
+import com.gamma.ops.ObjectType;
+import com.gamma.ops.OperationalObject;
+import com.gamma.ops.link.InMemoryLinkStore;
+import com.gamma.ops.note.InMemoryNoteStore;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * D7 phase 2: the assignment store is the truth for an object's tags and the legacy
+ * {@code attributes.tags} CSV is a <b>projection</b> of it.
+ *
+ * <p>Phase 1 left the two stores independent, so a Tag Rule's tag was invisible to
+ * {@code GET /tags/{name}/targets} and vice versa. Every test here asserts the two agree after a
+ * different mutation path — that agreement is the whole point of phase 2, and each path is a separate
+ * way it could regress.
+ */
+class ObjectTagProjectionTest {
+
+    private record Fixture(ObjectService objects, TagAssignmentStore tags, ObjectStore store) {}
+
+    private static Fixture fixture() {
+        ObjectStore store = new InMemoryObjectStore();
+        TagAssignmentStore tags = new InMemoryTagAssignmentStore();
+        return new Fixture(
+                new ObjectService(store, Map.of(), new InMemoryLinkStore(), new InMemoryNoteStore(), tags),
+                tags, store);
+    }
+
+    /** The invariant: what the CSV says and what the store says are the same set. */
+    private static void assertAgree(Fixture f, String objectId, String... expected) {
+        List<String> fromStore = f.tags.tagsOf("object", objectId);
+        assertEquals(List.of(expected), fromStore, "assignment store");
+        String csv = f.store.get(objectId).orElseThrow().attributes().get(ObjectService.ATTR_TAGS);
+        List<String> fromCsv = csv == null || csv.isBlank() ? List.of() : List.of(csv.split(","));
+        assertEquals(List.of(expected), fromCsv, "CSV projection disagrees with the store");
+    }
+
+    @Test
+    void aTagAuthoredAtOpenTimeLandsInTheAssignmentStore() {
+        Fixture f = fixture();
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "q3-audit,urgent"));
+
+        // Phase 1 would have left this invisible to the cross-kind query.
+        assertAgree(f, o.id(), "q3-audit", "urgent");
+        assertEquals(1, f.tags.forTag("q3-audit").size());
+    }
+
+    @Test
+    void applyTagUpdatesBothSides() {
+        Fixture f = fixture();
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of());
+
+        f.objects.applyTag(o.id(), "q3-audit", "alice");
+        assertAgree(f, o.id(), "q3-audit");
+    }
+
+    @Test
+    void removeTagClearsBothSidesIncludingTheLastTag() {
+        Fixture f = fixture();
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "only"));
+
+        f.objects.removeTag(o.id(), "only");
+        // Removing the LAST tag is the case a lazy CSV-fallback adoption would have got wrong, by
+        // treating "no assignments" as "not yet migrated" and resurrecting the tag on the next read.
+        assertAgree(f, o.id());
+    }
+
+    @Test
+    void aTagRuleTagIsVisibleToTheCrossKindQuery() {
+        Fixture f = fixture();
+        f.objects.registerTagRule(TagRule.fromMap(Map.of(
+                "name", "criticals", "tag", "urgent", "filter", Map.of("severity", "CRITICAL"))));
+
+        OperationalObject hit = f.objects.open(ObjectType.INCIDENT, "spike", "d", "CRITICAL", "HIGH",
+                null, null, "corr", Map.of());
+
+        // The headline phase-1 bug: rule-applied tags lived only in the CSV.
+        assertAgree(f, hit.id(), "urgent");
+        assertEquals(hit.id(), f.tags.forTag("urgent").getFirst().targetId());
+    }
+
+    @Test
+    void bulkApplyingARuleToExistingObjectsUpdatesBothSides() {
+        Fixture f = fixture();
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "CRITICAL", "HIGH",
+                null, null, "corr", Map.of());
+        f.objects.registerTagRule(TagRule.fromMap(Map.of(
+                "name", "criticals", "tag", "urgent", "filter", Map.of("severity", "CRITICAL"))));
+
+        ObjectService.TagRuleApplication r = f.objects.applyTagRule("criticals");
+
+        assertEquals(1, r.matched());
+        assertEquals(1, r.updated());
+        assertAgree(f, o.id(), "urgent");
+
+        // Idempotent: a second pass matches but changes nothing.
+        assertEquals(0, f.objects.applyTagRule("criticals").updated());
+        assertAgree(f, o.id(), "urgent");
+    }
+
+    @Test
+    void backfillAdoptsLegacyCsvTagsAndIsIdempotent() {
+        // Simulate a Space upgraded from before D7: tags in the CSV, nothing in the assignment store.
+        ObjectStore store = new InMemoryObjectStore();
+        OperationalObject legacy = store.create(OperationalObject.builder(ObjectType.INCIDENT)
+                .title("old").status("OPEN")
+                .attributes(Map.of(ObjectService.ATTR_TAGS, "q3-audit,urgent"))
+                .createdAt(1_000L).updatedAt(1_000L)
+                .build());
+        TagAssignmentStore tags = new InMemoryTagAssignmentStore();
+        ObjectService objects = new ObjectService(store, Map.of(), new InMemoryLinkStore(),
+                new InMemoryNoteStore(), tags);
+        assertTrue(tags.tagsOf("object", legacy.id()).isEmpty(), "precondition: not yet migrated");
+
+        assertEquals(2, objects.backfillTagAssignments());
+        assertEquals(List.of("q3-audit", "urgent"), tags.tagsOf("object", legacy.id()));
+        assertEquals("migration", tags.forTag("q3-audit").getFirst().actor());
+
+        // Re-running on an already-migrated Space must not duplicate or re-stamp anything.
+        assertEquals(0, objects.backfillTagAssignments());
+        assertEquals(List.of("q3-audit", "urgent"), tags.tagsOf("object", legacy.id()));
+    }
+
+    @Test
+    void renamingATagReachesTheObjectCsvOnceReprojected() {
+        // The architectural payoff: under the pre-D7 per-entity CSV shape a rename could not propagate.
+        Fixture f = fixture();
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "q3-audit"));
+
+        assertEquals(1, f.tags.rename("q3-audit", "q3-review"));
+        assertEquals(List.of("q3-review"), f.tags.tagsOf("object", o.id()));
+
+        // ⚠ The CSV is stale until something re-projects it — there is no rename ROUTE yet, and wiring
+        // one must re-project every affected object. This test pins the gap so it cannot be forgotten.
+        assertEquals("q3-audit", f.store.get(o.id()).orElseThrow().attributes().get(ObjectService.ATTR_TAGS));
+        f.objects.applyTag(o.id(), "q3-review", "alice");
+        assertAgree(f, o.id(), "q3-review");
+    }
+}

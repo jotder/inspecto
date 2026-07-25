@@ -1,7 +1,8 @@
 # Tags — the cross-entity label graph
 
-**Concept home for BACKLOG D7.** Status: **phase 1 shipped 2026-07-25** (store + routes). The legacy
-object-attribute CSV path still ships alongside it — see [Two stores, deliberately](#two-stores-deliberately).
+**Concept home for BACKLOG D7.** Status: **phase 1 + phase 2 shipped 2026-07-26** — the central store,
+the routes, and the CSV reconciliation. One store is now authoritative; see
+[The CSV is a projection](#the-csv-is-a-projection).
 
 Related: [`control-api.md`](control-api.md) · [`api-v1.md`](api-v1.md) ·
 [`../editions/auth-security.md`](../editions/auth-security.md) ·
@@ -106,25 +107,42 @@ All under `/api/v1`. Unknown target kind → **400**; absent or invisible target
 **Applying an unregistered tag is a 404**, not an implicit create — silently minting a tag on a typo is
 how a tag vocabulary rots. Create it via `POST /tags` first.
 
-## Two stores, deliberately
+## The CSV is a projection
 
-The pre-D7 path still ships: `ObjectService.ATTR_TAGS` keeps tags as a **comma-separated CSV string in the
-object's own `attributes` map**, written by five `ObjectService` sites (`applyTagRule`, `autoApplyTagRules`,
-rule-raised Case creation, `mergeCases` union, `splitCase`) and read through one private helper,
-`csvTags()`.
+`ObjectService.ATTR_TAGS` — the pre-D7 comma-separated string inside each object's `attributes` map — is
+**still written, and still part of the object's JSON**, because the Incidents UI reads it. But it is now a
+**projection of the assignment store, never a second source of truth**:
 
-Phase 1 deliberately did **not** migrate it, so the shipped Incidents/Cases tag behaviour could not
-regress. The consequence to know: **a tag applied by a Tag Rule lands in the CSV and is not visible to
-`GET /tags/{name}/targets`**, and vice versa. Reconciling them is phase 2 (BACKLOG §6).
+- every object tag mutation goes **store first**, then re-projects the CSV from
+  `tagAssignments.tagsOf("object", id)`;
+- nothing reads the CSV as authoritative — `ObjectService.tagsOf(objectId)` reads the store;
+- `open()` **adopts** whatever CSV the builder or a Tag Rule produced into the store, so a newly created
+  object is immediately visible to `GET /tags/{name}/targets`;
+- `applyTagRule`, `mergeCases` (tag union) and `splitCase` (tag carry-over) all route through the store.
 
-The comma ban on tag names comes from this: `TagAssignment` rejects a comma because the CSV path still
-ships, so a comma would be one label in one store and two in the other.
+**Migration.** `ObjectService.backfillTagAssignments()` adopts tags that exist only in a legacy CSV; it is
+idempotent and `CollectorService` runs it once per Space at startup, logging only when it actually adopts
+something.
+
+> Why a startup backfill rather than a lazy "if the store is empty, fall back to the CSV": lazy adoption
+> makes **"no assignments" and "not yet migrated" the same state**, so removing an object's *last* tag
+> would resurrect all of them on the next read. There is a test pinning exactly that case.
+
+The comma ban on tag names comes from this shape: a comma would be one label in the store and two in the
+CSV projection.
 
 ## Gotchas
 
 - **`rename()` and `removeTag()` have no route yet.** They exist on the store, with tests, because the
   architecture is justified by them — but no endpoint calls them, so deleting a tag from the registry
-  currently leaves its assignments behind. Tracked in BACKLOG §6.
+  currently leaves its assignments behind. ⚠ **When a rename route is wired it must re-project every
+  affected object's CSV** — the store rename alone leaves the projection stale, which
+  `ObjectTagProjectionTest.renamingATagReachesTheObjectCsvOnceReprojected` pins deliberately. Tracked in
+  BACKLOG §6.
+- **The backfill is a full object scan at Space startup.** Fine for Incidents/Cases volumes (they are
+  human-scale, not telemetry), but it is O(objects) on every boot even after migration — the store's
+  idempotent `add` makes repeat runs harmless, not free. Revisit if a Space ever holds enough objects for
+  it to show up in startup time.
 - **No cascade on target deletion.** Following D10's precedent: assignments are filtered at read time
   against target existence rather than cascade-deleted, because component deletion has no hook to attach
   to and object hard-delete is not reachable through the API at all. A stale edge is invisible, not wrong.

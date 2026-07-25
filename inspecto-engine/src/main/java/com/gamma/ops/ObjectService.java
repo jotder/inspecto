@@ -74,6 +74,8 @@ public final class ObjectService {
     private final ObjectStore store;
     private final LinkStore links;
     private final NoteStore notes;
+    /** D7: the truth for object tags. {@link #ATTR_TAGS} is a projection of this, never the reverse. */
+    private final com.gamma.ops.tag.TagAssignmentStore tagAssignments;
     private final NoteService noteService;                          // D10: kind-agnostic note path
     private final QueueStore queues = new InMemoryQueueStore();     // INC-4: work queues (config-authored)
     private volatile EscalationPolicy escalationPolicy;             // INC-4: applied on SLA breach; null = breach-only
@@ -103,9 +105,25 @@ public final class ObjectService {
      * mirroring the object store backend.
      */
     public ObjectService(ObjectStore store, Map<ObjectType, Workflow> overrides, LinkStore links, NoteStore notes) {
+        this(store, overrides, links, notes, new com.gamma.ops.tag.InMemoryTagAssignmentStore());
+    }
+
+    /**
+     * Build with an explicit {@link com.gamma.ops.tag.TagAssignmentStore} (BACKLOG D7 phase 2) — the
+     * cross-entity tag graph this service keeps in step for the {@code object} family.
+     *
+     * <p><b>The assignment store is the source of truth for an object's tags; the {@link #ATTR_TAGS} CSV
+     * attribute is a projection of it.</b> The CSV is still written on every change because it is part of
+     * the object's JSON and the Incidents UI reads it, but nothing treats it as authoritative — every tag
+     * mutation goes store-first and then re-projects. That is what lets a cross-kind rename reach objects,
+     * which the pre-D7 CSV-only shape could not do.
+     */
+    public ObjectService(ObjectStore store, Map<ObjectType, Workflow> overrides, LinkStore links, NoteStore notes,
+                         com.gamma.ops.tag.TagAssignmentStore tagAssignments) {
         this.store = store;
         this.links = links;
         this.notes = notes;
+        this.tagAssignments = tagAssignments;
         // D10: the object family's plug-in to the kind-agnostic note path — resolve the object (this is
         // what used to be require(objectId)) and hand back its correlation id; null ⇒ "no such target".
         this.noteService = new NoteService(notes, (targetKind, targetId) -> {
@@ -170,6 +188,9 @@ public final class ObjectService {
                 .build();
         obj = autoApplyTagRules(obj, now);   // Tag Rules tag incoming objects (GLOSSARY §9, Gmail-filter semantics)
         OperationalObject stored = store.create(obj);
+        // D7: the CSV the builder and Tag Rules just produced is authored input; adopt it into the
+        // assignment store so the object is immediately visible to GET /tags/{name}/targets.
+        adoptTags(stored);
         EventLog.current().emit(Event.builder(EventType.OBJECT_OPENED)
                 .level(EventLevel.INFO)
                 .source(SOURCE)
@@ -396,6 +417,70 @@ public final class ObjectService {
     /** Bulk-apply outcome: how many objects matched the rule, and how many were newly tagged. */
     public record TagRuleApplication(int matched, int updated) {}
 
+    /** This service's view of the cross-entity tag graph (D7) — the truth behind the {@link #ATTR_TAGS} CSV. */
+    public com.gamma.ops.tag.TagAssignmentStore tagAssignments() {
+        return tagAssignments;
+    }
+
+    /** An object's tags, alphabetical, read from the assignment store (never from the CSV projection). */
+    public List<String> tagsOf(String objectId) {
+        return tagAssignments.tagsOf(com.gamma.ops.note.NoteTargets.OBJECT, objectId);
+    }
+
+    /** Apply one tag to an object and re-project the CSV. Idempotent; returns the updated object. */
+    public OperationalObject applyTag(String objectId, String tag, String actor) {
+        OperationalObject o = require(objectId);
+        tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
+                tag, com.gamma.ops.note.NoteTargets.OBJECT, objectId, actor));
+        return projectTags(o, System.currentTimeMillis());
+    }
+
+    /** Remove one tag from an object and re-project the CSV. Idempotent; returns the updated object. */
+    public OperationalObject removeTag(String objectId, String tag) {
+        OperationalObject o = require(objectId);
+        tagAssignments.remove(tag, com.gamma.ops.note.NoteTargets.OBJECT, objectId);
+        return projectTags(o, System.currentTimeMillis());
+    }
+
+    /**
+     * One-time D7 migration: adopt every tag that exists only in an object's {@link #ATTR_TAGS} CSV into
+     * the assignment store. Idempotent (the store's {@code add} is), so re-running is harmless.
+     *
+     * <p>Run once at Space startup rather than lazily on read, deliberately: a lazy "if the store has
+     * nothing, fall back to the CSV" adoption would make removing an object's LAST tag resurrect all of
+     * them on the next read, because "no assignments" and "not yet migrated" would be the same state.
+     *
+     * @return how many assignments were created
+     */
+    public int backfillTagAssignments() {
+        int created = 0;
+        for (OperationalObject o : store.query(ObjectQuery.builder().limit(ObjectQuery.MAX_LIMIT).build())) {
+            List<String> csv = csvTags(o.attributes().get(ATTR_TAGS));
+            if (csv.isEmpty()) continue;
+            List<String> known = tagsOf(o.id());
+            for (String tag : csv) {
+                if (known.contains(tag)) continue;
+                tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
+                        tag, com.gamma.ops.note.NoteTargets.OBJECT, o.id(), "migration"));
+                created++;
+            }
+        }
+        return created;
+    }
+
+    /** Rewrite an object's CSV attribute from the assignment store — the projection, never the reverse. */
+    private OperationalObject projectTags(OperationalObject o, long now) {
+        return store.update(o.withAttributes(
+                Map.of(ATTR_TAGS, String.join(",", tagsOf(o.id()))), now));
+    }
+
+    /** Mirror a freshly-created object's authored/rule-applied CSV tags into the assignment store. */
+    private void adoptTags(OperationalObject stored) {
+        for (String tag : csvTags(stored.attributes().get(ATTR_TAGS)))
+            tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
+                    tag, com.gamma.ops.note.NoteTargets.OBJECT, stored.id(), "system"));
+    }
+
     /**
      * Apply a saved Tag Rule to every existing match ({@code POST /tags/rules/{name}/apply}) — the
      * Gmail "also apply to existing" semantics. Idempotent: objects already carrying the tag count as
@@ -410,10 +495,8 @@ public final class ObjectService {
         for (OperationalObject o : store.query(ObjectQuery.builder().limit(ObjectQuery.MAX_LIMIT).build())) {
             if (!rule.matches(o)) continue;
             matched++;
-            List<String> current = csvTags(o.attributes().get(ATTR_TAGS));
-            if (current.contains(rule.tag())) continue;
-            current.add(rule.tag());
-            store.update(o.withAttributes(Map.of(ATTR_TAGS, String.join(",", current)), System.currentTimeMillis()));
+            if (tagsOf(o.id()).contains(rule.tag())) continue;
+            applyTag(o.id(), rule.tag(), "tag-rule:" + name);
             updated++;
         }
         return new TagRuleApplication(matched, updated);
@@ -800,11 +883,11 @@ public final class ObjectService {
         }
         long now = System.currentTimeMillis();
         int moved = 0;
-        Set<String> tags = new LinkedHashSet<>(csvTags(survivor.attributes().get(ATTR_TAGS)));
+        Set<String> tags = new LinkedHashSet<>(tagsOf(survivor.id()));
         Set<String> watchers = new LinkedHashSet<>(survivor.watchers());
         for (OperationalObject src : absorbed) {
             moved += movePart(src.id(), survivorId, null);
-            tags.addAll(csvTags(src.attributes().get(ATTR_TAGS)));
+            tags.addAll(tagsOf(src.id()));
             watchers.addAll(src.watchers());
             link(src.id(), survivorId, LinkRelationship.MERGED_INTO, actor);
             store.update(src.withAttributes(Map.of(ATTR_MERGED_INTO, survivorId), now)
@@ -823,8 +906,12 @@ public final class ObjectService {
                     .attr("survivor", survivorId)
                     .attr("actor", actor));
         }
+        // D7: the survivor absorbs the union in the assignment store; the CSV below is its projection.
+        for (String tag : tags)
+            tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
+                    tag, com.gamma.ops.note.NoteTargets.OBJECT, survivorId, actor));
         Map<String, String> union = new LinkedHashMap<>();
-        if (!tags.isEmpty()) union.put(ATTR_TAGS, String.join(",", tags));
+        if (!tags.isEmpty()) union.put(ATTR_TAGS, String.join(",", tagsOf(survivorId)));
         if (!watchers.isEmpty()) union.put(ATTR_WATCHERS, String.join(",", watchers));
         OperationalObject updated = union.isEmpty() ? require(survivorId)
                 : store.update(require(survivorId).withAttributes(union, now));
@@ -858,9 +945,10 @@ public final class ObjectService {
         }
         Map<String, String> attrs = new LinkedHashMap<>();
         String category = original.attributes().get("category");
-        String tags = original.attributes().get(ATTR_TAGS);
+        List<String> tags = tagsOf(caseId);
         if (category != null) attrs.put("category", category);
-        if (tags != null) attrs.put(ATTR_TAGS, tags);
+        // The new part is created through open(), which adopts this CSV into the assignment store.
+        if (!tags.isEmpty()) attrs.put(ATTR_TAGS, String.join(",", tags));
         OperationalObject part = open(ObjectType.CASE, title, "Split from " + caseId + ": " + original.title(),
                 original.severity(), original.priority(), original.owner(), null, original.correlationId(), attrs);
         int moved = movePart(caseId, part.id(), new LinkedHashSet<>(members));

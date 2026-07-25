@@ -89,9 +89,21 @@ final class TagRoutes implements RouteModule {
             requireVisibleTarget(api, ex, targetKind, targetId);
             if (api.service().objects().tag(tag).isEmpty())
                 throw new ApiException(404, "no tag named '" + tag + "' — create it via POST /tags first");
-            return api.service().tagAssignments()
-                    .add(com.gamma.ops.tag.TagAssignment.of(tag, targetKind, targetId,
-                            ApiContext.str(body, "actor")))
+            String actor = ApiContext.str(body, "actor");
+            // An object's `tags` attribute is a projection of the assignment store (D7 phase 2), so object
+            // targets go through ObjectService — writing the store directly would leave the CSV stale and
+            // recreate exactly the split-brain phase 2 exists to remove.
+            if (com.gamma.ops.note.NoteTargets.OBJECT.equals(targetKind))
+                api.service().objects().applyTag(targetId, tag, actor);
+            else
+                api.service().tagAssignments()
+                        .add(com.gamma.ops.tag.TagAssignment.of(tag, targetKind, targetId, actor));
+            // Report the STORED edge, not the request: on a re-apply the original actor and timestamp win,
+            // and echoing this caller's would misreport who first applied the tag.
+            return api.service().tagAssignments().forTag(tag).stream()
+                    .filter(a -> a.targets(targetKind, targetId))
+                    .findFirst()
+                    .orElseThrow(() -> new ApiException(500, "tag assignment did not persist"))
                     .toMap();
         });
     }
@@ -101,7 +113,13 @@ final class TagRoutes implements RouteModule {
                             String targetKind, String targetId, String tag) {
         return AnnotationTargets.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
-            boolean removed = api.service().tagAssignments().remove(tag, targetKind, targetId);
+            boolean removed;
+            if (com.gamma.ops.note.NoteTargets.OBJECT.equals(targetKind)) {
+                removed = api.service().tagAssignments().tagsOf(targetKind, targetId).contains(tag);
+                api.service().objects().removeTag(targetId, tag);   // also re-projects the CSV
+            } else {
+                removed = api.service().tagAssignments().remove(tag, targetKind, targetId);
+            }
             return Map.of("tag", tag, "targetKind", targetKind, "targetId", targetId, "removed", removed);
         });
     }
