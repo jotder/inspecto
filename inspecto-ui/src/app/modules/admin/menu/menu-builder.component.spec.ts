@@ -24,7 +24,7 @@ describe('MenuBuilderComponent', () => {
                 { provide: NavMenusService, useValue: { get: () => of(emptyTree('default')), put: () => of(emptyTree('default')) } },
                 { provide: ToastrService, useValue: { error: () => {} } },
                 { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
-                { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
+                { provide: LensService, useValue: { canCurateMenus: () => true } },
             ],
         });
         const f = TestBed.createComponent(MenuBuilderComponent);
@@ -55,7 +55,7 @@ describe('MenuBuilderComponent', () => {
                 { provide: NavMenusService, useValue: { get: () => of(leafTree), put: () => of(leafTree) } },
                 { provide: ToastrService, useValue: { error: () => {} } },
                 { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
-                { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
+                { provide: LensService, useValue: { canCurateMenus: () => true } },
             ],
         });
         const f = TestBed.createComponent(MenuBuilderComponent);
@@ -74,11 +74,11 @@ describe('MenuBuilderComponent', () => {
         expect(f.nativeElement.querySelector('button[aria-pressed]')!.getAttribute('aria-pressed')).toBe('true');
     });
 
-    // Open point O1 — who may curate. The server has always gated PUT /nav/menus on canAuthorWorkbench;
-    // the pane offered edits to everyone, so a non-curator could build a tree and only then be 403'd.
-    // Curation affordances now mirror the server gate, while favoriting (personal, client-local, never PUT)
-    // stays available to every viewer.
-    it('hides curation affordances without canAuthorWorkbench but keeps favorites usable', async () => {
+    // Open point O1 — who may curate. PUT /nav/menus is gated on canCurateMenus (BACKLOG D4; it was
+    // canAuthorWorkbench until 2026-07-25), and the pane offered edits to everyone, so a non-curator could
+    // build a tree and only then be 403'd. Curation affordances now mirror the server gate, while favoriting
+    // (personal, client-local, never PUT) stays available to every viewer.
+    it('hides curation affordances without canCurateMenus but keeps favorites usable', async () => {
         const leafTree = {
             space: 'default',
             version: 1 as const,
@@ -99,7 +99,7 @@ describe('MenuBuilderComponent', () => {
                 { provide: NavMenusService, useValue: { get: () => of(leafTree), put: () => of(leafTree) } },
                 { provide: ToastrService, useValue: { error: () => {} } },
                 { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
-                { provide: LensService, useValue: { canAuthorWorkbench: () => false } },
+                { provide: LensService, useValue: { canCurateMenus: () => false } },
             ],
         });
         const f = TestBed.createComponent(MenuBuilderComponent);
@@ -130,7 +130,7 @@ describe('MenuBuilderComponent', () => {
                 { provide: NavMenusService, useValue: { get: () => of(emptyTree('default')), put: () => of(emptyTree('default')) } },
                 { provide: ToastrService, useValue: { error: () => {} } },
                 { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
-                { provide: LensService, useValue: { canAuthorWorkbench: () => false } },
+                { provide: LensService, useValue: { canCurateMenus: () => false } },
             ],
         });
         const f = TestBed.createComponent(MenuBuilderComponent);

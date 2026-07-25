@@ -39,6 +39,9 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
     settings: [{
         id: 'access.configure', kind: 'action', capability: 'canConfigureAccess',
         label: 'Configure lens access',
+    }, {
+        id: 'menus.curate', kind: 'action', capability: 'canCurateMenus',
+        label: 'Curate the space menu tree',
     }],
 };
 

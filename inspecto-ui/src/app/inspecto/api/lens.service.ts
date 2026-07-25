@@ -132,6 +132,14 @@ export class LensService {
     readonly canAuthorAlertRules = computed(
         () => this.granted('canAuthorAlertRules') && !this.readOnly() && this.allows('alerts.author'));
 
+    /** May curate the space's shared Menu tree (Settings ▸ Menu Builder, `PUT /nav/menus`). Split out
+     *  of {@link canAuthorWorkbench} 2026-07-25 (BACKLOG D4): a nav change is visible to every business
+     *  user in the space and is not a build activity. RBAC: Admin, Power, Super — note this is *not* a
+     *  subset of Workbench authoring, so a Pipeline Developer authors freely but no longer re-arranges
+     *  everyone's sidebar. */
+    readonly canCurateMenus = computed(
+        () => this.granted('canCurateMenus') && !this.readOnly() && this.allows('menus.curate'));
+
     /** May configure lens access (the Settings ▸ Access matrix). RBAC: Admin, Super. */
     readonly canConfigureAccess = computed(
         () => this.granted('canConfigureAccess') && !this.readOnly() && this.allows('access.configure'));

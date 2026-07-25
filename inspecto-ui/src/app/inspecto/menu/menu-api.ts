@@ -8,7 +8,7 @@ import { MENU_TREE_VERSION, MenuTree } from './menu-types';
  * The real per-space navigation-menus backend (`NavRoutes`, GET/PUT `/nav/menus`) — a singleton
  * document persisted as `nav-menus.toon`, same settings-doc discipline as branding. Space-scoped by
  * the global `spaceInterceptor`; the server stamps `space` on every response and canonicalizes the
- * nodes (whitelist copy, dedupe ids, children-XOR-binding). PUT is gated by `canAuthorWorkbench`
+ * nodes (whitelist copy, dedupe ids, children-XOR-binding). PUT is gated by `canCurateMenus`
  * (403), the write root (503) and validation (422); GET is open and returns an empty tree when
  * nothing is persisted yet (never 404). The wire shape is exactly {@link MenuTree}.
  */

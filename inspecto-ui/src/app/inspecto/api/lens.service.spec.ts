@@ -98,6 +98,31 @@ describe('LensService', () => {
         expect(service.canTriageRequirements()).toBe(false);
     });
 
+    // BACKLOG D4: menu curation is its own capability, NOT a subset of Workbench authoring — a
+    // Pipeline Developer authors freely but does not re-arrange every business user's sidebar.
+    it('canCurateMenus is independent of canAuthorWorkbench (D4 split)', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        service.selectLens('builder');
+
+        session.capabilities.set(['canAuthorWorkbench']); // the developer seed
+        expect(service.canAuthorWorkbench()).toBe(true);
+        expect(service.canCurateMenus()).toBe(false);
+
+        // Curation without authoring is legal (the admin seed). Paired with canOperateRuns because a
+        // subject holding ONLY canCurateMenus qualifies for no non-Business lens and is therefore
+        // read-only — see the lens/capability mismatch noted in BACKLOG §5.
+        session.capabilities.set(['canCurateMenus', 'canOperateRuns']);
+        service.selectLens('ops');
+        expect(service.canCurateMenus()).toBe(true);
+        expect(service.canAuthorWorkbench()).toBe(false);
+
+        // and the Access Profile action node gates it like any other capability
+        service.setActionGrants({ 'menus.curate': { ops: false } });
+        expect(service.canCurateMenus()).toBe(false);
+    });
+
     it('under OIDC the switcher is constrained to the lenses the grants project onto', () => {
         const session = TestBed.inject(SessionService);
         const service = TestBed.inject(LensService);

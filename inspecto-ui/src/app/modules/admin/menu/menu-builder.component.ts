@@ -120,11 +120,11 @@ export class MenuBuilderComponent {
 
     /**
      * Whether this viewer may curate the space's shared menu tree (open point O1) — the client mirror of the
-     * server's existing `canAuthorWorkbench` gate on `PUT /nav/menus`, so a non-curator no longer edits a tree
-     * only to be 403'd at save. A non-curator still gets the pane read-only, because **favorites are personal**
+     * server's `canCurateMenus` gate on `PUT /nav/menus`, so a non-curator no longer edits a tree only to be
+     * 403'd at save. A non-curator still gets the pane read-only, because **favorites are personal**
      * (a client-local overlay, never PUT) and their star toggles live in this tree.
      */
-    readonly canCurate = computed(() => this.lens.canAuthorWorkbench());
+    readonly canCurate = computed(() => this.lens.canCurateMenus());
 
     readonly nodes = this.menuApi.nodes;
     readonly selectedId = signal<string | null>(null);

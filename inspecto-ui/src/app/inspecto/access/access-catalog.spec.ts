@@ -34,11 +34,11 @@ describe('access-catalog derivation', () => {
         expect(workbench.children!.map((c) => c.id)).toEqual(['pipelines', 'runs', 'workbench.author']);
         expect(workbench.children![0].kind).toBe('pane');
         expect(workbench.children![0].link).toBe('/pipelines');
-        // runs carries its operate action; settings (a pane) carries access.configure
+        // runs carries its operate action; settings (a pane) carries both of its actions
         const runs = workbench.children![1];
         expect(runs.children!.map((c) => c.id)).toEqual(['runs.operate']);
         expect(runs.children![0].capability).toBe('canOperateRuns');
-        expect(nodes[1].children!.map((c) => c.id)).toEqual(['access.configure']);
+        expect(nodes[1].children!.map((c) => c.id)).toEqual(['access.configure', 'menus.curate']);
     });
 
     it('the default catalog covers every declared action node', () => {
