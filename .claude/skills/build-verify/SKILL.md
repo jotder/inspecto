@@ -37,6 +37,18 @@ Compare against the current baseline, report regressions verbatim before fixing 
 **Never stage `inspecto/pom.xml`.** Prefer the `verify-runner` agent so build logs stay out of the
 main context.
 
+### ⚠ Narrowing to specific tests — commas, never `+`
+
+```powershell
+mvn -o -pl inspecto-engine -am test -Dtest=FooTest,BarTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+This Surefire (3.2.5) needs a **comma-separated** class list. A `+`-joined list
+(`-Dtest=FooTest+BarTest`) silently runs only *some* of them and still reports **BUILD SUCCESS** —
+a false green that hides a real failure (observed 2026-07-25). `-Dsurefire.failIfNoSpecifiedTests=false`
+is required with `-am`, since upstream modules contain none of the named classes and would otherwise
+fail the reactor before it reaches the module under test. **A narrowed run is never "verified"** —
+`mvn -o clean test` is.
+
 ## Deployment bundle (per edition)
 
 ```powershell
