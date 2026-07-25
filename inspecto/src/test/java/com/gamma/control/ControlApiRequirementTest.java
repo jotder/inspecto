@@ -138,7 +138,7 @@ class ControlApiRequirementTest {
             HttpResponse<String> denied = send(c.port, "POST", "/api/v1/requirements/r1/decision",
                     "{\"accept\":true}", "Authorization", "Bearer business");
             assertEquals(403, denied.statusCode(), denied.body());
-            assertEquals("PERMISSION_DENIED", JSON.readTree(denied.body()).get("error").get("errorCode").asText());
+            assertEquals("PERMISSION_DENIED", V1Body.of(denied.body()).get("error").get("errorCode").asText());
 
             // a triager (canTriageRequirements) may decide; SEC-7(b): the accepted resource still has
             // a triage verb left (deliver), so the per-resource permissions keep the capability…
@@ -158,7 +158,7 @@ class ControlApiRequirementTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body, String... headers) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
@@ -166,6 +166,6 @@ class ControlApiRequirementTest {
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

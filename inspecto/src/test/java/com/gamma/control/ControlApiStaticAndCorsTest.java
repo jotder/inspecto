@@ -59,7 +59,7 @@ class ControlApiStaticAndCorsTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }

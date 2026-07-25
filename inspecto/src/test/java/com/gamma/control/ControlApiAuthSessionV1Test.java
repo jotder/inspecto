@@ -64,7 +64,7 @@ class ControlApiAuthSessionV1Test {
     }
 
     private HttpResponse<String> post(int port, String path, String body, String... headers) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         return client.send(b.method("POST", body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
                 BodyHandlers.ofString());
@@ -78,10 +78,10 @@ class ControlApiAuthSessionV1Test {
     void personalEditionAnswers503OnEveryAuthRoute(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {   // no TokenRelays.forTest — Personal: no relay found
             for (String path : List.of("/auth/exchange", "/auth/refresh", "/auth/logout")) {
-                HttpResponse<String> r = post(c.port, "/api/v1" + path, "{}");
+                HttpResponse<String> r = post(c.port, "" + path, "{}");
                 assertEquals(503, r.statusCode(), path);
                 assertEquals("CAPABILITY_UNAVAILABLE",
-                        JSON.readTree(r.body()).get("error").get("errorCode").asText(), path);
+                        V1Body.of(r.body()).get("error").get("errorCode").asText(), path);
             }
         }
     }
@@ -90,10 +90,10 @@ class ControlApiAuthSessionV1Test {
     void exchangeSetsHttpOnlyCookieAndReturnsOnlyTheAccessToken(@TempDir Path cfg) throws Exception {
         TokenRelays.forTest(FAKE);
         try (Ctx c = open(cfg)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/auth/exchange",
+            HttpResponse<String> r = post(c.port, "/auth/exchange",
                     "{\"code\":\"good-code\",\"codeVerifier\":\"v\",\"redirectUri\":\"http://localhost:4200/\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals("at-1", data.get("accessToken").asText());
             assertEquals(300, data.get("expiresIn").asLong());
             String cookie = setCookie(r);
@@ -111,11 +111,11 @@ class ControlApiAuthSessionV1Test {
     void badCodeIs401AndMissingFieldsAre400(@TempDir Path cfg) throws Exception {
         TokenRelays.forTest(FAKE);
         try (Ctx c = open(cfg)) {
-            HttpResponse<String> bad = post(c.port, "/api/v1/auth/exchange",
+            HttpResponse<String> bad = post(c.port, "/auth/exchange",
                     "{\"code\":\"stolen\",\"codeVerifier\":\"v\",\"redirectUri\":\"r\"}");
             assertEquals(401, bad.statusCode());
-            assertEquals("UNAUTHENTICATED", JSON.readTree(bad.body()).get("error").get("errorCode").asText());
-            assertEquals(400, post(c.port, "/api/v1/auth/exchange", "{\"code\":\"x\"}").statusCode());
+            assertEquals("UNAUTHENTICATED", V1Body.of(bad.body()).get("error").get("errorCode").asText());
+            assertEquals(400, post(c.port, "/auth/exchange", "{\"code\":\"x\"}").statusCode());
         }
     }
 
@@ -123,18 +123,18 @@ class ControlApiAuthSessionV1Test {
     void refreshRotatesTheCookieAndARejectedSessionClearsIt(@TempDir Path cfg) throws Exception {
         TokenRelays.forTest(FAKE);
         try (Ctx c = open(cfg)) {
-            HttpResponse<String> ok = post(c.port, "/api/v1/auth/refresh", null,
+            HttpResponse<String> ok = post(c.port, "/auth/refresh", null,
                     "Cookie", AuthRoutes.COOKIE + "=rt-1");
             assertEquals(200, ok.statusCode(), ok.body());
-            assertEquals("at-2", JSON.readTree(ok.body()).get("data").get("accessToken").asText());
+            assertEquals("at-2", V1Body.of(ok.body()).get("accessToken").asText());
             assertTrue(setCookie(ok).startsWith(AuthRoutes.COOKIE + "=rt-2;"), "rotated to the new refresh token");
 
-            HttpResponse<String> dead = post(c.port, "/api/v1/auth/refresh", null,
+            HttpResponse<String> dead = post(c.port, "/auth/refresh", null,
                     "Cookie", AuthRoutes.COOKIE + "=rt-1-revoked");
             assertEquals(401, dead.statusCode());
             assertTrue(setCookie(dead).contains("Max-Age=0"), "a dead session's cookie is cleared");
 
-            assertEquals(401, post(c.port, "/api/v1/auth/refresh", null).statusCode(), "no cookie ⇒ no session");
+            assertEquals(401, post(c.port, "/auth/refresh", null).statusCode(), "no cookie ⇒ no session");
         }
     }
 
@@ -142,10 +142,10 @@ class ControlApiAuthSessionV1Test {
     void logoutClearsTheCookie(@TempDir Path cfg) throws Exception {
         TokenRelays.forTest(FAKE);
         try (Ctx c = open(cfg)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/auth/logout", null,
+            HttpResponse<String> r = post(c.port, "/auth/logout", null,
                     "Cookie", AuthRoutes.COOKIE + "=rt-1");
             assertEquals(200, r.statusCode());
-            assertTrue(JSON.readTree(r.body()).get("data").get("loggedOut").asBoolean());
+            assertTrue(V1Body.of(r.body()).get("loggedOut").asBoolean());
             assertTrue(setCookie(r).contains("Max-Age=0"));
         }
     }
@@ -155,13 +155,13 @@ class ControlApiAuthSessionV1Test {
         TokenRelays.forTest(FAKE);
         System.setProperty("auth.origin", "https://inspecto.internal");
         try (Ctx c = open(cfg)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/auth/exchange",
+            HttpResponse<String> r = post(c.port, "/auth/exchange",
                     "{\"code\":\"good-code\",\"codeVerifier\":\"v\",\"redirectUri\":\"r\"}",
                     "Origin", "https://evil.example");
             assertEquals(403, r.statusCode());
-            assertEquals("PERMISSION_DENIED", JSON.readTree(r.body()).get("error").get("errorCode").asText());
+            assertEquals("PERMISSION_DENIED", V1Body.of(r.body()).get("error").get("errorCode").asText());
 
-            HttpResponse<String> same = post(c.port, "/api/v1/auth/exchange",
+            HttpResponse<String> same = post(c.port, "/auth/exchange",
                     "{\"code\":\"good-code\",\"codeVerifier\":\"v\",\"redirectUri\":\"r\"}",
                     "Origin", "https://inspecto.internal");
             assertEquals(200, same.statusCode(), "the configured origin passes");
@@ -174,7 +174,7 @@ class ControlApiAuthSessionV1Test {
         Authenticators.forTest(ex -> Optional.empty());   // strictest possible authenticator: rejects everyone
         try {
             try (Ctx c = open(cfg)) {
-                HttpResponse<String> r = post(c.port, "/api/v1/auth/exchange",
+                HttpResponse<String> r = post(c.port, "/auth/exchange",
                         "{\"code\":\"good-code\",\"codeVerifier\":\"v\",\"redirectUri\":\"r\"}");
                 assertEquals(200, r.statusCode(), "exchange must not require the token it exists to mint");
             }

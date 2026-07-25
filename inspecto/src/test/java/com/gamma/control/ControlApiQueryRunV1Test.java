@@ -124,7 +124,7 @@ class ControlApiQueryRunV1Test {
                     "type", "sql", "text", "SELECT * FROM read_csv('/etc/passwd')"));
             HttpResponse<String> r = run(c.port, "evil_q", null);
             assertEquals(422, r.statusCode());
-            JsonNode err = JSON.readTree(r.body()).get("error");
+            JsonNode err = V1Body.of(r.body()).get("error");
             assertEquals("CONFIG_VALIDATION_FAILED", err.get("errorCode").asText());
             assertTrue(err.get("details").get("findings").isArray(), "the SqlGuard findings ride error.details");
         }

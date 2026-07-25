@@ -47,7 +47,7 @@ class ControlApiEnrichmentPreviewTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
@@ -69,7 +69,7 @@ class ControlApiEnrichmentPreviewTest {
                     "SELECT id, UPPER(id) AS id_upper FROM input",
                     "[{\"id\":\"c1\"},{\"id\":\"c2\"},{\"id\":\"c3\"}]"));
             assertEquals(200, resp.statusCode(), resp.body());
-            JsonNode r = JSON.readTree(resp.body());
+            JsonNode r = V1Body.of(resp.body());
 
             List<String> cols = new ArrayList<>();
             r.get("columns").forEach(n -> cols.add(n.asText()));

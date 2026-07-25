@@ -98,12 +98,12 @@ class ControlApiDataSourceExportTest {
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
 
     private HttpResponse<String> sendText(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<byte[]> sendBytes(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofByteArray());
     }
 

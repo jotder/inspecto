@@ -53,7 +53,7 @@ class ControlApiProvenanceTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        HttpRequest req = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        HttpRequest req = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .method("GET", BodyPublishers.noBody()).build();
         return client.send(req, BodyHandlers.ofString());
     }

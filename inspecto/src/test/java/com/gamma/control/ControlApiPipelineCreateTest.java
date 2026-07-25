@@ -70,12 +70,12 @@ class ControlApiPipelineCreateTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofString());
     }
 
@@ -99,7 +99,7 @@ class ControlApiPipelineCreateTest {
 
             HttpResponse<String> r = post(c.port, "/runs", body("orders.toon"));
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertTrue(out.get("registered").asBoolean());
             assertEquals("orders", out.get("id").asText(), "in-file name is lowercased to the id");
             assertEquals("orders.toon", out.get("path").asText());
@@ -180,7 +180,7 @@ class ControlApiPipelineCreateTest {
 
             HttpResponse<String> r = post(c.port, "/runs", body("ghosted.toon"));
             assertEquals(422, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertFalse(out.get("registered").asBoolean());
             boolean anchored = false;
             for (JsonNode f : out.get("findings"))

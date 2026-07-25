@@ -55,7 +55,7 @@ class ControlApiAlertRuleWriteTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         HttpRequest.BodyPublisher pub = body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body);
         return client.send(b.method(method, pub).build(), BodyHandlers.ofString());
     }
@@ -92,7 +92,7 @@ class ControlApiAlertRuleWriteTest {
 
             HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", rule("high-error", "gt", 0.05));
             assertEquals(200, r.statusCode(), r.body());
-            assertEquals("high-error", JSON.readTree(r.body()).get("name").asText());
+            assertEquals("high-error", V1Body.of(r.body()).get("name").asText());
 
             // Persisted as an alert-rule component (registry/alert-rules/high-error.toon) that
             // ServiceBootstrap re-arms on boot.
@@ -145,7 +145,7 @@ class ControlApiAlertRuleWriteTest {
             // Change the comparator; the name (path) is immutable and authoritative.
             HttpResponse<String> up = send(c.port, "PUT", "/alerts/rules/r1", rule("r1", "lt", 0.2));
             assertEquals(200, up.statusCode(), up.body());
-            assertEquals("lt", JSON.readTree(up.body()).get("comparator").asText());
+            assertEquals("lt", V1Body.of(up.body()).get("comparator").asText());
 
             AlertRule onDisk = AlertRule.fromMap(store(root).get("alert-rule", "r1").orElseThrow().content());
             assertEquals("lt", onDisk.comparator());
@@ -165,7 +165,7 @@ class ControlApiAlertRuleWriteTest {
 
             HttpResponse<String> del = send(c.port, "DELETE", "/alerts/rules/gone", null);
             assertEquals(200, del.statusCode(), del.body());
-            assertEquals("gone", JSON.readTree(del.body()).get("deleted").asText());
+            assertEquals("gone", V1Body.of(del.body()).get("deleted").asText());
             assertTrue(store(root).get("alert-rule", "gone").isEmpty(), "component removed on delete");
             assertTrue(ruleNames(c.port).isEmpty(), "disarmed in the running engine");
         }

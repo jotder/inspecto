@@ -132,11 +132,11 @@ class ControlApiSpaceTemplatesTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
 }

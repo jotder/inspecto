@@ -128,12 +128,12 @@ class ControlApiScopedObjectsTest {
     }
 
     private HttpResponse<String> get(int port, String path, String bearer) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Authorization", "Bearer " + bearer).GET().build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(int port, String path, String body, String bearer) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Authorization", "Bearer " + bearer)
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());

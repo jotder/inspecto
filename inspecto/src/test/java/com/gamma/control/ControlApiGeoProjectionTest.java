@@ -76,7 +76,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","entityCol":"who","kindCol":"kind"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(3, data.get("points").size(), "two bad coordinates are excluded: " + data);
             assertEquals(2, data.get("skipped").asInt(), "out-of-range + NULL rows are skipped");
             assertFalse(data.get("truncated").asBoolean());
@@ -94,7 +94,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection",
                     "{\"dataset\":\"sights_ds\",\"latCol\":\"lat\",\"lonCol\":\"lon\"}");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode points = JSON.readTree(r.body()).at("/data/points");
+            JsonNode points = V1Body.of(r.body()).at("/data/points");
             assertEquals(3, points.size());
             assertEquals("point", points.get(0).get("kind").asText(), "no kindCol → the 'point' default");
         }
@@ -107,7 +107,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","limit":2}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(2, data.get("points").size());
             assertTrue(data.get("truncated").asBoolean());
             assertEquals(2, data.get("skipped").asInt(), "skipped counts all bad rows, independent of the limit");
@@ -121,7 +121,7 @@ class ControlApiGeoProjectionTest {
             HttpResponse<String> r = post(c.port, "geo/projection", """
                     {"dataset":"sights_ds","latCol":"lat","lonCol":"lon","attrCols":["who"]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode points = JSON.readTree(r.body()).at("/data/points");
+            JsonNode points = V1Body.of(r.body()).at("/data/points");
             assertEquals("alice", points.get(0).get("attrs").get("who").asText());
         }
     }
@@ -147,7 +147,7 @@ class ControlApiGeoProjectionTest {
                     {"dataset":"trips_ds","fromLatCol":"alat","fromLonCol":"alon","toLatCol":"blat","toLonCol":"blon",
                      "fromCol":"a","toCol":"b","kindCol":"kind"}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(2, data.get("routes").size(), "two distinct O/D+kind routes survive: " + data);
             assertEquals(3, data.get("points").size(), "alice, bob, carol fold into 3 endpoints");
             assertEquals(1, data.get("skipped").asInt(), "the out-of-range destination row is skipped");

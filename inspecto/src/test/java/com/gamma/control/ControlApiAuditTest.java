@@ -78,7 +78,7 @@ class ControlApiAuditTest {
     void honoursCustomActorHeader(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpRequest req = HttpRequest.newBuilder(
-                            URI.create("http://localhost:" + c.port + "/runs/" + c.name + "/pause"))
+                            URI.create("http://localhost:" + c.port + "/api/v1" + "/runs/" + c.name + "/pause"))
                     .header("X-Actor", "support_agent")
                     .POST(BodyPublishers.noBody()).build();
             assertEquals(200, client.send(req, BodyHandlers.ofString()).statusCode());
@@ -119,13 +119,13 @@ class ControlApiAuditTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
     private JsonNode json(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 }

@@ -58,14 +58,14 @@ class ControlApiBundleImportTest {
             // import into beta → the pipeline is registered and live there
             HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundle);
             assertEquals(200, imp.statusCode(), imp.body());
-            assertTrue(JSON.readTree(imp.body()).get("pipelines").toString().contains("test_etl"));
+            assertTrue(V1Body.of(imp.body()).get("pipelines").toString().contains("test_etl"));
             assertTrue(idList(c.port, "/spaces/beta/datasources").contains("test_etl"),
                     "beta now hosts the imported data source");
 
             // re-import without overwrite → 409 listing the clash, nothing changes
             HttpResponse<String> clash = post(c.port, "/spaces/beta/import", bundle);
             assertEquals(409, clash.statusCode());
-            assertTrue(JSON.readTree(clash.body()).get("conflicts").toString().contains("test_etl"));
+            assertTrue(V1Body.of(clash.body()).get("conflicts").toString().contains("test_etl"));
 
             // re-import with overwrite → 200
             assertEquals(200, post(c.port, "/spaces/beta/import?on_conflict=overwrite", bundle).statusCode());
@@ -79,7 +79,7 @@ class ControlApiBundleImportTest {
 
             HttpResponse<String> pv = post(c.port, "/spaces/beta/import/preview", bundle);
             assertEquals(200, pv.statusCode(), pv.body());
-            JsonNode r = JSON.readTree(pv.body());
+            JsonNode r = V1Body.of(pv.body());
             assertTrue(r.get("dataSources").toString().contains("test_etl"), "lists the bundled data source");
             assertTrue(r.get("conflicts").isEmpty(), "no clash in empty beta");
             assertTrue(r.get("valid").asBoolean(), "the exported pipeline validates: " + r.get("findings"));
@@ -95,7 +95,7 @@ class ControlApiBundleImportTest {
 
             HttpResponse<String> created = post(c.port, "/spaces/import?id=gamma", spaceBundle);
             assertEquals(200, created.statusCode(), created.body());
-            assertEquals("gamma", JSON.readTree(created.body()).get("id").asText());
+            assertEquals("gamma", V1Body.of(created.body()).get("id").asText());
 
             // the new space is hosted and carries alpha's data source
             JsonNode spaces = JSON.readTree(getBytes(c.port, "/spaces").body());
@@ -122,12 +122,12 @@ class ControlApiBundleImportTest {
     }
 
     private HttpResponse<byte[]> getBytes(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .GET().build(), BodyHandlers.ofByteArray());
     }
 
     private HttpResponse<String> post(int port, String path, byte[] body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/zip")
                 .POST(BodyPublishers.ofByteArray(body)).build(), BodyHandlers.ofString());
     }

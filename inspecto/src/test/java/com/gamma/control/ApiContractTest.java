@@ -118,13 +118,13 @@ class ApiContractTest {
                     String probePath = probe.get("path").asText();
                     int expected = probe.get("status").asInt();
                     HttpResponse<String> r = client.send(
-                            HttpRequest.newBuilder(URI.create("http://localhost:" + api.port() + probePath))
+                            HttpRequest.newBuilder(URI.create("http://localhost:" + api.port() + "/api/v1" + probePath))
                                     .GET().build(),
                             BodyHandlers.ofString());
                     assertEquals(expected, r.statusCode(),
                             "probe " + probePath + " (documented on " + pathEntry.getKey() + ")");
 
-                    JsonNode body = JSON.readTree(r.body());
+                    JsonNode body = V1Body.of(r.body());
                     assertSatisfies(contract, expected < 400 ? "Envelope" : "ErrorResponse", body,
                             "live " + probePath);
                     probed.add(probePath);

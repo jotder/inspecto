@@ -55,7 +55,7 @@ class ControlApiConfigWriteTest {
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
@@ -80,7 +80,7 @@ class ControlApiConfigWriteTest {
         try (Ctx c = open(cfg, root)) {
             HttpResponse<String> r = post(c.port, "/config/write", pipeline("orders_daily"));
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertTrue(out.get("written").asBoolean());
             assertEquals("orders_daily", out.get("name").asText());
             // Pipeline files are named for the bootstrap-scan convention (*_pipeline.toon) so a
@@ -122,7 +122,7 @@ class ControlApiConfigWriteTest {
                        "processing":{"ingester":"com.x.Plugin","threads":1}}}""";
             HttpResponse<String> r = post(c.port, "/config/write", bad);
             assertEquals(422, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertFalse(out.get("written").asBoolean());
             assertTrue(out.get("findings").size() > 0, "findings returned");
             assertFalse(Files.exists(root.resolve("broken.toon")), "nothing written on a rejected config");

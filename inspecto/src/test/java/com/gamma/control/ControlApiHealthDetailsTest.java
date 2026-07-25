@@ -47,9 +47,9 @@ class ControlApiHealthDetailsTest {
 
     private JsonNode details(int port) throws Exception {
         HttpResponse<String> r = client.send(HttpRequest.newBuilder(
-                URI.create("http://localhost:" + port + "/health/details")).GET().build(), BodyHandlers.ofString());
+                URI.create("http://localhost:" + port + "/api/v1" + "/health/details")).GET().build(), BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), r.body());
-        return JSON.readTree(r.body());
+        return V1Body.of(r.body());
     }
 
     @Test

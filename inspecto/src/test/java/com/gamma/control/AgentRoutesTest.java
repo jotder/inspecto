@@ -49,7 +49,7 @@ class AgentRoutesTest {
     }
 
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
@@ -69,14 +69,14 @@ class AgentRoutesTest {
             HttpResponse<String> opened = send(ctx.port(), "POST", "/agent/sessions",
                     "{\"role\":\"analyst\",\"page\":{\"pageId\":\"overview\"}}");
             assertEquals(200, opened.statusCode());
-            JsonNode openedBody = JSON.readTree(opened.body());
+            JsonNode openedBody = V1Body.of(opened.body());
             String sessionId = openedBody.get("sessionId").asText();
             assertFalse(sessionId.isBlank());
 
             HttpResponse<String> asked = send(ctx.port(), "POST",
                     "/agent/sessions/" + sessionId + "/ask", "{\"question\":\"How does ingestion work?\"}");
             assertEquals(200, asked.statusCode());
-            JsonNode askedBody = JSON.readTree(asked.body());
+            JsonNode askedBody = V1Body.of(asked.body());
             assertEquals("TEXT", askedBody.get("kind").asText());
             assertTrue(askedBody.get("text").asText().contains("How does ingestion work?"));
         }
@@ -95,7 +95,7 @@ class AgentRoutesTest {
     void askStreamRoundTripsAsServerSentEvents(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
             HttpResponse<String> opened = send(ctx.port(), "POST", "/agent/sessions", "{}");
-            String sessionId = JSON.readTree(opened.body()).get("sessionId").asText();
+            String sessionId = V1Body.of(opened.body()).get("sessionId").asText();
 
             HttpResponse<String> streamed = send(ctx.port(), "POST",
                     "/agent/sessions/" + sessionId + "/ask/stream", "{\"question\":\"stream this\"}");
@@ -110,7 +110,7 @@ class AgentRoutesTest {
     void askStreamEmitsAnArtifactFrameBeforeComplete(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
             HttpResponse<String> opened = send(ctx.port(), "POST", "/agent/sessions", "{}");
-            String sessionId = JSON.readTree(opened.body()).get("sessionId").asText();
+            String sessionId = V1Body.of(opened.body()).get("sessionId").asText();
 
             HttpResponse<String> streamed = send(ctx.port(), "POST",
                     "/agent/sessions/" + sessionId + "/ask/stream", "{\"question\":\"stream this\"}");
@@ -148,7 +148,7 @@ class AgentRoutesTest {
     void askWithoutAQuestionIs400(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
             HttpResponse<String> opened = send(ctx.port(), "POST", "/agent/sessions", "{}");
-            String sessionId = JSON.readTree(opened.body()).get("sessionId").asText();
+            String sessionId = V1Body.of(opened.body()).get("sessionId").asText();
             HttpResponse<String> r = send(ctx.port(), "POST", "/agent/sessions/" + sessionId + "/ask", "{}");
             assertEquals(400, r.statusCode());
         }
@@ -189,7 +189,7 @@ class AgentRoutesTest {
                 "case-2", Map.of("id", "case-2", "outcome", "resolved"))))) {
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/cases", null);
             assertEquals(200, r.statusCode());
-            JsonNode cases = JSON.readTree(r.body()).get("cases");
+            JsonNode cases = V1Body.of(r.body()).get("cases");
             assertEquals(2, cases.size());
         }
     }
@@ -200,7 +200,7 @@ class AgentRoutesTest {
                 "case-1", Map.of("id", "case-1", "outcome", "open"))))) {
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/cases/case-1", null);
             assertEquals(200, r.statusCode());
-            assertEquals("open", JSON.readTree(r.body()).get("outcome").asText());
+            assertEquals("open", V1Body.of(r.body()).get("outcome").asText());
         }
     }
 
@@ -231,7 +231,7 @@ class AgentRoutesTest {
         try (Ctx ctx = open(dir, agent)) {
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/approvals", null);
             assertEquals(200, r.statusCode());
-            JsonNode approvals = JSON.readTree(r.body()).get("approvals");
+            JsonNode approvals = V1Body.of(r.body()).get("approvals");
             assertEquals(1, approvals.size());
             assertEquals("component_apply", approvals.get(0).get("tool").asText());
         }
@@ -244,7 +244,7 @@ class AgentRoutesTest {
         try (Ctx ctx = open(dir, agent)) {
             HttpResponse<String> ok = send(ctx.port(), "GET", "/agent/approvals/appr-1", null);
             assertEquals(200, ok.statusCode());
-            assertEquals("PENDING", JSON.readTree(ok.body()).get("status").asText());
+            assertEquals("PENDING", V1Body.of(ok.body()).get("status").asText());
             assertEquals(404, send(ctx.port(), "GET", "/agent/approvals/nope", null).statusCode());
         }
     }
@@ -257,7 +257,7 @@ class AgentRoutesTest {
             HttpResponse<String> r = send(ctx.port(), "POST", "/agent/approvals/appr-1/decision",
                     "{\"decision\":\"approve\",\"decidedBy\":\"alice\"}");
             assertEquals(200, r.statusCode());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertEquals("APPROVED", body.get("status").asText());
             assertEquals("alice", body.get("decidedBy").asText());
         }
@@ -303,7 +303,7 @@ class AgentRoutesTest {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/policy", null);
             assertEquals(200, r.statusCode());
-            assertFalse(JSON.readTree(r.body()).get("killSwitch").asBoolean());
+            assertFalse(V1Body.of(r.body()).get("killSwitch").asBoolean());
         }
     }
 
@@ -313,7 +313,7 @@ class AgentRoutesTest {
             HttpResponse<String> r = send(ctx.port(), "PUT", "/agent/policy",
                     "{\"classes\":{\"batch_rerun\":{\"mode\":\"auto\",\"maxPerHour\":3}}}");
             assertEquals(200, r.statusCode());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertEquals("auto", body.get("classes").get("batch_rerun").get("mode").asText());
             // No X-Agent-Session header → attributed to the calling human actor, not "agent:*".
             assertFalse(body.get("updatedBy").asText().startsWith("agent:"));
@@ -326,11 +326,11 @@ class AgentRoutesTest {
             HttpResponse<String> on = send(ctx.port(), "POST", "/agent/policy/kill-switch",
                     "{\"engaged\":true}");
             assertEquals(200, on.statusCode());
-            assertTrue(JSON.readTree(on.body()).get("killSwitch").asBoolean());
+            assertTrue(V1Body.of(on.body()).get("killSwitch").asBoolean());
 
             HttpResponse<String> off = send(ctx.port(), "POST", "/agent/policy/kill-switch",
                     "{\"engaged\":false}");
-            assertFalse(JSON.readTree(off.body()).get("killSwitch").asBoolean());
+            assertFalse(V1Body.of(off.body()).get("killSwitch").asBoolean());
         }
     }
 
@@ -352,7 +352,7 @@ class AgentRoutesTest {
         try (Ctx ctx = open(dir, agent)) {
             HttpResponse<String> ok = send(ctx.port(), "GET", "/agent/cases/case-1/similar", null);
             assertEquals(200, ok.statusCode());
-            JsonNode similar = JSON.readTree(ok.body()).get("similar");
+            JsonNode similar = V1Body.of(ok.body()).get("similar");
             assertEquals(1, similar.size());
             assertEquals("case-2", similar.get(0).get("id").asText());
             // The greedy /agent/cases/(.+) must not shadow /similar (registration-order match).
@@ -375,7 +375,7 @@ class AgentRoutesTest {
             HttpResponse<String> ok = send(ctx.port(), "POST", "/agent/cases/case-1/feedback",
                     "{\"rating\":\"helpful\",\"note\":\"good\"}");
             assertEquals(200, ok.statusCode());
-            assertEquals("HELPFUL", JSON.readTree(ok.body()).get("rating").asText());
+            assertEquals("HELPFUL", V1Body.of(ok.body()).get("rating").asText());
         }
     }
 
@@ -389,7 +389,7 @@ class AgentRoutesTest {
             send(ctx.port(), "POST", "/agent/cases/case-1/feedback", "{\"rating\":\"not_helpful\"}");
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/feedback", null);
             assertEquals(200, r.statusCode());
-            assertEquals(1, JSON.readTree(r.body()).get("feedback").size());
+            assertEquals(1, V1Body.of(r.body()).get("feedback").size());
         }
     }
 
@@ -403,7 +403,7 @@ class AgentRoutesTest {
         try (Ctx ctx = open(dir, agent)) {
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/actions", null);
             assertEquals(200, r.statusCode());
-            JsonNode actions = JSON.readTree(r.body()).get("actions");
+            JsonNode actions = V1Body.of(r.body()).get("actions");
             assertEquals(1, actions.size());
             assertEquals("batch_rerun", actions.get(0).get("actionClass").asText());
             assertEquals(200, send(ctx.port(), "GET", "/agent/actions/act-1", null).statusCode());

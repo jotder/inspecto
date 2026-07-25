@@ -55,14 +55,14 @@ class ControlApiAsyncV1Test {
     }
 
     private HttpResponse<String> post(int port, String path, String body, String... headers) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         return client.send(b.method("POST", body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
                 BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
@@ -72,18 +72,18 @@ class ControlApiAsyncV1Test {
     void idempotencyKeyReplaysTheFirstResponse(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, List.of())) {
             String widget = "{\"id\":\"w1\",\"kind\":\"bar\"}";
-            HttpResponse<String> first = post(c.port, "/api/v1/components/widget", widget, "Idempotency-Key", "k1");
+            HttpResponse<String> first = post(c.port, "/components/widget", widget, "Idempotency-Key", "k1");
             assertEquals(200, first.statusCode(), first.body());
             assertTrue(first.headers().firstValue("Idempotency-Replayed").isEmpty());
 
             // Same key → the FIRST response replays verbatim (no second create, so NOT the 409 a real retry would hit).
-            HttpResponse<String> replay = post(c.port, "/api/v1/components/widget", widget, "Idempotency-Key", "k1");
+            HttpResponse<String> replay = post(c.port, "/components/widget", widget, "Idempotency-Key", "k1");
             assertEquals(200, replay.statusCode(), "replayed, not 409");
             assertEquals("true", replay.headers().firstValue("Idempotency-Replayed").orElse(null));
             assertEquals(first.body(), replay.body(), "byte-identical replay of the original response");
 
             // A keyless retry proves the resource really exists now — it 409s.
-            assertEquals(409, post(c.port, "/api/v1/components/widget", widget).statusCode());
+            assertEquals(409, post(c.port, "/components/widget", widget).statusCode());
         }
     }
 
@@ -93,9 +93,9 @@ class ControlApiAsyncV1Test {
     void jobTriggerIsAcceptedWithRunIdAndPollable(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
         try (Ctx c = open(cfg, root, List.of(hb))) {
-            HttpResponse<String> accepted = post(c.port, "/api/v1/jobs/hb/trigger", null);
+            HttpResponse<String> accepted = post(c.port, "/jobs/hb/trigger", null);
             assertEquals(202, accepted.statusCode(), accepted.body());
-            JsonNode data = JSON.readTree(accepted.body()).get("data");
+            JsonNode data = V1Body.of(accepted.body());
             String runId = data.get("runId").asText();
             assertFalse(runId.isBlank());
             assertEquals("running", data.get("status").asText());
@@ -105,9 +105,9 @@ class ControlApiAsyncV1Test {
             String status = null;
             long deadline = System.nanoTime() + 10_000_000_000L;
             while (System.nanoTime() < deadline) {
-                HttpResponse<String> polled = get(c.port, "/api/v1/jobs/runs/" + runId);
+                HttpResponse<String> polled = get(c.port, "/jobs/runs/" + runId);
                 assertEquals(200, polled.statusCode(), polled.body());
-                JsonNode run = JSON.readTree(polled.body()).get("data");
+                JsonNode run = V1Body.of(polled.body());
                 assertEquals(runId, run.get("runId").asText());
                 status = run.get("status").asText();
                 if (!"RUNNING".equals(status)) break;
@@ -123,7 +123,7 @@ class ControlApiAsyncV1Test {
         try (Ctx c = open(cfg, root, List.of(hb))) {
             HttpResponse<String> r = post(c.port, "/jobs/hb/trigger", null);   // unversioned surface
             assertEquals(200, r.statusCode());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertEquals("triggered", body.get("status").asText());
             assertEquals("hb", body.get("job").asText());
             assertNull(body.get("data"), "legacy surface stays un-enveloped and un-changed (200, no runId/202)");
@@ -141,9 +141,9 @@ class ControlApiAsyncV1Test {
         JobConfig clean = new JobConfig("dryclean", JobType.MAINTENANCE, null, null, true, false,
                 Map.of("task", "cleanup", "dir", junk.toString(), "retention_days", "7"));
         try (Ctx c = open(cfg, root, List.of(clean))) {
-            HttpResponse<String> accepted = post(c.port, "/api/v1/jobs/dryclean/trigger?dryRun=true", null);
+            HttpResponse<String> accepted = post(c.port, "/jobs/dryclean/trigger?dryRun=true", null);
             assertEquals(202, accepted.statusCode(), accepted.body());
-            JsonNode data = JSON.readTree(accepted.body()).get("data");
+            JsonNode data = V1Body.of(accepted.body());
             assertTrue(data.get("dryRun").asBoolean(), accepted.body());
             String dryId = data.get("runId").asText();
 
@@ -154,7 +154,7 @@ class ControlApiAsyncV1Test {
             assertTrue(Files.exists(a) && Files.exists(b), "a dry run deletes nothing");
 
             // The real fire matches the dry-run estimate.
-            String realId = JSON.readTree(post(c.port, "/api/v1/jobs/dryclean/trigger", null).body())
+            String realId = JSON.readTree(post(c.port, "/jobs/dryclean/trigger", null).body())
                     .get("data").get("runId").asText();
             JsonNode real = awaitRun(c, "dryclean",
                     r -> realId.equals(r.get("runId").asText()) && !"RUNNING".equals(r.get("status").asText()));
@@ -168,8 +168,8 @@ class ControlApiAsyncV1Test {
     void unknownJobTriggerIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
         try (Ctx c = open(cfg, root, List.of(hb))) {
-            assertEquals(404, post(c.port, "/api/v1/jobs/ghost/trigger", null).statusCode());
-            assertEquals(404, get(c.port, "/api/v1/jobs/runs/does-not-exist").statusCode());
+            assertEquals(404, post(c.port, "/jobs/ghost/trigger", null).statusCode());
+            assertEquals(404, get(c.port, "/jobs/runs/does-not-exist").statusCode());
         }
     }
 
@@ -179,17 +179,17 @@ class ControlApiAsyncV1Test {
     void runLogIsPersistedAndServedWithTheParamSnapshot(@TempDir Path cfg, @TempDir Path root) throws Exception {
         JobConfig hb = new JobConfig("hb", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "heartbeat"));
         try (Ctx c = open(cfg, root, List.of(hb))) {
-            String runId = JSON.readTree(post(c.port, "/api/v1/jobs/hb/trigger", null).body()).get("data").get("runId").asText();
+            String runId = JSON.readTree(post(c.port, "/jobs/hb/trigger", null).body()).get("data").get("runId").asText();
             // wait for the run to reach a terminal status so the "run completed" entry is written
             long deadline = System.nanoTime() + 10_000_000_000L;
             while (System.nanoTime() < deadline) {
-                JsonNode run = JSON.readTree(get(c.port, "/api/v1/jobs/runs/" + runId).body()).get("data");
+                JsonNode run = JSON.readTree(get(c.port, "/jobs/runs/" + runId).body()).get("data");
                 if (!"RUNNING".equals(run.get("status").asText())) break;
                 Thread.sleep(50);
             }
             HttpResponse<String> logResp = get(c.port, "/jobs/hb/runs/" + runId + "/log");   // unversioned: raw array
             assertEquals(200, logResp.statusCode(), logResp.body());
-            JsonNode entries = JSON.readTree(logResp.body());
+            JsonNode entries = V1Body.of(logResp.body());
             assertTrue(entries.isArray() && entries.size() >= 2, "run start + completion logged: " + logResp.body());
 
             List<String> messages = new ArrayList<>();
@@ -210,7 +210,7 @@ class ControlApiAsyncV1Test {
         try (Ctx c = open(cfg, root, List.of(hb))) {
             HttpResponse<String> r = get(c.port, "/jobs/hb/runs/never-ran-1/log");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertTrue(body.isArray() && body.isEmpty(), "unknown run → empty log, not 404");
         }
     }
@@ -230,7 +230,7 @@ class ControlApiAsyncV1Test {
 
             HttpResponse<String> resp = get(c.port, "/jobs/types/maintenance");
             assertEquals(200, resp.statusCode(), resp.body());
-            JsonNode desc = JSON.readTree(resp.body());
+            JsonNode desc = V1Body.of(resp.body());
             assertEquals("maintenance", desc.get("id").asText());
             List<String> paramNames = new ArrayList<>();
             desc.get("parameters").forEach(p -> paramNames.add(p.get("name").asText()));
@@ -244,11 +244,11 @@ class ControlApiAsyncV1Test {
 
     /** Trigger a heartbeat job and wait for it to reach a terminal status; returns its runId. */
     private String triggerAndAwait(Ctx c, String job) throws Exception {
-        String runId = JSON.readTree(post(c.port, "/api/v1/jobs/" + job + "/trigger", null).body())
+        String runId = JSON.readTree(post(c.port, "/jobs/" + job + "/trigger", null).body())
                 .get("data").get("runId").asText();
         long deadline = System.nanoTime() + 10_000_000_000L;
         while (System.nanoTime() < deadline) {
-            JsonNode run = JSON.readTree(get(c.port, "/api/v1/jobs/runs/" + runId).body()).get("data");
+            JsonNode run = JSON.readTree(get(c.port, "/jobs/runs/" + runId).body()).get("data");
             if (!"RUNNING".equals(run.get("status").asText())) break;
             Thread.sleep(50);
         }
@@ -266,7 +266,7 @@ class ControlApiAsyncV1Test {
 
             HttpResponse<String> resp = get(c.port, "/signals?correlationId=" + runId);
             assertEquals(200, resp.statusCode(), resp.body());
-            JsonNode arr = JSON.readTree(resp.body());
+            JsonNode arr = V1Body.of(resp.body());
             assertTrue(arr.isArray() && arr.size() >= 2, "started + completed on the ledger: " + resp.body());
 
             List<String> types = new ArrayList<>();
@@ -328,7 +328,7 @@ class ControlApiAsyncV1Test {
                 Map.of("task", "heartbeat"), "job.run.completed", null);   // fires on any job's completion
         try (Ctx c = open(cfg, root, List.of(producer, listener))) {
             c.svc().start();   // on-signal dispatch (like cron) arms only on a started service; manual triggers don't
-            post(c.port, "/api/v1/jobs/producerjob/trigger", null);   // its job.run.completed fires the listener
+            post(c.port, "/jobs/producerjob/trigger", null);   // its job.run.completed fires the listener
             JsonNode run = awaitRun(c, "listenerjob", r -> r.get("trigger").asText().startsWith("signal:"));
             assertEquals("SUCCESS", run.get("status").asText(), run.toString());
             assertTrue(run.get("trigger").asText().startsWith("signal:job.run.completed"), run.toString());
@@ -344,7 +344,7 @@ class ControlApiAsyncV1Test {
                 Map.of("task", "heartbeat"), "job.run.completed", "$signal.outcome == \"NOPE\"");
         try (Ctx c = open(cfg, root, List.of(producer, listener))) {
             c.svc().start();
-            post(c.port, "/api/v1/jobs/prodguard/trigger", null);
+            post(c.port, "/jobs/prodguard/trigger", null);
             JsonNode skipped = awaitRun(c, "listenguard", r -> "SKIPPED".equals(r.get("status").asText()));
             assertTrue(skipped.get("trigger").asText().startsWith("signal:"), skipped.toString());
             assertTrue(skipped.get("message").asText().contains("guard"), skipped.toString());
@@ -380,12 +380,12 @@ class ControlApiAsyncV1Test {
         try (Ctx c = open(cfg, root, List.of(head, second, third, failhead, failfollow))) {
             c.svc().start();
 
-            post(c.port, "/api/v1/jobs/chainhead/trigger", null);
+            post(c.port, "/jobs/chainhead/trigger", null);
             JsonNode tail = awaitRun(c, "chainthird", r -> "SUCCESS".equals(r.get("status").asText()));
             assertTrue(tail.get("trigger").asText().startsWith("signal:job.run.completed"),
                     "the tail fired off the chain, not a manual trigger: " + tail);
 
-            post(c.port, "/api/v1/jobs/failhead/trigger", null);
+            post(c.port, "/jobs/failhead/trigger", null);
             JsonNode skipped = awaitRun(c, "failfollow", r -> "SKIPPED".equals(r.get("status").asText()));
             assertTrue(skipped.get("message").asText().contains("guard"), skipped.toString());
             JsonNode runs = JSON.readTree(get(c.port, "/jobs/failfollow/runs").body());
@@ -401,9 +401,9 @@ class ControlApiAsyncV1Test {
     void pipelineTriggerIsAcceptedWithRunIdAndPollable(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, List.of())) {   // Ctx writes one pipeline; take its registered id
             String pipe = c.svc.pipelines().get(0).name();
-            HttpResponse<String> accepted = post(c.port, "/api/v1/runs/" + pipe + "/trigger", null);
+            HttpResponse<String> accepted = post(c.port, "/runs/" + pipe + "/trigger", null);
             assertEquals(202, accepted.statusCode(), accepted.body());
-            JsonNode data = JSON.readTree(accepted.body()).get("data");
+            JsonNode data = V1Body.of(accepted.body());
             String runId = data.get("runId").asText();
             assertFalse(runId.isBlank());
             assertEquals(pipe, data.get("pipeline").asText());
@@ -414,9 +414,9 @@ class ControlApiAsyncV1Test {
             String status = null;
             long deadline = System.nanoTime() + 10_000_000_000L;
             while (System.nanoTime() < deadline) {
-                HttpResponse<String> polled = get(c.port, "/api/v1/runs/runs/" + runId);
+                HttpResponse<String> polled = get(c.port, "/runs/runs/" + runId);
                 assertEquals(200, polled.statusCode(), polled.body());
-                JsonNode run = JSON.readTree(polled.body()).get("data");
+                JsonNode run = V1Body.of(polled.body());
                 assertEquals(runId, run.get("runId").asText());
                 status = run.get("status").asText();
                 if (!"RUNNING".equals(status)) break;
@@ -432,7 +432,7 @@ class ControlApiAsyncV1Test {
             String pipe = c.svc.pipelines().get(0).name();
             HttpResponse<String> r = post(c.port, "/runs/" + pipe + "/trigger", null);   // unversioned surface
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertTrue(body.has("total") && body.has("failed"), "legacy body is the raw RunResult");
             assertNull(body.get("data"), "legacy surface stays un-enveloped (200, no runId/202)");
         }
@@ -441,8 +441,8 @@ class ControlApiAsyncV1Test {
     @Test
     void unknownPipelineTriggerIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, List.of())) {
-            assertEquals(404, post(c.port, "/api/v1/runs/ghost/trigger", null).statusCode());
-            assertEquals(404, get(c.port, "/api/v1/runs/runs/does-not-exist").statusCode());
+            assertEquals(404, post(c.port, "/runs/ghost/trigger", null).statusCode());
+            assertEquals(404, get(c.port, "/runs/runs/does-not-exist").statusCode());
         }
     }
 }

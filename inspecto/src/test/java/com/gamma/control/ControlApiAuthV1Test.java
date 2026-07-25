@@ -65,14 +65,14 @@ class ControlApiAuthV1Test {
     }
 
     private HttpResponse<String> post(int port, String path, String body, String... headers) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         return client.send(b.method("POST", body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
                 BodyHandlers.ofString());
     }
 
     private HttpResponse<String> get(int port, String path, String... headers) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (headers.length > 0) b.headers(headers);
         return client.send(b.GET().build(), BodyHandlers.ofString());
     }
@@ -81,9 +81,9 @@ class ControlApiAuthV1Test {
     void writeRouteWithoutCredentialsIs401(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
             assertEquals(401, r.statusCode());
-            assertEquals("UNAUTHENTICATED", JSON.readTree(r.body()).get("error").get("errorCode").asText());
+            assertEquals("UNAUTHENTICATED", V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
     }
 
@@ -91,10 +91,10 @@ class ControlApiAuthV1Test {
     void writeRouteWithoutCapabilityIs403(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
                     "Authorization", "Bearer limited");
             assertEquals(403, r.statusCode());
-            assertEquals("PERMISSION_DENIED", JSON.readTree(r.body()).get("error").get("errorCode").asText());
+            assertEquals("PERMISSION_DENIED", V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
     }
 
@@ -102,10 +102,10 @@ class ControlApiAuthV1Test {
     void writeRouteWithCapabilitySucceedsAndEnvelopeCarriesPermissions(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}",
                     "Authorization", "Bearer valid");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode permissions = JSON.readTree(r.body()).get("permissions");
+            JsonNode permissions = V1Body.of(r.body()).get("permissions");
             assertTrue(permissions.isArray());
             assertTrue(streamText(permissions).contains("canAuthorWorkbench"));
         }
@@ -118,14 +118,14 @@ class ControlApiAuthV1Test {
             // No credentials: bootstrap still 200s, anonymous.
             HttpResponse<String> anon = get(c.port, "/bootstrap");
             assertEquals(200, anon.statusCode());
-            JsonNode anonSession = JSON.readTree(anon.body()).get("session");
+            JsonNode anonSession = V1Body.of(anon.body()).get("session");
             assertFalse(anonSession.get("authenticated").asBoolean());
             assertEquals(0, anonSession.get("capabilities").size());
 
             // With a valid token: bootstrap reports the real session, still without requiring one.
             HttpResponse<String> authed = get(c.port, "/bootstrap", "Authorization", "Bearer valid");
             assertEquals(200, authed.statusCode());
-            JsonNode session = JSON.readTree(authed.body()).get("session");
+            JsonNode session = V1Body.of(authed.body()).get("session");
             assertTrue(session.get("authenticated").asBoolean());
             assertEquals("jdoe", session.get("actor").asText());
             assertTrue(streamText(session.get("capabilities")).contains("canAuthorWorkbench"));
@@ -145,9 +145,9 @@ class ControlApiAuthV1Test {
     void personalEditionUnaffectedWhenNoAuthenticatorIsRegistered(@TempDir Path cfg, @TempDir Path root) throws Exception {
         // No Authenticators.forTest call — Authenticators.active() resolves empty, exactly like Personal.
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = post(c.port, "/api/v1/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
+            HttpResponse<String> r = post(c.port, "/components/widget", "{\"id\":\"w1\",\"kind\":\"bar\"}");
             assertEquals(200, r.statusCode(), "no credential required when no Authenticator is present");
-            assertNull(JSON.readTree(r.body()).get("permissions"), "no Subject ⇒ no permissions block");
+            assertNull(V1Body.of(r.body()).get("permissions"), "no Subject ⇒ no permissions block");
         }
     }
 
@@ -160,13 +160,13 @@ class ControlApiAuthV1Test {
             new com.gamma.pipeline.ComponentStore(root.resolve("registry"))
                     .write("grammar", "g1", java.util.Map.of("delimiter", ","));
 
-            JsonNode one = JSON.readTree(get(c.port, "/api/v1/components/grammar/g1",
+            JsonNode one = JSON.readTree(get(c.port, "/components/grammar/g1",
                     "Authorization", "Bearer valid").body());
             assertEquals(List.of("canAuthorWorkbench"), streamText(one.get("permissions")),
                     "per-resource ∩ resource-state, not the session-wide set");
 
             // the list response declares nothing → session-wide array unchanged
-            JsonNode list = JSON.readTree(get(c.port, "/api/v1/components/grammar",
+            JsonNode list = JSON.readTree(get(c.port, "/components/grammar",
                     "Authorization", "Bearer valid").body());
             assertEquals(2, list.get("permissions").size(), "lists keep the session-wide grants");
         }
@@ -178,10 +178,10 @@ class ControlApiAuthV1Test {
         // even alongside valid credentials — the actor must come from the authenticated Subject.
         Authenticators.forTest(FAKE);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = get(c.port, "/api/v1/components/grammar",
+            HttpResponse<String> r = get(c.port, "/components/grammar",
                     "Authorization", "Bearer valid", "X-Actor", "mallory");
             assertEquals(403, r.statusCode(), r.body());
-            assertEquals("PERMISSION_DENIED", JSON.readTree(r.body()).get("error").get("errorCode").asText());
+            assertEquals("PERMISSION_DENIED", V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
     }
 
@@ -189,7 +189,7 @@ class ControlApiAuthV1Test {
     void xActorHeaderStillHonouredOnPersonal(@TempDir Path cfg, @TempDir Path root) throws Exception {
         // No Authenticator (Personal): X-Actor stays the historic actor mechanism — the reject never fires.
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = get(c.port, "/api/v1/components/grammar", "X-Actor", "alice");
+            HttpResponse<String> r = get(c.port, "/components/grammar", "X-Actor", "alice");
             assertEquals(200, r.statusCode(), r.body());
         }
     }

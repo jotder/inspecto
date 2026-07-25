@@ -69,7 +69,7 @@ class ControlApiEventsPageTest {
             c.svc.events().append(event("e5", base + 4_000L));
 
             // page 1 — newest two, total across all pages, first-page request cursor is null
-            JsonNode e1 = json(get(c.port, "/api/v1/events?limit=2"));
+            JsonNode e1 = json(get(c.port, "/events?limit=2"));
             assertEquals(List.of("e5", "e4"), ids(e1.get("data")), "newest-first, id DESC on the tie");
             JsonNode pg1 = e1.get("metadata").get("pagination");
             assertTrue(pg1.get("total").asInt() >= 5, "total spans the whole retained history");
@@ -79,14 +79,14 @@ class ControlApiEventsPageTest {
             assertFalse(next1.isBlank(), "more pages ⇒ a nextCursor");
 
             // page 2 — resumes strictly after e4 (the shared-ts row), echoes the request cursor
-            JsonNode e2 = json(get(c.port, "/api/v1/events?limit=2&cursor=" + next1));
+            JsonNode e2 = json(get(c.port, "/events?limit=2&cursor=" + next1));
             assertEquals(List.of("e3", "e2"), ids(e2.get("data")), "tiebreak resume — e3 not skipped, e4 not repeated");
             JsonNode pg2 = e2.get("metadata").get("pagination");
             assertEquals(next1, pg2.get("cursor").asText(), "request cursor echoed");
             String next2 = pg2.get("nextCursor").asText();
 
             // page 3 — starts with the last fixture; service events (older) may follow it
-            JsonNode e3 = json(get(c.port, "/api/v1/events?limit=2&cursor=" + next2));
+            JsonNode e3 = json(get(c.port, "/events?limit=2&cursor=" + next2));
             assertFalse(ids(e3.get("data")).isEmpty());
             assertEquals("e1", ids(e3.get("data")).get(0), "the walk reaches every fixture in order");
 
@@ -109,9 +109,9 @@ class ControlApiEventsPageTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
 }

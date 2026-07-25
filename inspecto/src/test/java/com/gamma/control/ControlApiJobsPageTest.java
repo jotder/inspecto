@@ -58,7 +58,7 @@ class ControlApiJobsPageTest {
                         "name", name, "type", "maintenance", "task", "cleanup", "cron", "0 3 * * *"))));
 
             // page 1 — name-ordered, total across all pages, first-page request cursor is null
-            JsonNode e1 = json(get(c.port, "/api/v1/jobs?limit=2"));
+            JsonNode e1 = json(get(c.port, "/jobs?limit=2"));
             assertEquals(List.of("job_a", "job_b"), names(e1.get("data")), "name-ordered keyset");
             JsonNode pg1 = e1.get("metadata").get("pagination");
             assertEquals(5, pg1.get("total").asInt(), "total spans every page, not just this one");
@@ -72,7 +72,7 @@ class ControlApiJobsPageTest {
             while (!pg.get("nextCursor").isNull()) {
                 assertTrue(++guard < 10, "pagination must terminate");
                 String next = pg.get("nextCursor").asText();
-                JsonNode page = json(get(c.port, "/api/v1/jobs?limit=2&cursor=" + next));
+                JsonNode page = json(get(c.port, "/jobs?limit=2&cursor=" + next));
                 pg = page.get("metadata").get("pagination");
                 assertEquals(next, pg.get("cursor").asText(), "request cursor echoed");
                 assertTrue(page.get("data").size() <= 2, "no page exceeds the limit");
@@ -97,9 +97,9 @@ class ControlApiJobsPageTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
 }

@@ -73,7 +73,7 @@ class ControlApiBiQueryTest {
                      "groupBy":["region"],
                      "orderBy":[{"field":"sum_amount","dir":"desc"}]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(2, data.get("rows").size());
             JsonNode top = data.get("rows").get(0);
             assertEquals("EU", top.get("region").asText());
@@ -92,7 +92,7 @@ class ControlApiBiQueryTest {
                      "measures":[{"agg":"sum","field":"amount"}],
                      "filters":[{"field":"region","op":"=","value":"US"}]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).get("data").get("rows");
+            JsonNode rows = V1Body.of(r.body()).get("rows");
             assertEquals(1, rows.size());
             assertEquals(5.0, rows.get(0).get("sum_amount").asDouble(), 1e-9);
         }
@@ -119,7 +119,7 @@ class ControlApiBiQueryTest {
                      "groupBy":["order_date"],
                      "orderBy":[{"field":"order_date","dir":"asc"}]}""");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode rows = JSON.readTree(r.body()).get("data").get("rows");
+            JsonNode rows = V1Body.of(r.body()).get("rows");
             assertEquals(2, rows.size());
             JsonNode first = rows.get(0);
             assertTrue(first.get("order_date").isTextual(), "DATE serialised as an ISO string, not an object");
@@ -136,7 +136,7 @@ class ControlApiBiQueryTest {
                             URI.create("http://localhost:" + c.port + "/api/v1/bi/datasets")).GET().build(),
                     BodyHandlers.ofString());
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode data = JSON.readTree(r.body()).get("data");
+            JsonNode data = V1Body.of(r.body());
             assertEquals(1, data.size());
             assertEquals("sales_ds", data.get(0).get("id").asText());
             assertEquals("view", data.get(0).get("binding").asText());

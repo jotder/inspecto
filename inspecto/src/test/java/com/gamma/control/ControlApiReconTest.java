@@ -105,13 +105,13 @@ class ControlApiReconTest {
     }
 
     private HttpResponse<String> postJson(int port, String path, String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/json")
                 .method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
     private static JsonNode data(HttpResponse<String> r) throws Exception {
-        return JSON.readTree(r.body()).get("data");
+        return V1Body.of(r.body());
     }
 
     // ── POST /recon/run ────────────────────────────────────────────────────────────
@@ -119,7 +119,7 @@ class ControlApiReconTest {
     @Test
     void runBySavedIdReturnsGrainTotalsAndSummary(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            HttpResponse<String> r = postJson(c.port, "/api/v1/spaces/s1/recon/run", "{\"id\":\"orders_recon\"}");
+            HttpResponse<String> r = postJson(c.port, "/spaces/s1/recon/run", "{\"id\":\"orders_recon\"}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode d = data(r);
 
@@ -152,7 +152,7 @@ class ControlApiReconTest {
     @Test
     void inlineDraftConfigRunsWithoutASavedComponent(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            HttpResponse<String> r = postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            HttpResponse<String> r = postJson(c.port, "/spaces/s1/recon/run",
                     "{\"config\":{\"datasets\":[\"a_ds\",\"b_ds\"],\"keyColumns\":[\"region\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\"}]}}");
             assertEquals(200, r.statusCode(), r.body());
@@ -165,7 +165,7 @@ class ControlApiReconTest {
     @Test
     void breaksReturnsTheThreeSetsAndScopesByPath(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            JsonNode all = data(postJson(c.port, "/api/v1/spaces/s1/recon/breaks", "{\"id\":\"orders_recon\"}"));
+            JsonNode all = data(postJson(c.port, "/spaces/s1/recon/breaks", "{\"id\":\"orders_recon\"}"));
             assertEquals(1, all.get("missing_right").get("rowCount").asInt());
             assertEquals("MEA", all.get("missing_right").get("rows").get(0).get("key").get("region").asText());
             assertEquals(10.0, all.get("missing_right").get("rows").get(0).get("a").get("amount").asDouble());
@@ -176,13 +176,13 @@ class ControlApiReconTest {
             assertEquals(114.0, vb.get("b").get("amount").asDouble());
 
             // scoped to the Board path region=EU → no missing_right, the one value_break
-            JsonNode eu = data(postJson(c.port, "/api/v1/spaces/s1/recon/breaks",
+            JsonNode eu = data(postJson(c.port, "/spaces/s1/recon/breaks",
                     "{\"id\":\"orders_recon\",\"path\":{\"region\":\"EU\"}}"));
             assertEquals(0, eu.get("missing_right").get("rowCount").asInt());
             assertEquals(1, eu.get("value_break").get("rowCount").asInt());
 
             // type filter returns only that set
-            JsonNode one = data(postJson(c.port, "/api/v1/spaces/s1/recon/breaks",
+            JsonNode one = data(postJson(c.port, "/spaces/s1/recon/breaks",
                     "{\"id\":\"orders_recon\",\"type\":\"missing_left\"}"));
             assertNotNull(one.get("missing_left"));
             assertNull(one.get("missing_right"));
@@ -194,7 +194,7 @@ class ControlApiReconTest {
     @Test
     void columnsInventoriesBothSidesWithMatches(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            HttpResponse<String> r = postJson(c.port, "/api/v1/spaces/s1/recon/columns",
+            HttpResponse<String> r = postJson(c.port, "/spaces/s1/recon/columns",
                     "{\"datasets\":[\"a_ds\",\"b_ds\"]}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode d = data(r);
@@ -214,14 +214,14 @@ class ControlApiReconTest {
     @Test
     void reconciliationComponentKindIsWritableOverHttp(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            HttpResponse<String> created = postJson(c.port, "/api/v1/spaces/s1/components/reconciliation",
+            HttpResponse<String> created = postJson(c.port, "/spaces/s1/components/reconciliation",
                     "{\"id\":\"via_http\",\"datasets\":[\"a_ds\",\"b_ds\"],\"keyColumns\":[\"region\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\"}]}");
             assertEquals(200, created.statusCode(), created.body());
             assertEquals("reconciliation/via_http", data(created).get("ref").asText());
 
             // and the saved component runs
-            HttpResponse<String> run = postJson(c.port, "/api/v1/spaces/s1/recon/run", "{\"id\":\"via_http\"}");
+            HttpResponse<String> run = postJson(c.port, "/spaces/s1/recon/run", "{\"id\":\"via_http\"}");
             assertEquals(200, run.statusCode(), run.body());
             assertEquals(4, data(run).get("statistics").get("rowCount").asInt());
         }
@@ -235,7 +235,7 @@ class ControlApiReconTest {
                     + "\"keyColumns\":[\"region\",\"product\"],"
                     + "\"compareColumns\":[{\"column\":\"amount\",\"toleranceType\":\"percent\",\"tolerance\":0.5}]}";
 
-            HttpResponse<String> run = postJson(c.port, "/api/v1/spaces/s1/recon/run", config + "}");
+            HttpResponse<String> run = postJson(c.port, "/spaces/s1/recon/run", config + "}");
             assertEquals(200, run.statusCode(), run.body());
             JsonNode d = data(run);
             assertEquals(6, d.get("statistics").get("rowCount").asInt(), "union of key groups across all 3 sides");
@@ -253,14 +253,14 @@ class ControlApiReconTest {
             assertEquals(368.0, d.get("totals").get("c").get("amount").asDouble());
 
             // side-scoped breaks: pair A↔C
-            JsonNode breaks = data(postJson(c.port, "/api/v1/spaces/s1/recon/breaks", config + ",\"side\":\"c\"}"));
+            JsonNode breaks = data(postJson(c.port, "/spaces/s1/recon/breaks", config + ",\"side\":\"c\"}"));
             assertEquals("LATAM", breaks.get("missing_left").get("rows").get(0).get("key").get("region").asText());
             assertEquals(195.0, breaks.get("value_break").get("rows").get(0).get("b").get("amount").asDouble());
 
             // side c against a 2-way config, or a bogus side → 422
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/breaks",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/breaks",
                     "{\"id\":\"orders_recon\",\"side\":\"c\"}").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/breaks",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/breaks",
                     "{\"id\":\"orders_recon\",\"side\":\"z\"}").statusCode());
         }
     }
@@ -270,10 +270,10 @@ class ControlApiReconTest {
     void bundleExportStripsRunStateAndRoundTrips(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // give the stored recon some run state that must NOT travel
-            HttpResponse<String> run = postJson(c.port, "/api/v1/spaces/s1/recon/run", "{\"id\":\"orders_recon\"}");
+            HttpResponse<String> run = postJson(c.port, "/spaces/s1/recon/run", "{\"id\":\"orders_recon\"}");
             assertEquals(200, run.statusCode(), run.body());
 
-            HttpResponse<String> exported = postJson(c.port, "/api/v1/spaces/s1/bundle/export",
+            HttpResponse<String> exported = postJson(c.port, "/spaces/s1/bundle/export",
                     "{\"items\":[{\"kind\":\"reconciliation\",\"id\":\"orders_recon\"},"
                             + "{\"kind\":\"dataset\",\"id\":\"a_ds\"},{\"kind\":\"dataset\",\"id\":\"b_ds\"}]}");
             assertEquals(200, exported.statusCode(), exported.body());
@@ -288,9 +288,9 @@ class ControlApiReconTest {
 
             // import the exported bundle back under a new id → lands in the registry and runs
             String reimport = bundle.toString().replace("orders_recon", "orders_recon_copy");
-            HttpResponse<String> imported = postJson(c.port, "/api/v1/spaces/s1/bundle/import", reimport);
+            HttpResponse<String> imported = postJson(c.port, "/spaces/s1/bundle/import", reimport);
             assertEquals(200, imported.statusCode(), imported.body());
-            assertEquals(200, postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            assertEquals(200, postJson(c.port, "/spaces/s1/recon/run",
                     "{\"id\":\"orders_recon_copy\"}").statusCode());
         }
     }
@@ -299,30 +299,30 @@ class ControlApiReconTest {
     void failsClosed(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // unknown reconciliation / dataset → 404
-            assertEquals(404, postJson(c.port, "/api/v1/spaces/s1/recon/run", "{\"id\":\"ghost\"}").statusCode());
-            assertEquals(404, postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            assertEquals(404, postJson(c.port, "/spaces/s1/recon/run", "{\"id\":\"ghost\"}").statusCode());
+            assertEquals(404, postJson(c.port, "/spaces/s1/recon/run",
                     "{\"config\":{\"datasets\":[\"a_ds\",\"ghost_ds\"],\"keyColumns\":[\"region\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\"}]}}").statusCode());
             // neither id nor config, wrong dataset count, bad agg, unsafe key, guarded filter, bad path → 422
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/run", "{}").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/run", "{}").statusCode());
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/run",
                     "{\"config\":{\"datasets\":[\"a_ds\"],\"keyColumns\":[\"region\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\"}]}}").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/run",
                     "{\"config\":{\"datasets\":[\"a_ds\",\"b_ds\"],\"keyColumns\":[\"region\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\",\"agg\":\"avg\"}]}}").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/run",
                     "{\"config\":{\"datasets\":[\"a_ds\",\"b_ds\"],\"keyColumns\":[\"region;drop\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\"}]}}").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/run",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/run",
                     "{\"config\":{\"datasets\":[\"a_ds\",\"b_ds\"],\"keyColumns\":[\"region\"],"
                             + "\"compareColumns\":[{\"column\":\"amount\"}],"
                             + "\"filters\":{\"a_ds\":\"select 1\"}}}").statusCode());
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/breaks",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/breaks",
                     "{\"id\":\"orders_recon\",\"path\":{\"amount\":\"1\"}}").statusCode());
             // /recon/columns with no datasets → 422; unknown dataset → 404
-            assertEquals(422, postJson(c.port, "/api/v1/spaces/s1/recon/columns", "{}").statusCode());
-            assertEquals(404, postJson(c.port, "/api/v1/spaces/s1/recon/columns",
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/columns", "{}").statusCode());
+            assertEquals(404, postJson(c.port, "/spaces/s1/recon/columns",
                     "{\"datasets\":[\"ghost_ds\"]}").statusCode());
         }
     }
@@ -338,7 +338,7 @@ class ControlApiReconTest {
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             try {
-                assertEquals(503, postJson(api.port(), "/api/v1/recon/run", "{\"id\":\"x\"}").statusCode());
+                assertEquals(503, postJson(api.port(), "/recon/run", "{\"id\":\"x\"}").statusCode());
             } finally {
                 api.close();
             }

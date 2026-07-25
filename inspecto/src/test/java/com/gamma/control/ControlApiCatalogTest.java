@@ -47,7 +47,7 @@ class ControlApiCatalogTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("GET", BodyPublishers.noBody()).build(), BodyHandlers.ofString());
     }
 
@@ -68,7 +68,7 @@ class ControlApiCatalogTest {
             HttpResponse<String> r = get(c.port,
                     "/catalog/graph?from=kpi:daily&depth=5&direction=both");
             assertEquals(200, r.statusCode());
-            JsonNode g = JSON.readTree(r.body());
+            JsonNode g = V1Body.of(r.body());
             boolean reachesSource = false;
             for (JsonNode n : g.get("nodes")) if ("stream:mini_etl".equals(n.get("id").asText())) reachesSource = true;
             assertTrue(reachesSource, "KPI traversal reaches the source: " + g.get("nodes"));
@@ -80,7 +80,7 @@ class ControlApiCatalogTest {
         try (Ctx c = open(dir)) {
             HttpResponse<String> r = get(c.port, "/catalog/tables/event:mini_etl/mini");
             assertEquals(200, r.statusCode());
-            JsonNode body = JSON.readTree(r.body());
+            JsonNode body = V1Body.of(r.body());
             assertEquals("event:mini_etl/mini", body.get("node").get("id").asText());
             assertNotNull(body.get("node").get("overlay"), "detail hydrates the overlay");
             assertTrue(body.get("neighbors").get("nodes").size() > 1, "neighbours include schema/columns");

@@ -70,7 +70,7 @@ class ControlApiJobRunsPageTest {
             store.record(run("r5", "2026-06-17 10:04:00"));
 
             // page 1 — newest two, total across all pages, first-page cursor is null
-            JsonNode e1 = json(get(c.port, "/api/v1/jobs/runs?limit=2"));
+            JsonNode e1 = json(get(c.port, "/jobs/runs?limit=2"));
             assertEquals(List.of("r5", "r4"), ids(e1.get("data")));
             JsonNode pg1 = e1.get("metadata").get("pagination");
             assertEquals(5, pg1.get("total").asInt());
@@ -80,14 +80,14 @@ class ControlApiJobRunsPageTest {
             assertFalse(next1.isBlank(), "more pages ⇒ a nextCursor");
 
             // page 2 — resumes strictly after r4, echoes the request cursor
-            JsonNode e2 = json(get(c.port, "/api/v1/jobs/runs?limit=2&cursor=" + next1));
+            JsonNode e2 = json(get(c.port, "/jobs/runs?limit=2&cursor=" + next1));
             assertEquals(List.of("r3", "r2"), ids(e2.get("data")), "no overlap with page 1");
             JsonNode pg2 = e2.get("metadata").get("pagination");
             assertEquals(next1, pg2.get("cursor").asText(), "request cursor echoed");
             String next2 = pg2.get("nextCursor").asText();
 
             // page 3 — final partial page, nextCursor exhausted
-            JsonNode e3 = json(get(c.port, "/api/v1/jobs/runs?limit=2&cursor=" + next2));
+            JsonNode e3 = json(get(c.port, "/jobs/runs?limit=2&cursor=" + next2));
             assertEquals(List.of("r1"), ids(e3.get("data")));
             assertTrue(e3.get("metadata").get("pagination").get("nextCursor").isNull(), "last page ⇒ null nextCursor");
 
@@ -104,9 +104,9 @@ class ControlApiJobRunsPageTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build(),
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(),
                 BodyHandlers.ofString());
     }
 
-    private JsonNode json(HttpResponse<String> r) throws Exception { return JSON.readTree(r.body()); }
+    private JsonNode json(HttpResponse<String> r) throws Exception { return V1Body.of(r.body()); }
 }

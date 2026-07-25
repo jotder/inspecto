@@ -51,17 +51,17 @@ class ControlApiOnboardingLifecycleTest {
     }
 
     private HttpResponse<String> get(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .GET().build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> post(int port, String path, String body) throws Exception {
-        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         return client.send(b.method("POST", BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
     }
 
     private HttpResponse<String> delete(int port, String path) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .DELETE().build(), BodyHandlers.ofString());
     }
 
@@ -77,18 +77,18 @@ class ControlApiOnboardingLifecycleTest {
                        "processing":{"threads":1}}}""";
             HttpResponse<String> w = post(c.port, "/config/write", draft);
             assertEquals(200, w.statusCode(), w.body());
-            String path = JSON.readTree(w.body()).get("path").asText();
+            String path = V1Body.of(w.body()).get("path").asText();
             // The bootstrap scan only indexes *_pipeline.toon — a guided draft MUST follow the
             // convention or it silently drops out of the registry on the next service restart.
             assertTrue(path.endsWith("orders_feed_pipeline.toon"), "scan-convention filename: " + path);
-            assertEquals("orders_feed", JSON.readTree(w.body()).get("name").asText());
+            assertEquals("orders_feed", V1Body.of(w.body()).get("name").asText());
 
             // 2. Register so the running service indexes it (write alone is not enough).
             HttpResponse<String> reg = post(c.port, "/runs", "{\"configPath\":\"" + path + "\"}");
             assertEquals(2, reg.statusCode() / 100, "schema-less inactive draft registers: " + reg.body());
 
             // 3. The draft is catalog-visible immediately, as a Draft (active:false).
-            JsonNode streams = JSON.readTree(get(c.port, "/api/v1/catalog/streams").body()).get("data");
+            JsonNode streams = JSON.readTree(get(c.port, "/catalog/streams").body()).get("data");
             JsonNode draftRow = null;
             for (JsonNode n : streams)
                 if ("orders_feed".equals(n.get("attrs").get("pipeline").asText())) draftRow = n;
@@ -98,7 +98,7 @@ class ControlApiOnboardingLifecycleTest {
             // 4. Resume: read the config back (decoded), exactly as written.
             HttpResponse<String> r = get(c.port, "/config/pipeline/orders_feed");
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode read = JSON.readTree(r.body());
+            JsonNode read = V1Body.of(r.body());
             assertEquals("orders_feed", read.get("name").asText());
             assertEquals("orders_feed", read.get("config").get("name").asText());
             assertEquals("in", read.get("config").get("dirs").get("poll").asText());
@@ -114,7 +114,7 @@ class ControlApiOnboardingLifecycleTest {
                        "parsing":{"frontend":"delimited","delimited":{"delimiter":"|","has_header":true}}}}""";
             HttpResponse<String> w2 = post(c.port, "/config/write", withParsing);
             assertEquals(200, w2.statusCode(), w2.body());
-            assertTrue(JSON.readTree(w2.body()).get("overwritten").asBoolean());
+            assertTrue(V1Body.of(w2.body()).get("overwritten").asBoolean());
             JsonNode reread = JSON.readTree(get(c.port, "/config/pipeline/orders_feed").body());
             assertEquals("delimited", reread.get("config").get("parsing").get("frontend").asText());
 
@@ -158,7 +158,7 @@ class ControlApiOnboardingLifecycleTest {
                      "sample_text":"id|city\\n1|london\\n2|paris\\n"}""";
             HttpResponse<String> r = post(c.port, "/config/preview/parsing", body);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertEquals("delimited", out.get("frontend").asText());
             assertEquals(2, out.get("rowCount").asInt());
             assertEquals("id", out.get("columns").get(0).asText());
@@ -191,7 +191,7 @@ class ControlApiOnboardingLifecycleTest {
                        {"ORDER_ID":"1002","QUANTITY":"abc"}]}""";
             HttpResponse<String> r = post(c.port, "/config/preview/schema", body);
             assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = JSON.readTree(r.body());
+            JsonNode out = V1Body.of(r.body());
             assertEquals(1, out.get("okCount").asInt());
             assertEquals(1, out.get("rejectedCount").asInt());
             assertEquals("1002", out.get("rejectedRows").get(0).get("ORDER_ID").asText());

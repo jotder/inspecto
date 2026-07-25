@@ -23,8 +23,11 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Real-HTTP tests for the v1 transport spine (worklog W1, docs/superpower/api-contract-design.md
  * §10): the {@code /api/v1} seam + response envelope, the structured error object with contract
- * error codes, per-request {@code Correlation-ID} issue/echo, gzip content negotiation — and that
- * the legacy (unversioned) surface stays byte-for-byte unchanged.
+ * error codes, per-request {@code Correlation-ID} issue/echo, gzip content negotiation.
+ *
+ * <p>Since API-5 (2026-07-25) {@code /api/v1} is the <em>only</em> API surface; the unversioned aliases
+ * this class used to pin for byte-for-byte parity are retired. That contract lives in
+ * {@link ControlApiVersionedSurfaceTest} — here only the infra probes are still reached unversioned.
  */
 class ControlApiV1Test {
 
@@ -65,7 +68,7 @@ class ControlApiV1Test {
         try (Ctx c = open(cfg, null)) {
             HttpResponse<String> r = get(c.port, "/api/v1/health");
             assertEquals(200, r.statusCode());
-            JsonNode env = JSON.readTree(r.body());
+            JsonNode env = V1Body.envelope(r.body());   // this test asserts the envelope, so keep it un-peeled
             assertEquals("UP", env.get("data").get("status").asText(), "handler result under 'data'");
             assertEquals("v1", env.get("metadata").get("apiVersion").asText());
             assertTrue(env.get("metadata").get("durationMs").asLong() >= 0);
@@ -79,15 +82,15 @@ class ControlApiV1Test {
     }
 
     @Test
-    void correlationIdEchoedAndLegacyBodyUnchanged(@TempDir Path cfg) throws Exception {
+    void correlationIdEchoedOnUnversionedInfraProbe(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg, null)) {
             HttpResponse<String> r = get(c.port, "/health", "Correlation-ID", "shift-cid-42");
             assertEquals(200, r.statusCode());
             assertEquals("shift-cid-42", r.headers().firstValue("Correlation-ID").orElse(null),
-                    "a caller-supplied id is honoured and echoed — on the legacy surface too");
-            JsonNode body = JSON.readTree(r.body());
-            assertEquals("UP", body.get("status").asText(), "legacy body is the raw handler result");
-            assertNull(body.get("data"), "no envelope on the unversioned surface");
+                    "a caller-supplied id is honoured and echoed — on the infra probes too");
+            JsonNode body = V1Body.of(r.body());
+            assertEquals("UP", body.get("status").asText(), "the probe returns the raw handler result");
+            assertNull(body.get("data"), "infra probes are never envelope-shaped (API-5)");
         }
     }
 
@@ -96,7 +99,7 @@ class ControlApiV1Test {
         try (Ctx c = open(cfg, null)) {
             HttpResponse<String> r = get(c.port, "/api/v1/no-such-route");
             assertEquals(404, r.statusCode());
-            JsonNode err = JSON.readTree(r.body()).get("error");
+            JsonNode err = V1Body.of(r.body()).get("error");
             assertEquals("NOT_FOUND", err.get("errorCode").asText());
             assertEquals("not found", err.get("message").asText());
             assertTrue(err.get("recoverable").asBoolean());
@@ -111,7 +114,7 @@ class ControlApiV1Test {
                     BodyHandlers.ofString());
             assertEquals(405, r.statusCode());
             assertEquals("METHOD_NOT_ALLOWED",
-                    JSON.readTree(r.body()).get("error").get("errorCode").asText());
+                    V1Body.of(r.body()).get("error").get("errorCode").asText());
         }
     }
 
@@ -124,7 +127,7 @@ class ControlApiV1Test {
                             .build(),
                     BodyHandlers.ofString());
             assertEquals(503, r.statusCode());
-            JsonNode err = JSON.readTree(r.body()).get("error");
+            JsonNode err = V1Body.of(r.body()).get("error");
             assertEquals("CONTROL_PLANE_READ_ONLY", err.get("errorCode").asText(),
                     "the write-root gate carries its specific contract code, not the 503 default");
             assertEquals("config write disabled: set -Dassist.write.root to enable",
@@ -133,16 +136,17 @@ class ControlApiV1Test {
     }
 
     @Test
-    void legacyWriteRootErrorUnchanged(@TempDir Path cfg) throws Exception {
+    void unversionedWriteIsRetiredNotServed(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg, null)) {
             HttpResponse<String> r = client.send(
                     req(c.port, "/config/write")
                             .method("POST", BodyPublishers.ofString("{\"type\":\"pipeline\",\"config\":{\"name\":\"x\"}}"))
                             .build(),
                     BodyHandlers.ofString());
-            assertEquals(503, r.statusCode());
-            assertEquals("{\"error\":\"config write disabled: set -Dassist.write.root to enable\"}",
-                    r.body(), "legacy error shape is byte-for-byte unchanged");
+            // API-5: the unversioned alias no longer reaches the handler at all, so this is a routing 404 —
+            // not the 503 write-root gate it used to hit.
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("/api/v1"), r.body());
         }
     }
 
@@ -158,30 +162,11 @@ class ControlApiV1Test {
                     req(c.port, "/api/v1/config/write").method("POST", BodyPublishers.ofString(bad)).build(),
                     BodyHandlers.ofString());
             assertEquals(422, r.statusCode());
-            JsonNode err = JSON.readTree(r.body()).get("error");
+            JsonNode err = V1Body.of(r.body()).get("error");
             assertEquals("CONFIG_VALIDATION_FAILED", err.get("errorCode").asText());
             assertTrue(err.get("details").get("findings").isArray(),
                     "the findings payload is preserved under error.details");
             assertFalse(err.get("details").get("written").asBoolean());
-        }
-    }
-
-    @Test
-    void legacyUsageIsCountedForVersionedRoutesButNotV1OrInfra(@TempDir Path cfg) throws Exception {
-        try (Ctx c = open(cfg, null)) {
-            assertEquals(200, get(c.port, "/runs").statusCode());          // legacy call to a versioned route → counted
-            assertEquals(200, get(c.port, "/api/v1/runs").statusCode());   // v1 surface → NOT counted
-            assertEquals(200, get(c.port, "/health").statusCode());        // infra probe → NOT counted
-
-            String metrics = get(c.port, "/metrics").body();
-            assertTrue(metrics.contains("inspecto_legacy_api_requests_total"),
-                    "the W7 legacy-usage sunset counter is exported");
-            assertTrue(metrics.lines().anyMatch(l ->
-                            l.startsWith("inspecto_legacy_api_requests_total{") && l.contains("/runs")),
-                    "the legacy GET /runs is counted under its route label");
-            assertTrue(metrics.lines().noneMatch(l ->
-                            l.startsWith("inspecto_legacy_api_requests_total{") && l.contains("/health")),
-                    "always-unversioned infra probes are never counted as legacy usage");
         }
     }
 
@@ -204,7 +189,7 @@ class ControlApiV1Test {
             try (GZIPInputStream in = new GZIPInputStream(new ByteArrayInputStream(zipped.body()))) {
                 inflated = in.readAllBytes();
             }
-            assertEquals(JSON.readTree(plain.body()), JSON.readTree(inflated),
+            assertEquals(V1Body.of(plain.body()), JSON.readTree(inflated),
                     "gzipped body inflates to the identical JSON");
         }
     }
