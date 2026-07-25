@@ -24,7 +24,6 @@ export const environment = {
     footerText: ' © Powered By Gamma Analytics LLC 2024',
     appLogoutUri: 'logout',
     appClientId: '5829657973124606976',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     iamAppUrl: 'https://app1.pronto.lebara.sa/iam-server',
     promptoUrl:'http://68.183.16.242/apps/newchat',

@@ -1,8 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, map, catchError } from 'rxjs';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 
-import { AppProperties } from './modules/commons/app.properties';
 import { AppHttpService } from './modules/commons/app.http.service';
 import { environment } from 'environments/environment';
 
@@ -11,7 +10,7 @@ import { environment } from 'environments/environment';
 })
 export class AppComponentService extends AppHttpService {
 
-    constructor(public httpClient: HttpClient, private _props: AppProperties) {
+    constructor(public httpClient: HttpClient) {
         super(httpClient);
     }
 
@@ -38,23 +37,6 @@ export class AppComponentService extends AppHttpService {
     saveNewAppPage(pageMeta: any): Observable<any> {
         const apiUrl = environment.appUrl + environment.apiVersion + '/app-setting/newAppPage';
         return this.http.post(apiUrl, JSON.stringify(pageMeta), this.options)
-            .pipe(
-                map((response: Response) => {
-                    return response;
-                }),
-                catchError(this.handleError));
-    }
-
-    checkToken(token: string): Observable<any> {
-        const body = new FormData();
-        body.append('token', token);
-
-        const headers = new HttpHeaders({
-            'Authorization': 'Basic ' + window.btoa(this._props.appClientId + ":" + this._props.appClientSecret)
-        });
-
-        const apiUrl = environment.authServerUrl +  environment.authVersion + '/check_token';
-        return this.http.post(apiUrl, body)
             .pipe(
                 map((response: Response) => {
                     return response;

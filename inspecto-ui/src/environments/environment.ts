@@ -36,7 +36,6 @@ export const environment = {
     footerText: ' © Powered By Gamma Analytics LLC',
     appLogoutUri: 'logout',
     appClientId: '8825302933668759552',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     chatLogo: 'assets/images/logos/assistant.png',
     iamAppUrl: 'https://app1.pronto.lebara.sa/iam-server',

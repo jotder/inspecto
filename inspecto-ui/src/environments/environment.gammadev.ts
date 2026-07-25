@@ -17,7 +17,6 @@ export const environment = {
     footerText: 'Powered by Gamma Analytics',
     appLogoutUri: 'pronto/logout',
     appClientId: '2826856297262914560',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     promptoUrl: "https://demo.gammadev.io/prompto/",
     promptoServerUrl: "https://demo.gammadev.io/promtoapiserver",
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',

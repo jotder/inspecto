@@ -1,6 +1,6 @@
 // auth-service.ts
 import { inject, Injectable, OnDestroy } from '@angular/core';
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, catchError, map, Observable, throwError } from 'rxjs';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
@@ -9,6 +9,7 @@ import { SecurityPrincipal } from '../commons/security-principal';
 import { AppHttpService } from '../commons/app.http.service';
 import { AUTH_HTTP_CLIENT } from './auth-http-client.token';
 import { environment } from 'environments/environment';
+import { PKCE_STATE_STORAGE_KEY, PKCE_VERIFIER_STORAGE_KEY } from '../commons/app-utils';
 
 enum AuthBroadcastMessage {
     TOKENS_UPDATED = 'TOKENS_UPDATED',
@@ -80,16 +81,20 @@ export class AuthService extends AppHttpService implements OnDestroy {
      * Uses authHttp to skip the Bearer interceptor on the token endpoint.
      */
     retrieveToken(code: string): Observable<any> {
+        const verifier = sessionStorage.getItem(PKCE_VERIFIER_STORAGE_KEY) ?? '';
+        sessionStorage.removeItem(PKCE_VERIFIER_STORAGE_KEY);
+        sessionStorage.removeItem(PKCE_STATE_STORAGE_KEY);
+
         const body = new FormData();
         body.append('grant_type', 'authorization_code');
         body.append('client_id', this.props.appClientId);
-        body.append('client_secret', this.props.appClientSecret);
+        body.append('code_verifier', verifier);
         body.append('redirect_uri', this.props.appRedirectUri);
         body.append('code', code);
 
         const apiUrl = `${environment.authServerUrl}${environment.authVersion}/token`;
 
-        return this.authHttp.post(apiUrl, body, { headers: this.getBasicAuthHeader() }).pipe(
+        return this.authHttp.post(apiUrl, body).pipe(
             catchError((err) => {
                 console.error('Token retrieval failed:', err);
                 return throwError(() => err);
@@ -104,11 +109,12 @@ export class AuthService extends AppHttpService implements OnDestroy {
     renewAccessTokenUsingRefreshToken(): Observable<any> {
         const body = new HttpParams()
             .set('grant_type', 'refresh_token')
+            .set('client_id', this.props.appClientId)
             .set('refresh_token', this.getRefreshToken() ?? '');
 
         const apiUrl = `${environment.authServerUrl}${environment.authVersion}/token`;
 
-        return this.authHttp.post(apiUrl, body, { headers: this.getBasicAuthHeader() }).pipe(
+        return this.authHttp.post(apiUrl, body).pipe(
             map((response: any) => {
                 this.saveTokens(response);
                 return response;
@@ -142,13 +148,6 @@ export class AuthService extends AppHttpService implements OnDestroy {
         const token      = this.getAccessToken();
         const expiration = this.getAccessTokenExpiration();
         return !!token && expiration !== null && Date.now() < expiration;
-    }
-
-    getBasicAuthHeader(): HttpHeaders {
-        const credentials = window.btoa(
-            `${this.props.appClientId}:${this.props.appClientSecret}`
-        );
-        return new HttpHeaders({ Authorization: `Basic ${credentials}` });
     }
 
     getAccessToken(): string {

@@ -17,7 +17,6 @@ export const environment = {
     footerText: 'Powered by Latro',
     appLogoutUri: 'pronto/logout',
     appClientId: '8738429453654150144',
-    appClientSecret: 'REDACTED-SEC-INCIDENT-1',
     chatUrl: "http://68.183.16.242:5000/",
     appLogoutLogo: 'assets/images/logo/inspecto-logo.svg',
     iamAppUrl: 'https://app1.pronto.lebara.sa/iam-server',
