@@ -23,6 +23,11 @@ import java.util.TreeMap;
  * {@link SecretResolver} reference such as {@code ${ENV:CDR_PW}} — resolved only at connect time, never stored
  * or logged. {@link #toMap()} (the API/UI view) shows a {@code ${…}} reference verbatim but masks any non-ref
  * value as {@code ***}, so the profile can be displayed without leaking a credential a user may have inlined.
+ *
+ * <h3>Key spelling</h3>
+ * Every key is spelled identically in every view except {@link #basePath}: an {@code *_connection.toon} uses
+ * {@code base_path}; the JSON API {@link #toMap()} the SPA consumes uses {@code basePath}.
+ * {@link #fromMap(Map)} accepts <b>either</b>, so both views round-trip losslessly.
  */
 @com.gamma.api.PublicApi(since = "4.2.0")
 public record ConnectionProfile(String id, String connector, String host, int port, String database,
@@ -81,8 +86,19 @@ public record ConnectionProfile(String id, String connector, String host, int po
             if (th != null) tunnel = new Tunnel(th, toInt(tm.get("port")), str(tm.get("username")), str(tm.get("password")));
         }
         return new ConnectionProfile(str(c.get("id")), str(c.get("connector")), str(c.get("host")),
-                toInt(c.get("port")), str(c.get("database")), str(c.get("base_path")),
+                toInt(c.get("port")), str(c.get("database")), basePath(c),
                 str(c.get("username")), str(c.get("password")), options, tunnel);
+    }
+
+    /**
+     * The one field whose two views spell it differently: {@code base_path} on disk (every
+     * {@code *_connection.toon}) vs. {@code basePath} in the JSON API {@link #toMap()} the SPA consumes.
+     * Reading <b>both</b> is what makes {@code fromMap(toMap(p))} lossless — without it a {@code toMap()} →
+     * {@code fromMap()} round-trip silently dropped the path.
+     */
+    private static String basePath(Map<String, Object> c) {
+        String snake = str(c.get("base_path"));
+        return snake != null ? snake : str(c.get("basePath"));
     }
 
     /** JSON-ready, <b>secret-masked</b> view (stable key order) for the {@code /connections} API + UI. */
