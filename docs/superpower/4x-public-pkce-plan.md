@@ -1,6 +1,10 @@
 # Plan — `4.x` public-PKCE auth (unblock the SEC-INCIDENT-1 rotation)
 
-**Status:** SCOPED, not started · **Opened:** 2026-07-25 · **Branch of record:** `4.x`
+**Status:** **P0 + P1 SHIPPED 2026-07-25** (`481a68d5`, `89cb3cce` on `4.x`; propagated to master as
+no-content `-s ours` merges `54443256`, `37c98c6a`). **Only P2 remains — and P2 is entirely operator
+action** (deploy the `4.x` bundle, then rotate at the issuer). No code work is left on this plan.
+⚠ **Do not archive this plan until rotation is confirmed** — P2 is the whole point of the exercise.
+· **Opened:** 2026-07-25 · **Branch of record:** `4.x`
 **Parent item:** [`../BACKLOG.md`](../BACKLOG.md) §5 SEC-INCIDENT-1 · **Concept home on ship:**
 [`../okf/backend/editions/auth-security.md`](../okf/backend/editions/auth-security.md)
 
@@ -56,7 +60,7 @@ Read via `git show 4.x:<path>` — no checkout needed.
 
 Phased so the highest-value, lowest-risk piece can ship alone.
 
-### P0 — delete the dead confidential-client code (no design change)
+### P0 — delete the dead confidential-client code (no design change) — ✅ SHIPPED `481a68d5`
 
 1. Remove `renewAccessToken()` and `retrieveToken()` from `app-component.service.ts`, plus the now-unused
    imports (`HttpParams`, `HttpHeaders`, `SecurityPrincipal`, `AppProperties`) they orphan.
@@ -69,7 +73,21 @@ Phased so the highest-value, lowest-risk piece can ship alone.
 **P0 alone removes the hardcoded literal from `4.x`.** It does not make rotation safe — the live path
 still uses `environment.appClientSecret` — so P1 is still required.
 
-### P1 — PKCE on the live path
+### P1 — PKCE on the live path — ✅ SHIPPED `89cb3cce`
+
+> **As built** (all five steps below done): `pkce.ts` + `pkce.spec.ts` ported verbatim to
+> `modules/auth/`; `app-utils.redirectToAuthServer` is now **async** and persists verifier + state in
+> `sessionStorage` under `PKCE_VERIFIER_STORAGE_KEY` / `PKCE_STATE_STORAGE_KEY` (exported from
+> `app-utils.ts`, imported by `auth-service.ts`); `retrieveToken` sends `code_verifier` and clears both
+> storage keys; the refresh grant sends **`client_id`** instead of Basic auth (public clients
+> self-identify); `getBasicAuthHeader` and the dead `checkToken()` are gone, as is the now-orphaned
+> `AppProperties` injection in `app-component.service.ts`. **`appClientSecret` no longer exists anywhere
+> in `4.x` source** — not in `app.properties.ts`, not in any of the four `environments/*.ts`.
+> Verified: `npm run test:ci` 42 pass / 5 skip (incl. the ported `pkce.spec.ts`), `npm run build` clean.
+> ⚠ **Not yet verified against a live IdP** — step 7's "real login round trip" is a P2/deploy-time check.
+> ⚠ **The `state` param is generated and sent but not yet validated on callback.** `default-callback`
+> still only parses `code=` out of the URL. That is a CSRF gap worth closing — tracked as a residual, and
+> it does not block rotation (the secret is what the incident is about).
 
 3. Copy `pkce.ts` + `pkce.spec.ts` from `master` into `4.x` (path suits `4.x` layout, e.g.
    `modules/auth/pkce.ts`). Verbatim — no edits; it has no imports.
@@ -93,13 +111,20 @@ still uses `environment.appClientSecret` — so P1 is still required.
 
 ## 4. Open questions — need the operator / IdP owner
 
-- **Q1 (blocking P1): does the IAM at `environment.authServerUrl` support PKCE (S256) and a *public*
-  client?** The whole plan assumes yes. If the IdP cannot issue a public client, the fallback is a
-  server-side token exchange (the SPA talks to our backend; the secret lives there) — a larger change
-  with a different shape. Confirm before writing P1 code.
-- **Q2: for a public client, does the IdP allow `refresh_token` without client authentication, and is
-  refresh-token rotation enforced?** Public clients normally require rotation. If it is not supported,
-  the SPA may need short-lived tokens plus silent re-auth instead of a refresh grant.
+- ~~**Q1 (blocking P1): does the IAM at `environment.authServerUrl` support PKCE (S256) and a *public*
+  client?**~~ **ANSWERED YES by the operator, 2026-07-25** — P1 was written against that answer.
+  ⚠ **This was an operator statement, not an observed IdP capability**: nothing in this repo has yet
+  exchanged a code with the real issuer using PKCE. If the first P2 deploy fails at the token endpoint,
+  suspect this answer before suspecting the port. The fallback if it turns out to be wrong is unchanged —
+  a server-side token exchange (the SPA talks to our backend; the secret lives there), a larger change
+  with a different shape.
+- **Q2 (now load-bearing — P1 shipped against an assumption here): for a public client, does the IdP allow
+  `refresh_token` without client authentication, and is refresh-token rotation enforced?** Public clients
+  normally require rotation. **As shipped, the refresh grant sends `client_id` in the body and no Basic
+  auth header** — if the IdP rejects that, sessions will fail at first token expiry (~minutes after
+  login), *not* at login, so a smoke test that only checks sign-in will miss it. Verify a refresh
+  explicitly during the P2 deploy. If unsupported, the fallback is short-lived tokens plus silent
+  re-auth instead of a refresh grant.
 - **Q3: is the IAM client (`iamClientId`, used by the dead `renewAccessToken`) still needed at all on
   `4.x`?** If nothing uses it after P0, its secret still needs rotating but the client itself may be
   retirable.

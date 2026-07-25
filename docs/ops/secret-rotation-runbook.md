@@ -1,6 +1,10 @@
 # Runbook — rotating the SEC-INCIDENT-1 OAuth client secrets
 
-> **Status:** rotation **NOT YET PERFORMED** as of 2026-07-25. This runbook is the execution checklist;
+> **Status:** rotation **NOT YET PERFORMED** as of 2026-07-25 — but **the code-side blocker is now
+> cleared**: `4.x` P0+P1 shipped (`481a68d5`, `89cb3cce`), so `4.x` no longer sends a client secret and a
+> rotation no longer breaks a running SPA *once the new bundle is deployed*. Read §"The complication"
+> below with that in mind — the deploy-then-rotate ordering still applies, the design blocker does not.
+> This runbook is the execution checklist;
 > [`../BACKLOG.md`](../BACKLOG.md) §5 is the incident record and closes only on *confirmed* rotation.
 > **Operator-executed.** Every step below happens in the IdP console and in deployment infrastructure —
 > none of it is an agent action, and no secret value belongs in this repo, a commit, or a chat transcript.
@@ -11,10 +15,14 @@ Five OAuth client secrets were public on GitHub for ~6 weeks (2026-06-12 → 202
 `master` in `8dd072c6` **remediated nothing** — the values persist in git history, every clone, every fork,
 and GitHub's caches. Rotation at the issuer is the only fix.
 
-The complication: **`4.x` still authenticates with these exact values.** `app-component.service.ts` on
-`4.x` sends `client_secret` in a token request plus `Authorization: Basic btoa(clientId:clientSecret)`,
-with the IAM secret hardcoded inline at line 26. So a naive rotation is a customer-visible outage at
-`app1.pronto.lebara.sa`, not a quiet swap. See [`../superpower/4x-public-pkce-plan.md`](../superpower/4x-public-pkce-plan.md).
+The complication **as it stood before P1**: `4.x` authenticated with these exact values, so a naive
+rotation was a customer-visible outage at `app1.pronto.lebara.sa`, not a quiet swap.
+
+**As of `89cb3cce` that is fixed in source** — `4.x` uses PKCE and holds no `appClientSecret`. But the
+constraint it created still governs the *ordering*: **whatever is currently deployed at
+`app1.pronto.lebara.sa` is still the old bundle** until someone ships the new one. Rotating before that
+deploy breaks the running SPA exactly as it always would have. Deploy first, then rotate.
+See [`../superpower/4x-public-pkce-plan.md`](../superpower/4x-public-pkce-plan.md).
 
 ## The credentials
 
@@ -94,11 +102,10 @@ For each credential, in the order fixed by Step 2:
 - [ ] All five secrets rotated **and old values revoked**.
 - [ ] Step 0 log review recorded in [`../BACKLOG.md`](../BACKLOG.md) §5, including a negative result.
 - [ ] BACKLOG §5 row closed — it closes on confirmed rotation, not on a merged commit.
-- [ ] `tools/check-secrets.mjs` merged forward to `4.x` **only after** `4.x` no longer holds live values;
-      merging it early pins `4.x` CI permanently red, and a permanently-red guard is one someone deletes.
-- [ ] Orphaned worktrees deleted — they hold unversioned copies of four `environments/*.ts` files
-      **plus further copies in `quirky`'s `.angular/` build cache**:
-      `rm -rf .claude/worktrees/quirky-lalande-a4a696 .claude/worktrees/vigorous-ptolemy-911ed7`
+- [ ] `tools/check-secrets.mjs` merged forward to `4.x`. **The gate on this is now satisfied** — `4.x`
+      stopped holding live values in `89cb3cce` (P1), so merging it no longer pins `4.x` CI red.
+- [x] ~~Orphaned worktrees deleted~~ — **done 2026-07-25**; both dirs are gone from disk and from
+      `git worktree list`.
 
 ## Standing constraints
 

@@ -165,10 +165,31 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > `${ENV:…}`/`%VAR%`/`process.env`, placeholders, `*Ref`/`*File`/`*Name` indirection keys, `token`-suffixed
 > keys (D15 made `tokenEndpoint` required config), and anything containing `EXAMPLE` (AWS's published SigV4
 > vectors). Line hatch: `secret-allow`. Verified both ways — green on the repo, and red on a synthetic
-> fixture in the incident's exact shape. ⚠ **Master-only by design: do NOT merge it forward** until the
-> `4.x` PKCE fix lands, or `4.x` CI pins permanently red.
+> fixture in the incident's exact shape. ~~Master-only by design: do NOT merge it forward until the `4.x`
+> PKCE fix lands~~ — **that gate is now satisfied** (P1 shipped `89cb3cce`); merging it forward to `4.x`
+> is an open follow-on, see the P0/P1 block below.
 >
-> **⚠ `4.x` IS NOT FIXED, AND THERE THE SECRETS ARE LIVE.** On `master` the removal was a no-op because
+> **✅ `4.x` IS NOW FIXED CODE-SIDE (2026-07-25) — ROTATION IS UNBLOCKED.** P0 (`481a68d5`) removed the
+> dead confidential-client code holding the inline IAM literal; **P1 (`89cb3cce`) put the live path on
+> PKCE and removed `appClientSecret` from `4.x` entirely** — `app.properties.ts` and all four
+> `environments/*.ts`. `git grep appClientSecret` on `4.x` now returns nothing. Both propagated to master
+> as no-content `-s ours` merges (`54443256`, `37c98c6a`). **Nothing code-side blocks rotation any more;
+> what remains is P2 — deploy the `4.x` bundle, then rotate.** Two follow-ons this unlocked or exposed:
+>
+> - **`tools/check-secrets.mjs` can now be merged forward to `4.x`** — the "would pin `4.x` CI
+>   permanently red" objection below is **no longer true**, because `4.x` no longer holds live values.
+>   Do it as its own change and confirm `4.x` CI is green.
+> - **⚠ The OAuth `state` param is generated and sent but never validated on callback.**
+>   `default-callback.component.ts` still only parses `code=` out of the URL, so the CSRF defence PKCE's
+>   `state` exists to provide is not actually armed. Not a rotation blocker (the incident is about the
+>   secret), but it should not sit indefinitely. Fix = compare the returned `state` against the
+>   `sessionStorage` copy before calling `retrieveToken`, and refuse the exchange on mismatch.
+> - **⚠ The refresh grant now sends `client_id` with no client authentication** — an assumption about the
+>   IdP that has not been tested against the real issuer. If wrong, sessions break at *first token
+>   expiry*, not at login, so a sign-in-only smoke test will not catch it. Verify a refresh explicitly
+>   during the P2 deploy (plan §4 Q2).
+>
+> **Historical — the state that motivated the P0/P1 work:** On `master` the removal was a no-op because
 > the consumer was already gone; on `4.x` `app/app-component.service.ts` still exists, is wired into
 > `app.component.ts` + `modules/commons/page.manager.ts`, and actively sends `client_secret` in a token
 > request plus `Authorization: Basic btoa(clientId:clientSecret)` — with the IAM secret **hardcoded inline
@@ -198,20 +219,12 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > Retired lines `1.x`–`3.x` very likely carry the values too; policy forbids committing there, and
 > rotation covers them.
 >
-> **Also still on disk, outside git — OPEN, needs one operator command.** Verified 2026-07-25: there are
-> **two** orphaned dirs under `.claude/worktrees/` (present on disk, absent from `git worktree list`), not
-> one. `quirky-lalande-a4a696/` holds live copies of four `inspecto-ui/src/environments/*.ts` files —
-> including the named-customer prod `appClientSecret` — **plus further copies in its `.angular/` build
-> cache**, which the original row missed. `vigorous-ptolemy-911ed7/` is 11 files of run artifacts with no
-> secrets (its one unique-looking doc, `.claude/completions/2026-06-15-ui-ux-audit-remediation.md`, already
-> exists in the main tree). Both are safe to delete; the path is gitignored so nothing is version-tracked:
->
-> ```
-> rm -rf .claude/worktrees/quirky-lalande-a4a696 .claude/worktrees/vigorous-ptolemy-911ed7
-> ```
->
-> Deletion does **not** reduce the incident's severity (the values are already public via git history) —
-> it just stops a local grep from handing them out. Rotation remains the fix.
+> **✅ Orphaned worktrees on disk — RESOLVED.** The two dirs under `.claude/worktrees/`
+> (`quirky-lalande-a4a696/`, which held live copies of four `inspecto-ui/src/environments/*.ts` plus
+> further copies in its `.angular/` build cache, and `vigorous-ptolemy-911ed7/`) are **gone as of
+> 2026-07-25** — confirmed absent from both disk and `git worktree list`. Their deletion never reduced the
+> incident's severity (the values are public via git history regardless); it only stopped a local grep
+> from handing them out. Rotation remains the fix.
 >
 > Lower severity, same files, unaddressed: internal hostnames/IPs are published in-repo
 > (`68.183.16.242`, `p20.prod.pronto`, `app1.pronto.lebara.sa`).
