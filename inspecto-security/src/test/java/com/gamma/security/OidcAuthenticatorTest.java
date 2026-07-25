@@ -145,11 +145,13 @@ class OidcAuthenticatorTest {
         //   canTriageRequirements — Q3 seed, 2026-07-24 (7e90f53d)
         //   canOfferDatasets      — BACKLOG D14, 2026-07-25 (offering exposes data cross-space with no
         //                           second gate, so it left Builder/Power for Admin)
+        //   canCurateMenus        — BACKLOG D4, 2026-07-25 (split out of canAuthorWorkbench: a nav change
+        //                           is visible to every business user and is not a build activity)
         String jwt = token(Instant.now().plusSeconds(60), List.of("admin"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
-                Roles.CAN_OFFER_DATASETS), admin.capabilities());
+                Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS), admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
     }
@@ -233,12 +235,17 @@ class OidcAuthenticatorTest {
 
     @Test
     void superRoleGrantsAllCapabilities() throws Exception {
+        // ⚠ This literal set is the WHOLE capability vocabulary and must be extended by every new
+        // capability — it went stale twice on 2026-07-25 alone (D14 canOfferDatasets, D4 canCurateMenus).
+        // It cannot assert against Roles.KNOWN_CAPABILITIES / CapabilityManifest.capabilities() because
+        // both are package-private to com.gamma.control and this test is another package in another
+        // module; widening them for a test was judged the wrong trade. Keep the list in sync.
         String jwt = token(Instant.now().plusSeconds(60), List.of("super"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Optional<Subject> subject = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt);
         assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS,
                         Roles.CAN_TRIAGE_REQUIREMENTS, Roles.CAN_ONBOARD_CONNECTIONS,
                         Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
-                        Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES),
+                        Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS),
                 subject.get().capabilities());
     }
 

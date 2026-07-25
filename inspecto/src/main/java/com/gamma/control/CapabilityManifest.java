@@ -78,7 +78,7 @@ final class CapabilityManifest {
             new Entry("POST", "/jobs/([^/]+)/reschedule", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/jobs/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             // NavRoutes
-            new Entry("PUT", "/nav/menus", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("PUT", "/nav/menus", Roles.CAN_CURATE_MENUS),
             // NotificationRoutes
             new Entry("POST", "/notifications/channels", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/notifications/channels/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

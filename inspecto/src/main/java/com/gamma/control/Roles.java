@@ -56,6 +56,7 @@ public final class Roles {
     // ── capability vocabulary (must stay congruent with the withCapability route gates; R4 will
     //    pin that congruence with a manifest test) ─────────────────────────────────────────────
     public static final String CAN_AUTHOR_WORKBENCH    = "canAuthorWorkbench";
+    public static final String CAN_CURATE_MENUS        = "canCurateMenus";
     public static final String CAN_OPERATE_RUNS        = "canOperateRuns";
     public static final String CAN_TRIAGE_REQUIREMENTS = "canTriageRequirements";
     public static final String CAN_ONBOARD_CONNECTIONS = "canOnboardConnections";
@@ -97,6 +98,11 @@ public final class Roles {
      * <em>offering</em> a Dataset cross-space is a data-exposure decision with no second gate behind it, unlike
      * {@code canRequestShares}, where an owner still has to approve. Requesting stays broadly granted;
      * exposing does not.
+     *
+     * <p>{@code canCurateMenus} was split out of {@code canAuthorWorkbench} on 2026-07-25 (BACKLOG D4) and
+     * granted to Admin/Super plus {@code power}: a Menu-tree change is visible to every business user in the
+     * space and is not a build activity, so the builder roles that may edit a pipeline no longer get menu
+     * curation for free. {@code power} is the seeded role closest to "owns this space's presentation".
      */
     static final Map<String, Def> SEED = seed();
 
@@ -110,9 +116,9 @@ public final class Roles {
         m.put("operations", new Def(ops, null));
         m.put("support", new Def(ops, null));
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
-                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS), null));
+                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
-                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS), null));
+                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order

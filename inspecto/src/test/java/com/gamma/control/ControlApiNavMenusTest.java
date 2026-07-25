@@ -6,6 +6,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.metrics.MetricRegistry;
 import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceManager;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -18,6 +19,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -142,8 +144,54 @@ class ControlApiNavMenusTest {
         }
     }
 
-    private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
+    // ── BACKLOG D4: the PUT gate is canCurateMenus, not canAuthorWorkbench ──────────
+    // Forced Authenticator standing in for the Standard edition's security module (same seam as
+    // ControlApiAuthV1Test); grants come straight from the seed table so the D4 seed split is what
+    // is asserted, not a hand-written capability set. Always restored in tearDown.
+
+    private static final String AUTH = "Authorization";
+
+    private static final Authenticator SEED_ROLES = ex -> switch (
+            String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+        case "Bearer power" -> Optional.of(new Subject("pat", Roles.SEED.get("power").capabilities()));
+        case "Bearer developer" -> Optional.of(new Subject("dev", Roles.SEED.get("developer").capabilities()));
+        default -> Optional.empty();
+    };
+
+    @AfterEach
+    void restoreAuthenticator() {
+        Authenticators.forTest(null);
+    }
+
+    @Test
+    void menuCurationRequiresCanCurateMenus(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            // Create the space BEFORE arming the Authenticator. With one active, authenticate()
+            // resolves writeRoot() → SpaceManager.current(), which throws "No spaces are hosted" on a
+            // root that has none — and POST /spaces is the very call that creates the first one.
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            Authenticators.forTest(SEED_ROLES);
+            String base = "/spaces/acme/nav/menus";
+
+            // 'developer' holds canAuthorWorkbench but no longer curates menus (D4 split)
+            assertTrue(Roles.SEED.get("developer").capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH));
+            HttpResponse<String> denied = send(c.port, "PUT", base, TREE, AUTH, "Bearer developer");
+            assertEquals(403, denied.statusCode(), denied.body());
+            assertEquals("PERMISSION_DENIED", V1Body.of(denied.body()).get("error").get("errorCode").asText());
+            assertFalse(Files.exists(root.resolve("acme").resolve("config").resolve("nav-menus.toon")),
+                    "a denied curation must not have written the Menu tree");
+
+            // 'power' carries the new capability (seed grant: admin/super + power) and curates
+            assertTrue(Roles.SEED.get("power").capabilities().contains(Roles.CAN_CURATE_MENUS));
+            HttpResponse<String> ok = send(c.port, "PUT", base, TREE, AUTH, "Bearer power");
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertEquals(2, json(ok).get("nodes").size());
+        }
+    }
+
+    private HttpResponse<String> send(int port, String method, String path, String body, String... headers) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
+        if (headers.length > 0) b.headers(headers);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());

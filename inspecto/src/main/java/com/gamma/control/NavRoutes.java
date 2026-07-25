@@ -12,8 +12,12 @@ import java.util.Map;
  * (menu-builder plan §4.7):
  * <pre>
  *   GET /nav/menus   the space's Menu tree {space, version, nodes} (empty tree before any save)
- *   PUT /nav/menus   replace the space's Menu tree (write-root gated, capability-gated)
+ *   PUT /nav/menus   replace the space's Menu tree (write-root gated, canCurateMenus)
  * </pre>
+ *
+ * <p>The write gate is {@code canCurateMenus}, split out of {@code canAuthorWorkbench} on 2026-07-25
+ * (BACKLOG D4): a Menu-tree change is visible to every business user in the space and is not a build
+ * activity, so it must not ride on the workbench-authoring capability.
  *
  * <p>Space-scoped through the standard {@code /spaces/{id}/…} request seam, stored as
  * {@code nav-menus.toon} in the bound space's config tree ({@link ApiContext#writeRoot()}) — the same
@@ -27,7 +31,7 @@ final class NavRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/nav/menus", (e, m) -> ETags.respond(e, readMenus(api)));
-        api.put("/nav/menus", ApiContext.withCapability("canAuthorWorkbench",
+        api.put("/nav/menus", ApiContext.withCapability("canCurateMenus",
                 (e, m) -> writeMenus(api, api.body(e))));
     }
 
