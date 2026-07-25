@@ -221,16 +221,6 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
-- **⚠ Possible auth bootstrap trap — `POST /spaces` 500s when an `Authenticator` is active and no space
-  is hosted yet.** Surfaced 2026-07-25 while writing the D4 gate test: `ControlApi.authenticate`
-  (`ControlApi.java:618`) resolves `writeRoot()` → `SpaceManager.current()`
-  (`SpaceManager.java:393`), which throws `IllegalStateException: No spaces are hosted` — and
-  `POST /spaces` is the very call that creates the first one. The result is a **500 with an empty body**,
-  not a 4xx. **Not confirmed against a real deployment** — it may be unreachable if Standard/Enterprise
-  always host a space by the time auth is armed. Worth 20 minutes to confirm: if a fresh multi-space
-  deployment with auth on and an empty spaces root can hit it, the first space can never be created.
-  Fix direction (needs a call): make the authenticate step resolve `writeRoot()` lazily, or exempt the
-  space-creation route. The D4 test works around it by creating the space before arming the authenticator.
 - **`fp-query`/`fp-job`/`fp-enrich` module extraction** — **build only on explicit request.** Nobody
   has asked; it is a preference, not a need. Main-code layering is already clean and acyclic, but it
   is **not a single clean increment**: `query`/`job` also depend on `signal` + `ops` (outside the

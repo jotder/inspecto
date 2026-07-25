@@ -180,11 +180,21 @@ via `META-INF/services`. Personal/Standard never bundle it and behave byte-ident
   ⚠ **The manifest entry and the route gate must land in the same commit** — `CapabilityManifestTest`
   enforces manifest↔registration congruence in *both* directions, matching on the capability **string
   literal** at the registration site.
-  ⚠ **Bootstrap-order trap, hit writing the gate test:** with an `Authenticator` active,
-  `ControlApi.authenticate` resolves `writeRoot()` → `SpaceManager.current()`, which throws on a root with no
-  spaces — so `POST /spaces` (the call that creates the first one) 500s with an empty body. `ControlApiNavMenusTest`
-  works around it by creating the space *before* arming the authenticator; whether it is reachable in a real
-  deployment is [BACKLOG](../../../BACKLOG.md) §6.
+  ⚠ **Zero-hosted-spaces trap, hit writing the gate test — INVESTIGATED + FIXED 2026-07-25.** With an
+  `Authenticator` active, `ControlApi.authenticate` resolved `writeRoot()` → `SpaceManager.current()` for
+  *every* request, which throws `IllegalStateException: No spaces are hosted` on a root with none — so every
+  route 500ed, including `/health` and the `POST /spaces` that would recover. Findings on investigation:
+  the **bootstrap framing was wrong** (`ControlApi.main` `System.exit(1)`s on an empty `-Dspaces.root`, so a
+  fresh install can never reach a running zero-space server, and single-tenant always hosts exactly one), and
+  the body was **not** empty — `errorBoundary` returns a structured `INTERNAL` envelope. But it **was**
+  reachable by *deleting the last space* at runtime, which had no guard. Two fixes shipped: `authenticate`
+  resolves the roles root only when a space is hosted (`Roles.effective(null)` already degrades to the seed
+  table, so authentication needs no space), and `DELETE /spaces/{id}?purge=true` is refused with a **409**
+  when it would remove the last space *directory on disk* — deliberately a directory count, not a hosted
+  count, so a deregistered-but-on-disk space still counts as a survivor and the predicate is exactly the
+  negation of `main()`'s boot condition. Deregister-only on the last space stays allowed. Regression tests:
+  `ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet` and
+  `purgingTheLastSpaceOnDiskIsRefused`.
   ⚠ **UI caveat, pre-existing and NOT introduced here:** every `LensService` capability is
   `granted && !readOnly && allows(…)`, and `allowedLenses` qualifies Builder/Ops only via
   `canAuthorWorkbench`/`canOperateRuns`. An OIDC subject holding *only* the admin seed is therefore snapped to
