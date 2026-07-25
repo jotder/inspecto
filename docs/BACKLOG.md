@@ -148,7 +148,7 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > | `appClientSecret` | **`app1.pronto.lebara.sa`** — named-customer production (`environment.prod.ts`) | 1 |
 >
 > Rotate the production `appClientSecret` first, then the shared `iamClientSecret` (one rotation covers
-> every environment). Client IDs are retained in-repo — they are not secrets — so the issuer-side entries
+> every environment). Execution checklist: [`ops/secret-rotation-runbook.md`](ops/secret-rotation-runbook.md). Client IDs are retained in-repo — they are not secrets — so the issuer-side entries
 > are identifiable: `appClientId` 8738429453654150144 (prod), 8825302933668759552 (dev/offline),
 > 5829657973124606976 (gamma), 2826856297262914560 (gammadev); `iamClientId` 1070682796450139008.
 >

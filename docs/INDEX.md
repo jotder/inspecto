@@ -61,7 +61,7 @@ former root reference docs** (each index lists them):
 
 - [`api/`](api/README.md) — **machine-readable v1 HTTP contract**: `openapi-v1.json` + canonical
   `examples/`, enforced by `ApiContractTest`; `schemas/` (metadata-bundle JSON Schema + samples).
-- [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance.
+- [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation.
 - [`ui/accessibility-audit.md`](ui/accessibility-audit.md) — the **living** inspecto-ui WCAG/a11y
   findings register (referenced by `okf/frontend/conventions/accessibility.md`).
 
