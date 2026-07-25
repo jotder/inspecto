@@ -34,6 +34,11 @@ export class AppUtils {
     }
 
     static async redirectToAuthServer(props: AppProperties, pageManager: PageManager): Promise<void> {
+        // Capture the return URL BEFORE the first await. This runs from a CanActivate guard that
+        // returns false, so once we yield the router may already have reverted the address bar —
+        // reading it after `await` would send the user somewhere else after login.
+        pageManager.redirectPath = window.location.href;
+
         const verifier = randomVerifier();
         const state = randomState();
         const challenge = await challengeFromVerifier(verifier);
@@ -51,7 +56,6 @@ export class AppUtils {
         });
 
         const navigateUrl = `${environment.authServerUrl}${environment.authVersion}/authorize?${params}`;
-        pageManager.redirectPath = window.location.href;
         window.location.href = navigateUrl;
     }
 
