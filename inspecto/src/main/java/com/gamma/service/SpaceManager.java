@@ -327,6 +327,21 @@ public final class SpaceManager implements AutoCloseable {
     }
 
     /**
+     * True when {@code id}'s directory is the last one under the container root that {@link #discover} would boot —
+     * i.e. purging it would leave an empty spaces root, which {@code ControlApi.main} refuses to start from. Uses the
+     * same "dir with a {@code config/} subtree" predicate as discovery, so a deregistered-but-still-on-disk space
+     * (deleted without {@code purge}) correctly counts as a survivor; {@code false} in single-tenant mode.
+     */
+    public boolean isLastOnDisk(SpaceId id) throws IOException {
+        if (spacesRoot == null || !Files.isDirectory(spacesRoot)) return false;
+        try (Stream<Path> dirs = Files.list(spacesRoot)) {
+            return dirs.filter(Files::isDirectory)
+                    .filter(d -> Files.isDirectory(d.resolve("config")))
+                    .allMatch(d -> d.getFileName().toString().equals(id.value()));
+        }
+    }
+
+    /**
      * Remove a hosted space: deregister it first (new requests {@code 404} at once), then drain-and-close its service
      * (the existing {@link CollectorService#close()}). When {@code purge} is set, the space's directory tree
      * ({@code config/data/audit/duckdb/flows} + manifest) is then deleted from disk; otherwise the files are left for

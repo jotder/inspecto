@@ -15,6 +15,8 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -111,8 +113,81 @@ class ControlApiSpacesTest {
         }
     }
 
+    /**
+     * A Standard/Enterprise server that hosts ZERO spaces must still answer its recovery route. Reachable in
+     * production by deleting the last space (there is no last-space guard); {@code main()} refuses to boot an
+     * empty {@code -Dspaces.root}, so this is the delete path, not a fresh install. The gate used to resolve
+     * {@code writeRoot()} for every authenticated request, which calls {@code SpaceManager.current()} and
+     * throws {@code IllegalStateException("No spaces are hosted")} — bricking the server: every route 500ed,
+     * including the {@code POST /spaces} that would recover it.
+     */
+    @Test
+    void authenticatedCreateSucceedsWhenNoSpaceIsHostedYet(@TempDir Path root) throws Exception {
+        Authenticators.forTest(ex -> "Bearer valid".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? Optional.of(new Subject("jdoe", Set.of()))
+                : Optional.empty());
+        try (Ctx c = open(root)) {
+            assertEquals(0, c.spaces.size(), "precondition: an armed Authenticator over an empty container");
+
+            HttpResponse<String> created = authed(c.port, "POST", "/spaces", "{\"id\":\"acme\"}");
+            assertEquals(200, created.statusCode(), created.body());
+            assertEquals("acme", json(created).get("id").asText());
+
+            // the gate still authenticates — a missing credential is a clean 401, never a 500
+            assertEquals(401, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
+
+            // and deregistering back down to zero leaves the server recoverable rather than bricked
+            assertEquals(200, authed(c.port, "DELETE", "/spaces/acme", null).statusCode());
+            assertEquals(0, c.spaces.size());
+            assertEquals(200, authed(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}").statusCode());
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    /**
+     * {@code ?purge=true} on the last space dir on disk is refused (409): it would leave an empty spaces root,
+     * which {@code main()} exits rather than boots — an irrecoverable state over HTTP. The predicate counts
+     * DIRECTORIES, not hosted spaces, so a space deregistered without purge still counts as a survivor.
+     */
+    @Test
+    void purgingTheLastSpaceOnDiskIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+
+            HttpResponse<String> refused = send(c.port, "DELETE", "/spaces/acme?purge=true", null);
+            assertEquals(409, refused.statusCode(), refused.body());
+            assertTrue(Files.isDirectory(root.resolve("acme")), "refused purge left the tree intact");
+            assertEquals(1, c.spaces.size(), "refused purge did not deregister it either");
+
+            // a second space on disk makes the purge safe again
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
+            assertEquals(200, send(c.port, "DELETE", "/spaces/acme?purge=true", null).statusCode());
+            assertFalse(Files.exists(root.resolve("acme")));
+
+            // beta is now last: deregister-only is still allowed and keeps the files for re-discovery
+            assertEquals(200, send(c.port, "DELETE", "/spaces/beta", null).statusCode());
+            assertEquals(0, c.spaces.size());
+            assertTrue(Files.isDirectory(root.resolve("beta")), "deregister-only keeps the last tree on disk");
+
+            // and an unhosted-but-on-disk space is still the reason a purge of a hosted one can proceed
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"gamma\"}").statusCode());
+            assertEquals(200, send(c.port, "DELETE", "/spaces/gamma?purge=true", null).statusCode(),
+                    "beta's tree survives on disk, so purging gamma is recoverable");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
+        return send(port, method, path, body, null);
+    }
+
+    private HttpResponse<String> authed(int port, String method, String path, String body) throws Exception {
+        return send(port, method, path, body, "Bearer valid");
+    }
+
+    private HttpResponse<String> send(int port, String method, String path, String body, String auth) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
+        if (auth != null) b.header("Authorization", auth);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
