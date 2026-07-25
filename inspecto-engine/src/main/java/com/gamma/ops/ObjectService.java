@@ -468,6 +468,92 @@ public final class ObjectService {
         return created;
     }
 
+    /**
+     * What a vocabulary-level tag change touched: assignment edges rewritten, object CSVs re-projected,
+     * and the Tag Rules that followed the rename (their persisted files need rewriting by the caller).
+     */
+    public record TagVocabularyChange(int assignments, int objects, List<String> rules) {}
+
+    /**
+     * Rename a tag <em>everywhere</em> — registry, assignment edges, the {@link #ATTR_TAGS} projection of
+     * every affected object, and any Tag Rule that applies it. This is the operation the central
+     * assignment store exists for: under the pre-D7 per-entity CSV shape a rename could not propagate.
+     *
+     * <p>Renaming onto an existing tag <b>merges</b> them, which the store's composite key already handles
+     * correctly; the source tag then ceases to exist. Tag Rules follow the rename, otherwise the next rule
+     * run would resurrect the old name.
+     *
+     * @throws NoSuchElementException   if no tag has this name
+     * @throws IllegalArgumentException if the new name is not a valid tag name
+     */
+    public TagVocabularyChange renameTag(String from, String to) {
+        Tag existing = tag(from).orElseThrow(() -> new NoSuchElementException("no tag named '" + from + "'"));
+        Tag renamed = new Tag(to, existing.createdAt());   // validates the new name before anything mutates
+        if (renamed.name().equals(existing.name())) return new TagVocabularyChange(0, 0, List.of());
+
+        // Collect the affected objects BEFORE the rename — afterwards the old name has no edges left.
+        List<String> affected = objectTargetsOf(existing.name());
+        int edges = tagAssignments.rename(existing.name(), renamed.name());
+        tags.remove(existing.name());
+        tags.put(renamed.name(), renamed);
+
+        List<String> followed = new java.util.ArrayList<>();
+        for (TagRule rule : tagRules()) {
+            if (!rule.tag().equals(existing.name())) continue;
+            tagRules.put(rule.name(), new TagRule(rule.name(), renamed.name(), rule.filter(), rule.createdAt()));
+            followed.add(rule.name());
+        }
+        return new TagVocabularyChange(edges, reprojectAll(affected), List.copyOf(followed));
+    }
+
+    /**
+     * Delete a tag from the registry and remove every assignment it has, re-projecting each affected
+     * object's CSV. Without this, retiring a tag would leave its edges orphaned in the store.
+     *
+     * @throws NoSuchElementException if no tag has this name
+     * @throws IllegalStateException  if a Tag Rule still applies it — the rule would immediately
+     *                                re-create the tag, so the rule must be dealt with first
+     */
+    public TagVocabularyChange deleteTag(String name) {
+        Tag existing = tag(name).orElseThrow(() -> new NoSuchElementException("no tag named '" + name + "'"));
+        List<String> appliedBy = tagRules().stream().filter(r -> r.tag().equals(existing.name()))
+                .map(TagRule::name).toList();
+        if (!appliedBy.isEmpty())
+            throw new IllegalStateException("tag '" + existing.name() + "' is still applied by tag rule(s) "
+                    + appliedBy + " — delete or repoint them first");
+
+        List<String> affected = objectTargetsOf(existing.name());
+        int edges = tagAssignments.removeTag(existing.name());
+        tags.remove(existing.name());
+        return new TagVocabularyChange(edges, reprojectAll(affected), List.of());
+    }
+
+    /** The ids of the objects currently carrying {@code tag} (component targets have no CSV to project). */
+    private List<String> objectTargetsOf(String tag) {
+        return tagAssignments.forTag(tag).stream()
+                .filter(a -> com.gamma.ops.note.NoteTargets.OBJECT.equals(a.targetKind()))
+                .map(com.gamma.ops.tag.TagAssignment::targetId)
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * Re-project the CSV of each object id. A store-level rename alone leaves every projection stale —
+     * this is the step that makes the vocabulary change visible in the object JSON the UI reads. Ids with
+     * no object behind them are skipped: assignments are not cascade-deleted, so a stale edge is normal.
+     */
+    private int reprojectAll(List<String> objectIds) {
+        long now = System.currentTimeMillis();
+        int done = 0;
+        for (String id : objectIds) {
+            OperationalObject o = store.get(id).orElse(null);
+            if (o == null) continue;
+            projectTags(o, now);
+            done++;
+        }
+        return done;
+    }
+
     /** Rewrite an object's CSV attribute from the assignment store — the projection, never the reverse. */
     private OperationalObject projectTags(OperationalObject o, long now) {
         return store.update(o.withAttributes(

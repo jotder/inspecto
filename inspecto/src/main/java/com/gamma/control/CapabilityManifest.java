@@ -116,6 +116,8 @@ final class CapabilityManifest {
             new Entry("POST", "/dashboards/([^/]+)/share", Roles.CAN_AUTHOR_WORKBENCH),
             // TagRoutes
             new Entry("POST", "/tags", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/tags/([^/]+)/rename", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("DELETE", "/tags/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/tags/rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/tags/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH));
 

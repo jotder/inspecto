@@ -235,6 +235,65 @@ class ControlApiTagRoutesTest {
         }
     }
 
+    @Test
+    void renamingATagMovesTheEdgesTheCsvTheRuleAndTheFile(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+                    "HIGH", "CRITICAL", null, null, "corr", Map.of());
+            send(c.port, "POST", "/tags/rules",
+                    "{\"name\":\"criticals\",\"tag\":\"urgent\",\"filter\":{\"severity\":\"CRITICAL\"}}");
+            send(c.port, "POST", "/tags/assignments/object/" + inc.id(), "{\"tag\":\"urgent\"}");
+
+            JsonNode renamed = json(send(c.port, "POST", "/tags/urgent/rename", "{\"to\":\"sev1\"}"));
+            assertEquals(1, renamed.get("assignments").asInt());
+            assertEquals(1, renamed.get("objects").asInt(), "the object CSV must be re-projected");
+            assertEquals("criticals", renamed.get("rules").get(0).asText(), "rules follow the rename");
+
+            assertEquals("sev1", json(send(c.port, "GET", "/objects/" + inc.id(), null))
+                    .get("attributes").get("tags").asText());
+            assertEquals(1, JSON.readTree(send(c.port, "GET", "/tags/sev1/targets", null).body())
+                    .at("/data").size());
+            assertEquals(0, JSON.readTree(send(c.port, "GET", "/tags/urgent/targets", null).body())
+                    .at("/data").size());
+            assertEquals("sev1", json(send(c.port, "GET", "/tags/rules", null)).get(0).get("tag").asText());
+
+            // The registry must survive a restart under the NEW name only.
+            assertTrue(Files.exists(writeRoot.resolve("sev1_tag.toon")));
+            assertFalse(Files.exists(writeRoot.resolve("urgent_tag.toon")));
+            assertEquals(404, send(c.port, "POST", "/tags/urgent/rename", "{\"to\":\"x\"}").statusCode());
+            assertEquals(400, send(c.port, "POST", "/tags/sev1/rename", "{}").statusCode());
+            assertEquals(422, send(c.port, "POST", "/tags/sev1/rename", "{\"to\":\"a,b\"}").statusCode());
+        }
+    }
+
+    @Test
+    void deletingATagRemovesItsAssignmentsButNotWhileARuleAppliesIt(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            OperationalObject inc = c.svc.objects().open(ObjectType.INCIDENT, "spike", "d",
+                    "HIGH", "CRITICAL", null, null, "corr", Map.of());
+            send(c.port, "POST", "/tags/rules",
+                    "{\"name\":\"criticals\",\"tag\":\"urgent\",\"filter\":{\"severity\":\"CRITICAL\"}}");
+            send(c.port, "POST", "/tags", "{\"name\":\"q3-audit\"}");
+            send(c.port, "POST", "/tags/assignments/object/" + inc.id(), "{\"tag\":\"q3-audit\"}");
+            send(c.port, "POST", "/tags/assignments/object/" + inc.id(), "{\"tag\":\"urgent\"}");
+
+            // The rule would re-create it on the next matching object, so deleting it is a conflict.
+            assertEquals(409, send(c.port, "DELETE", "/tags/urgent", null).statusCode());
+
+            JsonNode deleted = json(send(c.port, "DELETE", "/tags/q3-audit", null));
+            assertEquals(1, deleted.get("assignments").asInt());
+            assertTrue(deleted.get("fileRemoved").asBoolean());
+            assertFalse(Files.exists(writeRoot.resolve("q3-audit_tag.toon")));
+            assertEquals("urgent", json(send(c.port, "GET", "/objects/" + inc.id(), null))
+                    .get("attributes").get("tags").asText(), "only the deleted label leaves the CSV");
+            assertEquals(0, JSON.readTree(send(c.port, "GET", "/tags/q3-audit/targets", null).body())
+                    .at("/data").size(), "no orphaned edges may survive the tag");
+            assertEquals(404, send(c.port, "DELETE", "/tags/q3-audit", null).statusCode());
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

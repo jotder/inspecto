@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -135,19 +136,78 @@ class ObjectTagProjectionTest {
     }
 
     @Test
-    void renamingATagReachesTheObjectCsvOnceReprojected() {
+    void renamingATagReachesTheObjectCsv() {
         // The architectural payoff: under the pre-D7 per-entity CSV shape a rename could not propagate.
         Fixture f = fixture();
+        f.objects.registerTag(new Tag("q3-audit", 1_000L));
         OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "HIGH", "CRITICAL",
                 null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "q3-audit"));
 
-        assertEquals(1, f.tags.rename("q3-audit", "q3-review"));
-        assertEquals(List.of("q3-review"), f.tags.tagsOf("object", o.id()));
+        ObjectService.TagVocabularyChange changed = f.objects.renameTag("q3-audit", "q3-review");
 
-        // ⚠ The CSV is stale until something re-projects it — there is no rename ROUTE yet, and wiring
-        // one must re-project every affected object. This test pins the gap so it cannot be forgotten.
-        assertEquals("q3-audit", f.store.get(o.id()).orElseThrow().attributes().get(ObjectService.ATTR_TAGS));
-        f.objects.applyTag(o.id(), "q3-review", "alice");
+        assertEquals(1, changed.assignments());
+        // The store rename alone would leave every CSV stale; re-projection is what closes the gap.
+        assertEquals(1, changed.objects());
         assertAgree(f, o.id(), "q3-review");
+        assertTrue(f.objects.tag("q3-audit").isEmpty(), "the old name must stop existing");
+    }
+
+    @Test
+    void renamingOntoAnExistingTagMergesThem() {
+        Fixture f = fixture();
+        f.objects.registerTag(new Tag("q3-audit", 1_000L));
+        f.objects.registerTag(new Tag("q3-review", 1_000L));
+        OperationalObject both = f.objects.open(ObjectType.INCIDENT, "a", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "q3-audit,q3-review"));
+        OperationalObject old = f.objects.open(ObjectType.INCIDENT, "b", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "q3-audit"));
+
+        f.objects.renameTag("q3-audit", "q3-review");
+
+        // Two edges collapsing into one is correct, not a conflict — the composite key makes it so.
+        assertAgree(f, both.id(), "q3-review");
+        assertAgree(f, old.id(), "q3-review");
+        assertEquals(2, f.tags.forTag("q3-review").size());
+    }
+
+    @Test
+    void renamingCarriesTheTagRulesThatApplyTheTag() {
+        Fixture f = fixture();
+        f.objects.registerTagRule(TagRule.fromMap(Map.of(
+                "name", "criticals", "tag", "urgent", "filter", Map.of("severity", "CRITICAL"))));
+
+        assertEquals(List.of("criticals"), f.objects.renameTag("urgent", "sev1").rules());
+
+        // Had the rule kept the old name it would resurrect it on the next object.
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "CRITICAL", "HIGH",
+                null, null, "corr", Map.of());
+        assertAgree(f, o.id(), "sev1");
+    }
+
+    @Test
+    void deletingATagDropsItsAssignmentsAndReprojects() {
+        Fixture f = fixture();
+        f.objects.registerTag(new Tag("q3-audit", 1_000L));
+        OperationalObject o = f.objects.open(ObjectType.INCIDENT, "spike", "d", "HIGH", "CRITICAL",
+                null, null, "corr", Map.of(ObjectService.ATTR_TAGS, "q3-audit,keep"));
+
+        ObjectService.TagVocabularyChange changed = f.objects.deleteTag("q3-audit");
+
+        assertEquals(1, changed.assignments());
+        assertAgree(f, o.id(), "keep");
+        assertTrue(f.tags.forTag("q3-audit").isEmpty(), "no orphaned edges may survive the tag");
+    }
+
+    @Test
+    void deletingATagStillAppliedByARuleIsRefused() {
+        Fixture f = fixture();
+        f.objects.registerTagRule(TagRule.fromMap(Map.of(
+                "name", "criticals", "tag", "urgent", "filter", Map.of("severity", "CRITICAL"))));
+
+        // Deleting it would be undone by the next matching object — the rule must be dealt with first.
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> f.objects.deleteTag("urgent"));
+        assertTrue(refused.getMessage().contains("criticals"), refused.getMessage());
+        assertTrue(f.objects.tag("urgent").isPresent());
     }
 }

@@ -33,6 +33,8 @@ final class TagRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/tags", (e, m) -> api.service().objects().tags().stream().map(Tag::toMap).toList());
         api.post("/tags", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createTag(api, api.body(e))));
+        api.post("/tags/([^/]+)/rename", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> renameTag(api, ApiContext.name(m), api.body(e))));
+        api.delete("/tags/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteTag(api, ApiContext.name(m))));
         api.get("/tags/rules", (e, m) -> api.service().objects().tagRules().stream().map(TagRule::toMap).toList());
         api.post("/tags/rules", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> saveTagRule(api, api.body(e))));
         api.delete("/tags/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteTagRule(api, ApiContext.name(m))));
@@ -145,6 +147,69 @@ final class TagRoutes implements RouteModule {
                 "tag '" + tag.name() + "' already exists");
         persist(api, file, Map.of("tag", tag.toMap()), ".tag-");
         return api.service().objects().registerTag(tag).toMap();
+    }
+
+    /**
+     * {@code POST /tags/{name}/rename} — rename a tag everywhere; body {@code {to}}. The operation the
+     * central assignment store exists for: the registry entry, every assignment edge, every affected
+     * object's {@code tags} projection and any Tag Rule applying the tag all move together.
+     *
+     * <p>Renaming onto an existing tag <b>merges</b> the two — the composite assignment key makes that
+     * correct rather than a conflict — and the source tag stops existing.
+     */
+    private Object renameTag(ApiContext api, String from, Map<String, Object> body) throws IOException {
+        WriteGates.requireWriteRoot(api, "tag write");
+        String to = ApiContext.str(body, "to");
+        if (to == null) throw new ApiException(400, "body must include 'to'");
+        if (api.service().objects().tag(from).isEmpty())
+            throw new ApiException(404, "no tag named '" + from + "'");
+
+        // Persist the destination first (the createTag order): a failed write must not leave a renamed
+        // in-memory vocabulary with nothing on disk to reload at the next boot.
+        Path target = tagFile(api, to, "_tag.toon", "tag name");
+        ObjectService.TagVocabularyChange changed;
+        try {
+            persist(api, target, Map.of("tag", Map.of("name", to.trim(),
+                    "createdAt", System.currentTimeMillis())), ".tag-");
+            changed = api.service().objects().renameTag(from, to);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
+        }
+        // A rule that followed the rename now disagrees with its own file until rewritten.
+        for (String rule : changed.rules())
+            api.service().objects().tagRule(rule).ifPresent(r -> {
+                try {
+                    persist(api, tagFile(api, rule, "_tagrule.toon", "tag rule name"),
+                            Map.of("tag_rule", r.toMap()), ".tagrule-");
+                } catch (IOException io) {
+                    throw new ApiException(500, "renamed tag rule '" + rule + "' could not be persisted: " + io);
+                }
+            });
+        boolean fileRemoved = Files.deleteIfExists(tagFile(api, from, "_tag.toon", "tag name"));
+        log.info("[TAG-RENAME] '{}' -> '{}': {} assignment(s), {} object(s) re-projected, rules {}",
+                from, to, changed.assignments(), changed.objects(), changed.rules());
+        return Map.of("renamed", from, "to", to.trim(), "assignments", changed.assignments(),
+                "objects", changed.objects(), "rules", changed.rules(), "fileRemoved", fileRemoved);
+    }
+
+    /**
+     * {@code DELETE /tags/{name}} — retire a tag: the registry entry, its file, and every assignment it
+     * has, re-projecting each affected object. 409 while a Tag Rule still applies it, because the rule
+     * would immediately re-create it.
+     */
+    private Object deleteTag(ApiContext api, String name) throws IOException {
+        WriteGates.requireWriteRoot(api, "tag write");
+        ObjectService.TagVocabularyChange changed;
+        try {
+            changed = api.service().objects().deleteTag(name);
+        } catch (NoSuchElementException notFound) {
+            throw new ApiException(404, notFound.getMessage());
+        } catch (IllegalStateException conflict) {
+            throw new ApiException(409, conflict.getMessage());
+        }
+        boolean fileRemoved = Files.deleteIfExists(tagFile(api, name, "_tag.toon", "tag name"));
+        return Map.of("deleted", name, "assignments", changed.assignments(),
+                "objects", changed.objects(), "fileRemoved", fileRemoved);
     }
 
     /**

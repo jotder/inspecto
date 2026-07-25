@@ -1,10 +1,10 @@
 # Generic tags — cross-entity labelling plan (BACKLOG D7)
 
-**Status:** **PHASES 1 + 2 SHIPPED 2026-07-26** — backend store + routes are in (`ops.tag.TagAssignment*`,
-`/tags/assignments/…`, `/tags/{name}/targets`). Q1–Q4 were answered from the code; **Q5 dissolved and Q6
-was scoped down** at build time (see §3). **Phase 2 — the CSV reconciliation — is now
-built too**: the assignment store is the source of truth and `attributes.tags` is a projection of it, with
-an idempotent startup backfill. **Still open: the rename/delete routes and the UI**; residuals are in
+**Status:** **BACKEND COMPLETE 2026-07-26** — the assignment store (`ops.tag.TagAssignment*`), the
+`/tags/assignments/…` + `/tags/{name}/targets` routes, the CSV reconciliation (the store is the source of
+truth, `attributes.tags` a projection, with an idempotent startup backfill), and the vocabulary routes
+`POST /tags/{name}/rename` + `DELETE /tags/{name}`. Q1–Q4 were answered from the code; **Q5 dissolved and
+Q6 was scoped down** at build time (see §3). **The only thing still open is the UI**; residuals are in
 BACKLOG §6. Concept home:
 [`../okf/backend/control-plane/tags.md`](../okf/backend/control-plane/tags.md). **Owner:** unassigned.
 **Origin:** BACKLOG **D7**, rescoped by the operator during the 2026-07-25 decision session from
@@ -164,10 +164,13 @@ store tests driving **both** implementations through identical assertions + 4 HT
   path (open/adopt, `applyTagRule`, merge union, split carry-over, and the new `applyTag`/`removeTag`).
   Q2 said "do not dual-write", and this is not dual-write — there is exactly one writer of record and one
   derived copy kept for the object JSON the UI reads.
-- **`rename()` and `removeTag()` have no route.** They are implemented and tested — the architecture is
-  justified by rename, so it needed a test that would fail under the per-entity shape — but nothing calls
-  them, so deleting a tag from the registry leaves its assignments behind.
-- **No UI.**
+- ~~**`rename()` and `removeTag()` have no route.**~~ **DONE 2026-07-26** — `POST /tags/{name}/rename` and
+  `DELETE /tags/{name}`, both `canAuthorWorkbench`, via `ObjectService.renameTag`/`deleteTag`. A vocabulary
+  change moves five things at once: registry entry, assignment edges, **every affected object's CSV
+  projection**, any **Tag Rule** applying the tag, and the persisted `*_tag.toon`/`*_tagrule.toon` files.
+  Rename-onto-existing merges (the composite key makes that correct); deleting a tag a rule still applies
+  is **409**, because the rule would silently re-create it.
+- **No UI** — the only remaining gap; the backend is complete end-to-end.
 
 ## 4. Non-goals (v1)
 

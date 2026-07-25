@@ -1,8 +1,8 @@
 # Tags — the cross-entity label graph
 
-**Concept home for BACKLOG D7.** Status: **phase 1 + phase 2 shipped 2026-07-26** — the central store,
-the routes, and the CSV reconciliation. One store is now authoritative; see
-[The CSV is a projection](#the-csv-is-a-projection).
+**Concept home for BACKLOG D7.** Status: **backend complete 2026-07-26** — the central store, the
+assignment routes, the CSV reconciliation, and the rename/delete vocabulary routes. One store is
+authoritative; see [The CSV is a projection](#the-csv-is-a-projection). **No UI yet** (BACKLOG §6).
 
 Related: [`control-api.md`](control-api.md) · [`api-v1.md`](api-v1.md) ·
 [`../editions/auth-security.md`](../editions/auth-security.md) ·
@@ -103,6 +103,8 @@ All under `/api/v1`. Unknown target kind → **400**; absent or invisible target
 | **`GET /tags/assignments/{targetKind}/{targetId}`** | the tags on one thing, alphabetical |
 | **`POST /tags/assignments/{targetKind}/{targetId}`** | apply; body `{tag, actor?}`; idempotent |
 | **`DELETE /tags/assignments/{targetKind}/{targetId}/{tag}`** | remove; idempotent, returns `{removed}` |
+| **`POST /tags/{name}/rename`** | body `{to}`; renames everywhere (`canAuthorWorkbench`) |
+| **`DELETE /tags/{name}`** | retire the tag and all its assignments (`canAuthorWorkbench`) |
 
 **Applying an unregistered tag is a 404**, not an implicit create — silently minting a tag on a typo is
 how a tag vocabulary rots. Create it via `POST /tags` first.
@@ -133,12 +135,17 @@ CSV projection.
 
 ## Gotchas
 
-- **`rename()` and `removeTag()` have no route yet.** They exist on the store, with tests, because the
-  architecture is justified by them — but no endpoint calls them, so deleting a tag from the registry
-  currently leaves its assignments behind. ⚠ **When a rename route is wired it must re-project every
-  affected object's CSV** — the store rename alone leaves the projection stale, which
-  `ObjectTagProjectionTest.renamingATagReachesTheObjectCsvOnceReprojected` pins deliberately. Tracked in
-  BACKLOG §6.
+- **A vocabulary change is five moves, not one.** `POST /tags/{name}/rename` goes through
+  `ObjectService.renameTag`, which moves the registry entry, the assignment edges, **every affected
+  object's CSV projection**, and any **Tag Rule** applying the tag — then the route rewrites the
+  `*_tag.toon` / `*_tagrule.toon` files so the change survives a boot. Miss any one and the vocabulary
+  splits: a store-level rename alone leaves every projection stale, and a rule left pointing at the old
+  name resurrects it on the next matching object. Both are pinned by tests.
+- **Renaming onto an existing tag merges them, deliberately** — the composite assignment key makes two
+  edges collapsing into one correct rather than a conflict, and the source tag then stops existing.
+- **`DELETE /tags/{name}` is 409 while a Tag Rule still applies the tag.** Deleting it would be silently
+  undone by the next matching object, so the rule must be deleted or repointed first. Tag *deletion* does
+  remove every assignment (no orphans); tag *rule* deletion never touches assignments.
 - **The backfill is a full object scan at Space startup.** Fine for Incidents/Cases volumes (they are
   human-scale, not telemetry), but it is O(objects) on every boot even after migration — the store's
   idempotent `add` makes repeat runs harmless, not free. Revisit if a Space ever holds enough objects for
