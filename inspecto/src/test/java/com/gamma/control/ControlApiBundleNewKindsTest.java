@@ -22,9 +22,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Metadata Bundle v2 (2026-07-18 follow-up): the three own-store kinds {@code authored-pipeline}/
  * {@code job}/{@code saved-view} over real HTTP — export, preview and import round-trip through the
- * {@code BundleSource} seam, exactly like the pre-existing {@link ComponentStore} kinds. {@code connection}
- * stays 422 (unsupported) — a deliberate, documented exclusion (secret-policy gated), covered already by
- * {@link ControlApiBundleTest#exportRejectsUnsupportedKindAndEmptySelection}.
+ * {@code BundleSource} seam, exactly like the pre-existing {@link ComponentStore} kinds.
+ *
+ * <p>Since 2026-07-25 (BACKLOG D2) {@code connection} is the fourth own-store kind, carried
+ * <b>reference-only with secrets stripped</b>: a {@code ${ENV:…}} reference travels verbatim, a literal
+ * credential is omitted entirely (never masked to {@code ***}), and an import carrying a raw secret fails
+ * that item. {@code collector} stands in as the still-unsupported kind in the boundary assertions.
  */
 class ControlApiBundleNewKindsTest {
 
@@ -123,10 +126,84 @@ class ControlApiBundleNewKindsTest {
         }
     }
 
+    // ── connection: reference-only, secrets stripped (BACKLOG D2) ────────────────
+
+    @Test
+    void connectionExportStripsLiteralSecretsAndKeepsReferences(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            // A profile a user inlined a literal credential into, alongside a proper ${ENV:…} reference.
+            assertEquals(200, send(c.port, "POST", "/connections",
+                    "{\"id\":\"pg\",\"connector\":\"sftp\",\"host\":\"h1\",\"port\":22,\"username\":\"u\","
+                    + "\"password\":\"hunter2\",\"options\":{\"api_token\":\"raw-token\",\"mode\":\"fast\"},"
+                    + "\"tunnel\":{\"host\":\"bastion\",\"port\":2222,\"password\":\"${ENV:TUN_PW}\"}}")
+                    .statusCode());
+
+            HttpResponse<String> raw = send(c.port, "POST", "/bundle/export",
+                    "{\"items\":[{\"kind\":\"connection\",\"id\":\"pg\"}]}");
+            JsonNode content = json(raw).get("bundle").get("items").get(0).get("content");
+
+            assertFalse(content.has("password"), "a literal password is OMITTED, not masked: " + content);
+            assertFalse(content.get("options").has("api_token"), "a literal secret-ish option is omitted");
+            assertEquals("fast", content.get("options").get("mode").asText(), "non-secret options travel");
+            assertEquals("${ENV:TUN_PW}", content.get("tunnel").get("password").asText(),
+                    "a ${ENV:…} reference travels verbatim");
+            assertEquals("h1", content.get("host").asText());
+            assertEquals("u", content.get("username").asText());
+            assertFalse(raw.body().contains("hunter2"), "no secret value anywhere in the bundle");
+            assertFalse(raw.body().contains("raw-token"), "no secret value anywhere in the bundle");
+            assertFalse(raw.body().contains("***"), "and no mask sentinel either — a sentinel is a persisted lie");
+        }
+    }
+
+    @Test
+    void connectionImportRoundTripsReferencesAndHotRegisters(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String content = "{\"id\":\"pg\",\"connector\":\"sftp\",\"host\":\"h1\",\"port\":22,"
+                    + "\"username\":\"u\",\"password\":\"${ENV:PG_PW}\",\"options\":{\"mode\":\"fast\"}}";
+            JsonNode imp = json(send(c.port, "POST", "/bundle/import", bundleOf("connection", "pg", content)));
+            assertEquals(1, imp.get("imported").asInt(), imp.toString());
+
+            JsonNode detail = json(send(c.port, "GET", "/connections/pg", null));
+            assertEquals("sftp", detail.get("connector").asText(), "hot-registered on the live service");
+            assertEquals("${ENV:PG_PW}", detail.get("password").asText(), "reference preserved end to end");
+
+            JsonNode exp = json(send(c.port, "POST", "/bundle/export",
+                    "{\"items\":[{\"kind\":\"connection\",\"id\":\"pg\"}]}"));
+            assertEquals("${ENV:PG_PW}",
+                    exp.get("bundle").get("items").get(0).get("content").get("password").asText());
+
+            JsonNode imp2 = json(send(c.port, "POST", "/bundle/import", bundleOf("connection", "pg", content)));
+            assertEquals(1, imp2.get("unchanged").asInt(), imp2.toString());
+        }
+    }
+
+    @Test
+    void connectionImportRejectsARawSecret(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String content = "{\"id\":\"pg\",\"connector\":\"sftp\",\"host\":\"h1\",\"password\":\"hunter2\"}";
+            JsonNode r = json(send(c.port, "POST", "/bundle/import", bundleOf("connection", "pg", content)));
+            assertEquals(1, r.get("failed").asInt(), r.toString());
+            assertEquals(0, r.get("imported").asInt(), r.toString());
+            assertTrue(r.get("results").get(0).get("message").asText().contains("${…} secret reference"),
+                    r.toString());
+            assertFalse(r.toString().contains("hunter2"), "the rejection must not echo the secret back");
+            assertEquals(404, send(c.port, "GET", "/connections/pg", null).statusCode(), "nothing persisted");
+
+            // …and the same guard covers the masked-sentinel and options paths.
+            String masked = "{\"id\":\"pg2\",\"connector\":\"sftp\",\"host\":\"h1\",\"password\":\"***\"}";
+            assertEquals(1, json(send(c.port, "POST", "/bundle/import", bundleOf("connection", "pg2", masked)))
+                    .get("failed").asInt());
+            String opt = "{\"id\":\"pg3\",\"connector\":\"sftp\",\"host\":\"h1\","
+                    + "\"options\":{\"api_token\":\"raw-token\"}}";
+            assertEquals(1, json(send(c.port, "POST", "/bundle/import", bundleOf("connection", "pg3", opt)))
+                    .get("failed").asInt());
+        }
+    }
+
     // ── preview + requires across the new kinds ─────────────────────────────────
 
     @Test
-    void previewClassifiesNewKindsAndConnectionStaysUnsupported(@TempDir Path dir) throws Exception {
+    void previewClassifiesNewKindsAndUnknownKindStaysUnsupported(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             String content = "{\"name\":\"p2\",\"active\":false,\"nodes\":[],\"edges\":[]}";
             send(c.port, "POST", "/bundle/import", bundleOf("authored-pipeline", "p2", content));
@@ -135,7 +212,7 @@ class ControlApiBundleNewKindsTest {
                     "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,\"items\":["
                     + "{\"kind\":\"authored-pipeline\",\"id\":\"p2\",\"content\":" + content + "},"
                     + "{\"kind\":\"authored-pipeline\",\"id\":\"brand_new\",\"content\":" + content + "},"
-                    + "{\"kind\":\"connection\",\"id\":\"pg\",\"content\":{}}]}"));
+                    + "{\"kind\":\"collector\",\"id\":\"pg\",\"content\":{}}]}"));
             assertEquals("unchanged", preview.get("items").get(0).get("status").asText());
             assertEquals("new", preview.get("items").get(1).get("status").asText());
             assertEquals("unsupported", preview.get("items").get(2).get("status").asText());

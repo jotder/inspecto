@@ -24,6 +24,8 @@ import java.util.TreeMap;
  * {@link SecretResolver} reference such as {@code ${ENV:CDR_PW}} — resolved only at connect time, never stored
  * or logged. {@link #toMap()} (the API/UI view) shows a {@code ${…}} reference verbatim but masks any non-ref
  * value as {@code ***}, so the profile can be displayed without leaking a credential a user may have inlined.
+ * {@link #toBundleMap()} (the metadata-bundle view) is stricter still — it <em>omits</em> a non-reference
+ * secret rather than masking it.
  */
 @com.gamma.api.PublicApi(since = "4.2.0")
 public record ConnectionProfile(String id, String connector, String host, int port, String database,
@@ -128,7 +130,7 @@ public record ConnectionProfile(String id, String connector, String host, int po
         if (password != null) m.put("password", mask(password));
         if (!options.isEmpty()) {
             Map<String, Object> masked = new TreeMap<>();
-            options.forEach((k, v) -> masked.put(k, looksSecret(k) ? mask(v) : v));
+            options.forEach((k, v) -> masked.put(k, isSecretKey(k) ? mask(v) : v));
             m.put("options", masked);
         }
         if (tunnel != null) {
@@ -151,12 +153,70 @@ public record ConnectionProfile(String id, String connector, String host, int po
         return m;
     }
 
+    /**
+     * JSON-ready, <b>secret-stripped</b> view for metadata bundles (BACKLOG D2). Same shape as
+     * {@link #toMap()} with one deliberate difference: a secret-bearing field ({@link #password},
+     * {@link Tunnel#password}, {@link Proxy#password}, and any {@link #options} entry whose key
+     * {@linkplain #isSecretKey looks secret}) travels <b>only</b> when it is a {@code ${…}} reference —
+     * a literal value is <b>omitted entirely</b>, never masked.
+     *
+     * <p>Masking would be wrong here: bundles land in git, CI logs and support tickets, so no secret may
+     * appear in any form — and a {@code ***} sentinel is a persisted lie that would round-trip back into the
+     * target as a literal-looking value. Absence is the honest signal: "this credential is not in the
+     * bundle; set it on the target".
+     */
+    public Map<String, Object> toBundleMap() {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", id);
+        m.put("connector", connector);
+        if (host != null) m.put("host", host);
+        if (port > 0) m.put("port", port);
+        if (database != null) m.put("database", database);
+        if (basePath != null) m.put("basePath", basePath);
+        if (username != null) m.put("username", username);
+        if (refOnly(password) != null) m.put("password", password);
+        if (!options.isEmpty()) {
+            Map<String, Object> stripped = new TreeMap<>();
+            options.forEach((k, v) -> {
+                if (!isSecretKey(k)) stripped.put(k, v);
+                else if (refOnly(v) != null) stripped.put(k, v);
+            });
+            if (!stripped.isEmpty()) m.put("options", stripped);
+        }
+        if (tunnel != null) {
+            Map<String, Object> t = new LinkedHashMap<>();
+            t.put("host", tunnel.host());
+            if (tunnel.port() > 0) t.put("port", tunnel.port());
+            if (tunnel.username() != null) t.put("username", tunnel.username());
+            if (refOnly(tunnel.password()) != null) t.put("password", tunnel.password());
+            m.put("tunnel", t);
+        }
+        if (proxy != null) {
+            Map<String, Object> pr = new LinkedHashMap<>();
+            if (proxy.type() != null) pr.put("type", proxy.type());
+            pr.put("host", proxy.host());
+            if (proxy.port() > 0) pr.put("port", proxy.port());
+            if (proxy.username() != null) pr.put("username", proxy.username());
+            if (refOnly(proxy.password()) != null) pr.put("password", proxy.password());
+            m.put("proxy", pr);
+        }
+        return m;
+    }
+
     /** A {@code ${…}} reference is shown as-is (it is not a secret); any other value is masked. */
     private static String mask(String v) {
         return v == null ? null : (SecretResolver.isReference(v) ? v : "***");
     }
 
-    private static boolean looksSecret(String key) {
+    /** {@code v} when it is a {@code ${…}} reference (safe to travel), else {@code null} (strip it). */
+    private static String refOnly(String v) {
+        return SecretResolver.isReference(v) ? v : null;
+    }
+
+    /** Whether an {@code options} key names a credential-ish value — the one rule both masking and
+     *  bundle-stripping use, so the two views can never disagree about what counts as a secret. */
+    public static boolean isSecretKey(String key) {
+        if (key == null) return false;
         String k = key.toLowerCase();
         return k.contains("pass") || k.contains("secret") || k.contains("token") || k.contains("key");
     }

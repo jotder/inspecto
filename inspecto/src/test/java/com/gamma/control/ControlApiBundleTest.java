@@ -84,8 +84,9 @@ class ControlApiBundleTest {
     @Test
     void exportRejectsUnsupportedKindAndEmptySelection(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
+            // 'connection' became supported (reference-only) 2026-07-25 — 'collector' is still out of scope.
             assertEquals(422, send(c.port, "POST", "/bundle/export",
-                    "{\"items\":[{\"kind\":\"connection\",\"id\":\"pg\"}]}").statusCode());
+                    "{\"items\":[{\"kind\":\"collector\",\"id\":\"pg\"}]}").statusCode());
             assertEquals(422, send(c.port, "POST", "/bundle/export", "{\"items\":[]}").statusCode());
         }
     }
@@ -248,7 +249,7 @@ class ControlApiBundleTest {
             String bundle = "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,"
                     + "\"exportedAt\":\"2026-07-07T00:00:00Z\",\"sourceSpace\":null,\"items\":["
                     + "{\"kind\":\"dataset\",\"id\":\"ok\",\"content\":{\"title\":\"OK\"}},"
-                    + "{\"kind\":\"connection\",\"id\":\"pg\",\"content\":{\"host\":\"h\"}},"      // unsupported
+                    + "{\"kind\":\"collector\",\"id\":\"pg\",\"content\":{\"host\":\"h\"}},"       // unsupported
                     + "{\"kind\":\"widget\",\"id\":\"nocontent\"}"                                  // missing content
                     + "]}";
             JsonNode r = json(send(c.port, "POST", "/bundle/import", bundle));

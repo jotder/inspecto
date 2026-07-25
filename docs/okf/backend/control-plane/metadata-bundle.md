@@ -25,7 +25,8 @@ v1 files stay importable (refs/provenance optional ⇒ derived on the target). S
 (`PipelineStore`, round-tripped through `PipelineCodec`), `job` (`JobService`'s live registry — import
 hot-registers via `upsertJob`, exactly like the `/jobs` write routes), and `saved-view` (the event-viewer
 `SavedViewStore`; **not** the run-generated `pipeline.ViewStore` `sink.view` definitions, which aren't
-authored config). Every supported kind is read/written through the uniform `BundleSource` seam regardless
+authored config), and, since 2026-07-25, `connection` (the live `CollectorService` connection registry —
+**reference-only, secrets stripped**; see the boundary section). Every supported kind is read/written through the uniform `BundleSource` seam regardless
 of its backing store:
 
 * **`POST /bundle/export`** — `{items, provenance?, requires?}` → `{bundle, missing}`; real content + real
@@ -42,17 +43,26 @@ of its backing store:
 
 ## Boundary & invariants
 
-* **Secrets never travel** — connection secrets export masked (`${ENV:…}` references only).
+* **Secrets never travel** — a connection's secret-bearing fields export **stripped**, `${ENV:…}` references only.
 * **Data never travels** — a dataset item is metadata (columns/roles/measures/query); runtime state (runs,
   batches, Incidents, watermarks) and server TOON config are out of scope by design.
-* **`connection` — policy DECIDED 2026-07-25 (BACKLOG D2): reference-only, secrets stripped.** A bundle may
-  carry a `connection`, but **never a secret value in any form** — not plaintext, not bundle-encrypted. Only
-  the `${ENV:…}` reference travels (the same masking the invariant above already applies), so an importing
-  installation must have the referenced env/secret provisioned independently; if it does not, the connection
-  imports with an unresolvable reference and fails closed at first use rather than at import. Rationale: a
-  bundle is a promotion/transport artifact that lands in git, CI, and support tickets, so an encrypted-secret
-  option would put credential material in all three for the sake of convenience. This unblocks `connection` as
-  the last missing `BundleRoutes` kind — implementing it is now a build, not a decision.
+* **`connection` — SHIPPED 2026-07-25 (BACKLOG D2): reference-only, secrets stripped.** A bundle may carry a
+  `connection`, but **never a secret value in any form** — not plaintext, not bundle-encrypted. Only the
+  `${ENV:…}` reference travels, so an importing installation must have the referenced env/secret provisioned
+  independently; if it does not, the connection imports with an unresolvable reference and fails closed at
+  first use rather than at import. Rationale: a bundle is a promotion/transport artifact that lands in git, CI
+  and support tickets, so an encrypted-secret option would put credential material in all three.
+  * ⚠ **Strip, do not mask.** `ConnectionProfile.toBundleMap()` (new; **not** `toMap()`, which keeps masking
+    for the UI) **omits** a literal `password` / `tunnel.password` / `proxy.password` / secret-ish `options`
+    key entirely. A `***` sentinel would be a persisted lie that round-trips back into the target as a
+    literal-looking value. `SecretResolver.isReference` is the predicate; `ConnectionProfile.isSecretKey`
+    (widened from the private `looksSecret`) is the one rule both views share.
+  * **Import is defence in depth** — a secret-looking field that is present, non-blank and not a `${…}`
+    reference (including `***`) fails *that item*, so a bundle can never smuggle a raw secret in.
+  * `connection` is **first in `APPLY_ORDER`** (no outbound refs; an authored pipeline's source may reference
+    it) and is **not** in `INTEGRITY_KINDS` — `ComponentIntegrity`'s ref graph covers only `ComponentStore`
+    kinds. Persistence reuses `ConnectionRoutes.persistConnection` (jail → atomic write → hot-register), so an
+    imported profile behaves exactly like a `POST /connections`.
 * `requires` classify `satisfied | different | missing` — *present-but-different* (2026-07-18) compares the
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.

@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.acquire.ConnectionProfile;
 import com.gamma.event.SavedView;
 import com.gamma.event.SavedViewStore;
 import com.gamma.job.JobConfig;
@@ -37,13 +38,19 @@ import java.util.Set;
  * hot-registers, matching the {@code /jobs} CRUD routes), and {@code saved-view} (the event-viewer
  * {@link SavedViewStore} — a user-authored, sharable bookmarked search; <b>not</b> the derived
  * {@code pipeline.ViewStore} {@code sink.view} definitions, which are run-generated, not authored
- * config, and so are not bundle-eligible). Every supported kind is read/written through the uniform
+ * config, and so are not bundle-eligible), and, since 2026-07-25, {@code connection}
+ * ({@link com.gamma.acquire.ConnectionProfile}). Every supported kind is read/written through the uniform
  * {@link BundleSource} seam (below) regardless of its backing store.
  *
- * <p>{@code connection} stays out-of-scope on purpose: its profiles carry secret references, and
- * whether/how a bundle may carry a masked or reference-only credential is a policy call the plans this
- * feature is built from (`metadata-bundle.md`) never made — promote a connection via the UI mock path
- * or the whole-space zip (SPC-2) until that call is made.
+ * <p><b>{@code connection} is reference-only, secrets stripped</b> (BACKLOG decision D2). A connection
+ * item carries the profile's shape (connector/host/port/database/base path/username, tunnel, proxy) and any
+ * secret expressed as a {@code ${ENV:…}}-style {@link com.gamma.acquire.SecretResolver} reference — but
+ * <b>no secret value in any form, not even bundle-encrypted</b>, because bundles land in git, CI and support
+ * tickets. A literal credential is <em>omitted</em> at export, never masked
+ * ({@link com.gamma.acquire.ConnectionProfile#toBundleMap()}): a {@code ***} sentinel would be a persisted
+ * lie that round-trips back into the target as a literal-looking value. Symmetrically, import is
+ * defence-in-depth — an incoming secret-looking field that is present, non-blank and <em>not</em> a
+ * {@code ${…}} reference fails that item, so a bundle can never smuggle a raw secret in.
  *
  * <p>Routes: {@code POST /bundle/export} (read; content+hash for a requested item list),
  * {@code POST /bundle/preview} (read; New/Exists/drift fit-check + {@code requires} classification,
@@ -58,13 +65,14 @@ final class BundleRoutes implements RouteModule {
     static final String FORMAT = "inspecto-metadata-bundle";
 
     /** The non-{@link ComponentStore} kinds this module also serves (each has its own {@link BundleSource}). */
-    private static final Set<String> OWN_STORE_KINDS = Set.of("authored-pipeline", "job", "saved-view");
+    private static final Set<String> OWN_STORE_KINDS = Set.of("authored-pipeline", "job", "saved-view", "connection");
 
-    /** Supported kinds in dependency order (referenced kinds first) — the import apply order. Authored
-     *  pipelines/jobs may reference the component kinds above them; saved-view has no references. */
+    /** Supported kinds in dependency order (referenced kinds first) — the import apply order. {@code connection}
+     *  is first: it has no outbound refs of its own and an authored pipeline's source may reference it.
+     *  Authored pipelines/jobs may reference the component kinds above them; saved-view has no references. */
     private static final List<String> APPLY_ORDER =
-            List.of("grammar", "schema", "transform", "sink", "dataset", "query", "widget", "dashboard",
-                    "reconciliation", "authored-pipeline", "job", "saved-view");
+            List.of("connection", "grammar", "schema", "transform", "sink", "dataset", "query", "widget",
+                    "dashboard", "reconciliation", "authored-pipeline", "job", "saved-view");
 
     private static boolean supported(String kind) {
         return ComponentStore.WRITABLE_TYPES.contains(kind) || OWN_STORE_KINDS.contains(kind);
@@ -218,8 +226,8 @@ final class BundleRoutes implements RouteModule {
         // write: an import may not INTRODUCE broken references. Findings are computed over
         // (registry ∪ incoming) minus the registry's pre-existing findings, so a bundle whose items
         // resolve each other passes and an old broken ref already on disk never blocks a new import.
-        // (Integrity checking only covers the ComponentStore kinds — authored-pipeline/job/saved-view
-        // don't participate in ComponentIntegrity's ref graph.)
+        // (Integrity checking only covers the ComponentStore kinds — authored-pipeline/job/saved-view/
+        // connection don't participate in ComponentIntegrity's ref graph.)
         List<String> introduced = introducedIntegrityFindings(store, ordered);
         if (!introduced.isEmpty())
             throw new ApiException(422, "bundle fails referential integrity — import would introduce: " + introduced);
@@ -358,6 +366,7 @@ final class BundleRoutes implements RouteModule {
             case "authored-pipeline" -> new PipelineBundleSource(new PipelineStore(root.resolve("flows")));
             case "job" -> new JobBundleSource(api);
             case "saved-view" -> new SavedViewBundleSource(api.service().savedViews());
+            case "connection" -> new ConnectionBundleSource(api);
             default -> null;
         };
     }
@@ -437,6 +446,72 @@ final class BundleRoutes implements RouteModule {
     }
 
     /**
+     * {@code connection} — the live {@code CollectorService} connection registry (read; the same source of
+     * truth {@code /connections} CRUD uses) + the {@code <write-root>/<id>_connection.toon} file (write,
+     * through {@link ConnectionRoutes#persistConnection}, so an imported profile is jailed, atomically
+     * written and hot-registered exactly like a {@code POST /connections}).
+     *
+     * <p><b>Reference-only, secrets stripped</b> (BACKLOG D2) — see the class javadoc. Read goes through
+     * {@link ConnectionProfile#toBundleMap()} (omits literal secrets); write goes through
+     * {@link #rejectRawSecrets} first (defence in depth). Because both the export and the {@code normalized}
+     * hash use {@code toBundleMap}, a stripped literal is invisible to drift detection — a re-import of the
+     * same bundle is honestly {@code unchanged} even though the target holds a credential the bundle never did.
+     */
+    private record ConnectionBundleSource(ApiContext api) implements BundleSource {
+        public Optional<Map<String, Object>> get(String id) {
+            return api.service().connection(id).map(ConnectionProfile::toBundleMap);
+        }
+        public boolean exists(String id) { return get(id).isPresent(); }
+        public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
+            ConnectionProfile p = parse(id, content);
+            ConnectionRoutes.persistConnection(api, p);
+            return p.toBundleMap();
+        }
+        public Map<String, Object> normalized(String id, Map<String, Object> content) {
+            return parse(id, content).toBundleMap();   // the registry's stored form, secrets stripped
+        }
+
+        /** Validate + parse an incoming item into a profile stamped with the bundle item's id. */
+        private static ConnectionProfile parse(String id, Map<String, Object> content) {
+            rejectRawSecrets(content);
+            Map<String, Object> c = new LinkedHashMap<>(content);
+            c.put("id", id);                                    // in-file identity == item id, like the other sources
+            // toBundleMap emits the API's camelCase basePath; ConnectionProfile.fromMap reads base_path.
+            if (c.get("base_path") == null && c.get("basePath") != null) c.put("base_path", c.remove("basePath"));
+            try {
+                return ConnectionProfile.fromMap(c);
+            } catch (RuntimeException ex) {
+                throw new IllegalArgumentException(ex.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Defence in depth for {@code connection} import (BACKLOG D2): a secret-bearing field may be absent or
+     * blank (nothing travelled) or a {@code ${…}} reference — anything else is a raw credential a bundle must
+     * never be able to smuggle in, including the {@code ***} mask sentinel from the UI view. Fails the item
+     * (an {@link IllegalArgumentException} → a per-item {@code failed} result), not the whole batch.
+     */
+    private static void rejectRawSecrets(Map<String, Object> content) {
+        checkSecret("password", content.get("password"));
+        for (String block : List.of("tunnel", "proxy"))
+            if (content.get(block) instanceof Map<?, ?> b)
+                checkSecret(block + ".password", b.get("password"));
+        if (content.get("options") instanceof Map<?, ?> opts)
+            opts.forEach((k, v) -> {
+                if (ConnectionProfile.isSecretKey(String.valueOf(k))) checkSecret("options." + k, v);
+            });
+    }
+
+    private static void checkSecret(String field, Object value) {
+        if (value == null) return;
+        String s = String.valueOf(value);
+        if (s.isBlank() || com.gamma.acquire.SecretResolver.isReference(s)) return;
+        throw new IllegalArgumentException("connection '" + field + "' must be a ${…} secret reference — a "
+                + "bundle may not carry a secret value (it carried " + s.length() + " literal characters)");
+    }
+
+    /**
      * {@code saved-view} — the event-viewer {@link SavedViewStore} (a user-authored bookmarked search;
      * <b>not</b> the run-generated {@code pipeline.ViewStore} {@code sink.view} definitions, which aren't
      * authored config and so aren't bundle-eligible).
@@ -488,7 +563,7 @@ final class BundleRoutes implements RouteModule {
                 .filter(k -> k != null && !supported(k)).distinct().toList();
         if (!bad.isEmpty())
             throw new ApiException(422, "unsupported kind(s) " + bad + " — backend bundle covers "
-                    + APPLY_ORDER + "; connection is not exportable server-side (secret-policy gated)");
+                    + APPLY_ORDER + " (connection travels reference-only: literal secrets are stripped)");
     }
 
     /**

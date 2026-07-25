@@ -213,8 +213,10 @@ final class ConnectionRoutes implements RouteModule {
         return Map.of("id", id, "deleted", true, "fileRemoved", removed);
     }
 
-    /** The jailed {@code <id>_connection.toon} path under the write root; 422 on an unsafe id, 403 on escape. */
-    private Path connectionFile(ApiContext api, String id) {
+    /** The jailed {@code <id>_connection.toon} path under the write root; 422 on an unsafe id, 403 on escape.
+     *  Package-private: {@link BundleRoutes}' {@code connection} source persists through the same helpers
+     *  rather than re-deriving the path/encoding. */
+    static Path connectionFile(ApiContext api, String id) {
         String safe = WriteGates.safeName(id, "connection id");
         Path root = api.writeRoot();
         return WriteGates.jail(root, root.resolve(safe + "_connection.toon"), "resolved path");
@@ -273,8 +275,9 @@ final class ConnectionRoutes implements RouteModule {
         return "***".equals(incoming) ? existing : incoming;
     }
 
-    /** Encode the profile as a {@code connection { … }} TOON doc and write it atomically under the write root. */
-    private void persistConnection(ApiContext api, ConnectionProfile p) throws IOException {
+    /** Encode the profile as a {@code connection { … }} TOON doc, write it atomically under the write root and
+     *  hot-register it on the live service. Package-private — shared with {@link BundleRoutes}. */
+    static void persistConnection(ApiContext api, ConnectionProfile p) throws IOException {
         Path target = connectionFile(api, p.id());
         byte[] bytes = ConfigCodec.toToon(Map.of("connection", connectionDoc(p))).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".conn-");
