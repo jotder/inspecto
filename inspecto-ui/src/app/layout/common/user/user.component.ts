@@ -122,12 +122,24 @@ user_name: string;
         this.router.navigate(['/logout'], navigationExtras);
     }
 
+    /**
+     * Sign out through the in-app `/logout` route.
+     *
+     * This used to redirect to `environment.authServerUrl + '/confirm-logout'`. That key was removed in
+     * `ca3680df` along with the other published internal hostnames/IPs (BACKLOG §5), which left this
+     * method referencing a field that no longer exists and broke the UI build. Operator call
+     * 2026-07-25: route to the same `/logout` {@link signOut} already uses rather than reinstate the
+     * hardcoded host.
+     *
+     * ⚠ Consequence: only the Inspecto session ends. The IdP's SSO session is no longer terminated, so
+     * a subsequent sign-in may complete without re-prompting for credentials. Restoring a
+     * standards-based end-session redirect (OIDC RP-initiated logout, discovered from the provider
+     * rather than hardcoded) is tracked in BACKLOG §5.
+     */
     onclicklogout() {
         localStorage.clear();
         sessionStorage.clear();
-        let currentUrl = window.location.href
-        let url = environment.authServerUrl + '/confirm-logout?redirectUrl=' + environment.gatewayUrl + environment.appLogoutUri;
-        window.open(url, '_self')
+        this.signOut();
     }
 
     onMyProfileClick(): any {

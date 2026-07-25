@@ -77,7 +77,11 @@ export class LensService {
     });
 
     /** True while the active lens is the read-only one (Business). Internal derivation for the
-     *  capabilities below — gate on a capability, not on this. */
+     *  **lens-scoped** capabilities below — gate on a capability, not on this.
+     *
+     *  ⚠ This is a *presentation* flag, never a security boundary. Nothing outside this file reads it;
+     *  the real gate is server-side (`CapabilityManifest` + `withCapability`), which is why the Business
+     *  lens can safely stop suppressing identity capabilities — see {@link identityCapability}. */
     readonly readOnly = computed(() => this.currentLens() === 'business');
 
     /** Action-node grants pushed by {@code AccessStateService} once the saved lens Access Profiles
@@ -102,47 +106,92 @@ export class LensService {
         return this.session.authMode() !== 'oidc' || this.session.capabilities().includes(cap);
     }
 
+    /**
+     * An **identity** capability: a property of *who the subject is*, not of what they are currently
+     * looking at. It survives every lens, including the read-only Business one — an admin viewing the
+     * console through the Business lens is still the admin.
+     *
+     * The distinction (BACKLOG §5, resolved 2026-07-25). Previously *every* capability carried
+     * `!readOnly()`, and {@link allowedLenses} qualifies Builder/Ops only via `canAuthorWorkbench` /
+     * `canOperateRuns`. A subject holding neither — notably the whole **admin** seed — was snapped to
+     * Business and evaluated *every* capability false client-side while the server authorized the
+     * calls. The worst case was a bootstrap deadlock: a fresh OIDC deployment's admin could not author
+     * the Access matrix that grants access, because the matrix rendered read-only to them.
+     *
+     * Safe because `readOnly` guards nothing — see its javadoc. The server is the boundary.
+     *
+     * ⚠ The lens still suppresses these **in honor-system mode**. The exemption is justified by the
+     * subject's *identity*, and off-OIDC there is no identity — {@link granted} short-circuits true for
+     * everyone, so the lens is the only signal there is. Without this clause, Personal mode's Business
+     * lens would start showing Connections and Requirements affordances, breaking the "View as" preview
+     * whose entire job is showing what a business user sees. Fix the OIDC bug; leave the preview alone.
+     */
+    private identityCapability(cap: string, actionNode: string): boolean {
+        const identityKnown = this.session.authMode() === 'oidc';
+        return this.granted(cap) && (identityKnown || !this.readOnly()) && this.allows(actionNode);
+    }
+
+    /**
+     * A **lens-scoped** capability: an *activity* the current lens represents. Legitimately suppressed
+     * in the read-only Business view, because the point of that lens is "I am reading, not building".
+     */
+    private lensCapability(cap: string, actionNode: string): boolean {
+        return this.granted(cap) && !this.readOnly() && this.allows(actionNode);
+    }
+
     /** May author in the Workbench (Pipelines / Jobs / Components create-edit-delete). RBAC: Pipeline
      *  Developer, Power user, Super user. (Connection onboarding split out to {@link canOnboardConnections}
      *  2026-07-22 — the credential/egress surface is Admin-owned, not Builder.) */
     readonly canAuthorWorkbench = computed(
-        () => this.granted('canAuthorWorkbench') && !this.readOnly() && this.allows('workbench.author'));
+        () => this.lensCapability('canAuthorWorkbench', 'workbench.author'));
 
     /** May onboard/configure Connections (create / edit / delete a connection profile) — its own
      *  authorization question because Connections are the credential + network-egress surface, a worse
      *  blast radius than authoring a pipeline (rbac-groundwork §3/§4.1 Q1, product sign-off 2026-07-22).
      *  RBAC: Admin, Super. In the lens honor-system preview it defaults allowed for the non-Business
-     *  lenses, exactly as Workbench authoring did before the split. */
+     *  lenses, exactly as Workbench authoring did before the split.
+     *  {@link identityCapability}: the credential surface is Admin-owned, and admin never qualifies for
+     *  a non-Business lens. */
     readonly canOnboardConnections = computed(
-        () => this.granted('canOnboardConnections') && !this.readOnly() && this.allows('connections.onboard'));
+        () => this.identityCapability('canOnboardConnections', 'connections.onboard'));
 
     /** May operate runs (trigger / pause / resume / reprocess) — the plan's "read-only observe"
      *  exception for Business on the Runs pane. RBAC: Operations, Pipeline Developer, Power/Super. */
     readonly canOperateRuns = computed(
-        () => this.granted('canOperateRuns') && !this.readOnly() && this.allows('runs.operate'));
+        () => this.lensCapability('canOperateRuns', 'runs.operate'));
 
     /** May triage Requirements (accept / reject / deliver) — the Builder-facing intake queue (C1).
-     *  RBAC: Pipeline Developer, Operations, Power/Super. */
+     *  RBAC: Pipeline Developer, Operations, Power/Super — **and the `business` seed role**, whose only
+     *  capability this is (`Roles.SEED`, product sign-off 2026-07-24).
+     *
+     *  {@link identityCapability} by that grant: a business subject is snapped to the Business lens, so
+     *  treating triage as lens-scoped revoked the one thing the role was given. Deciding it is identity
+     *  (operator call 2026-07-25) means **"Business lens ⇒ read-only" is no longer true of the product**
+     *  — intake triage is the deliberate exception. */
     readonly canTriageRequirements = computed(
-        () => this.granted('canTriageRequirements') && !this.readOnly() && this.allows('requirements.triage'));
+        () => this.identityCapability('canTriageRequirements', 'requirements.triage'));
 
     /** May author Alert Rules (create / edit / delete on the Alerts pane — audit C3). A distinct
      *  question from Workbench authoring: monitoring config is Ops-owned. RBAC: Operations,
      *  Power/Super. */
     readonly canAuthorAlertRules = computed(
-        () => this.granted('canAuthorAlertRules') && !this.readOnly() && this.allows('alerts.author'));
+        () => this.lensCapability('canAuthorAlertRules', 'alerts.author'));
 
     /** May curate the space's shared Menu tree (Settings ▸ Menu Builder, `PUT /nav/menus`). Split out
      *  of {@link canAuthorWorkbench} 2026-07-25 (BACKLOG D4): a nav change is visible to every business
      *  user in the space and is not a build activity. RBAC: Admin, Power, Super — note this is *not* a
      *  subset of Workbench authoring, so a Pipeline Developer authors freely but no longer re-arranges
-     *  everyone's sidebar. */
+     *  everyone's sidebar. {@link identityCapability} — its own rationale says curation "is not a build
+     *  activity", so no lens represents it. */
     readonly canCurateMenus = computed(
-        () => this.granted('canCurateMenus') && !this.readOnly() && this.allows('menus.curate'));
+        () => this.identityCapability('canCurateMenus', 'menus.curate'));
 
-    /** May configure lens access (the Settings ▸ Access matrix). RBAC: Admin, Super. */
+    /** May configure lens access (the Settings ▸ Access matrix). RBAC: Admin, Super.
+     *  {@link identityCapability} — and the sharpest case for it: while this was lens-scoped, a fresh
+     *  OIDC deployment's admin saw the Access matrix read-only and could not author the roles that
+     *  grant access. */
     readonly canConfigureAccess = computed(
-        () => this.granted('canConfigureAccess') && !this.readOnly() && this.allows('access.configure'));
+        () => this.identityCapability('canConfigureAccess', 'access.configure'));
 
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */

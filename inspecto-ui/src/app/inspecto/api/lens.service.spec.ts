@@ -50,16 +50,72 @@ describe('LensService', () => {
         expect(service.readOnly()).toBe(false);
     });
 
-    it('capabilities (the RBAC seam) all deny in the business lens and grant otherwise', () => {
+    // BACKLOG §5, resolved 2026-07-25: LENS-SCOPED capabilities (activities a lens represents) are
+    // suppressed by the read-only Business lens; IDENTITY capabilities (who the subject is) are not.
+    // This test previously asserted "all deny in the business lens", which is what broke admin-only
+    // subjects — they qualify for no non-Business lens, so every capability read false client-side
+    // while the server authorized the calls.
+    it('lens-scoped capabilities deny in the business lens and grant otherwise', () => {
         const service = TestBed.inject(LensService);
         service.selectLens('business');
         expect(service.canAuthorWorkbench()).toBe(false);
         expect(service.canOperateRuns()).toBe(false);
-        expect(service.canTriageRequirements()).toBe(false);
+        expect(service.canAuthorAlertRules()).toBe(false);
         service.selectLens('ops');
         expect(service.canAuthorWorkbench()).toBe(true);
         expect(service.canOperateRuns()).toBe(true);
+        expect(service.canAuthorAlertRules()).toBe(true);
+    });
+
+    it('identity capabilities survive the read-only business lens under OIDC', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canConfigureAccess', 'canCurateMenus', 'canOnboardConnections',
+            'canTriageRequirements']);
+        service.selectLens('business');
+
+        expect(service.canConfigureAccess()).toBe(true);
+        expect(service.canCurateMenus()).toBe(true);
+        expect(service.canOnboardConnections()).toBe(true);
+        // the business seed's ONLY capability — lens-scoping it revoked the one grant the role has
         expect(service.canTriageRequirements()).toBe(true);
+    });
+
+    // Off-OIDC there is no identity to justify the exemption — granted() is true for everyone — so the
+    // lens stays the only signal and the Business "View as" preview keeps hiding authoring affordances.
+    it('identity capabilities are still lens-suppressed in honor-system mode', () => {
+        const service = TestBed.inject(LensService);
+        service.selectLens('business');
+        expect(service.canConfigureAccess()).toBe(false);
+        expect(service.canOnboardConnections()).toBe(false);
+        expect(service.canTriageRequirements()).toBe(false);
+        service.selectLens('ops');
+        expect(service.canConfigureAccess()).toBe(true);
+        expect(service.canOnboardConnections()).toBe(true);
+    });
+
+    // The case that motivated the fix: the admin seed holds neither canAuthorWorkbench nor
+    // canOperateRuns, so allowedLenses offers it only Business. Its governance capabilities must
+    // still resolve true, or a fresh OIDC deployment's admin cannot author the Access matrix that
+    // grants access — a bootstrap deadlock.
+    it('an admin-only OIDC subject keeps its admin affordances despite the Business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canOnboardConnections', 'canConfigureAccess', 'canApproveShares',
+            'canOfferDatasets', 'canTriageRequirements', 'canCurateMenus']); // Roles.SEED admin
+
+        expect(service.allowedLenses().map((l) => l.id)).toEqual(['business']);
+        expect(service.readOnly()).toBe(true);
+
+        expect(service.canConfigureAccess()).toBe(true);
+        expect(service.canCurateMenus()).toBe(true);
+        expect(service.canOnboardConnections()).toBe(true);
+        expect(service.canTriageRequirements()).toBe(true);
+        // ...but it still cannot author or operate: those it genuinely was not granted
+        expect(service.canAuthorWorkbench()).toBe(false);
+        expect(service.canOperateRuns()).toBe(false);
     });
 
     it('exposes the three lenses in display order', () => {
@@ -110,16 +166,14 @@ describe('LensService', () => {
         expect(service.canAuthorWorkbench()).toBe(true);
         expect(service.canCurateMenus()).toBe(false);
 
-        // Curation without authoring is legal (the admin seed). Paired with canOperateRuns because a
-        // subject holding ONLY canCurateMenus qualifies for no non-Business lens and is therefore
-        // read-only — see the lens/capability mismatch noted in BACKLOG §5.
-        session.capabilities.set(['canCurateMenus', 'canOperateRuns']);
-        service.selectLens('ops');
+        // Curation without authoring is legal (the admin seed) and needs no lens-qualifying capability
+        // alongside it — canCurateMenus is identity-scoped, so it holds even snapped to Business.
+        session.capabilities.set(['canCurateMenus']);
         expect(service.canCurateMenus()).toBe(true);
         expect(service.canAuthorWorkbench()).toBe(false);
 
         // and the Access Profile action node gates it like any other capability
-        service.setActionGrants({ 'menus.curate': { ops: false } });
+        service.setActionGrants({ 'menus.curate': { business: false } });
         expect(service.canCurateMenus()).toBe(false);
     });
 
