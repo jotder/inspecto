@@ -120,6 +120,12 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `.toon`).
 - **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch for
   these whenever generating SQL with date/trigger columns.
+- **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push:
+  `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs) and `tools/check-secrets.mjs` (a
+  secret-ish key assigned a ≥16-char literal — SEC-INCIDENT-1). Both take a per-line `vocab-allow` /
+  `secret-allow` comment as the escape hatch. ⚠ **`check-secrets.mjs` is deliberately master-only** — `4.x`
+  still carries the live OAuth secrets, so merging it forward pins `4.x` CI red (BACKLOG §5). A third guard,
+  `npm run lint:tokens`, runs in the separate path-filtered `ui.yml` (§6).
 - **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — tests call
   `runPipeline("up_stream")`, not `"UP_STREAM"`.

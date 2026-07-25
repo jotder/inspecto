@@ -73,6 +73,14 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md) — **`4.x` public-PKCE auth,
+  SCOPED 2026-07-25** — the gate on the SEC-INCIDENT-1 rotation (BACKLOG §5): `4.x` must stop needing a
+  client secret before the leaked secrets can be rotated. Verified against `4.x` `291c86a1`, and three
+  findings reshape it: the live token exchange is `modules/auth/auth-service.ts` (**not** the file BACKLOG
+  §5 names), the hardcoded inline secret sits in **dead** code and is deletable today with no design
+  change (P0), and `master`'s `inspecto/api/pkce.ts` is a zero-import RFC 7636 impl that ports verbatim —
+  so P1 is a **port, not a design exercise** (master's `session.service.ts` does *not* port: it needs
+  `/bootstrap` + `/api/v1`). Blocking ask Q1: does the IdP support PKCE + a public client?
 - [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan, DRAFT 2026-07-25** — splits the
   requirement: **AGT-6a** inline AI authoring (`Should`, schedulable — one shared inline surface + a
   four-pane adoption wave reusing the shipped L1 draft tools, phases A1–A4) vs **AGT-6b** model-composed

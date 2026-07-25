@@ -176,9 +176,21 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 >
 > - **Rotation will break running `4.x` SPAs.** They authenticate with exactly these values and will fail
 >   until rebuilt with new config. Rotation needs a deployment-coordination window, not a quiet swap.
-> - **The `4.x` fix is a design change, not a deletion** — a browser bundle cannot hold a confidential
->   client secret, so re-issuing a secret that still ships in the SPA just reproduces this incident with
->   fresh values. The line needs a public-PKCE (or server-side token exchange) path first.
+> - **The `4.x` LIVE-path fix is a design change** — a browser bundle cannot hold a confidential client
+>   secret, so re-issuing a secret that still ships in the SPA just reproduces this incident with fresh
+>   values. That path needs public PKCE (or a server-side token exchange) first.
+> - **⚠ Two corrections to the paragraph above, verified 2026-07-25 against `4.x` `291c86a1`** — full
+>   detail + phased plan in [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md):
+>   - **The live token exchange is `modules/auth/auth-service.ts`** (`:84-90` code→token, `:106-109`
+>     refresh, `:148` Basic header), a second near-duplicate implementation this row never mentioned.
+>     `app-component.service.ts` is *not* the live path.
+>   - **The hardcoded inline secret is in DEAD code and IS deletable today, with no design change.**
+>     `app-component.service.ts`'s `renewAccessToken`/`retrieveToken` have **zero call sites** on `4.x`;
+>     `app.component.ts` injects the service but calls nothing on it. So "not a deletion" holds only for
+>     the live path — the worst single artifact can go now (plan P0).
+>   - Also: **`master`'s `inspecto/api/pkce.ts` is a zero-import RFC 7636 implementation that ports
+>     verbatim**, so the fix is a port, not a design exercise. (`session.service.ts` does *not* port — it
+>     needs `/bootstrap` + `/api/v1`, which `4.x` predates.)
 > - Merge-forward was therefore **deliberately not followed** here (operator call 2026-07-25): the
 >   `master` fix shipped alone, and the `4.x` remediation is tracked as its own item rather than
 >   improvised inside a shift.
