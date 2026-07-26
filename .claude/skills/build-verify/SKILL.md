@@ -68,6 +68,24 @@ default-profile run skipped the module. Two lessons: run the enterprise profile 
 `Roles.SEED` change, and remember the reactor is **fail-fast** — a failure in `inspecto-security`
 leaves `inspecto-policy` **SKIPPED**, i.e. unverified, not passing.
 
+### ⚠ …and on the UI, `npm run build` is a false green for anything a SPEC references
+
+The production build does **not** compile `*.spec.ts`, so a change to a shared model type can leave
+`npm run build` exit 0 while `npm run test:ci` is red on a stale spec that still constructs the old shape.
+
+Observed 2026-07-26 (§2 D9, renaming `ExchangeOffer.dataset` → `datasets`): `build` passed while `test:ci`
+failed to bundle at all — three TS2561 errors in `catalog/sharing.component.spec.ts`, a file the change never
+touched. Because the bundle failed, **0 tests ran and no vitest summary printed**, so a pass-count glance
+would also have missed it.
+
+**For any rename or type change to a shared interface, `test:ci` is the type gate — not `build`.** Run all
+three, and read the **exit code** of each (an unhandled jsdom/canvas error makes vitest exit non-zero even
+with 0 test failures):
+
+```powershell
+npm run lint:tokens ; npm run test:ci ; npm run build
+```
+
 ### ⚠ …and `-pl <module> -am` is a false green for everything DOWNSTREAM
 
 `-pl X -am` builds X plus its **upstream** dependencies — never its **dependents**. So a control-plane
