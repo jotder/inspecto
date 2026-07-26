@@ -72,7 +72,12 @@ public final class ComponentStore {
                     // one findings-spec per ObjectType describing the Findings panel's fields. A kind rather
                     // than a *_workflow.toon-style boot scan precisely so an operator can edit it through the
                     // product; absent one, FindingsSpec.defaultFor() renders today's hardcoded shape.
-                    "findings-spec");
+                    "findings-spec",
+                    // Link-Analysis pattern packs (V2 (c) / BACKLOG D16, overturned 2026-07-26): a named motif
+                    // that pre-fills the pattern-match builder. Per-Space authored content rather than a
+                    // reserved system Space — a Space's packs may fork from another's, deliberately. Absent
+                    // any, the UI's shipped PATTERN_PACKS const stays the fallback.
+                    "pattern-pack");
 
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");

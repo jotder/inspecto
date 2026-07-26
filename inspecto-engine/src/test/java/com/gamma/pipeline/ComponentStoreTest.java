@@ -79,6 +79,29 @@ class ComponentStoreTest {
     }
 
     @Test
+    void patternPackStepsSurviveTheRoundTripWithABlankStartDirection(@TempDir Path root) throws Exception {
+        // probe: a pattern pack's steps are uniform {direction} rows, and the start node's direction is the
+        // EMPTY STRING — never an empty map. TOON cannot represent {} as a list element: JToon encodes it as a
+        // bare "-" and then fails to decode its own output ("Array length mismatch: declared 4, found 1"), so
+        // an omitted key here silently breaks every seeded pack on read. Keep the blank, don't "tidy" it away.
+        ComponentStore store = new ComponentStore(root);
+        Map<String, Object> pack = Map.of(
+                "label", "Layering chain",
+                "category", "money",
+                "description", "Funds relayed through a chain of intermediaries.",
+                "steps", List.of(Map.of("direction", ""), Map.of("direction", "out"), Map.of("direction", "out")));
+        store.write("pattern-pack", "layering-chain", pack);
+
+        ComponentRegistry.Component c = store.get("pattern-pack", "layering-chain").orElseThrow();
+        assertTrue(c.path().toString().replace('\\', '/').endsWith("pattern-packs/layering-chain.toon"));
+        Object steps = c.content().get("steps");
+        assertInstanceOf(List.class, steps);
+        assertEquals(3, ((List<?>) steps).size(), "all three steps survive, blank start row included");
+        assertEquals("", ((Map<?, ?>) ((List<?>) steps).get(0)).get("direction"), "start node stays a wildcard");
+        assertEquals("out", ((Map<?, ?>) ((List<?>) steps).get(1)).get("direction"));
+    }
+
+    @Test
     void rejectsUnknownTypeUnsafeIdAndConnection(@TempDir Path root) {
         ComponentStore store = new ComponentStore(root);
         assertThrows(IllegalArgumentException.class, () -> store.list("bogus"));
