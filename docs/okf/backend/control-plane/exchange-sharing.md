@@ -9,7 +9,7 @@ timestamp: 2026-07-19T00:00:00Z
 
 # Exchange — Cross-Space Sharing
 
-Datasets and Widgets can be shared **read-only, per-item, opt-in** across [Spaces](multi-space.md) via
+Datasets, Widgets and saved Views can be shared **read-only, per-item, opt-in** across [Spaces](multi-space.md) via
 a grant-mediated ledger — the "ministries" model (a department's Dataset used by another department's
 Widgets/Queries/Alert Rules, without reprocessing or re-creating pipelines). Nothing is discoverable
 across Spaces unless its owner offers it; nothing is usable without an active grant (fail-closed).
@@ -33,14 +33,16 @@ POST /exchange/grants/{id}/expiry               owner sets/clears a grant's expi
 GET  /exchange/grants[?space=]                 the grant ledger
 GET  /exchange/datasets/{owner}/{item}[?consumer=]  one item's metadata (+ grant status)
 GET  /exchange/widgets/{owner}/{item}?consumer=     render-only view of a shared Widget
+GET  /exchange/views/{owner}/{item}?consumer=       render-only view of a shared saved View (D9)
 ```
 
 **`ShareGrant`** lifecycle: `requested → active | denied`; `active` → `revoked`/`expired`. One grant per
 `(kind, item, owner, consumer)` quad, id `consumer~owner~kind~item`. Fields include `mode`
 (`snapshot`|`live`), `pin` (a `"v<n>"` version string; null = track current), `expiresAt` (epoch millis;
-null = no expiry). A **Widget grant requires its Dataset grant** — offering/requesting a widget
-auto-pairs its bound dataset's offer/grant; approving the widget activates both; revoking the dataset
-grant cascades revocation to every widget grant that depends on it.
+null = no expiry). A **derived grant requires the grants of every Dataset it reads** — offering/requesting a
+widget or saved view auto-pairs those datasets' offers/grants; approving it activates the whole closure;
+revoking any one dataset grant cascades revocation to every derived grant that reads it. See the D9 section
+below for the generalized rule (`Exchange.DERIVED_KINDS`) — a widget is just the one-dataset case.
 
 **Snapshot delivery (S2, the default).** `ExchangeSnapshotWriter.publish` resolves the owner's own
 `DatasetRelation` (never a shared ref), `COPY`s it to
@@ -96,22 +98,59 @@ split — no new color owner, still passes `lint:tokens`.
 (`_server` pseudo-space ledgers), gated on `mockExchange`; its seed pins the demo "Shared with me" grant
 at `v2` against a `v3` snapshot so drift is visible with no backend.
 
-## Decided 2026-07-25 (BACKLOG D9) — widen the kind axis to saved views
+## Saved views on the kind axis (BACKLOG D9) — SHIPPED end-to-end 2026-07-26
 
-`kind` is to become a **third value: a saved view** (the link-analysis saved view is the first adopter), not
-just `dataset`/`widget`. Today `OfferShareDialog` and `ExchangeService.offer` are **hard-typed** to
-`dataset`/`widget`, so link-analysis V2 (b) sharing was blocked backend-side — the earlier "sharing is
-frontend-only" claim in the backlog was wrong. The call: widen the seam rather than build a parallel
-sharing mechanism for views, so grants, expiry, revocation, and the audit ledger stay in one place.
+`kind` carries a **third value, `link-analysis-view`** (the link-analysis saved view is the first adopter)
+alongside `dataset`/`widget`. The call was to widen this seam rather than build a parallel sharing mechanism
+for views, so grants, expiry, revocation and the audit ledger stay in one place. *(The earlier "sharing is
+frontend-only" claim in the backlog was wrong — `OfferShareDialog` and `ExchangeService.offer` were
+hard-typed, but so was the backend.)*
 
-Constraints the widening must respect, because a view is not a dataset:
+**Derived kinds are now the generalization.** `Exchange.DERIVED_KINDS = {widget, link-analysis-view}`
+replaced four `if ("widget".equals(kind))` blocks in `request`/`approve`/`revoke`/`canRender`, and
+`Offer.dataset` (singular) became **`Offer.datasets`** (a list) — a widget binds exactly one, a view may read
+several. As built:
 
-* A saved view is **metadata that references datasets**, so a view grant must **require the grants of every
-  dataset it reads** — the existing widget→dataset auto-pairing/cascade is the precedent to generalize, not
-  to special-case a second time. A view whose underlying dataset grant is revoked must stop resolving.
-* Snapshot delivery is meaningless for a view (there are no rows of its own) ⇒ a view offer is **live-mode
-  only**; `mode: snapshot` must be rejected rather than silently treated as live.
-* Fail-closed stays: no active grant ⇒ the view ref does not resolve even if the files exist.
+* **The closure spans every Dataset the item reads.** Requesting a derived item creates a pending grant per
+  dataset; approving activates the whole closure atomically; revoking **any one** dataset grant cascades back
+  to it. `Exchange.canRender(consumer, owner, kind, item)` requires the item's own grant **and** every
+  dataset grant to be active — so an **empty closure is a denial, never a free pass**
+  (`canRenderWidget` now delegates to it).
+* **A view is live-mode only.** `Exchange.effectiveMode` rejects an explicit non-`live` mode with
+  `IllegalArgumentException` → **422** at the edge, and defaults an *omitted* mode to `live` instead of the
+  Dataset default (the paired dataset grants inherit it). Enforced **in the ledger**, not only at the HTTP
+  edge, so no caller can bypass it. ⚠ Rejecting is deliberate — silently treating `snapshot` as `live` would
+  hide a real misunderstanding of what a view is.
+* **⚠ Only an `entity-projection` view is shareable, and its Datasets are its projection MAPPINGS** —
+  `query.projections[].datasetId` (multi-mapping: the real reason one view reads several Datasets), falling
+  back to the single `query.projection.datasetId`. **They are NOT `query.roots`/`query.from`** — that is the
+  `lineage`/`provenance` shape, whose roots are catalog assets and Pipelines respectively, neither of which
+  the Exchange can grant. A view on any other source is refused at offer time (**422**) rather than shared
+  with a closure that could never be enforced. *(This cost a preview cycle: the shipped saved views all use
+  the single-mapping shape, so a roots/from reading 422s every real view while passing hand-written tests.)*
+* **New `GET /exchange/views/{owner}/{item}?consumer=`** mirrors the widget render route: the view read-only,
+  with each mapping's `datasetId` rewritten to `shared/<owner>/<id>`. Because that is the **same
+  plain-string ref shape a local Dataset uses**, `POST /inv/projection` takes it unchanged and
+  `ExchangeRefResolver` keeps grant-checking it — so **`ExchangeRefResolver` needed no change at all**, and
+  fail-closed still holds: revoke the dataset grant and the ref stops resolving even though the files exist.
+* **Snapshot publishing is untouched.** `POST /exchange/refresh` looks up a `dataset` offer specifically, so
+  a view offer simply 404s there — no view ever reaches `ExchangeSnapshotWriter`.
+
+**Persisted-shape note.** `Offer.toMap` writes only `datasets`; `fromMap` *also reads* the pre-D9 scalar
+`dataset` key so ledgers written before this change still load. **Do not "unify" that legacy read away, and
+do not start writing `dataset` again** — one concept, one persisted spelling is what keeps a widget offer
+from developing the split brain that D7 phase 2 had to close.
+
+**UI.** `ExchangeKind` is the shared union; `OfferShareDialog` accepts any kind and explains the two
+view-specific truths (datasets first, shared live), rendering "saved view" rather than the wire value. Link
+Analysis's per-view menu gained "Offer for sharing" beside Comments/Tags (the D10 idiom), gated on
+`exchangeEnabled() && canOfferDatasets()` — the same capability the server gates offers on, since a shared
+view exposes its datasets' rows — **and** on the view's source being `entity-projection`, so an unshareable
+view never shows an action that could only 422. The offline `exchange.handler` mirrors all of the above.
+
+Tests: `ControlApiExchangeViewTest` (5, real HTTP — full closure, single-mapping, wrong-source 422, refresh
+404, unknown kind 400) · `ExchangeTest` +4 (two-dataset closure, live-only, empty-closure denial, legacy
+scalar key) · `exchange.handler.spec` +2.
 
 ## What is deliberately out of scope
 

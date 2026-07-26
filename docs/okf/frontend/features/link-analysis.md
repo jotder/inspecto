@@ -62,26 +62,28 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   `{type:'link-analysis-view', id, label}` — the same dialog the widget/query/dataset/dashboard hosts
   use, working as-is because `link-analysis-view` is a `ComponentStore` WRITABLE_TYPE (so
   `/components/{type}/{id}/versions` + `restore` apply); a successful restore reloads the view list.
-  Frontend-only (`ComponentsService.versions/restore` were already wired). Remaining V2 (BACKLOG):
-  **collaboration** — **per-view comments need a new backend** (no Component-attached note model —
-  `ObjectNote` is keyed to Incidents/Cases, so a saved-view comment path would re-key that model by
-  component `type`+`id`); **sharing is NOT frontend-only** after all — the UI share path
-  (`OfferShareDialog` → `ExchangeService.offer` + the mock `exchange.handler`) is hard-typed to
-  `dataset`/`widget`, and `ComponentsService` carries no owner/shares field, so sharing a saved view
-  needs the Exchange seam widened backend-side plus a product call on whether saved views belong in the
-  Exchange (the R3 RBAC component-shares envelope is a distinct server-side mechanism, not surfaced in
-  the UI `ComponentsService`).
+  Frontend-only (`ComponentsService.versions/restore` were already wired).
+  **2026-07-26 shipped V2 (b) sharing** — the Exchange `kind` axis now carries `link-analysis-view`; see the
+  D9 bullet below and [exchange-sharing.md](../../backend/control-plane/exchange-sharing.md). Remaining V2
+  (BACKLOG): **(c)** domain-seeded pattern packs owned by a dedicated system Space (D16) and **(d)** AI
+  assist routed through the shared assist seam.
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
   "View on map" (pivots to Geo Map Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.
 * **V2 decisions of record — 2026-07-25 product session (BACKLOG D9 / D10 / D16).** All three remaining V2
   blockers were product calls, and all three were answered in favour of generalizing an existing seam rather
   than adding a link-analysis-specific one:
-  * **D9 sharing — yes, saved views belong in the Exchange**, and the Exchange `kind` axis is widened
-    backend-side to carry them. Detail and the constraints a view grant must respect (live-mode only, must
-    require its datasets' grants) live in
-    [exchange-sharing.md](../../backend/control-plane/exchange-sharing.md) — the widening is a backend change,
-    so that doc is authoritative, not this one.
+  * **D9 sharing — SHIPPED end-to-end 2026-07-26.** Saved views belong in the Exchange, and the Exchange
+    `kind` axis was widened to carry `link-analysis-view`. Full as-built (derived-kind closure, live-only
+    grants, the `GET /exchange/views/...` render route) lives in
+    [exchange-sharing.md](../../backend/control-plane/exchange-sharing.md) — **that doc is authoritative**,
+    not this one. The link-analysis-side facts: "Offer for sharing" sits in the per-view menu beside
+    Comments/Tags (the D10 idiom), gated on `exchangeEnabled() && canOfferDatasets()` **and** on the view's
+    source being `entity-projection`. ⚠ **Only an entity-projection view is shareable, and its Datasets are
+    its projection mappings** (`query.projections[].datasetId`, else `query.projection.datasetId`) — *not*
+    `query.roots`/`query.from`, which is the lineage/provenance shape whose roots are catalog assets and
+    Pipelines. Every shipped saved view uses the single-mapping shape, so reading roots/from 422s all of them
+    while still passing hand-written tests — verify this one in the preview, not only in specs.
   * **D10 per-view comments — generalize the note model**, do not re-key `ObjectNote` by component
     `type`+`id`. A note becomes attachable to any `(kind, id)` target, so Incidents/Cases stay one adopter
     instead of the special case the model is currently shaped around. Rejected alternative: the narrow re-key,
