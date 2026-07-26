@@ -39,6 +39,7 @@ import { DatasetsService } from '../datasets/datasets.service';
 import { SAMPLE_SOURCES } from '../datasets/dataset-sources';
 import { Query, QueryType, buildQuery } from './query-types';
 import { QueriesService } from './queries.service';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import './query.kind'; // ensure the query kind is registered
 
 /** The default (empty) structured model — a fresh Query Core builder state. */
@@ -77,6 +78,7 @@ function tokenName(raw: string): string {
     selector: 'app-queries',
     standalone: true,
     imports: [
+        AiExplainComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatButtonToggleModule,

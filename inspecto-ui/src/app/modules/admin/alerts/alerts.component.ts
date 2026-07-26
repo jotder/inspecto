@@ -12,6 +12,7 @@ import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component'
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { AlertRuleFormData, AlertRuleFormDialog, AlertRuleFormResult } from './alert-rule-form.dialog';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 /**
  * Alerts — the core alert engine's surface (v4.1, B5): recent fired alerts (GET /alerts) over the
@@ -23,6 +24,7 @@ import { AlertRuleFormData, AlertRuleFormDialog, AlertRuleFormResult } from './a
     selector: 'app-alerts',
     standalone: true,
     imports: [
+        AiExplainComponent,
         FormsModule,
         MatButtonModule,
         MatIconModule,

@@ -9,6 +9,7 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
+            <inspecto-ai-explain screen="Tags" [terms]="['Tag', 'Tag Rule', 'Incident', 'Case']" />
             @if (loadingTags() || loadingTargets()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }

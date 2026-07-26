@@ -14,6 +14,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 /**
  * **Tags** (BACKLOG D7) — the operator surface over the cross-entity label graph. Picking a tag from the
@@ -41,6 +42,7 @@ import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
     selector: 'app-tags',
     standalone: true,
     imports: [
+        AiExplainComponent,
         MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatFormFieldModule, MatInputModule,
         ReactiveFormsModule, DataTableComponent, InspectoEmptyStateComponent,
     ],

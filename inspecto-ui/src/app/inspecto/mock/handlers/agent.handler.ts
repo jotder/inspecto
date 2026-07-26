@@ -27,6 +27,47 @@ const MUTATING = new Set([
     'runbook_operator',
 ]);
 
+/**
+ * The canonical terms the adopting panes declare (AGT-6a A4), keyed lowercase. Copied verbatim from
+ * `docs/GLOSSARY.md`, which the real `glossary_lookup` parses at runtime — a paraphrase here would put a
+ * second, drifting definition of the binding vocabulary in the codebase. It is a SUBSET (the real tool
+ * parses the whole file), so keep it covering what the adopting panes declare — a term missing here
+ * answers 422 and falls through to `docs_search`, which offline has nothing real to cite.
+ */
+const GLOSSARY: Record<string, string> = {
+    'alert': 'A fired instance of an Alert Rule (severity: info / warning / critical).',
+    'alert rule': 'Watches an observability Metric against a threshold and fires an Alert when crossed.',
+    'batch': 'A set of one or more files ingested and processed together as one unit of work.',
+    'case': 'A group of related Incidents managed as one larger investigation with a shared resolution.',
+    'catalog': 'The library/index of all Schemas (and Datasets) in a Space, with version history and usage.',
+    'collector': 'A configured collection task bound to one Connection: what to collect (paths/queries), how often, and where it lands.',
+    'connection': 'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud storage).',
+    'dataset': 'The umbrella for any queryable relation the BI layer can bind to: Table | Derived Table | Reference Dataset | View | Matrix.',
+    'decision rule': 'A business-logic / routing rule that transforms or routes records.',
+    'derived table': 'A materialized Table produced by a Transform or cube/rollup.',
+    'diagnosis': 'An AI-assisted root-cause analysis of a failing Run or Collector that produces an Incident with a suggested fix.',
+    'disposition': 'The decided outcome a Case resolves with (built-in ladder: confirmed · …).',
+    'executable': 'The abstraction for anything the Scheduler can start and that produces a Run. It is either a Pipeline or a Job.',
+    'expectation': 'A data-quality rule that validates records against a Schema (non-null, range, regex, …).',
+    'findings': "A Case's resolution artifact (the loose, business counterpart of the Incident postmortem).",
+    'incident': 'A tracked operational problem. Raised automatically by an Alert or a Diagnosis, or by hand.',
+    'job': 'An atomic, Quartz-style Executable that can do anything. A Job may also be embedded as a Step.',
+    'measure': 'A BI aggregation (SUM, AVG, COUNT, …) over a Dataset.',
+    'notification': 'Delivery of a Signal to a channel (email, webhook); a consumer of the ledger.',
+    'pipeline': 'A named, authored DAG of Steps that turns raw source files into clean, partitioned Tables.',
+    'reference': 'A named external dimension data origin, the slow-changing counterpart to a Stream.',
+    'run': 'One execution of an Executable.',
+    'scheduler': 'The Operations engine that owns Triggers and starts Executables (Pipelines or Jobs).',
+    'step': 'One node in a Pipeline. A Step is a Parser, Transform, Enrichment, or Sink — or an embedded Job.',
+    'stream': 'A named external event / fact data origin as seen in the Catalog.',
+    'table': 'A Hive-style root directory of Parquet files, partitioned by date / partition key.',
+    'tag': 'A user-created label attached to an Incident or Case for cross-cutting grouping.',
+    'tag rule': 'A saved search that applies a Tag (the Gmail-filter metaphor): it auto-tags newly arriving items.',
+    'trigger': 'The start condition of a run: cron | event | manual | on-pipeline. Owned by the Scheduler.',
+    'view': 'A virtual (logical) query over a Table, Derived Table, or View. No storage of its own.',
+    'widget': "A Visualization Type + Config + a binding to a Dataset's resultset metadata — the configured, renderable instance.",
+};
+
 function argsOf(req: MockRequest): Record<string, unknown> {
     const body = req.body as { args?: unknown } | null;
     const args = body?.args;
@@ -166,6 +207,31 @@ export function agentHandler(flags: MockFlags): MockHandler {
                     ? [{ severity: 'ERROR' as const, fieldPath: 'name', message: 'name is required' }]
                     : [];
                 return json({ kind, type: kind, clean: findings.length === 0, findings, draft });
+            }
+            // AGT-6a A4 — the two read tools behind "explain this screen". They are non-mutating reads,
+            // so the real route needs no new capability; offline they answer from a small extract of
+            // docs/GLOSSARY.md (the real tool parses the whole file, which the SPA cannot read).
+            case 'glossary_lookup': {
+                const term = text(args, 'term');
+                if (!term) return error(422, 'term is required');
+                const definition = GLOSSARY[term.toLowerCase()];
+                // A term with no canonical definition is a 422 — that is what drives the docs fallback.
+                if (!definition) return error(422, `no canonical definition for '${term}'`);
+                return json({ term, definition });
+            }
+            case 'docs_search': {
+                const query = text(args, 'query');
+                if (!query) return error(422, 'query is required');
+                return json({
+                    query,
+                    hits: [
+                        {
+                            file: 'GLOSSARY.md',
+                            line: 1,
+                            snippet: `Offline mock: the docs corpus is not readable from the SPA, so '${query}' has no real citations.`,
+                        },
+                    ],
+                });
             }
             default:
                 return error(404, `unknown tool: '${tool}'`);

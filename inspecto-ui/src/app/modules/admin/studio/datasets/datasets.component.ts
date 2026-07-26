@@ -17,6 +17,7 @@ import { BindSharedDatasetDialog, BindSharedDatasetResult } from './bind-shared-
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { buildDataset, Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 /**
  * Studio **Datasets** — the data-source abstractions (physical / virtual / materialized) widgets build on.
@@ -27,6 +28,7 @@ import { DatasetsService } from './datasets.service';
     selector: 'app-datasets',
     standalone: true,
     imports: [
+        AiExplainComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

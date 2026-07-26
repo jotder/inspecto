@@ -21,6 +21,7 @@ import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineEditorComponent } from './pipeline-editor.component';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import {
     CATEGORY_ORDER,
     NodeTypeGroup,
@@ -42,6 +43,7 @@ export type PipelinesViewMode = 'combined' | 'editor';
     selector: 'app-pipelines',
     standalone: true,
     imports: [
+        AiExplainComponent,
         NgTemplateOutlet,
         MatButtonModule,
         MatButtonToggleModule,

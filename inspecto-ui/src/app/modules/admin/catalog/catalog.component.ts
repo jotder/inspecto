@@ -31,6 +31,7 @@ import { G6GraphData, legendFor, toG6Data } from './catalog-graph';
 import { GraphViewComponent } from './graph-view.component';
 import { NodeDetailDialog } from './node-detail.dialog';
 import { SharingComponent } from './sharing.component';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' | 'shared-with-me' | 'shared-by-me';
 
@@ -45,6 +46,7 @@ type CatTab = 'tables' | 'streams' | 'references' | 'kpis' | 'graph' | 'usage' |
 @Component({
     standalone: true,
     imports: [
+        AiExplainComponent,
         FormsModule,
         MatButtonModule,
         MatCheckboxModule,

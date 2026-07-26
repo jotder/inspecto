@@ -8,6 +8,7 @@
                 <div class="text-secondary mt-1.5">Ingest runs and lifecycle actions</div>
             </div>
             <div class="mt-4 flex items-center gap-3 sm:mt-0">
+                <inspecto-ai-explain screen="Runs" [terms]="['Run', 'Executable', 'Batch', 'Pipeline']" />
                 <mat-slide-toggle [(ngModel)]="autoRefresh">Auto</mat-slide-toggle>
                 <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>

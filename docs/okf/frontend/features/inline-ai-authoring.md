@@ -5,8 +5,8 @@ context as that tool's arguments, and the surface renders the returned draft wit
 diff against current state. Panes **adopt** it; they never fork it. Backend half and the route's gate
 order: [[embedded-intelligence]].
 
-Shipped 2026-07-26 (A1–A3). Plan: `superpower/agt-6-plan.md` — still active for A4 + the deferred
-`kpi_report_builder` host.
+Shipped 2026-07-26 (A1–A3, then **A4** — see *Explain this screen* below). Plan:
+`superpower/agt-6-plan.md` — still active for the deferred `kpi_report_builder` host + A5.
 
 ## Shape
 
@@ -88,10 +88,50 @@ Three gotchas that cost a debug cycle each — do not "clean these up":
 ## Offline
 
 `inspecto/mock/handlers/agent.handler.ts` (gated on `mockOps`) mocks `POST /agent/tools/{name}` for all
-five tools **and reproduces the gates** (403 mutating, 404 unknown, 422 missing args), because the
+five authoring tools plus the two read tools **and reproduces the gates** (403 mutating, 404 unknown, 422 missing args), because the
 surface's degrade paths are what most need exercising offline. Result shapes mirror `InspectoTools` — if
 those change, change these too. Registered in `mock-api.interceptor.ts`; the rest of `/agent/*` stays
 real.
+
+## Explain this screen (`<inspecto-ai-explain>`, A4 — shipped 2026-07-26)
+
+The read-only half. One icon button a pane drops into its header; everything it renders lives in a
+**dialog**, so adopting it cannot disturb the header row it sits in — that is what made breadth cheap.
+
+`inspecto/ai-assist/ai-explain.component.ts` (the trigger) + `ai-explain.dialog.ts` (the lookup + render)
++ specs. Also in the `/design` gallery.
+
+```html
+<inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+```
+
+**Why it is a sibling of `<inspecto-ai-assist>` and not a mode of it** — three of the four things that
+component *is* do not apply, so a mode flag would leave half of it dead on every render:
+
+1. **No write path whatsoever** — no draft, no diff, no Apply, no `adaptToolResult`.
+2. **Deliberately NOT gated on `canAuthorWorkbench()`.** A Business-lens user is exactly who needs the
+   vocabulary explained. ⚠ Do not "make it consistent" with the authoring surface by adding the gate.
+3. **The pane declares the terms; the operator never types one.** A free-text box would make this a docs
+   search engine and would re-state what the screen already knows (the A3 rule). Terms are
+   `docs/GLOSSARY.md` spellings — the canonical ones, never a banned synonym.
+
+**Backend: none was added.** `POST /agent/tools/{name}` gates only on `ToolSpec.mutating()`, and
+`glossary_lookup` / `docs_search` are non-mutating `READ_DOCS` reads, so the whole feature is UI-side.
+
+**Resolution order per term**, each term degrading independently so one failure never blanks the others:
+`glossary_lookup` → on **422** (no canonical definition) fall back to `docs_search` and render its
+`{file, line, snippet}` **citations** → otherwise "No canonical definition found." A **503** latches once
+and the dialog explains the module is absent instead of failing. There is **no model in the loop**: the
+operator reads the binding glossary, not a paraphrase of it.
+
+**Adopted on 11 panes** (12 routes — `object-mail` serves both `/incidents` and `/cases` and switches its
+term list on `isIncident`): Pipelines · Datasets · Catalog · Expectations · Alerts · Collectors · Query
+Library · Runs · Scheduler · Tags · Incidents/Case Manager.
+
+⚠ **The offline `GLOSSARY` map in `agent.handler.ts` is a subset** of the real file (the SPA cannot read
+`docs/`), so a term a new pane declares must be added there too or it falls through to a `docs_search`
+that has nothing real to cite offline. Definitions are copied **verbatim** — a paraphrase would put a
+second, drifting definition of the binding vocabulary in the codebase.
 
 ## Not shipped
 
@@ -100,7 +140,10 @@ real.
   dataset + measures (`controls()`, whose `ChannelValue.agg` enum matches the tool's exactly) but saves
   exactly **one** widget; `studio/dashboards/dashboard-editor` can build a dashboard but has no measures.
   That host is a new flow, not an adoption. → `BACKLOG.md`.
-- **A4** — the read-only "explain this screen" affordance. The route already admits the read tools, so
-  this needs no new backend.
+- **"Why is this red"** — A4's *other* half. The one-line plan row bundled two different affordances:
+  the vocabulary explain that shipped, and a status explain over `status_get` / `signal_timeline` /
+  `timeline_build`. The second needs real entity ids, so it only means anything on the operational panes
+  (Pipelines status, Incidents, Signals, Alerts) and is **not** a breadth win. Operator call 2026-07-26:
+  vocabulary first. → `BACKLOG.md`.
 - **A5 (new)** — true natural-language authoring. Needs the NL→structure model hop this plan never
   scoped; see the shape warning in [[embedded-intelligence]].

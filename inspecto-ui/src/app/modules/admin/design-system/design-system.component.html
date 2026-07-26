@@ -275,6 +275,33 @@
             <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.aiAssist }}</code></pre>
         </section>
 
+        <!-- ── Explain this screen (the read-only half, AGT-6a A4) ───────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Explain this screen</h2>
+                <button mat-stroked-button (click)="copy(snippets.aiExplain)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-ai-explain&gt;</code> is the read-only sibling of the authoring surface: one
+                icon button for a pane header that answers "what am I looking at" from
+                <code>docs/GLOSSARY.md</code>, the binding vocabulary. The <b>pane declares the terms</b> — a
+                free-text box would make it a docs search engine and would re-state what the screen already
+                knows. It has <b>no write path at all</b> (no draft, no diff, no Apply) and is deliberately
+                <b>not</b> gated on <code>canAuthorWorkbench</code>: a Business-lens user is exactly who needs
+                the vocabulary explained. Everything it renders lives in a dialog, so it cannot disturb the
+                header row it sits in. Backed by the non-mutating <code>glossary_lookup</code>, falling back to
+                <code>docs_search</code> for an undefined term; an absent intelligence module renders an
+                explanation instead of failing.
+            </p>
+            <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
+                <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+            </div>
+            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.aiExplain }}</code></pre>
+        </section>
+
         <!-- ── Data table (mini / standard / pro / pro max) ──────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">

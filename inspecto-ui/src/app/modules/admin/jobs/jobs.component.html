@@ -12,6 +12,7 @@
             </div>
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-3 sm:mt-0">
+            <inspecto-ai-explain screen="the Scheduler" [terms]="['Scheduler', 'Job', 'Trigger', 'Executable', 'Run']" />
             <mat-button-toggle-group
                 [value]="mode"
                 (change)="setMode($event.value)"

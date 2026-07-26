@@ -6,6 +6,7 @@
                 <h1 class="text-3xl font-extrabold leading-none tracking-tight">Catalog</h1>
                 <div class="text-secondary mt-1.5">Metadata graph — streams, references, tables, KPIs and lineage traversal</div>
             </div>
+            <inspecto-ai-explain screen="the Catalog" [terms]="['Catalog', 'Stream', 'Reference', 'Table']" />
             <!-- Contextual onboarding CTA — the guided path to a new data origin (authoring lenses). -->
             @if (lens.canAuthorWorkbench() && (activeTab === 'streams' || activeTab === 'references')) {
                 <button mat-flat-button color="primary" (click)="onboard(activeTab === 'references' ? 'reference' : 'stream')">

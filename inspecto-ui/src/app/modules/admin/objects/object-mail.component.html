@@ -121,6 +121,7 @@
                     <div class="text-secondary mt-1 text-sm">{{ activeLabel() }} · {{ rows().length }} item{{ rows().length === 1 ? '' : 's' }}</div>
                 </div>
                 <div class="flex items-center gap-2">
+                    <inspecto-ai-explain [screen]="title" [terms]="explainTerms" />
                     @if (!isIncident) {
                         <button mat-icon-button (click)="openAnalytics()" matTooltip="Case analytics" aria-label="Case analytics">
                             <mat-icon svgIcon="heroicons_outline:chart-bar"></mat-icon>

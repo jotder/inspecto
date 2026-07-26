@@ -22,6 +22,7 @@ import { InspectoRowAction } from 'app/inspecto/grid';
 import { fmtBytes, fmtInt } from 'app/inspecto/format';
 import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
 import { CollectorDetailDialog } from './collector-detail.dialog';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 /** A summary card above the grid. */
 interface MetricCard {
@@ -38,6 +39,7 @@ interface MetricCard {
     selector: 'app-collectors',
     standalone: true,
     imports: [
+        AiExplainComponent,
         MatButtonModule,
         MatIconModule,
         MatTooltipModule,

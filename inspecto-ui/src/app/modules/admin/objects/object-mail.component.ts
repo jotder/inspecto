@@ -45,6 +45,7 @@ import { PostmortemPanelComponent } from './postmortem-panel.component';
 import { ResolveDialog } from './resolve.dialog';
 import { TagChange, TagDialog } from './tag.dialog';
 import { TagRulesDialog } from './tag-rules.dialog';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 const NAV_COLLAPSED_KEY = 'inspecto.mail.navCollapsed';
 
@@ -79,6 +80,7 @@ function mailDate(ms: number | undefined): string {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        AiExplainComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatFormFieldModule,
@@ -105,6 +107,11 @@ export class ObjectMailComponent implements OnInit {
     readonly type = (this.route.snapshot.data['type'] as string) ?? 'INCIDENT';
     readonly title = (this.route.snapshot.data['title'] as string) ?? 'Incidents';
     readonly isIncident = this.type === 'INCIDENT';
+
+    /** One pane serves both types, and they are different concepts — so are the terms it explains (A4). */
+    readonly explainTerms = this.isIncident
+        ? ['Incident', 'Alert', 'Diagnosis', 'Tag']
+        : ['Case', 'Incident', 'Findings', 'Disposition'];
     readonly priorities = INCIDENT_PRIORITIES;
     readonly me = currentOperator();
 

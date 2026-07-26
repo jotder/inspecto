@@ -123,6 +123,17 @@ src/app/
   them without scoping the model hop (BACKLOG AGT-6a · A5). Details + the per-pane gotchas (target-vs-table
   vocabularies, the `kind`+`min`/`max` same-patch trap, the Queries `type` switch):
   `docs/okf/frontend/features/inline-ai-authoring.md`.
+- **"Explain this screen" on a pane → `<inspecto-ai-explain>`** (`inspecto/ai-assist/`, AGT-6a A4). The
+  read-only sibling of the above: one icon button for the pane's header action row —
+  `<inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline','Step','Trigger']" />` — that resolves each
+  term from `docs/GLOSSARY.md` via the non-mutating `glossary_lookup` (falling back to `docs_search`
+  citations, and explaining itself on 503). Everything renders in a dialog, so adopting it can't disturb
+  the header. Three rules: **the PANE declares the terms** (never a free-text box — that is a docs search
+  engine, and it re-states what the screen already knows); terms are **canonical** spellings, never banned
+  synonyms; and it is **NOT gated on `canAuthorWorkbench()`** — it has no write path, and a Business-lens
+  user is who needs it most, so don't "make it consistent" with the authoring surface. Adopted on 11 panes.
+  ⚠ A new pane's terms must also be added to the **subset** `GLOSSARY` map in `mock/handlers/agent.handler.ts`
+  (verbatim from the real file) or they can't resolve offline.
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL

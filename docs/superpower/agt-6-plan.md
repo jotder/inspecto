@@ -1,8 +1,21 @@
 # AGT-6 Plan — Inline AI Authoring & Agent Graphs
 
-> ## ⚠️ AS-BUILT UPDATE — 2026-07-26: A1–A3 SHIPPED, and two of this plan's premises were WRONG
+> ## ⚠️ AS-BUILT UPDATE — 2026-07-26: A1–A4 SHIPPED, and three of this plan's premises were WRONG
 >
-> **Plan stays active** (A4 + one A2 pane + all of 6b remain). D1–D4 answered; §8 records the calls.
+> **Plan stays active** (one A2 pane + A5 + all of 6b remain). D1–D4 answered; §8 records the calls.
+>
+> **Correction 3 — A4 (§3.2) is TWO affordances, not one, and only one of them is a breadth win.** The
+> row's own phrasing gives it away: *"what am I looking at / why is this red"*. The first is a **vocabulary**
+> explain over `glossary_lookup`/`docs_search` — deterministic, meaningful on every pane, and correctly
+> **ungated** (a Business-lens user needs it most). The second is a **status** explain over
+> `status_get`/`signal_timeline`/`timeline_build`, which needs real entity ids and therefore only means
+> anything on the four operational panes — so it cannot satisfy "every remaining pane" and is not the cheap
+> win the row priced. **Operator decision 2026-07-26: vocabulary first**, status explain → BACKLOG.
+> **Shipped:** `<inspecto-ai-explain>` (trigger + dialog) on **11 panes / 12 routes**, 7 new specs, offline
+> glossary mock, `/design` entry. Backend: **genuinely none** this time — the route gates only on
+> `ToolSpec.mutating()`, so the read belt was already reachable. ⚠ It is a **sibling** of
+> `<inspecto-ai-assist>`, not a mode of it (no write path, no authoring gate, no diff) — see
+> `okf/frontend/features/inline-ai-authoring.md` for why folding them together leaves half dead per render.
 >
 > **Correction 1 — "no new backend capability" (§0 table, §3.2 A2) was FALSE.** The five L1 tools had
 > **no invocable route**. They are `ToolSpec`s in the agent's belt, reachable only *indirectly* through
@@ -28,8 +41,8 @@
 > **NOT shipped:** **`kpi_report_builder` has no viable host pane** — it emits N widgets *plus* a
 > dashboard, and no pane holds a dataset and operator-built measures *and* can create both. `explore` has
 > dataset+measures but saves exactly one widget; `dashboard-editor` can build a dashboard but has no
-> measures. That host is a new flow, not an adoption. → BACKLOG. **A4** (read-only "explain this screen")
-> untouched.
+> measures. That host is a new flow, not an adoption. → BACKLOG. **A4's status half**
+> ("why is this red") → BACKLOG; its vocabulary half shipped (Correction 3).
 >
 > **Status: DRAFT for stakeholder review — 2026-07-25.** Scopes AGT-6, which was deliberately left
 > "not scoped further on purpose" until AGT-5's tool belt + autonomy ladder shipped (P0–P5 complete

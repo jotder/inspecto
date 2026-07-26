@@ -14,6 +14,7 @@ import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component'
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { ExpectationFormDialog, ExpectationFormData, ExpectationFormResult } from './expectation-form.dialog';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 
 /** Human label for the check kind. */
 const KIND_LABELS: Record<string, string> = {
@@ -34,6 +35,7 @@ const KIND_LABELS: Record<string, string> = {
     selector: 'app-expectations',
     standalone: true,
     imports: [
+        AiExplainComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,

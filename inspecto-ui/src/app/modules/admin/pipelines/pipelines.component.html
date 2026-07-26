@@ -11,6 +11,7 @@
             </div>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
+            <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
             <mat-button-toggle-group
                 [value]="mode()"
                 (change)="setMode($event.value)"
