@@ -95,6 +95,23 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
     }
 
     @Override
+    public synchronized int deleteForTarget(String targetKind, String targetId) {
+        String tk = targetKind == null || targetKind.isBlank()
+                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+        String sql = "DELETE FROM " + TABLE + " WHERE object_id = ? AND target_kind = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, targetId);
+            ps.setString(2, tk);
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            // Throws, unlike the read above which logs and degrades to an empty list: a cascade that
+            // quietly "deleted 0" would orphan the rows the caller is purging an object to remove.
+            throw new IllegalStateException("could not delete notes for " + tk + "/" + targetId
+                    + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void close() {
         try {
             conn.close();

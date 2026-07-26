@@ -70,6 +70,30 @@ public final class ObjectService {
     public static final String ATTR_MERGED_INTO = "mergedInto";
     /** Attribute key stamped on a rule-raised case: the {@link CaseRule} name that opened it (GLOSSARY §9, C5). */
     public static final String ATTR_RAISED_BY_RULE = "raisedByRule";
+    /** Attribute key placing an object under legal hold — see {@link #hasLegalHold} (MNT-14). */
+    public static final String ATTR_LEGAL_HOLD = "legalHold";
+
+    /**
+     * {@code true} when {@code o} is under legal hold ({@link #ATTR_LEGAL_HOLD}) and must therefore
+     * <b>never</b> be purged by the MNT-14 retention sweep, however long its retention window has been
+     * expired. Absence of the key means no hold.
+     *
+     * <p><b>Deliberately fail-safe on anything unrecognised.</b> Only an explicit falsey spelling
+     * ({@code false}/{@code 0}/{@code no}/{@code off}, case-insensitively) clears the hold; every other
+     * non-blank value holds. A typo in a hold value must keep records, not delete them — the two failure
+     * modes are not symmetric, and this one is irreversible.
+     *
+     * <p>The sweep must call this at <b>purge time</b>, not only when building its preview, or a hold
+     * applied between the preview and the run is ignored.
+     */
+    public static boolean hasLegalHold(OperationalObject o) {
+        String v = o == null ? null : o.attributes().get(ATTR_LEGAL_HOLD);
+        if (v == null || v.isBlank()) return false;
+        return switch (v.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "false", "0", "no", "off" -> false;
+            default -> true;
+        };
+    }
 
     private final ObjectStore store;
     private final LinkStore links;

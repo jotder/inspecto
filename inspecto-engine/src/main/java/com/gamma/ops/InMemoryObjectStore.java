@@ -57,7 +57,8 @@ public final class InMemoryObjectStore implements ObjectStore {
         for (OperationalObject o : byId.values()) {
             if (query.matches(o)) matched.add(o);
         }
-        matched.sort(Comparator.comparingLong(OperationalObject::createdAt).reversed());   // newest-first
+        Comparator<OperationalObject> byCreated = Comparator.comparingLong(OperationalObject::createdAt);
+        matched.sort(query.oldestFirst() ? byCreated : byCreated.reversed());
         int from = Math.min(query.offset(), matched.size());
         int to = Math.min(from + query.limit(), matched.size());
         return new ArrayList<>(matched.subList(from, to));

@@ -44,6 +44,19 @@ public interface LinkStore extends AutoCloseable {
     /** The newest {@code limit} links across the whole store (diagnostics/tests), newest-first. */
     List<ObjectLink> all(int limit);
 
+    /**
+     * Remove every edge touching {@code objectId} at <b>either</b> end — the bulk counterpart of
+     * {@link #incident(String)} — and return how many went. Exists so a retention purge can cascade
+     * (MNT-14 G2), because {@link com.gamma.ops.ObjectStore#delete} does not.
+     *
+     * <p>⚠ Both ends is the point: an edge whose <em>other</em> end is being purged would otherwise be
+     * left dangling, pointing at an id that no longer resolves.
+     *
+     * @since 4.10.0 widened in a MAJOR release rather than added as a throwing {@code default} — see
+     *        {@link com.gamma.ops.note.NoteStore#deleteForTarget}.
+     */
+    int removeAllIncident(String objectId);
+
     /** Release resources (e.g. the DuckDB connection). Idempotent; no-op for in-memory. */
     @Override
     default void close() {}

@@ -161,6 +161,20 @@ public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma
     }
 
     @Override
+    public synchronized int removeAllForTarget(String targetKind, String targetId) {
+        String tk = NoteTargets.require(targetKind);
+        String sql = "DELETE FROM " + TABLE + " WHERE target_kind = ? AND target_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tk);
+            ps.setString(2, targetId == null ? null : targetId.trim());
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not clear tags on " + tk + "/" + targetId
+                    + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public void close() {
         try {
             conn.close();

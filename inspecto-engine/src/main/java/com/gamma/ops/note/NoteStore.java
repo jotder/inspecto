@@ -34,6 +34,21 @@ public interface NoteStore extends AutoCloseable {
         return forTarget(NoteTargets.OBJECT, objectId, kind);
     }
 
+    /**
+     * Delete <b>every</b> note of every kind for one target, returning how many rows went. The one
+     * exception to this store's append-only contract, and deliberately narrow: it exists so a retention
+     * purge can cascade (MNT-14 G2), because {@link com.gamma.ops.ObjectStore#delete} does not.
+     *
+     * <p>This covers attachments too — an attachment is an {@link ObjectNote} row with an attachment
+     * {@link NoteKind}, not a separate store, so there is nothing else to clean up.
+     *
+     * <p>Scoped to the {@code (targetKind, targetId)} pair like every read here, never the id alone.
+     *
+     * @since 4.10.0 widened in a MAJOR release rather than added as a throwing {@code default}: a default
+     *        that silently did nothing would orphan rows, which is the exact failure this method prevents.
+     */
+    int deleteForTarget(String targetKind, String targetId);
+
     /** Release resources (e.g. the DuckDB connection). Idempotent; no-op for in-memory. */
     @Override
     default void close() {}

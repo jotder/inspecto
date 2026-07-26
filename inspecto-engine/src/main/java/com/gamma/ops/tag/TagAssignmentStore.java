@@ -59,6 +59,18 @@ public interface TagAssignmentStore extends AutoCloseable {
     /** Drop every edge for one tag (used when the tag itself is deleted). Returns the count removed. */
     int removeTag(String tag);
 
+    /**
+     * Drop every edge on one <b>target</b> — the missing axis. {@link #remove} is per-(tag, target) and
+     * {@link #removeTag} is per-tag; neither can answer "this entity is gone, forget its labels", which is
+     * what a retention purge needs (MNT-14 G2). Returns the count removed.
+     *
+     * <p>Scoped to the {@code (targetKind, targetId)} pair, never the id alone.
+     *
+     * @since 4.10.0 widened in a MAJOR release rather than added as a throwing {@code default} — see
+     *        {@link com.gamma.ops.note.NoteStore#deleteForTarget}.
+     */
+    int removeAllForTarget(String targetKind, String targetId);
+
     /** Release resources (e.g. the DuckDB connection). Idempotent; no-op for in-memory. */
     @Override
     default void close() {}

@@ -39,6 +39,13 @@ public final class InMemoryLinkStore implements LinkStore {
     }
 
     @Override
+    public synchronized int removeAllIncident(String objectId) {
+        int before = links.size();
+        links.removeIf(l -> l.fromId().equals(objectId) || l.toId().equals(objectId));
+        return before - links.size();
+    }
+
+    @Override
     public synchronized List<ObjectLink> all(int limit) {
         int cap = Math.max(0, limit);
         List<ObjectLink> out = new ArrayList<>();

@@ -18,7 +18,9 @@ import java.util.Optional;
  * <h3>Contract</h3>
  * <ul>
  *   <li>{@link #query(ObjectQuery)} returns matching objects <b>newest-first</b> (by {@code createdAt}),
- *       honoring the query's {@code limit}/{@code offset}.</li>
+ *       honoring the query's {@code limit}/{@code offset} — unless the query sets
+ *       {@link ObjectQuery#oldestFirst()}, which reverses it. Both backends must agree on ordering as
+ *       well as on rows: a retention sweep that reads one page depends on it (MNT-14 G1).</li>
  *   <li>Implementations must be thread-safe.</li>
  * </ul>
  *

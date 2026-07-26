@@ -147,6 +147,8 @@ public final class DbObjectStore implements ObjectStore, com.gamma.util.Browsabl
         ciEquals(where, params, "assignee", q.assignee());
         ciEquals(where, params, "\"owner\"", q.owner());
         if (q.correlationId() != null) { where.add("correlation_id = ?"); params.add(q.correlationId()); }
+        // closed_at = 0 means "not closed" — a reopened object must never satisfy a retention cutoff.
+        if (q.closedBefore() > 0) { where.add("closed_at > 0 AND closed_at < ?"); params.add(q.closedBefore()); }
         if (q.textContains() != null) {
             where.add("(LOWER(title) LIKE ? OR LOWER(description) LIKE ?)");
             String like = "%" + q.textContains().toLowerCase(Locale.ROOT) + "%";
@@ -155,7 +157,7 @@ public final class DbObjectStore implements ObjectStore, com.gamma.util.Browsabl
         }
         String sql = "SELECT " + COLS + " FROM " + TABLE
                 + (where.isEmpty() ? "" : " WHERE " + String.join(" AND ", where))
-                + " ORDER BY created_at DESC LIMIT ? OFFSET ?";
+                + " ORDER BY created_at " + (q.oldestFirst() ? "ASC" : "DESC") + " LIMIT ? OFFSET ?";
         List<OperationalObject> out = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             int i = 1;

@@ -93,6 +93,15 @@ public final class InMemoryTagAssignmentStore implements TagAssignmentStore {
         return before - edges.size();
     }
 
+    @Override
+    public synchronized int removeAllForTarget(String targetKind, String targetId) {
+        String tk = NoteTargets.require(targetKind);
+        String id = targetId == null ? null : targetId.trim();
+        int before = edges.size();
+        edges.removeIf(e -> e.targetKind().equals(tk) && e.targetId().equals(id));
+        return before - edges.size();
+    }
+
     private static boolean same(TagAssignment e, String tag, String kind, String id) {
         return e.tag().equals(tag) && e.targetKind().equals(kind) && e.targetId().equals(id);
     }

@@ -34,4 +34,13 @@ public final class InMemoryNoteStore implements NoteStore {
         }
         return out;
     }
+
+    @Override
+    public synchronized int deleteForTarget(String targetKind, String targetId) {
+        String tk = targetKind == null || targetKind.isBlank()
+                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+        int before = notes.size();
+        notes.removeIf(n -> n.targetKind().equals(tk) && n.objectId().equals(targetId));
+        return before - notes.size();
+    }
 }

@@ -88,6 +88,19 @@ public final class DbLinkStore implements LinkStore, com.gamma.util.BrowsableSto
     }
 
     @Override
+    public synchronized int removeAllIncident(String objectId) {
+        String sql = "DELETE FROM " + TABLE + " WHERE from_id = ? OR to_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, objectId);
+            ps.setString(2, objectId);
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not remove links incident to " + objectId
+                    + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public synchronized List<ObjectLink> incident(String objectId) {
         String sql = "SELECT " + COLS + " FROM " + TABLE
                 + " WHERE from_id = ? OR to_id = ? ORDER BY created_at DESC";
