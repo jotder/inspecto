@@ -87,46 +87,36 @@
                 (membersChange)="memberRollup.set($event)"
             />
 
-            <!-- C3 + C6: Findings (the case's loose resolution artifact) + team + target date -->
-            <form [formGroup]="findingsForm" class="mb-4 flex flex-col gap-3">
+            <!-- C3/D6: the Findings sections are deployment-configurable (GET /findings/{type}), so they
+                 render through the shared schema form. Team + target date are C6, not Findings, and stay
+                 fixed — they sit in a sibling form because the schema form owns its own <form> element. -->
+            <div class="mb-4 flex flex-col gap-3">
                 <h3 class="text-sm font-bold uppercase tracking-wider opacity-60">Findings</h3>
-                <div class="grid grid-cols-2 gap-3">
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Disposition</mat-label>
-                        <mat-select formControlName="disposition">
-                            <mat-option value="">— none yet —</mat-option>
-                            @for (d of dispositions; track d) {
-                                <mat-option [value]="d">{{ d }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Impact amount</mat-label>
-                        <input matInput formControlName="impactAmount" placeholder="e.g. 12500.00" />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Records / customers affected</mat-label>
-                        <input matInput formControlName="recordsAffected" placeholder="e.g. 4200" />
-                    </mat-form-field>
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Target date (loose SLA)</mat-label>
-                        <input matInput formControlName="targetDate" placeholder="YYYY-MM-DD" />
-                    </mat-form-field>
-                </div>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Team</mat-label>
-                    <input matInput formControlName="team" placeholder="comma-separated, e.g. alice, bob" />
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Findings summary</mat-label>
-                    <textarea matInput rows="3" formControlName="summary" placeholder="what was found, what was decided"></textarea>
-                </mat-form-field>
+                @if (findingsSpecs().length) {
+                    <inspecto-schema-form
+                        [specs]="findingsSpecs()"
+                        [initial]="findingsInitial()"
+                        (submitted)="saveFindings()"
+                    />
+                }
+                <form [formGroup]="teamForm" class="flex flex-col gap-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Target date (loose SLA)</mat-label>
+                            <input matInput formControlName="targetDate" placeholder="YYYY-MM-DD" />
+                        </mat-form-field>
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Team</mat-label>
+                            <input matInput formControlName="team" placeholder="comma-separated, e.g. alice, bob" />
+                        </mat-form-field>
+                    </div>
+                </form>
                 <div class="flex justify-end">
-                    <button mat-flat-button color="primary" [disabled]="saving || findingsForm.pristine" (click)="saveFindings()">
+                    <button mat-flat-button color="primary" [disabled]="saving || !findingsDirty" (click)="saveFindings()">
                         Save findings
                     </button>
                 </div>
-            </form>
+            </div>
         }
 
         @if (isIncident) {

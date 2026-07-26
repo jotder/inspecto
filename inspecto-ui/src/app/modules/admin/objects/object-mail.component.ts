@@ -13,7 +13,7 @@ import { ColDef, ICellRendererParams, ValueGetterParams } from 'ag-grid-communit
 import { forkJoin, Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectsService, OperationalObject, optimisticMutate, Tag, TagRule, UpdateObject, WorkflowDef } from 'app/inspecto/api';
+import { apiErrorMessage, FindingsSpecDef, ObjectsService, OperationalObject, optimisticMutate, Tag, TagRule, UpdateObject, WorkflowDef } from 'app/inspecto/api';
 import {
     STATUS_BADGE_BASE,
     statusBadgeClasses,
@@ -110,6 +110,8 @@ export class ObjectMailComponent implements OnInit {
 
     /** The effective CASE lifecycle (C6) — folders + toolbar verbs derive from it; TOON overrides win. */
     readonly workflowDef = signal<WorkflowDef>(DEFAULT_CASE_WORKFLOW);
+    /** C3/D6: the effective Findings sections, served per object type; null until loaded. */
+    readonly findingsSpec = signal<FindingsSpecDef | null>(null);
     readonly folders = computed<MailFolder[]>(() =>
         this.isIncident ? INCIDENT_FOLDERS : caseFoldersFrom(this.workflowDef()),
     );
@@ -282,6 +284,13 @@ export class ObjectMailComponent implements OnInit {
                     if (!this.folders().some((f) => f.id === this.folderId()))
                         this.folderId.set(wf.initial.toLowerCase());
                 },
+                error: () => undefined,
+            });
+            // C3/D6: the effective Findings sections for the detail panel. Fetched alongside the workflow
+            // and degraded independently — a failure leaves the configurable half unrendered rather than
+            // blanking the pane (the server resolves authored-else-built-in, so success is the norm).
+            this.api.findingsSpec('CASE').subscribe({
+                next: (spec) => this.findingsSpec.set(spec),
                 error: () => undefined,
             });
         }

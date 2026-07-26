@@ -1,4 +1,11 @@
-import { normalizeIncidentStatus, OperationalObject, WorkflowDef } from 'app/inspecto/api';
+import {
+    FindingsSection,
+    FindingsSpecDef,
+    normalizeIncidentStatus,
+    OperationalObject,
+    WorkflowDef,
+} from 'app/inspecto/api';
+import { AttributeSpec, AttributeTier, AttributeType } from 'app/inspecto/component-model';
 
 export { normalizeIncidentStatus };
 
@@ -130,19 +137,16 @@ export function postmortemGaps(o: OperationalObject): string[] {
 
 // ── Case Findings (attributes.findings, JSON — C3) + team + loose SLA (C6) ────────────────────
 
-/** Built-in disposition ladder (C3); a deployment-configurable list is the documented follow-up. */
-export const CASE_DISPOSITIONS = ['CONFIRMED', 'FALSE_POSITIVE', 'RECOVERED', 'WRITTEN_OFF', 'INCONCLUSIVE'] as const;
-
-/** The case's resolution artifact — generic/loose vs the incident's fixed postmortem pattern. */
-export interface Findings {
-    disposition: string;
-    impactAmount: string;
-    recordsAffected: string;
-    summary: string;
-}
+/**
+ * The case's resolution artifact — generic/loose vs the incident's fixed postmortem pattern. Since D6 the
+ * field set is **deployment-configurable**, so this is an open record keyed by the served spec's section
+ * keys rather than a fixed shape. `disposition` is the one key the panel still reads by name (the soft
+ * no-disposition gate on resolve), and it degrades to "no gate" when a deployment removes that section.
+ */
+export type Findings = Record<string, string>;
 
 export function emptyFindings(): Findings {
-    return { disposition: '', impactAmount: '', recordsAffected: '', summary: '' };
+    return {};
 }
 
 /** Parse the stored findings; null when absent or unreadable. */
@@ -150,10 +154,57 @@ export function parseFindings(o: OperationalObject): Findings | null {
     const raw = o.attributes?.['findings'];
     if (!raw) return null;
     try {
-        return { ...emptyFindings(), ...(JSON.parse(raw) as Partial<Findings>) };
+        const parsed = JSON.parse(raw) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+        return parsed as Findings;
     } catch {
         return null;
     }
+}
+
+/**
+ * Narrow a served Findings spec (C3/D6) to `AttributeSpec[]` for `<inspecto-schema-form>`. The server
+ * already authors sections in this vocabulary and validates them fail-closed at authoring time, so this
+ * only casts the open `string` type/tier onto their unions and drops anything unrecognised — a spec the
+ * renderer cannot draw is a server bug, and skipping the field beats rendering a broken control.
+ */
+export function findingsAttributes(spec: FindingsSpecDef | null): AttributeSpec[] {
+    if (!spec) return [];
+    const out: AttributeSpec[] = [];
+    for (const s of spec.sections ?? []) {
+        if (!ATTRIBUTE_TYPES.includes(s.type as AttributeType) || !ATTRIBUTE_TIERS.includes(s.tier as AttributeTier)) {
+            continue;
+        }
+        out.push({
+            key: s.key,
+            label: s.label || s.key,
+            type: s.type as AttributeType,
+            tier: s.tier as AttributeTier,
+            required: s.required,
+            default: s.default,
+            options: s.options,
+            pattern: s.pattern,
+            min: s.min,
+            max: s.max,
+            dependsOn: dependsOnOf(s),
+            help: s.help,
+            placeholder: s.placeholder,
+        });
+    }
+    return out;
+}
+
+const ATTRIBUTE_TYPES: AttributeType[] =
+    ['string', 'identifier', 'number', 'boolean', 'select', 'autocomplete', 'multiline'];
+const ATTRIBUTE_TIERS: AttributeTier[] = ['required', 'optional', 'advanced'];
+
+/** The served `{key, equals|notEquals}` clause, kept as exactly one sense (`AttributeSpec.dependsOn`). */
+function dependsOnOf(s: FindingsSection): AttributeSpec['dependsOn'] {
+    const d = s.dependsOn;
+    if (!d?.key) return undefined;
+    return 'notEquals' in d && d.notEquals !== undefined
+        ? { key: d.key, notEquals: d.notEquals }
+        : { key: d.key, equals: d.equals };
 }
 
 /** The case's working team (C6) — `attributes.assignees` CSV; `assignee` stays the lead. */

@@ -64,6 +64,7 @@ const OBJECT_ATTACHMENTS = /\/objects\/([^/]+)\/attachments$/;
 const OBJECT_RCA = /\/objects\/([^/]+)\/rca$/;
 const RCA_TEMPLATES = /\/rca\/templates$/;
 const WORKFLOW_ONE = /\/workflows\/([^/]+)$/;
+const FINDINGS_ONE = /\/findings\/([^/]+)$/;
 const TAGS = /\/tags$/;
 const TAG_RULES = /\/tags\/rules$/;
 const TAG_RULE_ONE = /\/tags\/rules\/([^/]+)$/;
@@ -93,6 +94,30 @@ const OBJECT_ACTION_STATUS: Record<string, string> = {
 
 /** Terminal statuses that stamp `closedAt`. */
 const CLOSING_STATUSES = new Set(['CLOSED', 'ARCHIVED']);
+
+/**
+ * The built-in Findings sections (GET /findings/{type}, C3/D6) — mirrors `FindingsSpec.defaultFor` on the
+ * backend. Every section is always-visible (`tier: 'required'`) but optional (`required: false`), because
+ * the no-disposition prompt on resolve is a soft warning, not validation.
+ */
+function defaultFindingsSpec(objectType: string): Record<string, unknown> {
+    const dispositions = ['CONFIRMED', 'FALSE_POSITIVE', 'RECOVERED', 'WRITTEN_OFF', 'INCONCLUSIVE'];
+    const section = (key: string, label: string, type: string, options?: { value: string; label: string }[]) =>
+        ({ key, label, type, tier: 'required', required: false, ...(options ? { options } : {}) });
+    return {
+        name: objectType,
+        objectType,
+        sections: [
+            section('disposition', 'Disposition', 'select', dispositions.map((d) => ({
+                value: d,
+                label: d.charAt(0) + d.slice(1).toLowerCase().replace(/_/g, ' '),
+            }))),
+            section('impactAmount', 'Impact amount', 'string'),
+            section('recordsAffected', 'Records affected', 'string'),
+            section('summary', 'Summary', 'multiline'),
+        ],
+    };
+}
 
 /** The effective lifecycles (GET /workflows/{type}) — mirrors the backend built-ins (C6). */
 const WORKFLOWS: Record<string, unknown> = {
@@ -427,6 +452,13 @@ export function opsHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && (m = match(url, WORKFLOW_ONE))) {
             const wf = WORKFLOWS[m[1].toUpperCase()];
             return wf ? json(wf) : error(400, `unknown object type '${m[1]}'`);
+        }
+        // C3/D6: the effective Findings sections. The real backend serves an authored findings-spec
+        // component when one exists; offline there is no registry, so this is always the built-in shape.
+        if (method === 'GET' && (m = match(url, FINDINGS_ONE))) {
+            const type = m[1].toUpperCase();
+            if (!WORKFLOWS[type]) return error(400, `unknown object type '${m[1]}'`);
+            return json(defaultFindingsSpec(m[1].toLowerCase()));
         }
         // ── tag registry + Tag Rules (design §7 follow-up on the real backend) ───────────────
         if (method === 'GET' && TAGS.test(url)) {

@@ -59,16 +59,39 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
   soft no-disposition prompt); team `assignees` + `targetDate`. **Rule-raised cases**: `CaseRule`
   (`/cases/rules`, evaluate-on-demand, opens-or-attaches idempotently); **case analytics** via
   `GET /objects/analytics?type=` (stat tiles + by-category bar; Studio-dataset binding is a follow-up).
-* **Configurable Findings sections (C3) — config source DECIDED 2026-07-25 (BACKLOG D6): reuse the C6
-  workflow/TOON pattern + the `attribute-spec` renderer; no new endpoint.** Findings today are a fixed
-  disposition/impact/records shape (`mail-model.ts`); making the section set configurable follows the
-  precedent already set two lines up — the **Lifecycle** bullet reads `GET /workflows/{type}` rather than
-  hardcoding states, and TOON overrides drive the same panes. Findings sections get the same treatment, so a
-  deployment configures them the way it already configures workflows, and the existing `attribute-spec`
-  renderer draws them. Rejected: a purpose-built Findings-config endpoint — it would be a third
-  configuration idiom for the same class of problem, and the pattern that exists already covers it. **This is
-  not a UI-only change**: the section definitions must be server-authored TOON and served like workflows are,
-  otherwise each client re-invents the schema.
+* **Configurable Findings sections (C3 / BACKLOG D6) — SHIPPED end-to-end 2026-07-26.** The Findings field
+  set is deployment-authored: a **`findings-spec` ComponentStore kind** (one per `ObjectType`, id = the
+  lowercased type) resolved and served by **`GET /findings/{type}`**, rendered by `<inspecto-schema-form>`.
+  Absent a component, `FindingsSpec.defaultFor()` serves today's exact shape
+  (disposition/impactAmount/recordsAffected/summary, all `tier:'required'` + `required:false` — always
+  visible, never mandatory), so an unconfigured deployment is byte-for-byte unchanged. A present spec
+  **fully replaces** the default for its type; field-level merge is unsupported on purpose because it makes
+  "remove a section" inexpressible. Full rationale + the rejected alternatives:
+  [`plans-archive/findings-spec-plan.md`](../../../archived-documents/plans-archive/findings-spec-plan.md).
+  ⚠ **Two premises in D6's wording were wrong** — if you remember the old framing, re-read this:
+  * *"Reuse the C6 workflow/TOON pattern"* — **not viable.** `*_workflow.toon` is a **boot-time scan of CLI
+    path arguments** (`ServiceBootstrap.resolveBySuffix`), with no write root, no CRUD and no hot reload;
+    cloning it would have shipped a config surface an operator cannot edit through the product. The
+    ComponentStore kind was chosen instead, and **still adds no endpoint** (D6's actual constraint) because
+    `/components/{type}` CRUD is generic — the kind inherits create/update/delete, ETags and version
+    history, joining the idiom `alert-rule`/`notification-rule`/`expectation` already use.
+  * *"the `attribute-spec` renderer"* — that is the **frontend** `<inspecto-schema-form>` driven by
+    `AttributeSpec[]`, **not** backend `ConfigSpecs`/`FieldSpec` (compiled-in Java for nine pipeline/Studio
+    config types, not runtime-authorable). Sections are therefore authored in the `AttributeSpec`
+    vocabulary and served verbatim; `ConfigSpecs` is deliberately untouched, since mapping the two shapes
+    (`path` vs `key`, `enumValues` vs `options`, `visibleWhen` vs `dependsOn`, no `tier` at all) would be
+    lossy for zero reuse.
+  * **Validation is fail-closed at authoring time (422)** via a per-kind hook in `ComponentRoutes.writeComponent`:
+    unknown `type`/`tier`, a `select` with no `options`, an invalid `pattern`, `min > max`, a `dependsOn`
+    naming no sibling, an `objectType` disagreeing with the component id, and **unknown section keys**
+    (a typo'd `tier` silently defaulting is how a required field becomes invisible). A spec hand-edited into
+    an unreadable state on disk degrades to the built-in with a logged warning rather than 500ing triage.
+  * **UI consequences:** `Findings` is now an open `Record<string, string>` (`mail-model.ts`), the panel's
+    team + target date moved to a sibling `teamForm` (they are C6, not Findings), the flat
+    `impactAmount`/`recordsAffected` copies the C4 analytics roll-up sums are written **only while those
+    sections are configured**, and the soft no-disposition prompt on resolve **only fires while
+    `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
+    ladder now lives in the backend default and the offline mock's mirror of it.
 
 As-built designs (archived):
 [`incidents-mail-ui-design.md`](../../../archived-documents/plans-archive/incidents-mail-ui-design.md) ·

@@ -85,6 +85,34 @@ export interface WorkflowDef {
     transitions: WorkflowTransition[];
 }
 
+/**
+ * The effective Findings sections for an object type (GET /findings/{type}, C3/D6) — the authored
+ * `findings-spec` component when a deployment has one, else the built-in shape. Each section is already
+ * in the `AttributeSpec` vocabulary, so `<inspecto-schema-form>` renders it without translation
+ * (`findingsAttributes` in the objects feature narrows it to the exact union types).
+ */
+export interface FindingsSpecDef {
+    objectType: string;
+    sections: FindingsSection[];
+}
+
+/** One configurable Findings field — the server-side mirror of `AttributeSpec`. */
+export interface FindingsSection {
+    key: string;
+    label: string;
+    type: string;
+    tier: string;
+    required?: boolean;
+    default?: unknown;
+    options?: { value: string; label: string }[];
+    pattern?: string;
+    min?: number;
+    max?: number;
+    dependsOn?: { key: string; equals?: unknown; notEquals?: unknown };
+    help?: string;
+    placeholder?: string;
+}
+
 /** A Case Rule (GET /cases/rules) — auto-groups matching incidents into a case (GLOSSARY §9, C5). */
 export interface CaseRule {
     name: string;
@@ -263,6 +291,12 @@ export class ObjectsService {
     /** The effective lifecycle for an object type — drives workflow-derived folders/actions (C6). */
     workflow(type: string): Observable<WorkflowDef> {
         return this.http.get<WorkflowDef>(apiUrl(`/workflows/${encodeURIComponent(type)}`));
+    }
+
+    /** The effective Findings sections for an object type — drives the configurable Findings form (C3/D6).
+     *  The server resolves authored-else-built-in, so there is no client-side default to keep in sync. */
+    findingsSpec(type: string): Observable<FindingsSpecDef> {
+        return this.http.get<FindingsSpecDef>(apiUrl(`/findings/${encodeURIComponent(type)}`));
     }
 
     // ── rule-raised cases (C5) + analytics (C4) ─────────────────────────────────────────────

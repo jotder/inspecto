@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+    viewChild,
+} from '@angular/core';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -9,17 +19,18 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectsService, OperationalObject, WorkflowDef } from 'app/inspecto/api';
+import { apiErrorMessage, FindingsSpecDef, ObjectsService, OperationalObject, WorkflowDef } from 'app/inspecto/api';
+import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { CaseContentsComponent, MemberRollup } from './case-contents.component';
 import {
-    CASE_DISPOSITIONS,
     DEFAULT_CASE_WORKFLOW,
     displayStatus,
     emptyFindings,
     emptyPostmortem,
+    findingsAttributes,
     isEscalated,
     isTargetOverdue,
     objectCategory,
@@ -57,6 +68,7 @@ import {
         MatTooltipModule,
         StatusBadgeComponent,
         CaseContentsComponent,
+        InspectoSchemaFormComponent,
     ],
     templateUrl: './postmortem-panel.component.html',
 })
@@ -92,16 +104,41 @@ export class PostmortemPanelComponent {
         actions: this.fb.array<FormGroup>([]),
     });
 
-    /** C3 + C6: the case's Findings (disposition/impact/summary) + team + loose-SLA target date. */
-    readonly findingsForm = this.fb.group({
-        disposition: [''],
-        impactAmount: [''],
-        recordsAffected: [''],
-        summary: [''],
+    /**
+     * C3/D6: the effective Findings sections for this object type, served by the shell. The **server**
+     * resolves authored-else-built-in, so there is deliberately no client-side default to drift.
+     */
+    readonly findingsSpec = input<FindingsSpecDef | null>(null);
+    readonly findingsSpecs = computed(() => findingsAttributes(this.findingsSpec()));
+
+    /** Stored Findings values patched into the schema form on (re)build. */
+    readonly findingsInitial = signal<Record<string, unknown>>({});
+
+    /** The rendered Findings form; absent until a spec arrives. Also the spec seam for driving its controls. */
+    readonly findingsSchema = viewChild(InspectoSchemaFormComponent);
+
+    /** C6 (not Findings): the case's working team + loose-SLA target date, a fixed shape. */
+    readonly teamForm = this.fb.group({
         team: [''],
         targetDate: [''],
     });
-    readonly dispositions = CASE_DISPOSITIONS;
+
+    /** Save is live when either half changed — the schema form tracks its own dirtiness. */
+    get findingsDirty(): boolean {
+        return this.teamForm.dirty || (this.findingsSchema()?.isDirty() ?? false);
+    }
+
+    /**
+     * The Findings values as flat strings (the `attributes.findings` blob has always been string-valued).
+     * Falls back to the stored values when the schema form has not rendered — no spec yet, or a
+     * deployment configured an empty section set.
+     */
+    private findingsValues(): Record<string, string> {
+        const raw = this.findingsSchema()?.value() ?? parseFindings(this.object()) ?? {};
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw)) out[k] = v == null ? '' : String(v).trim();
+        return out;
+    }
 
     constructor() {
         effect(() => this.rebuild(this.object()));
@@ -160,9 +197,13 @@ export class PostmortemPanelComponent {
             const warnings: string[] = [];
             const open = this.memberRollup().open;
             if (open > 0) warnings.push(`${open} open member incident${open === 1 ? '' : 's'}`);
-            const disposition = this.findingsForm.controls.disposition.value
-                || parseFindings(this.object())?.disposition;
-            if (id === 'resolve' && !disposition) warnings.push('no disposition recorded (Findings)');
+            // The gate only applies while `disposition` is actually a configured section (D6) — a
+            // deployment that removed it has no disposition to record, so there is nothing to warn about.
+            if (id === 'resolve' && this.findingsSpecs().some((s) => s.key === 'disposition')) {
+                const disposition = this.findingsValues()['disposition']
+                    || parseFindings(this.object())?.['disposition'];
+                if (!disposition) warnings.push('no disposition recorded (Findings)');
+            }
             if (warnings.length) {
                 const ok = await this.confirm.confirm(
                     `This case still has ${warnings.join(' and ')} — ${id} anyway?`,
@@ -202,13 +243,12 @@ export class PostmortemPanelComponent {
         p.actions.forEach((a) => this.actionsArr.push(this.actionRow(a)));
         this.form.markAsPristine();
 
-        const f = parseFindings(o) ?? emptyFindings();
-        this.findingsForm.patchValue({
-            ...f,
+        this.findingsInitial.set(parseFindings(o) ?? emptyFindings());
+        this.teamForm.patchValue({
             team: objectTeam(o).join(', '),
             targetDate: targetDate(o),
         });
-        this.findingsForm.markAsPristine();
+        this.teamForm.markAsPristine();
     }
 
     private timelineRow(t: PostmortemTimelineEntry = { time: '', text: '' }): FormGroup {
@@ -273,7 +313,10 @@ export class PostmortemPanelComponent {
 
     /** C3 + C6: persist the case's Findings + team + target date as an attributes patch. */
     saveFindings(): void {
-        const v = this.findingsForm.getRawValue();
+        const schema = this.findingsSchema();
+        if (schema && !schema.validate()) return;   // house rule: markAllAsTouched, surface inline errors
+        const findings = this.findingsValues();
+        const v = this.teamForm.getRawValue();
         const team = (v.team ?? '')
             .split(',')
             .map((t) => t.trim())
@@ -282,22 +325,19 @@ export class PostmortemPanelComponent {
         this.saving = true;
         this.api.update(this.object().id, {
             attributes: {
-                findings: JSON.stringify({
-                    disposition: v.disposition ?? '',
-                    impactAmount: v.impactAmount ?? '',
-                    recordsAffected: v.recordsAffected ?? '',
-                    summary: v.summary ?? '',
-                }),
+                findings: JSON.stringify(findings),
                 // Flat, queryable copies so case analytics (C4) can sum impact without parsing the blob.
-                impactAmount: (v.impactAmount ?? '').trim(),
-                recordsAffected: (v.recordsAffected ?? '').trim(),
+                // A deployment that removes these sections (D6) simply stops feeding the roll-up.
+                impactAmount: findings['impactAmount'] ?? '',
+                recordsAffected: findings['recordsAffected'] ?? '',
                 assignees: team,
                 targetDate: (v.targetDate ?? '').trim(),
             },
         }).subscribe({
             next: () => {
                 this.saving = false;
-                this.findingsForm.markAsPristine();
+                this.teamForm.markAsPristine();
+                schema?.form.markAsPristine();   // the values are already in place — just clear dirtiness
                 this.toastr.success('Findings saved');
                 this.changed.emit();
             },

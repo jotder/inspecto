@@ -439,6 +439,22 @@ describe('opsHandler', () => {
         expect(handler(req('GET', '/api/workflows/bogus'), store)?.status).toBe(400);
     });
 
+    it('serves the built-in Findings sections per type (C3/D6)', () => {
+        const store = seededStore();
+        const spec = handler(req('GET', '/api/findings/CASE'), store)?.body as {
+            objectType: string;
+            sections: { key: string; tier: string; required: boolean; options?: { value: string; label: string }[] }[];
+        };
+        expect(spec.objectType).toBe('case');
+        expect(spec.sections.map((s) => s.key))
+            .toEqual(['disposition', 'impactAmount', 'recordsAffected', 'summary']);
+        // Always visible, never mandatory — the no-disposition prompt on resolve is a soft warning.
+        expect(spec.sections.every((s) => s.tier === 'required' && s.required === false)).toBe(true);
+        expect(spec.sections[0].options?.map((o) => o.label))
+            .toEqual(['Confirmed', 'False positive', 'Recovered', 'Written off', 'Inconclusive']);
+        expect(handler(req('GET', '/api/findings/bogus'), store)?.status).toBe(400);
+    });
+
     it('deletes a single link and 404s when it is already gone', () => {
         const store = seededStore();
         expect(handler(req('DELETE', '/api/objects/case-102/links', null,

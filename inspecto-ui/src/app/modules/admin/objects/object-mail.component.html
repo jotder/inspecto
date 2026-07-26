@@ -244,6 +244,7 @@
             [style.width.px]="detailSplit.width()"
             [object]="d"
             [workflow]="isIncident ? null : workflowDef()"
+            [findingsSpec]="isIncident ? null : findingsSpec()"
             (closed)="detail.set(null)"
             (act)="onPanelAction($event)"
             (changed)="reload()"

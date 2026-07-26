@@ -97,6 +97,19 @@ former root reference docs** (each index lists them):
   edition flavors, security overlay matrix (TLS, IAM-delegated Kerberos/SSO, secrets/KMS), scaling + RPO/RTO
   posture, per-tier deployment plans, script workstreams SCR-1..11, preflight + post-deploy verification
   blocks; decision asks D1–D8 pending stakeholder sign-off.
+- [`superpower/delivery-status-webhooks-plan.md`](superpower/delivery-status-webhooks-plan.md) — **inbound
+  delivery-status webhooks, PLANNED 2026-07-26 (BACKLOG D8)** — bounce/complaint/delivered provider
+  callbacks: the raw-body seam (`ApiContext.rawBody`, since signatures cover raw bytes and `body()` consumes
+  the stream), our-id-embedded correlation (no `NotificationChannel` SPI break), per-status timestamps on a
+  new `DeliveryReceipt` store, a `DeliveryStatusAdapter` SPI with SendGrid Ed25519 + generic-HMAC impls, and
+  a fail-closed self-verifying route on the `/public/…` precedent. Not started.
+- ~~`superpower/findings-spec-plan.md`~~ — **SHIPPED end-to-end 2026-07-26 (BACKLOG D6), plan archived** to
+  [`archived-documents/plans-archive/findings-spec-plan.md`](archived-documents/plans-archive/findings-spec-plan.md).
+  As-built in [`okf/frontend/features/objects.md`](okf/frontend/features/objects.md): a `findings-spec`
+  ComponentStore kind served by `GET /findings/{type}` and rendered by `<inspecto-schema-form>`, with the
+  built-in default preserving today's shape. ⚠ It records **two wrong premises in D6's wording** (the
+  workflow TOON pattern is boot-scan-only; the `attribute-spec` renderer is the frontend one, not
+  `ConfigSpecs`).
 - ~~`superpower/generic-tags-plan.md`~~ — **SHIPPED end-to-end 2026-07-26 (BACKLOG D7), plan archived** to
   [`archived-documents/plans-archive/generic-tags-plan.md`](archived-documents/plans-archive/generic-tags-plan.md).
   As-built lives in [`okf/backend/control-plane/tags.md`](okf/backend/control-plane/tags.md): central
