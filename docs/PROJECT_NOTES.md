@@ -226,7 +226,11 @@ touching `inspecto-ui/`.** Highlights (full detail there):
 - **a11y gate** — `expectNoA11yViolations(el)` (`inspecto/testing/a11y.ts`, axe-core) in component specs; runs in
   CI. Manual WCAG: `docs/ui/accessibility-audit.md`.
 - **Shared design system**: `status-badge` / `empty-state` / `skeleton` / `grid` (+ `noRowsOverlay`) /
-  `connectivity-banner`. Living gallery at `/design`.
+  `connectivity-banner` / `ai-assist`. Living gallery at `/design`.
+- **`<inspecto-ai-assist>`** (`inspecto/ai-assist/`, AGT-6a) is the ONE inline AI authoring surface —
+  panes **adopt** it, never fork it. The pane names a non-mutating agent tool, passes its own context as
+  `[args]`, and applies the returned draft through **its own** validated route (the surface has no write
+  path, so the human stays the audited actor). → `okf/frontend/features/inline-ai-authoring.md`.
 - **ag-Grid gotchas:** (a) action/string cell renderers don't render on first paint with static `rowData` →
   call `refreshCells({force:true, columns:[…]})` on `(firstDataRendered)`/`(rowDataUpdated)`; (b) the shared
   theme MUST be the gamma-token `themeQuartz.withParams(GAMMA_GRID_PARAMS)` (`app/inspecto/grid/index.ts`) — never
@@ -234,6 +238,12 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   `scrollLeft` before asserting in preview.
 - **`@if/@else` + `mat-icon` button ⇒ NG8011** (icon won't project). Keep always-on icon buttons outside the
   branch, or make the branch's only root the button.
+- **A `computed()` that reads a plain `@Input` field NEVER invalidates** — computeds track *signal*
+  dependencies only, so a parent flipping the input leaves the derived value permanently stale (cost us a
+  disabled-forever button in `ai-assist`, 2026-07-26). Use **signal inputs** (`input()`) whenever a
+  `computed()`/`effect()` reads the input. ⚠ Specs miss this by construction if they set inputs *before*
+  the first render — assert the change with `fixture.componentRef.setInput(...)` *after* it, and note that
+  assigning to a signal input no longer compiles.
 - **TestBed `{provide: MatDialog, useValue: …}` is silently shadowed** on any pane that imports
   `DataTableComponent` (or anything else importing `MatDialogModule`): the standalone component's
   *standalone injector* re-provides the real `MatDialog` closer than the testing module, so the pane
