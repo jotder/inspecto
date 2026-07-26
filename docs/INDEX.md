@@ -97,12 +97,11 @@ former root reference docs** (each index lists them):
   edition flavors, security overlay matrix (TLS, IAM-delegated Kerberos/SSO, secrets/KMS), scaling + RPO/RTO
   posture, per-tier deployment plans, script workstreams SCR-1..11, preflight + post-deploy verification
   blocks; decision asks D1–D8 pending stakeholder sign-off.
-- [`superpower/generic-tags-plan.md`](superpower/generic-tags-plan.md) — **generic cross-entity tags,
-  DRAFT 2026-07-25** (BACKLOG **D7**, rescoped by the operator) — Gmail-label-style grouping across Streams /
-  Alert Rules / Alerts / Datasets / Incidents, on a central registry + `(tag, entity_kind, entity_id)`
-  assignment store. **A generalization of the shipped object-scoped `Tag`/`TagRule` system, not a greenfield
-  build**; the migration off the `ATTR_TAGS` CSV is the risky part. Six open questions before build; keep
-  aligned with **D10** (generalized notes) — same `(kind, id)` addressing problem.
+- ~~`superpower/generic-tags-plan.md`~~ — **SHIPPED end-to-end 2026-07-26 (BACKLOG D7), plan archived** to
+  [`archived-documents/plans-archive/generic-tags-plan.md`](archived-documents/plans-archive/generic-tags-plan.md).
+  As-built lives in [`okf/backend/control-plane/tags.md`](okf/backend/control-plane/tags.md): central
+  assignment store + `(targetKind, targetId)` addressing shared with **D10** notes, the CSV as a
+  projection, rename/delete across the whole vocabulary, and the `/tags` pane. Residuals in BACKLOG §6.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5

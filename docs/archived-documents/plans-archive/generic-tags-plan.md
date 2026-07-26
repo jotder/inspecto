@@ -1,5 +1,9 @@
 # Generic tags — cross-entity labelling plan (BACKLOG D7)
 
+> **ARCHIVED 2026-07-26 — shipped end-to-end, not maintained.** The UI phase (the `/tags` pane) closed the
+> last gap. Read the as-built in [`../../okf/backend/control-plane/tags.md`](../../okf/backend/control-plane/tags.md);
+> residuals are in `docs/BACKLOG.md` §6. Kept for provenance only.
+
 **Status:** **BACKEND COMPLETE 2026-07-26** — the assignment store (`ops.tag.TagAssignment*`), the
 `/tags/assignments/…` + `/tags/{name}/targets` routes, the CSV reconciliation (the store is the source of
 truth, `attributes.tags` a projection, with an idempotent startup backfill), and the vocabulary routes

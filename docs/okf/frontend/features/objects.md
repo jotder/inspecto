@@ -49,8 +49,11 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
   beside it. ⚠ Note for anyone reading the old backlog row: its claim that "nothing writes `attributes.tags`"
   was **simply false** — `ObjectService.ATTR_TAGS` (`= "tags"`) is written on manual apply, tag-rule merge,
   rule-raised creation, merge union, and split. The narrow `GET /objects` tag filter that row dismissed as
-  "would silently match nothing" would in fact have worked. Plan:
-  [`superpower/generic-tags-plan.md`](../../../superpower/generic-tags-plan.md).
+  "would silently match nothing" would in fact have worked. **D7 SHIPPED end-to-end 2026-07-26** — the
+  generalization landed, `attributes.tags` is now a **projection** of the central assignment store rather
+  than storage, and the cross-kind surface lives in the `/tags` pane. The mail pane's tag menu is still the
+  only place a tag is *applied*; as-built:
+  [`../../backend/control-plane/tags.md`](../../backend/control-plane/tags.md).
 * **Case management** — case **Contents** (member incidents) with **Split & Merge**; variable **Cause
   Analysis** (`postmortem.causeAnalysis[]` + `causeMethod`); **Findings** (disposition/impact/records,
   soft no-disposition prompt); team `assignees` + `targetDate`. **Rule-raised cases**: `CaseRule`

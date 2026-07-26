@@ -242,6 +242,89 @@ describe('opsHandler', () => {
         expect(handler(req('POST', '/api/tags/rules/feed-issues/apply', {}), store)?.status).toBe(404);
     });
 
+    it('assigns tags across kinds and answers "everything carrying this tag" (D7)', () => {
+        const store = seededStore();
+        // An object already carries "urgent" via its CSV; the store answers for both paths.
+        const before = handler(req('GET', '/api/tags/urgent/targets'), store)?.body as Array<{ targetKind: string }>;
+        expect(before.length).toBeGreaterThan(0);
+        expect(before.every((a) => a.targetKind === 'object')).toBe(true);
+
+        // Applying an unregistered tag is a 404, never an implicit create.
+        expect(handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'nope' }), store)?.status)
+            .toBe(404);
+        expect(handler(req('POST', '/api/tags/assignments/nonsense/x', { tag: 'urgent' }), store)?.status).toBe(400);
+
+        expect(handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store)?.status)
+            .toBe(200);
+        // Idempotent — re-applying adds no second edge.
+        handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store);
+
+        const after = handler(req('GET', '/api/tags/urgent/targets'), store)?.body as Array<{ targetKind: string; targetId: string }>;
+        expect(after.length).toBe(before.length + 1);
+        expect(after.filter((a) => a.targetKind === 'link-analysis-view')).toEqual([
+            expect.objectContaining({ targetId: 'fraud-ring' }),
+        ]);
+
+        const on = handler(req('GET', '/api/tags/assignments/link-analysis-view/fraud-ring'), store)
+            ?.body as { tags: string[] };
+        expect(on.tags).toEqual(['urgent']);
+
+        // Removal is idempotent: the first reports removed, the second is a no-op success.
+        expect((handler(req('DELETE', '/api/tags/assignments/link-analysis-view/fraud-ring/urgent'), store)
+            ?.body as { removed: boolean }).removed).toBe(true);
+        expect((handler(req('DELETE', '/api/tags/assignments/link-analysis-view/fraud-ring/urgent'), store)
+            ?.body as { removed: boolean }).removed).toBe(false);
+    });
+
+    it('renames a tag across the registry, edges, CSV projections and Tag Rules at once (D7)', () => {
+        const store = seededStore();
+        handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store);
+        const before = handler(req('GET', '/api/tags/urgent/targets'), store)?.body as unknown[];
+
+        const out = handler(req('POST', '/api/tags/urgent/rename', { to: 'p1' }), store)
+            ?.body as { assignments: number; objects: number; rules: number };
+        expect(out.assignments).toBe(before.length);
+        expect(out.rules).toBeGreaterThan(0); // the seeded "critical-is-urgent" rule followed the rename
+
+        // The old name is gone everywhere; the new one carries the same targets.
+        const names = (handler(req('GET', '/api/tags'), store)?.body as Array<{ name: string }>).map((t) => t.name);
+        expect(names).toContain('p1');
+        expect(names).not.toContain('urgent');
+        expect((handler(req('GET', '/api/tags/urgent/targets'), store)?.body as unknown[]).length).toBe(0);
+        expect((handler(req('GET', '/api/tags/p1/targets'), store)?.body as unknown[]).length).toBe(before.length);
+
+        // A rule left pointing at the old name would resurrect it — it must have moved.
+        const rules = handler(req('GET', '/api/tags/rules'), store)?.body as Array<{ tag: string }>;
+        expect(rules.some((r) => r.tag === 'urgent')).toBe(false);
+    });
+
+    it('renaming onto an existing tag merges the two (D7)', () => {
+        const store = seededStore();
+        handler(req('POST', '/api/tags', { name: 'p1' }), store);
+        handler(req('POST', '/api/tags/assignments/link-analysis-view/v1', { tag: 'p1' }), store);
+        handler(req('POST', '/api/tags/assignments/link-analysis-view/v1', { tag: 'urgent' }), store);
+
+        handler(req('POST', '/api/tags/urgent/rename', { to: 'p1' }), store);
+        const targets = handler(req('GET', '/api/tags/p1/targets'), store)
+            ?.body as Array<{ targetKind: string; targetId: string }>;
+        // The two edges on v1 collapsed into one rather than conflicting.
+        expect(targets.filter((t) => t.targetId === 'v1').length).toBe(1);
+    });
+
+    it('refuses to delete a tag a Tag Rule still applies, and otherwise removes every assignment (D7)', () => {
+        const store = seededStore();
+        // The seeded "critical-is-urgent" rule still applies "urgent" → 409.
+        expect(handler(req('DELETE', '/api/tags/urgent'), store)?.status).toBe(409);
+
+        handler(req('POST', '/api/tags', { name: 'scratch' }), store);
+        handler(req('POST', '/api/tags/assignments/link-analysis-view/v1', { tag: 'scratch' }), store);
+        expect(handler(req('DELETE', '/api/tags/scratch'), store)?.status).toBe(200);
+        expect((handler(req('GET', '/api/tags/scratch/targets'), store)?.body as unknown[]).length).toBe(0);
+        expect((handler(req('GET', '/api/tags'), store)?.body as Array<{ name: string }>)
+            .some((t) => t.name === 'scratch')).toBe(false);
+        expect(handler(req('DELETE', '/api/tags/scratch'), store)?.status).toBe(404);
+    });
+
     it('auto-applies matching Tag Rules to newly created objects (Gmail-filter semantics)', () => {
         const store = seededStore();
         // The seeded rule "critical-is-urgent" tags CRITICAL incidents with "urgent".

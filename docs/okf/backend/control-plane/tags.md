@@ -1,8 +1,8 @@
 # Tags — the cross-entity label graph
 
-**Concept home for BACKLOG D7.** Status: **backend complete 2026-07-26** — the central store, the
-assignment routes, the CSV reconciliation, and the rename/delete vocabulary routes. One store is
-authoritative; see [The CSV is a projection](#the-csv-is-a-projection). **No UI yet** (BACKLOG §6).
+**Concept home for BACKLOG D7.** Status: **complete end-to-end 2026-07-26** — the central store, the
+assignment routes, the CSV reconciliation, the rename/delete vocabulary routes, and the **Tags pane**.
+One store is authoritative; see [The CSV is a projection](#the-csv-is-a-projection).
 
 Related: [`control-api.md`](control-api.md) · [`api-v1.md`](api-v1.md) ·
 [`../editions/auth-security.md`](../editions/auth-security.md) ·
@@ -133,6 +133,31 @@ something.
 The comma ban on tag names comes from this shape: a comma would be one label in the store and two in the
 CSV projection.
 
+## The UI: a vocabulary pane, not an assignment pane
+
+`inspecto-ui/src/app/modules/admin/tags/` (route `/tags`, nav entry under Operations) — a two-column
+pane: the vocabulary on the left, and on the right *everything carrying the selected tag, across kinds*
+(`GET /tags/{name}/targets`) in a standard-tier data table. `TagsService`
+(`inspecto/api/tags.service.ts`) is the client for the cross-entity routes; the registry read and the Tag
+Rule CRUD stay on `ObjectsService`, where their existing callers are.
+
+Three deliberate shapes:
+
+- **Applying a tag is not in this pane.** Assignment belongs next to the thing being labelled — the mail
+  pane's tag menu — not in a vocabulary admin screen, which would need a cross-kind target picker to
+  answer a question nobody asked. The pane *removes* assignments, the half with no other home;
+  `TagsService.assign` ships for the callers that will label in place.
+- **Counts are never cached across tags.** The target list is server-filtered to what the caller may see,
+  so a count is "targets *you* can see" — a cached or shared count would be wrong for the next viewer.
+  For the same reason the vocabulary list shows no count at all until a tag is selected.
+- **The 409 on delete is surfaced, not pre-empted.** The pane does not check the Tag Rules itself before
+  offering Delete; it shows the server's message naming the rule. A client-side pre-check would be a
+  second, staler copy of the rule state.
+
+Rename is inline in the header (one field does not warrant a dialog), rejects a comma client-side, and
+treats "rename to the same name" as a no-op rather than a request. Delete is
+`confirmDestructive({requireText})` — typing the tag name, because the blast radius is every target.
+
 ## Gotchas
 
 - **A vocabulary change is five moves, not one.** `POST /tags/{name}/rename` goes through
@@ -155,3 +180,9 @@ CSV projection.
   to and object hard-delete is not reachable through the API at all. A stale edge is invisible, not wrong.
   Re-creating an id resurrects its tags — the same documented residual notes have.
 - **Tag names are compared exactly** — no case folding. `Q3` and `q3` are two tags.
+- **The offline mock mirrors the CSV/store split deliberately.** `mock/handlers/ops.handler.ts` reads
+  *object* edges out of `attributes.tags` and keeps only non-object edges in its own collection, so the
+  mock cannot drift into having two answers for one object the way a second edge collection would. Its
+  `TAG_TARGET_KINDS` is the client-side copy of `NoteTargets.KINDS` — widen both together. Route-order
+  trap: `/tags/{name}` is a catch-all, so every more specific `/tags/…` pattern must be matched before it
+  or `DELETE /tags/rules` deletes a tag named `rules`.

@@ -1,0 +1,121 @@
+<div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Tags</h1>
+            <div class="text-secondary mt-1">
+                Labels shared across incidents, cases and saved views. Pick a tag to see everything
+                carrying it — the list shows only targets you have access to, so counts are per-viewer.
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            @if (loadingTags() || loadingTargets()) {
+                <mat-spinner diameter="24"></mat-spinner>
+            }
+            <button
+                mat-icon-button
+                (click)="loadRegistry()"
+                [disabled]="loadingTags()"
+                aria-label="Refresh tags"
+            >
+                <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+            </button>
+        </div>
+    </div>
+
+    <div class="mt-6 flex min-h-0 flex-auto gap-6">
+        <!-- Vocabulary -->
+        <nav class="w-64 shrink-0 overflow-y-auto" aria-label="Tag vocabulary">
+            @if (registry().length) {
+                <ul class="flex flex-col gap-1">
+                    @for (tag of registry(); track tag.name) {
+                        <li>
+                            <button
+                                class="flex w-full items-center gap-2 rounded px-3 py-2 text-left hover:bg-hover"
+                                [class.bg-hover]="tag.name === selected()"
+                                [attr.aria-current]="tag.name === selected() ? 'true' : null"
+                                (click)="select(tag.name)"
+                            >
+                                <mat-icon
+                                    class="icon-size-4"
+                                    [svgIcon]="'heroicons_outline:tag'"
+                                ></mat-icon>
+                                <span class="min-w-0 truncate">{{ tag.name }}</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            } @else if (!loadingTags()) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:tag"
+                    title="No tags yet"
+                    message="Tags are created from the Incidents and Cases panes, or by saving a Tag Rule."
+                />
+            }
+        </nav>
+
+        <!-- Selected tag -->
+        <div class="flex min-w-0 flex-auto flex-col">
+            @if (selected(); as name) {
+                <div class="flex items-center justify-between gap-4">
+                    @if (renaming()) {
+                        <form class="flex items-center gap-2" (ngSubmit)="commitRename()">
+                            <mat-form-field subscriptSizing="dynamic">
+                                <mat-label>Rename tag</mat-label>
+                                <input matInput [formControl]="renameCtrl" autocomplete="off" />
+                                @if (renameCtrl.hasError('required')) {
+                                    <mat-error>A tag name is required</mat-error>
+                                } @else if (renameCtrl.hasError('pattern')) {
+                                    <mat-error>Tag names may not contain commas</mat-error>
+                                }
+                            </mat-form-field>
+                            <button mat-flat-button color="primary" type="submit">Rename</button>
+                            <button mat-button type="button" (click)="cancelRename()">Cancel</button>
+                        </form>
+                    } @else {
+                        <h2 class="truncate text-2xl font-semibold">{{ name }}</h2>
+                    }
+
+                    @if (canAuthor() && !renaming()) {
+                        <div class="flex shrink-0 items-center gap-2">
+                            <button mat-stroked-button (click)="startRename()">
+                                <mat-icon [svgIcon]="'heroicons_outline:pencil'"></mat-icon>
+                                <span class="ml-2">Rename</span>
+                            </button>
+                            <button mat-stroked-button color="warn" (click)="remove()">
+                                <mat-icon [svgIcon]="'heroicons_outline:trash'"></mat-icon>
+                                <span class="ml-2">Delete</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <p class="text-secondary mt-1 text-sm">
+                    Renaming moves the label everywhere at once — assignments, object attributes and any
+                    Tag Rule. Renaming onto a tag that already exists merges the two.
+                </p>
+
+                <div class="mt-4 flex-auto">
+                    <inspecto-data-table
+                        tier="standard"
+                        stateKey="tag-targets"
+                        sourceName="tag-targets"
+                        exportName="tag-targets"
+                        [rows]="targets()"
+                        [columns]="columnDefs"
+                        [rowActions]="rowActions"
+                        [loading]="loadingTargets()"
+                        noRowsTitle="Nothing carries this tag"
+                        noRowsHint="Apply it from an incident, a case, or a saved view — or it may only be on targets you cannot see."
+                    />
+                </div>
+            } @else if (!loadingTags()) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:tag"
+                    title="No tag selected"
+                    message="Pick a tag on the left to see everything carrying it."
+                />
+            }
+        </div>
+    </div>
+</div>

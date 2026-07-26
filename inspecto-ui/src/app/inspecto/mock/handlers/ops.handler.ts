@@ -12,6 +12,7 @@ import {
     type TagRule,
     type TagRuleFilter,
 } from '../../api/objects.service';
+import type { TagAssignment } from '../../api/tags.service';
 import { type Signal, alertToSignal, isAlertSignal, signalToAlert, signalToEvent } from '../../signal/signal';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
@@ -35,6 +36,8 @@ export const OBJECT_NOTES_COLL = 'object-note';
 export const ENRICHMENT_COLL = 'enrichment-job';
 export const TAGS_COLL = 'tag';
 export const TAG_RULES_COLL = 'tag-rule';
+/** Assignment edges for NON-object targets. Object tags stay in the `attributes.tags` CSV — see `tagTargets`. */
+export const TAG_ASSIGNMENTS_COLL = 'tag-assignment';
 export const CASE_RULES_COLL = 'case-rule';
 
 const EVENTS_SEARCH = /\/events\/search$/;
@@ -65,6 +68,13 @@ const TAGS = /\/tags$/;
 const TAG_RULES = /\/tags\/rules$/;
 const TAG_RULE_ONE = /\/tags\/rules\/([^/]+)$/;
 const TAG_RULE_APPLY = /\/tags\/rules\/([^/]+)\/apply$/;
+// Cross-entity assignments (BACKLOG D7). TAG_ONE is the catch-all `/tags/{name}` — every more specific
+// `/tags/…` pattern above and below MUST be tested before it, or `/tags/rules` deletes a tag named "rules".
+const TAG_TARGETS = /\/tags\/([^/]+)\/targets$/;
+const TAG_RENAME = /\/tags\/([^/]+)\/rename$/;
+const TAG_ASSIGNMENTS = /\/tags\/assignments\/([^/]+)\/([^/]+)$/;
+const TAG_ASSIGNMENT_ONE = /\/tags\/assignments\/([^/]+)\/([^/]+)\/([^/]+)$/;
+const TAG_ONE = /\/tags\/([^/]+)$/;
 
 /** Happy-path workflow: action → resulting status (the real backend validates per-type state machines). */
 const OBJECT_ACTION_STATUS: Record<string, string> = {
@@ -471,6 +481,50 @@ export function opsHandler(flags: MockFlags): MockHandler {
             }
             return json({ matched, updated });
         }
+        // ── cross-entity assignments (BACKLOG D7) ────────────────────────────────────────────
+        if (method === 'GET' && (m = match(url, TAG_TARGETS))) {
+            return json(tagTargets(store, space, decodeURIComponent(m[1])));
+        }
+        if (method === 'GET' && (m = match(url, TAG_ASSIGNMENTS))) {
+            const kind = decodeURIComponent(m[1]);
+            const id = decodeURIComponent(m[2]);
+            if (!TAG_TARGET_KINDS.includes(kind)) return error(400, `unknown target kind '${kind}'`);
+            return json({ targetKind: kind, targetId: id, tags: tagsOnTarget(store, space, kind, id) });
+        }
+        if (method === 'POST' && (m = match(url, TAG_ASSIGNMENTS))) {
+            const kind = decodeURIComponent(m[1]);
+            const id = decodeURIComponent(m[2]);
+            const tag = String((req.body as { tag?: string })?.tag ?? '').trim();
+            const actor = (req.body as { actor?: string })?.actor;
+            if (!TAG_TARGET_KINDS.includes(kind)) return error(400, `unknown target kind '${kind}'`);
+            if (!tag) return error(422, 'a tag name is required');
+            // Applying an unregistered tag is a 404, never an implicit create — a typo must not mint a tag.
+            if (!store.has(space, TAGS_COLL, tag)) return error(404, `no tag "${tag}"`);
+            return assignTag(store, space, kind, id, tag, actor);
+        }
+        if (method === 'DELETE' && (m = match(url, TAG_ASSIGNMENT_ONE))) {
+            const kind = decodeURIComponent(m[1]);
+            const id = decodeURIComponent(m[2]);
+            const tag = decodeURIComponent(m[3]);
+            if (!TAG_TARGET_KINDS.includes(kind)) return error(400, `unknown target kind '${kind}'`);
+            return json({ tag, targetKind: kind, targetId: id, removed: unassignTag(store, space, kind, id, tag) });
+        }
+        if (method === 'POST' && (m = match(url, TAG_RENAME))) {
+            const from = decodeURIComponent(m[1]);
+            const to = String((req.body as { to?: string })?.to ?? '').trim();
+            if (!store.has(space, TAGS_COLL, from)) return error(404, `no tag "${from}"`);
+            if (!to) return error(422, 'a destination tag name is required');
+            if (to.includes(',')) return error(422, 'tag names may not contain commas');
+            return json({ renamed: from, to, ...renameTagEverywhere(store, space, from, to) });
+        }
+        if (method === 'DELETE' && (m = match(url, TAG_ONE))) {
+            const name = decodeURIComponent(m[1]);
+            if (!store.has(space, TAGS_COLL, name)) return error(404, `no tag "${name}"`);
+            // A rule that still applies the tag would silently resurrect it on the next matching object.
+            const rule = store.list<TagRule>(space, TAG_RULES_COLL).find((r) => r.tag === name);
+            if (rule) return error(409, `tag rule "${rule.name}" still applies tag "${name}"`);
+            return json({ deleted: name, ...deleteTagEverywhere(store, space, name) });
+        }
         if (method === 'GET' && (m = match(url, OBJECT_ONE))) {
             const obj = store.get<OperationalObject>(space, OPS_OBJECTS_COLL, m[1]);
             return obj ? json(obj) : error(404, `object ${m[1]} not found`);
@@ -505,6 +559,154 @@ export function opsHandler(flags: MockFlags): MockHandler {
 /** Split the `attributes.tags` CSV. */
 function csvTags(csv: string | undefined): string[] {
     return (csv ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+}
+
+// ── cross-entity tag assignments (BACKLOG D7 — mirrors ops.tag.TagAssignmentStore) ───────────────
+
+/**
+ * The annotation-target vocabulary, shared with notes (backend `NoteTargets.KINDS` = `"object"` +
+ * `ComponentStore.WRITABLE_TYPES`). Keep the two in step — widening it widens both features.
+ */
+export const TAG_TARGET_KINDS = [
+    'object', 'link-analysis-view', 'geo-map-view', 'dashboard', 'widget', 'dataset',
+];
+
+/** Composite key of an edge — identity is the `(tag, kind, id)` triple, which is what makes `add` idempotent. */
+function edgeKey(tag: string, kind: string, id: string): string {
+    return `${tag}\u0000${kind}\u0000${id}`;
+}
+
+/**
+ * Object tags live in the `attributes.tags` CSV and non-object tags in their own collection — the same
+ * split the real backend has, where the CSV is a **projection** of the store rather than a second source
+ * of truth. Reading object edges from the CSV is what keeps the mock's two paths from disagreeing.
+ */
+function tagTargets(store: MockStore, space: string, tag: string): TagAssignment[] {
+    const fromObjects = store.list<OperationalObject>(space, OPS_OBJECTS_COLL)
+        .filter((o) => csvTags(o.attributes?.['tags']).includes(tag))
+        .map((o) => ({
+            tag, targetKind: 'object', targetId: o.id, createdAt: o.updatedAt ?? Date.now(),
+        } satisfies TagAssignment));
+    const fromEdges = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL).filter((a) => a.tag === tag);
+    return [...fromObjects, ...fromEdges]
+        .sort((a, b) => a.targetKind.localeCompare(b.targetKind) || a.targetId.localeCompare(b.targetId));
+}
+
+function tagsOnTarget(store: MockStore, space: string, kind: string, id: string): string[] {
+    const tags = kind === 'object'
+        ? csvTags(store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id)?.attributes?.['tags'])
+        : store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+            .filter((a) => a.targetKind === kind && a.targetId === id).map((a) => a.tag);
+    return [...tags].sort((a, b) => a.localeCompare(b));
+}
+
+/** Idempotent: re-applying returns the edge already stored, so provenance is never rewritten. */
+function assignTag(store: MockStore, space: string, kind: string, id: string, tag: string, actor?: string) {
+    if (kind === 'object') {
+        const obj = store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id);
+        if (!obj) return error(404, `no object '${id}'`);
+        const tags = csvTags(obj.attributes?.['tags']);
+        if (!tags.includes(tag)) {
+            store.put(space, OPS_OBJECTS_COLL, id, {
+                ...obj,
+                attributes: { ...(obj.attributes ?? {}), tags: [...tags, tag].join(',') },
+                updatedAt: Date.now(),
+            });
+        }
+        return json({ tag, targetKind: kind, targetId: id, actor, createdAt: Date.now() } satisfies TagAssignment);
+    }
+    const existing = store.get<TagAssignment>(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id));
+    if (existing) return json(existing);
+    return json(store.put(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id), {
+        tag, targetKind: kind, targetId: id, actor, createdAt: Date.now(),
+    } satisfies TagAssignment));
+}
+
+/** Idempotent: already-absent is success, so the boolean reports whether an edge actually went away. */
+function unassignTag(store: MockStore, space: string, kind: string, id: string, tag: string): boolean {
+    if (kind === 'object') {
+        const obj = store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id);
+        const tags = csvTags(obj?.attributes?.['tags']);
+        if (!obj || !tags.includes(tag)) return false;
+        store.put(space, OPS_OBJECTS_COLL, id, {
+            ...obj,
+            attributes: { ...(obj.attributes ?? {}), tags: tags.filter((t) => t !== tag).join(',') },
+            updatedAt: Date.now(),
+        });
+        return true;
+    }
+    const key = edgeKey(tag, kind, id);
+    if (!store.has(space, TAG_ASSIGNMENTS_COLL, key)) return false;
+    store.delete(space, TAG_ASSIGNMENTS_COLL, key);
+    return true;
+}
+
+/**
+ * A vocabulary change is five moves, not one: the registry entry, the assignment edges, every affected
+ * object's CSV projection, and any Tag Rule applying the tag. Miss one and the vocabulary splits — a rule
+ * left pointing at the old name resurrects it on the next matching object.
+ *
+ * Renaming onto an existing tag **merges** (the composite key makes two edges collapsing into one correct),
+ * and the source tag then stops existing.
+ */
+function renameTagEverywhere(store: MockStore, space: string, from: string, to: string) {
+    let assignments = 0;
+    let objects = 0;
+    let rules = 0;
+
+    for (const o of store.list<OperationalObject>(space, OPS_OBJECTS_COLL)) {
+        const tags = csvTags(o.attributes?.['tags']);
+        if (!tags.includes(from)) continue;
+        objects++;
+        assignments++;
+        const renamed = [...new Set(tags.map((t) => (t === from ? to : t)))];
+        store.put(space, OPS_OBJECTS_COLL, o.id, {
+            ...o, attributes: { ...(o.attributes ?? {}), tags: renamed.join(',') }, updatedAt: Date.now(),
+        });
+    }
+    for (const a of store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)) {
+        if (a.tag !== from) continue;
+        assignments++;
+        // delete-then-insert, not an in-place update: the destination edge may already exist, and merging
+        // the two is the correct outcome rather than a key conflict.
+        store.delete(space, TAG_ASSIGNMENTS_COLL, edgeKey(from, a.targetKind, a.targetId));
+        store.put(space, TAG_ASSIGNMENTS_COLL, edgeKey(to, a.targetKind, a.targetId), { ...a, tag: to });
+    }
+    for (const r of store.list<TagRule>(space, TAG_RULES_COLL)) {
+        if (r.tag !== from) continue;
+        rules++;
+        store.put(space, TAG_RULES_COLL, r.name, { ...r, tag: to });
+    }
+    store.delete(space, TAGS_COLL, from);
+    if (!store.has(space, TAGS_COLL, to)) {
+        store.put(space, TAGS_COLL, to, { name: to, createdAt: Date.now() } satisfies Tag);
+    }
+    return { assignments, objects, rules };
+}
+
+/** Retire a tag and every assignment of it — deletion leaves no orphan edges. */
+function deleteTagEverywhere(store: MockStore, space: string, name: string) {
+    let assignments = 0;
+    let objects = 0;
+
+    for (const o of store.list<OperationalObject>(space, OPS_OBJECTS_COLL)) {
+        const tags = csvTags(o.attributes?.['tags']);
+        if (!tags.includes(name)) continue;
+        objects++;
+        assignments++;
+        store.put(space, OPS_OBJECTS_COLL, o.id, {
+            ...o,
+            attributes: { ...(o.attributes ?? {}), tags: tags.filter((t) => t !== name).join(',') },
+            updatedAt: Date.now(),
+        });
+    }
+    for (const a of store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)) {
+        if (a.tag !== name) continue;
+        assignments++;
+        store.delete(space, TAG_ASSIGNMENTS_COLL, edgeKey(name, a.targetKind, a.targetId));
+    }
+    store.delete(space, TAGS_COLL, name);
+    return { assignments, objects, rules: 0 };
 }
 
 // ── case group management (GLOSSARY §9 — Split & Merge; mirrors ObjectService) ──────────────────
