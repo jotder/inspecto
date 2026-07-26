@@ -345,6 +345,19 @@ message · otherwise **200** with the tool's `value`.
   (condition tree), `kpi_report_builder` (measures), `pipeline_author` (graph). Only `component_draft`
   presumes a model composed something, and it merely *validates*. Anyone planning "NL authoring" on top
   of these must scope the NL→structure model hop explicitly. → [[inline-ai-authoring]].
+  **That hop is now scoped** (A5, 2026-07-26): `superpower/agt-6-plan.md` §3.4. Two things to know before
+  touching it, both non-obvious from this module:
+  - ⚠ **Build it on native function-calling, NOT on `Investigator`'s prose-scrape.** `ChatRequest` already
+    carries `List<ToolSpec>`, and `ToolMapping.toLc4j` turns each `ToolSpec.jsonSchema()` into a real
+    LangChain4j `JsonObjectSchema` sent over the provider's tool-calling protocol, with arguments parsed
+    back into a `Map` (malformed small-model output surfaces as a `_raw` key). `Investigator`'s
+    `gateway.chat` → `extractJsonObject` → Jackson pattern is right for *hypothesis synthesis*, which has
+    no schema to constrain, and wrong for an argument map.
+  - ⚠ **Every tool's `jsonSchema` constrains only the arg envelope** — `component_draft.config`,
+    `query_author.when` and `pipeline_author.flow` are all bare `{"type":"object"}`, with the real shape
+    living in the human-readable `description`. The intended fix already has a home: `FieldSpec`'s Javadoc
+    names "LLM grammar-constrained generation" among its drivers, so `ConfigSpecs.forType(kind)` can be
+    projected to JSON Schema and constrain the model with the same spec that will judge it (plan D9).
 
 UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
 

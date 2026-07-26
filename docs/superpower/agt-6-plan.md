@@ -175,6 +175,7 @@ validated write routes.
 | **A2** | **Adoption wave 1 — the four panes with matching tools** | M | Pipelines editor (`pipeline_author`), Expectations (`suggest_expectations`), Dashboards/Widgets (`kpi_report_builder`), Queries (`query_author`). These four are first precisely because the backend tool already exists and is already validated — **zero new backend capability**. |
 | **A3** | **Context grounding** | S | Pass the pane's current component ref / Dataset ref / selected column as agent **session attributes** so the operator doesn't re-state what the screen already knows. Extends the existing `goalKind` session-attribute seam; no new route. |
 | **A4** | **Adoption wave 2 — "explain this screen" everywhere** | S | A read-only L0 affordance on the remaining panes ("what am I looking at / why is this red"), which needs no draft tool at all. Cheapest breadth win; ship after A1–A3 prove the surface. |
+| **A5** | **True natural-language authoring — the model hop** | M+L | The phase D8 split out: prose → structured tool args via a single-turn, single-tool, schema-constrained model call, then the same deterministic invoke A1 already does. **Fully scoped in §3.4** — read F1–F4 there before estimating; the hop is cheap and the *nested* schema work is not. |
 
 ### 3.3 Invariants this must not break
 
@@ -185,6 +186,154 @@ validated write routes.
 - **Draft ≠ mutation.** A returned draft persists nothing until an explicit Apply.
 - **Canonical vocabulary** in every label and prompt (Pipeline, Dataset, Incident, Expectation /
   Alert Rule / Decision Rule, Measure, Collector, Stream / Reference) — `GLOSSARY.md` is binding.
+
+### 3.4 A5 — true natural-language authoring (the model hop), scoped 2026-07-26
+
+**Why this exists.** D8 shipped A1–A3 as *deterministic derive*: pane structure → `runTool` → draft, no
+model anywhere. That was the honest first cut, because four of the five L1 tools take structured input.
+A5 is the phase that adds the missing **NL → structured-args model hop**. Scoping it was the operator's
+instruction ("scope the hop first"), and the investigation below changed its shape and its cost
+materially — read the four findings before estimating.
+
+#### 3.4.1 What the investigation found (four findings, two of them plan-changing)
+
+- **F1 — the transport already does schema-constrained function-calling. A5 needs no new mechanism.**
+  `ChatRequest` carries `List<ToolSpec>`; `ToolMapping.toLc4j` parses each `ToolSpec.jsonSchema()` into a
+  LangChain4j `JsonObjectSchema` and attaches it as `ToolSpecification.parameters(...)`, so the model is
+  constrained over the provider's **native tool-calling protocol** and its arguments come back parsed into
+  a `Map` (`ToolMapping.toToolCalls`), with a `_raw` fallback key when a small local model emits malformed
+  JSON. ⚠ **Do not build the hop as prompt-then-scrape.** `Investigator`'s `gateway.chat` →
+  `extractJsonObject` → Jackson pattern is the P1 precedent, and it is the *wrong* one here — it exists
+  because a ranked-hypothesis synthesis has no tool schema to constrain. An argument map does.
+- **F2 — but the existing schemas constrain only the ARG ENVELOPE; every nested payload is
+  `{"type":"object"}`.** `component_draft.config`, `query_author.when`, `pipeline_author.flow` are all
+  unconstrained objects whose real shape is described *only in the human-readable `description` string*.
+  So function-calling reliably gets the model to emit `{kind, config}` and tells it nothing about what
+  belongs *inside* `config`. **This, not the hop, is A5's cost centre**, and it is what makes a naive
+  "just switch the tools on in `/ask`" estimate wrong.
+- **F3 — the fix for F2 is already designed and never wired: project the schema from `ConfigSpec`.**
+  `FieldSpec`'s own Javadoc names its drivers as "in-memory validation, structured API output, **LLM
+  grammar-constrained generation**, and generic UI form rendering"
+  ([`FieldSpec.java:9`](../../inspecto-config/src/main/java/com/gamma/config/spec/FieldSpec.java)) — the
+  third has never been built. A `ConfigSpecs.forType(kind)` → JSON Schema projection (`path` + `type` +
+  `required` + `enumValues` + `pattern` + `defaultValue`) constrains the model with **the very spec that
+  will judge its output**, which is the single biggest determinant of whether the repair loop converges on
+  a local model. Highest-leverage work in this phase. ⚠ `FieldSpec.path` is **dotted**
+  (`processing.threads`), so the projection must un-flatten into nested `properties` — mechanical, but it
+  is real work, and `visibleWhen` is a render hint that must **not** become a schema constraint.
+- **F4 — the offline degrade lies unless it is handled explicitly.** With no local model configured,
+  `GatewayFactory.build()` returns a `StubLlmGateway` whose reply is **an explanatory prose sentence**
+  ([`GatewayFactory.java:40`](../../inspecto-intelligence/src/main/java/com/gamma/intelligence/GatewayFactory.java)).
+  It emits **no tool call**, so the hop sees "no arguments" and would report *"could not understand your
+  request"* when the truth is *"no local model is configured"*. The derive path must answer **503** in
+  that case, which the surface already latches into a self-explaining disabled state (invariant 2) — so
+  handling it honestly needs **no new probe route**.
+
+#### 3.4.2 The shape
+
+One new non-mutating route beside the A1 one, in `AgentRoutes`:
+
+```
+POST /agent/tools/{name}/derive     { prompt, args?, kind? }  →  same body POST /agent/tools/{name} returns,
+                                                                 plus derivedArgs
+```
+
+Server steps: resolve the tool from the existing `runTool` belt index → **refuse mutating (403) before any
+model call** → build a `ChatRequest` offering **exactly one tool**, whose schema is the belt spec's, or the
+`ConfigSpec`-projected narrowing (F3) when the request names a `kind` → single-turn `gateway.chat` → take
+the first `ToolCall`'s `arguments` → merge with the pane's `args` → invoke the tool **deterministically**
+through the existing path → return its result verbatim.
+
+Five properties that make this safe and worth stating in review:
+
+1. **Containment by construction.** Offering exactly one non-mutating tool and reading only its arguments
+   means the model *cannot* select another tool. This is not policy, it is the request shape. It also means
+   the hop never enters the deliberative loop's tool-choice or paraphrase steps.
+2. **The model still never writes SQL.** `query_author`'s invariant survives untouched because the hop
+   emits only `dataset` + `when`; the server still renders the relation and predicate and `SqlGuard`-checks
+   the statement. ⚠ Pin this with a test asserting a model-emitted `text`/`sql` key is **dropped, not
+   spliced** — the merge must be schema-keyed, not a blind `putAll`.
+3. **Pane context wins over model output on identity fields** (`dataset`, `table`, `target`, the open
+   component's id). The screen *knows* these; a model can hallucinate them. This is the A3 rule
+   generalized, and it is why the hop takes `args` as well as `prompt` rather than replacing them.
+4. **`derivedArgs` is echoed back** so the operator sees what their sentence became before they Apply.
+   Non-negotiable for trust once a model is in the loop, and it is the field the specs assert on.
+5. **The `_raw` key is the fail-closed signal.** Its presence means the local model produced malformed
+   arguments ⇒ **422** with a retryable message. Absence of any tool call with a real gateway ⇒ 422;
+   absence with the stub gateway ⇒ **503** (F4). These are different failures and must not share a message.
+
+**Rejected alternatives**, each for a concrete reason:
+
+- **Route it through `POST /agent/sessions/{id}/ask`.** `AgentAskResult` is `{kind,text,citations,
+  navigationTarget,artifact}` and cannot carry a draft — `parseArtifact` is dead in practice, per its own
+  in-code comment ("no eoiagent tool/session can produce an `INLINE_ARTIFACT` answer today"). This is the
+  exact wall that forced A1's route; A5 must not walk back into it.
+- **Fold the prose into `args` as an `instruction` key.** That pushes the NL parse *into* the tool and
+  breaks the property every one of the five relies on: they are deterministic and model-free.
+- **A fourth `<inspecto-ai-*>` sibling.** The A4 siblings are siblings because three of the four things
+  `ai-assist` *is* did not apply to them. For NL authoring **all four apply** — same draft, diff, Apply,
+  and `canAuthorWorkbench` gate. Only the *input* differs, so this is a mode of `ai-assist`, not a sibling.
+
+#### 3.4.3 Which tools actually get NL, honestly
+
+| Tool | What NL buys | Verdict |
+|---|---|---|
+| `query_author` | prose → condition tree; the operator stops hand-building a filter tree | **A5.1 flagship.** Smallest nested payload, highest daily value, already adopted on Queries |
+| `component_draft` | prose → a whole component config of a named kind | **A5.2.** It has *no authoring logic* — it echoes `config` back with findings — so NL is the only thing that ever makes it an authoring tool. Needs F3 + a repair loop |
+| `pipeline_author` | prose → a node/edge graph | **A5.2/A5.3.** Highest ceiling, highest risk: a graph is large and model errors are structural, not field-level |
+| `kpi_report_builder` | prose → Measures | **Blocked** on the separate "no viable host pane" row — not an A5 problem |
+| `suggest_expectations` | **nothing.** The pane supplies `table`+`column`; profiling is deterministic SQL by design | **Excluded.** Adding a prompt box here would be theatre |
+
+⚠ **`component_draft` NL is a LOOP, not a hop.** One turn yields a probably-invalid config plus anchored
+findings; converging needs findings fed back over bounded turns. Budget it as such — this is the difference
+between A5.1 and A5.2, and pretending otherwise is how this phase overruns.
+
+#### 3.4.4 Phasing
+
+| # | Slice | Effort | Deliverable |
+|---|---|---|---|
+| **A5.1** | The hop, on `query_author` | M | `/derive` route + gate order + single-offered-tool call + `derivedArgs` echo + the three distinct failure answers (503 stub / 422 `_raw` / 422 no-call). `ai-assist` gains an optional prompt input, hidden unless the pane opts in. Offline mock branch. |
+| **A5.2** | `ConfigSpec` → JSON Schema projection + the bounded repair loop, on `component_draft` | L | The F3 projection (un-flattened, `visibleWhen` excluded) + N-turn repair feeding findings back, with a hard turn cap. This is where the phase's cost is. |
+| **A5.3** | `pipeline_author` | M | Only after A5.2 proves convergence on a local model. |
+
+#### 3.4.5 What A5 changes about an earlier decision
+
+**D3 needs one amendment.** It justified ungated availability partly on "the deterministic-derive decision
+strengthens this — `suggest_expectations` et al. run **no model at all**, so there is not even a local-
+inference cost." A5 reintroduces local inference. The *conclusion* (no edition gate; available wherever
+the module is, air-gapped included) still holds — local models remain sufficient, which is the AGT-3 claim
+— but the *reason* no longer applies to the NL path, and the 503-on-stub degrade (F4) is what keeps the
+promise honest on a build with no model configured.
+
+#### 3.4.6 Exit criteria
+
+- An operator types a sentence on the Queries pane and applies the resulting Query **unchanged**, with
+  `derivedArgs` visible before Apply.
+- The mutating-tool **403 fires before any model call** — asserted over the real belt's mutating specs, the
+  A1 test idiom, so a newly added act tool is covered automatically.
+- A model-emitted `text`/`sql` key on a `query_author` derive is **dropped**, proven by a test.
+- The three failure answers are distinct and asserted: stub gateway → 503 + latched disabled state;
+  `_raw` → retryable 422; no tool call → retryable 422.
+- Offline: the mock answers the derive branch; `EgressGuardTest` unchanged (air-gap invariant).
+- GAUNTLET green.
+
+#### 3.4.7 Implementation traps
+
+- ⚠ **Route registration order.** `AgentRoutes` registers `POST /agent/tools/(.+)` — a **greedy** pattern
+  that will swallow `/agent/tools/{name}/derive`. Register the derive route **first**, exactly as
+  `/agent/cases/{id}/similar` had to precede `/agent/cases/(.+)`.
+- ⚠ **Two unrelated `ToolSpec` types exist.** The live one is `com.eoiagent.core.ToolSpec`
+  (`name, description, jsonSchema, mutating, requiredRole, capability`). `com.gamma.agent.kernel.tool.ToolSpec`
+  in `inspecto-agent` is the superseded agent-kernel record — no schema, no `mutating`. Do not touch it.
+- ⚠ **`/agent/tools/{name}` enforces no `Role`/`Capability`** — it bypasses `DefaultToolRegistry`, so
+  `mutating()` is its only check and `AUTHOR_PIPELINE` is *not* enforced there; the UI's
+  `canAuthorWorkbench` and the edition's `ApiContext`/`WriteGates` seam are the authoring gates. The derive
+  route inherits this exactly — **do not quietly add a half-gate on one route only**.
+- The prompt belongs in `InspectoPromptProfile.systemPrompt(GoalKind)`, which already has a
+  `PIPELINE_AUTHOR` stub, and/or a versioned `resources/prompts/*.v1.md` file beside the two P1 prompts.
+- `gateway` is already a field on `InspectoIntelligenceAgent` (`GatewayFactory.build()`, overridable with
+  `StubLlmGateway` via the package-private test ctor) — the hop needs **no new wiring** to reach a model,
+  and `StubLlmGateway.builder().replyToolCalls(...)` makes it deterministically testable.
 
 ---
 
@@ -255,6 +404,7 @@ what/why/spend. **No new operator surface is required** — both already exist.
 | **A2** | On each of the four panes, an operator authors a valid component from a natural-language request and applies it **unchanged** — with no new backend route or tool added. |
 | **A3** | The agent resolves the pane's current component/Dataset without the operator re-stating it; verified by a session-attribute assertion, not by prompt inspection. |
 | **A4** | Every remaining pane offers a read-only explain affordance that degrades cleanly. |
+| **A5** | An operator authors a Query from a typed sentence and applies it unchanged, with the derived args shown before Apply; the mutating-tool 403 fires **before** the model call; a model-emitted SQL key is dropped; the three failure answers (no model / malformed args / no tool call) are distinct. Full list: §3.4.6. |
 | **6b** | A model-proposed step list is schema-validated, approved as one resolved plan, executes stepwise with halt + durable resume, and mutates nothing on a pre-flight failure. |
 | **All** | GAUNTLET green (reactor tests + UI lint/test/build). Air-gap invariant (`EgressGuardTest`) unchanged. |
 
@@ -288,7 +438,12 @@ what/why/spend. **No new operator surface is required** — both already exist.
 | **D5** | What counts as the demand trigger for 6b? | A named client asking for orchestration beyond the three seeded runbooks. Until then 6b stays parked. |
 | **D6** | Client segment for the §2 framing — telecom vs. general regulated enterprise changes the emphasis. | Needs product input; the air-gap moat argument holds either way. |
 | **D7** | Should the eoiagent `DryRunProvider` seam (§4.2 G2) be raised from "low priority refactor" to "6b prerequisite" in the BACKLOG? | **Yes** — it is reclassified by this plan. Still not urgent while 6b is parked. |
+| **D9** *(A5)* | **Does A5.2 build the `ConfigSpec` → JSON Schema projection (§3.4 F3), or do we accept prose-guided nested payloads plus the repair loop?** This is the phase's effort fork: the projection is the difference between "M" and "L". | **Build it.** `FieldSpec` already declares grammar-constrained generation as one of its drivers, and constraining the model with the same spec that judges its output is what decides whether the loop converges on a local model. Skipping it makes A5.2 look cheaper and behave worse. |
+| **D10** *(A5)* | **Which panes get the prompt box** — every pane that adopted `ai-assist`, or opt-in per pane? | **Opt-in per pane**, and explicitly **not** Expectations: `suggest_expectations` profiles real data with deterministic SQL from a `table`+`column` the dialog already holds, so a prompt box there is theatre. Queries first (A5.1). |
+| **D11** *(A5)* | **Turn cap for the `component_draft` repair loop** — how many local-model round trips before it gives up and shows the operator the findings as-is? | **Hard cap of 3**, then hand over the best draft plus its anchored findings. The surface already renders findings for human repair, so the fallback is the existing A1 experience, not a dead end. |
 
 ---
 
-*AGT-6a is `Should` and ready to schedule pending D1–D4. AGT-6b is `Could`, parked behind D5 + G2.*
+*AGT-6a is `Should`; A1–A4 shipped 2026-07-26. **A5 is scoped in §3.4 and ready to schedule pending
+D9–D11**; the `kpi_report_builder` host remains open as a separate new-flow item. AGT-6b is `Could`,
+parked behind D5 + G2.*

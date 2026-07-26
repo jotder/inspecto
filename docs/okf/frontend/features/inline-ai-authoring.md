@@ -209,5 +209,9 @@ second, drifting definition of the binding vocabulary in the codebase.
   exactly **one** widget; `studio/dashboards/dashboard-editor` can build a dashboard but has no measures.
   That host is a new flow, not an adoption. → `BACKLOG.md`.
 - ~~**"Why is this red"**~~ — **SHIPPED 2026-07-26**, see *Why is this red* below.
-- **A5 (new)** — true natural-language authoring. Needs the NL→structure model hop this plan never
-  scoped; see the shape warning in [[embedded-intelligence]].
+- **A5** — true natural-language authoring. **Now scoped** (2026-07-26): `superpower/agt-6-plan.md` §3.4.
+  Two facts that matter to this surface specifically: NL is a **mode of `<inspecto-ai-assist>`, not a fourth
+  sibling** (unlike the A4 pair, all four of this component's properties — draft, diff, Apply,
+  `canAuthorWorkbench` — apply), and it is **opt-in per pane**, explicitly *not* Expectations, where the
+  dialog already holds `table`+`column` and the profiling is deterministic SQL. See also the shape warning
+  in [[embedded-intelligence]].
