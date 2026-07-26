@@ -110,6 +110,19 @@ src/app/
   new dialog. ⚠ **Not** the mail pane's `TagDialog` — that one is bulk/tri-state and writes the
   `attributes.tags` CSV projection; this one is single-target and writes assignment edges. Keep them
   separate: one dialog spanning both persistence paths re-creates the split-brain D7 phase 2 closed.
+- **Inline AI authoring on a pane → `<inspecto-ai-assist>`** (`inspecto/ai-assist/`, AGT-6a A1). ONE shared
+  surface; panes **adopt** it, never fork it. The pane names a non-mutating agent tool, passes its own
+  context as `[args]` (so the operator re-states nothing), and gets back `(applyDraft)`; **the pane** then
+  writes through its own existing validated route — the surface has **no write path at all**, so the human
+  stays the audited actor. `[current]` is the diff baseline (null on create). It self-gates on
+  `LensService.canAuthorWorkbench()` and latches a **503** into a disabled, explained affordance (other
+  errors toast and stay retryable), so a pane never hard-fails when the intelligence module is absent.
+  Backend: `POST /agent/tools/{name}` — **mutating tools are refused 403**; a draft carrying findings is a
+  **200**, not an error. Result-shape adapters + the diff are framework-free in `ai-draft.ts`.
+  ⚠ Four of the five L1 tools take **structured** input, not natural language — don't build an NL box on
+  them without scoping the model hop (BACKLOG AGT-6a · A5). Details + the per-pane gotchas (target-vs-table
+  vocabularies, the `kind`+`min`/`max` same-patch trap, the Queries `type` switch):
+  `docs/okf/frontend/features/inline-ai-authoring.md`.
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL

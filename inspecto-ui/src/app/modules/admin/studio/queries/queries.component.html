@@ -108,6 +108,17 @@
                     }
                     <span class="ml-2">Run preview</span>
                 </button>
+                <!-- AGT-6a A2: render trusted SQL from the structured condition tree the operator already
+                     built. The server composes the SQL — the model never writes SQL text. -->
+                <inspecto-ai-assist
+                    tool="query_author"
+                    [args]="aiQueryArgs()"
+                    [current]="aiCurrentQuery()"
+                    label="Draft SQL from conditions"
+                    [disabled]="!form.controls.datasetId.value"
+                    disabledReason="Choose a dataset first"
+                    (applyDraft)="applyQueryDraft($event)"
+                ></inspecto-ai-assist>
                 <span class="flex-auto"></span>
                 <button mat-button type="button" (click)="cancel()">Cancel</button>
                 <button mat-flat-button color="primary" type="submit" [disabled]="saving()">Save</button>

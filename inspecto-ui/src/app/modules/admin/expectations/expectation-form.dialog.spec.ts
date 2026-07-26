@@ -128,4 +128,72 @@ describe('ExpectationFormDialog', () => {
         expect(c.step()).toBe('config');
         expect(fixture.nativeElement.textContent).toContain('cdr_duration_range');
     });
+
+    // ─── AGT-6a A2/A3: the inline suggestion surface ───
+
+    it('passes the chosen target and column through as the tool args (A3)', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr', column: 'cost_usd' });
+        fixture.detectChanges();
+
+        // The operator re-states nothing — the dialog already knows both.
+        expect(c.aiArgs()).toEqual({ table: 'cdr', target: 'cdr', column: 'cost_usd' });
+    });
+
+    it('applies a range suggestion with kind and min/max in one patch', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr', column: 'cost_usd' });
+        fixture.detectChanges();
+
+        c.applySuggestion({
+            label: 'cdr_cost_usd_range',
+            clean: true,
+            findings: [],
+            config: {
+                name: 'cdr_cost_usd_range',
+                description: 'Auto-suggested from profiling: observed bounds',
+                targetType: 'pipeline',
+                target: 'cdr',
+                column: 'cost_usd',
+                kind: 'range',
+                min: '0.0',
+                max: '412.75',
+                severity: 'MAJOR',
+                enabled: true,
+            },
+        });
+        fixture.detectChanges();
+
+        // min/max are only enabled while kind === 'range', so they survive only if kind landed with
+        // them — this is the regression guard for that ordering trap.
+        const value = c.schemaForm.value() as Record<string, unknown>;
+        expect(value['kind']).toBe('range');
+        expect(value['min']).toBe('0.0');
+        expect(value['max']).toBe('412.75');
+        // An applied suggestion is an unsaved edit, so the dirty-close guard must see it.
+        expect(c.schemaForm.isDirty()).toBe(true);
+        // name/description are save-step fields (R9), not schema attributes.
+        expect(c.saveForm.controls.name.value).toBe('cdr_cost_usd_range');
+    });
+
+    it('applying persists nothing — the operator still completes the existing save flow (D2)', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr', column: 'cost_usd' });
+        fixture.detectChanges();
+
+        c.applySuggestion({
+            label: 'cdr_cost_usd_not_null',
+            clean: true,
+            findings: [],
+            config: { name: 'cdr_cost_usd_not_null', kind: 'non_null', target: 'cdr', column: 'cost_usd' },
+        });
+        fixture.detectChanges();
+
+        // Still on the config step, nothing saved — ExpectationsService was stubbed with NO methods, so
+        // any write attempt would have thrown.
+        expect(c.step()).toBe('config');
+    });
 });

@@ -246,6 +246,35 @@
             <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.schemaForm }}</code></pre>
         </section>
 
+        <!-- ── Inline AI assist (AGT-6a A1) ──────────────────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Inline AI assist</h2>
+                <button mat-stroked-button (click)="copy(snippets.aiAssist)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-ai-assist&gt;</code> is the ONE inline authoring surface — panes adopt it,
+                never fork it. The pane names a non-mutating agent tool and passes its own context as the
+                tool's <code>args</code>, so the operator never re-states what the screen already knows. The
+                surface renders the returned draft with its anchored findings and a diff against the current
+                config; <code>(applyDraft)</code> fires only on an explicit click and <b>the pane</b> does the
+                write through its own validated route — the human is the actor. It persists nothing, the
+                backend refuses mutating tools with 403, and an absent intelligence module degrades to a
+                disabled affordance rather than breaking the pane. Gated on <code>canAuthorWorkbench</code>.
+            </p>
+            <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
+                <inspecto-ai-assist
+                    tool="suggest_expectations"
+                    [args]="{ table: 'cdr', column: 'cost_usd' }"
+                    label="Suggest expectations"
+                ></inspecto-ai-assist>
+            </div>
+            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.aiAssist }}</code></pre>
+        </section>
+
         <!-- ── Data table (mini / standard / pro / pro max) ──────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">

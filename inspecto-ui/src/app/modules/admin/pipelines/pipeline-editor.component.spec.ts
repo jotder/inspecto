@@ -225,4 +225,44 @@ describe('PipelineEditorComponent', () => {
         c.openNodeConfig(c.model()!.nodes[0]);
         expect(dialog.open).not.toHaveBeenCalled();
     });
+
+    // ─── AGT-6a A2: adopting a checked topology from the inline surface ───
+
+    it('applying a pipeline draft replaces the graph and marks it dirty without saving (D2)', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+        c.selectedId.set('demo');
+        c.dirty.set(false);
+
+        c.applyPipelineDraft({
+            label: 'demo',
+            clean: true,
+            findings: [],
+            config: {
+                name: 'renamed_by_tool',
+                active: true,
+                nodes: [{ id: 'src', type: 'acquisition', config: {} }],
+                edges: [],
+            },
+        });
+
+        const m = c.model()!;
+        expect(m.nodes).toHaveLength(1);
+        // The open pipeline's identity and lifecycle are preserved — adopting a draft must never
+        // silently rename or activate a live pipeline.
+        expect(m.name).toBe('demo');
+        expect(m.active).toBe(false);
+        expect(c.dirty()).toBe(true);
+        // Nothing persisted: the operator still presses the existing Save.
+        expect(api.replaceAuthored).not.toHaveBeenCalled();
+    });
+
+    it('ignores a malformed draft and refuses to apply in a non-authoring lens', () => {
+        const c = make();
+        c.model.set(structuredClone(FLOW));
+
+        c.applyPipelineDraft({ label: 'x', clean: true, findings: [], config: { name: 'x' } });
+        expect(c.model()!.nodes).toHaveLength(2); // unchanged — no nodes/edges in the draft
+        expect(c.dirty()).toBe(false);
+    });
 });

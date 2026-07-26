@@ -8,6 +8,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, DbBrowserService, Expectation, ExpectationKind, ExpectationsService, ExpectationUpsert } from 'app/inspecto/api';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -65,6 +67,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         QueryConditionGroupComponent,
+        AiAssistComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -81,6 +84,19 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                  step transition — only visually hidden via [hidden], never destroyed. -->
             <div [hidden]="step() === 'save'">
                 <inspecto-schema-form [specs]="attributes" [initial]="initialValue" [optionLoaders]="optionLoaders" (submitted)="save()"></inspecto-schema-form>
+
+                <!-- AGT-6a A2/A3: profile the chosen target+column and fill the check in from what the data
+                     actually shows. The dialog already knows both, so nothing is re-stated. -->
+                <inspecto-ai-assist
+                    class="mt-3 block"
+                    tool="suggest_expectations"
+                    [args]="aiArgs()"
+                    [current]="aiCurrent()"
+                    label="Suggest from the data"
+                    [disabled]="!aiTarget() || !aiColumn()"
+                    disabledReason="Set Target and Column above first"
+                    (applyDraft)="applySuggestion($event)"
+                ></inspecto-ai-assist>
 
                 @if (kind() === 'condition') {
                     <div class="mt-4 font-semibold">Records violate this check when</div>
@@ -240,6 +256,71 @@ export class ExpectationFormDialog implements AfterViewInit {
         this.schemaForm.form.get('kind')?.valueChanges
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((k) => this.kind.set(k as ExpectationKind));
+
+        // AGT-6a A3: mirror target/column into signals so the inline surface's args stay reactive
+        // without it reaching into the form itself.
+        this.aiTarget.set(String(target?.value ?? ''));
+        target?.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((t) => this.aiTarget.set(String(t ?? '')));
+        const column = this.schemaForm.form.get('column');
+        this.aiColumn.set(String(column?.value ?? ''));
+        column?.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((c) => this.aiColumn.set(String(c ?? '')));
+    }
+
+    /** The target/column the operator has chosen — the inline surface's context (AGT-6a A3). */
+    readonly aiTarget = signal('');
+    readonly aiColumn = signal('');
+
+    /**
+     * `suggest_expectations` arguments from what the dialog already knows.
+     *
+     * ⚠ `target` and `table` are DIFFERENT vocabularies: `target` is a pipeline/job id, `table` is a
+     * browsable store. Nothing in the UI maps between them, but the existing column probe
+     * (`columnOptionLoader('target')` → `/db/table`) already uses the target value verbatim as a store
+     * name, and the backend defaults `target` to `table` when omitted — so passing the same value for
+     * both matches established behaviour. When the target is not a browsable store the tool answers
+     * "unknown table", which the surface reports as an ordinary rejection; that is expected, not a bug.
+     */
+    aiArgs(): Record<string, unknown> {
+        return { table: this.aiTarget(), target: this.aiTarget(), column: this.aiColumn() };
+    }
+
+    /** The configured check as the diff baseline, so a suggestion is reviewed against it, not blind. */
+    aiCurrent(): Record<string, unknown> | null {
+        const value = this.schemaForm?.value() as Record<string, unknown> | undefined;
+        return value && Object.keys(value).length ? value : null;
+    }
+
+    /**
+     * Adopt a profiled suggestion into the form (AGT-6a A2). Nothing is written here — the operator still
+     * completes the existing two-step flow and presses Create/Save, so the write goes through the
+     * dialog's own validated route with the human as the audited actor (decision D2).
+     */
+    applySuggestion(draft: AiDraft): void {
+        const s = draft.config as Record<string, unknown>;
+        // `kind` must land in the SAME patch as min/max: those controls are only enabled while
+        // kind === 'range', and a disabled control's value is excluded from schemaForm.value().
+        this.schemaForm.form.patchValue({
+            targetType: s['targetType'] ?? 'pipeline',
+            target: s['target'] ?? this.aiTarget(),
+            column: s['column'] ?? this.aiColumn(),
+            kind: s['kind'],
+            ...(s['min'] !== undefined ? { min: s['min'] } : {}),
+            ...(s['max'] !== undefined ? { max: s['max'] } : {}),
+            ...(s['severity'] !== undefined ? { severity: s['severity'] } : {}),
+        });
+        // An applied suggestion IS an unsaved edit — keep the dirty-close guard honest.
+        this.schemaForm.form.markAsDirty();
+        // `name`/`description` are save-step fields (R9), so the tool's suggested id goes there.
+        if (!this.isEdit) {
+            this.saveForm.patchValue({
+                name: String(s['name'] ?? this.suggestedName()),
+                description: String(s['description'] ?? ''),
+            });
+        }
     }
 
     /** The suggested expectation id: `<target>_<column>_<kind>`. */

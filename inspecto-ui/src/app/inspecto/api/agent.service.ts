@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { A2uiArtifact, isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 import { apiUrl } from './api-base';
+import { Finding } from './models';
 import { SessionService } from './session.service';
 import { SpacesService } from './spaces.service';
 
@@ -26,6 +27,21 @@ export interface AgentAskResult {
     citations: AgentCitation[];
     navigationTarget: string | null;
     artifact: A2uiArtifact | null;
+}
+
+/**
+ * POST /agent/tools/component_draft result (AGT-6a A1) — a config validated against the same
+ * structural spec + safety gate the control plane enforces on write. `clean` false with `findings`
+ * is a SUCCESSFUL call: the findings are the repair loop, anchored to the offending field by
+ * `fieldPath`, and are what the inline surface renders. Nothing is persisted — applying the `draft`
+ * is a separate, explicit human action through the pane's own validated route.
+ */
+export interface ComponentDraftResult {
+    kind: string;
+    type: string;
+    clean: boolean;
+    findings: Finding[];
+    draft: Record<string, unknown>;
 }
 
 /** Callbacks for one streamed ask — tokens, then optionally an artifact, then complete or error. */
@@ -115,6 +131,20 @@ export class AgentService {
     /** One complete (non-streamed) ask. 404 unknown session, 400 missing question. */
     ask(sessionId: string, question: string, page?: Record<string, unknown>): Observable<AgentAskResult> {
         return this.http.post<AgentAskResult>(apiUrl(`/agent/sessions/${encodeURIComponent(sessionId)}/ask`), { question, page });
+    }
+
+    /**
+     * Invoke ONE named agent tool deterministically (AGT-6a A1) and get its own result back — no
+     * model in the loop. This is the seam the inline authoring surface uses: {@link ask} runs the
+     * deliberative loop and answers in prose, which cannot be diffed or applied, whereas this returns
+     * the tool's structure (for `component_draft`: {@link ComponentDraftResult}).
+     *
+     * Status contract: 503 the intelligence module is absent · 404 unknown tool · 403 the tool is
+     * mutating (only the approval spine may run those — a draft surface must never act) · 422 the tool
+     * rejected the arguments, message in the error body. A draft carrying findings is 200.
+     */
+    runTool<T>(name: string, args: Record<string, unknown>): Observable<T> {
+        return this.http.post<T>(apiUrl(`/agent/tools/${encodeURIComponent(name)}`), { args });
     }
 
     /**

@@ -166,4 +166,54 @@ describe('QueriesComponent (R3)', () => {
         expect(c.form.controls.type.value).toBe('structured');
         expect(c.structuredModel()).toEqual(model);
     });
+
+    // ─── AGT-6a A2/A3: drafting SQL from the structured condition tree ───
+
+    it('passes the dataset and the condition tree through as the tool args (A3)', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.newQuery();
+        c.form.controls.datasetId.setValue('cdr_sample');
+        c.form.controls.name.setValue('costly');
+
+        const args = c.aiQueryArgs();
+        expect(args['dataset']).toBe('cdr_sample');
+        expect(args['name']).toBe('costly');
+        // The structured tree, never SQL text — the server renders the predicate.
+        expect(args['when']).toEqual(c.structuredModel().where);
+    });
+
+    it('applying drafted SQL switches the editor to sql so the draft is not discarded on save', () => {
+        const { fixture, save } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.newQuery();
+        c.form.controls.datasetId.setValue('cdr_sample');
+        c.form.controls.type.setValue('structured');
+
+        c.applyQueryDraft({
+            label: 'query',
+            clean: true,
+            findings: [],
+            config: { type: 'sql', text: 'SELECT * FROM cdr WHERE cost_usd > 100', datasetId: 'cdr_sample' },
+        });
+
+        // Left on 'structured', buildQuery persists the MODEL and drops the text entirely.
+        expect(c.form.controls.type.value).toBe('sql');
+        expect(c.form.controls.text.value).toContain('cost_usd > 100');
+        // Nothing saved — the operator still presses the existing Save (D2).
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('ignores a draft with no SQL text', () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.newQuery();
+        c.form.controls.text.setValue('SELECT 1');
+
+        c.applyQueryDraft({ label: 'query', clean: true, findings: [], config: { type: 'sql', text: '  ' } });
+        expect(c.form.controls.text.value).toBe('SELECT 1');
+    });
 });

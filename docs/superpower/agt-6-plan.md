@@ -1,5 +1,36 @@
 # AGT-6 Plan — Inline AI Authoring & Agent Graphs
 
+> ## ⚠️ AS-BUILT UPDATE — 2026-07-26: A1–A3 SHIPPED, and two of this plan's premises were WRONG
+>
+> **Plan stays active** (A4 + one A2 pane + all of 6b remain). D1–D4 answered; §8 records the calls.
+>
+> **Correction 1 — "no new backend capability" (§0 table, §3.2 A2) was FALSE.** The five L1 tools had
+> **no invocable route**. They are `ToolSpec`s in the agent's belt, reachable only *indirectly* through
+> `POST /agent/sessions/{id}/ask` — where the model chooses the tools and then **paraphrases** what they
+> returned. `AgentAskResult` is `{kind,text,citations,navigationTarget,artifact}`: the validated draft and
+> its anchored findings are **not** first-class fields, so a pane could neither diff nor apply them, and
+> A1's exit criterion was structurally unreachable. Shipped fix: **`POST /agent/tools/{name}`** — one
+> non-mutating tool, invoked deterministically, result returned verbatim, no model in the loop. Modelled on
+> `AssistRoutes`' `POST /assist/{intent}`. → `okf/backend/agent/embedded-intelligence.md`.
+>
+> **Correction 2 — "natural-language authoring" (§3.1) does not describe what these tools do.** Four of the
+> five take **structured** input, not prose: `suggest_expectations` profiles a column (its own description
+> says *"Deterministic SQL, no model"*), `query_author` takes a condition tree, `kpi_report_builder` takes
+> measures, `pipeline_author` takes a graph. Only `component_draft` needs a model — and it merely
+> *validates* a config something else composed. So "NL → validated draft" needs a **model hop** the plan
+> never scoped. **Operator decision 2026-07-26: deterministic-derive first** — the surface takes pane
+> structure, no model anywhere. True NL authoring is a separate, honestly-scoped item (**A5**, BACKLOG).
+>
+> **Shipped:** `<inspecto-ai-assist>` (A1, D1) · adopted on **3** panes (A2) · pane context as tool args
+> (A3, reframed — the deterministic path has no agent session, so "session attributes" did not apply) ·
+> `runTool` SPI + route + 10 backend tests · offline mock handler · `/design` gallery entry.
+>
+> **NOT shipped:** **`kpi_report_builder` has no viable host pane** — it emits N widgets *plus* a
+> dashboard, and no pane holds a dataset and operator-built measures *and* can create both. `explore` has
+> dataset+measures but saves exactly one widget; `dashboard-editor` can build a dashboard but has no
+> measures. That host is a new flow, not an adoption. → BACKLOG. **A4** (read-only "explain this screen")
+> untouched.
+>
 > **Status: DRAFT for stakeholder review — 2026-07-25.** Scopes AGT-6, which was deliberately left
 > "not scoped further on purpose" until AGT-5's tool belt + autonomy ladder shipped (P0–P5 complete
 > 2026-07-21). Operator decision this session: **split the requirement** — the inline-authoring half
@@ -236,10 +267,11 @@ what/why/spend. **No new operator surface is required** — both already exist.
 
 | # | Ask | Recommendation |
 |---|---|---|
-| **D1** | Name + shape of the shared inline surface (`<inspecto-ai-assist>`?) — must be settled against the `angular-ui` shared-design-system conventions before A1. | Confirm naming with the UI owner; keep it a standalone component in the shared design system, not a per-feature widget. |
-| **D2** | Does inline **Apply** go through the plain validated route (human is the actor) or through L2 `component_apply` (agent is the actor, approval inbox)? | **Plain validated route.** The human clicked Apply, so the human is the actor — simpler, and keeps the approvals inbox meaningful for genuinely agent-initiated work. |
-| **D3** | Is AGT-6a **Tier B (Standard+)** or available in Personal/air-gapped too? | Available wherever the intelligence module is, i.e. including air-gapped — it is draft-only, so it carries no security weight. Packaging value sits in Tier B messaging, not in a hard gate. |
-| **D4** | A2 pane order — confirm Pipelines → Expectations → Dashboards → Queries. | Accept; it is ordered by existing-tool maturity, not guesswork. |
+| **D1** | ✅ **ANSWERED 2026-07-26: `<inspecto-ai-assist>`.** Standalone component in the shared design system (`inspecto/ai-assist/`), adopted by panes, never forked. Listed in the `/design` gallery. | Confirm naming with the UI owner; keep it a standalone component in the shared design system, not a per-feature widget. |
+| **D2** | ✅ **ANSWERED 2026-07-26: the plain validated route.** The surface only emits `(applyDraft)`; **the pane** writes through its own existing route, so the human is the audited actor. Enforced three ways: the surface has no write path at all, `runTool` refuses mutating tools (403), and each pane's apply handler stops at its form/model with `dirty` set so the operator presses the existing Save. | **Plain validated route.** The human clicked Apply, so the human is the actor — simpler, and keeps the approvals inbox meaningful for genuinely agent-initiated work. |
+| **D3** | ✅ **ANSWERED 2026-07-26: available wherever the intelligence module is**, air-gapped included. No edition gate was added; the deterministic-derive decision strengthens this — `suggest_expectations` et al. run **no model at all**, so there is not even a local-inference cost. | Available wherever the intelligence module is, i.e. including air-gapped — it is draft-only, so it carries no security weight. Packaging value sits in Tier B messaging, not in a hard gate. |
+| **D4** | ✅ **ANSWERED 2026-07-26, and the pane list changed** — order accepted, but two panes moved to the host that actually holds the context: **Pipelines** editor (`pipeline_author`) · **Expectations** → the **`ExpectationFormDialog`**, not the list pane (the list has no row selection, so no `table`/`column`; the dialog has both as controls) · **Queries** (`query_author`) · **Dashboards → deferred** (`kpi_report_builder` has no host — see the as-built note at the top). | Accept; it is ordered by existing-tool maturity, not guesswork. |
+| **D8** *(new)* | **A1's input model** — the plan assumed free text, but four of five tools take structured input. | ✅ **ANSWERED 2026-07-26: deterministic derive first.** Pane structure → `runTool` → draft + findings + diff + Apply, no model. NL authoring is **A5**, scoped separately with its model hop made explicit. |
 | **D5** | What counts as the demand trigger for 6b? | A named client asking for orchestration beyond the three seeded runbooks. Until then 6b stays parked. |
 | **D6** | Client segment for the §2 framing — telecom vs. general regulated enterprise changes the emphasis. | Needs product input; the air-gap moat argument holds either way. |
 | **D7** | Should the eoiagent `DryRunProvider` seam (§4.2 G2) be raised from "low priority refactor" to "6b prerequisite" in the BACKLOG? | **Yes** — it is reclassified by this plan. Still not urgent while 6b is parked. |

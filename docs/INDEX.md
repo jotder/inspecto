@@ -81,12 +81,18 @@ former root reference docs** (each index lists them):
   change (P0), and `master`'s `inspecto/api/pkce.ts` is a zero-import RFC 7636 impl that ports verbatim —
   so P1 is a **port, not a design exercise** (master's `session.service.ts` does *not* port: it needs
   `/bootstrap` + `/api/v1`). Blocking ask Q1: does the IdP support PKCE + a public client?
-- [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan, DRAFT 2026-07-25** — splits the
-  requirement: **AGT-6a** inline AI authoring (`Should`, schedulable — one shared inline surface + a
-  four-pane adoption wave reusing the shipped L1 draft tools, phases A1–A4) vs **AGT-6b** model-composed
-  agent graphs (`Could`, demand-gated behind the eoiagent `DryRunProvider` seam). Also carries the
-  ladder-as-packaging commercial framing (Tiers A/B/C ↔ edition flavors, air-gap moat, SHADOW-first
-  adoption). Decision asks D1–D7 pending.
+- [`superpower/agt-6-plan.md`](superpower/agt-6-plan.md) — **AGT-6 plan — AGT-6a A1–A3 SHIPPED
+  2026-07-26, plan STILL ACTIVE** (A4 + the `kpi_report_builder` host + all of AGT-6b remain). Splits the
+  requirement: **AGT-6a** inline AI authoring (one shared `<inspecto-ai-assist>` surface + a pane adoption
+  wave, phases A1–A4) vs **AGT-6b** model-composed agent graphs (`Could`, demand-gated behind the eoiagent
+  `DryRunProvider` seam). Also carries the ladder-as-packaging commercial framing (Tiers A/B/C ↔ edition
+  flavors, air-gap moat, SHADOW-first adoption). D1–D4 + D8 answered; D5–D7 pending.
+  ⚠ **Two of the plan's own premises were WRONG and are corrected in its as-built header** — the L1 tools
+  had **no invocable route** (so "no new backend capability" was false ⇒ `POST /agent/tools/{name}`), and
+  four of the five take **structured** input, not natural language (⇒ deterministic-derive first, NL
+  authoring split out as A5). As-built:
+  [`okf/frontend/features/inline-ai-authoring.md`](okf/frontend/features/inline-ai-authoring.md) +
+  [`okf/backend/agent/embedded-intelligence.md`](okf/backend/agent/embedded-intelligence.md).
 - [`superpower/compliance-certifications-plan.md`](superpower/compliance-certifications-plan.md) —
   **NFR-7 certifications plan, DRAFT 2026-07-23** (SOC 2 Type I → II → ISO 27001 → FedRAMP
   800-53 alignment/ATO-support; HIPAA/PCI scoping statements only); control-level coverage in

@@ -1,0 +1,156 @@
+<div class="inspecto-ai-assist">
+    <!-- The invocation affordance. Never hidden when blocked — a disabled control with a reason is
+         discoverable, whereas a vanished one just looks broken. -->
+    <button
+        mat-stroked-button
+        type="button"
+        [disabled]="blocked()"
+        [matTooltip]="blockedReason()"
+        [matTooltipDisabled]="!blockedReason()"
+        (click)="run()"
+    >
+        @if (running()) {
+            <mat-progress-spinner diameter="18" mode="indeterminate" />
+        } @else {
+            <mat-icon svgIcon="heroicons_outline:sparkles" />
+        }
+        <span>{{ running() ? 'Working…' : label() }}</span>
+    </button>
+
+    @if (unavailable()) {
+        <inspecto-alert variant="info" title="AI assistance unavailable" class="mt-3 block">
+            The intelligence module is not installed on this backend. Everything else on this screen works
+            as usual.
+        </inspecto-alert>
+    }
+
+    @if (drafts(); as candidates) {
+        <section class="mt-3 rounded-lg border border-gray-200 dark:border-gray-700" aria-label="AI suggestion">
+            @if (candidates.length === 0) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:sparkles"
+                    title="No suggestion"
+                    message="The tool ran but produced nothing to apply. Try a different column or narrow the request."
+                />
+            } @else {
+                <!-- Several candidates (suggest_expectations) are chosen between; a single draft skips
+                     the picker entirely rather than rendering a one-item list. -->
+                @if (candidates.length > 1) {
+                    <ul class="flex flex-wrap gap-2 border-b border-gray-200 p-3 dark:border-gray-700" role="tablist">
+                        @for (candidate of candidates; track candidate.label; let i = $index) {
+                            <li role="presentation">
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    class="rounded-md px-3 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                                    [class.font-semibold]="selected() === i"
+                                    [attr.aria-selected]="selected() === i"
+                                    (click)="select(i)"
+                                >
+                                    {{ candidate.label }}
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                }
+
+                @if (activeDraft(); as draft) {
+                    <div class="p-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="text-base font-medium">{{ draft.label }}</h3>
+                            <!-- Tone comes from the shared vocabulary (OK/WARNING); the label carries the
+                                 domain wording. "VALID"/"INVALID" are not tones and would read neutral. -->
+                            <inspecto-status-badge
+                                [value]="draft.clean ? 'OK' : 'WARNING'"
+                                [label]="draft.clean ? 'Validated' : 'Needs attention'"
+                            />
+                        </div>
+                        @if (draft.note) {
+                            <p class="mt-1 text-sm text-secondary">{{ draft.note }}</p>
+                        }
+
+                        <!-- Anchored findings: fieldPath is what makes a finding actionable, so it is
+                             shown, not just the message. -->
+                        @if (draft.findings.length > 0) {
+                            <ul class="mt-3 flex flex-col gap-2" aria-label="Validation findings">
+                                @for (finding of findingsOf(draft); track finding.fieldPath + finding.message) {
+                                    <li class="flex items-start gap-2 text-sm">
+                                        <inspecto-status-badge [value]="finding.severity" />
+                                        <span>
+                                            <code>{{ finding.fieldPath }}</code>
+                                            — {{ finding.message }}
+                                        </span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+
+                        <!-- The diff: Apply is never a blind write. -->
+                        <table class="mt-3 w-full text-left text-sm">
+                            <caption class="sr-only">Proposed changes compared with the current configuration</caption>
+                            <thead>
+                                <tr class="border-b border-gray-200 dark:border-gray-700">
+                                    <th scope="col" class="py-1 pr-3 font-medium">Field</th>
+                                    <th scope="col" class="py-1 pr-3 font-medium">Current</th>
+                                    <th scope="col" class="py-1 font-medium">Proposed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (row of diff(); track row.path) {
+                                    <tr class="border-b border-gray-100 last:border-0 dark:border-gray-800">
+                                        <th scope="row" class="py-1 pr-3 font-normal align-top">
+                                            <code>{{ row.path }}</code>
+                                            <span class="sr-only">({{ row.change }})</span>
+                                        </th>
+                                        <td class="py-1 pr-3 align-top">{{ row.before }}</td>
+                                        <td class="py-1 align-top" [class.font-medium]="row.change !== 'same'">
+                                            {{ row.after }}
+                                        </td>
+                                    </tr>
+                                }
+                                @if (diff().length === 0) {
+                                    <tr>
+                                        <td colspan="3" class="py-2 text-secondary">
+                                            The draft matches the current configuration — nothing would change.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+
+                        @if (unchangedCount() > 0) {
+                            <button
+                                mat-button
+                                type="button"
+                                class="mt-1"
+                                [attr.aria-expanded]="showUnchanged()"
+                                (click)="toggleUnchanged()"
+                            >
+                                {{ showUnchanged() ? 'Hide' : 'Show' }} {{ unchangedCount() }} unchanged
+                                {{ unchangedCount() === 1 ? 'field' : 'fields' }}
+                            </button>
+                        }
+
+                        @if (draft.prerequisites?.length) {
+                            <p class="mt-2 text-sm text-secondary">
+                                {{ draft.prerequisites!.length }} dependent
+                                {{ draft.prerequisites!.length === 1 ? 'component' : 'components' }} will be applied
+                                first.
+                            </p>
+                        }
+
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <!-- Apply is deliberately enabled even with findings: the operator may want the
+                                 draft in the form to finish by hand. The pane's own validated route is the
+                                 gate that decides what may be saved — this surface never writes. -->
+                            <button mat-flat-button color="primary" type="button" (click)="apply(draft)">
+                                Apply
+                            </button>
+                            <button mat-stroked-button type="button" (click)="dismiss()">Discard</button>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+    }
+</div>

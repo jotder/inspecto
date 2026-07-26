@@ -32,6 +32,8 @@ import {
     LensService,
     apiErrorMessage,
 } from 'app/inspecto/api';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
@@ -106,6 +108,7 @@ import {
         PipelinePaletteComponent,
         InspectoEmptyStateComponent,
         TransferMenuComponent,
+        AiAssistComponent,
     ],
     templateUrl: './pipeline-editor.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -347,6 +350,33 @@ export class PipelineEditorComponent implements OnInit {
             },
             error: (err) => this.onWriteError(err, 'Could not create the pipeline'),
         });
+    }
+
+    /**
+     * AGT-6a A2: the working model as the diff baseline for the inline surface. `pipeline_author` echoes
+     * back a parsed `flow`, so the comparison is draft-vs-current on the same shape.
+     */
+    aiCurrentPipeline(): Record<string, unknown> | null {
+        const m = this.model();
+        return m ? ({ ...m } as unknown as Record<string, unknown>) : null;
+    }
+
+    /**
+     * Adopt a checked topology into the working model (AGT-6a A2). It stops here — `dirty` is set and
+     * the operator presses the existing Save, so the write still goes through `replaceAuthored` with the
+     * human as the audited actor (decision D2). Nothing is persisted by applying.
+     */
+    applyPipelineDraft(draft: AiDraft): void {
+        if (!this.lens.canAuthorWorkbench()) return; // defense in depth, not just the button
+        const flow = draft.config as unknown as AuthoredPipeline;
+        if (!flow?.nodes || !flow?.edges) return;
+        const current = this.model();
+        // Keep the open pipeline's identity and active state — the tool echoes the graph, not the
+        // lifecycle, and adopting a draft must never silently activate or rename a live pipeline.
+        this.model.set({ ...flow, name: current?.name ?? flow.name, active: current?.active ?? false });
+        this.dirty.set(true);
+        this.selectedNode.set(null);
+        this.selectedEdgeId.set(null);
     }
 
     save(): void {

@@ -60,3 +60,5 @@ documented as concepts.
 # Assistant
 
 * [Assistant](assist.md) - the AI assist panel/dialog (per-screen 503 when disabled).
+* [Inline AI authoring](inline-ai-authoring.md) - the shared `<inspecto-ai-assist>` surface (AGT-6a):
+  deterministic draft + anchored findings + diff, applied by the pane through its own validated route.

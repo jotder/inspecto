@@ -26,6 +26,8 @@ import {
 import { ResultSet, describeResultSet, recommend } from 'app/inspecto/viz';
 import { registerBuiltinViz } from 'app/inspecto/viz/plugins';
 import { runSql } from 'app/inspecto/data-table/sql/sql-run';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -88,6 +90,7 @@ function tokenName(raw: string): string {
         InspectoEmptyStateComponent,
         StatusBadgeComponent,
         QueryPanelComponent,
+        AiAssistComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './queries.component.html',
@@ -264,6 +267,41 @@ export class QueriesComponent implements OnInit {
         const recommended = recommend(resultSet).slice(0, 3).map((p) => p.meta.label);
         this.preview.set({ resolvedSql, resultSet, rows: res.rows.slice(0, 20), recommended });
         this.running.set(false);
+    }
+
+    /**
+     * AGT-6a A2/A3: the pane's own state as `query_author`'s arguments — the dataset the operator picked
+     * and the condition tree they already built, so nothing is re-stated. `when` is the structured tree
+     * only; the server renders the predicate, so no SQL text ever crosses the wire inbound.
+     */
+    aiQueryArgs(): Record<string, unknown> {
+        const name = String(this.form.controls.name.value ?? '').trim();
+        return {
+            dataset: this.form.controls.datasetId.value,
+            when: this.structuredModel().where ?? {},
+            ...(name ? { name } : {}),
+        };
+    }
+
+    /** The current SQL as the diff baseline — `query_author` returns a `{type,text,datasetId}` draft. */
+    aiCurrentQuery(): Record<string, unknown> | null {
+        const text = this.form.controls.type.value === 'sql' ? this.form.controls.text.value : this.structuredSql();
+        if (!text) return null;
+        return { type: 'sql', text, datasetId: this.form.controls.datasetId.value };
+    }
+
+    /**
+     * Adopt drafted SQL into the form (AGT-6a A2). It stops at the form: the operator still presses the
+     * existing Save, so the write goes through `save()`/`queriesApi.save` with the human as the actor
+     * (decision D2). Switches the editor to `sql` because the draft IS rendered SQL — leaving the type on
+     * `structured` would silently discard it on save (the model, not the text, is persisted there).
+     */
+    applyQueryDraft(draft: AiDraft): void {
+        const text = draft.config['text'];
+        if (typeof text !== 'string' || !text.trim()) return;
+        this.form.controls.type.setValue('sql');
+        this.form.controls.text.setValue(text);
+        this.form.controls.text.markAsDirty();
     }
 
     save(): void {

@@ -101,6 +101,20 @@
         </div>
     }
 
+    <!-- AGT-6a A2: parse + dry-run-simulate the authored graph, then review the result as a diff before
+         it replaces the working model. Only meaningful once a pipeline is open. -->
+    @if (model(); as m) {
+        <inspecto-ai-assist
+            tool="pipeline_author"
+            [args]="{ name: m.name, nodes: m.nodes, edges: m.edges }"
+            [current]="aiCurrentPipeline()"
+            label="Check this topology"
+            [disabled]="!m.nodes.length"
+            disabledReason="Add at least one processor first"
+            (applyDraft)="applyPipelineDraft($event)"
+        ></inspecto-ai-assist>
+    }
+
     @if (!flows().length && !creating() && !loading()) {
         <inspecto-empty-state icon="heroicons_outline:arrows-right-left" title="No authored pipelines"
             message="Create a pipeline to start composing a topology.">

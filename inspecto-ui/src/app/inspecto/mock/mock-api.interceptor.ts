@@ -5,6 +5,7 @@ import { delay, mergeMap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { SpacesService } from '../api/spaces.service';
 import { accessHandler } from './handlers/access.handler';
+import { agentHandler } from './handlers/agent.handler';
 import { assistHandler } from './handlers/assist.handler';
 import { authHandler } from './handlers/auth.handler';
 import { componentsHandler } from './handlers/components.handler';
@@ -77,6 +78,7 @@ const HANDLERS: MockHandler[] = [
     healthHandler(flags), // /health/details only — the bare /health probe stays real (connectivity banner)
     jobsHandler(flags),
     assistHandler(flags),
+    agentHandler(flags), // AGT-6a: POST /agent/tools/{name} draft dispatch — the rest of /agent/* stays real
     settingsHandler(flags),
     navHandler(flags), // /nav/menus singleton — Menu Builder + custom sidebar offline (mockDemo)
 ];
