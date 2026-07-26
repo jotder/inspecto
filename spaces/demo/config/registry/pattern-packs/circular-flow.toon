@@ -1,0 +1,9 @@
+name: circular-flow
+label: Circular flow
+category: money
+description: Value or calls returning to their origin (A → … → A). Use the Cycles tool — a closed loop is not a simple path motif.
+steps[3]{direction}:
+  ""
+  out
+  out
+tool: cycles

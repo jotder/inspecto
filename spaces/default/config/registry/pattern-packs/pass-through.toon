@@ -1,0 +1,8 @@
+name: pass-through
+label: Pass-through intermediary
+category: money
+description: A single intermediary that receives then forwards (A → M → B). Inspect the middle node — it is the mule/shell to scrutinize.
+steps[3]{direction}:
+  ""
+  out
+  out

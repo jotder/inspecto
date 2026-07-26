@@ -1,0 +1,9 @@
+name: layering-chain
+label: Layering chain
+category: money
+description: Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering.
+steps[4]{direction}:
+  ""
+  out
+  out
+  out

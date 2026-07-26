@@ -1,0 +1,8 @@
+name: shared-associates
+label: Shared associates
+category: identity
+description: "Distinct identities that share the same devices/accounts. Use Similarity from a seed node, or Cohesive groups for the whole ring."
+steps[2]{direction}:
+  ""
+  both
+tool: similarity

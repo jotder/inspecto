@@ -1,0 +1,8 @@
+name: forwarding-relay
+label: Call-forwarding relay
+category: telecom
+description: A relay hop A → B → C — the building block of call-forwarding abuse and SIM-box relaying.
+steps[3]{direction}:
+  ""
+  out
+  out
