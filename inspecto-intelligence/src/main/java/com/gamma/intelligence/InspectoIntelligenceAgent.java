@@ -20,6 +20,7 @@ import com.eoiagent.host.SessionRequest;
 import com.eoiagent.model.LlmGateway;
 import com.eoiagent.platform.AgentPlatform;
 import com.eoiagent.platform.PlatformBuilder;
+import com.eoiagent.tool.Tool;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.intelligence.action.AgentApprovals;
@@ -92,6 +93,10 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     // ledger is always present (reads degrade to empty); the loop is opt-in and only attached in start().
     private final AutonomyLog autonomyLog = new AutonomyLog();
     private OpsMonitor opsMonitor;
+    // AGT-6a A1: the belt indexed by tool name, for deterministic single-tool dispatch off the
+    // inline-authoring surface (runTool) — the model is not involved. Built once in start() from the
+    // same ToolProvider the platform assembles from, so the two never drift. Empty until then.
+    private Map<String, Tool> belt = Map.of();
     private final LlmGateway gatewayOverride;
     private CollectorService service;
     private InspectoPack pack;
@@ -142,6 +147,11 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             builder.approvalHandler(approvals).approvalDecisionStore(approvals);
         }
         platform = builder.start();
+        // AGT-6a A1: index the belt by name for deterministic dispatch (runTool). Read from the same
+        // ToolProvider the platform just assembled from — a second, equivalent instance of the
+        // stateless read/author tools; runTool refuses the mutating ones, so the gated act tools in
+        // this copy are never invocable through it.
+        belt = indexBelt(pack);
         log.info("Intelligence platform assembled: {} v{}{}", platform.pack().name(), platform.pack().version(),
                 AgentApprovals.enabled() ? " (act tier ENABLED — mutating tools gated via approvals inbox)" : "");
 
@@ -221,6 +231,43 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         }
         AgentAnswer answer = session.ask(new UserMessage(request.question(), toPageContext(request.page()), Instant.now()));
         return toResult(answer);
+    }
+
+    /**
+     * AGT-6a A1: invoke one named tool directly and hand back its own result, so the inline-authoring
+     * surface gets a structural draft + anchored findings instead of the model's prose. Mirrors
+     * {@link Investigator}'s deterministic tool calls — same {@link ToolCall} shape, no session, no
+     * model.
+     *
+     * <p>A mutating tool is refused with {@link IllegalStateException} (→ 403). This is the invariant
+     * that keeps the surface draft-only: the act belt stays reachable only through the approval spine,
+     * so an inline box can never become a second, ungated way to mutate state.
+     */
+    @Override
+    public Optional<Map<String, Object>> runTool(String name, Map<String, Object> args, String session) {
+        Tool tool = belt.get(name);
+        if (tool == null) return Optional.empty();
+        if (tool.spec().mutating()) {
+            throw new IllegalStateException("tool '" + name + "' is mutating and is not invocable directly"
+                    + " — mutating tools run only through the approval spine");
+        }
+        ToolResult result = tool.invoke(new ToolCall(name, args == null ? Map.of() : args,
+                new RunId(session == null || session.isBlank() ? "inline-" + UUID.randomUUID() : session)));
+        Map<String, Object> view = new HashMap<>();
+        view.put("ok", result.ok());
+        if (result.ok()) {
+            view.put("value", result.value());
+        } else {
+            view.put("error", result.error());
+        }
+        return Optional.of(view);
+    }
+
+    /** The belt indexed by {@link com.eoiagent.core.ToolSpec#name()} (AGT-6a A1). */
+    private static Map<String, Tool> indexBelt(InspectoPack pack) {
+        Map<String, Tool> byName = new HashMap<>();
+        for (Tool t : pack.toolProvider().tools()) byName.put(t.spec().name(), t);
+        return Map.copyOf(byName);
     }
 
     @Override

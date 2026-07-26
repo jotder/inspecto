@@ -72,6 +72,76 @@ class InspectoIntelligenceAgentTest {
         }
     }
 
+    // ─── AGT-6a A1: runTool — deterministic single-tool dispatch against the REAL belt ───
+
+    @Test
+    void runToolInvokesARealDraftToolAndReturnsItsFindingsVerbatim() {
+        // No gateway scripting: runTool must not involve the model at all. The draft comes back as
+        // structure (clean/findings/draft) so a pane can diff and apply it.
+        InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("unused").build());
+        try {
+            Map<String, Object> result = agent.runTool("component_draft",
+                    Map.of("kind", "expectation", "config", Map.of()), "run-1").orElseThrow();
+            assertEquals(Boolean.TRUE, result.get("ok"), "a draft with findings is still a successful call");
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> value = (Map<String, Object>) result.get("value");
+            assertEquals("expectation", value.get("kind"));
+            assertEquals(Boolean.FALSE, value.get("clean"), "an empty expectation config cannot be clean");
+            assertFalse(((List<?>) value.get("findings")).isEmpty(), "findings anchor the repair loop");
+        } finally {
+            agent.close();
+        }
+    }
+
+    @Test
+    void runToolRefusesEveryMutatingToolOnTheRealBelt() {
+        // THE draft-only invariant, asserted against the real ToolSpecs rather than a fake: every
+        // mutating tool the pack registers must be refused. A new act tool is covered automatically.
+        InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("unused").build());
+        try {
+            List<String> mutating = new com.gamma.intelligence.pack.InspectoPack(
+                    new CollectorService(List.of(), 3600, 1)).toolProvider().tools().stream()
+                    .filter(t -> t.spec().mutating())
+                    .map(t -> t.spec().name())
+                    .toList();
+            assertFalse(mutating.isEmpty(), "the act belt should not be empty — otherwise this proves nothing");
+
+            for (String tool : mutating) {
+                IllegalStateException refused = assertThrows(IllegalStateException.class,
+                        () -> agent.runTool(tool, Map.of(), "run-1"),
+                        tool + " is mutating and must not be invocable through runTool");
+                assertTrue(refused.getMessage().contains("mutating"));
+            }
+        } finally {
+            agent.close();
+        }
+    }
+
+    @Test
+    void runToolOnAnUnknownToolIsEmpty() {
+        InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("unused").build());
+        try {
+            assertTrue(agent.runTool("no_such_tool", Map.of(), "run-1").isEmpty(),
+                    "an unknown tool is empty — the control route maps that to 404");
+        } finally {
+            agent.close();
+        }
+    }
+
+    @Test
+    void runToolReportsAnExpectedToolFailureAsNotOk() {
+        InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("unused").build());
+        try {
+            // Missing the required "kind" — the tools never throw, so this is an ok=false result (→ 422).
+            Map<String, Object> result = agent.runTool("component_draft", Map.of(), "run-1").orElseThrow();
+            assertEquals(Boolean.FALSE, result.get("ok"));
+            assertNotNull(result.get("error"));
+        } finally {
+            agent.close();
+        }
+    }
+
     @Test
     void closeIsCleanAndIdempotent() {
         InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("ok").build());

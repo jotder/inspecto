@@ -411,6 +411,90 @@ class AgentRoutesTest {
         }
     }
 
+    // ─── AGT-6a A1: POST /agent/tools/{name} — one test per gate, plus the happy path ───
+
+    @Test
+    void toolDispatchIs503WhenTheModuleIsAbsent(@TempDir Path dir) throws Exception {
+        try (Ctx ctx = open(dir, null)) {
+            assertEquals(503, send(ctx.port(), "POST", "/agent/tools/component_draft", "{}").statusCode());
+        }
+    }
+
+    @Test
+    void toolDispatchReturnsTheToolsOwnResultVerbatim(@TempDir Path dir) throws Exception {
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        try (Ctx ctx = open(dir, agent)) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/component_draft",
+                    "{\"args\":{\"kind\":\"expectation\",\"config\":{\"id\":\"amt-nonneg\"}}}");
+            assertEquals(200, r.statusCode());
+            JsonNode body = V1Body.of(r.body());
+            // The draft + anchored findings arrive as structure, not prose — this is the whole point of
+            // the route: a pane can diff and apply this, which it cannot do with an /ask answer.
+            assertEquals("expectation", body.get("kind").asText());
+            assertFalse(body.get("clean").asBoolean());
+            assertEquals("column", body.get("findings").get(0).get("fieldPath").asText());
+            assertEquals("amt-nonneg", body.get("draft").get("config").get("id").asText());
+            // args are passed through untouched, and the audited actor rides along for attribution
+            assertEquals("amt-nonneg",
+                    ((Map<?, ?>) agent.lastToolArgs.get("config")).get("id"));
+            assertEquals("appUser", agent.lastToolSession, "the audited actor default");
+
+            // ...and an agent session token propagates as the attribution the SPI promises
+            HttpRequest attributed = HttpRequest.newBuilder(
+                            URI.create("http://localhost:" + ctx.port() + "/api/v1/agent/tools/component_draft"))
+                    .header("Content-Type", "application/json")
+                    .header("X-Agent-Session", "run-42")
+                    .POST(BodyPublishers.ofString("{\"args\":{\"kind\":\"expectation\",\"config\":{}}}"))
+                    .build();
+            assertEquals(200, client.send(attributed, BodyHandlers.ofString()).statusCode());
+            assertEquals("agent:run-42", agent.lastToolSession);
+        }
+    }
+
+    @Test
+    void aDraftWithFindingsIs200NotAnError(@TempDir Path dir) throws Exception {
+        // Guards the contract the surface depends on: findings are the payload, not a failure. If this
+        // ever becomes 4xx the inline surface loses the repair loop it exists to render.
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/component_draft",
+                    "{\"args\":{\"kind\":\"expectation\",\"config\":{}}}");
+            assertEquals(200, r.statusCode());
+            assertTrue(V1Body.of(r.body()).get("findings").size() > 0);
+        }
+    }
+
+    @Test
+    void anUnknownToolIs404(@TempDir Path dir) throws Exception {
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/no_such_tool", "{}");
+            assertEquals(404, r.statusCode());
+            assertTrue(r.body().contains("no_such_tool"));
+        }
+    }
+
+    @Test
+    void aMutatingToolIs403AndIsNeverInvoked(@TempDir Path dir) throws Exception {
+        // THE draft-only invariant. The act belt is reachable only through the approval spine; if this
+        // gate regresses, the inline surface becomes a second, ungated way to mutate state.
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        try (Ctx ctx = open(dir, agent)) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/component_apply",
+                    "{\"args\":{\"type\":\"expectation\",\"id\":\"amt-nonneg\",\"config\":{}}}");
+            assertEquals(403, r.statusCode());
+            assertTrue(r.body().contains("mutating"));
+            assertNull(agent.appliedArgs, "a mutating tool must be refused before it is invoked");
+        }
+    }
+
+    @Test
+    void anExpectedToolFailureIs422WithTheToolsMessage(@TempDir Path dir) throws Exception {
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/component_draft", "{}");
+            assertEquals(422, r.statusCode());
+            assertTrue(r.body().contains("kind is required"));
+        }
+    }
+
     /** A deterministic in-memory agent — no eoiagent/model dependency needed in the core test tree. */
     private static final class FakeIntelligenceAgent implements IntelligenceAgent {
         // Stand-in for the eoiagent GoalKind enum (not on the core test classpath).
@@ -441,6 +525,32 @@ class AgentRoutesTest {
 
         @Override public String name() { return "fake-intelligence"; }
         @Override public void init(CollectorService service) {}
+
+        // AGT-6a A1: a stand-in belt for POST /agent/tools/{name}. "component_draft" mirrors the real
+        // tool's result shape (ok=true even when findings exist); "component_apply" stands in for the
+        // mutating belt and must be refused before invocation; anything else is unknown.
+        volatile Map<String, Object> lastToolArgs;
+        volatile String lastToolSession;
+        volatile Map<String, Object> appliedArgs;
+
+        @Override
+        public java.util.Optional<Map<String, Object>> runTool(String name, Map<String, Object> args, String session) {
+            this.lastToolArgs = args;
+            this.lastToolSession = session;
+            if ("component_apply".equals(name)) {
+                throw new IllegalStateException("tool 'component_apply' is mutating and is not invocable directly");
+            }
+            if (!"component_draft".equals(name)) return java.util.Optional.empty();
+            Object kind = args.get("kind");
+            if (kind == null) return java.util.Optional.of(Map.of("ok", false, "error", "kind is required"));
+            return java.util.Optional.of(Map.of("ok", true, "value", Map.of(
+                    "kind", kind,
+                    "type", kind,
+                    "clean", false,
+                    "findings", List.of(Map.of(
+                            "severity", "ERROR", "fieldPath", "column", "message", "column is required")),
+                    "draft", args)));
+        }
 
         @Override
         public java.util.Optional<Map<String, Object>> autonomyPolicy() {

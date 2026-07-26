@@ -73,6 +73,32 @@ public interface IntelligenceAgent extends AutoCloseable {
     }
 
     /**
+     * Invoke <b>one named tool</b> from the belt directly, bypassing the deliberative loop (AGT-6a A1,
+     * the inline-authoring surface). Where {@link #ask} lets the model decide which tools to call and
+     * then paraphrases what they returned, this hands back the tool's own result verbatim — so a UI can
+     * render a structural draft, anchored findings and a diff rather than prose. No model is involved.
+     *
+     * <p><b>Draft-only, enforced here.</b> Implementations MUST refuse a tool whose
+     * {@code ToolSpec.mutating()} is true by throwing {@link IllegalStateException} (the control plane
+     * maps that to HTTP 403). Mutating tools are reachable only through their own gated path — the
+     * approval spine — and an inline box must never become a second, ungated way to act. The
+     * non-mutating belt is safe by construction: those tools persist nothing.
+     *
+     * <p>Returns the tool's result as a plain JSON-friendly map — {@code ok}, plus {@code value} on
+     * success or {@code error} on an expected failure (the tools never throw; a missing argument or an
+     * unvalidatable kind is an {@code ok=false} result). Empty when no tool of that name exists, which
+     * the control route maps to 404. Default empty: an implementation with no tool belt exposes nothing
+     * rather than 503, mirroring {@link #recentCases}.
+     *
+     * @param args    the tool's arguments, as the caller supplied them
+     * @param session the agent-session token for audit attribution ({@code actor=agent:<run>})
+     * @throws IllegalStateException when the named tool is mutating (→ 403)
+     */
+    default Optional<Map<String, Object>> runTool(String name, Map<String, Object> args, String session) {
+        return Optional.empty();
+    }
+
+    /**
      * The most recent investigation Cases (AGT-5 P1 slice D), newest first, as plain JSON-friendly
      * maps — the core stays free of the {@code Case} record type, which lives in the optional
      * {@code file-processor-intelligence} module. Default empty: an implementation without an

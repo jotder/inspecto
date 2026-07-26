@@ -301,6 +301,53 @@ case-similarity recall + the learning dashboard UI). With it, the full AGT-5 P0�
   7→**10** (resume-at-failed-step + skip, terminal-runs-afresh, durable resumeIndex reload). Module
   132→**135**.
 
+## AGT-6a A1 — deterministic single-tool dispatch (`runTool`), shipped 2026-07-26
+
+**Two ways into the belt, deliberately different.** `POST /agent/sessions/{id}/ask` runs the
+deliberative loop: the *model* picks tools and then **paraphrases** their results. `AgentAskResult` is
+`{kind,text,citations,navigationTarget,artifact}` — a tool's structured output is **not** a first-class
+field there. That is fine for prose, and useless for a UI that must **diff and apply** a config.
+
+So AGT-6a added `POST /agent/tools/{name}` (`AgentRoutes`) over
+`IntelligenceAgent.runTool(name, args, session)`: look the tool up in the belt by `ToolSpec.name`,
+invoke it, return its own result map verbatim. **No model is involved.** Modelled on the reflex layer's
+`POST /assist/{intent}` (`AssistRoutes`) — the house precedent for generic named dispatch.
+
+`InspectoIntelligenceAgent.runTool` indexes the belt once in `start()` from the same `ToolProvider` the
+platform assembles from (so the two cannot drift), mirroring `Investigator`'s existing deterministic
+`tool.invoke(new ToolCall(name, args, new RunId(session)))` pattern.
+
+**Gate order, fail-closed:** module absent → **503** · unknown tool → **404** · **mutating tool → 403**
+· the tool's own expected failure (missing arg, unvalidatable kind, no write root) → **422** with its
+message · otherwise **200** with the tool's `value`.
+
+- ⚠ **A draft carrying findings is a SUCCESS (200), not an error.** `component_draft` answers
+  `ok=true, clean=false` — the findings *are* the payload, and they drive the repair loop the UI
+  renders. Mapping that to 4xx would break the whole surface. Pinned by
+  `AgentRoutesTest.aDraftWithFindingsIs200NotAnError`.
+- ⚠ **The mutating-tool 403 is the draft-only invariant, and it is load-bearing.** Without it this route
+  is a second, *ungated* way to run `component_apply`/`job_run`/`runbook_operator`, bypassing the
+  approval spine entirely. `runTool` throws `IllegalStateException` **before invoking**;
+  `InspectoIntelligenceAgentTest.runToolRefusesEveryMutatingToolOnTheRealBelt` enumerates the real
+  pack's `mutating()` ToolSpecs and asserts each is refused, so a **newly added act tool is covered
+  automatically**. Never "simplify" this to an allow-list of the five draft tools.
+- The non-mutating belt is safe by construction — those tools persist nothing — so the gate is
+  `ToolSpec.mutating()`, not a hand-kept name list. That also makes the read tools
+  (`glossary_lookup`, `status_get`, `timeline_build`, …) reachable, which is what A4 will need.
+- The audited actor rides through as the tool's `RunId`: `X-Agent-Session: run-42` →
+  `agent:run-42`, else the request's actor (`appUser` by default — **not** `"operator"`; `actorOrOperator`'s
+  fallback never fires on this path because `ApiContext.actor` already defaults).
+- **Write-root 503 does not apply** to this route (unlike the `endpoint` skill's default gate order) —
+  these tools persist nothing. Tools that *need* a write root to read the registry (`query_author`,
+  `kpi_report_builder`) self-degrade to an `ok=false` → **422**.
+- ⚠ **Four of the five L1 "authoring" tools take STRUCTURED input, not natural language** —
+  `suggest_expectations` (its own description: *"Deterministic SQL, no model"*), `query_author`
+  (condition tree), `kpi_report_builder` (measures), `pipeline_author` (graph). Only `component_draft`
+  presumes a model composed something, and it merely *validates*. Anyone planning "NL authoring" on top
+  of these must scope the NL→structure model hop explicitly. → [[inline-ai-authoring]].
+
+UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
+
 ## Gotchas / seams
 
 - **`ingestLock` deadlock rule** governs every `EventLog`/Signal-bus subscriber: subscribers run

@@ -19,6 +19,11 @@ import java.util.Map;
  * this seam — so every route degrades to 503 when it is absent. Sibling to {@link AssistRoutes}
  * (the reflex layer): that module answers one skill call per request, this one hosts multi-turn
  * sessions on the deliberative loop.
+ *
+ * <p>Two ways in, deliberately different: {@code POST /agent/sessions/{id}/ask} runs the deliberative
+ * loop and answers in prose (the model chooses its tools), while {@code POST /agent/tools/{name}}
+ * (AGT-6a A1) invokes <b>one non-mutating tool</b> and returns its result verbatim, for UI surfaces
+ * that need a structural draft to diff and apply rather than a paraphrase.
  */
 final class AgentRoutes implements RouteModule {
 
@@ -53,6 +58,33 @@ final class AgentRoutes implements RouteModule {
             Object page = body.get("page");
             streamAsk(agentOr503(api), ApiContext.name(m), new AgentAskRequest(question, mapField(page)), e);
             return ApiContext.HANDLED;
+        });
+        // AGT-6a A1: deterministic single-tool dispatch for the inline-authoring surface. The /ask
+        // routes above run the deliberative loop and return the model's PROSE — the draft and its
+        // anchored findings are buried in a tool result the model paraphrases, so a pane cannot diff or
+        // apply them. This route invokes one named tool and returns its own result verbatim; no model is
+        // involved. Sibling in spirit to AssistRoutes' POST /assist/{intent} skill dispatch.
+        //
+        // Gates, fail-closed: module absent → 503 · unknown tool → 404 · MUTATING tool → 403 (the
+        // draft-only invariant — the act belt is reachable only through the approval spine, and an
+        // inline box must never become a second, ungated way to act) · the tool's own expected failure
+        // (missing argument, unvalidatable kind, no write root) → 422 with its message. A draft that
+        // merely has findings is a SUCCESS (ok=true, clean=false) and returns 200 — the findings are
+        // what the surface renders, not an error.
+        api.post("/agent/tools/(.+)", (e, m) -> {
+            String tool = ApiContext.name(m);
+            Map<String, Object> result;
+            try {
+                result = agentOr503(api).runTool(tool, mapField(api.body(e).get("args")), actorOrOperator(e))
+                        .orElseThrow(() -> new ApiException(404, "unknown tool: '" + tool + "'"));
+            } catch (IllegalStateException mutating) {
+                throw new ApiException(403, mutating.getMessage());
+            }
+            if (!Boolean.TRUE.equals(result.get("ok"))) {
+                Object error = result.get("error");
+                throw new ApiException(422, error == null ? "tool '" + tool + "' failed" : String.valueOf(error));
+            }
+            return result.get("value");
         });
         api.get("/agent/cases", (e, m) ->
                 Map.of("cases", agentOr503(api).recentCases(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
