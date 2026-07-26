@@ -41,7 +41,7 @@ envelope, so they share a branch. The other two do not, and that is the whole re
 
 | Tool | Its own shape | Normalized to |
 |---|---|---|
-| `component_draft`, `query_author` | `{kind, id?, clean, findings, draft}` | **one** `AiDraft` |
+| `component_draft`, `query_author`, `projection_author` | `{kind, id?, clean, findings, draft}` | **one** `AiDraft` |
 | `kpi_report_builder` | + `widgets: [{id, draft}]` | one `AiDraft` whose **`prerequisites`** are the widgets |
 | `suggest_expectations` | `{table, column, profile, suggestions[]}` | **N** candidates the operator picks between |
 | `pipeline_author` | `{flow, nodes[], simulated, nodeOutputs[], …}` | one `AiDraft` from `flow`, `note` from the simulation |
@@ -66,6 +66,12 @@ sent, never by prompt inspection.
 | `pipelines/pipeline-editor` | `pipeline_author` | `model()` → `{name, nodes, edges}` | `model.set(...)` + `dirty.set(true)`; operator presses the existing Save |
 | `studio/queries` | `query_author` | form `datasetId` + `structuredModel().where` | `form.controls.text`; operator presses the existing Save |
 | `expectations/expectation-form.dialog` | `suggest_expectations` | `target` + `column` controls | `schemaForm.form.patchValue(...)` + `markAsDirty()`; operator completes the two-step save |
+| `studio/link-analysis` query panel | `projection_author` | `datasetId` + the panel's own `datasetColumns()` | `patchFormFromQuery(...)` + `markAsDirty()`; operator presses Run, then the host's Save |
+
+⚠ **The Link Analysis adopter is the one whose args the backend could not have resolved itself** — no tool
+or tool-layer route returns a Dataset's columns, so A3's "the pane's context *is* the args" is load-bearing
+there rather than merely convenient. As-built:
+[`link-analysis.md`](link-analysis.md#ai-derived-projection-mappings-v2-d-authoring-half--shipped-2026-07-27).
 
 Three gotchas that cost a debug cycle each — do not "clean these up":
 

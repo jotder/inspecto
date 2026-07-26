@@ -1,6 +1,10 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-26 (**AGT-6a A5 SCOPED** — the NL→structure model hop now has a real shape in plan
+**Updated:** 2026-07-27 (**Link-analysis V2 (d) authoring half SHIPPED end-to-end** ⇒ V2 complete and the §4
+Link-analysis row is retired: a new deterministic non-mutating `projection_author` tool + the query panel as
+the 5th `<inspecto-ai-assist>` adopter. It also fixed a pre-existing load-path bug — `patchFormFromView`
+ignored `projections[]`, so a multi-mapping *saved* view loaded first-only. Plan archived.) · Previously
+2026-07-26 (**AGT-6a A5 SCOPED** — the NL→structure model hop now has a real shape in plan
 §3.4; the investigation found the transport **already** does schema-constrained function-calling, that the
 cost sits in the unconstrained **nested** payload schemas, and that a `ConfigSpec`→JSON-Schema projection
 was designed years ago and never wired. Three new plan-level calls, D9–D11. Same day: **AGT-6a A4-status
@@ -69,13 +73,12 @@ each row's detail stays in its own section.
      **D1–D11** are a separate numbering space from §2's D1–D17 — and they now COLLIDE on D9/D10, which
      mean different things in each. Always say "plan D9" or "§2 D9".)*
    - **Generic tag system (D7)** — newly rescoped, plan-first, second-largest item on the board.
-   - Link-analysis V2 — **(b) sharing SHIPPED 2026-07-26 (§2 D9)** · **(c) pattern packs SHIPPED
-     end-to-end 2026-07-26** as a per-Space `pattern-pack` component kind after §2 D16 was overturned
-     (as-built: `okf/frontend/features/link-analysis.md`; plan archived) · **(d)'s vocabulary half
-     shipped**, leaving only **(d)'s authoring half** — which is *not* a mechanical adoption, since nothing
-     drafts a projection mapping today and the tool question is now **ANSWERED** (see §4) ·
-     configurable Findings sections (D6) · M4 Fuse remainder · eoiagent `DryRunProvider` · DuckDB
-     `spatial` extension.
+   - ~~Link-analysis V2~~ — **COMPLETE end-to-end 2026-07-27.** (b) sharing + (c) pattern packs + (d)'s
+     vocabulary half shipped 2026-07-26; **(d)'s authoring half shipped 2026-07-27** as the deterministic
+     `projection_author` tool + a `<inspecto-ai-assist>` adopter on the query panel, with the **pane**
+     supplying the column list because no tool-layer route returns one. All four plans archived; as-built:
+     `okf/frontend/features/link-analysis.md`. No open Link-analysis items remain — the §4 row is gone.
+   - M4 Fuse remainder · eoiagent `DryRunProvider` · DuckDB `spatial` extension.
    - ⚠ **"Geo Phase 4 backend" is effectively closed** — the projection/aggregation endpoints
      shipped 2026-07-24 and the `ComponentStore` view-kind widening landed 2026-07-08. All that
      survives under that heading is the `spatial` extension decision (§3 Geo row) and the
@@ -143,7 +146,6 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 | **Queries / BI** | `graph`/`spatial`/`search`/`api` QueryTypes · more `$`-resolvers | `okf/backend/control-plane/queries.md` |
 | **Notifications** | ~~delivery-status webhooks~~ **SHIPPED 2026-07-26 (D8)** — inbound provider callbacks, SPI + SendGrid/HMAC adapters + fail-closed route; residuals (suppression policy, soft-bounce retry, SES/SNS, receipt pruning) in §6 · GeoIP · auth-gated per-user prefs / security triggers | `okf/backend/control-plane/events-metrics.md` |
 | **Signal / Decision networks** | optional S8 (connector-direct emission + cross-space controller) · a general **event-triggered consequence policy gate** (still `/apply`-only) · RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet) · ⚠ **no producer threads `causationId`**, so `/signals/tree` is flat today | `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md` |
-| **Link analysis** | V1 + four V2 tracks + timeline + version history all shipped. **§2 D10 (per-view comments) SHIPPED end-to-end 2026-07-25; V2 (b) sharing SHIPPED end-to-end 2026-07-26 (§2 D9** — Exchange `kind` axis widened to `link-analysis-view`; ⚠ only an **entity-projection** view is shareable and its datasets come from its projection **mappings**, not `query.roots`/`from`**)**. **V2 (d) VOCABULARY HALF SHIPPED 2026-07-26** — `<inspecto-ai-explain>` adopted (12th pane) with six canonical terms; the four graph terms were added to the mock `GLOSSARY` subset. Remaining: (c) domain-seeded pattern packs → a dedicated system Space owns them (**§2 D16**) · **(d) authoring half — needs a call on which L1 tool backs it.** ⚠ Like A4, this row was one item but the work is two: the vocabulary surface was a mechanical adoption, but authoring is **not** — `component_draft` could validate a drafted `link-analysis-view`, yet **nothing drafts a projection mapping** (column→Entity choices over a Dataset's real columns), and that mapping *is* the pane's authoring act. **TOOL DECIDED 2026-07-26 — design pass complete, build not started:** `superpower/link-analysis-projection-authoring-plan.md`. The call is a **new non-mutating `projection_author`** over the existing `POST /agent/tools/{name}` dispatch, **not** `component_draft` and **not** `query_author`. ⚠ Why: `component_draft` **cannot draft** (it echoes+validates) and its `kind` resolves through `ConfigSpecs.TYPES`, which has **no `link-analysis-view`** ⇒ it returns `ok=false` today; `query_author` emits a Query, not a mapping, and hard-errors without `-Dassist.write.root`. ⚠ The pivot: **no agent tool or tool-layer route returns a Dataset's columns** (the belt only sees the operational-store `table` vocabulary; `InvRoutes.schemaRelationships` builds a `columnsByDataset` map and **throws it away**, and is unreachable from the tool layer) — so **the pane passes its own column list as an arg**. ⚠ Traps: `patchFormFromView` reads only `query.projection` and **ignores `projections[]`** (a pre-existing load-path bug); `AiToolName` + `adaptToolResult` are a closed pair ⇒ a missing registration reads as "no suggestion", never an error; `entityType` **changes node ids** so it must be unset for one mapping and set on all of them for ≥2 | `okf/frontend/features/link-analysis.md` |
 | **Geo map** | DuckDB **`spatial` extension** — deliberately deferred: plain SQL covers today's projection/aggregation, and loading it means bypassing the hardened `SqlSandbox` extension lockdown **and** bundling a per-platform native binary for offline installs. Only worth it once a real geometry op (ST_Distance/ST_Contains, spatial join) is demanded. *(Progressive loading + worker binning CLOSED 2026-07-24 as obsoleted by the server-side fold + the hard `GEO_POINT_CAP = 5000`. Revisit ONLY if that cap is raised — the candidate then is worker-izing the O(n²) toolbox analyses, not binning.)* | `okf/frontend/features/geo-map.md` |
 | **Pipeline graph** | T15 residuals (non-blocking): per-flow TOON override of the back-pressure thresholds (globals only) · flipping the intake cap on by default (needs a soak) · remote-fetch economy (the cap applies post-dedup, so a remote source still materialises its full ready set — unchanged from pre-T15, but a pre-materialise cap would save bandwidth) · mock-only: run-to-here `POST …/run` (path deliberately reserved for the editor's scratch-only contract) · `/asn1/modules` **stays mock-only** — no backend ASN.1 capability exists | `okf/backend/pipeline-graph/pipeline-graph-design.md` §14 |
 | **Acquisition / connections** | the JDBC-based connectors each need their own library-specific proxy wiring · an actual **HTTP CONNECT** handshake for any connector (SOCKS5 is wired for SFTP/FTP/FTPS; HTTP fails closed) | `okf/backend/acquisition/connectors.md` |

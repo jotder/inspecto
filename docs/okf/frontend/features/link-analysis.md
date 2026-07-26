@@ -70,10 +70,9 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   making this the 12th adopter — the pane most in need of it, since the glossary bans using Entity/Link for
   artifacts or assets and this is the one studio where they are the subject. No backend
   (`glossary_lookup` is non-mutating). **2026-07-26 also shipped V2 (c)**: pattern packs are now a per-Space
-  `pattern-pack` component kind (see *Pattern packs* below) rather than a hardcoded const. Remaining V2
-  (BACKLOG): **(d)'s authoring half** — open, and *not* a mechanical adoption: nothing
-  drafts a **projection mapping** (column→Entity choices over a Dataset's real columns) today, and that
-  mapping is the pane's actual authoring act, so which L1 tool backs it is still a call.
+  `pattern-pack` component kind (see *Pattern packs* below) rather than a hardcoded const.
+  **V2 (d)'s authoring half shipped 2026-07-27 — V2 is now complete** (see *AI-derived projection mappings*
+  below).
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
   "View on map" (pivots to Geo Map Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.
@@ -162,8 +161,55 @@ per-Space **`pattern-pack` `ComponentStore` kind**, authored at
   `Skipping space dir` WARN on **every boot**; and a sentinel *without* `config/` cannot be reached through
   `/spaces/{id}/…` at all, so it would need a dedicated cross-space read route.
 
-Design (archived):
-[`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
+## AI-derived projection mappings (V2 (d) authoring half — shipped 2026-07-27)
+
+The query panel's Entity/Link tab has a **Derive mapping** button (`<inspecto-ai-assist>`, the 5th adopter)
+that proposes which column is the source entity, which is the target, which labels the edge and which travel
+as node attributes. Backed by a **new non-mutating `projection_author` tool** over the existing
+`POST /agent/tools/{name}` dispatch. Applying a draft patches the form **dirty and stops there** — the
+operator still presses Run and Save, so the human stays the actor.
+
+* **Deterministic, not a model call.** The authoring act is column *selection*, so name-shape scoring answers
+  it: an ordered `ENDPOINT_PAIRS` table (`caller/callee` … `from/to`), then a first-two-`*_id` fallback, then
+  **refusal** — an unmappable list returns `clean=false` with a finding anchored at
+  `projections.0.sourceCol`, never a guess, because an arbitrary pair produces a graph that looks authored
+  and is wrong. `hint` **narrows the candidate set**; it is not a prompt, and a hint matching fewer than two
+  columns is ignored with a WARNING. NL is AGT-6a **A5**'s job and this tool is its `derive` target.
+* ⚠ **The pane supplies the column list as an argument, deliberately.** No agent tool and no tool-layer
+  route returns a Dataset's columns — the belt only sees the operational-store `table` vocabulary, and
+  `InvRoutes.schemaRelationships` builds a `columnsByDataset` map only to **throw it away**. The panel
+  already holds the real list, so passing it in is cheaper *and* dodges the `-Dassist.write.root`
+  dependency that any `ComponentStore`-backed column lookup would inherit (it is what makes `query_author`
+  hard-error without a write root).
+* ⚠ **`entityType` is left unset.** Set on a *single* mapping it changes node ids from `entity:<v>` to
+  `entity:<type>:<v>`, breaking byte-identity with existing saved views and exports — while `buildQuery`
+  *requires* it on every mapping once extras exist. The tool emits exactly one mapping, so unset is the only
+  correct answer; a future multi-mapping drafter must set it on **all** of them.
+* ⚠ **The draft is `query.projections[]`, never `query.roots`/`from`** — a view's Datasets come from its
+  projection *mappings*, the premise that 422'd every shipped view during V2 (b) sharing.
+* **Why not `component_draft` or `query_author`** (the call, 2026-07-26): `component_draft` cannot draft — it
+  echoes the config it was handed back with findings, and its `kind` resolves through `ConfigSpecs.TYPES`,
+  which has **no `link-analysis-view`**, so it returns `ok=false` today. `query_author` emits a Query, not a
+  mapping. No `link-analysis-view` ConfigSpec was added: it would buy validation, not authoring, and the
+  defensive UI mapper is already the boundary (the `pattern-pack` precedent).
+* **Fixed on the way through: `patchFormFromView` ignored `projections[]`.** It read only
+  `query.projection`, so a *saved* multi-mapping view loaded first-only — a pre-existing load-path bug, not
+  one the draft introduced. It now rebuilds the extras `FormArray` and patches `attrCols`/`entityType` too,
+  and both the saved-view and draft paths share one `patchFormFromQuery`.
+* ⚠ **Adopting the assist surface broke every test in the panel's spec** until `provideHttpClient()` + a
+  `ToastrService` stub were added — `<inspecto-ai-assist>` injects `AgentService`. The same trap as the
+  toolbox's `ComponentsService` injection.
+* ⚠ **Offline the columns come from `SAMPLE_SOURCES`**, so an offline draft is over sample columns and is
+  never evidence the real column path works. (Verified offline: `money_moves` → `from_city → to_city` +
+  7 attributes, applied and run to a 7-node/11-link graph; `cdr_sample` correctly **refuses** — it has only
+  one id-shaped column.)
+* ⚠ **`AiToolName` and `adaptToolResult` are a pair.** A tool missing from either yields an empty candidate
+  list, which renders as "no suggestion" with **no error** — the failure mode that makes a new tool look like
+  a model problem. `projection_author` joins the shared `{kind,id,clean,findings,draft}` branch.
+* ⚠ **The tool count in `InspectoPackTest` is hard-coded** (21 → 22). Any new belt tool trips it.
+
+Design (archived): [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
+· [`link-analysis-projection-authoring-plan.md`](../../../archived-documents/plans-archive/link-analysis-projection-authoring-plan.md)
 §7 (schema-relationship model, now shipped) ·
 plans: [`link-analysis-studio-plan.md`](../../../archived-documents/plans-archive/link-analysis-studio-plan.md)
 (§6–7, V1 now fully shipped; V2+ remains open backlog),

@@ -131,11 +131,12 @@ former root reference docs** (each index lists them):
   As-built lives in [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md):
   pattern packs as a per-Space `pattern-pack` component kind, the `PATTERN_PACKS` const as the fallback,
   and the two costs that ruled out a reserved system Space.
-- [`superpower/link-analysis-projection-authoring-plan.md`](superpower/link-analysis-projection-authoring-plan.md)
-  — **Link-analysis V2 (d) authoring half — design pass done 2026-07-26, build not started.** Answers the
-  "which L1 tool" call: a new non-mutating `projection_author` (not `component_draft`, which cannot draft
-  and has no `link-analysis-view` ConfigSpec), with the **pane** supplying the Dataset's column list
-  because no tool-layer route returns one.
+- ~~`superpower/link-analysis-projection-authoring-plan.md`~~ — **SHIPPED end-to-end 2026-07-27
+  (Link-analysis V2 (d) authoring half ⇒ V2 complete), plan archived** to
+  [`archived-documents/plans-archive/link-analysis-projection-authoring-plan.md`](archived-documents/plans-archive/link-analysis-projection-authoring-plan.md).
+  As-built lives in [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md):
+  the deterministic `projection_author` tool, the **pane**-supplied column list (no tool-layer route returns
+  one), refusal instead of a guess, and the `patchFormFromView` `projections[]` fix it carried.
 - [`superpower/widget-tags-assignment-migration-plan.md`](superpower/widget-tags-assignment-migration-plan.md)
   — **D7 widget tags → assignment store — call (c) made 2026-07-26, design pass done, build not started.**
   Why it is a migration and not a menu item: no Java widget service to re-derive from, `renameTag`/
