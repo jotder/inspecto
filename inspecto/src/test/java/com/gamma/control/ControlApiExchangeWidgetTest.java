@@ -61,7 +61,9 @@ class ControlApiExchangeWidgetTest {
             HttpResponse<String> wo = send(c.port, "POST", "/exchange/offers",
                     "{\"kind\":\"widget\",\"item\":\"receipts_chart\",\"owner\":\"finance\"}");
             assertEquals(200, wo.statusCode(), wo.body());
-            assertEquals("tax_receipts", json(wo).get("dataset").asText());
+            // D9 widened the offer's bound-dataset field to a list; a widget still binds exactly one
+            assertEquals(1, json(wo).get("datasets").size());
+            assertEquals("tax_receipts", json(wo).get("datasets").get(0).asText());
 
             // audit requests the widget → widget + dataset grants both created
             String wid = json(send(c.port, "POST", "/exchange/requests",

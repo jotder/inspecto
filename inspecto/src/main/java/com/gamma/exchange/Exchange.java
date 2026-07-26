@@ -10,8 +10,8 @@ import java.util.Optional;
  * The Exchange — the installation-scope, cross-Space sharing surface that lives under
  * {@code spaces/_shared/} (reserved, never itself a Space). It holds two flat ledgers:
  * <ul>
- *   <li>{@code offers.toon} — the Datasets/Widgets each owner has listed as shareable (catalog metadata
- *       only, never rows);</li>
+ *   <li>{@code offers.toon} — the Datasets/Widgets/saved Views each owner has listed as shareable (catalog
+ *       metadata only, never rows);</li>
  *   <li>{@code grants.toon} — the {@link ShareGrant} lifecycle ledger tying an owner's offered item to a
  *       consumer Space.</li>
  * </ul>
@@ -32,6 +32,22 @@ public final class Exchange {
 
     private static final String OFFERS = "offers";
     private static final String GRANTS = "grants";
+
+    /** The saved-view kind the Exchange carries (BACKLOG D9) — live-mode only; see {@link #effectiveMode}. */
+    public static final String VIEW = "link-analysis-view";
+
+    /**
+     * Kinds that are <em>derived</em> — metadata reading one or more Datasets rather than owning rows of
+     * their own. Their grant closure includes a grant for every Dataset they read (§3.5 for widgets,
+     * generalized to saved views by D9): requesting one requests its Dataset grants, approving one activates
+     * them atomically, and revoking a Dataset grant cascades back to every derived grant that reads it.
+     */
+    private static final java.util.Set<String> DERIVED_KINDS = java.util.Set.of("widget", VIEW);
+
+    /** Whether {@code kind} is derived — i.e. its grant closure includes the Datasets it reads. */
+    public static boolean isDerived(String kind) {
+        return DERIVED_KINDS.contains(kind);
+    }
     /** Serialises ledger mutations across the per-request {@link Exchange} instances (one _shared dir). */
     private static final Object LOCK = new Object();
 
@@ -125,15 +141,15 @@ public final class Exchange {
             if (existing.isPresent() && ShareGrant.REQUESTED.equals(existing.get().status()))
                 return existing.get();   // idempotent re-request
             ShareGrant grant = new ShareGrant(id, kind, item, owner, consumer,
-                    (mode == null || mode.isBlank()) ? ShareGrant.SNAPSHOT : mode,
+                    effectiveMode(kind, mode),
                     ShareGrant.REQUESTED, requestedBy, System.currentTimeMillis(), purpose,
                     null, 0L, null, null);
             upsert(grant);
-            // Widget grant closure (§3.5): its underlying Dataset grant travels with it. Ensure a dataset
-            // grant for the same consumer exists (created here as pending; approved atomically with the widget).
-            if ("widget".equals(kind)) {
-                String ds = boundDataset(owner, item);
-                if (ds != null) {
+            // Derived-kind grant closure (§3.5, generalized by D9): every Dataset it reads travels with it.
+            // Ensure a dataset grant for the same consumer exists (created here as pending; approved
+            // atomically with the derived grant).
+            if (DERIVED_KINDS.contains(kind)) {
+                for (String ds : boundDatasets(owner, kind, item)) {
                     String dgid = ShareGrant.idFor("dataset", ds, owner, consumer);
                     boolean livePair = grant(dgid).map(x -> ShareGrant.ACTIVE.equals(x.status())
                             || ShareGrant.REQUESTED.equals(x.status())).orElse(false);
@@ -148,15 +164,15 @@ public final class Exchange {
     }
 
     /**
-     * Owner approves a pending request → {@code active}. A widget approval also activates its bound
-     * Dataset grant atomically (the pair travels together — §3.5).
+     * Owner approves a pending request → {@code active}. Approving a derived item (a widget, a saved view)
+     * also activates the grants of every Dataset it reads, atomically (the closure travels together — §3.5,
+     * generalized by D9).
      */
     public ShareGrant approve(String id, String approver) {
         synchronized (LOCK) {
             ShareGrant g = transition(id, ShareGrant.REQUESTED, ShareGrant.ACTIVE, approver, true);
-            if ("widget".equals(g.kind())) {
-                String ds = boundDataset(g.owner(), g.item());
-                if (ds != null) {
+            if (DERIVED_KINDS.contains(g.kind())) {
+                for (String ds : boundDatasets(g.owner(), g.kind(), g.item())) {
                     String dgid = ShareGrant.idFor("dataset", ds, g.owner(), g.consumer());
                     grant(dgid).filter(x -> ShareGrant.REQUESTED.equals(x.status()))
                             .ifPresent(x -> transition(dgid, ShareGrant.REQUESTED, ShareGrant.ACTIVE, approver, true));
@@ -173,16 +189,17 @@ public final class Exchange {
 
     /**
      * Owner revokes an active grant → {@code revoked}. Revoking a Dataset grant cascades: every active
-     * widget grant that depends on it (same owner+consumer) is revoked too — fail-closed (§3.5).
+     * derived grant that reads it (same owner+consumer) is revoked too — fail-closed (§3.5, generalized by
+     * D9, so a saved view stops resolving the moment any one of its Datasets is revoked).
      */
     public ShareGrant revoke(String id, String actor) {
         synchronized (LOCK) {
             ShareGrant g = transition(id, ShareGrant.ACTIVE, ShareGrant.REVOKED, actor, false);
             if ("dataset".equals(g.kind())) {
                 for (ShareGrant w : grants()) {
-                    if ("widget".equals(w.kind()) && ShareGrant.ACTIVE.equals(w.status())
+                    if (DERIVED_KINDS.contains(w.kind()) && ShareGrant.ACTIVE.equals(w.status())
                             && g.owner().equals(w.owner()) && g.consumer().equals(w.consumer())
-                            && g.item().equals(boundDataset(w.owner(), w.item())))
+                            && boundDatasets(w.owner(), w.kind(), w.item()).contains(g.item()))
                         transition(w.id(), ShareGrant.ACTIVE, ShareGrant.REVOKED, actor, false);
                 }
             }
@@ -191,20 +208,44 @@ public final class Exchange {
     }
 
     /**
-     * Whether {@code consumer} may render owner's shared widget {@code item} — fail-closed: both the widget
-     * grant <em>and</em> the bound Dataset grant must be active (§3.5). A widget with no bound Dataset offer
-     * can never render shared.
+     * Whether {@code consumer} may render owner's shared derived item ({@code kind} = widget or saved view)
+     * — fail-closed: the item's own grant <em>and</em> a grant for <b>every</b> Dataset it reads must be
+     * active (§3.5, generalized by D9). A derived item with no bound Dataset offer can never render shared,
+     * so an empty closure is a denial, never a free pass.
      */
-    public boolean canRenderWidget(String consumer, String owner, String item) {
-        if (activeGrant(consumer, owner, "widget", item).isEmpty()) return false;
-        String ds = boundDataset(owner, item);
-        return ds != null && activeGrant(consumer, owner, "dataset", ds).isPresent();
+    public boolean canRender(String consumer, String owner, String kind, String item) {
+        if (activeGrant(consumer, owner, kind, item).isEmpty()) return false;
+        List<String> datasets = boundDatasets(owner, kind, item);
+        return !datasets.isEmpty()
+                && datasets.stream().allMatch(ds -> activeGrant(consumer, owner, "dataset", ds).isPresent());
     }
 
-    /** The Dataset a widget offer binds ({@link Offer#dataset}), or {@code null} when unknown/unset. */
-    private String boundDataset(String owner, String item) {
-        return offer(owner, "widget", item).map(Offer::dataset)
-                .filter(s -> s != null && !s.isBlank()).orElse(null);
+    /** Whether {@code consumer} may render owner's shared widget {@code item} — see {@link #canRender}. */
+    public boolean canRenderWidget(String consumer, String owner, String item) {
+        return canRender(consumer, owner, "widget", item);
+    }
+
+    /** The Datasets a derived offer reads ({@link Offer#datasets}); empty when unknown/unoffered. */
+    private List<String> boundDatasets(String owner, String kind, String item) {
+        return offer(owner, kind, item).map(Offer::datasets).orElse(List.of())
+                .stream().filter(s -> s != null && !s.isBlank()).toList();
+    }
+
+    /**
+     * The effective delivery mode for a new grant. A saved view owns no rows of its own, so snapshot
+     * delivery is meaningless for it: an explicit non-{@code live} mode is <b>rejected</b> rather than
+     * silently treated as live (D9), and an omitted mode defaults to {@code live} instead of the Dataset
+     * default. Enforced here in the ledger rather than only at the HTTP edge, so no caller can bypass it.
+     */
+    private static String effectiveMode(String kind, String mode) {
+        boolean unset = mode == null || mode.isBlank();
+        if (VIEW.equals(kind)) {
+            if (!unset && !ShareGrant.LIVE.equals(mode))
+                throw new IllegalArgumentException("a " + VIEW + " grant is live-mode only (mode '" + mode
+                        + "' rejected: a saved view has no rows of its own to snapshot)");
+            return ShareGrant.LIVE;
+        }
+        return unset ? ShareGrant.SNAPSHOT : mode;
     }
 
     /**

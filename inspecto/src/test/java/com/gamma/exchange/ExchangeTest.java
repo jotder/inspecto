@@ -100,7 +100,8 @@ class ExchangeTest {
     void widgetGrantClosureAndCascade(@TempDir Path spacesRoot) {
         Exchange ex = Exchange.under(spacesRoot);
         ex.putOffer(new Offer("dataset", "tax_receipts", "finance", "", Map.of(), "a", 1L));
-        ex.putOffer(new Offer("widget", "chart1", "finance", "", Map.of(), "a", 1L, "tax_receipts"));
+        ex.putOffer(new Offer("widget", "chart1", "finance", "", Map.of(), "a", 1L,
+                java.util.List.of("tax_receipts")));
 
         // requesting the widget auto-creates the bound dataset grant (both pending)
         ShareGrant wg = ex.request("widget", "chart1", "finance", "audit", "r", "p", null);
@@ -118,6 +119,86 @@ class ExchangeTest {
         ex.revoke(dgid, "a");
         assertEquals(ShareGrant.REVOKED, ex.grant(wg.id()).orElseThrow().status());
         assertFalse(ex.canRenderWidget("audit", "finance", "chart1"));
+    }
+
+    // ── D9: the saved-view kind ────────────────────────────────────────────────
+
+    /** A view reading TWO datasets: the closure must cover both, and ANY revocation must close the view. */
+    @Test
+    void viewGrantClosureCoversEveryDatasetItReads(@TempDir Path spacesRoot) {
+        Exchange ex = Exchange.under(spacesRoot);
+        ex.putOffer(new Offer("dataset", "payments", "finance", "", Map.of(), "a", 1L));
+        ex.putOffer(new Offer("dataset", "accounts", "finance", "", Map.of(), "a", 1L));
+        ex.putOffer(new Offer(Exchange.VIEW, "fraud_ring", "finance", "", Map.of(), "a", 1L,
+                java.util.List.of("payments", "accounts")));
+
+        ShareGrant vg = ex.request(Exchange.VIEW, "fraud_ring", "finance", "audit", "r", "p", null);
+        String pay = ShareGrant.idFor("dataset", "payments", "finance", "audit");
+        String acc = ShareGrant.idFor("dataset", "accounts", "finance", "audit");
+        assertTrue(ex.grant(pay).isPresent(), "every dataset the view reads travels with it");
+        assertTrue(ex.grant(acc).isPresent(), "every dataset the view reads travels with it");
+        assertFalse(ex.canRender("audit", "finance", Exchange.VIEW, "fraud_ring"), "not renderable while pending");
+
+        ex.approve(vg.id(), "a");
+        assertEquals(ShareGrant.ACTIVE, ex.grant(pay).orElseThrow().status(), "approval activates the closure");
+        assertEquals(ShareGrant.ACTIVE, ex.grant(acc).orElseThrow().status());
+        assertTrue(ex.canRender("audit", "finance", Exchange.VIEW, "fraud_ring"));
+
+        // revoking ONE of the two datasets must close the view — a partial closure is not a free pass
+        ex.revoke(acc, "a");
+        assertEquals(ShareGrant.REVOKED, ex.grant(vg.id()).orElseThrow().status(), "cascade reaches the view");
+        assertFalse(ex.canRender("audit", "finance", Exchange.VIEW, "fraud_ring"));
+        assertEquals(ShareGrant.ACTIVE, ex.grant(pay).orElseThrow().status(), "the untouched dataset stays active");
+    }
+
+    /** A view owns no rows, so snapshot delivery is rejected outright — never silently coerced to live. */
+    @Test
+    void viewGrantIsLiveModeOnly(@TempDir Path spacesRoot) {
+        Exchange ex = Exchange.under(spacesRoot);
+        ex.putOffer(new Offer("dataset", "payments", "finance", "", Map.of(), "a", 1L));
+        ex.putOffer(new Offer(Exchange.VIEW, "fraud_ring", "finance", "", Map.of(), "a", 1L,
+                java.util.List.of("payments")));
+
+        assertEquals(ShareGrant.LIVE,
+                ex.request(Exchange.VIEW, "fraud_ring", "finance", "audit", "r", "p", null).mode(),
+                "an omitted mode defaults to live for a view, not to the dataset default");
+        assertEquals(ShareGrant.LIVE, ex.grant(ShareGrant.idFor("dataset", "payments", "finance", "audit"))
+                .orElseThrow().mode(), "the paired dataset grant inherits the view's live mode");
+
+        IllegalArgumentException bad = assertThrows(IllegalArgumentException.class, () ->
+                ex.request(Exchange.VIEW, "fraud_ring", "finance", "ops", "r", "p", ShareGrant.SNAPSHOT));
+        assertTrue(bad.getMessage().contains("live-mode only"), bad.getMessage());
+        assertTrue(ex.grant(ShareGrant.idFor(Exchange.VIEW, "fraud_ring", "finance", "ops")).isEmpty(),
+                "a rejected request must leave no grant behind");
+        // a dataset offer keeps the snapshot default — the view rule must not leak across kinds
+        assertEquals(ShareGrant.SNAPSHOT,
+                ex.request("dataset", "payments", "finance", "ops", "r", "p", null).mode());
+    }
+
+    /** A derived item whose offer records no datasets can never render — an empty closure is a denial. */
+    @Test
+    void viewWithNoRecordedDatasetsNeverRenders(@TempDir Path spacesRoot) {
+        Exchange ex = Exchange.under(spacesRoot);
+        ex.putOffer(new Offer(Exchange.VIEW, "orphan", "finance", "", Map.of(), "a", 1L));
+        ShareGrant g = ex.request(Exchange.VIEW, "orphan", "finance", "audit", "r", "p", null);
+        ex.approve(g.id(), "a");
+        assertEquals(ShareGrant.ACTIVE, ex.grant(g.id()).orElseThrow().status());
+        assertFalse(ex.canRender("audit", "finance", Exchange.VIEW, "orphan"),
+                "an active grant with an empty dataset closure is still fail-closed");
+    }
+
+    /** Offers persisted before D9 carry a scalar {@code dataset}; they must still load. */
+    @Test
+    void legacyScalarDatasetKeyStillLoads(@TempDir Path spacesRoot) {
+        Exchange ex = Exchange.under(spacesRoot);
+        Map<String, Object> legacy = new java.util.LinkedHashMap<>(
+                new Offer("widget", "chart1", "finance", "", Map.of(), "a", 1L).toMap());
+        legacy.remove("datasets");
+        legacy.put("dataset", "tax_receipts");          // the pre-D9 spelling
+        Ledger.write(spacesRoot.resolve("_shared").resolve("offers.toon"), "offers", java.util.List.of(legacy));
+
+        assertEquals(java.util.List.of("tax_receipts"),
+                ex.offer("finance", "widget", "chart1").orElseThrow().datasets());
     }
 
     @Test
