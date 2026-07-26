@@ -104,6 +104,12 @@ src/app/
   pill — never hand-roll a `rounded-full … text-xs` span; content is projected, `(removed)` emits on
   the optional ✕; a clickable filter toggle keeps its own `<button>` around the chip for
   `aria-pressed`/keyboard).
+- **Labelling something with cross-entity tags → `TagAssignmentDialog`** (`inspecto/tags/`, D7). Kind-
+  agnostic: `dialog.open(TagAssignmentDialog, {data: {targetKind, targetId, label}})`, where `targetKind`
+  is `object` or a `ComponentStore.WRITABLE_TYPES` value. Adopting it on a new pane is a menu item, not a
+  new dialog. ⚠ **Not** the mail pane's `TagDialog` — that one is bulk/tri-state and writes the
+  `attributes.tags` CSV projection; this one is single-target and writes assignment edges. Keep them
+  separate: one dialog spanning both persistence paths re-creates the split-brain D7 phase 2 closed.
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL
@@ -344,6 +350,14 @@ src/app/
    `expectNoA11yViolations` for new components.
 4. **Verify in the preview** (`.claude/launch.json` servers): load the route, confirm behavior in the DOM
    (`preview_eval`/snapshot — screenshots time out in this env), check `preview_console_logs` for errors.
+   **⚠ Two ways a preview check reports a false green.** (a) **Toggling a control and clicking its submit
+   button in the SAME eval call silently does nothing** — Angular has not re-rendered `[disabled]` yet, so
+   the click lands on a still-disabled button while the UI looks like it worked. Split them into two calls
+   and assert `button.disabled === false` before clicking. (b) **A raw `fetch('/api/…')` bypasses the
+   offline mock entirely** (it is an `HttpInterceptor`, not a service worker) and returns an empty body —
+   so it can neither confirm nor refute a write. Confirm a mutation by reading the mock store
+   (`localStorage['inspecto.mock.v19']` → `<space>[<collection>]`) or by re-opening the UI, never by
+   observing that a dialog closed.
    **The preview browser does NOT deliver `ResizeObserver` callbacks** (it renders from DOM snapshots, no
    continuous paint loop) — RO-driven behavior (chart/graph/map container-resize) can't be exercised
    in-preview; rely on the unit test (observer wired + disconnected) + the shared RO→`resize()` precedent.
