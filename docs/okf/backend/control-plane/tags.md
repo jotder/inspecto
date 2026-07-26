@@ -146,7 +146,7 @@ Three deliberate shapes:
 - **Applying a tag is not in this pane.** Assignment belongs next to the thing being labelled — the mail
   pane's tag menu — not in a vocabulary admin screen, which would need a cross-kind target picker to
   answer a question nobody asked. The pane *removes* assignments, the half with no other home;
-  `TagsService.assign` ships for the callers that will label in place.
+  `TagsService.assign` serves the callers that label in place.
 - **Counts are never cached across tags.** The target list is server-filtered to what the caller may see,
   so a count is "targets *you* can see" — a cached or shared count would be wrong for the next viewer.
   For the same reason the vocabulary list shows no count at all until a tag is selected.
@@ -157,6 +157,32 @@ Three deliberate shapes:
 Rename is inline in the header (one field does not warrant a dialog), rejects a comma client-side, and
 treats "rename to the same name" as a no-op rather than a request. Delete is
 `confirmDestructive({requireText})` — typing the tag name, because the blast radius is every target.
+
+### Labelling in place: `TagAssignmentDialog` (2026-07-26)
+
+`inspecto/tags/tag-assignment.dialog.ts` is the shared "apply tags to this thing" surface for **any**
+target kind. It takes `{targetKind, targetId, label?}` as dialog data and persists through
+`TagsService.assign`/`unassign`, so **adopting it on a new pane is a menu item, not another dialog**:
+
+```ts
+this.dialog.open(TagAssignmentDialog, { data: { targetKind: 'link-analysis-view', targetId: view.id, label: view.name } });
+```
+
+First adopter: the Link Analysis saved-views menu, sitting beside Comments (D10) so the two annotate-a-view
+actions read as one family. Remaining kinds are still API-only — see BACKLOG §6.
+
+Two shapes worth preserving:
+
+- **It is not `TagDialog`.** The mail pane's dialog is bulk + tri-state over a selection and writes the
+  `attributes.tags` CSV; this one is single-target and writes assignment edges. They look alike
+  deliberately, but one dialog spanning both persistence paths would re-create the split-brain that
+  phase 2 closed — the CSV is a *projection*, not a second source of truth.
+- **Creating a tag is a separate, prior write.** Assigning an unregistered tag is a 404, never an implicit
+  create, so the inline "New tag" field calls `ObjectsService.createTag` first and only then pre-checks it.
+  A typo must not silently mint vocabulary.
+
+Only the checkboxes the user actually touched are applied, and a toggle returned to its original state is
+no write at all — re-tagging must not rewrite an edge's provenance.
 
 ## Gotchas
 

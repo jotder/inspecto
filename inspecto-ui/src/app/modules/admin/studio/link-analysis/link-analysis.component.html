@@ -154,6 +154,10 @@
                         <mat-icon svgIcon="heroicons_outline:chat-bubble-left-right"></mat-icon>
                         <span>Comments</span>
                     </button>
+                    <button mat-menu-item (click)="openTags(view)" [attr.aria-label]="'Tags for ' + view.name">
+                        <mat-icon svgIcon="heroicons_outline:tag"></mat-icon>
+                        <span>Tags</span>
+                    </button>
                 </ng-template>
             </mat-menu>
 

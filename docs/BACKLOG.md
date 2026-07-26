@@ -293,10 +293,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   lists the vocabulary, shows *everything carrying a tag across kinds*, and renames / deletes / untags
   through `TagsService`; the offline mock answers all six routes. **D7 is complete end-to-end and the plan
   is archived.** → `okf/backend/control-plane/tags.md`
-- **D7 — applying a tag to a non-object target is API-only.** `TagsService.assign` ships and the mock
-  serves it, but the only *assignment* UI is still the mail pane's tag menu (objects). Labelling a saved
-  view or a dataset in place needs a tag menu on those panes — a small per-pane addition, deliberately not
-  faked with a cross-kind target picker in the vocabulary screen.
+- **D7 — assignment UI for non-object targets: SEAM SHIPPED 2026-07-26, adopters outstanding.** The
+  kind-agnostic `TagAssignmentDialog` (`inspecto/tags/tag-assignment.dialog.ts`) is the shared surface —
+  it takes `{targetKind, targetId, label}` as data and persists through `TagsService`'s assignment edges,
+  so a further adopter is **a menu item, not another dialog**. First adopter wired: the **Link Analysis
+  saved-views menu** (`link-analysis-view`), following the D10 Comments idiom. Verified end-to-end offline:
+  tagging a saved view makes it appear under that tag in the `/tags` pane beside object targets.
+  **Still API-only on the remaining kinds** — `geo-map-view`, `dashboard`, `widget`, `dataset` (the mock's
+  `TAG_TARGET_KINDS` whitelist; the backend vocabulary is wider). ⚠ Deliberately **not** merged with the
+  mail pane's `TagDialog`: that one is bulk/tri-state and persists via the `attributes.tags` CSV, and one
+  dialog straddling both persistence paths is how the phase-2 split-brain returns.
 - **`NoteTargets` is now misnamed.** It is the shared annotation-target vocabulary for both notes (D10)
   and tags (D7), but still lives in `com.gamma.ops.note` under a note-specific name. Rename to something
   neutral when a change is already touching it — not worth its own churn, but it will mislead a reader.

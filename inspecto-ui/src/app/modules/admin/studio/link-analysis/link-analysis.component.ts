@@ -57,6 +57,7 @@ import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { ProjectedGraph } from './entity-projection';
 import { GraphSourcesService } from './graph-sources';
+import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { LinkAnalysisCommentsDialog } from './link-analysis-comments.dialog';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component';
@@ -846,5 +847,13 @@ export class LinkAnalysisComponent implements OnInit {
     /** Per-view comments (D10) — a collaboration thread on the saved view, not an edit of its content. */
     openComments(view: LinkAnalysisView): void {
         this.dialog.open(LinkAnalysisCommentsDialog, { data: { id: view.id, label: view.name } });
+    }
+
+    /** Per-view tags (D7) — labels the view in place, through the cross-entity assignment edges. Like
+     *  Comments, this annotates the saved view rather than editing it, so there is nothing to reload. */
+    openTags(view: LinkAnalysisView): void {
+        this.dialog.open(TagAssignmentDialog, {
+            data: { targetKind: 'link-analysis-view', targetId: view.id, label: view.name },
+        });
     }
 }
