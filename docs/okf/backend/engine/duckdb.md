@@ -51,6 +51,39 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
     (DuckDB uses ≈90% of the disk), though spill already lands on the data volume via the batch scratch dir
     (`BatchIngestStrategy.scratchDir` → `dirs.temp`). Read-path connection reuse is explicitly **not** the
     lever here (see BACKLOG §6 C6).
+  * **D11 — MEASURED 2026-07-27. The number is `2GB`, and two long-standing beliefs here are wrong.**
+    Measured on a 32 GiB host, DuckDB 1.5.2.1, over a CDR-shaped 12-column CSV. What the numbers say:
+    - ⚠ **Peak memory does NOT scale with input size on the ingest path.** `read_csv_auto` →
+      `COPY … TO parquet` streams: a **1.0 GiB** input peaked at **1081 MiB**, a **3.1 GiB** input at
+      **981 MiB** — flat. So a giant file is *not* what exhausts memory, and **chunking (D12) was never
+      really the memory bound** it is described as above; it bounds the unit of work and scratch, which is
+      still worth having, but it is not standing in for D11.
+    - ⚠ **What a cap actually governs is the blocking operators, and they hard-fail instead of spilling.**
+      A 9M-group `GROUP BY` peaked at 937 MiB, a wide `DISTINCT` at 895 MiB, and **at `512MB` both died
+      with `Out of Memory Error`** having spilled only ~192 MiB. Graceful degradation is not the failure
+      mode. **This is the trap: an aggressive cap turns working jobs into failing ones.** (`ORDER BY`
+      ~200 MiB and a self-`JOIN` ~385 MiB are cheap and never the constraint.)
+    - **`2GB` is the defensible value**: ~2.2× the highest peak observed anywhere (1081 MiB), clear of the
+      OOM cliff, and free — capped runs measured at or slightly *faster* than uncapped (ingest 3741 ms
+      @ `2GB` vs 4928 ms uncapped; `GROUP BY` 1711 vs 2123 ms). `1GB` passed everything too but sits only
+      ~1.3× over peak, uncomfortably near the cliff.
+    - ⚠ **A `memory_limit` default alone does not close D11.** Total exposure = `memory_limit` ×
+      concurrent runs, and `-Djobs.maxConcurrentRuns` still defaults to `0` = unbounded — so at enough
+      concurrency *any* fixed per-instance cap overcommits. The pair is the fix: `memory_limit=2GB` +
+      `maxConcurrentRuns=4` ⇒ ≤8 GiB worst case (~25% of a 32 GiB box) vs ~25 GiB *per run* today. Note
+      this does **not** resurrect the rejected *computed* cap (RAM ÷ semaphore) — it is two independent
+      fixed knobs, which is exactly what the D11 decision asked for.
+    - **Method, to reproduce:** open a plain JDBC DuckDB connection, `SET temp_directory` (as
+      `DuckDbUtil.applyDuckDbSettings` does) and optionally `SET memory_limit`; poll
+      `SELECT sum(memory_usage_bytes), sum(temporary_storage_bytes) FROM duckdb_memory()` on a duplicated
+      connection every 15 ms while the statement runs, and take the max. Sweep the cap over
+      `{default, 8GB, 4GB, 2GB, 1GB, 512MB, 256MB, 128MB}` for the ingest shape and
+      `{default, 4GB, 2GB, 1GB, 512MB}` for the blocking-operator shapes.
+    - **Not measured, so not claimed:** scaling with thread/core count (DuckDB sizes per-thread buffers, so
+      a much larger box may need more than 2 GiB), non-CSV frontends, the `materialize` task's real query
+      shapes, and any RAM-relative or per-edition default.
+    - **Still an operator call** — the measurement removes the blocker (BACKLOG §6); it does not ship a
+      default.
 * **Reserved-word quoting.** `day` is a DuckDB keyword — alias it (`run_day`) in SQL; quote `"trigger"` too.
   Watch this whenever generating SQL with date/trigger columns. See [gotchas](../gotchas/cross-cutting.md).
 

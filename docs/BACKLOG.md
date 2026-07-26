@@ -1,6 +1,17 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-27 (**D7 widget tags MIGRATED — call (c) built end-to-end**, so all five
+**Updated:** 2026-07-27 (**AGT-6a plan D9 SHIPPED** — `ConfigJsonSchema` projects any `ConfigSpec` into a
+real JSON Schema and the new `config_schema` L1 read tool exposes it, closing A5's stated prerequisite;
+⚠ deliberately *not* a tighter `component_draft` schema. Same day: **D11 MEASURED — the number is `2GB`**,
+and two of its premises are wrong: ingest peak does **not** scale with file size (~1 GiB flat at 1.0 and
+3.1 GiB inputs), and blocking operators **hard-OOM rather than spill** below ~900 MiB, so an aggressive cap
+breaks working jobs; `memory_limit` alone still doesn't bound total exposure while `jobs.maxConcurrentRuns`
+defaults to unbounded. Same day: **MNT-14 re-scoped — its stated blocker was a WRONG PREMISE**, the
+`ARCHIVED` state already ships; the real prerequisites are an oldest-first object query and bulk
+delete-by-target on three stores, now planned in `superpower/mnt-14-incident-retention-plan.md`. Same day:
+**local secret hygiene verified clean** — no stale worktrees remain, guard green, history redacted on every
+local ref; the exposure itself is unchanged and rotation is still outstanding.) · Previously 2026-07-27
+(**D7 widget tags MIGRATED — call (c) built end-to-end**, so all five
 mock-whitelisted kinds are adopters and no kind carries a private tag system; the save dialog's comma field
 is gone. Same day: **Link-analysis V2 (d) authoring half SHIPPED end-to-end** ⇒ V2 complete and the §4
 Link-analysis row is retired: a new deterministic non-mutating `projection_author` tool + the query panel as
@@ -53,8 +64,10 @@ each row's detail stays in its own section.
 1. **Root enablers — DRAINED.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound, Incidents I1
    resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
    2026-07-23/24. The one survivor is **MNT-14**; its retention question is now answered (§2 D5 —
-   retention tier), so the only thing left in its way is the backend Incident `Archived` state — a
-   build, not a call.
+   retention tier). ⚠ **Re-scoped 2026-07-27:** the `Archived` state it was said to be waiting on
+   **already ships**, but the sweep needs an oldest-first object query and bulk delete-by-target on three
+   dependent stores first — a multi-part build, not the small one this line implied. See §6 "MNT-14 — the
+   real prerequisites".
 2. **Decision gates — DRAINED 2026-07-25.** §2 is empty; see it for what each call was and where the
    rationale lives. Several rows below changed shape as a result, and three had **wrong premises**
    corrected (D3 legacy-route framing, D7 tags-are-greenfield, D14 already-tightened) — trust §2 over
@@ -64,13 +77,17 @@ each row's detail stays in its own section.
    `tokenEndpoint` (D15) · chunking on by default at 8 GiB (D12). **One deliberate deviation: D11's
    on-by-default `memory_limit` was NOT shipped** — operator call, see §6.
 4. **Dependent chains (sequence behind a build, no longer behind a decision):** Lens Access P3 · NFR-7
-   execution (now parallel — C1 is not a predecessor, D1) · MNT-14 (after the `Archived` state) ·
+   execution (now parallel — C1 is not a predecessor, D1) · MNT-14 (⚠ **not** "after the `Archived` state" —
+   that already ships; after the oldest-first query + bulk delete-by-target, see the §6 row and
+   `superpower/mnt-14-incident-retention-plan.md`) ·
    Postgres multi-user (write the `docs/superpower/` plan first, then store pooling).
 5. **Independent — schedule by value, no ordering constraint:**
    - **AGT-6a inline AI authoring** — **A1–A4 shipped 2026-07-26**; what is left are the three
      residual rows in §3 — **A4-status closed 2026-07-26** (all four operational panes adopted), leaving
      the `kpi_report_builder` host and A5's NL model hop, each independently schedulable. **A5 is now
-     SCOPED** (2026-07-26, plan §3.4) and is a build queued behind three plan-level calls, D9–D11.
+     SCOPED** (2026-07-26, plan §3.4) and is a build queued behind ~~three~~ **two** plan-level calls,
+     D10–D11 — **plan D9 is CLOSED, its `ConfigSpec`→JSON-Schema projection SHIPPED 2026-07-27**
+     (`ConfigJsonSchema` + the `config_schema` L1 read tool).
      ⚠ "No new backend capability" turned out **false** for A1 — see the AGT-6a row. *(Its plan's
      **D1–D11** are a separate numbering space from §2's D1–D17 — and they now COLLIDE on D9/D10, which
      mean different things in each. Always say "plan D9" or "§2 D9".)*
@@ -129,7 +146,7 @@ you remember the old framing, re-read those three.
 | AGT-6a · kpi host | `kpi_report_builder` has **no viable host pane** | **OPEN — needs a new flow, not an adoption.** It emits N widgets *plus* a dashboard; no pane holds a dataset **and** operator-built measures **and** can create both. `studio/widgets/explore` has dataset + measures (its `ChannelValue.agg` enum matches the tool's exactly) but saves exactly **one** widget; `studio/dashboards/dashboard-editor` builds a dashboard but has no measures. Apply order matters — widgets before the dashboard that tiles them (`AiDraft.prerequisites` already models this) |
 | AGT-6a · A4 | Read-only "explain this screen" on the remaining panes | **✅ VOCABULARY HALF SHIPPED 2026-07-26** — `<inspecto-ai-explain>` (icon button + dialog) on **11 panes / 12 routes**, resolving each pane-declared canonical term through `glossary_lookup` with a `docs_search` citation fallback. **Backend: none needed**, as this row predicted. ⚠ **The row was one item but the work is two**: "why is this red" is a *different* affordance (`status_get`/`signal_timeline`/`timeline_build`), needs real entity ids, and is therefore operational-panes-only — **not** a breadth win. Operator call: vocabulary first; the status half is the row below. ⚠ Not a mode of `<inspecto-ai-assist>` and **not gated on `canAuthorWorkbench`** (no write path; Business lens needs it most). → `okf/frontend/features/inline-ai-authoring.md` |
 | AGT-6a · A4-status | "Why is this red" — the status half of A4 | **✅ SHIPPED 2026-07-26** (surface + reference adoption). `<inspecto-ai-status>` over `status_get` / `signal_timeline` / `timeline_build` — all non-mutating, so **no new backend**, as predicted. Picks the **exact causal chain** when the pane has a `correlationId`, a focused window otherwise; the status and timeline halves **degrade independently**. Adopted on the **Alerts** fired-alert grid (a fired Alert *is* the red thing; `FiredAlert` carries `pipeline` but **no `correlationId`**, hence the window path). Ungated, like its vocabulary sibling. ⚠ Offline it answers from the **mock store's own ledger**, never a canned shape — an empty ledger honestly says "nothing was recorded". ⚠ A `[rowActions]` column on a wide grid is **horizontally virtualized out of view** — needed `[pinActions]`. **✅ CLOSED 2026-07-26 — all four named panes adopted**: + Processing Status (`RunStatus.pipeline`, window), Events/signals (`correlationId` ?? `pipeline`, **chain** when present, action hidden on a row with neither), Incidents/Cases (`object-detail` header, chain only, **no status half** — an Incident has no pipeline). ⚠ Offline the chain path is only exercisable from Incidents: no mock producer sets a `correlationId` on an event row | `okf/frontend/features/inline-ai-authoring.md` |
-| AGT-6a · A5 | True **natural-language** authoring | **SCOPED 2026-07-26 — build not started; pending D9–D11.** Full scope: `superpower/agt-6-plan.md` **§3.4**. Shape: one new non-mutating `POST /agent/tools/{name}/derive` doing a **single-turn, single-tool, schema-constrained** model call to produce the tool's *args*, then the same deterministic invoke A1 already does — so `AgentAskResult` is never involved. Four findings changed the estimate: (F1) the transport **already** does native function-calling (`ToolSpec.jsonSchema` → LangChain4j `ToolSpecification`), so ⚠ **do not build this as prompt-then-scrape** — `Investigator`'s JSON-scrape is the wrong precedent; (F2) but every **nested** payload schema is `{"type":"object"}` (`component_draft.config`, `query_author.when`, `pipeline_author.flow`) — the envelope is constrained, the payload is prose-guided, and **that is the cost centre**; (F3) the fix is already designed and never wired — `FieldSpec`'s Javadoc names "LLM grammar-constrained generation" as one of its drivers, so project JSON Schema from `ConfigSpecs.forType(kind)` and constrain the model with the spec that judges it (**D9**); (F4) with no local model, `GatewayFactory` returns a stub answering **prose with no tool call**, so a naive hop reports "could not understand you" when the truth is "no model configured" ⇒ must be **503** (which the surface already latches). Phasing: A5.1 `query_author` (M) · A5.2 the projection + a **bounded repair loop** for `component_draft` (L — ⚠ it is a *loop*, not a hop) · A5.3 `pipeline_author`. `suggest_expectations` **excluded** (the pane already supplies `table`+`column`; NL buys nothing); `kpi_report_builder` blocked on its host row. NL is a **mode of `<inspecto-ai-assist>`, not a fourth sibling** — all four of its properties apply. ⚠ Traps: the greedy `POST /agent/tools/(.+)` must be registered **after** the derive route; two unrelated `ToolSpec` types exist (use `com.eoiagent.core`, not `inspecto-agent`'s kernel record); `/agent/tools/{name}` enforces **no** `Role`/`Capability` (it bypasses `DefaultToolRegistry`) and the derive route must inherit that exactly, not add a half-gate. ⚠ A5 **amends D3's reasoning** — it reintroduces local inference, so "not even an inference cost" no longer holds (the conclusion, no edition gate, stands) |
+| AGT-6a · A5 | True **natural-language** authoring | **SCOPED 2026-07-26 — build not started; pending plan D10–D11. ⚠ Plan D9 is CLOSED 2026-07-27: the `ConfigSpec`→JSON-Schema projection SHIPPED** — `ConfigJsonSchema` (`inspecto-config`) + the `config_schema` L1 read tool (23 tools now). F3's "designed years ago and never wired" is wired. ⚠ It is deliberately a **separate tool, not a tighter `component_draft` schema** — `component_draft` is a validator and must be able to receive a malformed draft to report findings on it. ⚠ `query_author.when` and `pipeline_author.flow` are **still bare** and are NOT covered: neither is `ConfigSpec`-shaped, so they need hand-written schemas with A5.1/A5.3. → `okf/frontend/features/inline-ai-authoring.md`. Full scope: `superpower/agt-6-plan.md` **§3.4**. Shape: one new non-mutating `POST /agent/tools/{name}/derive` doing a **single-turn, single-tool, schema-constrained** model call to produce the tool's *args*, then the same deterministic invoke A1 already does — so `AgentAskResult` is never involved. Four findings changed the estimate: (F1) the transport **already** does native function-calling (`ToolSpec.jsonSchema` → LangChain4j `ToolSpecification`), so ⚠ **do not build this as prompt-then-scrape** — `Investigator`'s JSON-scrape is the wrong precedent; (F2) but every **nested** payload schema is `{"type":"object"}` (`component_draft.config`, `query_author.when`, `pipeline_author.flow`) — the envelope is constrained, the payload is prose-guided, and **that is the cost centre**; (F3) the fix is already designed and never wired — `FieldSpec`'s Javadoc names "LLM grammar-constrained generation" as one of its drivers, so project JSON Schema from `ConfigSpecs.forType(kind)` and constrain the model with the spec that judges it (**D9**); (F4) with no local model, `GatewayFactory` returns a stub answering **prose with no tool call**, so a naive hop reports "could not understand you" when the truth is "no model configured" ⇒ must be **503** (which the surface already latches). Phasing: A5.1 `query_author` (M) · A5.2 the projection + a **bounded repair loop** for `component_draft` (L — ⚠ it is a *loop*, not a hop) · A5.3 `pipeline_author`. `suggest_expectations` **excluded** (the pane already supplies `table`+`column`; NL buys nothing); `kpi_report_builder` blocked on its host row. NL is a **mode of `<inspecto-ai-assist>`, not a fourth sibling** — all four of its properties apply. ⚠ Traps: the greedy `POST /agent/tools/(.+)` must be registered **after** the derive route; two unrelated `ToolSpec` types exist (use `com.eoiagent.core`, not `inspecto-agent`'s kernel record); `/agent/tools/{name}` enforces **no** `Role`/`Capability` (it bypasses `DefaultToolRegistry`) and the derive route must inherit that exactly, not add a half-gate. ⚠ A5 **amends D3's reasoning** — it reintroduces local inference, so "not even an inference cost" no longer holds (the conclusion, no edition gate, stands) |
 | AGT-6b | **Multi-step agent graphs** — model-composed plans (provision → watch → roll back) | **PLANNED, demand-gated** — `superpower/agt-6-plan.md` §4. Blockers: the eoiagent approval gate is synchronous per-call (nested gates deadlock) + no per-tool `DryRunProvider` seam (a **prerequisite** — a composed plan can't be previewed per step without it). First cut = generalize `RunbookActions`, never free-form ReAct over mutating tools |
 | AGT-5 · DryRunProvider | Cross-repo (`jotder/inspect-agent`): per-tool `DryRunProvider`/preview seam on `PlatformBuilder`, letting inspecto drop its parallel `AgentApprovals` previewer | **OPEN, low priority** — functional parity today, but reclassified 2026-07-25 as an **AGT-6b prerequisite** (`agt-6-plan.md` §4.2 G2), not merely a refactor. Push-first discipline applies |
 | AGT-5 · embedding recall | Replace `CaseSimilarity` Jaccard with embedding/vector recall | **PARKED — not warranted.** `CaseStore` is a 256-cap ring; Jaccard is adequate. Drop-in seam preserved behind `CaseSimilarity.score` |
@@ -144,7 +161,7 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 |---|---|---|
 | **API v1** | X-Actor **full removal** (already rejected outright on Standard/Enterprise; removal is client-migration-gated with the API-v1 sunset) · UI sign-out affordance (absorbed by the §5 gateway topology) · adopt the cursor-pagination seam on further list families **as demanded** (4 adopters live) · adopt the `ETags.respond` wrapper on further singleton reads **as demanded** (list/paginated routes deliberately excluded) · Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed) | `okf/backend/api/api-v1.md` |
 | **Bundle / Exchange** | ~~missing kind `connection`~~ **DONE 2026-07-25 (D2: reference-only, secrets stripped)** — the `BundleRoutes` kind set is now complete · ~~widen the Exchange `kind` axis to carry saved views (**§2 D9**)~~ **DONE 2026-07-26** — `link-analysis-view` is a first-class Exchange kind, live-mode only, closure over every dataset it reads; as-built in the OKF doc · `requires` present-but-different classification · per-editor "load as draft" import — **not a small buildable**: `BundleTransferService.write` commits straight through each store, there is no generic draft seam, and editors open by route/id (not injected content); design-first, likely multi-session, **do not fake it with a cross-kind `enabled:false` stamp** | `okf/backend/control-plane/exchange-sharing.md` |
-| **Job framework** | MNT-14 archived-Incident sweep — **retention model decided (D5: retention tier + a real `Archived` state, dry-run-first sweep, legal-hold exemption)**; the remaining blocker is building the `Archived` lifecycle state, not a call · maintenance COULD tier: space-to-space comparison · predictive maintenance (AGT-5/self-healing territory, deliberately deferred) | `okf/backend/control-plane/jobs.md` |
+| **Job framework** | MNT-14 archived-Incident sweep — **retention model decided (D5: retention tier + a real `Archived` state, dry-run-first sweep, legal-hold exemption)**. ⚠ **The stated blocker is a WRONG PREMISE (corrected 2026-07-27): the `ARCHIVED` state ALREADY SHIPS** — `Workflow.defaultFor(INCIDENT)` (`Workflow.java:173-183`) has it as the sole terminal state with `archive` from `IDENTIFIED`/`DIAGNOSING`/`RESOLVED` and `reopen` back to `DIAGNOSING`, and terminal transitions already stamp `closedAt` (= the archive time, cleared on reopen), so **the retention window needs no new column**. MNT-14 was never blocked on that. What it is *actually* blocked on is 4× bigger and listed in §6 ("MNT-14 — the real prerequisites") · maintenance COULD tier: space-to-space comparison · predictive maintenance (AGT-5/self-healing territory, deliberately deferred) | `okf/backend/control-plane/jobs.md` |
 | **Queries / BI** | `graph`/`spatial`/`search`/`api` QueryTypes · more `$`-resolvers | `okf/backend/control-plane/queries.md` |
 | **Notifications** | ~~delivery-status webhooks~~ **SHIPPED 2026-07-26 (D8)** — inbound provider callbacks, SPI + SendGrid/HMAC adapters + fail-closed route; residuals (suppression policy, soft-bounce retry, SES/SNS, receipt pruning) in §6 · GeoIP · auth-gated per-user prefs / security triggers | `okf/backend/control-plane/events-metrics.md` |
 | **Signal / Decision networks** | optional S8 (connector-direct emission + cross-space controller) · a general **event-triggered consequence policy gate** (still `/apply`-only) · RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet) · ⚠ **no producer threads `causationId`**, so `/signals/tree` is flat today | `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md` |
@@ -289,6 +306,20 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > this.** Sweep with `git worktree prune` + `git worktree remove` at handoff. Deleting them never reduced
 > the incident's severity — the values are public via git history regardless — it only stops a local grep
 > from handing them out. Rotation remains the fix.
+>
+> **✅ Local checkout verified CLEAN 2026-07-27** (the sweep found nothing left to sweep): `git worktree
+> list` shows only the main checkout, `.claude/worktrees/` is empty and `.git/worktrees/` does not exist,
+> so all five stale trees are already gone. Also verified, so the next shift need not re-check: the shipped
+> guard `node tools/check-secrets.mjs` exits 0 on the working tree; **all five values are `REDACTED-SEC-INCIDENT-1`
+> in local history on every ref** (`git log --all -S` over the redaction marker hits the leak commits, and
+> the secret literals return nothing), and the stray local branch `claude/brave-pascal-55aae7` — which
+> `refs/pull/*` notes as never rewritten — is at `8f30d548`, carries **0 commits not already in `master`**,
+> and holds no secret in `environments/*.ts`. ⚠ **None of this touches the actual exposure**: `refs/pull/*`
+> on the public remote still serves the literals, so severity is unchanged and rotation is still the fix.
+> ⚠ The pre-rewrite backup bundle `C:/sandbox/ucc-prerewrite-backup-20260726-203545.bundle` (16 MiB) is
+> **still present and still holds all five secrets in cleartext** — deliberately NOT deleted (operator call
+> 2026-07-27: it is the only pre-rewrite recovery point and the incident is still open). Delete it at
+> incident close, per the note above.
 >
 > Lower severity, same files, unaddressed: internal hostnames/IPs are published in-repo
 > (`68.183.16.242`, `p20.prod.pronto`, `app1.pronto.lebara.sa`).
@@ -436,12 +467,69 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   **on-by-default `memory_limit` (D11) was deliberately not shipped** — operator call, "spill routing
   only". ⚠ **The exposure D11 existed to close therefore remains open:** unset `memory_limit` ⇒ DuckDB
   defaults to ≈80% RAM *per instance* ⇒ concurrent runs overcommit ⇒ the whole box (incl. the HTTP API)
-  can go unresponsive, and chunking is now the only bound on a pathological file. **To reopen, bring a
-  measured value** — that is what blocked it, not the decision. A semaphore-computed cap stays rejected
+  can go unresponsive, and chunking is now the only bound on a pathological file. ~~**To reopen, bring a
+  measured value**~~ — **MEASURED 2026-07-27, see the row below.** A semaphore-computed cap stays rejected
   (`maxConcurrentRuns` defaults to unbounded; batch-ingest has a second limiter). Spill *routing* already
   ships (`scratchDir` → `dirs.temp` on the data volume); `max_temp_directory_size` has no fixed default
   because none is defensible without the volume size. Read-path is **not** the risk (see C6 below).
   `okf/backend/engine/duckdb.md`
+- **D11 — MEASURED 2026-07-27; the number is `2GB`, and one of D11's premises is WRONG.** The blocker was
+  "no defensible value", so a value was measured (host: 32 GiB RAM, DuckDB 1.5.2.1; CDR-shaped 12-column
+  CSV; harness kept out-of-repo, method reproduced in the OKF doc). Findings, in order of importance:
+  - ⚠ **Peak does NOT scale with file size — the "pathological single file" premise is wrong for the
+    ingest path.** `read_csv_auto` → `COPY … TO parquet` is fully streaming: a **1.0 GiB** input peaked at
+    **1081 MiB** and a **3.1 GiB** input at **981 MiB** — i.e. flat, not proportional. So a huge file is
+    *not* what exhausts memory, and **D12 chunking was never really the bound on memory** it is described
+    as (it bounds scratch/unit-of-work, which is still worth having).
+  - ⚠ **What a cap actually governs is the blocking operators, and they HARD-FAIL rather than spill.**
+    A 9M-group `GROUP BY` peaked at 937 MiB and a wide `DISTINCT` at 895 MiB; at `512MB` **both died with
+    `Out of Memory Error`** after spilling only ~192 MiB. Graceful degradation is NOT the failure mode, so
+    **an aggressive cap converts working jobs into failing ones** — this is the trap that makes "just set
+    it low" wrong. (`ORDER BY` ~200 MiB and a self-`JOIN` ~385 MiB are cheap; they are not the constraint.)
+  - **`2GB` is the defensible default**: ~2.2× the highest peak observed across every probe (1081 MiB),
+    above the OOM cliff with real headroom, and it costs **nothing measurable** — capped runs came in at or
+    slightly *faster* than uncapped (ingest 3741 ms @ 2GB vs 4928 ms uncapped; `GROUP BY` 1711 vs 2123 ms).
+    `1GB` also passed everything but sits only ~1.3× over the observed peak — too close to the cliff.
+  - ⚠ **`memory_limit` alone still does not bound total exposure, so shipping it alone does not close
+    D11.** Total = `memory_limit` × concurrent runs, and **`-Djobs.maxConcurrentRuns` defaults to `0` =
+    unbounded** (`JobService.java:134-140`, whose own Javadoc already calls itself "root enabler for an
+    eventual on-by-default DuckDB memory cap"). The pair is the fix: `memory_limit=2GB` +
+    `maxConcurrentRuns=4` ⇒ ≤8 GiB worst case (~25% of a 32 GiB box) instead of ~25 GiB *per run*.
+  - **Not measured, so not claimed:** scaling with thread count / core count (DuckDB sizes per-thread
+    buffers, so a much larger box may want more than 2 GiB), non-CSV frontends, and the `materialize`
+    task's real query shapes. A per-edition or RAM-relative default was not evaluated.
+  - **Still an operator call** — this row brings the number D11 was declined for; it does not ship it.
+- **MNT-14 — the real prerequisites (scoped 2026-07-27).** §4 said the last blocker was the `Archived`
+  state; it already ships (see that row). The sweep's actual cost is **referential cleanup + an ordering
+  gap**, none of which exists yet. `ObjectStore.delete` is ready and unconsumed (`ObjectStore.java:39-56`,
+  zero callers) and the `receipt_prune` task (`MaintenanceJob.java:234-250`) is the template to clone, but:
+  - ⚠ **`ObjectStore.query` returns NEWEST-first and there is no ascending mode** (`ObjectQuery.java`,
+    `MAX_LIMIT` 10 000). A sweep that takes one page therefore gets the **newest** archived Incidents and
+    systematically **misses the oldest — the only purge-eligible ones**. This is a correctness trap, not a
+    perf detail. No existing caller hits it (they are all "everything relevant, well under 10k" reads), so
+    there is no idiom to copy: either add an oldest-first/cutoff query to `ObjectStore` + both backends, or
+    push the whole thing down to a `DELETE … WHERE closed_at < ?` in `DbObjectStore` (probably the right
+    answer, and it also skips the Java page loop entirely — but `InMemoryObjectStore` still needs a path).
+  - ⚠ **No bulk delete-by-target exists on any dependent store**, and `ObjectStore.delete` explicitly does
+    not cascade: `NoteStore` has **no delete method at all** (notes *and* attachments — "attachments" are
+    `ObjectNote` rows, not a separate store) · `LinkStore` has only per-edge `remove(from,to,rel)` · the D7
+    `TagAssignmentStore` has `remove(tag,kind,id)` and `removeTag(tag)` but nothing per-target. That is
+    3 interfaces + 6 implementations of new bulk methods. ⚠ Several are `@PublicApi`, so the additions must
+    be `default` methods or they break external implementors.
+  - ⚠ **`EventStore` is append-only by contract and can never be cascaded.** A purged Incident's
+    `OBJECT_ACTIVITY` trail outlives it permanently. That is arguably correct (the audit log is not the
+    record being retention-managed) but it must be a **stated, documented decision** in the sweep, not an
+    accident — and it means "purge" never means "all trace removed", which matters for a legal answer.
+  - **Nothing is reachable from the job layer yet**: `JobService` has hooks for `notificationStore` /
+    `deliveryReceiptStore` only (`JobService.java:836-853` is the pattern); `ObjectStore`, `NoteStore`,
+    `LinkStore` and `TagAssignmentStore` each need one.
+  - **Legal hold** has no representation anywhere on an object today; it rides the `attributes` bag as a new
+    `ObjectService.ATTR_*` constant (the block at `ObjectService.java:61-72`), like `watchers`/`tags`.
+  - **Naming call to make:** every sibling is `*_prune`, but this one deletes **operator business records**
+    rather than housekeeping telemetry. Recommend `incident_purge` and a distinct verb, so no one reads it
+    as another log trim.
+  - **Full plan (build order, the five gaps, the decisions still open):**
+    [`superpower/mnt-14-incident-retention-plan.md`](superpower/mnt-14-incident-retention-plan.md).
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already

@@ -109,6 +109,26 @@ Plain `-Pedition-enterprise` is fail-fast, so a single broken module hides the r
 (`--fail-at-end`) is what you want while draining a multi-module breakage. Note `-fae` still skips
 modules that *depend* on a failed one — those are unverified, not passing.
 
+### ⚠ …and a red reactor is not always YOUR red — one known FALSE RED (fixed 2026-07-27)
+
+`ControlApiShareTest.tamperedAndUnknownTokensAreIndistinguishable404s` failed
+`expected: <404> but was: <200>` roughly **1 run in 4096**, in a module a change need not have touched.
+Cause was the test, not the product: it forged a "tampered" token as
+`token.substring(0, len - 2) + "zz"`, and a share token is
+`base64url(payload) + "." + base64url(HMAC)` (`ShareTokens.java:33-40`) — so whenever the digest already
+ended in `zz` the tamper was a **no-op**, the signature still verified, and the server correctly returned
+200. Fixed by flipping the **first** character of the signature segment instead, plus an
+`assertNotEquals` guard that the tamper changed anything.
+
+⚠ **The obvious fix is also wrong**: flipping the token's LAST base64 character is unsound even when the
+string changes. A 32-byte digest encodes to 43 unpadded chars, so the final character carries 2 unused low
+bits and some flips (`'z'`→`'y'`) decode to the **same bytes**. Tamper where every bit is significant.
+
+**The lesson generalises:** before believing a reactor red belongs to your diff, check whether the failing
+module is even downstream of what you touched, then re-run the class ~3× and once with your work
+`git stash`ed. (⚠ plain `git stash` does **not** stash untracked files, so brand-new files stay present —
+usually fine, but know it before drawing conclusions.)
+
 ## Deployment bundle (per edition)
 
 ```powershell
@@ -156,3 +176,24 @@ Note: editing the gamma Tailwind theming plugin/tokens does NOT hot-reload — r
 
 Report build/test outcomes faithfully: if tests fail, quote the failing output; if a step was skipped,
 say so. "Verified" means `mvn -o clean test` passed — not that the code looks right.
+
+### ⚠ Count the reactor total mechanically — the eyeballed sum is wrong
+
+The recorded baseline was **2049 for months and that number is WRONG** (found 2026-07-27). Summing
+per-module `Tests run:` lines by hand silently drops modules, and it dropped two (57 and 178). Maven prints
+no grand total, so **always compute it**, from the module-summary lines only (they have no `-- in` suffix —
+the `-- in <class>` lines are per-class and double-count):
+
+```bash
+grep -E "Tests run:.*Skipped: [0-9]+$" full.log \
+  | sed 's/.*Tests run: \([0-9]*\).*Skipped: \([0-9]*\)$/\1 \2/' \
+  | awk '{t+=$1; s+=$2} END {print "TOTAL:", t, "skipped:", s, "modules:", NR}'
+```
+
+**Correct baseline as of 2026-07-27: 2288 tests, 0 failures, 0 errors, 3 skipped, across 14 test-bearing
+modules (16 reactor modules).** The 3 skips are pre-existing (1 in `ConfigSafetyValidatorTest`, 2 in one
+`inspecto-etl`-tier module), not a regression.
+
+⚠ Note `bc` and `grep -P` are unavailable in this Git-Bash environment — use `awk` and POSIX classes.
+⚠ And a total is not a verdict: confirm your own new test classes appear in the log with the counts you
+expect. A green reactor that never ran your test is the quietest false green there is.

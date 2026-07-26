@@ -217,6 +217,31 @@ second, drifting definition of the binding vocabulary in the codebase.
   exactly **one** widget; `studio/dashboards/dashboard-editor` can build a dashboard but has no measures.
   That host is a new flow, not an adoption. → `BACKLOG.md`.
 - ~~**"Why is this red"**~~ — **SHIPPED 2026-07-26**, see *Why is this red* below.
+- **A5's D9 prerequisite is DONE (2026-07-27) — the `ConfigSpec` → JSON Schema projection ships.**
+  `ConfigJsonSchema` (`inspecto-config`, `com.gamma.config.spec`) turns any `ConfigSpecs.forType(kind)` into
+  a real JSON Schema, and the new **`config_schema` read tool** (L1, `READ_DOCS`, non-mutating) exposes it.
+  This is what A5's derive hop constrains generation with — "constrain the model with the spec that judges
+  it", so a schema-honouring generation cannot fail on structure. Load-bearing details:
+  - ⚠ **It is deliberately a separate tool, NOT a tighter `component_draft` input schema.**
+    `component_draft` is a *validator*; its job is to accept a malformed draft and return anchored findings.
+    Constraining its own `config` property would let the transport reject bad drafts before the validator
+    could explain them — destroying the repair loop. The schema travels as data a caller fetches.
+  - ⚠ **A required nested path pulls its whole ancestor chain into `required`.** `ConfigLoader.validate`
+    treats a required path as required *absolutely*, so marking only the leaf would let a model omit the
+    entire enclosing block and still satisfy the schema while failing validation.
+  - ⚠ **`additionalProperties` is never set to `false`.** A `ConfigSpec` enumerates what it can *validate*,
+    not every key a kind accepts, so forbidding extras would reject configs the control plane applies.
+    Likewise `LIST` gets no guessed `items` type — the element type is not in the spec model.
+  - A path can be both a leaf and a prefix (`x` as a `MAP` plus `x.y`); the node merges, in either authoring
+    order. `FILEPATH`/`CRON`/`SQL` project as `string` (they are wire-level STRING refinements) with the
+    refinement surviving in the description, which is what a model actually reads.
+  - Degrades to the bare `{"type":"object"}` — today's hand-written value — for a null/unspecced kind, so an
+    unknown kind never fails registration.
+  - ⚠ **`query_author.when` and `pipeline_author.flow` are still bare `{"type":"object"}`** and are **not**
+    fixed by this: neither is `ConfigSpec`-shaped (a condition tree and a flow graph). They need hand-written
+    schemas, and belong with A5.1/A5.3 respectively.
+  - ⚠ **`InspectoPackTest` asserts a hardcoded tool count** (now 23) — every new tool goes stale there.
+    Same trap class as `OidcAuthenticatorTest`'s hand-written capability sets.
 - **A5** — true natural-language authoring. **Now scoped** (2026-07-26): `superpower/agt-6-plan.md` §3.4.
   Two facts that matter to this surface specifically: NL is a **mode of `<inspecto-ai-assist>`, not a fourth
   sibling** (unlike the A4 pair, all four of this component's properties — draft, diff, Apply,

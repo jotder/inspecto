@@ -143,6 +143,13 @@ former root reference docs** (each index lists them):
   As-built lives in [`okf/backend/control-plane/tags.md`](okf/backend/control-plane/tags.md): the edge-side
   `WidgetTags` projection, adopt-on-create vs overwrite-on-update, the lazy per-Space backfill (it cannot run
   at route registration), and why the save dialog's tags field had to go.
+- [`superpower/mnt-14-incident-retention-plan.md`](superpower/mnt-14-incident-retention-plan.md) —
+  **MNT-14 archived-Incident retention sweep — SCOPED 2026-07-27, build not started.** ⚠ Opens by
+  correcting the backlog's premise: the `ARCHIVED` state **already ships**, so MNT-14 was never blocked on
+  it. The real prerequisites are an oldest-first object query (a newest-first sweep silently reports "0
+  prunable" on an expired corpus), bulk delete-by-target on `NoteStore`/`LinkStore`/`TagAssignmentStore`
+  (none has one), four `JobService` hooks, and a legal-hold attribute — plus the stated decision that the
+  append-only event trail can never be cascaded.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5
