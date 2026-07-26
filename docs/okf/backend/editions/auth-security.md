@@ -27,6 +27,26 @@ exchange server-side and keep the refresh token in an **httpOnly `inspecto_rt` c
 (`SameSite=Strict`, plus an `Origin` check for CSRF). HTTPS is served by the pure-JDK `HttpsServer`. The UI
 discovers the mode via `GET /bootstrap` → `features.authMode` and its OIDC flow is a no-op on Personal.
 
+**Sign-out is three layers, and all three have to fire** (fixed 2026-07-26; BACKLOG §5 tracked only the
+third). `SessionService.logout()` (1) POSTs `/auth/logout` so the backend revokes and clears the
+`inspecto_rt` cookie, (2) drops the in-memory access token, and (3) — **RP-Initiated Logout 1.0** — sends the
+browser to the provider's `end_session_endpoint` with `client_id` + `post_logout_redirect_uri=<origin>/sign-in`,
+so the IdP's SSO session ends too. Without (3) the next sign-in completes with no credential prompt.
+`id_token_hint` is deliberately omitted: the id token lives behind the BFF, and the spec accepts `client_id`
+as the RP identifier instead.
+
+- **`endSessionUrl` is declared config, never derived or discovered** — `bootstrap.auth.endSessionUrl`
+  falling back to `environment.oidc.endSessionUrl`, sitting beside `authorizeUrl`. This is D15's call for
+  `auth.oidc.tokenEndpoint` applied again: no vendor's path layout is assumed, and a hardcoded IdP host in
+  the SPA is exactly what caused the leaked-secret incident. *(The BACKLOG row asked for `/.well-known`
+  discovery; that contradicts the D15 precedent it cited in the same sentence, so declaration won.)* Leave it
+  blank and sign-out degrades to layers (1)+(2) — all a provider without the endpoint can support anyway.
+- **`SessionService.redirect()` is the single seam that leaves the SPA** (authorize + end-session). It exists
+  because jsdom makes `window.location.assign` non-configurable, so it is the only way to unit-test either
+  redirect.
+- **Personal renders no user menu at all.** The auth-free shell has no principal to name and no session to
+  end; showing the menu meant a blank "Signed in as" over a Sign out that could not work.
+
 **The Capability seam (RBAC groundwork, 2026-07-03; seam proven by Lens Access config 2026-07-14).**
 Authorization questions are always asked as **named capabilities** (`canAuthorWorkbench`, `canOperateRuns`,
 `canTriageRequirements`, `canOnboardConnections`, …) — never "which lens is active?". A **Lens** is a

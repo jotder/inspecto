@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { environment } from '../../../environments/environment';
 import { SessionService } from './session.service';
 
@@ -105,5 +105,65 @@ describe('SessionService (W6d edition switch)', () => {
         await tick();
         expect(svc.authenticated()).toBe(false);
         expect(svc.token()).toBeNull();
+    });
+
+    /** Stub the one seam that navigates away from the SPA (jsdom forbids spying `location.assign`). */
+    function spyOnRedirect() {
+        return vi
+            .spyOn(svc as unknown as { redirect(url: string): void }, 'redirect')
+            .mockImplementation(() => {});
+    }
+
+    /** Sign in far enough for `oidc` config to be resolved, with the given `bootstrap.auth` block. */
+    async function signedInWith(auth: Record<string, unknown>): Promise<void> {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ features: { authMode: 'oidc' }, auth });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ accessToken: 'at', expiresIn: 300 });
+        await tick();
+        httpMock.expectOne(`${base}/bootstrap`).flush({ session: { authenticated: true } });
+        await done;
+    }
+
+    // RP-Initiated Logout 1.0. Without this the Inspecto session ends but the IdP's SSO session does
+    // not, so the next sign-in completes with no credential prompt (BACKLOG §5).
+    it('logout redirects to the provider end_session_endpoint when one is configured', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({ authorizeUrl: 'https://idp/authorize', clientId: 'spa-1', endSessionUrl: 'https://idp/logout' });
+
+        svc.logout();
+        httpMock.expectOne(`${base}/auth/logout`).flush({ loggedOut: true });
+        await tick();
+
+        expect(svc.authenticated()).toBe(false); // local state dropped before the redirect
+        const url = new URL(assign.mock.calls[0][0] as string);
+        expect(url.origin + url.pathname).toBe('https://idp/logout');
+        expect(url.searchParams.get('client_id')).toBe('spa-1');
+        expect(url.searchParams.get('post_logout_redirect_uri')).toBe(`${window.location.origin}/sign-in`);
+        assign.mockRestore();
+    });
+
+    it('logout stays in-app when the provider declares no end_session_endpoint', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({ authorizeUrl: 'https://idp/authorize', clientId: 'spa-1' });
+
+        svc.logout();
+        httpMock.expectOne(`${base}/auth/logout`).flush({ loggedOut: true });
+        await tick();
+
+        expect(assign).not.toHaveBeenCalled();
+        assign.mockRestore();
+    });
+
+    it('logout never redirects in offline mock mode, even with an endSessionUrl', async () => {
+        const assign = spyOnRedirect();
+        await signedInWith({ clientId: 'spa-1', endSessionUrl: 'https://idp/logout', mock: true });
+
+        svc.logout();
+        httpMock.expectOne(`${base}/auth/logout`).flush({ loggedOut: true });
+        await tick();
+
+        expect(assign).not.toHaveBeenCalled();
+        assign.mockRestore();
     });
 });

@@ -13,9 +13,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
-import { NavigationExtras, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { UserService } from 'app/core/user/user.service';
 import { User } from 'app/core/user/user.types';
+import { SessionService } from 'app/inspecto/api';
 import { environment } from 'environments/environment';
 import { Subject, takeUntil } from 'rxjs';
 
@@ -36,7 +37,10 @@ export class UserComponent implements OnInit, OnDestroy {
     /* eslint-disable @typescript-eslint/naming-convention */
     static ngAcceptInputType_showAvatar: BooleanInput;
     /* eslint-enable @typescript-eslint/naming-convention */
-    private  router = inject(Router);
+    private session = inject(SessionService);
+
+    /** Personal/offline is auth-free — the whole menu is hidden rather than offer a no-op Sign out. */
+    readonly signedInEdition = this.session.authMode;
 
     @Input() showAvatar: boolean = true;
     user: User;
@@ -108,38 +112,18 @@ user_name: string;
     }
 
     /**
-     * Sign out
+     * Sign out — the one path, delegating to {@link SessionService.logout}: revoke the refresh cookie at
+     * the backend, drop the in-memory token, then end the SSO session at the provider when an
+     * `endSessionUrl` is configured.
+     *
+     * Replaces two broken predecessors (2026-07-26, BACKLOG §5). `signOut()` navigated to `/logout` — a
+     * route that does not exist and has no wildcard fallback, so the navigation simply errored and the
+     * user stayed signed in — and `onclicklogout()` first called `localStorage.clear()`, which took every
+     * unrelated `inspecto.*` preference (grid layouts, lens, current space, SQL history) with it. Neither
+     * ever told the backend, so the httpOnly refresh cookie survived a "sign out".
      */
-
-
     signOut(): void {
-        const navigationExtras: NavigationExtras = {
-            queryParams: {
-                fromApp: environment.appName,
-                type: 'implicit'
-            },
-        };
-        this.router.navigate(['/logout'], navigationExtras);
-    }
-
-    /**
-     * Sign out through the in-app `/logout` route.
-     *
-     * This used to redirect to `environment.authServerUrl + '/confirm-logout'`. That key was removed in
-     * `ca3680df` along with the other published internal hostnames/IPs (BACKLOG §5), which left this
-     * method referencing a field that no longer exists and broke the UI build. Operator call
-     * 2026-07-25: route to the same `/logout` {@link signOut} already uses rather than reinstate the
-     * hardcoded host.
-     *
-     * ⚠ Consequence: only the Inspecto session ends. The IdP's SSO session is no longer terminated, so
-     * a subsequent sign-in may complete without re-prompting for credentials. Restoring a
-     * standards-based end-session redirect (OIDC RP-initiated logout, discovered from the provider
-     * rather than hardcoded) is tracked in BACKLOG §5.
-     */
-    onclicklogout() {
-        localStorage.clear();
-        sessionStorage.clear();
-        this.signOut();
+        this.session.logout();
     }
 
     onMyProfileClick(): any {

@@ -22,7 +22,7 @@ export const environment = {
     // 'none' → mock /bootstrap reports Personal, so the app boots with NO login. Set 'oidc' (or
     // localStorage['inspecto.mockAuthMode']) to exercise the Standard sign-in UX offline.
     mockAuthMode: 'none' as 'none' | 'oidc',
-    oidc: { authorizeUrl: '', clientId: '', scopes: 'openid profile roles', mock: false },
+    oidc: { authorizeUrl: '', clientId: '', scopes: 'openid profile roles', endSessionUrl: '', mock: false },
     apiVersion: '/api/v1',
     basePath: '/',
     authVersion: '/oauth',

@@ -58,8 +58,10 @@ export const environment = {
     // Real Standard-deployment OIDC config (public PKCE client — no secret). Left blank in dev because
     // offline mock mode supplies its own auth block (auth.mock=true). A real deployment sets the IAM's
     // authorize endpoint + the SPA's public client id here; the SessionService reads bootstrap.auth first
-    // and falls back to this.
-    oidc: { authorizeUrl: '', clientId: '', scopes: 'openid profile roles', mock: false },
+    // and falls back to this. `endSessionUrl` is the provider's `end_session_endpoint` (RP-initiated
+    // logout) — declared, never derived from the issuer, same call D15 made for tokenEndpoint. Leave it
+    // blank and sign-out ends the Inspecto session only.
+    oidc: { authorizeUrl: '', clientId: '', scopes: 'openid profile roles', endSessionUrl: '', mock: false },
     apiVersion: '/api/v1',
     basePath: '/',
     authVersion:"/oauth",

@@ -15,6 +15,17 @@ export interface OidcConfig {
     authorizeUrl: string;
     clientId: string;
     scopes: string;
+    /**
+     * The provider's `end_session_endpoint` (OIDC RP-Initiated Logout 1.0). Optional: when absent
+     * {@link SessionService.logout} ends the Inspecto session only, which is the pre-2026-07-26
+     * behavior and all a provider without the endpoint can support.
+     *
+     * **Declared config, not derived and not discovered** — the same call D15 made for
+     * `auth.oidc.tokenEndpoint`: no vendor's path layout is assumed. It sits beside `authorizeUrl`
+     * so both endpoints come from one place; a hardcoded host anywhere in the SPA is what caused
+     * BACKLOG §5's incident.
+     */
+    endSessionUrl?: string;
     /** Offline/mock only: skip the real IAM round-trip and grant a fake code locally (dev demo). */
     mock?: boolean;
 }
@@ -87,6 +98,7 @@ export class SessionService {
             authorizeUrl: boot.auth?.authorizeUrl ?? environment.oidc?.authorizeUrl ?? '',
             clientId: boot.auth?.clientId ?? environment.oidc?.clientId ?? '',
             scopes: boot.auth?.scopes ?? environment.oidc?.scopes ?? 'openid profile',
+            endSessionUrl: boot.auth?.endSessionUrl ?? environment.oidc?.endSessionUrl ?? '',
             mock: boot.auth?.mock ?? environment.oidc?.mock ?? false,
         };
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401
@@ -121,7 +133,7 @@ export class SessionService {
             code_challenge: challenge,
             code_challenge_method: 'S256',
         });
-        window.location.assign(`${this.oidc?.authorizeUrl}?${params.toString()}`);
+        this.redirect(`${this.oidc?.authorizeUrl}?${params.toString()}`);
     }
 
     /**
@@ -170,11 +182,33 @@ export class SessionService {
         );
     }
 
-    /** Clear the local session and end it at the backend (best-effort), then route to sign-in. */
+    /**
+     * Clear the local session and end it at the backend (best-effort), then end the SSO session at the
+     * provider if one can be — RP-Initiated Logout 1.0: redirect to `end_session_endpoint` with
+     * `client_id` + `post_logout_redirect_uri`, and the provider returns the browser to `/sign-in`.
+     *
+     * `id_token_hint` is deliberately absent: the id token lives behind the BFF (the SPA only ever holds
+     * a short-lived access token), and the spec accepts `client_id` in its place when the RP is
+     * identified that way. Without this redirect the Inspecto session ends but the IdP's does not, so
+     * the next sign-in completes with no credential prompt — which is what the console did between
+     * `ca3680df` and 2026-07-26.
+     *
+     * Falls back to the in-app route when no `endSessionUrl` is configured (or in offline mock mode,
+     * where there is no provider to redirect to), so Personal and the dev mock are unaffected.
+     */
     logout(): void {
         this.http.post(apiUrl('/auth/logout'), {}).pipe(catchError(() => of(null))).subscribe(() => {
             this.onAuthLost();
-            this.router.navigate(['/sign-in']);
+            const endSession = this.oidc?.endSessionUrl;
+            if (!endSession || this.oidc?.mock) {
+                this.router.navigate(['/sign-in']);
+                return;
+            }
+            const params = new URLSearchParams({
+                client_id: this.oidc?.clientId ?? '',
+                post_logout_redirect_uri: `${window.location.origin}/sign-in`,
+            });
+            this.redirect(`${endSession}?${params.toString()}`);
         });
     }
 
@@ -187,6 +221,12 @@ export class SessionService {
 
     private redirectUri(): string {
         return `${window.location.origin}/auth/callback`;
+    }
+
+    /** Leave the SPA for the provider (authorize / end-session). The one seam that navigates away —
+     *  jsdom makes `window.location.assign` non-configurable, so tests stub this instead. */
+    protected redirect(url: string): void {
+        window.location.assign(url);
     }
 
     private async loadSessionFromBootstrap(): Promise<void> {

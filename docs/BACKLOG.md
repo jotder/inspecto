@@ -1,6 +1,8 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-26 (**every route capability now has a client signal + action node** — the
+**Updated:** 2026-07-26 (**sign-out fixed end to end** — the user-menu button was navigating to a
+nonexistent `/logout` after wiping all of `localStorage`, and never reached the backend; RP-initiated IdP
+logout shipped with it. Same day: **every route capability now has a client signal + action node** — the
 `canRequestShares` residual closed, decided lens-scoped; earlier same day **D7 complete end-to-end**,
 plan archived, residuals only in §6. Previously 2026-07-25: **decision session — all seventeen §2 calls answered**; each call's rationale
 now lives in its OKF/plan concept home, and the items they gated moved from "blocked on a call" to
@@ -240,13 +242,13 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > (`68.183.16.242`, `p20.prod.pronto`, `app1.pronto.lebara.sa`).
 
 **UI residuals (small, valuable):**
-- **No IdP end-session on sign-out (opened 2026-07-25).** `user.component.ts`'s logout used to redirect to
-  `environment.authServerUrl + '/confirm-logout'`; that key went with the published internal hostnames/IPs
-  in `ca3680df`, which broke the UI build. It now routes to the in-app `/logout` (operator call), so the
-  Inspecto session ends but **the IdP's SSO session does not** — a later sign-in may not re-prompt. The
-  proper fix is standards-based OIDC RP-initiated logout with `end_session_endpoint` **discovered from the
-  provider's `/.well-known/openid-configuration`**, never a hardcoded host — same D15 litmus test that made
-  `tokenEndpoint` required config.
+- **⚠ A deployment that wants IdP sign-out must now set `endSessionUrl`.** RP-initiated logout shipped
+  2026-07-26, but it is **inert until configured** — `bootstrap.auth.endSessionUrl` or
+  `environment.oidc.endSessionUrl` (declared, never derived; see `okf/backend/editions/auth-security.md`).
+  Blank ⇒ sign-out ends the Inspecto session only, exactly as before. **The backend does not emit
+  `bootstrap.auth` at all today** (no `authorizeUrl`/`clientId` either — real deployments configure the SPA
+  via `environment.oidc`), so wiring an `auth.oidc.endSessionEndpoint` property through `BootstrapRoutes` is
+  the follow-on if server-supplied OIDC config is ever wanted.
 - `ComponentKind.deriveParts` seam — formalize when a 3rd composite kind needs it.
 - Parser/node attribute tiers are a best guess pending firm backend specs — same call as **D13**, which was
   **confirmed parked** 2026-07-25 (needs a real onboarding-observation session, not an engineering guess).
