@@ -12,6 +12,7 @@ import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, EventRow, EventsService, NodeKind, ObjectGraph, ObjectGraphNode, ObjectNote, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { AiStatusComponent } from 'app/inspecto/ai-assist/ai-status.component';
 import { InspectoBreadcrumbComponent } from 'app/inspecto/components/breadcrumb.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -50,6 +51,7 @@ interface MemberTimelineEntry {
         MatTabsModule,
         MatTooltipModule,
         ReactiveFormsModule,
+        AiStatusComponent,
         GraphViewComponent,
         InspectoBreadcrumbComponent,
         InspectoEmptyStateComponent,

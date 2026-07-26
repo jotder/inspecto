@@ -14,6 +14,12 @@
             </div>
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-2 sm:mt-0">
+            <!-- "Why is this red" (AGT-6a A4-status) — only when the Incident/Case carries a correlation
+                 id: that is the only thing here the timeline can be addressed by, and without it the
+                 dialog would have nothing to reconstruct. -->
+            @if (obj?.correlationId) {
+                <inspecto-ai-status [label]="id" [correlationId]="obj!.correlationId!" />
+            }
             @for (a of actions; track a) {
                 <button mat-stroked-button (click)="transition(a)">
                     <mat-icon svgIcon="heroicons_outline:arrow-right-circle"></mat-icon>

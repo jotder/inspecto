@@ -5,6 +5,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { EventFilter, EventRow, EventsService, SavedEventView } from 'app/inspecto/api';
+import { AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -30,7 +31,7 @@ const VIEW: SavedEventView = {
     createdAt: 1,
 };
 
-async function create(overrides: Partial<Record<keyof EventsService, unknown>> = {}) {
+async function create(overrides: Partial<Record<keyof EventsService, unknown>> = {}, dialog: unknown = {}) {
     const search = vi.fn((_f: EventFilter) => of([EVENT]));
     const api = {
         search,
@@ -45,13 +46,15 @@ async function create(overrides: Partial<Record<keyof EventsService, unknown>> =
         providers: [
             provideNoopAnimations(),
             { provide: EventsService, useValue: api },
-            { provide: MatDialog, useValue: {} },
+            { provide: MatDialog, useValue: dialog },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
+    // The data-table injects the real MatDialog, so a stub must be OVERRIDDEN, not just provided.
+    TestBed.overrideProvider(MatDialog, { useValue: dialog });
     await TestBed.compileComponents(); // data-table @defer block
     const fixture = TestBed.createComponent(EventsComponent);
     fixture.detectChanges(); // ngOnInit → load() + loadViews()
@@ -59,6 +62,22 @@ async function create(overrides: Partial<Record<keyof EventsService, unknown>> =
 }
 
 describe('EventsComponent', () => {
+    it('asks "what led to this" by correlation id, preferring the causal chain', async () => {
+        const open = vi.fn();
+        const { fixture } = await create({}, { open });
+        fixture.componentInstance.actions[1].onClick(EVENT);
+        expect(open).toHaveBeenCalledWith(AiStatusDialog, {
+            data: { label: 'corr-1', pipelineId: 'cdr_ingest', correlationId: 'corr-1' },
+        });
+    });
+
+    it('hides the status action on a row with neither a correlation id nor a pipeline', async () => {
+        const { fixture } = await create();
+        const action = fixture.componentInstance.actions[1];
+        expect(action.visible?.({ ...EVENT, correlationId: null, pipeline: null })).toBe(false);
+        expect(action.visible?.({ ...EVENT, correlationId: null })).toBe(true);
+    });
+
     it('loads events and saved views on init', async () => {
         const { fixture } = await create();
         const c = fixture.componentInstance;

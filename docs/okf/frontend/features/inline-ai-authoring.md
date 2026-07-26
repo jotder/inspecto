@@ -133,8 +133,33 @@ ignored the store.
 ⚠ **Not gated on `canAuthorWorkbench()`**, same reasoning as its sibling: no write path, and asking why an
 alert fired is not an authoring act. Don't "make it consistent" with the row-actions next to it.
 
-**Open:** the three other operational panes named in the plan row (Pipelines status, Incidents, Signals)
-are unadopted — per-pane, deliberately, since each addresses its entity differently. → `BACKLOG.md`.
+**All four named operational panes are adopted (2026-07-26).** Per-pane, deliberately: each addresses its
+entity differently, and *how* it addresses it decides which half of the dialog answers.
+
+| Pane | Host | Addressed by | Path taken |
+|---|---|---|---|
+| **Alerts** (reference) | `firedActions` on the fired-alert grid | `FiredAlert.pipeline` | window, focused |
+| **Processing Status** | first `rowActions` entry | `RunStatus.pipeline` | window, focused |
+| **Events** (the signal ledger) | second `actions` entry | `correlationId` ?? `pipeline` | **chain** when present |
+| **Incidents / Cases** | `object-detail` header, next to the lifecycle verbs | `OperationalObject.correlationId` | **chain**, no status half |
+
+Two shapes worth keeping:
+
+- **Events is where the chain path earns its keep** — a signal row is the one row that usually carries a
+  `correlationId`. The action is **hidden** (`visible`) on a row with neither a correlation id nor a
+  pipeline: there would be nothing to address, and an affordance that can only answer "nothing" is worse
+  than no affordance.
+- **Incidents shows it only when `correlationId` is set**, and gets the timeline half *alone* — an Incident
+  has no pipeline, so there is no live state to read. That is the independent-degrade design working, not a
+  gap to fill by inventing a pipeline lookup.
+
+⚠ **Both grid adoptions needed `[pinActions]="true"`** — same horizontal-virtualization trap as Alerts.
+Processing Status already had a `rowActions` column and still needed it once a second button widened it.
+
+⚠ **Offline the chain path cannot be exercised from the Events pane**: no mock producer sets a
+`correlationId` on an event row (the same flatness noted for `GET /signals/tree`), so every row there falls
+back to the pipeline window. The chain path is verifiable from **Incidents**, whose seeded objects carry
+`corr-N`. Don't "fix" the mock by inventing correlation ids on events — the unit test covers the branch.
 
 ## Explain this screen (`<inspecto-ai-explain>`, A4 — shipped 2026-07-26)
 

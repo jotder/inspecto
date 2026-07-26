@@ -61,6 +61,16 @@ describe('ObjectDetailComponent', () => {
         expect(c.listLabel).toBe('Incidents');
     });
 
+    it('offers "what happened" only when the object carries a correlation id', () => {
+        const { fixture } = create();
+        expect(fixture.nativeElement.querySelector('inspecto-ai-status button[aria-label="What happened to obj-9"]')).toBeTruthy();
+
+        // Same fixture, no correlation id: nothing the timeline could be addressed by.
+        fixture.componentInstance.obj = { ...CASE, correlationId: undefined };
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-ai-status')).toBeNull();
+    });
+
     it('a transition replaces the object in place', () => {
         const { fixture, api } = create();
         const c = fixture.componentInstance;

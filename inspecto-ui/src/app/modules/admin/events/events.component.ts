@@ -26,6 +26,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { ToastrService } from 'ngx-toastr';
+import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { EventDetailDialog, EventDrilldown } from './event-detail.dialog';
 
 /** Selectable live-tail poll cadences (seconds) — polling pauses while the tab is hidden via {@link visibleInterval}. */
@@ -115,6 +116,23 @@ export class EventsComponent implements OnInit, OnDestroy {
             icon: 'heroicons_outline:information-circle',
             hint: 'Details',
             onClick: (e) => this.openDetail(e),
+        },
+        {
+            // "Why is this red" (AGT-6a A4-status). A signal is the one row that usually carries a
+            // `correlationId`, so this is the pane where the dialog answers with the exact causal chain
+            // rather than a window — the whole point of the chain path. Hidden on a row that has
+            // neither a correlation id nor a pipeline: there would be nothing to address.
+            icon: 'heroicons_outline:link',
+            hint: 'What led to this',
+            visible: (e) => !!(e.correlationId || e.pipeline),
+            onClick: (e) =>
+                this.dialog.open(AiStatusDialog, {
+                    data: {
+                        label: e.correlationId ?? e.pipeline ?? e.type,
+                        pipelineId: e.pipeline ?? undefined,
+                        correlationId: e.correlationId ?? undefined,
+                    } satisfies AiStatusData,
+                }),
         },
     ];
 

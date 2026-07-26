@@ -1,9 +1,11 @@
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
+import { AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ReportsService, RunStatus, StatusReport } from 'app/inspecto/api';
 import { ProcessingStatusComponent } from './processing-status.component';
@@ -22,7 +24,7 @@ const REPORT: StatusReport = {
     pipelines: PIPELINES,
 };
 
-function create(report: StatusReport | null = REPORT) {
+function create(report: StatusReport | null = REPORT, dialogOpen?: (...args: unknown[]) => unknown) {
     TestBed.configureTestingModule({
         imports: [ProcessingStatusComponent],
         providers: [
@@ -32,6 +34,8 @@ function create(report: StatusReport | null = REPORT) {
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
+    // The data-table injects the real MatDialog, so it must be overridden, not just provided.
+    if (dialogOpen) TestBed.overrideProvider(MatDialog, { useValue: { open: dialogOpen } });
     return TestBed.createComponent(ProcessingStatusComponent);
 }
 
@@ -42,6 +46,16 @@ describe('ProcessingStatusComponent', () => {
         const c = fixture.componentInstance;
         expect(c.report?.pipelines).toHaveLength(2);
         expect(c.cards.map((x) => x.value)).toEqual(['2', '1', '351', '2']);
+    });
+
+    it('asks "what happened" for the row\'s own pipeline, over the windowed path', () => {
+        const open = vi.fn();
+        const fixture = create(REPORT, open);
+        fixture.detectChanges();
+        fixture.componentInstance.rowActions[0].onClick(PIPELINES[1]);
+        expect(open).toHaveBeenCalledWith(AiStatusDialog, {
+            data: { label: 'billing_daily', pipelineId: 'billing_daily' },
+        });
     });
 
     it('renders with no a11y violations', async () => {

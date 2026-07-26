@@ -1,5 +1,6 @@
 import { Component, inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
@@ -8,6 +9,7 @@ import { ReportsService, RunStatus, StatusReport } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
+import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 
 /** A summary card above the grid. */
 interface MetricCard {
@@ -31,6 +33,7 @@ interface MetricCard {
 export class ProcessingStatusComponent implements OnInit {
     private api = inject(ReportsService);
     private router = inject(Router);
+    private dialog = inject(MatDialog);
 
     loading = false;
     report: StatusReport | null = null;
@@ -57,6 +60,17 @@ export class ProcessingStatusComponent implements OnInit {
     ];
 
     readonly rowActions: InspectoRowAction<RunStatus>[] = [
+        {
+            // "Why is this red" (AGT-6a A4-status) — this row IS the pipeline's state, so it is the
+            // natural place to ask. No correlationId here, so the dialog takes the windowed path,
+            // focused on this pipeline. Ungated: reading state is not an authoring act.
+            icon: 'heroicons_outline:information-circle',
+            hint: 'What happened',
+            onClick: (r) =>
+                this.dialog.open(AiStatusDialog, {
+                    data: { label: r.pipeline, pipelineId: r.pipeline } satisfies AiStatusData,
+                }),
+        },
         {
             icon: 'heroicons_outline:rectangle-group',
             hint: 'Open provenance & lineage for this pipeline',
