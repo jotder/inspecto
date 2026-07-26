@@ -42,6 +42,9 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
     }, {
         id: 'exchange.approve', kind: 'action', capability: 'canApproveShares',
         label: 'Decide share requests (approve / deny / revoke)',
+    }, {
+        id: 'exchange.request', kind: 'action', capability: 'canRequestShares',
+        label: 'Request access to another space’s offer',
     }],
     settings: [{
         id: 'access.configure', kind: 'action', capability: 'canConfigureAccess',

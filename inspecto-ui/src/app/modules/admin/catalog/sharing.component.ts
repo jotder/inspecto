@@ -141,11 +141,16 @@ export class SharingComponent implements OnInit {
         return this.view() === 'by-me' && this.lens.canApproveShares();
     }
 
+    /** Consumer-side acts: the with-me view **and** `canRequestShares`, which gates both
+     *  `POST /exchange/requests` and `POST /exchange/grants/…/pin` server-side. */
+    private canConsume(): boolean {
+        return this.view() === 'with-me' && this.lens.canRequestShares();
+    }
+
     /** by-me: the owner's grant lifecycle actions (approve/deny a request, revoke an active grant).
      *
-     *  Each owner-side decision additionally requires `canApproveShares`, the capability the server
-     *  gates `POST /exchange/grants/…` on. Consumer-side actions (request access, pin) are a different
-     *  question and stay as they were. */
+     *  Each owner-side decision additionally requires `canApproveShares`, and each consumer-side act
+     *  `canRequestShares` — the two capabilities the server gates `POST /exchange/grants/…` on. */
     readonly grantActions: InspectoRowAction<ExchangeGrant>[] = [
         {
             icon: 'heroicons_outline:check',
@@ -169,7 +174,7 @@ export class SharingComponent implements OnInit {
             // Consumer governance (S3): pin an active grant to a fixed snapshot version.
             icon: 'heroicons_outline:bookmark',
             hint: (g) => (g.pin ? `Pinned to ${g.pin} — change or clear` : 'Pin a snapshot version'),
-            visible: (g) => this.view() === 'with-me' && g.status === 'active',
+            visible: (g) => this.canConsume() && g.status === 'active',
             onClick: (g) => this.govern(g, 'pin'),
         },
         {
@@ -186,7 +191,7 @@ export class SharingComponent implements OnInit {
         {
             icon: 'heroicons_outline:paper-airplane',
             hint: 'Request access',
-            visible: (o) => this.view() === 'with-me' && !this.inFlight(o),
+            visible: (o) => this.canConsume() && !this.inFlight(o),
             onClick: (o) => this.requestAccess(o),
         },
         {

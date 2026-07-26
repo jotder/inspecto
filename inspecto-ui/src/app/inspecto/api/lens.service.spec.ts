@@ -115,9 +115,10 @@ describe('LensService', () => {
         expect(service.canTriageRequirements()).toBe(true);
         expect(service.canOfferDatasets()).toBe(true);
         expect(service.canApproveShares()).toBe(true);
-        // ...but it still cannot author or operate: those it genuinely was not granted
+        // ...but it still cannot author or operate, nor request a share (not in the admin seed):
         expect(service.canAuthorWorkbench()).toBe(false);
         expect(service.canOperateRuns()).toBe(false);
+        expect(service.canRequestShares()).toBe(false);
     });
 
     // The inverse of the admin case, and the bug the Exchange panes actually had: without a capability
@@ -132,6 +133,22 @@ describe('LensService', () => {
         expect(service.canAuthorWorkbench()).toBe(true);
         expect(service.canOfferDatasets()).toBe(false);
         expect(service.canApproveShares()).toBe(false);
+        expect(service.canRequestShares()).toBe(false); // not in the developer seed either
+    });
+
+    // canRequestShares is LENS-SCOPED, not identity (2026-07-26): every seeded role holding it also
+    // qualifies for Builder or Ops, so the Business snap that stranded the admin capabilities cannot
+    // reach it — and the admin seed, which is Business-only, pointedly does not hold it.
+    it('canRequestShares follows the lens: granted to a builder, suppressed in the Business view', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canAuthorWorkbench', 'canRequestShares']); // the developer seed
+
+        expect(service.currentLens()).toBe('builder');
+        expect(service.canRequestShares()).toBe(true);
+        service.selectLens('business'); // "View as" a business user — a read-only preview
+        expect(service.canRequestShares()).toBe(false);
     });
 
     it('exposes the three lenses in display order', () => {

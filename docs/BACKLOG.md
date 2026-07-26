@@ -1,7 +1,8 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-26 (**D7 tags backend complete** — phases 1+2 plus rename/delete; only the UI is
-open, see §6. Previously 2026-07-25: **decision session — all seventeen §2 calls answered**; each call's rationale
+**Updated:** 2026-07-26 (**every route capability now has a client signal + action node** — the
+`canRequestShares` residual closed, decided lens-scoped; earlier same day **D7 complete end-to-end**,
+plan archived, residuals only in §6. Previously 2026-07-25: **decision session — all seventeen §2 calls answered**; each call's rationale
 now lives in its OKF/plan concept home, and the items they gated moved from "blocked on a call" to
 "schedulable build". Earlier same day: compaction pass, shipped strikethrough narrative removed in favour
 of OKF pointers) · **Owner:** whole team (update at every handoff that closes/opens an item)
@@ -258,13 +259,6 @@ standards-only. *(Keycloak + WSO2 APIM are a supported example, not the answer.)
 non-blocking:**
 - **Policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility + a
   "why denied?" explain endpoint + a read-only Policies tab all shipped 2026-07-24).
-- **`canRequestShares` is ungated client-side.** The consumer-side Exchange actions ("Request access",
-  "Pin a snapshot version") render for every subject and fail 403 on click for anyone without the grant —
-  the same false-positive the owner-side actions had until 2026-07-26. Not fixed with them because whether
-  requesting a share is an **identity** or a **lens-scoped** capability is a genuine call: unlike
-  `canOfferDatasets`/`canApproveShares` it is developer/ops-tier, not Admin, so a lens plausibly does
-  represent it. *(The admin-only lens/capability mismatch this sat under is CLOSED — `identityCapability`
-  shipped 2026-07-25, the Exchange half 2026-07-26.)* → `okf/backend/editions/auth-security.md`
 - X-Actor **full removal** — client-migration-gated (see §4 API v1).
 
 > **Do not partially implement security concerns elsewhere** — this section stays the single scope.

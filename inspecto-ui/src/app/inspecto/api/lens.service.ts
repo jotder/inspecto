@@ -206,6 +206,18 @@ export class LensService {
     readonly canApproveShares = computed(
         () => this.identityCapability('canApproveShares', 'exchange.approve'));
 
+    /** May request access to another Space's offer and pin a consumed snapshot
+     *  (`POST /exchange/requests`, `POST /exchange/grants/…/pin`). RBAC: the builder roles, Operations,
+     *  Power/Super — deliberately broad, because an owner still has to approve (`Roles.SEED`, D14).
+     *
+     *  {@link lensCapability}, unlike its two Exchange siblings (operator call 2026-07-26). Every seeded
+     *  role holding it also holds `canAuthorWorkbench` or `canOperateRuns`, so it always qualifies for a
+     *  non-Business lens and lens-scoping strands nobody — the deadlock that forced the Admin-owned
+     *  capabilities to identity cannot arise here. The `business` seed pointedly does *not* hold it, and
+     *  "I want this dataset to build with" is exactly an activity a lens represents. */
+    readonly canRequestShares = computed(
+        () => this.lensCapability('canRequestShares', 'exchange.request'));
+
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */
     selectLens(lens: Lens): void {

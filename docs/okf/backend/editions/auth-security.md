@@ -209,7 +209,7 @@ The rule is now split, and the split is the durable fact:
 | | Predicate | Members |
 |---|---|---|
 | **Identity** — who the subject *is* | `granted && allows` | `canConfigureAccess`, `canCurateMenus`, `canOnboardConnections`, `canTriageRequirements`, `canOfferDatasets`, `canApproveShares` |
-| **Lens-scoped** — the activity a lens *represents* | `granted && !readOnly && allows` | `canAuthorWorkbench`, `canOperateRuns`, `canAuthorAlertRules` |
+| **Lens-scoped** — the activity a lens *represents* | `granted && !readOnly && allows` | `canAuthorWorkbench`, `canOperateRuns`, `canAuthorAlertRules`, `canRequestShares` |
 
 **The Exchange half landed 2026-07-26, and it was the mirror-image bug.** `canOfferDatasets` and
 `canApproveShares` had no `LensService` signal at all, so the UI gated Offer on nothing but the
@@ -221,7 +221,18 @@ capabilities (Admin-owned, and admin never qualifies for a non-Business lens), w
 > The generalisable lesson: **a capability the server enforces but the client never reads is a bug in
 > both directions** — a false negative hides an affordance the subject is entitled to, a false positive
 > offers one that 403s. When adding a `withCapability` route, check whether a `LensService` signal and an
-> action node exist for it. `canRequestShares` is the remaining instance (BACKLOG §5).
+> action node exist for it. **As of 2026-07-26 every route capability has both** — the last instance,
+> `canRequestShares`, closed below.
+
+**`canRequestShares` is the one Exchange capability that is lens-scoped** (2026-07-26). Same bug shape as
+its two siblings — "Request access" and "Pin a snapshot version" rendered for everyone and 403'd on click —
+but the opposite classification, and the reason is worth keeping: **which side of the table a capability
+falls on is decided by whether lens-scoping can strand a role, not by the feature it belongs to.** Every
+seeded role holding `canRequestShares` (the three builder roles, `operations`, `power`, `super`) also holds
+`canAuthorWorkbench` or `canOperateRuns`, so it always qualifies for a non-Business lens and the Business
+snap that stranded the admin seed cannot reach it; the `business` seed pointedly does not hold it. It is
+also genuinely an activity — "I want this dataset to build with" — where offering and approving are
+governance. Action node `exchange.request`, same Data Catalog group.
 
 Three things a future change must not undo:
 

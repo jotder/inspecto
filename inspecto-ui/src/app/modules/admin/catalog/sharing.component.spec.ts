@@ -45,7 +45,7 @@ async function create(
     view: 'with-me' | 'by-me',
     exchange: Partial<ExchangeService> = {},
     dialogResult?: unknown,
-    { canApproveShares = true, canOfferDatasets = true } = {},
+    { canApproveShares = true, canOfferDatasets = true, canRequestShares = true } = {},
 ) {
     const api = {
         grants: () => of(GRANTS),
@@ -73,6 +73,7 @@ async function create(
                 useValue: {
                     canApproveShares: () => canApproveShares,
                     canOfferDatasets: () => canOfferDatasets,
+                    canRequestShares: () => canRequestShares,
                 },
             },
         ],
@@ -130,6 +131,16 @@ describe('SharingComponent', () => {
         const expiry = c.grantActions.find((a) => typeof a.hint === 'function'
             && (a.hint as (g: ExchangeGrant) => string)(active).includes('expiry'))!;
         expect(expiry.visible!(active)).toBe(false);
+    });
+
+    // The consumer-side mirror: the server gates POST /exchange/requests and …/pin on
+    // canRequestShares, so a subject without it must see neither affordance.
+    it('with-me: a subject without canRequestShares can neither request nor pin', async () => {
+        const { fixture } = await create('with-me', {}, undefined, { canRequestShares: false });
+        const c = fixture.componentInstance;
+        expect(c.offerActions[0].visible!(c.myOffers()[1])).toBe(false); // request — nothing in flight
+        const pin = c.grantActions.find((a) => a.icon === 'heroicons_outline:bookmark')!;
+        expect(pin.visible!(c.myGrants()[0])).toBe(false); // pin — an active grant I consume
     });
 
     it('by-me: refreshing a snapshot requires canOfferDatasets', async () => {
