@@ -64,9 +64,15 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   `/components/{type}/{id}/versions` + `restore` apply); a successful restore reloads the view list.
   Frontend-only (`ComponentsService.versions/restore` were already wired).
   **2026-07-26 shipped V2 (b) sharing** — the Exchange `kind` axis now carries `link-analysis-view`; see the
-  D9 bullet below and [exchange-sharing.md](../../backend/control-plane/exchange-sharing.md). Remaining V2
-  (BACKLOG): **(c)** domain-seeded pattern packs owned by a dedicated system Space (D16) and **(d)** AI
-  assist routed through the shared assist seam.
+  D9 bullet below and [exchange-sharing.md](../../backend/control-plane/exchange-sharing.md). **2026-07-26
+  also shipped V2 (d)'s vocabulary half**: `<inspecto-ai-explain screen="Link Analysis">` in the header
+  declares six canonical terms (Entity · Link · Entity Projection · Link-Analysis View · Dataset · Widget),
+  making this the 12th adopter — the pane most in need of it, since the glossary bans using Entity/Link for
+  artifacts or assets and this is the one studio where they are the subject. No backend
+  (`glossary_lookup` is non-mutating). Remaining V2 (BACKLOG): **(c)** domain-seeded pattern packs owned by a
+  dedicated system Space (D16), and **(d)'s authoring half** — open, and *not* a mechanical adoption: nothing
+  drafts a **projection mapping** (column→Entity choices over a Dataset's real columns) today, and that
+  mapping is the pane's actual authoring act, so which L1 tool backs it is still a call.
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
   "View on map" (pivots to Geo Map Analysis with the same record); see
   [Investigation Pivot](investigation-pivot.md) for the shared contract.

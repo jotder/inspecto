@@ -131,7 +131,7 @@ src/app/
   the header. Three rules: **the PANE declares the terms** (never a free-text box — that is a docs search
   engine, and it re-states what the screen already knows); terms are **canonical** spellings, never banned
   synonyms; and it is **NOT gated on `canAuthorWorkbench()`** — it has no write path, and a Business-lens
-  user is who needs it most, so don't "make it consistent" with the authoring surface. Adopted on 11 panes.
+  user is who needs it most, so don't "make it consistent" with the authoring surface. Adopted on 12 panes.
   ⚠ A new pane's terms must also be added to the **subset** `GLOSSARY` map in `mock/handlers/agent.handler.ts`
   (verbatim from the real file) or they can't resolve offline.
 - **"Why is this red" on a ROW → `<inspecto-ai-status>`** (`inspecto/ai-assist/`, AGT-6a A4-status). The third

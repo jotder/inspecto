@@ -192,9 +192,11 @@ component *is* do not apply, so a mode flag would leave half of it dead on every
 and the dialog explains the module is absent instead of failing. There is **no model in the loop**: the
 operator reads the binding glossary, not a paraphrase of it.
 
-**Adopted on 11 panes** (12 routes — `object-mail` serves both `/incidents` and `/cases` and switches its
+**Adopted on 12 panes** (13 routes — `object-mail` serves both `/incidents` and `/cases` and switches its
 term list on `isIncident`): Pipelines · Datasets · Catalog · Expectations · Alerts · Collectors · Query
-Library · Runs · Scheduler · Tags · Incidents/Case Manager.
+Library · Runs · Scheduler · Tags · Incidents/Case Manager · **Link Analysis** (2026-07-26, as
+link-analysis V2 (d)'s vocabulary half — the pane with the most specialised vocabulary in the app, since
+Entity/Link mean something here that the glossary explicitly bans using for artifacts or assets).
 
 ⚠ **The offline `GLOSSARY` map in `agent.handler.ts` is a subset** of the real file (the SPA cannot read
 `docs/`), so a term a new pane declares must be added there too or it falls through to a `docs_search`
