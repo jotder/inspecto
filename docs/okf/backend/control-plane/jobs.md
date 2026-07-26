@@ -147,7 +147,8 @@ Design of record (all phases + resolved decisions + TOON config gallery):
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:
 `cleanup` (retention knobs `max_count`/`max_size`/`archive_dir`/`min_keep` — the newest N are never retired),
-`ledger_prune`, `runlog_prune`, `notification_prune` (`retention_days` required — deliberate forgetting;
+`ledger_prune`, `runlog_prune`, `notification_prune`, `receipt_prune`, `incident_purge` (see below —
+the only destructive task over operator business records) (`retention_days` required — deliberate forgetting;
 `notification_prune` forgets in-app feed entries older than the window whatever their read/archived state,
 via `NotificationStore.prune`/`countPrunable`, the per-space feed attached to `JobService` post-construction),
 `db_maintenance`
@@ -174,19 +175,66 @@ fail-closed) / `restore` (manifest validation before any write, zip-slip jail, c
   Read-only, fail-soft on <2 samples. The catalog's `created_ms` (epoch millis) is the sortable/filterable key —
   ISO strings aren't reliably chronological across variable precision. Open COULD follow-ons: space-to-space
   comparison, predictive maintenance (the latter is AGT-5/self-healing territory, deliberately deferred).
-* **Archived-Incident sweep (MNT-14) — retention model DECIDED 2026-07-25 (BACKLOG D5): a retention tier,
-  NOT archive-is-terminal.** `Archived` is a real lifecycle state (today the workflow is only
-  OPEN→…→CLOSED) but it is **not** the end of the line: an archived Incident carries a **retention window**,
-  and expiry of that window is what makes it eligible for purge/cold-store. Rationale: archive-is-terminal
-  would have made "archived" mean "kept forever", which is exactly the posture the NFR-7 compliance work
-  (see `superpower/compliance-certifications-plan.md`) has to be able to bound and evidence — a retention
-  tier lets a deployment answer "how long do we keep incident records" with configuration instead of a code
-  change. Consequences for the build:
-  * Retention is **per-tier, operator-configured**, and the sweep is the *enforcer* of a tier, not the owner
-    of a hardcoded age. CLOSED→`Archived` and `Archived`→purge are two separate windows.
-  * Purge is a **real deletion** and needs the `ObjectStore` delete API (shipped 2026-07-24) — so the
-    surviving blocker is the `Archived` lifecycle state itself, no longer the delete seam.
-  * The sweep must be **dry-run-first and report what it would purge** before it purges; a retention sweep
-    that silently deletes case history is the one failure here nobody can undo.
-  * A legal-hold / exempt escape hatch is required, otherwise retention expiry can destroy records that an
-    open investigation still needs. Runbook: `docs/ops/backup-restore-runbook.md`.
+### `incident_purge` — the archived-Incident retention sweep (MNT-14, shipped 2026-07-27)
+
+The retention model is **a retention tier, NOT archive-is-terminal** (BACKLOG D5, decided 2026-07-25):
+an `ARCHIVED` Incident carries a **retention window**, and expiry of that window is what makes it
+purge-eligible. Archive-is-terminal would have made "archived" mean "kept forever" — exactly the posture the
+NFR-7 compliance work has to be able to bound and evidence. `CLOSED→ARCHIVED` and `ARCHIVED→purge` are two
+separate windows, and the sweep *enforces* a tier rather than owning a hardcoded age.
+
+**Task:** `task: incident_purge`, `retention_days` **required** (no default — a defaulted window on the one
+task that hard-deletes business records would be indefensible), optional `max_count` (default 1000) bounding
+one run. Dry-run-first like every write task. Named `purge`, not `*_prune` like its siblings, because the
+blast radius genuinely differs: the `*_prune` tasks trim housekeeping telemetry, this deletes operator
+business records irreversibly.
+
+Retention is **derived** — `closedAt + retention_days`, where `closedAt` is the archive timestamp the
+terminal transition already stamps. No new column, no per-object expiry to keep in step. ⚠ Trade-off accepted
+consciously: **shortening `retention_days` later retroactively makes older records eligible**, so the sweep
+does not honour "what was promised when this was archived". If that guarantee is needed it becomes a stamped
+attribute — cheap then, so not pre-built.
+
+Two premises in the original scoping were **wrong**, and both are worth remembering as a pattern:
+
+* "The blocker is building the `Archived` state" — it already shipped. `Workflow.defaultFor(INCIDENT)` has
+  `ARCHIVED` as its sole terminal state, and terminal transitions already stamp `closedAt`.
+* "G4 needs four new `JobService` store hooks, fail-CLOSED on partial attachment" — **no new hooks were
+  needed at all.** `JobService.objects(ObjectService)` already existed and was already wired, and
+  `ObjectService` holds all four stores as non-null final fields. ⚠ **There is therefore no partially
+  attached cascade to fail closed on** — the engine is present or absent whole. Do not add per-store hooks
+  beside `objects()`; four independently-nullable fields would *reintroduce* the half-cascade hazard this
+  shape rules out.
+
+The seams, all in `com.gamma.ops`:
+
+| Seam | What it is | Why it is shaped that way |
+|---|---|---|
+| `ObjectQuery.closedBefore` + `oldestFirst`, entry point `ObjectQuery.purgeEligible(type,status,cutoff,limit)` | Eligibility selection | `ObjectQuery` is already the single shape driving both `matches()` (in-memory) and SQL `WHERE`, so the backends **cannot diverge** on the predicate. A 9-arg constructor still delegates to the canonical one, which is the only reason widening the record was non-breaking — **don't tidy that overload away.** |
+| `ObjectService.purge(id, actor)` → `PurgeOutcome(notes, links, tagEdges)` | The cascade | `ObjectStore.delete` explicitly does not cascade; this service is the one place holding all four stores. |
+| `NoteStore.deleteForTarget` · `LinkStore.removeAllIncident` · `TagAssignmentStore.removeAllForTarget` | Bulk delete-by-target | Shipped as **abstract** methods (a MAJOR widening of three `@PublicApi` interfaces) after verifying each has exactly two implementors and no test fakes. A silent no-op `default` would have orphaned rows quietly — the exact failure these prevent. |
+| `ObjectService.ATTR_LEGAL_HOLD` + `hasLegalHold(o)` | Legal hold | Fail-safe: only `false`/`0`/`no`/`off` or blank clears a hold; anything else holds. The mistakes are asymmetric — wrongly keeping a record costs storage, wrongly purging one is unrecoverable. |
+
+⚠ **Correctness comes from the cutoff, not the ordering.** Because `closedBefore` is in the `WHERE`, every
+row a capped page returns is eligible whichever end of the corpus it came from — that alone kills the
+"reports 0 prunable against a fully-expired corpus" failure, which was the worst outcome available here (a
+silent, plausible-looking wrong answer). `oldestFirst` only decides *which* eligible rows a capped sweep
+takes first.
+
+Three further invariants the code enforces rather than merely documenting:
+
+* **Dependents are deleted before the object.** If a later step fails the object still exists and the next
+  sweep retries it; the reverse leaves notes and edges pointing at an id that no longer resolves.
+* **Legal hold is re-checked inside `purge()`**, not only in the preview — a hold applied between preview
+  and run has nowhere else left to take effect. `purge` throws on a held object; the task logs the refusal
+  and continues, because a refusal *is* the hold working. The dry run reports held-but-expired as its own
+  count ("12 eligible, 3 held"); an operator cannot trust a sweep whose arithmetic doesn't add up.
+* **The store cannot filter on the hold at all** (attribute bag, not a column), so `purgeEligible` returns
+  held rows by design and every caller must exclude them. That split is deliberate.
+* ⚠ **A purge is NOT "all trace removed" (G3 — a stated decision).** The event ledger is append-only, so a
+  purged Incident's `OBJECT_ACTIVITY` history — including its own purge record — outlives it permanently.
+  The audit log is not the record being retention-managed. This is the first question a legal/DPA reviewer
+  asks, so it is asserted by a test, not just written down.
+
+Scoped to `ObjectType.INCIDENT` because `ARCHIVED` exists only in the Incident workflow; generalise when a
+second type gains a terminal archive state. Runbook: `docs/ops/backup-restore-runbook.md`.

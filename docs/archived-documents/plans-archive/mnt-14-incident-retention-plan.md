@@ -1,9 +1,21 @@
 # MNT-14 — archived-Incident retention sweep (plan)
 
-**Status:** ACTIVE — scoped 2026-07-27; **§4 steps 1–3 BUILT + verified the same day** (G5 legal hold, G1
-purge-eligibility query, G2 bulk delete-by-target). Steps 4–6 open: `JobService` hooks, the
-`incident_purge` task itself, docs. · **Decision of record:** BACKLOG §2 D5 (retention tier, not
-archive-is-terminal) · **Home when shipped:** `docs/okf/backend/control-plane/jobs.md`
+**Status:** ✅ **ARCHIVED — SHIPPED end-to-end 2026-07-27** (all six §4 steps; reactor 2304/0/0/3). This file
+is kept for provenance only and is **not maintained**. The durable as-built facts live in
+**`docs/okf/backend/control-plane/jobs.md`** (`incident_purge`) — read that, not this. Residuals are in
+`docs/BACKLOG.md` §6.
+
+> ⚠ **Two things this plan asserted turned out to be wrong** — noted here so a reader of the archive is not
+> misled by §3 below:
+> - **§3 G4 is wrong.** It calls for four new `JobService` store hooks and a fail-CLOSED guard on partial
+>   attachment. **No new hooks were needed:** `JobService.objects(ObjectService)` already existed and was
+>   already wired by `CollectorService`, and `ObjectService` holds all four stores as non-null final fields
+>   — so **there is no partially-attached cascade to fail closed on.** The only real gap was that
+>   `jobServiceOrCreate()` (the lazily-created path) never wired it.
+> - **§3 G1 frames the ordering as the fix.** It is the smaller half: correctness comes from the **cutoff**
+>   being in the `WHERE`, which makes every row a capped page returns eligible.
+>
+> · **Decision of record:** BACKLOG §2 D5 (retention tier, not archive-is-terminal)
 
 > **As-built for steps 1–3** (`RetentionSweepSeamTest`, 8 tests; reactor 2296/0/0/3):
 >

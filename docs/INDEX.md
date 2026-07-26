@@ -143,13 +143,16 @@ former root reference docs** (each index lists them):
   As-built lives in [`okf/backend/control-plane/tags.md`](okf/backend/control-plane/tags.md): the edge-side
   `WidgetTags` projection, adopt-on-create vs overwrite-on-update, the lazy per-Space backfill (it cannot run
   at route registration), and why the save dialog's tags field had to go.
-- [`superpower/mnt-14-incident-retention-plan.md`](superpower/mnt-14-incident-retention-plan.md) —
-  **MNT-14 archived-Incident retention sweep — SCOPED 2026-07-27, build not started.** ⚠ Opens by
-  correcting the backlog's premise: the `ARCHIVED` state **already ships**, so MNT-14 was never blocked on
-  it. The real prerequisites are an oldest-first object query (a newest-first sweep silently reports "0
-  prunable" on an expired corpus), bulk delete-by-target on `NoteStore`/`LinkStore`/`TagAssignmentStore`
-  (none has one), four `JobService` hooks, and a legal-hold attribute — plus the stated decision that the
-  append-only event trail can never be cascaded.
+- ~~`superpower/mnt-14-incident-retention-plan.md`~~ — **SHIPPED end-to-end 2026-07-27 (the
+  `incident_purge` maintenance task — the last root enabler), plan archived** to
+  [`archived-documents/plans-archive/mnt-14-incident-retention-plan.md`](archived-documents/plans-archive/mnt-14-incident-retention-plan.md).
+  As-built lives in [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md): the derived
+  retention window (`closedAt + retention_days`, no new column), why correctness comes from the **cutoff**
+  and not the ordering, the `ObjectService.purge` cascade and its dependents-before-object ordering, legal
+  hold enforced inside `purge()` rather than only at preview, and the stated G3 decision that the
+  append-only event trail **survives** a purge. ⚠ Two premises the plan itself corrected or got wrong are
+  recorded there: the `ARCHIVED` state was never the blocker, and G4's four `JobService` store hooks were
+  never needed.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5

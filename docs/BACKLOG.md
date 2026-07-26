@@ -1,11 +1,15 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-27 (**MNT-14 prerequisites G1 + G2 + G5 BUILT** — purge-eligibility now has a correct
-cutoff query on both `ObjectStore` backends, the three dependent stores have bulk delete-by-target, and
-legal hold exists as a fail-safe attribute. All additive, **nothing consumes them yet**; G4 + the
-`incident_purge` task remain. ⚠ Two framings in the scoping were off: the *cutoff* rather than the ordering
-is what kills the "0 prunable" bug, and the widening went in as plain abstract methods once it was verified
-that only the two known impls exist per interface. See §6.) · Previously 2026-07-27 (**AGT-6a plan D9 SHIPPED** — `ConfigJsonSchema` projects any `ConfigSpec` into a
+**Updated:** 2026-07-27 (**MNT-14 COMPLETE — the `incident_purge` maintenance task ships**, the last root
+enabler, and `ObjectStore.delete` finally has its production caller. `ObjectService.purge` cascades to
+notes/attachments, links and tag edges; selection is `ObjectQuery.purgeEligible`; legal hold is enforced
+**inside** `purge()` so a hold applied between preview and run still wins; the dry run reports held-but-
+expired as its own count. ⚠ **G4's premise was WRONG** — the four `JobService` store hooks it called for
+were never needed: `objects(ObjectService)` already existed and was already wired, and `ObjectService` holds
+all four stores as non-null finals, so **there is no partial cascade to fail closed on**. ⚠ Three
+`@PublicApi` interfaces gained abstract methods earlier the same day ⇒ a **third** reason the next release
+is MAJOR. Plan archived; as-built in `okf/…/jobs.md`; residuals — chiefly operator retention docs carrying
+the G3 "a purge is not all-trace-removed" stance — in §6.) · Previously 2026-07-27 (**AGT-6a plan D9 SHIPPED** — `ConfigJsonSchema` projects any `ConfigSpec` into a
 real JSON Schema and the new `config_schema` L1 read tool exposes it, closing A5's stated prerequisite;
 ⚠ deliberately *not* a tighter `component_draft` schema. Same day: **D11 MEASURED — the number is `2GB`**,
 and two of its premises are wrong: ingest peak does **not** scale with file size (~1 GiB flat at 1.0 and
@@ -66,13 +70,11 @@ each row's detail stays in its own section.
    engineering task: five OAuth secrets, one of them a named-customer production credential, were public
    on GitHub for six weeks. The code is clean as of 2026-07-25 but **rotation at the issuer is
    outstanding** — history keeps the values, so deletion remediated nothing.
-1. **Root enablers — DRAINED.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound, Incidents I1
-   resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
-   2026-07-23/24. The one survivor is **MNT-14**; its retention question is now answered (§2 D5 —
-   retention tier). ⚠ **Re-scoped 2026-07-27:** the `Archived` state it was said to be waiting on
-   **already ships**, but the sweep needs an oldest-first object query and bulk delete-by-target on three
-   dependent stores first — a multi-part build, not the small one this line implied. See §6 "MNT-14 — the
-   real prerequisites".
+1. **Root enablers — DRAINED, now including MNT-14.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound,
+   Incidents I1 resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
+   2026-07-23/24; the last survivor **MNT-14 shipped 2026-07-27** as the `incident_purge` maintenance task
+   (§2 D5's retention tier, enforced). `ObjectStore.delete` finally has its production caller. §6 carries
+   the residuals (operator retention docs, no scheduled instance) and the two wrong premises it corrected.
 2. **Decision gates — DRAINED 2026-07-25.** §2 is empty; see it for what each call was and where the
    rationale lives. Several rows below changed shape as a result, and three had **wrong premises**
    corrected (D3 legacy-route framing, D7 tags-are-greenfield, D14 already-tightened) — trust §2 over
@@ -82,10 +84,9 @@ each row's detail stays in its own section.
    `tokenEndpoint` (D15) · chunking on by default at 8 GiB (D12). **One deliberate deviation: D11's
    on-by-default `memory_limit` was NOT shipped** — operator call, see §6.
 4. **Dependent chains (sequence behind a build, no longer behind a decision):** Lens Access P3 · NFR-7
-   execution (now parallel — C1 is not a predecessor, D1) · MNT-14 (⚠ **not** "after the `Archived` state" —
-   that already ships; after the oldest-first query + bulk delete-by-target, see the §6 row and
-   `superpower/mnt-14-incident-retention-plan.md`) ·
+   execution (now parallel — C1 is not a predecessor, D1) ·
    Postgres multi-user (write the `docs/superpower/` plan first, then store pooling).
+   *(MNT-14 left this list 2026-07-27 — shipped.)*
 5. **Independent — schedule by value, no ordering constraint:**
    - **AGT-6a inline AI authoring** — **A1–A4 shipped 2026-07-26**; what is left are the three
      residual rows in §3 — **A4-status closed 2026-07-26** (all four operational panes adopted), leaving
@@ -166,7 +167,7 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 |---|---|---|
 | **API v1** | X-Actor **full removal** (already rejected outright on Standard/Enterprise; removal is client-migration-gated with the API-v1 sunset) · UI sign-out affordance (absorbed by the §5 gateway topology) · adopt the cursor-pagination seam on further list families **as demanded** (4 adopters live) · adopt the `ETags.respond` wrapper on further singleton reads **as demanded** (list/paginated routes deliberately excluded) · Standard-edition jlink runtime vs Nimbus not re-verified (`-NoRuntime` until confirmed) | `okf/backend/api/api-v1.md` |
 | **Bundle / Exchange** | ~~missing kind `connection`~~ **DONE 2026-07-25 (D2: reference-only, secrets stripped)** — the `BundleRoutes` kind set is now complete · ~~widen the Exchange `kind` axis to carry saved views (**§2 D9**)~~ **DONE 2026-07-26** — `link-analysis-view` is a first-class Exchange kind, live-mode only, closure over every dataset it reads; as-built in the OKF doc · `requires` present-but-different classification · per-editor "load as draft" import — **not a small buildable**: `BundleTransferService.write` commits straight through each store, there is no generic draft seam, and editors open by route/id (not injected content); design-first, likely multi-session, **do not fake it with a cross-kind `enabled:false` stamp** | `okf/backend/control-plane/exchange-sharing.md` |
-| **Job framework** | MNT-14 archived-Incident sweep — **retention model decided (D5: retention tier + a real `Archived` state, dry-run-first sweep, legal-hold exemption)**. ⚠ **The stated blocker is a WRONG PREMISE (corrected 2026-07-27): the `ARCHIVED` state ALREADY SHIPS** — `Workflow.defaultFor(INCIDENT)` (`Workflow.java:173-183`) has it as the sole terminal state with `archive` from `IDENTIFIED`/`DIAGNOSING`/`RESOLVED` and `reopen` back to `DIAGNOSING`, and terminal transitions already stamp `closedAt` (= the archive time, cleared on reopen), so **the retention window needs no new column**. MNT-14 was never blocked on that. What it is *actually* blocked on is 4× bigger and listed in §6 ("MNT-14 — the real prerequisites") · maintenance COULD tier: space-to-space comparison · predictive maintenance (AGT-5/self-healing territory, deliberately deferred) | `okf/backend/control-plane/jobs.md` |
+| **Job framework** | ~~MNT-14 archived-Incident sweep~~ **SHIPPED 2026-07-27** as `incident_purge` (D5's retention tier, enforced; dry-run-first, legal-hold exemption, cascade to notes/links/tag edges). Residuals in §6 — chiefly **operator retention docs carrying the G3 stance** (the append-only event trail survives a purge) and no scheduled instance · maintenance COULD tier: space-to-space comparison · predictive maintenance (AGT-5/self-healing territory, deliberately deferred) | `okf/backend/control-plane/jobs.md` |
 | **Queries / BI** | `graph`/`spatial`/`search`/`api` QueryTypes · more `$`-resolvers | `okf/backend/control-plane/queries.md` |
 | **Notifications** | ~~delivery-status webhooks~~ **SHIPPED 2026-07-26 (D8)** — inbound provider callbacks, SPI + SendGrid/HMAC adapters + fail-closed route; residuals (suppression policy, soft-bounce retry, SES/SNS, receipt pruning) in §6 · GeoIP · auth-gated per-user prefs / security triggers | `okf/backend/control-plane/events-metrics.md` |
 | **Signal / Decision networks** | optional S8 (connector-direct emission + cross-space controller) · a general **event-triggered consequence policy gate** (still `/apply`-only) · RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet) · ⚠ **no producer threads `causationId`**, so `/signals/tree` is flat today | `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md` |
@@ -444,7 +445,11 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 - **`NoteTargets` is now misnamed.** It is the shared annotation-target vocabulary for both notes (D10)
   and tags (D7), but still lives in `com.gamma.ops.note` under a note-specific name. Rename to something
   neutral when a change is already touching it — not worth its own churn, but it will mislead a reader.
-- **`ObjectStore.delete` — CALL MADE 2026-07-26: KEEP as a reserved seam, do not wire, do not drop.**
+- ~~**`ObjectStore.delete` — reserved seam**~~ **RETIRED 2026-07-27: MNT-14 consumed it**, exactly as this
+  row's stated closing trigger required. It is now called by `ObjectService.purge`, behind the dry-run-first
+  sweep and the legal-hold exemption D5 demanded. There is still no `DELETE /objects/{id}` and hard-delete
+  is still not generally supported — the retention sweep is the one caller. Original rationale, kept for
+  provenance:
   `12cf20eb` added `void delete(String)` to `com.gamma.ops.ObjectStore` (`:50`) with both impls and unit
   tests; it still has **no production caller and no route** — there is no `DELETE /objects/{id}`, and
   Incidents/Cases are only closed, merged, or split. Dropping it is wrong because **MNT-14's purge needs
@@ -504,60 +509,32 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     buffers, so a much larger box may want more than 2 GiB), non-CSV frontends, and the `materialize`
     task's real query shapes. A per-edition or RAM-relative default was not evaluated.
   - **Still an operator call** — this row brings the number D11 was declined for; it does not ship it.
-- **MNT-14 — prerequisites G1/G2/G5 BUILT 2026-07-27; G4 + the task itself remain.** §4 said the last
-  blocker was the `Archived` state; it already ships (see that row). The sweep's actual cost is
-  **referential cleanup + an ordering gap** — three of those five gaps are now closed
-  (`RetentionSweepSeamTest`, 8 tests, reactor 2296/0/0/3), all as **additive seams with no caller**, which
-  is what made a partial slice safe: with no cascade wired, nothing can orphan anything.
-  - ✅ **G1** — `ObjectQuery.closedBefore` + `oldestFirst` (not a bespoke store method: the record is
-    already the single shape driving both `matches()` and SQL `WHERE`, so the backends can't diverge on the
-    predicate). Entry point `ObjectQuery.purgeEligible(type, status, cutoff, limit)`. Non-breaking — a
-    9-arg constructor delegates to the new canonical one. ⚠ **The cutoff, not the ordering, is what fixes
-    the bug**: with `closedBefore` in the `WHERE` every row a capped page returns is eligible, so
-    "0 prunable on an expired corpus" is dead; `oldestFirst` only picks *which* eligible rows come first.
-  - ✅ **G2** — `NoteStore.deleteForTarget` · `LinkStore.removeAllIncident` (both ends) ·
-    `TagAssignmentStore.removeAllForTarget`, each returning a row count, on all 3 interfaces × 2 impls.
-    Shipped as **abstract** methods (the MAJOR widening §3 G2 allows) after verifying each interface has
-    exactly two implementors and no test fakes. ⚠ The Db impls **throw** on `SQLException` instead of
-    logging and returning 0 like their sibling reads — a cascade that quietly "deleted 0" orphans rows.
-  - ✅ **G5** — `ObjectService.ATTR_LEGAL_HOLD` + `hasLegalHold`, **fail-safe**: only `false`/`0`/`no`/`off`
-    or blank clears a hold, anything else holds. ⚠ The store cannot filter on it (attribute bag, not a
-    column), so the sweep must apply it itself **at purge time**, not only when building a preview.
-  - **Still open: G4** (4 `JobService` store hooks + `CollectorService` wiring, fail-CLOSED on partial
-    attachment) and **the `incident_purge` task**, then docs. `ObjectStore.delete` is still unconsumed
-    (`ObjectStore.java:39-56`) and `receipt_prune` (`MaintenanceJob.java:234-250`) is still the template.
-  - ⚠ **G3 stays a decision to state, not code**: `EventStore` is append-only, so a purged Incident's
-    activity trail outlives it and "purge" never means "all trace removed". Must be written down in the
-    task's Javadoc + operator docs, per the plan.
-
-  Original gap analysis, still accurate for the open half:
-  - ⚠ **`ObjectStore.query` returns NEWEST-first and there is no ascending mode** (`ObjectQuery.java`,
-    `MAX_LIMIT` 10 000). A sweep that takes one page therefore gets the **newest** archived Incidents and
-    systematically **misses the oldest — the only purge-eligible ones**. This is a correctness trap, not a
-    perf detail. No existing caller hits it (they are all "everything relevant, well under 10k" reads), so
-    there is no idiom to copy: either add an oldest-first/cutoff query to `ObjectStore` + both backends, or
-    push the whole thing down to a `DELETE … WHERE closed_at < ?` in `DbObjectStore` (probably the right
-    answer, and it also skips the Java page loop entirely — but `InMemoryObjectStore` still needs a path).
-  - ⚠ **No bulk delete-by-target exists on any dependent store**, and `ObjectStore.delete` explicitly does
-    not cascade: `NoteStore` has **no delete method at all** (notes *and* attachments — "attachments" are
-    `ObjectNote` rows, not a separate store) · `LinkStore` has only per-edge `remove(from,to,rel)` · the D7
-    `TagAssignmentStore` has `remove(tag,kind,id)` and `removeTag(tag)` but nothing per-target. That is
-    3 interfaces + 6 implementations of new bulk methods. ⚠ Several are `@PublicApi`, so the additions must
-    be `default` methods or they break external implementors.
-  - ⚠ **`EventStore` is append-only by contract and can never be cascaded.** A purged Incident's
-    `OBJECT_ACTIVITY` trail outlives it permanently. That is arguably correct (the audit log is not the
-    record being retention-managed) but it must be a **stated, documented decision** in the sweep, not an
-    accident — and it means "purge" never means "all trace removed", which matters for a legal answer.
-  - **Nothing is reachable from the job layer yet**: `JobService` has hooks for `notificationStore` /
-    `deliveryReceiptStore` only (`JobService.java:836-853` is the pattern); `ObjectStore`, `NoteStore`,
-    `LinkStore` and `TagAssignmentStore` each need one.
-  - **Legal hold** has no representation anywhere on an object today; it rides the `attributes` bag as a new
-    `ObjectService.ATTR_*` constant (the block at `ObjectService.java:61-72`), like `watchers`/`tags`.
-  - **Naming call to make:** every sibling is `*_prune`, but this one deletes **operator business records**
-    rather than housekeeping telemetry. Recommend `incident_purge` and a distinct verb, so no one reads it
-    as another log trim.
-  - **Full plan (build order, the five gaps, the decisions still open):**
-    [`superpower/mnt-14-incident-retention-plan.md`](superpower/mnt-14-incident-retention-plan.md).
+- **MNT-14 archived-Incident retention sweep — ✅ COMPLETE 2026-07-27, plan archived.** All five gaps
+  closed; as-built in [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md)
+  (`incident_purge`). Residual open items only:
+  - **Operator-facing retention docs** — the runbook (`docs/ops/backup-restore-runbook.md`) does not yet
+    carry a retention section. ⚠ It must state the G3 stance explicitly: **the append-only event trail
+    survives a purge, so "purge" never means "all trace removed"**. That is the first question a legal/DPA
+    reviewer asks, and the code says it while the operator docs still don't.
+  - **No UI surface and no shipped Job instance** — the task exists and is reachable by config, but nothing
+    schedules it and the Scheduler UI has no retention affordance. Deliberate: an operator should opt into a
+    destructive sweep, and the MNT-13 nightly-chain template is the natural host when someone wants one.
+  - **Retention is derived, not stamped** (`closedAt + retention_days`), so shortening `retention_days`
+    retroactively makes older records eligible — the sweep does not honour "what was promised when this was
+    archived". Accepted consciously; becomes a stamped attribute if that guarantee is ever required.
+  - **Not generalised beyond Incidents.** `ARCHIVED` is only in the INCIDENT workflow today; the task is
+    scoped to `ObjectType.INCIDENT`. Widen when a second type gains a terminal archive state.
+  - ⚠ **Two premises in the original scoping were WRONG — a pattern worth remembering.** (i) "The blocker is
+    building the `Archived` state": it already shipped. (ii) "G4 needs four `JobService` store hooks,
+    fail-CLOSED on partial attachment": **no new hooks were needed** — `JobService.objects(ObjectService)`
+    already existed and was already wired, and `ObjectService` holds all four stores as non-null final
+    fields, so **there is no partially-attached cascade to fail closed on**. Do not add per-store hooks
+    beside `objects()`; that would reintroduce the half-cascade hazard the current shape rules out.
+  - ⚠ **`ObjectQuery`'s 9-arg constructor is load-bearing** — the only reason widening the record was
+    non-breaking. Positional callers depend on it; do not tidy the overload away.
+  - ⚠ Three `@PublicApi` store interfaces gained **abstract** methods ⇒ `feat!:`. A **third** independent
+    reason the next release is MAJOR, alongside D15's required `-Dauth.oidc.tokenEndpoint` and D4's
+    `DELETE /spaces/{id}?purge=true` 409.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
@@ -608,7 +585,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 | ~~API-5 legacy sunset~~ | **RETIRED 2026-07-25** — D3 built and shipped (`be498f35`, `bbf569df`); plan and runbook both archived, as-built in `okf/…/api-v1.md`. The still-open **X-Actor full removal** (§4, §5) was always a separate client-migration-gated item and stays open |
 | EOI-7b eoiagent publish | agent-kernel-replacement §open-items |
 | eoiagent `DryRunProvider` | AGT-5 follow-on (§3) · AGT-6b prerequisite (§3) |
-| MNT-14 archived-Incident sweep | D5 answered (retention tier); remaining blocker = build the `Archived` state |
+| ~~MNT-14 archived-Incident sweep~~ | **RETIRED 2026-07-27** — shipped as the `incident_purge` maintenance task; plan archived, as-built in `okf/…/jobs.md`, residuals in §6. ⚠ Its two long-standing framings were both WRONG: the `Archived` state was never the blocker, and G4's four `JobService` hooks were never needed |
 | Parser field tiers | D13 (parked) · §5 UI attribute tiers · interview #2 |
 | Generic tag system | D7 (rescoped) · **COMPLETE end-to-end 2026-07-26**, plan archived; residuals only (§6) · `okf/backend/control-plane/tags.md` · ⚠ supersedes the old §4 "`category`/`tags` params on `GET /objects`" row — the *existing* `Tag`/`TagRule`/`/tags` system is what gets generalized, not a separate feature. Keep aligned with **D10** (generalized notes): same `(kind, id)` addressing problem, so one adopts the other's scheme |
 | ~~Configurable Findings sections~~ | **RETIRED 2026-07-26** — D6 shipped end-to-end (`findings-spec` kind + `GET /findings/{type}`); plan archived, as-built in `okf/frontend/features/objects.md`, residuals in §6 |
