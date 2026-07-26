@@ -73,7 +73,7 @@ each row's detail stays in its own section.
      end-to-end 2026-07-26** as a per-Space `pattern-pack` component kind after §2 D16 was overturned
      (as-built: `okf/frontend/features/link-analysis.md`; plan archived) · **(d)'s vocabulary half
      shipped**, leaving only **(d)'s authoring half** — which is *not* a mechanical adoption, since nothing
-     drafts a projection mapping today and which L1 tool backs it is still a call ·
+     drafts a projection mapping today and the tool question is now **ANSWERED** (see §4) ·
      configurable Findings sections (D6) · M4 Fuse remainder · eoiagent `DryRunProvider` · DuckDB
      `spatial` extension.
    - ⚠ **"Geo Phase 4 backend" is effectively closed** — the projection/aggregation endpoints
@@ -143,7 +143,7 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 | **Queries / BI** | `graph`/`spatial`/`search`/`api` QueryTypes · more `$`-resolvers | `okf/backend/control-plane/queries.md` |
 | **Notifications** | ~~delivery-status webhooks~~ **SHIPPED 2026-07-26 (D8)** — inbound provider callbacks, SPI + SendGrid/HMAC adapters + fail-closed route; residuals (suppression policy, soft-bounce retry, SES/SNS, receipt pruning) in §6 · GeoIP · auth-gated per-user prefs / security triggers | `okf/backend/control-plane/events-metrics.md` |
 | **Signal / Decision networks** | optional S8 (connector-direct emission + cross-space controller) · a general **event-triggered consequence policy gate** (still `/apply`-only) · RFC 6902 JSON Patch state deltas for AG-UI (no consumer yet) · ⚠ **no producer threads `causationId`**, so `/signals/tree` is flat today | `okf/backend/control-plane/signal-backbone.md` · `okf/backend/control-plane/decision-rules.md` |
-| **Link analysis** | V1 + four V2 tracks + timeline + version history all shipped. **§2 D10 (per-view comments) SHIPPED end-to-end 2026-07-25; V2 (b) sharing SHIPPED end-to-end 2026-07-26 (§2 D9** — Exchange `kind` axis widened to `link-analysis-view`; ⚠ only an **entity-projection** view is shareable and its datasets come from its projection **mappings**, not `query.roots`/`from`**)**. **V2 (d) VOCABULARY HALF SHIPPED 2026-07-26** — `<inspecto-ai-explain>` adopted (12th pane) with six canonical terms; the four graph terms were added to the mock `GLOSSARY` subset. Remaining: (c) domain-seeded pattern packs → a dedicated system Space owns them (**§2 D16**) · **(d) authoring half — needs a call on which L1 tool backs it.** ⚠ Like A4, this row was one item but the work is two: the vocabulary surface was a mechanical adoption, but authoring is **not** — `component_draft` could validate a drafted `link-analysis-view`, yet **nothing drafts a projection mapping** (column→Entity choices over a Dataset's real columns), and that mapping *is* the pane's authoring act. Decide the tool before building | `okf/frontend/features/link-analysis.md` |
+| **Link analysis** | V1 + four V2 tracks + timeline + version history all shipped. **§2 D10 (per-view comments) SHIPPED end-to-end 2026-07-25; V2 (b) sharing SHIPPED end-to-end 2026-07-26 (§2 D9** — Exchange `kind` axis widened to `link-analysis-view`; ⚠ only an **entity-projection** view is shareable and its datasets come from its projection **mappings**, not `query.roots`/`from`**)**. **V2 (d) VOCABULARY HALF SHIPPED 2026-07-26** — `<inspecto-ai-explain>` adopted (12th pane) with six canonical terms; the four graph terms were added to the mock `GLOSSARY` subset. Remaining: (c) domain-seeded pattern packs → a dedicated system Space owns them (**§2 D16**) · **(d) authoring half — needs a call on which L1 tool backs it.** ⚠ Like A4, this row was one item but the work is two: the vocabulary surface was a mechanical adoption, but authoring is **not** — `component_draft` could validate a drafted `link-analysis-view`, yet **nothing drafts a projection mapping** (column→Entity choices over a Dataset's real columns), and that mapping *is* the pane's authoring act. **TOOL DECIDED 2026-07-26 — design pass complete, build not started:** `superpower/link-analysis-projection-authoring-plan.md`. The call is a **new non-mutating `projection_author`** over the existing `POST /agent/tools/{name}` dispatch, **not** `component_draft` and **not** `query_author`. ⚠ Why: `component_draft` **cannot draft** (it echoes+validates) and its `kind` resolves through `ConfigSpecs.TYPES`, which has **no `link-analysis-view`** ⇒ it returns `ok=false` today; `query_author` emits a Query, not a mapping, and hard-errors without `-Dassist.write.root`. ⚠ The pivot: **no agent tool or tool-layer route returns a Dataset's columns** (the belt only sees the operational-store `table` vocabulary; `InvRoutes.schemaRelationships` builds a `columnsByDataset` map and **throws it away**, and is unreachable from the tool layer) — so **the pane passes its own column list as an arg**. ⚠ Traps: `patchFormFromView` reads only `query.projection` and **ignores `projections[]`** (a pre-existing load-path bug); `AiToolName` + `adaptToolResult` are a closed pair ⇒ a missing registration reads as "no suggestion", never an error; `entityType` **changes node ids** so it must be unset for one mapping and set on all of them for ≥2 | `okf/frontend/features/link-analysis.md` |
 | **Geo map** | DuckDB **`spatial` extension** — deliberately deferred: plain SQL covers today's projection/aggregation, and loading it means bypassing the hardened `SqlSandbox` extension lockdown **and** bundling a per-platform native binary for offline installs. Only worth it once a real geometry op (ST_Distance/ST_Contains, spatial join) is demanded. *(Progressive loading + worker binning CLOSED 2026-07-24 as obsoleted by the server-side fold + the hard `GEO_POINT_CAP = 5000`. Revisit ONLY if that cap is raised — the candidate then is worker-izing the O(n²) toolbox analyses, not binning.)* | `okf/frontend/features/geo-map.md` |
 | **Pipeline graph** | T15 residuals (non-blocking): per-flow TOON override of the back-pressure thresholds (globals only) · flipping the intake cap on by default (needs a soak) · remote-fetch economy (the cap applies post-dedup, so a remote source still materialises its full ready set — unchanged from pre-T15, but a pre-materialise cap would save bandwidth) · mock-only: run-to-here `POST …/run` (path deliberately reserved for the editor's scratch-only contract) · `/asn1/modules` **stays mock-only** — no backend ASN.1 capability exists | `okf/backend/pipeline-graph/pipeline-graph-design.md` §14 |
 | **Acquisition / connections** | the JDBC-based connectors each need their own library-specific proxy wiring · an actual **HTTP CONNECT** handshake for any connector (SOCKS5 is wired for SFTP/FTP/FTPS; HTTP fails closed) | `okf/backend/acquisition/connectors.md` |
@@ -327,9 +327,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   - **Soft-bounce retry scheduling.** The hard/soft distinction is recorded; nothing retries.
   - **SES/SNS adapter** — needs SNS subscription confirmation plus a cert-chain fetch from a validated
     `amazonaws.com` URL. ⚠ An outbound fetch from an unauthenticated callback path deserves its own review.
-  - **Receipt retention/pruning is unwired.** `countPrunable`/`prune` exist on `DeliveryReceiptStore` and the
-    in-memory store evicts oldest-first at 5000, but no sweep calls them. Receipts accumulate **per external
-    delivery**, i.e. faster than notifications.
+  - ~~**Receipt retention/pruning is unwired.**~~ **CLOSED 2026-07-26** — new `receipt_prune` maintenance
+    task (`MaintenanceJob`), `retention_days` required like every other prune, dry-run previews via
+    `countPrunable`. Needed a `JobService.deliveryReceiptStore` hook: the store was wired into
+    `NotificationService` only, so nothing in the job layer could reach it. Fail-open (no store attached ⇒
+    no-op). ⚠ The in-memory store's oldest-first cap at 5000 is a **backstop, not retention** — it is
+    unconditional on `add()` and unrelated to the age sweep; scheduling the task is still an operator act.
   - **Digest deliveries correlate to the digest, not per notification** — a bounce says the digest bounced,
     not which of its N notifications was in it. Inherent to per-delivery receipts; flagged via
     `DeliveryReceipt.digest`.
@@ -374,14 +377,32 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   second, visually distinct row; (c) migrate `WidgetConfig.tags` onto the assignment store and make the
   chips a projection (the same move phase 2 made for `attributes.tags`) — (c) is the consistent answer but
   is a migration, not a menu item. Not urgent; nothing is broken today.
+  **CALL MADE 2026-07-26 (operator): (c).** Design pass done → `superpower/widget-tags-assignment-migration-plan.md`;
+  **build not started.** ⚠ Four findings make it materially bigger than this row implied: there is **no Java
+  widget service** to hang a server-side re-derive on (⇒ a per-kind hook in `writeComponent`, the D6 seam —
+  a client-side re-derive in `WidgetsService` would not be phase 2's guarantee); **`renameTag`/`deleteTag`
+  deliberately skip component targets** (`objectTargetsOf`, "component targets have no CSV to project" —
+  true today, false the moment chips are a projection, and unfixable from `ObjectService`, which has no
+  `ComponentStore` handle); widget tags are **free text** while assignment `add` 404s on an unregistered
+  tag (⇒ the backfill must register the vocabulary first); and widget tags **travel in bundles today**
+  while edges do not (⇒ import must adopt, or tag loss across Spaces becomes a decision on the record).
+  Also: the save dialog's comma field must **go**, or it stays a second writer that resurrects
+  config-only tags on every save.
 - **D6 — no spec-authoring UI.** A `findings-spec` is authored as TOON through the generic `/components`
   CRUD, exactly as `notification-rule` shipped backend-only. A matrix/editor is a separate item; nothing is
   broken without it. → `okf/frontend/features/objects.md`
-- **D6 — Findings *values* are not validated server-side against the spec.** The spec configures the
-  **form**; values still land as flat `attributes` strings, so a direct `PATCH /objects/{id}` can write a
-  key no section declares (or skip a `required:true` one). Closing it means validating the submitted
-  `findings` blob in `ObjectService` against the effective spec — defensible, deliberately out of scope, and
-  only worth it if a non-UI writer appears.
+- ~~**D6 — Findings *values* are not validated server-side against the spec.**~~ **CLOSED 2026-07-26** —
+  `FindingsSpec.validateValues(submitted, merged)` + a `validateFindings` gate on `PATCH /objects/{id}`
+  (→ 422). Enforces `select` membership, `number` + `min`/`max`, `boolean`, and `pattern`; skips a section
+  hidden by its `dependsOn`. ⚠ **Two premises in the old wording were wrong, and the shipped rules differ
+  accordingly:** (1) *"a key no section declares"* **cannot** be rejected — `attributes` is a shared bag
+  also carrying `tags`/`caseType`/`dueAt`, so an undeclared key is indistinguishable from a non-Findings
+  attribute; what is enforced is that a **declared** key holds a renderable value. (2) It is **not** in
+  `ObjectService` — the spec lives in the space's `ComponentStore`, an edge concern, so the gate is in
+  `ObjectRoutes` and the engine stays store-agnostic (`effectiveFindingsSpec` was extracted from
+  `findingsSpecOf` for reuse). Also load-bearing: nothing is judged unless the patch **touches a declared
+  key**, and `required` is judged against the **merged** bag — otherwise a tag write starts 422ing on an
+  incomplete triage form. `autocomplete` options stay suggestions, never a closed set.
 - **D6 — the spec vocabulary is defined by a frontend file.** `AttributeSpec`
   (`inspecto-ui/.../component-model/attribute-spec.ts`) is the canonical shape the backend `FindingsSpec`
   mirrors and validates against. Deliberate — the alternative was a third schema plus a lossy mapper — but a

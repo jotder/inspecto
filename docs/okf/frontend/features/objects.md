@@ -68,6 +68,20 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
   **fully replaces** the default for its type; field-level merge is unsupported on purpose because it makes
   "remove a section" inexpressible. Full rationale + the rejected alternatives:
   [`plans-archive/findings-spec-plan.md`](../../../archived-documents/plans-archive/findings-spec-plan.md).
+  **Values are validated too, since 2026-07-26** — `FindingsSpec.validateValues(submitted, merged)`, called
+  from `ObjectRoutes.validateFindings` on `PATCH /objects/{id}` (→ **422**): `select` membership, `number`
+  with `min`/`max`, `boolean`, and `pattern`; a section hidden by its `dependsOn` against the merged bag is
+  skipped entirely (the form never showed it, so it cannot be required). Three rules are load-bearing:
+  * **An undeclared key is never rejected.** `attributes` is a *shared* bag (it also carries `tags`,
+    `caseType`, `dueAt`, …), so a key no section declares is indistinguishable from a non-Findings
+    attribute. What is enforced is that a **declared** key holds a value the renderer could have produced.
+  * **Nothing is judged unless the patch touches a declared key**, and `required` is judged against the
+    **merged** result — otherwise an unrelated attribute write starts failing because a triage form was left
+    incomplete, and a partial save is tested against a form it never claimed to submit.
+  * **The gate is in `ObjectRoutes`, not `ObjectService`** — the spec lives in the space's `ComponentStore`,
+    an edge concern; the engine stays store-agnostic. `effectiveFindingsSpec` was extracted out of
+    `findingsSpecOf` so the read route and the write gate resolve the same spec exactly once.
+  `autocomplete` options stay *suggestions*, never a closed set — only `select` is closed.
   ⚠ **Two premises in D6's wording were wrong** — if you remember the old framing, re-read this:
   * *"Reuse the C6 workflow/TOON pattern"* — **not viable.** `*_workflow.toon` is a **boot-time scan of CLI
     path arguments** (`ServiceBootstrap.resolveBySuffix`), with no write root, no CRUD and no hot reload;

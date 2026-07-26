@@ -166,8 +166,17 @@ in-app / one per digest), `Hmac…`/`SendGridDeliveryStatusAdapterTest`, `SmtpEm
 
 **Deliberately not built** (residuals → BACKLOG §6): auto-disable / suppression on hard bounce +
 complaint, soft-bounce retry scheduling, an SES/SNS adapter (needs subscription confirmation and an
-outbound cert fetch from a callback path — its own review), a UI, receipt retention/pruning wiring, and the
-`deliverWithReceipt` SPI escape hatch.
+outbound cert fetch from a callback path — its own review), a UI, and the `deliverWithReceipt` SPI escape
+hatch.
+
+**Receipt retention (shipped 2026-07-26).** The `receipt_prune` maintenance task forgets receipts sent
+before `retention_days` (required, like every other prune — deliberate forgetting), with a
+`countPrunable` dry-run preview. It reaches the store through `JobService.deliveryReceiptStore`, a hook
+this added: the store was wired into `NotificationService` **only**, so nothing in the job layer could see
+it. Fail-open — no store attached is a reported no-op, never a throw. ⚠ `InMemoryDeliveryReceiptStore`'s
+oldest-first eviction at 5000 is an **unconditional backstop on `add()`, not a retention policy**; bounding
+receipts by age still requires scheduling the task, and receipts accrue per *external delivery*, i.e.
+faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
 
 ## Alert-rule authoring (shipped 2026-07-09)
 

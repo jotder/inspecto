@@ -131,6 +131,16 @@ former root reference docs** (each index lists them):
   As-built lives in [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md):
   pattern packs as a per-Space `pattern-pack` component kind, the `PATTERN_PACKS` const as the fallback,
   and the two costs that ruled out a reserved system Space.
+- [`superpower/link-analysis-projection-authoring-plan.md`](superpower/link-analysis-projection-authoring-plan.md)
+  — **Link-analysis V2 (d) authoring half — design pass done 2026-07-26, build not started.** Answers the
+  "which L1 tool" call: a new non-mutating `projection_author` (not `component_draft`, which cannot draft
+  and has no `link-analysis-view` ConfigSpec), with the **pane** supplying the Dataset's column list
+  because no tool-layer route returns one.
+- [`superpower/widget-tags-assignment-migration-plan.md`](superpower/widget-tags-assignment-migration-plan.md)
+  — **D7 widget tags → assignment store — call (c) made 2026-07-26, design pass done, build not started.**
+  Why it is a migration and not a menu item: no Java widget service to re-derive from, `renameTag`/
+  `deleteTag` skip component targets, free-text tags vs a registry that 404s, and tags that travel in
+  bundles while edges do not.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5
