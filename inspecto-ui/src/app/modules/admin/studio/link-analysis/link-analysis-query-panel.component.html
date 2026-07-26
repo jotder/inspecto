@@ -159,6 +159,19 @@
             }
         }
 
+        @if (sourceId() === 'entity-projection') {
+            <inspecto-ai-assist
+                class="self-center"
+                tool="projection_author"
+                [args]="aiProjectionArgs()"
+                [current]="aiCurrentProjection()"
+                label="Derive mapping"
+                [disabled]="!queryForm.controls.datasetId.value"
+                disabledReason="Choose a dataset first"
+                (applyDraft)="applyProjectionDraft($event)"
+            ></inspecto-ai-assist>
+        }
+
         <button mat-flat-button color="primary" type="submit" [disabled]="loading()" class="self-center">
             <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
             Run query

@@ -1,5 +1,7 @@
+import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GraphSourceId } from 'app/inspecto/graph';
@@ -8,7 +10,13 @@ import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.com
 function make(sourceId: GraphSourceId = 'entity-projection') {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisQueryPanelComponent],
-        providers: [provideNoopAnimations()],
+        providers: [
+            provideNoopAnimations(),
+            // The panel now hosts <inspecto-ai-assist> (projection_author), which injects AgentService +
+            // ToastrService — without these every test in this file dies at createComponent.
+            provideHttpClient(),
+            { provide: ToastrService, useValue: { info: () => undefined, error: () => undefined } },
+        ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisQueryPanelComponent);
     const c = fixture.componentInstance;
@@ -72,6 +80,58 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         });
         expect(c.queryForm.getRawValue().datasetId).toBe('ds');
         expect(c.queryForm.getRawValue().sourceCol).toBe('s');
+    });
+
+    it('patchFormFromView reads projections[] as well as projection', () => {
+        const { c } = make('entity-projection');
+        c.patchFormFromView({
+            id: 'v', name: 'V', sourceId: 'entity-projection',
+            query: {
+                projections: [
+                    { datasetId: 'ds1', sourceCol: 's1', targetCol: 't1', attrCols: ['w'], entityType: 'person' },
+                    { datasetId: 'ds2', sourceCol: 's2', targetCol: 't2', entityType: 'account' },
+                ],
+            },
+        });
+        const f = c.queryForm.getRawValue();
+        expect(f.datasetId).toBe('ds1');
+        expect(f.attrCols).toEqual(['w']);
+        expect(f.entityType).toBe('person');
+        expect(c.extraMappings.length).toBe(1);
+        expect(c.extraMappings.at(0).getRawValue()).toMatchObject({ datasetId: 'ds2', entityType: 'account' });
+        // The round trip is what a multi-mapping saved view needs: it used to load first-only.
+        expect(c.buildQuery()).toMatchObject({ projections: [{ datasetId: 'ds1' }, { datasetId: 'ds2' }] });
+    });
+
+    it('projection_author: applying a draft patches the form and persists nothing', () => {
+        const { c } = make('entity-projection');
+        c.applyProjectionDraft({
+            label: 'cdr', clean: true, findings: [],
+            config: {
+                query: {
+                    projections: [{ datasetId: 'cdr', sourceCol: 'caller_id', targetCol: 'callee_id', linkKindCol: 'call_type', attrCols: ['duration_sec'] }],
+                },
+            },
+        });
+        expect(c.queryForm.getRawValue()).toMatchObject({
+            datasetId: 'cdr', sourceCol: 'caller_id', targetCol: 'callee_id',
+            linkKindCol: 'call_type', attrCols: ['duration_sec'],
+            entityType: '',   // unset on a single mapping — it would change node ids
+        });
+        expect(c.queryForm.dirty).toBe(true);
+    });
+
+    it('projection_author args carry the pane\'s own column list, since no route returns one', () => {
+        const { c } = make('entity-projection');
+        // Order matters: picking a dataset RE-RESOLVES datasetColumns from `datasets()`, which is empty
+        // here — so seed the columns after the pick, exactly as onDatasetPicked would from a real Dataset.
+        c.queryForm.patchValue({ datasetId: 'cdr' });
+        c.datasetColumns.set(['caller_id', 'callee_id']);
+        expect(c.aiProjectionArgs()).toEqual({ datasetId: 'cdr', columns: ['caller_id', 'callee_id'] });
+        // No baseline until the mapping is complete enough to build — a create, so all fields read added.
+        expect(c.aiCurrentProjection()).toBeNull();
+        c.queryForm.patchValue({ sourceCol: 'caller_id', targetCol: 'callee_id' });
+        expect(c.aiCurrentProjection()).toMatchObject({ query: { projections: [{ datasetId: 'cdr' }] } });
     });
 
     it('renders with no a11y violations', async () => {

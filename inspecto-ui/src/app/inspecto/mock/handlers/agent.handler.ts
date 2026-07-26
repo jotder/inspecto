@@ -225,6 +225,72 @@ export function agentHandler(flags: MockFlags): MockHandler {
                     sinks: [],
                 });
             }
+            // Link Analysis V2 (d): derive an entity-projection mapping from the column list the PANE
+            // supplies (no route returns a Dataset's columns). Offline the pane's columns come from
+            // SAMPLE_SOURCES, so a draft here is over sample columns — never evidence the real path works.
+            case 'projection_author': {
+                const datasetId = text(args, 'datasetId');
+                if (!datasetId) return error(422, 'datasetId is required');
+                const columns = (Array.isArray(args['columns']) ? args['columns'] : [])
+                    .map((c) => (typeof c === 'string' ? c : text((c ?? {}) as Record<string, unknown>, 'name')))
+                    .filter((c): c is string => !!c);
+                if (columns.length < 2) {
+                    return error(422, 'columns is required and must name at least two columns');
+                }
+                const hint = text(args, 'hint').toLowerCase();
+                const narrowed = hint ? columns.filter((c) => c.toLowerCase().includes(hint)) : columns;
+                const candidates = narrowed.length >= 2 ? narrowed : columns;
+                const findings = narrowed.length >= 2
+                    ? []
+                    : [{ severity: 'WARNING' as const, fieldPath: 'hint', message: `hint '${hint}' matched fewer than two columns — it was ignored` }];
+                // Same shapes the real tool scores, kept short: it is the RESULT SHAPE that matters here.
+                const pairs = [['caller', 'callee'], ['source', 'target'], ['src', 'dst'], ['from', 'to']];
+                const carries = (c: string, token: string) => c.toLowerCase().split(/[^a-z0-9]+/).includes(token)
+                    || c.toLowerCase().startsWith(token) || c.toLowerCase().endsWith(token);
+                let source: string | undefined;
+                let target: string | undefined;
+                for (const [a, b] of pairs) {
+                    source = candidates.find((c) => carries(c, a));
+                    target = candidates.find((c) => carries(c, b) && c !== source);
+                    if (source && target) break;
+                    source = undefined;
+                    target = undefined;
+                }
+                if (!source || !target) {
+                    const ids = candidates.filter((c) => carries(c, 'id')).slice(0, 2);
+                    [source, target] = ids.length === 2 ? ids : [undefined, undefined];
+                }
+                if (!source || !target) {
+                    return json({
+                        kind: 'link-analysis-view', id: datasetId, clean: false,
+                        findings: [...findings, {
+                            severity: 'ERROR' as const, fieldPath: 'projections.0.sourceCol',
+                            message: `no source/target column pair could be derived from [${candidates.join(', ')}] — pick the two endpoint columns by hand`,
+                        }],
+                        draft: { query: { projections: [{ datasetId, sourceCol: '', targetCol: '' }] } },
+                    });
+                }
+                const linkKindCol = candidates.find(
+                    (c) => c !== source && c !== target && ['kind', 'type', 'relation'].some((t) => carries(c, t)),
+                );
+                const attrCols = columns.filter((c) => c !== source && c !== target && c !== linkKindCol).slice(0, 8);
+                return json({
+                    kind: 'link-analysis-view',
+                    id: datasetId,
+                    clean: findings.length === 0,
+                    findings,
+                    draft: {
+                        query: {
+                            // entityType is left UNSET on a single mapping — it changes node ids.
+                            projections: [{
+                                datasetId, sourceCol: source, targetCol: target,
+                                ...(linkKindCol ? { linkKindCol } : {}),
+                                ...(attrCols.length ? { attrCols } : {}),
+                            }],
+                        },
+                    },
+                });
+            }
             case 'component_draft': {
                 const kind = text(args, 'kind');
                 if (!kind) return error(422, 'kind is required');

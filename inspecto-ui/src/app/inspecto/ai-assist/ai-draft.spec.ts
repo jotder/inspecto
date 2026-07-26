@@ -25,6 +25,19 @@ describe('adaptToolResult', () => {
             .toBe('query');
     });
 
+    it('normalizes a projection_author draft through the shared envelope branch', () => {
+        // Registration in BOTH the AiToolName union and this adapter is what stops a new tool from
+        // silently rendering as "no suggestion" — so assert the candidate is really produced.
+        const projections = [{ datasetId: 'cdr', sourceCol: 'caller_id', targetCol: 'callee_id' }];
+        const drafts = adaptToolResult('projection_author', {
+            kind: 'link-analysis-view', id: 'cdr', clean: true, findings: [],
+            draft: { query: { projections } },
+        });
+        expect(drafts).toHaveLength(1);
+        expect(drafts[0].label).toBe('cdr');
+        expect(drafts[0].config).toEqual({ query: { projections } });
+    });
+
     it('turns every suggest_expectations suggestion into its own candidate', () => {
         const drafts = adaptToolResult('suggest_expectations', {
             table: 'cdr',

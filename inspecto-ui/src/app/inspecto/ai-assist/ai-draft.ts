@@ -1,15 +1,20 @@
 import { Finding } from 'app/inspecto/api';
 
 /**
- * The non-mutating agent tools the inline surface can invoke (AGT-6a A1). All five are draft-only:
- * they validate or derive, and persist nothing — applying a draft is a separate human action through
- * the pane's own validated route. `POST /agent/tools/{name}` refuses anything mutating with a 403.
+ * The non-mutating agent tools the inline surface can invoke (AGT-6a A1). All are draft-only: they
+ * validate or derive, and persist nothing — applying a draft is a separate human action through the
+ * pane's own validated route. `POST /agent/tools/{name}` refuses anything mutating with a 403.
+ *
+ * ⚠ This union and {@link adaptToolResult} are a **pair**. A backend tool missing from either yields an
+ * empty candidate list, which the surface renders as "no suggestion" with no error — the failure mode
+ * that makes a new tool look like a model problem.
  */
 export type AiToolName =
     | 'component_draft'
     | 'query_author'
     | 'kpi_report_builder'
     | 'pipeline_author'
+    | 'projection_author'
     | 'suggest_expectations';
 
 /**
@@ -52,8 +57,9 @@ function str(v: unknown, fallback: string): string {
 /**
  * Normalize one tool result into the candidates the surface renders.
  *
- * The three authoring tools that compose a single component already share the backend's
- * `{kind, id?, clean, findings, draft}` shape, so they share one branch. `suggest_expectations`
+ * The authoring tools that compose a single component already share the backend's
+ * `{kind, id?, clean, findings, draft}` shape, so they share one branch — `projection_author` joins it,
+ * its `draft` being a `{query:{projections:[…]}}` fragment rather than a whole config. `suggest_expectations`
  * returns several *derived* candidates with no validation of their own (they are profiled from real
  * data, so there is nothing to repair — findings stay empty until a human validates on apply).
  * `pipeline_author` returns a parsed+simulated graph rather than a config envelope.
@@ -118,7 +124,7 @@ export function adaptToolResult(tool: AiToolName, result: unknown): AiDraft[] {
             ];
         }
         default: {
-            // component_draft / query_author — one validated config envelope.
+            // component_draft / query_author / projection_author — one validated config envelope.
             const draft = result['draft'];
             if (!isRecord(draft)) return [];
             return [

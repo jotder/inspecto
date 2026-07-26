@@ -6,6 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { PipelineSummary } from 'app/inspecto/api';
 import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from 'app/inspecto/graph';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
@@ -32,7 +34,7 @@ export interface QuerySummaryItem {
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
         ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
-        MatInputModule, MatSelectModule,
+        MatInputModule, MatSelectModule, AiAssistComponent,
     ],
     templateUrl: './link-analysis-query-panel.component.html',
 })
@@ -168,17 +170,74 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
 
     /** Patch the form from a saved view's query (the host sets sourceId/display/layout separately). */
     patchFormFromView(view: LinkAnalysisView): void {
-        const p = view.query.projection;
+        this.patchFormFromQuery(view.query, view.sourceId === 'provenance');
+    }
+
+    /**
+     * Patch the form from any graph-source query — a saved view's or an AI-drafted one.
+     *
+     * `projections[]` takes precedence over `projection` exactly as {@link GraphSourceQuery} declares:
+     * mapping 0 is the primary, the rest rebuild the extras `FormArray`. Reading only `projection` (as
+     * this did until the V2 (d) authoring pass) loads a multi-mapping view blank.
+     */
+    private patchFormFromQuery(query: GraphSourceQuery, provenance: boolean): void {
+        const mappings = query.projections?.length ? query.projections : query.projection ? [query.projection] : [];
+        const [primary, ...extras] = mappings;
         this.queryForm.patchValue({
-            from: view.query.from ?? '',
-            depth: view.query.depth ?? 2,
-            direction: view.query.direction ?? 'both',
-            pipeline: view.sourceId === 'provenance' ? (view.query.from ?? '') : '',
-            counts: view.query.counts ?? false,
-            datasetId: p?.datasetId ?? '',
-            sourceCol: p?.sourceCol ?? '',
-            targetCol: p?.targetCol ?? '',
-            linkKindCol: p?.linkKindCol ?? '',
+            from: query.from ?? '',
+            depth: query.depth ?? 2,
+            direction: query.direction ?? 'both',
+            pipeline: provenance ? (query.from ?? '') : '',
+            counts: query.counts ?? false,
+            datasetId: primary?.datasetId ?? '',
+            sourceCol: primary?.sourceCol ?? '',
+            targetCol: primary?.targetCol ?? '',
+            linkKindCol: primary?.linkKindCol ?? '',
+            attrCols: primary?.attrCols ?? [],
+            entityType: primary?.entityType ?? '',
         });
+        this.extraMappings.clear();
+        this.extraMappingColumns.set([]);
+        for (const m of extras) {
+            this.addMapping();
+            this.extraMappings.at(this.extraMappings.length - 1).patchValue({
+                datasetId: m.datasetId, sourceCol: m.sourceCol, targetCol: m.targetCol,
+                linkKindCol: m.linkKindCol ?? '', attrCols: m.attrCols ?? [],
+                entityType: m.entityType ?? '',
+            });
+        }
+    }
+
+    /**
+     * AGT-6a A2/A3 — `projection_author`'s arguments: the picked Dataset plus the column list this panel
+     * already resolved. **The pane supplies the columns deliberately**: no agent tool or tool-layer route
+     * returns a Dataset's columns, and passing the list the selects are already drawn from is both
+     * cheaper and more correct than a second server-side resolver.
+     */
+    aiProjectionArgs(): Record<string, unknown> {
+        return { datasetId: this.queryForm.controls.datasetId.value, columns: this.datasetColumns() };
+    }
+
+    /**
+     * The current mapping as the diff baseline — null until the mapping is complete enough to build (a
+     * create, so every field reads as added). Normalized to `projections[]`, the shape the draft uses, or
+     * the diff would report every field twice under two different paths.
+     */
+    aiCurrentProjection(): Record<string, unknown> | null {
+        const built = this.buildQuery();
+        if ('error' in built) return null;
+        const mappings = built.projections ?? (built.projection ? [built.projection] : []);
+        return mappings.length ? { query: { projections: mappings } } : null;
+    }
+
+    /**
+     * Adopt a drafted mapping into the form (AGT-6a A2). It stops at the form — dirty, never saved: the
+     * operator still presses Run and the host's own Save, so the human stays the actor.
+     */
+    applyProjectionDraft(draft: AiDraft): void {
+        const query = draft.config['query'];
+        if (typeof query !== 'object' || query === null) return;
+        this.patchFormFromQuery(query as GraphSourceQuery, false);
+        this.queryForm.markAsDirty();
     }
 }
