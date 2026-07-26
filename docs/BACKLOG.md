@@ -231,11 +231,14 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > Retired lines `1.x`–`3.x` very likely carry the values too; policy forbids committing there, and
 > rotation covers them.
 >
-> **✅ Orphaned worktrees on disk — RESOLVED.** The two dirs under `.claude/worktrees/`
-> (`quirky-lalande-a4a696/`, which held live copies of four `inspecto-ui/src/environments/*.ts` plus
-> further copies in its `.angular/` build cache, and `vigorous-ptolemy-911ed7/`) are **gone as of
-> 2026-07-25** — confirmed absent from both disk and `git worktree list`. Their deletion never reduced the
-> incident's severity (the values are public via git history regardless); it only stopped a local grep
+> **⚠ Stale agent worktrees keep coming back — treat this as recurring, not resolved.** The two dirs named
+> here on 2026-07-25 (`quirky-lalande-a4a696/`, `vigorous-ptolemy-911ed7/`) were deleted, but by 2026-07-26
+> `git worktree list` showed **six** under `.claude/worktrees/`, five of them agent-isolation branches
+> pinned at pre-`8dd072c6` commits and therefore holding live copies of the leaked
+> `inspecto-ui/src/environments/*.ts` (plus copies in their `.angular/` caches). One
+> (`eloquent-bose-14c91c`) is already `prunable`. **Any agent run with `isolation: "worktree"` re-creates
+> this.** Sweep with `git worktree prune` + `git worktree remove` at handoff. Deleting them never reduced
+> the incident's severity — the values are public via git history regardless — it only stops a local grep
 > from handing them out. Rotation remains the fix.
 >
 > Lower severity, same files, unaddressed: internal hostnames/IPs are published in-repo

@@ -241,6 +241,10 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   Fix: after `createComponent`, `vi.spyOn(componentInstance['dialog'], 'open').mockReturnValue(...)` —
   spy on the instance the component actually got (see `alerts.component.spec.ts`). Several older specs
   carry the dead-weight provider without noticing because they never call through `open`.
+- **jsdom forbids spying `window.location.assign`** (`TypeError: Cannot redefine property: assign`), so any
+  code that navigates *away from the SPA* is untestable in place. `SessionService.redirect(url)` is the one
+  seam for it (authorize + OIDC end-session); stub that, not `location`. Route it through the seam rather
+  than adding a second `location.assign` call site.
 - **Authenticated file download** — go through `HttpClient` (`responseType:'text'|'blob'`) + `Blob` +
   `createObjectURL` + transient `<a download>`; a plain anchor `href` doesn't carry headers.
 - **Live tail** — `visibleInterval(ms)` (`api/auto-refresh.ts`, pauses on hidden tab); hold/resubscribe/unsub;
