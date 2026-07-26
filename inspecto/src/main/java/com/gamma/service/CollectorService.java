@@ -407,6 +407,11 @@ public final class CollectorService implements AutoCloseable {
                         com.gamma.notify.NotificationRules.defaults().rules(), this::persistedRules),
                 notificationPreferences,
                 this::persistedChannels);
+        // Delivery-status receipts (BACKLOG D8): one per external delivery, stamped by provider callbacks
+        // on /public/delivery-status/{adapterId}. In-memory like the feed itself — receipts are
+        // operational breadcrumbs, not a durable record, and are prunable.
+        this.deliveryReceipts = new com.gamma.notify.InMemoryDeliveryReceiptStore();
+        this.notificationService.deliveryReceipts(deliveryReceipts);
         this.notificationSubscriber = notificationService::onEvent;
         this.eventLog.addSubscriber(notificationSubscriber);
         String viewsFile = System.getProperty("events.views.file");
@@ -499,6 +504,7 @@ public final class CollectorService implements AutoCloseable {
     private final com.gamma.notify.NotificationStore notifications;
     private final com.gamma.notify.NotificationPreferences notificationPreferences;
     private final com.gamma.notify.NotificationService notificationService;
+    private final com.gamma.notify.DeliveryReceiptStore deliveryReceipts;
     private final java.util.function.Consumer<com.gamma.event.Event> notificationSubscriber;
 
     /** The alert engine (always present; empty until a rule is armed) — backs {@code /alerts}. */
@@ -541,6 +547,11 @@ public final class CollectorService implements AutoCloseable {
     /** The single appUser's notification preference grid (Phase B6) — backs {@code /notifications/preferences}. */
     public com.gamma.notify.NotificationPreferences notificationPreferences() {
         return notificationPreferences;
+    }
+
+    /** Delivery-status receipts for externally-delivered notifications (BACKLOG D8). */
+    public com.gamma.notify.DeliveryReceiptStore deliveryReceipts() {
+        return deliveryReceipts;
     }
 
     /** The Object Engine (Phase 2, v4.3.0) — managed operational objects + their workflows; backs the

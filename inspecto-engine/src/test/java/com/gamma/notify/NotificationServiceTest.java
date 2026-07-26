@@ -267,4 +267,112 @@ class NotificationServiceTest {
         svc.close();
         assertTrue(delivered.isEmpty());
     }
+
+    // ---- D8: delivery receipts on the send path -------------------------------------------------
+
+    /** A transport that records the correlation id it was handed with each delivery. */
+    private static final class RecordingChannel implements NotificationChannel {
+        final List<String> deliveryIds = new CopyOnWriteArrayList<>();
+
+        public String id() { return NotificationPreferences.EMAIL; }
+        public void deliver(Notification n) { deliveryIds.add(null); }
+        public void deliver(Notification n, String target) { deliveryIds.add(null); }
+        public void deliver(Notification n, String target, String deliveryId) { deliveryIds.add(deliveryId); }
+    }
+
+    private static NotificationPreferences emailOn() {
+        NotificationPreferences prefs = new NotificationPreferences();
+        prefs.set("pipeline", Map.of(NotificationPreferences.IN_APP, true, NotificationPreferences.EMAIL, true));
+        return prefs;
+    }
+
+    @Test
+    void aReceiptIsWrittenPerPersistedDestinationAndItsIdReachesTheTransport() {
+        NotificationStore store = new InMemoryNotificationStore();
+        DeliveryReceiptStore receipts = new InMemoryDeliveryReceiptStore();
+        RecordingChannel email = new RecordingChannel();
+        ChannelConfig a = new ChannelConfig("c1", "EMAIL", "ops@x.com", null, true, 0L, null, 0);
+        ChannelConfig b = new ChannelConfig("c2", "EMAIL", "dev@x.com", null, true, 0L, null, 0);
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(), emailOn(),
+                List.of(email), () -> List.of(a, b));
+        svc.deliveryReceipts(receipts);
+
+        svc.onEvent(batchFailed("orders", "b1", "boom"));
+        svc.close();
+
+        List<DeliveryReceipt> all = receipts.recent(10);
+        // Three deliveries, three receipts: the SPI channel's own notify.*-configured destination plus
+        // each persisted ChannelConfig. Both dispatch loops run for a transport that is enabled and also
+        // named by a config — receipts mirror deliveries one-for-one, whichever loop made them.
+        assertEquals(3, all.size(), "one receipt per external delivery — status is per delivery");
+        List<DeliveryReceipt> managed = all.stream().filter(r -> r.channelConfigId() != null).toList();
+        assertEquals(List.of("dev@x.com", "ops@x.com"),
+                managed.stream().map(DeliveryReceipt::target).sorted().toList());
+        assertEquals(List.of("c1", "c2"),
+                managed.stream().map(DeliveryReceipt::channelConfigId).sorted().toList());
+        assertEquals(1, all.size() - managed.size(), "the SPI channel's delivery is recorded too…");
+        DeliveryReceipt spi = all.stream().filter(r -> r.channelConfigId() == null).findFirst().orElseThrow();
+        assertNull(spi.target(), "…with no managed destination, because it resolves its own");
+        assertTrue(all.stream().allMatch(r -> r.statusAt().isEmpty()),
+                "a fresh receipt reads as 'sent, never confirmed' until a callback arrives");
+        // The ids the transport saw are exactly the ids we recorded — that correlation IS the feature.
+        assertEquals(all.stream().map(DeliveryReceipt::deliveryId).sorted().toList(),
+                email.deliveryIds.stream().sorted().toList());
+    }
+
+    @Test
+    void inAppOnlyDeliveryWritesNoReceipt() {
+        NotificationStore store = new InMemoryNotificationStore();
+        DeliveryReceiptStore receipts = new InMemoryDeliveryReceiptStore();
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(),
+                new NotificationPreferences(), List.of());
+        svc.deliveryReceipts(receipts);
+
+        svc.onEvent(batchFailed("orders", "b1", "boom"));
+        svc.close();
+
+        assertEquals(1, store.recent(10).size(), "the feed still got it");
+        assertTrue(receipts.recent(10).isEmpty(), "no provider to hear back from ⇒ nothing to correlate");
+    }
+
+    @Test
+    void aDigestFlushWritesExactlyOneReceiptMarkedAsADigest() {
+        NotificationStore store = new InMemoryNotificationStore();
+        DeliveryReceiptStore receipts = new InMemoryDeliveryReceiptStore();
+        RecordingChannel email = new RecordingChannel();
+        ChannelConfig cfg = new ChannelConfig("c1", "EMAIL", "ops@x.com", null, true, 0L, null, 60);
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(), emailOn(),
+                List.of(email), () -> List.of(cfg));
+        svc.deliveryReceipts(receipts);
+
+        svc.onEvent(batchFailed("orders", "b1", "boom"));
+        svc.onEvent(batchFailed("billing", "b2", "bang"));
+        svc.close();   // flushes the pending digest
+
+        List<DeliveryReceipt> digests = receipts.recent(10).stream().filter(DeliveryReceipt::digest).toList();
+        assertEquals(1, digests.size(),
+                "two buffered notifications, ONE digest delivery ⇒ exactly one digest receipt — flagged as "
+                        + "such because a bounce tells us the digest bounced, not which notification was in it");
+        assertEquals("c1", digests.get(0).channelConfigId());
+        assertTrue(email.deliveryIds.contains(digests.get(0).deliveryId()),
+                "the digest's correlation id was handed to the transport");
+    }
+
+    @Test
+    void deliveryIsUnchangedWhenTrackingIsNotWired() {
+        NotificationStore store = new InMemoryNotificationStore();
+        RecordingChannel email = new RecordingChannel();
+        ChannelConfig cfg = new ChannelConfig("c1", "EMAIL", "ops@x.com", null, true, 0L, null, 0);
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(), emailOn(),
+                List.of(email), () -> List.of(cfg));
+        // deliveryReceipts() deliberately not called — the lean default.
+
+        svc.onEvent(batchFailed("orders", "b1", "boom"));
+        svc.close();
+
+        assertNull(svc.deliveryReceipts());
+        assertFalse(email.deliveryIds.isEmpty(), "still delivered");
+        assertTrue(email.deliveryIds.stream().allMatch(java.util.Objects::isNull),
+                "with no correlation id — tracking off costs delivery nothing");
+    }
 }

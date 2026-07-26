@@ -42,6 +42,8 @@ interface ApiContext {
     String ATTR_IDEMPOTENCY_STORE = "inspecto.idempotency.store";
     /** The idempotency cache key for this exchange (present only for a keyed write). */
     String ATTR_IDEMPOTENCY_KEY   = "inspecto.idempotency.key";
+    /** The request body's raw bytes, cached because {@code ex.getRequestBody()} is single-read (D8). */
+    String ATTR_RAW_BODY          = "inspecto.rawBody";
     /** The authenticated {@link Subject} (W6), set by {@link ControlApi#dispatch} once an
      *  {@link Authenticator} validates the request; absent on Personal edition (no Authenticator present)
      *  and on the public bootstrap/health surface. */
@@ -126,6 +128,21 @@ interface ApiContext {
 
     /** Parse the request body as a JSON object map (an empty map when the body is empty). */
     Map<String, Object> body(HttpExchange ex) throws IOException;
+
+    /**
+     * The request body's <b>raw bytes</b>, exactly as they arrived (D8).
+     *
+     * <p>Needed by any route that verifies a provider signature: real providers sign the raw payload, and
+     * re-serialising a parsed {@code Map} would not reproduce it — key order and whitespace are not
+     * preserved, so signatures would fail non-deterministically rather than never.
+     *
+     * <p>{@code ex.getRequestBody()} is a <b>single-read</b> stream, so the bytes are read once and cached
+     * on the exchange ({@link #ATTR_RAW_BODY}); {@link #body} reads through this. That makes the two safe
+     * to call in either order and in any combination — deliberately, because the failure mode of a
+     * read-twice seam is a silently <i>empty</i> body rather than an exception. The returned array is the
+     * cached one: <b>do not mutate it.</b>
+     */
+    byte[] rawBody(HttpExchange ex) throws IOException;
 
     /** The running service host the routes act on (the request's bound space, per the {@code /spaces/{id}} seam). */
     CollectorService service();

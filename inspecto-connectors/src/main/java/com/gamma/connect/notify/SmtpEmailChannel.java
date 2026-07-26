@@ -73,6 +73,22 @@ public final class SmtpEmailChannel implements NotificationChannel {
 
     private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
+    /**
+     * A {@link MimeMessage} that keeps a {@code Message-ID} we set ourselves (D8 correlation).
+     *
+     * <p>Necessary, not decorative: {@code Transport.send} calls {@code saveChanges()}, which calls
+     * {@code updateMessageID()} and would replace our id with a generated one — silently breaking the
+     * round trip while the mail still sends. With no explicit header set, behaviour is unchanged.
+     */
+    private static final class PreservedMessageIdMessage extends MimeMessage {
+        PreservedMessageIdMessage(Session session) { super(session); }
+
+        @Override
+        protected void updateMessageID() throws javax.mail.MessagingException {
+            if (getHeader("Message-ID") == null) super.updateMessageID();
+        }
+    }
+
     @Override public String id() { return ID; }
 
     @Override public boolean configured() { return host != null && to != null; }
@@ -87,6 +103,12 @@ public final class SmtpEmailChannel implements NotificationChannel {
      * {@link com.gamma.notify.ChannelConfig} destination is delivered through, so one SMTP transport
      * serves several operator-managed recipients instead of the single fixed {@code notify.smtp.to}.
      */
+    /** Deliver to {@code target}, embedding {@code deliveryId} as our own {@code Message-ID} (D8). */
+    @Override
+    public void deliver(Notification n, String target, String deliveryId) throws Exception {
+        Transport.send(message(n, target, deliveryId));
+    }
+
     @Override
     public void deliver(Notification n, String target) throws Exception {
         Transport.send(message(n, target));
@@ -99,7 +121,26 @@ public final class SmtpEmailChannel implements NotificationChannel {
 
     /** As {@link #message(Notification)}, but addressed to an explicit {@code target} (blank ⇒ fixed {@code to}). */
     MimeMessage message(Notification n, String target) throws Exception {
-        return buildMessage(n, target != null && !target.isBlank() ? target : to);
+        return message(n, target, null);
+    }
+
+    /** As {@link #message(Notification, String)} plus a D8 correlation id stamped into {@code Message-ID}. */
+    MimeMessage message(Notification n, String target, String deliveryId) throws Exception {
+        MimeMessage msg = buildMessage(n, target != null && !target.isBlank() ? target : to);
+        if (deliveryId != null && !deliveryId.isBlank()) {
+            // We mint the Message-ID so bounce/complaint callbacks echo it back to us (D8 §2). It must be
+            // set AFTER buildMessage and survive the send: JavaMail generates its own during
+            // saveChanges()/send() otherwise, and saveChanges() would overwrite ours — hence the
+            // updateMessageID() override on the subclass below.
+            msg.setHeader("Message-ID", "<inspecto." + deliveryId + "@" + messageIdDomain() + ">");
+        }
+        return msg;
+    }
+
+    /** The right-hand side of our {@code Message-ID}, derived from the sender address. */
+    private String messageIdDomain() {
+        int at = from.indexOf('@');
+        return at >= 0 && at < from.length() - 1 ? from.substring(at + 1) : "inspecto.local";
     }
 
     private MimeMessage buildMessage(Notification n, String recipients) throws Exception {
@@ -118,7 +159,7 @@ public final class SmtpEmailChannel implements NotificationChannel {
         } else {
             session = Session.getInstance(props);
         }
-        MimeMessage msg = new MimeMessage(session);
+        MimeMessage msg = new PreservedMessageIdMessage(session);
         msg.setFrom(new InternetAddress(from));
         msg.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipients));
         msg.setSubject("[Inspecto] " + n.title());

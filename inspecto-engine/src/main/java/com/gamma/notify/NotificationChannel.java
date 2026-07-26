@@ -34,6 +34,25 @@ public interface NotificationChannel {
     default void deliver(Notification n, String target) throws Exception { deliver(n); }
 
     /**
+     * Deliver to {@code target}, embedding {@code deliveryId} in the outbound message so a provider
+     * callback can be correlated back to a {@link DeliveryReceipt} (BACKLOG D8) — an SMTP
+     * {@code Message-ID} of {@code <inspecto.{deliveryId}@{domain}>}, or an
+     * {@code X-Inspecto-Delivery-Id} header on an outbound webhook.
+     *
+     * <p><b>Why an overload and not a wider {@code deliver}.</b> D8 §2 ruled out changing
+     * {@link #deliver(Notification)}'s signature — this interface is {@code @PublicApi} and that would
+     * break every implementor. A {@code default} overload breaks none: an implementation that does not
+     * override it simply does not correlate, which costs delivery-status tracking for that transport and
+     * nothing else. That is the honest degrade, and it is why the receipt is written regardless — a
+     * receipt with no callback reads as "sent, never confirmed" rather than going missing.
+     *
+     * @since 4.9.0
+     */
+    default void deliver(Notification n, String target, String deliveryId) throws Exception {
+        deliver(n, target);
+    }
+
+    /**
      * Whether this channel has the configuration it needs to deliver (e.g. an SMTP host or webhook URL).
      * {@link NotificationService} skips unconfigured channels at discovery, so a registered-but-unconfigured
      * channel is inert rather than a per-notification failure. Defaults to {@code true} for channels that

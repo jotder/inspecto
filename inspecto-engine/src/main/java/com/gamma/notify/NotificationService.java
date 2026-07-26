@@ -53,6 +53,8 @@ public final class NotificationService implements AutoCloseable {
     private final java.util.Map<String, DigestBuffer> digests = new java.util.LinkedHashMap<>();
     /** Lazily-started single daemon timer that fires each buffer's one-shot flush; null until first use. */
     private java.util.concurrent.ScheduledExecutorService digestTimer;
+    /** Delivery-status receipts (D8), or {@code null} when tracking is not wired (the lean default). */
+    private volatile DeliveryReceiptStore receipts;
     private final CopyOnWriteArrayList<Consumer<Notification>> listeners = new CopyOnWriteArrayList<>();
     /** Callbacks run on {@link #close()} to unblock open SSE streams (each interrupts its blocked thread). */
     private final CopyOnWriteArrayList<Runnable> streamClosers = new CopyOnWriteArrayList<>();
@@ -100,6 +102,37 @@ public final class NotificationService implements AutoCloseable {
     /** The feed store (for the Control API routes). */
     public NotificationStore store() {
         return store;
+    }
+
+    /**
+     * Wire delivery-status tracking (BACKLOG D8): a receipt is written per <em>external</em> destination
+     * before the transport is called, and its {@code deliveryId} is handed to the transport to embed.
+     *
+     * <p>A setter rather than a sixth constructor: this is optional (Standard/Enterprise) and four public
+     * constructors already exist. {@code null} — the default — means no receipts are written and delivery
+     * behaves exactly as before.
+     *
+     * @since 4.9.0
+     */
+    public void deliveryReceipts(DeliveryReceiptStore receipts) {
+        this.receipts = receipts;
+    }
+
+    /** The receipt store, or {@code null} when delivery-status tracking is not wired. */
+    public DeliveryReceiptStore deliveryReceipts() {
+        return receipts;
+    }
+
+    /**
+     * Record an attempted external delivery and return the id to embed, or {@code null} when tracking is
+     * off. In-app delivery gets no receipt — there is no provider to hear back from.
+     */
+    private String openReceipt(String notificationId, String channelConfigId, String target, boolean digest) {
+        if (receipts == null) return null;
+        String deliveryId = DeliveryReceipt.newDeliveryId();
+        receipts.add(new DeliveryReceipt(deliveryId, notificationId, channelConfigId, target,
+                System.currentTimeMillis(), java.util.Map.of(), null, digest));
+        return deliveryId;
     }
 
     /** The {@link com.gamma.event.EventLog} subscriber. Cheap + non-blocking: filter, then hand off. */
@@ -155,7 +188,13 @@ public final class NotificationService implements AutoCloseable {
             // External SPI channels configured from notify.* flags: delivered only when enabled for this category.
             for (NotificationChannel ch : channels) {
                 if (!prefs.enabled(n.category(), ch.id())) continue;
-                try { ch.deliver(n); } catch (Exception ex) {
+                // No ChannelConfig and no explicit target: the channel resolves its destination from its
+                // own notify.* flags, so the receipt records the attempt with neither (D8).
+                String deliveryId = openReceipt(n.id(), null, null, false);
+                try {
+                    if (deliveryId == null) ch.deliver(n);
+                    else ch.deliver(n, null, deliveryId);
+                } catch (Exception ex) {
                     log.warn("channel {} delivery failed: {}", ch.id(), ex.getMessage());
                 }
             }
@@ -177,7 +216,8 @@ public final class NotificationService implements AutoCloseable {
                     bufferForDigest(cfg, toDeliver);
                     continue;
                 }
-                try { ch.deliver(toDeliver, cfg.target()); } catch (Exception ex) {
+                String deliveryId = openReceipt(toDeliver.id(), cfg.id(), cfg.target(), false);
+                try { ch.deliver(toDeliver, cfg.target(), deliveryId); } catch (Exception ex) {
                     log.warn("channel {} → {} delivery failed: {}", ch.id(), cfg.target(), ex.getMessage());
                 }
             }
@@ -229,7 +269,11 @@ public final class NotificationService implements AutoCloseable {
                 "Digest: " + batch.size() + " notification" + (batch.size() == 1 ? "" : "s"),
                 body.toString(),
                 "digest:" + cfg.id() + ":" + System.nanoTime());
-        try { ch.deliver(digest, cfg.target()); } catch (Exception ex) {
+        // ONE receipt per digest delivery, keyed on the digest — not one per batched notification. This is
+        // the single place the per-delivery model is lossy: a bounce tells us the digest bounced, not which
+        // of its N notifications was in it (D8 §4.5, carried as a known residual).
+        String deliveryId = openReceipt(digest.id(), cfg.id(), cfg.target(), true);
+        try { ch.deliver(digest, cfg.target(), deliveryId); } catch (Exception ex) {
             log.warn("digest delivery to channel {} → {} failed ({} buffered): {}",
                     ch.id(), cfg.target(), batch.size(), ex.getMessage());
         }

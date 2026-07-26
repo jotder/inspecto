@@ -76,4 +76,34 @@ class SmtpEmailChannelTest {
         SmtpEmailChannel anon = new SmtpEmailChannel("h", 25, "f@x.com", "t@x.com", null, null, false);
         assertNull(anon.message(sample()).getSession().getProperty("mail.smtp.auth"));
     }
+
+    @Test
+    void aDeliveryIdBecomesOurOwnMessageIdAndSurvivesTheSend() throws Exception {
+        SmtpEmailChannel ch = new SmtpEmailChannel("mail.example.com", 25,
+                "inspecto@example.com", "ops@example.com", null, null, false);
+
+        MimeMessage m = ch.message(sample(), "ops@example.com", "abc123");
+        assertEquals("<inspecto.abc123@example.com>", m.getHeader("Message-ID")[0],
+                "the domain comes from the sender address, and the id is what a callback echoes back");
+        assertEquals("abc123", DeliveryIds.fromMessageId(m.getHeader("Message-ID")[0]),
+                "the round trip closes: what we write is what the adapter parses back out");
+
+        // saveChanges() is what Transport.send calls, and stock MimeMessage regenerates Message-ID there —
+        // which would break correlation silently while the mail still sent.
+        m.saveChanges();
+        assertEquals("<inspecto.abc123@example.com>", m.getHeader("Message-ID")[0],
+                "our id must survive saveChanges()");
+    }
+
+    @Test
+    void withoutADeliveryIdMessageIdGenerationIsUnchanged() throws Exception {
+        SmtpEmailChannel ch = new SmtpEmailChannel("mail.example.com", 25,
+                "inspecto@example.com", "ops@example.com", null, null, false);
+
+        MimeMessage m = ch.message(sample(), "ops@example.com", null);
+        assertNull(m.getHeader("Message-ID"), "nothing set before the send");
+        m.saveChanges();
+        assertNotNull(m.getHeader("Message-ID")[0], "javax.mail still generates its own");
+        assertNull(DeliveryIds.fromMessageId(m.getHeader("Message-ID")[0]), "and it is not one of ours");
+    }
 }

@@ -390,7 +390,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new QueryRoutes(), new BiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(), new InvRoutes(), new GeoRoutes(),
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new AcquisitionRoutes(),
-                new NotificationRoutes(), new SettingsRoutes(), new NavRoutes(), new AccessRoutes(),
+                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AssistRoutes(), new AgentRoutes()))
             module.register(this);
     }
@@ -607,11 +607,26 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  credentials there is not an error. Every other route requires a valid credential; a miss is
      *  {@code 401 UNAUTHENTICATED}. On success the resolved {@link Subject} is attached to the exchange
      *  for {@link ApiContext#actor}, {@code requireCapability} and the v1 envelope's {@code permissions}. */
+    /**
+     * Paths that carry their own credential <em>in the request</em> and so are exempt from platform auth:
+     * the BI-6 share token in a public-dashboard path, and the provider signature on a D8 delivery-status
+     * callback. Both verify themselves before doing anything, and both are inert until configured
+     * ({@code -Dbi.share.secret} / an adapter's key), so neither exemption widens the default surface.
+     *
+     * <p>Deliberately <b>not</b> {@code PUBLIC_PATHS}: that is an exact-match set of fixed
+     * infrastructure/auth paths, and these are prefixes carrying a variable segment. Also deliberately not
+     * {@code isInfraRoute} — these are business callbacks, not infra probes, and they stay under
+     * {@code /api/v1} like every other business route.
+     */
+    private static boolean isSelfVerifyingPublic(String path) {
+        return path.startsWith("/public/dashboards/") || path.startsWith("/public/delivery-status/");
+    }
+
     private void authenticate(HttpExchange ex, String path) {
         // BI-6: /public/dashboards/* carries its own credential — the HMAC share token in the path,
         // verified (signature + expiry) by ShareRoutes. Sharing as a whole is disabled unless
         // -Dbi.share.secret is configured, so this exemption is inert by default.
-        boolean required = !PUBLIC_PATHS.contains(path) && !path.startsWith("/public/dashboards/");
+        boolean required = !PUBLIC_PATHS.contains(path) && !isSelfVerifyingPublic(path);
         Authenticators.active().ifPresent(a -> {
             // RBAC R1: hand the authenticator the bound space's config root so it can resolve the
             // authored roles.toon (Roles.effective) for THIS request — per-space, restart-free.
@@ -645,7 +660,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  audited (the existing capability gates decide and audit their own mutations). */
     private void authorize(HttpExchange ex, String method, String path) {
         AccessDecider decider = AccessDeciders.active().orElse(null);
-        if (decider == null || PUBLIC_PATHS.contains(path) || path.startsWith("/public/dashboards/")) return;
+        if (decider == null || PUBLIC_PATHS.contains(path) || isSelfVerifyingPublic(path)) return;
         if (!(ex.getAttribute(ApiContext.ATTR_SUBJECT) instanceof Subject subject)) return;
         String action = actionFor(method, path);
         ex.setAttribute(AccessDecider.ATTR_MATCHED_POLICY, null);   // clear stale; the decider re-stamps
@@ -754,11 +769,22 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     @Override
     public Map<String, Object> body(HttpExchange ex) throws IOException {
+        byte[] raw = rawBody(ex);
+        if (raw.length == 0) return Map.of();
+        return json.readValue(raw, new TypeReference<Map<String, Object>>() {});
+    }
+
+    @Override
+    public byte[] rawBody(HttpExchange ex) throws IOException {
+        // Cached, because getRequestBody() is single-read: a route that verifies a signature over the raw
+        // payload and then parses it would otherwise see an empty body on the second call (D8, §4.1).
+        if (ex.getAttribute(ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) return cached;
+        byte[] raw;
         try (InputStream in = ex.getRequestBody()) {
-            byte[] raw = in.readAllBytes();
-            if (raw.length == 0) return Map.of();
-            return json.readValue(raw, new TypeReference<Map<String, Object>>() {});
+            raw = in.readAllBytes();
         }
+        ex.setAttribute(ApiContext.ATTR_RAW_BODY, raw);
+        return raw;
     }
 
     /**

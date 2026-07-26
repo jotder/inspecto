@@ -61,11 +61,22 @@ public final class WebhookChannel implements NotificationChannel {
 
     @Override
     public void deliver(Notification n) throws Exception {
+        post(n, null);
+    }
+
+    /** Deliver with a D8 correlation id in {@code X-Inspecto-Delivery-Id} so callbacks can be matched. */
+    @Override
+    public void deliver(Notification n, String target, String deliveryId) throws Exception {
+        post(n, deliveryId);
+    }
+
+    private void post(Notification n, String deliveryId) throws Exception {
         HttpRequest.Builder req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(n.toMap())));
         if (token != null) req.header("Authorization", "Bearer " + token);
+        if (deliveryId != null && !deliveryId.isBlank()) req.header("X-Inspecto-Delivery-Id", deliveryId);
         HttpResponse<String> resp = client.send(req.build(), HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() / 100 != 2)
             throw new IllegalStateException("webhook returned HTTP " + resp.statusCode());
