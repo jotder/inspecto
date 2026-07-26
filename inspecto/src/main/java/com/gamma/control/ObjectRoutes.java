@@ -5,13 +5,18 @@ import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectType;
 import com.gamma.ops.OperationalObject;
+import com.gamma.ops.findings.FindingsSpec;
 import com.gamma.ops.link.ObjectLink;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.ops.rca.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
+import com.gamma.pipeline.ComponentRegistry;
+import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,6 +33,8 @@ import java.util.NoSuchElementException;
  * RCA seeding. Extracted verbatim from {@link ControlApi}: identical routes, order and HTTP statuses.
  */
 final class ObjectRoutes implements RouteModule {
+
+    private static final Logger log = LoggerFactory.getLogger(ObjectRoutes.class);
 
     @Override
     public void register(ApiContext api) {
@@ -61,6 +68,10 @@ final class ObjectRoutes implements RouteModule {
         // The effective (possibly *_workflow.toon-overridden) lifecycle for a type — lets the UI derive
         // folders + action verbs instead of hardcoding state lists (case-management-design.md C6).
         api.get("/workflows/([^/]+)", (e, m) -> workflowOf(api, ApiContext.name(m)));
+        // The effective Findings sections for a type (C3/D6) — authored as a findings-spec component, else
+        // the built-in shape. A read-only resolver, deliberately not a second config idiom: authoring stays
+        // on the generic /components CRUD (docs/superpower/findings-spec-plan.md §3.3).
+        api.get("/findings/([^/]+)", (e, m) -> findingsSpecOf(api, ApiContext.name(m)));
         // Rule-raised cases (C5): auto-group Incidents into a Case. CRUD is capability-gated (config);
         // evaluate mutates objects (an operational action, like transition), so it is ungated.
         api.get("/cases/rules", (e, m) -> api.service().objects().caseRules().stream().map(CaseRule::toMap).toList());
@@ -128,6 +139,32 @@ final class ObjectRoutes implements RouteModule {
     /** {@code GET /workflows/{type}} — the effective workflow definition; unknown type → 400. */
     private Object workflowOf(ApiContext api, String type) {
         return api.service().objects().workflow(parseObjectType(type)).toMap();
+    }
+
+    /**
+     * {@code GET /findings/{type}} — the <b>effective</b> Findings sections for an object type (C3 / BACKLOG
+     * D6): the authored {@code findings-spec} component when one exists, else
+     * {@link FindingsSpec#defaultFor}. Unknown type → 400.
+     *
+     * <p>The overlay is resolved <em>here</em> rather than in the client so the built-in default has exactly
+     * one definition. A spec that is malformed on disk falls back to the default with a warning — a broken
+     * config file must not take the triage panel down (it was already rejected at authoring time by
+     * {@link FindingsSpec#fromMap}, so reaching this branch means the file was hand-edited).
+     */
+    private Object findingsSpecOf(ApiContext api, String type) {
+        ObjectType objectType = parseObjectType(type);
+        String id = objectType.name().toLowerCase(java.util.Locale.ROOT);
+        Path root = api.writeRoot();
+        if (root != null) {
+            try {
+                Map<String, Object> content = new ComponentStore(root.resolve("registry"))
+                        .get("findings-spec", id).map(ComponentRegistry.Component::content).orElse(null);
+                if (content != null) return FindingsSpec.fromMap(content).toMap();
+            } catch (RuntimeException bad) {   // a malformed spec (IllegalArgumentException) or an unreadable file
+                log.warn("findings-spec '{}' is unreadable, serving the built-in default: {}", id, bad.getMessage());
+            }
+        }
+        return FindingsSpec.defaultFor(objectType).toMap();
     }
 
     // ── SEC-7d data-scoped grants ("a fraud analyst sees fraud cases") ───────────────

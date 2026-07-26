@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.ops.findings.FindingsSpec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineNode;
@@ -352,12 +353,33 @@ final class ComponentRoutes implements RouteModule {
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {
+            validateKind(type, id, content);
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));
             return componentDoc(c);
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, e.getMessage());
+        }
+    }
+
+    /**
+     * Per-kind content validation, for the kinds that have a model to validate against. Fail-closed at
+     * <b>authoring</b> time — the caller maps {@link IllegalArgumentException} to 422 — rather than leaving a
+     * malformed component to degrade at render/dispatch time. Kinds with no model stay unconstrained, so
+     * this is a hook, not a schema registry.
+     */
+    private static void validateKind(String type, String id, Map<String, Object> content) {
+        if ("findings-spec".equals(type)) {
+            // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
+            // content as it will be persisted and refuse a spec whose objectType disagrees with its id.
+            Map<String, Object> stamped = new LinkedHashMap<>(content);
+            stamped.put("name", id);
+            String declared = ApiContext.str(content, "objectType");
+            if (declared != null && !declared.trim().equalsIgnoreCase(id))
+                throw new IllegalArgumentException("findings-spec objectType '" + declared
+                        + "' must match the component id '" + id + "' (one spec per object type)");
+            FindingsSpec.fromMap(stamped);
         }
     }
 }

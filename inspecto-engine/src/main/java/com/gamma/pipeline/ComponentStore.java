@@ -67,7 +67,12 @@ public final class ComponentStore {
                     // Authored notification rules (NotificationRoutes /notifications/rules* admin CRUD): an
                     // operator-defined event→notification mapping, checked ahead of the built-in
                     // NotificationRules.defaults() at dispatch time.
-                    "notification-rule");
+                    "notification-rule",
+                    // Configurable Findings sections (C3 / BACKLOG D6, docs/superpower/findings-spec-plan.md):
+                    // one findings-spec per ObjectType describing the Findings panel's fields. A kind rather
+                    // than a *_workflow.toon-style boot scan precisely so an operator can edit it through the
+                    // product; absent one, FindingsSpec.defaultFor() renders today's hardcoded shape.
+                    "findings-spec");
 
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
