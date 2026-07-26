@@ -152,19 +152,23 @@ final class ObjectRoutes implements RouteModule {
      * {@link FindingsSpec#fromMap}, so reaching this branch means the file was hand-edited).
      */
     private Object findingsSpecOf(ApiContext api, String type) {
-        ObjectType objectType = parseObjectType(type);
+        return effectiveFindingsSpec(api, parseObjectType(type)).toMap();
+    }
+
+    /** The effective spec for {@code objectType} — see {@link #findingsSpecOf}, which serves it. */
+    private static FindingsSpec effectiveFindingsSpec(ApiContext api, ObjectType objectType) {
         String id = objectType.name().toLowerCase(java.util.Locale.ROOT);
         Path root = api.writeRoot();
         if (root != null) {
             try {
                 Map<String, Object> content = new ComponentStore(root.resolve("registry"))
                         .get("findings-spec", id).map(ComponentRegistry.Component::content).orElse(null);
-                if (content != null) return FindingsSpec.fromMap(content).toMap();
+                if (content != null) return FindingsSpec.fromMap(content);
             } catch (RuntimeException bad) {   // a malformed spec (IllegalArgumentException) or an unreadable file
                 log.warn("findings-spec '{}' is unreadable, serving the built-in default: {}", id, bad.getMessage());
             }
         }
-        return FindingsSpec.defaultFor(objectType).toMap();
+        return FindingsSpec.defaultFor(objectType);
     }
 
     // ── SEC-7d data-scoped grants ("a fraud analyst sees fraud cases") ───────────────
@@ -644,10 +648,32 @@ final class ObjectRoutes implements RouteModule {
         String assignee = ApiContext.str(body, "assignee");
         if (priority == null && severity == null && assignee == null && attrs == null)
             throw new ApiException(400, "body must include at least one of 'priority', 'severity', 'assignee', 'attributes'");
+        if (attrs != null) validateFindings(api, id, attrs);
         try {
             return api.service().objects().patch(id, priority, severity, assignee, attrs).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, notFound.getMessage());
+        }
+    }
+
+    /**
+     * Judge a submitted attributes bag against the object's effective Findings spec (BACKLOG D6 residual)
+     * → 422. The spec configures the <em>form</em>, so before this a direct {@code PATCH} could store a
+     * disposition no ladder offers or skip a {@code required} field the UI enforces.
+     *
+     * <p>Resolved here rather than in {@code ObjectService} because the spec lives in the space's
+     * {@code ComponentStore}, which is an edge concern — the engine stays store-agnostic. An unknown id is
+     * left to the patch itself to 404.
+     */
+    private static void validateFindings(ApiContext api, String id, Map<String, String> attrs) {
+        OperationalObject o = api.service().objects().get(id).orElse(null);
+        if (o == null) return;
+        Map<String, String> merged = new LinkedHashMap<>(o.attributes());
+        merged.putAll(attrs);
+        try {
+            effectiveFindingsSpec(api, o.objectType()).validateValues(attrs, merged);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
         }
     }
 

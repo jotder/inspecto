@@ -231,6 +231,91 @@ public record FindingsSpec(String objectType, List<Section> sections) {
         return new DependsOn(key, hasEquals ? m.get("equals") : m.get("notEquals"), hasNot);
     }
 
+    // ── validate submitted values (BACKLOG D6 residual) ─────────────────────────
+
+    /**
+     * Fail-closed check of a submitted Findings blob against this spec, throwing
+     * {@link IllegalArgumentException} (→ 422) on the first violation. Findings land as plain
+     * {@code attributes} strings on {@code PATCH /objects/{id}}, so without this a non-UI writer can store
+     * a value the form could never have produced.
+     *
+     * <p>Two deliberate scoping rules, because {@code attributes} is a <b>shared</b> bag (it also carries
+     * {@code tags}, {@code caseType}, {@code dueAt}, …) and the PATCH is a <b>merge</b>:
+     * <ul>
+     *   <li><b>Undeclared keys are not rejected.</b> A key no section declares cannot be told apart from a
+     *       non-Findings attribute, so rejecting it would break tagging and every other attribute writer.
+     *       What is enforced is that a <em>declared</em> key holds a value the renderer could produce.</li>
+     *   <li><b>Nothing is checked unless the patch touches at least one declared key</b>, and
+     *       {@code required} is then judged against the <em>merged</em> result — a partial save cannot be
+     *       tested against a form it never claimed to submit, and an unrelated attribute write must not
+     *       start failing because a triage form was left incomplete.</li>
+     * </ul>
+     * A section hidden by its {@link DependsOn} against the merged bag is skipped entirely — the form never
+     * showed it, so it cannot be required.
+     *
+     * @param submitted the attributes bag as sent
+     * @param merged    the bag as it will be stored (stored ∪ submitted)
+     */
+    public void validateValues(Map<String, String> submitted, Map<String, String> merged) {
+        if (submitted == null || submitted.isEmpty()) return;
+        boolean touches = sections.stream().anyMatch(s -> submitted.containsKey(s.key()));
+        if (!touches) return;
+        for (Section s : sections) {
+            if (hidden(s, merged)) continue;
+            String value = merged == null ? null : merged.get(s.key());
+            if (value == null || value.isBlank()) {
+                if (Boolean.TRUE.equals(s.required()))
+                    throw new IllegalArgumentException("findings field '" + s.key() + "' ("
+                            + s.label() + ") is required");
+                continue;
+            }
+            if (!submitted.containsKey(s.key())) continue;   // an untouched stored value is not re-judged
+            checkValue(s, value.trim());
+        }
+    }
+
+    /** Whether {@code s} is conditionally hidden by its {@code dependsOn} against the merged bag. */
+    private static boolean hidden(Section s, Map<String, String> merged) {
+        DependsOn d = s.dependsOn();
+        if (d == null) return false;
+        String other = merged == null ? null : merged.get(d.key());
+        boolean equal = String.valueOf(d.value()).equals(other == null ? "" : other.trim());
+        return d.negated() == equal;
+    }
+
+    private static void checkValue(Section s, String value) {
+        switch (s.type()) {
+            case "number" -> {
+                double n;
+                try {
+                    n = Double.parseDouble(value);
+                } catch (NumberFormatException bad) {
+                    throw new IllegalArgumentException("findings field '" + s.key() + "' must be a number, got '"
+                            + value + "'");
+                }
+                if (s.min() != null && n < s.min())
+                    throw new IllegalArgumentException("findings field '" + s.key() + "' must be >= " + s.min());
+                if (s.max() != null && n > s.max())
+                    throw new IllegalArgumentException("findings field '" + s.key() + "' must be <= " + s.max());
+            }
+            case "boolean" -> {
+                if (!"true".equalsIgnoreCase(value) && !"false".equalsIgnoreCase(value))
+                    throw new IllegalArgumentException("findings field '" + s.key()
+                            + "' must be true or false, got '" + value + "'");
+            }
+            // Only `select` is a closed set; `autocomplete` options are suggestions, so a free value is legal.
+            case "select" -> {
+                if (s.options().stream().noneMatch(o -> o.value().equals(value)))
+                    throw new IllegalArgumentException("findings field '" + s.key() + "' must be one of "
+                            + s.options().stream().map(Option::value).toList() + ", got '" + value + "'");
+            }
+            default -> { }
+        }
+        if (s.pattern() != null && !Pattern.compile(s.pattern()).matcher(value).matches())
+            throw new IllegalArgumentException("findings field '" + s.key() + "' does not match "
+                    + s.pattern());
+    }
+
     // ── serialize ───────────────────────────────────────────────────────────────
 
     /** The wire shape {@code <inspecto-schema-form>} consumes (also the persisted TOON content). */

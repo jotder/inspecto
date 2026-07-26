@@ -135,6 +135,58 @@ class ControlApiFindingsSpecTest {
         }
     }
 
+    /**
+     * The spec judges submitted <em>values</em>, not just the form (D6 residual): a direct PATCH can no
+     * longer store a disposition the ladder does not offer, while the shared attributes bag keeps working
+     * for every non-Findings key.
+     */
+    @Test
+    void aSubmittedFindingsValueIsJudgedAgainstTheEffectiveSpec(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            var seed = c.svc.objects().open(com.gamma.ops.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+                    null, null, null, "corr", java.util.Map.of());
+            String path = "/objects/" + seed.id();
+
+            assertEquals(422, send(c.port, "PATCH", path, "{\"attributes\":{\"disposition\":\"MAYBE\"}}").statusCode(),
+                    "a value outside the ladder the form offers");
+            assertEquals(200, send(c.port, "PATCH", path, "{\"attributes\":{\"disposition\":\"CONFIRMED\"}}").statusCode());
+            assertEquals(200, send(c.port, "PATCH", path, "{\"attributes\":{\"tags\":\"urgent\"}}").statusCode(),
+                    "an undeclared key is a non-Findings attribute, never a rejection");
+        }
+    }
+
+    /** A {@code required} section is judged against the merged result, and only once the patch touches
+     *  the form — an unrelated attribute write must not start failing on an incomplete triage. */
+    @Test
+    void aRequiredSectionIsEnforcedOnlyOnceThePatchTouchesTheForm(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        try (Ctx c = open(dir, writeRoot)) {
+            assertEquals(200, send(c.port, "POST", "/components/findings-spec",
+                    """
+                    {"name":"incident","objectType":"incident","sections":[
+                      {"key":"outcome","label":"Outcome","type":"select","tier":"required","required":true,
+                       "options":[{"value":"WIN"},{"value":"LOSS"}]},
+                      {"key":"loss","label":"Loss","type":"number","tier":"optional","min":0,
+                       "dependsOn":{"key":"outcome","equals":"LOSS"}}]}
+                    """).statusCode());
+            var seed = c.svc.objects().open(com.gamma.ops.ObjectType.INCIDENT, "bad rows", "d", "HIGH",
+                    null, null, null, "corr", java.util.Map.of());
+            String path = "/objects/" + seed.id();
+
+            assertEquals(200, send(c.port, "PATCH", path, "{\"attributes\":{\"tags\":\"urgent\"}}").statusCode(),
+                    "no declared key submitted — the form is not judged");
+            assertEquals(422, send(c.port, "PATCH", path, "{\"attributes\":{\"loss\":\"5\"}}").statusCode(),
+                    "touching the form with 'outcome' still unset");
+            assertEquals(200, send(c.port, "PATCH", path, "{\"attributes\":{\"outcome\":\"LOSS\"}}").statusCode());
+            assertEquals(422, send(c.port, "PATCH", path, "{\"attributes\":{\"loss\":\"-1\"}}").statusCode(),
+                    "min is enforced on a number");
+            assertEquals(422, send(c.port, "PATCH", path, "{\"attributes\":{\"loss\":\"lots\"}}").statusCode(),
+                    "a number section rejects a non-number");
+            assertEquals(200, send(c.port, "PATCH", path, "{\"attributes\":{\"loss\":\"5\"}}").statusCode(),
+                    "'outcome' is now stored, so the required check passes on the merged bag");
+        }
+    }
+
     private static List<String> keys(JsonNode spec) {
         List<String> out = new java.util.ArrayList<>();
         for (JsonNode s : spec.get("sections")) out.add(s.get("key").asText());
