@@ -14,6 +14,7 @@ import com.gamma.intelligence.action.RunbookRunStore;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.spec.ConfigJsonSchema;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
@@ -96,7 +97,7 @@ final class InspectoTools {
                 signalsQuery(service), signalTimeline(service),
                 timelineBuild(service, components), diffBatches(service),
                 configVersionsDiff(components), anomalyScan(browseStores),
-                componentDraft(), queryAuthor(service, components), kpiReportBuilder(components),
+                configSchema(), componentDraft(), queryAuthor(service, components), kpiReportBuilder(components),
                 pipelineAuthor(), projectionAuthor(), suggestExpectations(browseStores),
                 componentApply(controlPlane), componentRollback(controlPlane),
                 jobRun(controlPlane), pipelineRerun(controlPlane),
@@ -732,6 +733,48 @@ final class InspectoTools {
      * L2/P3 gated-action step) and never throws (an unvalidatable kind or malformed body is an
      * {@code ok=false} result, exactly like the read belt).
      */
+    /**
+     * AGT-6a plan D9 {@code config_schema} (read, L1): the JSON Schema for a component kind, projected
+     * from the same {@link ConfigSpecs} spec that {@link #componentDraft()} validates against
+     * ({@link ConfigJsonSchema}).
+     *
+     * <p>Two consumers, and the second is the reason this exists. A model composing a draft can read the
+     * shape first instead of guessing it; and the A5 natural-language {@code derive} hop constrains
+     * generation with this schema — "constrain the model with the spec that judges it", so a
+     * schema-honouring generation cannot fail on structure.
+     *
+     * <p><b>Why this is a separate tool rather than a tighter {@code component_draft} input schema:</b>
+     * {@code component_draft} is a <i>validator</i>. Its whole job is to accept a malformed draft and
+     * hand back anchored findings, so constraining its own {@code config} property would defeat it — the
+     * bad drafts would be rejected by the transport before the validator could explain what was wrong.
+     * The schema therefore travels as data a caller fetches, not as a gate on the validator's input.
+     */
+    private static Tool configSchema() {
+        ToolSpec spec = new ToolSpec("config_schema",
+                "Get the JSON Schema for a component kind (pipeline|enrichment|job|schema|expectation|"
+                        + "alert-rule|widget|dashboard|meta) — the structural contract component_draft "
+                        + "validates against. Read this before composing a draft. Args: kind.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"kind\":{\"type\":\"string\"}},"
+                        + "\"required\":[\"kind\"]}",
+                false, Role.USER, Capability.READ_DOCS);
+        return new FunctionTool(spec, call -> {
+            String kind = arg(call, "kind");
+            if (kind == null || kind.isBlank()) return error("kind is required");
+            String type = configType(kind);
+            ConfigSpec cfgSpec = ConfigSpecs.forType(type);
+            if (cfgSpec == null) {
+                return error("no structural spec for kind '" + kind + "' (known kinds: "
+                        + String.join(", ", ConfigSpecs.TYPES) + ")");
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("kind", kind);
+            result.put("type", type);
+            result.put("schema", ConfigJsonSchema.of(cfgSpec));
+            return ok(result);
+        });
+    }
+
     private static Tool componentDraft() {
         ToolSpec spec = new ToolSpec("component_draft",
                 "Validate a proposed component draft (kind: pipeline|enrichment|job|schema|expectation|"

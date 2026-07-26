@@ -347,6 +347,63 @@ class InspectoToolsTest {
         assertTrue(r.error().contains("unknown table"));
     }
 
+    // ── AGT-6a plan D9: config_schema (the projected structural contract) ────────
+
+    private static Tool schemaTool() {
+        return tool(InspectoTools.tools(seeded()), "config_schema");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void configSchemaProjectsRealStructureForEveryDraftableKind() {
+        for (String kind : List.of("pipeline", "enrichment", "job", "schema", "expectation",
+                "alert-rule", "widget", "dashboard")) {
+            Map<String, Object> out = invoke(schemaTool(), Map.of("kind", kind));
+            Map<String, Object> schema = (Map<String, Object>) out.get("schema");
+            assertEquals("object", schema.get("type"), kind);
+            Map<String, Object> props = (Map<String, Object>) schema.get("properties");
+            assertNotNull(props, kind + " must project properties, not a bare object");
+            assertFalse(props.isEmpty(), kind);
+        }
+    }
+
+    @Test
+    void configSchemaMapsAlertRuleOntoTheAlertSpec() {
+        // Same kind→type aliasing component_draft uses, so the two tools cannot disagree.
+        assertEquals("alert", invoke(schemaTool(), Map.of("kind", "alert-rule")).get("type"));
+    }
+
+    @Test
+    void configSchemaIsReadOnlyAndRejectsAnUnknownKind() {
+        assertFalse(schemaTool().spec().mutating());
+        ToolResult r = schemaTool().invoke(new ToolCall("config_schema",
+                Map.of("kind", "no-such-kind"), new RunId("t")));
+        assertFalse(r.ok());
+        assertTrue(r.error().contains("no structural spec"), r.error());
+    }
+
+    /** The projection must describe exactly what the validator enforces — same spec, same required set. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void configSchemaRequiredSetMatchesWhatComponentDraftRejects() {
+        Map<String, Object> schema =
+                (Map<String, Object>) invoke(schemaTool(), Map.of("kind", "expectation")).get("schema");
+        List<String> required = (List<String>) schema.get("required");
+        assertNotNull(required, "expectation declares required fields");
+
+        // Drop each required top-level field in turn; the validator must object to every one.
+        Map<String, Object> good = Map.of("name", "orders_id_notnull", "target", "orders",
+                "column", "ORDER_ID", "kind", "non_null");
+        for (String field : required) {
+            if (!good.containsKey(field)) continue;
+            Map<String, Object> missing = new java.util.LinkedHashMap<>(good);
+            missing.remove(field);
+            Map<String, Object> out = invoke(draftTool(), Map.of("kind", "expectation", "config", missing));
+            assertEquals(false, out.get("clean"),
+                    () -> "schema calls '" + field + "' required but the validator accepted it missing");
+        }
+    }
+
     // ── AGT-5 P2 slice 1: component_draft (the validator repair loop) ────────────
 
     private static Tool draftTool() {
