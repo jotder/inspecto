@@ -24,6 +24,7 @@ import {
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
+import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -113,6 +114,7 @@ interface PresentationSnapshot {
         MatTooltipModule,
         InspectoAlertComponent, InspectoEmptyStateComponent, InspectoSkeletonComponent, GraphViewComponent,
         DataTableComponent, TransferMenuComponent, LinkAnalysisToolboxComponent, LinkAnalysisQueryPanelComponent,
+        AiExplainComponent,
     ],
     templateUrl: './link-analysis.component.html',
     host: {

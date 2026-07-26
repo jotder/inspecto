@@ -68,6 +68,10 @@ const GLOSSARY: Record<string, string> = {
     'tag': 'A user-created label attached to an Incident or Case for cross-cutting grouping.',
     'tag rule': 'A saved search that applies a Tag (the Gmail-filter metaphor): it auto-tags newly arriving items.',
     'trigger': 'The start condition of a run: cron | event | manual | on-pipeline. Owned by the Scheduler.',
+    'entity': 'A business node in a business graph (a caller, an account). Never used for artifacts (Component/Part) or assets (Asset/Lineage).',
+    'link': 'A business edge between Entities (a call, a transaction) carrying typed attributes (call-type, duration). Never used for artifacts (Component/Part) or assets (Asset/Lineage).',
+    'entity projection': "The mapping (not a store) that folds a Dataset's rows into an Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.",
+    'link-analysis view': 'A saved investigation in the Link Analysis Studio (Component kind `link-analysis-view`); when its source is `entity-projection` it is a Widget (a Graph Visualization Type bound to a Dataset).',
     'view': 'A virtual (logical) query over a Table, Derived Table, or View. No storage of its own.',
     'widget': "A Visualization Type + Config + a binding to a Dataset's resultset metadata — the configured, renderable instance.",
 };
