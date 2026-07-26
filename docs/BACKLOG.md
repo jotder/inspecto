@@ -178,9 +178,35 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 > `clientId:clientSecret`), was removed with the dead Fuse code — nothing in `src/` has read these keys
 > since. UI verify after removal: `test:ci` 1642 pass, `ng build` clean.
 >
-> **Deliberately NOT done** (operator call 2026-07-25): no `git-filter-repo` history rewrite — it
-> invalidates every clone and breaks the shared-sandbox shift model while still not purging GitHub's cache
-> or forks; rotation is the real fix.
+> **⚠️ HISTORY REWRITE DONE 2026-07-26 — AND IT DID NOT END THE PUBLIC EXPOSURE. `refs/pull/*` DEFEATS IT.**
+> Reversing the 2026-07-25 "deliberately not done" call, the operator ordered the rewrite. Executed with
+> `git-filter-repo --replace-text` (all 5 values → `REDACTED-SEC-INCIDENT-1`): 73 occurrences replaced,
+> **0 secrets in 22 598 objects**, all 1008 commits preserved, `HEAD` tree byte-identical (zero code change),
+> `1.x`/`2.x`/`3.x` SHAs untouched (they never carried the values, so the retired-line rule stayed intact).
+> Force-pushed: `master` `bb2c486f`→`f275b6f6`, `4.x` `27780fee`→`f1fb6f20`, tags `v4.0.0-RC1` +
+> `backup-pre-squash-20260725` re-pointed, and the stray `origin/claude/brave-pascal-55aae7` (which had NOT
+> been rewritten — it was deleted locally *before* the rewrite, so filter-repo never saw it) deleted.
+>
+> **THEN VERIFIED AGAINST THE LIVE API — THE SECRETS ARE STILL SERVED.** All five PRs were merged
+> **2026-06-21 → 06-24**, i.e. *after* the 2026-06-12 leak commit, so every `refs/pull/N/head` pins the old
+> lineage. A `gh api .../contents/…environment.prod.ts?ref=<PR-head-sha>` still returned secret-shaped
+> literals at PR heads #1/#4/#5 **after** the force-push. **`refs/pull/*` cannot be deleted or rewritten by
+> a repo owner — only GitHub Support can purge them.** So:
+>
+> - **The rewrite bought local/branch hygiene, NOT remediation.** Anyone can still
+>   `git fetch origin refs/pull/1/head`.
+> - **Open a GitHub Support request to purge unreachable objects + PR refs.** Until that completes, treat the
+>   exposure as ONGOING, not historical.
+> - **ROTATION IS NOW UNAVOIDABLE AND URGENT** — it was always the real fix, and the exposure is live.
+> - ⚠ **The issuer auth logs are GONE** (operator, 2026-07-26) ⇒ the "pull logs before rotating" step is moot
+>   and we can **never** establish whether the exposure was exercised. "Assume compromised" is the only
+>   defensible reading. Rotation is no longer gated on anything.
+> - ⚠ **Lesson for any future rewrite: enumerate ALL remote refs first** (`git ls-remote origin`), not just
+>   branches. A stray branch nearly slipped through, and `refs/pull/*` cannot be fixed client-side at all.
+> - ⚠ **~84 short SHAs across `docs/`, the skills and the memory index now dangle** — every pre-rewrite SHA
+>   on the master/4.x lineage is invalid. Mapping for this shift's commits is in `SESSION_STATUS.local.md`.
+> - Pre-rewrite backup bundle: `C:/sandbox/ucc-prerewrite-backup-20260726-203545.bundle` (all refs).
+>   ⚠ **It contains the secrets — delete it once the incident is closed.**
 >
 > **✅ Reintroduction guard SHIPPED** (2026-07-25): `tools/check-secrets.mjs`, wired into `ci.yml` beside
 > the vocabulary guard (~1s, pure Node). Flags a secret-ish key assigned a ≥16-char literal; ignores
