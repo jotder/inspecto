@@ -258,17 +258,13 @@ standards-only. *(Keycloak + WSO2 APIM are a supported example, not the answer.)
 non-blocking:**
 - **Policy-authoring UX** — a matrix/create editor beyond hand-authored TOON (seed visibility + a
   "why denied?" explain endpoint + a read-only Policies tab all shipped 2026-07-24).
-- **⚠ Lens/capability mismatch for admin-only subjects (surfaced 2026-07-25 finishing the D4 UI half).**
-  Under OIDC, `LensService.allowedLenses` offers Builder only for `canAuthorWorkbench` and Ops only for
-  `canOperateRuns`; everyone else is snapped to **Business, which is `readOnly`** — and every capability
-  signal is `granted && !readOnly && …`. So a subject holding the **admin** seed and nothing else
-  (`canConfigureAccess`, `canCurateMenus`, `canOnboardConnections`, `canApproveShares`,
-  `canOfferDatasets`) evaluates **every one of them false in the UI** and sees no admin affordances,
-  even though the server would authorize the calls. Pre-existing (it predates D4 — `canConfigureAccess`
-  has always had it), not introduced by the split, and invisible in the honor-system/Personal mode
-  where `granted()` short-circuits true. **Needs a call:** either project admin capabilities onto a
-  lens, or stop conflating "read-only lens" with "no admin rights" — the `!readOnly()` conjunct is the
-  actual bug surface. `inspecto-ui/src/app/inspecto/api/lens.service.ts:60`
+- **`canRequestShares` is ungated client-side.** The consumer-side Exchange actions ("Request access",
+  "Pin a snapshot version") render for every subject and fail 403 on click for anyone without the grant —
+  the same false-positive the owner-side actions had until 2026-07-26. Not fixed with them because whether
+  requesting a share is an **identity** or a **lens-scoped** capability is a genuine call: unlike
+  `canOfferDatasets`/`canApproveShares` it is developer/ops-tier, not Admin, so a lens plausibly does
+  represent it. *(The admin-only lens/capability mismatch this sat under is CLOSED — `identityCapability`
+  shipped 2026-07-25, the Exchange half 2026-07-26.)* → `okf/backend/editions/auth-security.md`
 - X-Actor **full removal** — client-migration-gated (see §4 API v1).
 
 > **Do not partially implement security concerns elsewhere** — this section stays the single scope.

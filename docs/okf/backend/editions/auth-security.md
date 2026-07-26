@@ -208,8 +208,20 @@ The rule is now split, and the split is the durable fact:
 
 | | Predicate | Members |
 |---|---|---|
-| **Identity** — who the subject *is* | `granted && allows` | `canConfigureAccess`, `canCurateMenus`, `canOnboardConnections`, `canTriageRequirements` |
+| **Identity** — who the subject *is* | `granted && allows` | `canConfigureAccess`, `canCurateMenus`, `canOnboardConnections`, `canTriageRequirements`, `canOfferDatasets`, `canApproveShares` |
 | **Lens-scoped** — the activity a lens *represents* | `granted && !readOnly && allows` | `canAuthorWorkbench`, `canOperateRuns`, `canAuthorAlertRules` |
+
+**The Exchange half landed 2026-07-26, and it was the mirror-image bug.** `canOfferDatasets` and
+`canApproveShares` had no `LensService` signal at all, so the UI gated Offer on nothing but the
+`exchange` feature flag and gated Approve / Deny / Revoke / Expiry / Refresh on nothing but the by-me
+view. Every subject saw the owner's governance actions and got a server 403 on click. Both are identity
+capabilities (Admin-owned, and admin never qualifies for a non-Business lens), with `exchange.offer` /
+`exchange.approve` action nodes under Data Catalog so the Access-Profile seam can reach them.
+
+> The generalisable lesson: **a capability the server enforces but the client never reads is a bug in
+> both directions** — a false negative hides an affordance the subject is entitled to, a false positive
+> offers one that 403s. When adding a `withCapability` route, check whether a `LensService` signal and an
+> action node exist for it. `canRequestShares` is the remaining instance (BACKLOG §5).
 
 Three things a future change must not undo:
 

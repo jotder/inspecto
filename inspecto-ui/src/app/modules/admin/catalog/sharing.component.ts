@@ -6,6 +6,7 @@ import {
     ExchangeGrant,
     ExchangeOffer,
     ExchangeService,
+    LensService,
     SpacesService,
 } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
@@ -60,6 +61,7 @@ export class SharingComponent implements OnInit {
     private spaces = inject(SpacesService);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
+    private lens = inject(LensService);
 
     readonly view = input.required<'with-me' | 'by-me'>();
 
@@ -134,24 +136,33 @@ export class SharingComponent implements OnInit {
         { field: 'freshness.refreshedAt', headerName: 'Refreshed', width: 170, valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—') },
     ];
 
-    /** by-me: the owner's grant lifecycle actions (approve/deny a request, revoke an active grant). */
+    /** Owner-side decisions: the by-me view **and** the capability the server enforces. */
+    private canDecide(): boolean {
+        return this.view() === 'by-me' && this.lens.canApproveShares();
+    }
+
+    /** by-me: the owner's grant lifecycle actions (approve/deny a request, revoke an active grant).
+     *
+     *  Each owner-side decision additionally requires `canApproveShares`, the capability the server
+     *  gates `POST /exchange/grants/…` on. Consumer-side actions (request access, pin) are a different
+     *  question and stay as they were. */
     readonly grantActions: InspectoRowAction<ExchangeGrant>[] = [
         {
             icon: 'heroicons_outline:check',
             hint: 'Approve this request',
-            visible: (g) => this.view() === 'by-me' && g.status === 'requested',
+            visible: (g) => this.canDecide() && g.status === 'requested',
             onClick: (g) => this.act(g, 'approve'),
         },
         {
             icon: 'heroicons_outline:x-mark',
             hint: 'Deny this request',
-            visible: (g) => this.view() === 'by-me' && g.status === 'requested',
+            visible: (g) => this.canDecide() && g.status === 'requested',
             onClick: (g) => this.act(g, 'deny'),
         },
         {
             icon: 'heroicons_outline:no-symbol',
             hint: 'Revoke this grant',
-            visible: (g) => this.view() === 'by-me' && g.status === 'active',
+            visible: (g) => this.canDecide() && g.status === 'active',
             onClick: (g) => this.act(g, 'revoke'),
         },
         {
@@ -165,7 +176,7 @@ export class SharingComponent implements OnInit {
             // Owner governance (S3): set/clear an expiry after which the grant auto-revokes.
             icon: 'heroicons_outline:clock',
             hint: (g) => (g.expiresAt ? 'Change or clear expiry' : 'Set an expiry'),
-            visible: (g) => this.view() === 'by-me' && g.status === 'active',
+            visible: (g) => this.canDecide() && g.status === 'active',
             onClick: (g) => this.govern(g, 'expiry'),
         },
     ];
@@ -182,7 +193,8 @@ export class SharingComponent implements OnInit {
             // Owner republishes the dataset's Exchange snapshot from its current data (S2). Datasets only.
             icon: 'heroicons_outline:arrow-path',
             hint: 'Refresh snapshot',
-            visible: (o) => this.view() === 'by-me' && o.kind === 'dataset',
+            // Republishing is an offer mutation — same capability as making the offer.
+            visible: (o) => this.view() === 'by-me' && o.kind === 'dataset' && this.lens.canOfferDatasets(),
             onClick: (o) => this.refresh(o),
         },
     ];

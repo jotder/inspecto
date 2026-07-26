@@ -6,7 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ExchangeService, parseSharedRef, SessionService, SpacesService } from 'app/inspecto/api';
+import { apiErrorMessage, ExchangeService, LensService, parseSharedRef, SessionService, SpacesService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
@@ -47,8 +47,13 @@ export class DatasetsComponent implements OnInit {
     private exchange = inject(ExchangeService);
     private spaces = inject(SpacesService);
 
-    /** Cross-space sharing is available only on a multi-space runtime (bootstrap.features.exchange). */
-    readonly canShare = inject(SessionService).exchangeEnabled;
+    /** Offering is available only on a multi-space runtime (bootstrap.features.exchange) **and** to a
+     *  subject holding `canOfferDatasets` — the server gates `POST /exchange/offers` on it (D14: Admin
+     *  only, cross-space data exposure has no second gate), so without the capability check the button
+     *  renders for everyone and fails 403 on click. */
+    private readonly exchangeEnabled = inject(SessionService).exchangeEnabled;
+    private readonly lens = inject(LensService);
+    readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
 
     readonly datasets = signal<Dataset[]>([]);
     readonly loading = signal(false);

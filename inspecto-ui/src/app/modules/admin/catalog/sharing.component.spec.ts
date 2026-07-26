@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { GammaConfigService } from '@gamma/services/config';
-import { ExchangeGrant, ExchangeOffer, ExchangeService, SpacesService } from 'app/inspecto/api';
+import { ExchangeGrant, ExchangeOffer, ExchangeService, LensService, SpacesService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
@@ -41,7 +41,12 @@ const GRANTS: ExchangeGrant[] = [
     },
 ];
 
-async function create(view: 'with-me' | 'by-me', exchange: Partial<ExchangeService> = {}, dialogResult?: unknown) {
+async function create(
+    view: 'with-me' | 'by-me',
+    exchange: Partial<ExchangeService> = {},
+    dialogResult?: unknown,
+    { canApproveShares = true, canOfferDatasets = true } = {},
+) {
     const api = {
         grants: () => of(GRANTS),
         offers: () => of(OFFERS),
@@ -63,6 +68,13 @@ async function create(view: 'with-me' | 'by-me', exchange: Partial<ExchangeServi
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+            {
+                provide: LensService,
+                useValue: {
+                    canApproveShares: () => canApproveShares,
+                    canOfferDatasets: () => canOfferDatasets,
+                },
+            },
         ],
     });
     // A component-level MatDialog provider (via imported MatDialogModule) shadows the root test double —
@@ -103,6 +115,28 @@ describe('SharingComponent', () => {
         const active = { ...requested, status: 'active' as const };
         expect(c.grantActions[0].visible!(active)).toBe(false);
         expect(c.grantActions[2].visible!(active)).toBe(true);
+    });
+
+    // The server gates POST /exchange/grants/… on canApproveShares; before this check the buttons
+    // rendered for every subject and failed 403 on click.
+    it('by-me: a subject without canApproveShares sees no decision actions', async () => {
+        const { fixture } = await create('by-me', {}, undefined, { canApproveShares: false });
+        const c = fixture.componentInstance;
+        const requested = c.myGrants()[0];
+        const active = { ...requested, status: 'active' as const };
+        expect(c.grantActions[0].visible!(requested)).toBe(false); // approve
+        expect(c.grantActions[1].visible!(requested)).toBe(false); // deny
+        expect(c.grantActions[2].visible!(active)).toBe(false); // revoke
+        const expiry = c.grantActions.find((a) => typeof a.hint === 'function'
+            && (a.hint as (g: ExchangeGrant) => string)(active).includes('expiry'))!;
+        expect(expiry.visible!(active)).toBe(false);
+    });
+
+    it('by-me: refreshing a snapshot requires canOfferDatasets', async () => {
+        const { fixture } = await create('by-me', {}, undefined, { canOfferDatasets: false });
+        const c = fixture.componentInstance;
+        const refresh = c.offerActions.find((a) => a.hint === 'Refresh snapshot')!;
+        expect(refresh.visible!(c.myOffers()[0])).toBe(false);
     });
 
     it('by-me: approving a request calls the service and reloads the ledgers', async () => {

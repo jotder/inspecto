@@ -113,9 +113,25 @@ describe('LensService', () => {
         expect(service.canCurateMenus()).toBe(true);
         expect(service.canOnboardConnections()).toBe(true);
         expect(service.canTriageRequirements()).toBe(true);
+        expect(service.canOfferDatasets()).toBe(true);
+        expect(service.canApproveShares()).toBe(true);
         // ...but it still cannot author or operate: those it genuinely was not granted
         expect(service.canAuthorWorkbench()).toBe(false);
         expect(service.canOperateRuns()).toBe(false);
+    });
+
+    // The inverse of the admin case, and the bug the Exchange panes actually had: without a capability
+    // check those buttons rendered for every subject and failed 403 on click.
+    it('withholds the Exchange capabilities from a subject that was not granted them', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canAuthorWorkbench']); // a developer: authors, does not govern shares
+        service.selectLens('builder');
+
+        expect(service.canAuthorWorkbench()).toBe(true);
+        expect(service.canOfferDatasets()).toBe(false);
+        expect(service.canApproveShares()).toBe(false);
     });
 
     it('exposes the three lenses in display order', () => {

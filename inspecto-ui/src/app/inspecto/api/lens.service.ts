@@ -193,6 +193,19 @@ export class LensService {
     readonly canConfigureAccess = computed(
         () => this.identityCapability('canConfigureAccess', 'access.configure'));
 
+    /** May offer a dataset or widget into the Exchange (`POST /exchange/offers|refresh`). RBAC: Admin,
+     *  Super — `canOfferDatasets` moved Builder/Power → Admin on 2026-07-25 (BACKLOG D14) because
+     *  cross-space data exposure has no second gate. {@link identityCapability} for that same reason:
+     *  it is Admin-owned, and admin never qualifies for a non-Business lens. */
+    readonly canOfferDatasets = computed(
+        () => this.identityCapability('canOfferDatasets', 'exchange.offer'));
+
+    /** May decide share requests — approve / deny / revoke a grant and set its expiry
+     *  (`POST /exchange/grants/…`). RBAC: Admin, Super. {@link identityCapability}: deciding who may
+     *  read another space's data is governance, not an activity any lens represents. */
+    readonly canApproveShares = computed(
+        () => this.identityCapability('canApproveShares', 'exchange.approve'));
+
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */
     selectLens(lens: Lens): void {

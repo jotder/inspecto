@@ -36,6 +36,13 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
         id: 'alerts.author', kind: 'action', capability: 'canAuthorAlertRules',
         label: 'Author alert rules',
     }],
+    catalog: [{
+        id: 'exchange.offer', kind: 'action', capability: 'canOfferDatasets',
+        label: 'Offer datasets and widgets for sharing',
+    }, {
+        id: 'exchange.approve', kind: 'action', capability: 'canApproveShares',
+        label: 'Decide share requests (approve / deny / revoke)',
+    }],
     settings: [{
         id: 'access.configure', kind: 'action', capability: 'canConfigureAccess',
         label: 'Configure lens access',
