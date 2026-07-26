@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -31,7 +32,12 @@ final class TagRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/tags", (e, m) -> api.service().objects().tags().stream().map(Tag::toMap).toList());
+        api.get("/tags", (e, m) -> {
+            // D7 (c): adopt tags that exist only inside a widget's own config array. Lazy and once per
+            // Space — see WidgetTags.backfillOnce for why this cannot happen here at registration time.
+            WidgetTags.backfillOnce(api, name -> ensureTag(api, name));
+            return api.service().objects().tags().stream().map(Tag::toMap).toList();
+        });
         api.post("/tags", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createTag(api, api.body(e))));
         api.post("/tags/([^/]+)/rename", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> renameTag(api, ApiContext.name(m), api.body(e))));
         api.delete("/tags/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteTag(api, ApiContext.name(m))));
@@ -55,6 +61,33 @@ final class TagRoutes implements RouteModule {
     }
 
     /**
+     * Register {@code name} as a tag if it is not one already, persisting it exactly as {@code POST /tags}
+     * would. Used by the widget projection: a widget's config tags are free text, while an assignment to an
+     * unregistered tag is a 404, so a migration that did not register first would silently drop them.
+     *
+     * <p>Failing to persist is logged, not thrown: the in-memory registration still stands for this boot,
+     * and refusing to tag a widget because a 40-byte file could not be written would be the worse outcome.
+     */
+    static void ensureTag(ApiContext api, String name) {
+        if (api.service().objects().tag(name).isPresent()) return;
+        Tag tag;
+        try {
+            tag = new Tag(name, System.currentTimeMillis());
+        } catch (IllegalArgumentException unusable) {
+            log.warn("[TAG-ADOPT] '{}' is not a usable tag name, skipped: {}", name, unusable.getMessage());
+            return;
+        }
+        api.service().objects().registerTag(tag);
+        if (api.writeRoot() == null) return;
+        try {
+            persist(api, tagFile(api, tag.name(), "_tag.toon", "tag name"),
+                    Map.of("tag", tag.toMap()), ".tag-");
+        } catch (IOException | ApiException io) {
+            log.warn("[TAG-ADOPT] registered '{}' in memory but could not persist it: {}", tag.name(), io);
+        }
+    }
+
+    /**
      * {@code GET /tags/{name}/targets} — everything carrying this tag, across kinds. The point of D7.
      *
      * <p>The result is filtered to what the caller may actually see. Two consequences worth keeping:
@@ -62,6 +95,7 @@ final class TagRoutes implements RouteModule {
      * legitimately get different counts for the same tag.
      */
     private Object targetsOf(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String name) {
+        WidgetTags.backfillOnce(api, n -> ensureTag(api, n));   // a widget must be findable here too
         return AnnotationTargets.mapErrors(() -> api.service().tagAssignments().forTag(name).stream()
                 .filter(a -> AnnotationTargets.visible(api, ex, a.targetKind(), a.targetId()))
                 .map(com.gamma.ops.tag.TagAssignment::toMap)
@@ -71,6 +105,7 @@ final class TagRoutes implements RouteModule {
     /** {@code GET /tags/assignments/{targetKind}/{targetId}} — the tags on one thing, alphabetical. */
     private Object tagsOn(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
                           String targetKind, String targetId) {
+        WidgetTags.backfillOnce(api, n -> ensureTag(api, n));
         return AnnotationTargets.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             return Map.of("targetKind", targetKind, "targetId", targetId,
@@ -95,11 +130,15 @@ final class TagRoutes implements RouteModule {
             // An object's `tags` attribute is a projection of the assignment store (D7 phase 2), so object
             // targets go through ObjectService — writing the store directly would leave the CSV stale and
             // recreate exactly the split-brain phase 2 exists to remove.
-            if (com.gamma.ops.note.NoteTargets.OBJECT.equals(targetKind))
+            if (com.gamma.ops.note.NoteTargets.OBJECT.equals(targetKind)) {
                 api.service().objects().applyTag(targetId, tag, actor);
-            else
+            } else {
                 api.service().tagAssignments()
                         .add(com.gamma.ops.tag.TagAssignment.of(tag, targetKind, targetId, actor));
+                // A widget's `tags` array is the same kind of projection (D7 (c)) — the chips on its
+                // gallery card are drawn from the config, so the edge alone would leave them stale.
+                WidgetTags.reproject(api, List.of(targetId));
+            }
             // Report the STORED edge, not the request: on a re-apply the original actor and timestamp win,
             // and echoing this caller's would misreport who first applied the tag.
             return api.service().tagAssignments().forTag(tag).stream()
@@ -121,6 +160,7 @@ final class TagRoutes implements RouteModule {
                 api.service().objects().removeTag(targetId, tag);   // also re-projects the CSV
             } else {
                 removed = api.service().tagAssignments().remove(tag, targetKind, targetId);
+                WidgetTags.reproject(api, List.of(targetId));   // drop the chip too, not just the edge
             }
             return Map.of("tag", tag, "targetKind", targetKind, "targetId", targetId, "removed", removed);
         });
@@ -167,6 +207,10 @@ final class TagRoutes implements RouteModule {
         // Persist the destination first (the createTag order): a failed write must not leave a renamed
         // in-memory vocabulary with nothing on disk to reload at the next boot.
         Path target = tagFile(api, to, "_tag.toon", "tag name");
+        // Collect the widget targets BEFORE the rename — afterwards the old name has no edges left.
+        // ObjectService moves the registry entry, the edges and the OBJECT CSVs; the component-side
+        // projections are ours, because the engine has no ComponentStore (see WidgetTags).
+        List<String> widgets = WidgetTags.targetsOf(api, from);
         ObjectService.TagVocabularyChange changed;
         try {
             persist(api, target, Map.of("tag", Map.of("name", to.trim(),
@@ -185,11 +229,13 @@ final class TagRoutes implements RouteModule {
                     throw new ApiException(500, "renamed tag rule '" + rule + "' could not be persisted: " + io);
                 }
             });
+        int reprojected = WidgetTags.reproject(api, widgets);
         boolean fileRemoved = Files.deleteIfExists(tagFile(api, from, "_tag.toon", "tag name"));
-        log.info("[TAG-RENAME] '{}' -> '{}': {} assignment(s), {} object(s) re-projected, rules {}",
-                from, to, changed.assignments(), changed.objects(), changed.rules());
+        log.info("[TAG-RENAME] '{}' -> '{}': {} assignment(s), {} object(s) + {} widget(s) re-projected, rules {}",
+                from, to, changed.assignments(), changed.objects(), reprojected, changed.rules());
         return Map.of("renamed", from, "to", to.trim(), "assignments", changed.assignments(),
-                "objects", changed.objects(), "rules", changed.rules(), "fileRemoved", fileRemoved);
+                "objects", changed.objects(), "widgets", reprojected,
+                "rules", changed.rules(), "fileRemoved", fileRemoved);
     }
 
     /**
@@ -199,6 +245,7 @@ final class TagRoutes implements RouteModule {
      */
     private Object deleteTag(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "tag write");
+        List<String> widgets = WidgetTags.targetsOf(api, name);   // before the edges are removed
         ObjectService.TagVocabularyChange changed;
         try {
             changed = api.service().objects().deleteTag(name);
@@ -207,9 +254,10 @@ final class TagRoutes implements RouteModule {
         } catch (IllegalStateException conflict) {
             throw new ApiException(409, conflict.getMessage());
         }
+        int reprojected = WidgetTags.reproject(api, widgets);
         boolean fileRemoved = Files.deleteIfExists(tagFile(api, name, "_tag.toon", "tag name"));
         return Map.of("deleted", name, "assignments", changed.assignments(),
-                "objects", changed.objects(), "fileRemoved", fileRemoved);
+                "objects", changed.objects(), "widgets", reprojected, "fileRemoved", fileRemoved);
     }
 
     /**

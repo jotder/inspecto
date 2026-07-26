@@ -294,6 +294,63 @@ class ControlApiTagRoutesTest {
         }
     }
 
+    // ── D7 (c): a widget's `tags` array is a projection of the assignment store ──────────────────
+
+    /** The `tags` array persisted in the widget component, as the API serves it. */
+    private List<String> widgetTags(Ctx c, String id) throws Exception {
+        JsonNode tags = json(send(c.port, "GET", "/components/widget/" + id, null)).at("/content/tags");
+        List<String> out = new java.util.ArrayList<>();
+        tags.forEach(t -> out.add(t.asText()));
+        return out;
+    }
+
+    @Test
+    void aWidgetsTagsArrayIsDerivedFromTheAssignmentStore(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("cfg"))) {
+            // Create carries its tags INSIDE the config (a bundle/seed/template shape): they are adopted
+            // as edges and the free-text names are registered, because assigning an unregistered tag 404s.
+            assertEquals(200, send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"revenue\",\"vizType\":\"kpi\",\"tags\":[\"ra\",\"billing\"]}").statusCode());
+            assertEquals(List.of("billing", "ra"), widgetTags(c, "revenue"), "alphabetical, from the edges");
+            assertEquals(List.of("billing", "ra"), List.of(
+                    json(send(c.port, "GET", "/tags/assignments/widget/revenue", null)).get("tags").get(0).asText(),
+                    json(send(c.port, "GET", "/tags/assignments/widget/revenue", null)).get("tags").get(1).asText()));
+            assertTrue(json(send(c.port, "GET", "/tags", null)).toString().contains("\"ra\""),
+                    "the config's free-text tag was registered in the vocabulary");
+
+            // An UPDATE may not resurrect a tag: the submitted array is overwritten from the edges, so a
+            // stale client re-saving the widget cannot undo a removal made through the tags dialog.
+            send(c.port, "DELETE", "/tags/assignments/widget/revenue/billing", null);
+            assertEquals(List.of("ra"), widgetTags(c, "revenue"), "the chip goes with the edge");
+            assertEquals(200, send(c.port, "PUT", "/components/widget/revenue",
+                    "{\"vizType\":\"kpi\",\"tags\":[\"ra\",\"billing\",\"invented\"]}").statusCode());
+            assertEquals(List.of("ra"), widgetTags(c, "revenue"), "edges are the truth on update");
+
+            // Assigning through the shared dialog's route updates the chips as well as the edge.
+            send(c.port, "POST", "/tags", "{\"name\":\"fraud\"}");
+            send(c.port, "POST", "/tags/assignments/widget/revenue", "{\"tag\":\"fraud\"}");
+            assertEquals(List.of("fraud", "ra"), widgetTags(c, "revenue"));
+        }
+    }
+
+    @Test
+    void aVocabularyChangeMovesWidgetProjectionsToo(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("cfg"))) {
+            send(c.port, "POST", "/components/widget",
+                    "{\"id\":\"usage\",\"vizType\":\"bar\",\"tags\":[\"ra\"]}");
+
+            // Before D7 (c) `renameTag` skipped component targets ("no CSV to project"), which would have
+            // left a stale array on every widget. The component half is composed at the edge, in TagRoutes.
+            JsonNode renamed = json(send(c.port, "POST", "/tags/ra/rename", "{\"to\":\"revenue-assurance\"}"));
+            assertEquals(1, renamed.get("widgets").asInt());
+            assertEquals(List.of("revenue-assurance"), widgetTags(c, "usage"));
+
+            JsonNode deleted = json(send(c.port, "DELETE", "/tags/revenue-assurance", null));
+            assertEquals(1, deleted.get("widgets").asInt());
+            assertTrue(widgetTags(c, "usage").isEmpty(), "an empty projection is removed, not left as []");
+        }
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

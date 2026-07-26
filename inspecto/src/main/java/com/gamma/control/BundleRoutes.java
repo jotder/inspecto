@@ -263,7 +263,17 @@ final class BundleRoutes implements RouteModule {
                                 : "already exists (pass actions {\"" + kind + "/" + id + "\":\"overwrite\"} to replace)";
                         skipped++;
                     } else {
-                        src.write(id, cast(item.get("content")));
+                        Map<String, Object> content = cast(item.get("content"));
+                        src.write(id, content);
+                        // D7 (c): a widget's tags travel INSIDE its config, but assignment edges are
+                        // per-Space and do not cross a bundle. Without adopting the incoming array here,
+                        // importing a tagged widget would silently lose its tags — a decision on the
+                        // record, not an accident. Adopt-then-reproject, exactly as a create does.
+                        if (WidgetTags.KIND.equals(kind)) {
+                            WidgetTags.project(api, kind, id, new LinkedHashMap<>(content), true,
+                                    name -> TagRoutes.ensureTag(api, name));
+                            WidgetTags.reproject(api, List.of(id));
+                        }
                         status = exists ? "overwritten" : "imported";
                         if (exists) overwritten++; else imported++;
                     }

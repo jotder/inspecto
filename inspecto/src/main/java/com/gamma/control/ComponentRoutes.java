@@ -125,7 +125,7 @@ final class ComponentRoutes implements RouteModule {
         if (componentExists(store, type, id))
             throw new ApiException(409, type + " component '" + id + "' already exists (use PUT to update)");
         // R3: validate the sharing envelope + stamp owner from the authenticated subject (provenance).
-        return writeComponent(store, ex, type, id, ComponentAccess.onCreate(ex, body));
+        return writeComponent(api, store, ex, type, id, ComponentAccess.onCreate(ex, body));
     }
 
     /**
@@ -140,7 +140,7 @@ final class ComponentRoutes implements RouteModule {
         // R3: edit access against the current envelope, carry owner/shares forward, owner-only envelope changes.
         Map<String, Object> merged = ComponentAccess.onUpdate(ex, type, id, current.content(), body);
         ETags.requireMatch(ex, ETags.of(ContentHash.of(current.content())));
-        return writeComponent(store, ex, type, id, merged);
+        return writeComponent(api, store, ex, type, id, merged);
     }
 
     /** The current component or {@code null}; maps a bad type to the standard 400. */
@@ -215,7 +215,7 @@ final class ComponentRoutes implements RouteModule {
             throw new ApiException(400, e.getMessage());
         }
         // R3: a restore is an update — edit access, envelope carried forward, owner-only envelope changes.
-        return writeComponent(store, ex, type, id, ComponentAccess.onUpdate(ex, type, id, current.content(), content));
+        return writeComponent(api, store, ex, type, id, ComponentAccess.onUpdate(ex, type, id, current.content(), content));
     }
 
     /** The JSON shape for one archived version: identity + version metadata + the archived content. */
@@ -349,11 +349,15 @@ final class ComponentRoutes implements RouteModule {
 
     /** Write a component: the body is the content (the routing-only {@code id} key is stripped); 422 on bad input.
      *  The written resource's new {@code ETag} rides the response so a client can chain a conditional update. */
-    private Object writeComponent(ComponentStore store, com.sun.net.httpserver.HttpExchange ex, String type, String id, Map<String, Object> body) throws IOException {
+    private Object writeComponent(ApiContext api, ComponentStore store, com.sun.net.httpserver.HttpExchange ex, String type, String id, Map<String, Object> body) throws IOException {
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {
             validateKind(type, id, content);
+            // D7 (c): a widget's `tags` array is a projection of the assignment store, so it is derived
+            // here rather than taken from the body — adopted on create, overwritten on update.
+            WidgetTags.project(api, type, id, content, !componentExists(store, type, id),
+                    name -> TagRoutes.ensureTag(api, name));
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));
