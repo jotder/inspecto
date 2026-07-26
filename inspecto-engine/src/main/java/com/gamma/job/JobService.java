@@ -242,13 +242,14 @@ public final class JobService implements AutoCloseable {
                 c -> new ReportJob(c, reports, dataDir)));
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("maintenance", "Maintenance",
                 "Built-in housekeeping task (cleanup / ledger_prune / runlog_prune / notification_prune / "
-                        + "storage_report / storage_trend / scheduler_audit / backup / backup_verify / restore / "
-                        + "metadata_validate / file_repository_audit / db_maintenance / compact / materialize).",
+                        + "incident_purge / storage_report / storage_trend / scheduler_audit / backup / "
+                        + "backup_verify / restore / metadata_validate / file_repository_audit / "
+                        + "db_maintenance / compact / materialize).",
                 List.of(ParameterDecl.optional("task", ParamType.STRING, "cleanup", "Which maintenance task"),
                         ParameterDecl.optional("dir", ParamType.STRING, null, "Target directory (cleanup / compact / storage_report / backup source)"),
-                        ParameterDecl.optional("retention_days", ParamType.INTEGER, "7", "Age threshold in days (required for the *_prune tasks)"),
+                        ParameterDecl.optional("retention_days", ParamType.INTEGER, "7", "Age threshold in days (required for the *_prune tasks and incident_purge)"),
                         ParameterDecl.optional("glob", ParamType.STRING, "*", "Filename filter (cleanup)"),
-                        ParameterDecl.optional("max_count", ParamType.INTEGER, null, "Keep at most the newest N files (cleanup / runlog_prune)"),
+                        ParameterDecl.optional("max_count", ParamType.INTEGER, null, "Cap per run: newest N files (cleanup / runlog_prune) or incidents purged (incident_purge, default 1000)"),
                         ParameterDecl.optional("max_size", ParamType.INTEGER, null, "Keep at most this many bytes, newest first (cleanup)"),
                         ParameterDecl.optional("min_keep", ParamType.INTEGER, null, "cleanup: never retire the newest N files, whatever the other limits say"),
                         ParameterDecl.optional("archive_instead_of_delete", ParamType.BOOLEAN, "false", "cleanup: move affected files to archive_dir instead of deleting"),
@@ -401,6 +402,20 @@ public final class JobService implements AutoCloseable {
      *  Optional; read live by the built-in through a supplier, so ordering vs construction doesn't matter. */
     public void objects(com.gamma.ops.ObjectService objects) {
         this.objects = objects;
+    }
+
+    /**
+     * This space's Object Engine, or empty when the host never wired one (a bare/lazily-created service).
+     * Read at run time by the {@code incident_purge} maintenance task (MNT-14).
+     *
+     * <p>⚠ <b>One hook, not four.</b> The retention sweep needs the object, note, link and tag-assignment
+     * stores together, and {@link com.gamma.ops.ObjectService} already holds all four as non-null final
+     * fields — so there is no such thing as a partially-attached cascade to fail closed on. Do not add
+     * per-store hooks alongside this one; four independently-nullable fields would reintroduce exactly the
+     * half-cascade hazard this shape rules out.
+     */
+    public Optional<com.gamma.ops.ObjectService> objects() {
+        return Optional.ofNullable(objects);
     }
 
     /**

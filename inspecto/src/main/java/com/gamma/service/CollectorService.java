@@ -1076,6 +1076,7 @@ public final class CollectorService implements AutoCloseable {
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             created.notificationStore(notifications);              // notification_prune maintenance task
+            created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
             created.start();
             jobs = created;
         }

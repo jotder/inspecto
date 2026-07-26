@@ -20,12 +20,17 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The MNT-14 retention-sweep seams: purge-<b>eligibility</b> selection (G1), legal hold (G5) and the bulk
- * delete-by-target primitives the cascade needs (G2). No sweep exists yet — these are the prerequisites,
- * and each one has a silent failure mode, which is why they are tested before anything consumes them.
+ * The MNT-14 retention-sweep seams: purge-<b>eligibility</b> selection (G1), legal hold (G5), the bulk
+ * delete-by-target primitives (G2), and the {@link ObjectService#purge} cascade that composes them. Each
+ * one has a silent failure mode — a sweep that finds nothing, or one that deletes an object and leaves its
+ * notes and edges pointing at an id that no longer resolves.
+ *
+ * <p>The {@code incident_purge} task that drives this lives in {@code MaintenanceLibraryTest}; here the
+ * cascade is exercised directly, so a cascade bug cannot hide behind the task's own reporting.
  *
  * <p>Every store check runs against <b>both</b> implementations through the same assertions (the
  * {@code TagAssignmentCoreTest} idiom): a divergence between the lean in-memory default and the durable
@@ -193,6 +198,98 @@ class RetentionSweepSeamTest {
                     "and the same id in another kind keeps its own edges");
             assertEquals(2, store.forTag("q3-audit").size(), "the tag itself still exists elsewhere");
         });
+    }
+
+    // ── the cascade itself — ObjectService.purge (MNT-14 §4 step 5) ───────────────
+
+    /** An {@link ObjectService} over in-memory stores, with the object store handed back for direct setup. */
+    private record Engine(ObjectService objects, ObjectStore store, InMemoryNoteStore notes,
+                          InMemoryLinkStore links, InMemoryTagAssignmentStore tags) {}
+
+    private static Engine engine() {
+        ObjectStore store = new InMemoryObjectStore();
+        InMemoryNoteStore notes = new InMemoryNoteStore();
+        InMemoryLinkStore links = new InMemoryLinkStore();
+        InMemoryTagAssignmentStore tags = new InMemoryTagAssignmentStore();
+        return new Engine(new ObjectService(store, java.util.Map.of(), links, notes, tags),
+                store, notes, links, tags);
+    }
+
+    /** An expired archived incident with a note, an edge to {@code peerId} and a tag — a full dependent set. */
+    private static String expiredWithDependents(Engine e, String title, String peerId) {
+        OperationalObject o = e.objects.open(ObjectType.INCIDENT, title, "d", "WARNING", null, java.util.Map.of());
+        e.objects.comment(o.id(), "alice", "root cause");
+        e.objects.applyTag(o.id(), "q3-audit", "alice");
+        e.objects.link(o.id(), peerId, "relates", "alice");
+        // Backdate the archive stamp — open() stamps now, and retention is measured from closedAt.
+        e.store.update(o.withStatus("ARCHIVED", System.currentTimeMillis() - (400 * DAY), true));
+        return o.id();
+    }
+
+    @Test
+    void purgeRemovesTheObjectAndEveryDependentRowThatReferencesIt() {
+        Engine e = engine();
+        OperationalObject peer = e.objects.open(ObjectType.INCIDENT, "peer", "d", "WARNING", null, java.util.Map.of());
+        String id = expiredWithDependents(e, "expired", peer.id());
+
+        ObjectService.PurgeOutcome out = e.objects.purge(id, "test");
+
+        assertEquals(id, out.objectId());
+        assertEquals(1, out.notes(), "the comment goes with it");
+        assertEquals(1, out.links(), "and the edge, from whichever end it was written");
+        assertEquals(1, out.tagEdges(), "and the tag assignment");
+        assertEquals(3, out.dependents());
+        assertTrue(e.store.get(id).isEmpty(), "the object itself is gone");
+        assertTrue(e.notes.forObject(id, null).isEmpty());
+        assertTrue(e.links.incident(id).isEmpty());
+        assertTrue(e.tags.tagsOf("object", id).isEmpty());
+        // The peer survives with no dangling edge — the orphan this cascade exists to prevent.
+        assertTrue(e.store.get(peer.id()).isPresent());
+        assertTrue(e.links.incident(peer.id()).isEmpty(), "the edge is gone from the peer's side too");
+    }
+
+    @Test
+    void purgeRefusesAHeldObjectEvenWhenTheCallerForgotToCheck() {
+        // The hold is enforced at the chokepoint, not merely by caller convention: a hold applied between
+        // a sweep's preview and its run has no other place left to take effect.
+        Engine e = engine();
+        OperationalObject peer = e.objects.open(ObjectType.INCIDENT, "peer", "d", "WARNING", null, java.util.Map.of());
+        String id = expiredWithDependents(e, "held", peer.id());
+        e.store.update(e.store.get(id).orElseThrow()
+                .withAttributes(java.util.Map.of(ObjectService.ATTR_LEGAL_HOLD, "DPA-2026-14"), NOW));
+
+        assertThrows(IllegalStateException.class, () -> e.objects.purge(id, "test"));
+        assertTrue(e.store.get(id).isPresent(), "still there …");
+        assertEquals(1, e.notes.forObject(id, null).size(), "… and nothing was cascaded away first");
+    }
+
+    @Test
+    void aPurgedObjectsEventTrailDeliberatelySurvivesIt() {
+        // MNT-14 G3, asserted rather than only documented: the event ledger is append-only, so "purge"
+        // never means "all trace removed". A legal/DPA reviewer asks this, and a future change that
+        // quietly made the trail disappear would be a behaviour change nobody chose.
+        Engine e = engine();
+        OperationalObject peer = e.objects.open(ObjectType.INCIDENT, "peer", "d", "WARNING", null, java.util.Map.of());
+        String id = expiredWithDependents(e, "expired", peer.id());
+
+        List<com.gamma.event.Event> seen = new java.util.ArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        com.gamma.event.EventLog.global().addSubscriber(sub);
+        try {
+            e.objects.purge(id, "incident_purge");
+        } finally {
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
+        }
+
+        assertTrue(seen.stream().anyMatch(ev -> "purge".equals(ev.attributes().get("action"))
+                        && id.equals(ev.attributes().get("objectId"))),
+                "the purge itself is recorded on the append-only trail: " + seen);
+        assertTrue(e.store.get(id).isEmpty(), "even though the object it describes no longer exists");
+    }
+
+    @Test
+    void purgeRejectsAnUnknownIdRatherThanReportingASilentSuccess() {
+        assertThrows(java.util.NoSuchElementException.class, () -> engine().objects.purge("INC-nope", "test"));
     }
 
     private static void eachNoteStore(Consumer<NoteStore> check) {

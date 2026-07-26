@@ -1202,6 +1202,79 @@ public final class ObjectService {
 
     // ── internals ──────────────────────────────────────────────────────────────────
 
+    // ── retention purge (MNT-14) ─────────────────────────────────────────────────────
+
+    /** What one {@link #purge} removed: the object, plus the dependent rows that went with it. */
+    public record PurgeOutcome(String objectId, int notes, int links, int tagEdges) {
+
+        /** Dependent rows removed alongside the object — the cascade's size, excluding the object itself. */
+        public int dependents() {
+            return notes + links + tagEdges;
+        }
+    }
+
+    /**
+     * Objects whose retention window has expired: {@code objectType == type}, {@code status} matches, and
+     * the object was closed (archived) strictly before {@code closedBefore} — at most {@code limit} of
+     * them, longest-expired first. Delegates to {@link ObjectQuery#purgeEligible} so the in-memory and DB
+     * backends cannot disagree about eligibility.
+     *
+     * <p>⚠ <b>Legal hold is not applied here</b> and cannot be: a hold lives in the attribute bag, not a
+     * column, so no store can filter on it. Every caller must exclude {@link #hasLegalHold} itself —
+     * {@link #purge} refuses a held object as a backstop, but a dry-run preview that forgets the check
+     * would over-report. The separation is deliberate, not an oversight.
+     */
+    public List<OperationalObject> purgeEligible(ObjectType type, String status, long closedBefore, int limit) {
+        return store.query(ObjectQuery.purgeEligible(type, status, closedBefore, limit));
+    }
+
+    /**
+     * Physically remove an object and every dependent row that references it — the MNT-14 retention
+     * cascade. Returns what was removed; unknown id ⇒ {@link NoSuchElementException}.
+     *
+     * <p>The cascade lives here, and not in the calling task, because this service is the one place that
+     * holds all four stores; {@link ObjectStore#delete} explicitly does not cascade and requires its
+     * caller to.
+     *
+     * <p><b>Dependents are removed before the object, deliberately.</b> If a later step fails, the object
+     * still exists and the next sweep retries it. Deleting the object first and then failing would leave
+     * notes and edges pointing at an id that can no longer be resolved — invisible orphans, the failure
+     * mode this ordering exists to prevent.
+     *
+     * <p>⚠ <b>A purge is not "all trace removed" (MNT-14 G3).</b> {@link com.gamma.event.EventStore} is append-only by
+     * contract, so the object's {@link EventType#OBJECT_ACTIVITY} history — including the purge itself,
+     * emitted below — outlives it permanently. That is the intended behaviour: the audit log is not the
+     * record being retention-managed. Anyone answering a legal/DPA erasure question needs to know this.
+     *
+     * @throws IllegalStateException if the object is under {@link #hasLegalHold legal hold}
+     */
+    public PurgeOutcome purge(String objectId, String actor) {
+        OperationalObject o = require(objectId);
+        // Checked here rather than only in the caller's preview: a hold applied between preview and run
+        // must still be honoured, and this is the only chokepoint every purge passes through.
+        if (hasLegalHold(o))
+            throw new IllegalStateException("object '" + objectId + "' is under legal hold — not purgeable");
+        String correlationId = o.correlationId();          // read before the row is gone
+        int notesRemoved = notes.deleteForTarget(NoteTargets.OBJECT, objectId);
+        int linksRemoved = links.removeAllIncident(objectId);
+        int tagsRemoved = tagAssignments.removeAllForTarget(NoteTargets.OBJECT, objectId);
+        store.delete(objectId);
+        EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+                .level(EventLevel.INFO)
+                .source(SOURCE)
+                .correlationId(correlationId)
+                .message(o.objectType() + " " + objectId + " purged after retention expiry"
+                        + (actor == null ? "" : " by " + actor))
+                .attr("objectId", objectId)
+                .attr("objectType", o.objectType().name())
+                .attr("action", "purge")
+                .attr("notesRemoved", String.valueOf(notesRemoved))
+                .attr("linksRemoved", String.valueOf(linksRemoved))
+                .attr("tagEdgesRemoved", String.valueOf(tagsRemoved))
+                .attr("actor", actor));
+        return new PurgeOutcome(objectId, notesRemoved, linksRemoved, tagsRemoved);
+    }
+
     private static long parseEpoch(String s) {
         if (s == null || s.isBlank()) return 0L;
         try {
