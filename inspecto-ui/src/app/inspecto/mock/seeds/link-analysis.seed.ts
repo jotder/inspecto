@@ -8,7 +8,7 @@ import { PIPELINES_COLL } from '../handlers/pipelines.handler';
 import { eventToSignal } from '../../signal/signal';
 import { SIGNALS_COLL } from '../signals';
 import { MockStore } from '../mock-store';
-import { putComponent, seedIconMap } from './seed-utils';
+import { putComponent, seedIconMap, seedPatternPacks } from './seed-utils';
 
 /**
  * **Link Analysis** Space-Template seed pack (W5) — entity/link tables built from xDRs
@@ -20,6 +20,7 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
     const now = Date.now();
     const iso = (offsetMin: number): string => new Date(now + offsetMin * 60_000).toISOString();
     seedIconMap(store, space);
+    seedPatternPacks(store, space);   // V2 (c): the six shipped motifs, authored per Space
 
     // ── Workbench ───────────────────────────────────────────────────────────────────────────────
     const connections: ConnectionProfile[] = [

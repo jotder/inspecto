@@ -22,6 +22,40 @@ export interface PatternPack {
     tool?: 'cycles' | 'cohesion' | 'similarity';
 }
 
+const CATEGORIES = new Set<PatternPack['category']>(['money', 'telecom', 'identity']);
+const TOOLS = new Set<NonNullable<PatternPack['tool']>>(['cycles', 'cohesion', 'similarity']);
+const DIRECTIONS = new Set<NonNullable<PatternStep['direction']>>(['out', 'in', 'both']);
+
+/**
+ * Map an authored `pattern-pack` component's content onto a {@link PatternPack}, or `null` when it is not
+ * usable. Deliberately defensive: pack content is free-form TOON (no backend `validateKind` branch), so a
+ * hand-edited file must be skipped rather than drawn as a broken option.
+ *
+ * ⚠ A step's `direction` is the EMPTY STRING for the start node, not an absent key — TOON cannot encode `{}`
+ * as a list element (JToon writes a bare `-` and then fails to decode its own output), so the persisted
+ * shape spells the wildcard as a blank and it maps back to `undefined` here.
+ */
+export function patternPackFromContent(content: Record<string, unknown>): PatternPack | null {
+    const id = typeof content['name'] === 'string' ? content['name'] : '';
+    const label = typeof content['label'] === 'string' ? content['label'] : '';
+    const category = content['category'] as PatternPack['category'];
+    const rawSteps = content['steps'];
+    if (!id || !label || !CATEGORIES.has(category) || !Array.isArray(rawSteps) || rawSteps.length === 0) return null;
+
+    const steps: PatternStep[] = rawSteps.map((s) => {
+        const direction = (s as Record<string, unknown>)?.['direction'];
+        return DIRECTIONS.has(direction as NonNullable<PatternStep['direction']>)
+            ? { direction: direction as PatternStep['direction'] }
+            : {};   // blank / unknown ⇒ wildcard, the start node's shape
+    });
+    const tool = content['tool'] as NonNullable<PatternPack['tool']>;
+    return {
+        id, label, category, steps,
+        description: typeof content['description'] === 'string' ? content['description'] : '',
+        ...(TOOLS.has(tool) ? { tool } : {}),
+    };
+}
+
 export const PATTERN_PACKS: PatternPack[] = [
     {
         id: 'layering-chain',

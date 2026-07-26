@@ -3,7 +3,7 @@ import { PIPELINES_COLL } from '../handlers/pipelines.handler';
 import { MockStore } from '../mock-store';
 import { seedOperations } from './operations.seed';
 import { seedPipelineCaseStudies } from './pipeline-case-studies.seed';
-import { putComponent, seedIconMap } from './seed-utils';
+import { putComponent, seedIconMap, seedPatternPacks } from './seed-utils';
 
 /**
  * The default seed pack — the consolidated seeds formerly baked into the studio / pipeline / jobs /
@@ -110,6 +110,7 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
             query: { projection: { datasetId: g.id, sourceCol: 'source', targetCol: 'target', linkKindCol: 'link_type' } },
         });
     }
+    seedPatternPacks(store, space);   // V2 (c): the six shipped motifs, authored per Space
 
     // ── Geo Map Analysis: a coordinate-bearing dataset + a saved Geo View, so /studio/geo-map
     //    demos one-click under Saved views ────────────────────────────────────────────────────

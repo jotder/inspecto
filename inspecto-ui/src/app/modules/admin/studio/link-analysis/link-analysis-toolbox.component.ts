@@ -1,11 +1,13 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { ComponentsService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
     G6GraphData,
@@ -43,7 +45,7 @@ import {
     weightedShortestPath,
 } from 'app/inspecto/graph';
 import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
-import { PATTERN_PACKS, PatternPack } from './pattern-packs';
+import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-packs';
 
 type AnalysisTab =
     | 'path' | 'explain' | 'centrality' | 'communities' | 'pattern' | 'all-paths' | 'components'
@@ -70,6 +72,23 @@ type CentralityMetric = 'degree' | 'betweenness' | 'closeness' | 'eigenvector' |
     templateUrl: './link-analysis-toolbox.component.html',
 })
 export class LinkAnalysisToolboxComponent {
+    // NOT `components` — that name is already this component's connected-components signal (below), and
+    // reusing it is a duplicate-identifier compile error, not a shadow.
+    private componentsApi = inject(ComponentsService);
+
+    constructor() {
+        // This Space's authored pattern packs, if it has any. Degrades silently: an error (no write root,
+        // intelligence-free edition, offline) leaves the shipped built-ins in place, which is the whole point
+        // of seeding the signal with them — there is no error surface to show for a catalog that has a default.
+        this.componentsApi.list('pattern-pack').pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe({
+            next: (defs) => {
+                const authored = defs.map((d) => patternPackFromContent(d.content)).filter((p): p is PatternPack => !!p);
+                if (authored.length) this.patternPacks.set(authored);
+            },
+            error: () => undefined,
+        });
+    }
+
     /** The graph the tools operate on — the host's displayed (filtered + collapsed) graph. */
     readonly graph = input<G6GraphData | null>(null);
     readonly nodeOptions = input<{ id: string; label: string }[]>([]);
@@ -118,8 +137,14 @@ export class LinkAnalysisToolboxComponent {
     /** The pattern-match motif — step 0 = the start node; each later step traverses one edge. */
     readonly patternSteps = signal<PatternStep[]>([{}, { direction: 'out' }]);
     readonly patternMatches = signal<GraphSelection[]>([]);
-    /** The built-in pattern packs (parameterized starter motifs) + the one loaded, for its hint. */
-    readonly patternPacks = PATTERN_PACKS;
+    /**
+     * The pattern packs (parameterized starter motifs) + the one loaded, for its hint. Seeded with the shipped
+     * built-ins so the catalog is never empty, then REPLACED by this Space's authored `pattern-pack` components
+     * when the fetch returns any (V2 (c)). A signal because this component is OnPush — reassigning a plain
+     * field from the HTTP callback would never re-render. The built-ins stay the fallback on error / empty /
+     * no write root, so the catalog is populated synchronously and never blank.
+     */
+    readonly patternPacks = signal<PatternPack[]>(PATTERN_PACKS);
     readonly loadedPack = signal<PatternPack | null>(null);
     // ── V2 result state (each group keeps its own so results survive tab switches) ──
     readonly cycles = signal<GraphSelection[]>([]);
@@ -339,7 +364,7 @@ export class LinkAnalysisToolboxComponent {
 
     /** Load a pattern pack's motif into the builder (a fresh copy so edits don't mutate the catalog). */
     loadPatternPack(id: string): void {
-        const pack = this.patternPacks.find((p) => p.id === id) ?? null;
+        const pack = this.patternPacks().find((p) => p.id === id) ?? null;
         this.loadedPack.set(pack);
         if (!pack) return;
         this.patternSteps.set(pack.steps.map((s) => ({ ...s })));

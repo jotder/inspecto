@@ -407,7 +407,7 @@
                                     <mat-label>Pattern pack</mat-label>
                                     <mat-select [value]="loadedPack()?.id ?? ''" (valueChange)="loadPatternPack($event)">
                                         <mat-option [value]="''">Custom motif</mat-option>
-                                        @for (p of patternPacks; track p.id) {
+                                        @for (p of patternPacks(); track p.id) {
                                             <mat-option [value]="p.id">{{ p.label }}</mat-option>
                                         }
                                     </mat-select>

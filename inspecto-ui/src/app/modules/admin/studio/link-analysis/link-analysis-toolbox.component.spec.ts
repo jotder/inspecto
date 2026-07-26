@@ -3,6 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
+import { ComponentDef, ComponentsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from 'app/inspecto/graph';
 import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
@@ -18,12 +19,15 @@ const GRAPH: G6GraphData = {
     ],
 };
 
-function make(graph: G6GraphData | null = GRAPH) {
+function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = []) {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisToolboxComponent],
         providers: [
             provideNoopAnimations(),
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+            // The toolbox fetches this Space's authored pattern packs; an empty list leaves the shipped
+            // built-ins in place, which is what most of these tests assert against.
+            { provide: ComponentsService, useValue: { list: () => of(packs) } },
         ],
     });
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
@@ -248,13 +252,33 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.patternSteps()).toHaveLength(4); // A → B → C → D
         // editing a loaded step must not mutate the shared catalog
         c.updatePatternStep(1, { nodeKind: 'account' });
-        expect(c.patternPacks.find((p) => p.id === 'layering-chain')!.steps[1].nodeKind).toBeUndefined();
+        expect(c.patternPacks().find((p) => p.id === 'layering-chain')!.steps[1].nodeKind).toBeUndefined();
 
         c.loadPatternPack('circular-flow');
         expect(c.loadedPack()?.tool).toBe('cycles');
 
         c.loadPatternPack(''); // back to a custom motif
         expect(c.loadedPack()).toBeNull();
+    });
+
+    it('pattern packs: a Space\'s authored packs replace the built-ins, a malformed one is skipped', () => {
+        const def = (name: string, content: Record<string, unknown>): ComponentDef =>
+            ({ type: 'pattern-pack', name, ref: `pattern-pack/${name}`, content: { name, ...content } });
+        const { c } = make(GRAPH, [
+            // the persisted shape: uniform {direction} steps, the start node's being the EMPTY STRING
+            def('smurfing-fan', {
+                label: 'Smurfing fan-out', category: 'money', description: 'One account fans out to many.',
+                steps: [{ direction: '' }, { direction: 'out' }, { direction: 'out' }], tool: 'cohesion',
+            }),
+            def('broken-pack', { label: 'No category, no steps' }),
+        ]);
+
+        expect(c.patternPacks().map((p) => p.id)).toEqual(['smurfing-fan']);   // built-ins replaced, junk dropped
+        c.loadPatternPack('smurfing-fan');
+        expect(c.patternSteps()).toHaveLength(3);
+        expect(c.patternSteps()[0].direction).toBeUndefined();                 // blank start ⇒ wildcard
+        expect(c.patternSteps()[1].direction).toBe('out');
+        expect(c.loadedPack()?.tool).toBe('cohesion');
     });
 
     it('renders with no a11y violations', async () => {
