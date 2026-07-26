@@ -103,12 +103,13 @@ former root reference docs** (each index lists them):
   edition flavors, security overlay matrix (TLS, IAM-delegated Kerberos/SSO, secrets/KMS), scaling + RPO/RTO
   posture, per-tier deployment plans, script workstreams SCR-1..11, preflight + post-deploy verification
   blocks; decision asks D1–D8 pending stakeholder sign-off.
-- [`superpower/delivery-status-webhooks-plan.md`](superpower/delivery-status-webhooks-plan.md) — **inbound
-  delivery-status webhooks, PLANNED 2026-07-26 (BACKLOG D8)** — bounce/complaint/delivered provider
-  callbacks: the raw-body seam (`ApiContext.rawBody`, since signatures cover raw bytes and `body()` consumes
-  the stream), our-id-embedded correlation (no `NotificationChannel` SPI break), per-status timestamps on a
-  new `DeliveryReceipt` store, a `DeliveryStatusAdapter` SPI with SendGrid Ed25519 + generic-HMAC impls, and
-  a fail-closed self-verifying route on the `/public/…` precedent. Not started.
+- ~~`superpower/delivery-status-webhooks-plan.md`~~ — **SHIPPED end-to-end 2026-07-26 (BACKLOG D8), plan
+  archived** to `archived-documents/plans-archive/`. As-built in
+  [`okf/backend/control-plane/events-metrics.md`](okf/backend/control-plane/events-metrics.md): the raw-body
+  seam (`ApiContext.rawBody`, cached on the exchange), our-id-embedded correlation via a `default` `deliver`
+  overload, a per-delivery `DeliveryReceipt` store with per-status timestamps, a `DeliveryStatusAdapter` SPI
+  with SendGrid + generic-HMAC impls, and the fail-closed self-verifying callback route. ⚠ SendGrid signs
+  **ECDSA P-256, not Ed25519** as the plan said. Residuals in `BACKLOG.md` §6.
 - ~~`superpower/findings-spec-plan.md`~~ — **SHIPPED end-to-end 2026-07-26 (BACKLOG D6), plan archived** to
   [`archived-documents/plans-archive/findings-spec-plan.md`](archived-documents/plans-archive/findings-spec-plan.md).
   As-built in [`okf/frontend/features/objects.md`](okf/frontend/features/objects.md): a `findings-spec`

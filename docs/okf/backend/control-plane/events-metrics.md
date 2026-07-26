@@ -99,27 +99,75 @@ timestamp: 2026-07-16T00:00:00Z
   In-app feed copies stay per-event — only the external destination delivery batches. Package-private
   `flushDigest(id)` is the test seam. Tests: `NotificationServiceTest` (buffer+combined flush,
   empty-flush no-op), `ControlApiNotificationChannelsTest` (default/round-trip/negative-422).
-* **Delivery-status webhooks re-scoped** (2026-07-24) — per the archived plan this means **inbound**
-  provider callbacks (bounce/complaint/delivered for sent email, SES/SendGrid-style event webhooks),
-  not outbound push (the outbound `webhook` channel shipped 2026-07-22, `channel/WebhookChannel`).
-  **Status model DECIDED 2026-07-25 (BACKLOG D8): track all three of `delivered` / `bounce` /
-  `complaint`.** Rationale: bounce alone tells you a send failed but not whether the rest are landing, and
-  `complaint` is the one class with a *deliverability* consequence (ignoring spam complaints degrades the
-  sending domain for every other notification), so it cannot be the thing we drop. The build shape this
-  implies:
-  * `Notification`/its store gain a **status field plus a per-status timestamp** — a single mutable status
-    enum loses ordering when a provider sends `delivered` then `complaint` for the same message, which is
-    the normal case for a spam-button click.
-  * Provider vocabularies differ (SES `Bounce`/`Complaint`/`Delivery` vs SendGrid `bounce`/`spamreport`/
-    `delivered`), so normalize at the adapter edge into our three canonical values; an unrecognized
-    provider event is **recorded as unknown, never dropped silently and never mapped to a guess**.
-  * Distinguish hard vs soft bounce — a soft bounce is retryable and must not disable a destination that is
-    merely full or briefly unavailable.
-  * The inbound callback route is **unauthenticated by origin**, so it must verify the provider's signature
-    and fail closed; an unverified callback must not be allowed to mark a destination dead (that is a cheap
-    denial-of-notification vector). Still Standard/Enterprise flavor territory; still not scheduled.
-* Deferred to editions/follow-ons: delivery-status webhooks (above), time-based retention
-  sweep, GeoIP, auth-gated security-event triggers / per-user prefs.
+* Deferred to editions/follow-ons: time-based retention sweep, GeoIP, auth-gated security-event triggers /
+  per-user prefs.
+
+### Inbound delivery-status webhooks (BACKLOG D8, shipped 2026-07-26)
+
+**Inbound** provider callbacks — what happened to an email we sent. Not outbound push: the outbound
+`webhook` *channel* shipped 2026-07-22 (`channel/WebhookChannel`) and is unrelated. Standard/Enterprise
+flavour territory (core ships the SPI; the adapters live in `inspecto-connectors`).
+
+**Shape.** `DeliveryStatusAdapter` SPI (core, `@PublicApi`, ServiceLoader-discovered exactly like
+`NotificationChannel`) → `SendGridDeliveryStatusAdapter` + `HmacDeliveryStatusAdapter` in
+`inspecto-connectors` → `POST /api/v1/public/delivery-status/{adapterId}` (`DeliveryStatusRoutes`) →
+`DeliveryReceipt` / `InMemoryDeliveryReceiptStore`. Read surface: `GET /notifications/deliveries`
+(`canAuthorWorkbench`), backend + HTTP only, as `notification-rule` shipped.
+
+**Three things the D8 decision did not anticipate — the corrections are the build:**
+
+1. **Nothing correlated a sent message back to a `Notification`.** `deliver` returned `void`, SMTP
+   discarded the `Transport.send` result, the outbound webhook threw the response body away. Fixed by
+   **minting the id ourselves and embedding it outbound** — an SMTP `Message-ID` of
+   `<inspecto.{deliveryId}@{domain}>`, or `X-Inspecto-Delivery-Id` on a webhook — never by capturing a
+   provider id, which would have meant widening a `@PublicApi` signature. The seam is a **`default`
+   three-arg `deliver` overload**: an implementor that ignores it simply does not correlate.
+   ⚠ `SmtpEmailChannel` needs the `PreservedMessageIdMessage` subclass — stock `MimeMessage.saveChanges()`
+   (which `Transport.send` calls) regenerates `Message-ID` and would break the round trip *silently, while
+   the mail still sends*.
+2. **Handlers could not see raw request bytes.** `ApiContext.rawBody` now reads once and **caches on the
+   exchange**, and `body()` reads through it, so the two are safe in any order. Verifying a signature
+   against a re-serialised `Map` is not an option: key order and whitespace do not survive, so signatures
+   would fail *non-deterministically*.
+3. **SendGrid signs with ECDSA P-256 / SHA-256, not the Ed25519 the plan specified.** An Ed25519
+   implementation would have rejected every genuine callback and only revealed it against the real
+   provider. Signed payload is `timestamp + rawBody`; the HMAC adapter signs `timestamp + "." + rawBody`
+   (the timestamp must be *inside* the signature or the freshness check it enables is attacker-controlled).
+
+**Load-bearing invariants — do not "simplify" these:**
+
+* **`statusAt` is a `Map<DeliveryStatus, Long>`, not one mutable enum.** A spam-button click is
+  `delivered` **then** `complaint`; a single field loses the ordering. **First observation of a status
+  wins**, so a provider retry cannot shift a recorded time.
+* **Verification precedes every write.** An unverified callback able to mark a destination dead is a cheap
+  denial-of-notification vector. Gate order: unknown/unconfigured adapter **404** → bad/absent/stale
+  signature **403** → no usable events **422** → every id unknown **202** → **200**.
+* **Unknown and unconfigured adapters answer identically (404).** Differing would let an unauthenticated
+  caller enumerate which providers a deployment has wired.
+* **An unknown `deliveryId` is 202, not an error** — receipts are prunable and providers retry forever on a
+  non-2xx, so rejecting one buys an infinite retry loop and no information.
+* **Hard vs soft bounce is normalised at the adapter edge** (SendGrid `blocked`/`deferred` ⇒ soft): a full
+  mailbox is not a dead address. An unrecognised event is `UNKNOWN` **with its raw payload** — never
+  dropped, never guessed.
+* **A receipt is per *delivery*, not per notification** (one notification fans out to many destinations);
+  `Notification` gained no fields. **One receipt per digest delivery**, flagged `digest` — the single place
+  the model is lossy about *which* notification bounced.
+* `/public/delivery-status/` joins `/public/dashboards/` in `ControlApi.isSelfVerifyingPublic`, exempt from
+  platform auth in both `authenticate` and `authorize`. It is **not** in `PUBLIC_PATHS` (exact-match infra
+  paths) and **not** `isInfraRoute` — and it still lives under `/api/v1`, which is what an operator must
+  paste into the provider console.
+
+Config: `notify.deliverystatus.sendgrid.publicKey` · `notify.deliverystatus.hmac.secret` ·
+`…{sendgrid,hmac}.freshnessSeconds` (default 300). Unset ⇒ the adapter is inert and its URL 404s.
+
+Tests: `ControlApiDeliveryStatusTest` (every gate, over real HTTP, plus the raw-body byte-identity
+assertion), `DeliveryReceiptStoreTest`, `NotificationServiceTest` (receipt per destination / none for
+in-app / one per digest), `Hmac…`/`SendGridDeliveryStatusAdapterTest`, `SmtpEmailChannelTest`.
+
+**Deliberately not built** (residuals → BACKLOG §6): auto-disable / suppression on hard bounce +
+complaint, soft-bounce retry scheduling, an SES/SNS adapter (needs subscription confirmation and an
+outbound cert fetch from a callback path — its own review), a UI, receipt retention/pruning wiring, and the
+`deliverWithReceipt` SPI escape hatch.
 
 ## Alert-rule authoring (shipped 2026-07-09)
 
