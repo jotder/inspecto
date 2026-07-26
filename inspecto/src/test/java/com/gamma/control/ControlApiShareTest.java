@@ -126,7 +126,21 @@ class ControlApiShareTest {
             JsonNode issued = JSON.readTree(post(c.port, "/dashboards/exec_board/share", null).body());
             String token = (issued.has("data") ? issued.get("data") : issued).get("token").asText();
             assertFalse(token.isBlank(), "share must issue a token: " + issued);
-            String tampered = token.substring(0, token.length() - 2) + "zz";
+            // Tamper the FIRST character of the signature segment, not the last of the token.
+            // Two traps this avoids, both of which make the "tampered" token verify and return 200:
+            //   1. the old `substring(0, len-2) + "zz"` was a no-op whenever the digest already ended
+            //      in "zz" (~1 in 4096 runs, since the tail is base64url(HMAC)) — an intermittent
+            //      false red with no product defect behind it;
+            //   2. flipping the LAST base64 character is unsound even when it changes the string: a
+            //      32-byte digest encodes to 43 unpadded chars, so the final char carries 2 unused
+            //      low bits and some flips (e.g. 'z'→'y') decode to the SAME bytes.
+            // The first character after the '.' carries 6 significant bits, so this always changes the
+            // decoded signature.
+            int dot = token.indexOf('.');
+            assertTrue(dot > 0 && dot < token.length() - 1, "token is payload.signature: " + token);
+            char sig0 = token.charAt(dot + 1);
+            String tampered = token.substring(0, dot + 1) + (sig0 == 'A' ? 'B' : 'A') + token.substring(dot + 2);
+            assertNotEquals(token, tampered, "the tamper must actually change the token");
             assertEquals(404, get(c.port, "/public/dashboards/" + tampered).statusCode());
             assertEquals(404, get(c.port, "/public/dashboards/garbage.token").statusCode());
             assertEquals(404, post(c.port, "/public/dashboards/" + tampered + "/query",
