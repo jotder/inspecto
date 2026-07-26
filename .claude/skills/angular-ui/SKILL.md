@@ -398,8 +398,9 @@ src/app/
    and assert `button.disabled === false` before clicking. (b) **A raw `fetch('/api/…')` bypasses the
    offline mock entirely** (it is an `HttpInterceptor`, not a service worker) and returns an empty body —
    so it can neither confirm nor refute a write. Confirm a mutation by reading the mock store
-   (`localStorage['inspecto.mock.v19']` → `<space>[<collection>]`) or by re-opening the UI, never by
-   observing that a dialog closed.
+   (`localStorage['inspecto.mock.v20']` → `<space>[<collection>]`) or by re-opening the UI, never by
+   observing that a dialog closed. (The key is bumped whenever the seed contract changes — read
+   `MOCK_STORE_KEY` in `mock/mock-store.ts` rather than trusting this literal.)
    **The preview browser does NOT deliver `ResizeObserver` callbacks** (it renders from DOM snapshots, no
    continuous paint loop) — RO-driven behavior (chart/graph/map container-resize) can't be exercised
    in-preview; rely on the unit test (observer wired + disconnected) + the shared RO→`resize()` precedent.

@@ -125,6 +125,12 @@ former root reference docs** (each index lists them):
   As-built lives in [`okf/backend/control-plane/tags.md`](okf/backend/control-plane/tags.md): central
   assignment store + `(targetKind, targetId)` addressing shared with **D10** notes, the CSV as a
   projection, rename/delete across the whole vocabulary, and the `/tags` pane. Residuals in BACKLOG §6.
+- ~~`superpower/link-analysis-pattern-packs-plan.md`~~ — **SHIPPED end-to-end 2026-07-26 (Link-analysis
+  V2 (c); BACKLOG §2 D16 overturned), plan archived** to
+  [`archived-documents/plans-archive/link-analysis-pattern-packs-plan.md`](archived-documents/plans-archive/link-analysis-pattern-packs-plan.md).
+  As-built lives in [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md):
+  pattern packs as a per-Space `pattern-pack` component kind, the `PATTERN_PACKS` const as the fallback,
+  and the two costs that ruled out a reserved system Space.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5

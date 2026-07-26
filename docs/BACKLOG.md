@@ -69,10 +69,11 @@ each row's detail stays in its own section.
      **D1–D11** are a separate numbering space from §2's D1–D17 — and they now COLLIDE on D9/D10, which
      mean different things in each. Always say "plan D9" or "§2 D9".)*
    - **Generic tag system (D7)** — newly rescoped, plan-first, second-largest item on the board.
-   - Link-analysis V2 — **(b) sharing SHIPPED end-to-end 2026-07-26 (§2 D9)**, closing the last
-     Exchange-side gap. Remaining: **(c)** pattern packs in a dedicated system Space (§2 D16) and
-     **(d)** AI assist, now an adoption of the shipped assist seam rather than a new surface. Both are
-     independent and need no further decision ·
+   - Link-analysis V2 — **(b) sharing SHIPPED 2026-07-26 (§2 D9)** · **(c) pattern packs SHIPPED
+     end-to-end 2026-07-26** as a per-Space `pattern-pack` component kind after §2 D16 was overturned
+     (as-built: `okf/frontend/features/link-analysis.md`; plan archived) · **(d)'s vocabulary half
+     shipped**, leaving only **(d)'s authoring half** — which is *not* a mechanical adoption, since nothing
+     drafts a projection mapping today and which L1 tool backs it is still a call ·
      configurable Findings sections (D6) · M4 Fuse remainder · eoiagent `DryRunProvider` · DuckDB
      `spatial` extension.
    - ⚠ **"Geo Phase 4 backend" is effectively closed** — the projection/aggregation endpoints
@@ -109,7 +110,7 @@ you remember the old framing, re-read those three.
 | D13 | **Confirmed parked** — stays gated on a real onboarding-observation session (interview #2). An engineering placeholder would bake in an arbitrary answer that is expensive to unwind once forms ship | §7 · interview #2 |
 | D14 | **Ratified with one tightening — SHIPPED 2026-07-25 (`2b1e7e9d`).** ⚠ `canConfigureAccess` + `canApproveShares` were **already** admin/super-only in `Roles.SEED`, so the "bootstrap deadlock left them over-granted" premise was unfounded. `canAuthorAlertRules`/`canRequestShares` ratified as developer/ops-tier. `canOfferDatasets` moved to admin (cross-space data exposure with no second gate) | `okf/…/auth-security.md` |
 | D15 | **Withdrawn, not answered — there is no vendor of record.** The IdP/gateway is a per-client deployment choice; standards-only and configurable. Litmus test: new auth code that can't be pointed at a different compliant IdP by config alone is wrong. **Both residuals SHIPPED 2026-07-25**: `KeycloakTokenRelay` → **`OidcTokenRelay`** (incl. the `META-INF/services` entry), and the Keycloak-shaped `tokenEndpoint` default deleted. ⚠ **BREAKING for existing deployments** — `-Dauth.oidc.tokenEndpoint` is now **required** and fails fast at startup; it is no longer derived from the issuer, so a Keycloak deployment that relied on the derived path will not boot until the flag is set from the provider's `/.well-known/openid-configuration`. `X-JWT-Assertion` default kept, now documented as *a* convention | `okf/…/auth-security.md` |
-| D16 | **A dedicated system Space** owns the domain-seeded pattern packs — the space-template-gallery path would fork packs per Space, so a fix to a shipped pattern could never reach the copies | `okf/frontend/features/link-analysis.md` |
+| D16 | ~~A dedicated system Space owns the domain-seeded pattern packs~~ — **OVERTURNED 2026-07-26 (operator): per-Space forking is acceptable.** The central-fix rationale (a system Space so a fix to a shipped pattern reaches every copy) was weighed and dropped; packs are ordinary per-Space `pattern-pack` components. ⚠ Two costs of the system-Space shape are recorded in the plan so it is not re-proposed blind: a `_`-sentinel dir holding `config/` passes `SpaceManager.discover`'s filter and then dies in `SpaceId.of` (a spurious `Skipping space dir` WARN every boot), and a sentinel without `config/` can't be reached through `/spaces/{id}/…` at all ⇒ a dedicated cross-space read route. **✅ SHIPPED end-to-end 2026-07-26** — the kind (2 registrations, no new endpoint or capability), 18 seed files across the three tracked spaces, and the toolbox reading `GET /components/pattern-pack` with the `PATTERN_PACKS` const as the fallback. ⚠ Load-bearing: a kind absent from `WRITABLE_TYPES` is **unreadable**, not read-only; a step's start `direction` persists as the **empty string** because TOON cannot encode `{}` in a list; `patternPacks` must be a **signal** (`OnPush`); and `spaces/uat/` is gitignored so it stays on the fallback. Plan archived | `okf/frontend/features/link-analysis.md` |
 | D17 | **Open, unscheduled** — acknowledged gap, no demand pressure, no build time committed | §7 |
 
 ## 3. Product remainder (MoSCoW of record: `REQUIREMENTS.md` §5)

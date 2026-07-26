@@ -69,8 +69,9 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
   declares six canonical terms (Entity · Link · Entity Projection · Link-Analysis View · Dataset · Widget),
   making this the 12th adopter — the pane most in need of it, since the glossary bans using Entity/Link for
   artifacts or assets and this is the one studio where they are the subject. No backend
-  (`glossary_lookup` is non-mutating). Remaining V2 (BACKLOG): **(c)** domain-seeded pattern packs owned by a
-  dedicated system Space (D16), and **(d)'s authoring half** — open, and *not* a mechanical adoption: nothing
+  (`glossary_lookup` is non-mutating). **2026-07-26 also shipped V2 (c)**: pattern packs are now a per-Space
+  `pattern-pack` component kind (see *Pattern packs* below) rather than a hardcoded const. Remaining V2
+  (BACKLOG): **(d)'s authoring half** — open, and *not* a mechanical adoption: nothing
   drafts a **projection mapping** (column→Entity choices over a Dataset's real columns) today, and that
   mapping is the pane's actual authoring act, so which L1 tool backs it is still a call.
 * **Investigation pivot** (ui-design-review R8, 2026-07-20) — a node resolving an `objectRef` offers
@@ -117,10 +118,49 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     UI: a "Comments" action sits next to "Version history" in the saved-views per-row menu, opening
     `LinkAnalysisCommentsDialog` (modeled on `ComponentHistoryDialog`) over a new `NotesService` — no
     "currently loaded view" state needed, since both actions already operate per-row on the views list.
-  * **D16 pattern packs — a dedicated system Space owns the domain-seeded packs**, not the
-    space-template-gallery seeding path. Rationale: packs are installation-wide reference content, and seeding
-    them into user Spaces would fork them per Space, so a fix to a shipped pattern could never reach the
-    copies. A reserved system Space keeps one authoritative copy that every Space reads.
+  * **D16 pattern packs — ~~a dedicated system Space owns the domain-seeded packs~~ OVERTURNED
+    2026-07-26 (operator): per-Space forking is acceptable.** The original rationale (one authoritative copy,
+    so a fix to a shipped pattern reaches every Space) was weighed and dropped — packs are per-Space content
+    and the central-fix guarantee is not required. **Shipped as a `pattern-pack` component kind**; see
+    *Pattern packs* below for the as-built shape and the two costs that killed the system-Space option.
+
+## Pattern packs (V2 (c) — shipped 2026-07-26)
+
+A **pattern pack** is a named starter motif that pre-fills the pattern-match builder. Packs are an ordinary
+per-Space **`pattern-pack` `ComponentStore` kind**, authored at
+`spaces/<space>/config/registry/pattern-packs/*.toon` and read by the toolbox over
+`GET /components/pattern-pack`. Six are seeded in each tracked Space.
+
+* **No new endpoint and no new capability.** `/components/{type}` CRUD is generic (the `findings-spec`
+  precedent), so the whole backend change is two registrations: `ComponentStore.WRITABLE_TYPES` and
+  `ComponentRegistry.TYPE_BY_DIR`. Writes ride the generic `canAuthorWorkbench` gate. Version history,
+  ETags, `ComponentAccess` share filtering, `NoteTargets`, `InspectoTools` and `BundleRoutes.supported()`
+  all read `WRITABLE_TYPES` dynamically and came free.
+* ⚠ **`WRITABLE_TYPES` is misnamed for this purpose: a kind absent from it is UNREADABLE, not merely
+  read-only** — `list`/`get` call `validateType` too. There is no read-only-kind concept and this change
+  deliberately did not invent one; that is *why* packs are writable over HTTP rather than a served-only
+  catalog.
+* ⚠ **TOON cannot encode `{}` as a list element**, and a motif's step 0 (the start node) is exactly that.
+  `ConfigCodec.toToon` writes a bare `-` and then **fails to decode its own output**. So the persisted shape
+  gives every step a `direction`, the start node's being the **empty string**, and `patternPackFromContent`
+  maps blank → `undefined`. **Do not "tidy" the blank away** — it silently breaks every seeded pack on read.
+  Pinned by `ComponentStoreTest.patternPackStepsSurviveTheRoundTripWithABlankStartDirection`.
+* **The shipped `PATTERN_PACKS` const stays the fallback**, used when a Space has no packs, on error, or with
+  no write root — so the catalog is populated synchronously and is never blank. The toolbox seeds its signal
+  with the const and replaces it only on a non-empty response.
+* ⚠ **`patternPacks` must be a signal**: the toolbox is `OnPush`, so reassigning a plain field from the HTTP
+  callback renders nothing. ⚠ And the injected service is **`componentsApi`** — `components` is already this
+  component's connected-components signal, so reusing the name is a duplicate-identifier compile error.
+* Pack content is **free-form TOON with no backend `validateKind` branch**; the guard is instead the
+  defensive UI mapper, which skips a malformed pack rather than drawing a broken option. Revisit if packs
+  ever get an authoring UI.
+* ⚠ **`spaces/uat/` is gitignored** and is deliberately unseeded (`tools/seed-uat.ps1` has no registry step),
+  so uat runs on the const fallback. Adding the files "to fix it" cannot work — they are not committable.
+* **Why not a reserved system Space** (the two costs that overturned D16, recorded so it is not re-proposed
+  blind): a `_`-prefixed sentinel dir holding `config/` **passes** `SpaceManager.discover`'s filter and then
+  dies in `SpaceBootstrap.load` at `SpaceId.of` (which forbids a leading underscore), logging a spurious
+  `Skipping space dir` WARN on **every boot**; and a sentinel *without* `config/` cannot be reached through
+  `/spaces/{id}/…` at all, so it would need a dedicated cross-space read route.
 
 Design (archived):
 [`link-analysis-and-graphsource.md`](../../../archived-documents/plans-archive/link-analysis-and-graphsource.md)
