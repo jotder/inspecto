@@ -12,6 +12,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { AddToDashboardDialog, AddToDashboardResult } from './add-to-dashboard.dialog';
 import { Widget } from './widget-types';
@@ -115,6 +116,20 @@ export class WidgetsComponent implements OnInit {
                 this.toastr.warning('Could not load widgets — is ControlApi running?');
             },
         });
+    }
+
+    /**
+     * Tags on this widget (D7 (c)) — the shared cross-entity dialog, so a widget is findable from `/tags`
+     * beside tagged incidents, dashboards, datasets and saved views.
+     *
+     * ⚠ **Reload on close, unlike the dashboards adopter.** A widget's chips are a *projection* of the
+     * assignment edges, re-derived server-side into its config, so the card would keep drawing the old
+     * chips until the list is refetched. Dashboards have no chip row and so need no reload.
+     */
+    openTags(w: Widget): void {
+        this.dialog.open(TagAssignmentDialog, {
+            data: { targetKind: 'widget', targetId: w.id, label: w.id },
+        }).afterClosed().subscribe(() => this.load());
     }
 
     onFilter(ev: Event): void {

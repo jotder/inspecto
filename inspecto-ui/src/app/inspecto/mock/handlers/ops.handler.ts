@@ -18,6 +18,7 @@ import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { emitSignal, SIGNALS_COLL } from '../signals';
+import { componentCollection } from './components.handler';
 import { batches, PIPELINES } from './demo.handler';
 
 /**
@@ -462,6 +463,9 @@ export function opsHandler(flags: MockFlags): MockHandler {
         }
         // ── tag registry + Tag Rules (design §7 follow-up on the real backend) ───────────────
         if (method === 'GET' && TAGS.test(url)) {
+            // D7 (c): seeded widgets carry free-text tags in their config. Adopting here (not only on an
+            // assignment read) is what makes them part of the vocabulary the /tags pane lists.
+            adoptWidgetTags(store, space);
             return json(store.list<Tag>(space, TAGS_COLL).sort((a, b) => a.name.localeCompare(b.name)));
         }
         if (method === 'POST' && TAGS.test(url)) {
@@ -609,11 +613,60 @@ function edgeKey(tag: string, kind: string, id: string): string {
 }
 
 /**
+ * D7 (c): a widget's tags live inside its own component config, and the card's chip row draws them from
+ * there — so, exactly like an object's `attributes.tags` CSV, that array is the **projection**, and
+ * re-deriving it here is what keeps the mock's two paths from disagreeing. Widget *edges* are stored like
+ * every other component target's; this rewrites the array after each change.
+ */
+function widgetConfigTags(store: MockStore, space: string, id: string): string[] {
+    const def = store.get<{ content?: Record<string, unknown> }>(space, componentCollection('widget'), id);
+    const raw = def?.content?.['tags'];
+    return Array.isArray(raw) ? raw.map(String) : [];
+}
+
+function projectWidgetTags(store: MockStore, space: string, id: string): void {
+    const coll = componentCollection('widget');
+    const def = store.get<{ content?: Record<string, unknown> }>(space, coll, id);
+    if (!def) return;
+    const tags = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+        .filter((a) => a.targetKind === 'widget' && a.targetId === id)
+        .map((a) => a.tag)
+        .sort((a, b) => a.localeCompare(b));
+    const content = { ...(def.content ?? {}) };
+    if (tags.length) content['tags'] = tags;
+    else delete content['tags'];
+    store.put(space, coll, id, { ...def, content });
+}
+
+/**
+ * Adopt every widget's config-array tags as edges — the offline half of the per-Space backfill the real
+ * `TagRoutes.register` runs. Called lazily from the assignment reads so a seeded store migrates itself
+ * without a mock-store version bump; idempotent, because the composite key makes `put` idempotent.
+ */
+function adoptWidgetTags(store: MockStore, space: string): void {
+    for (const def of store.list<{ name: string }>(space, componentCollection('widget'))) {
+        for (const tag of widgetConfigTags(store, space, def.name)) {
+            const key = edgeKey(tag, 'widget', def.name);
+            if (store.has(space, TAG_ASSIGNMENTS_COLL, key)) continue;
+            store.put(space, TAG_ASSIGNMENTS_COLL, key, {
+                tag, targetKind: 'widget', targetId: def.name, actor: 'migration', createdAt: Date.now(),
+            } satisfies TagAssignment);
+            // Seeded widget tags are free text; register the name too, or `/tags` cannot list them and
+            // assigning one would 404. Mirrors TagRoutes.ensureTag.
+            if (!store.has(space, TAGS_COLL, tag)) {
+                store.put(space, TAGS_COLL, tag, { name: tag, createdAt: Date.now() } satisfies Tag);
+            }
+        }
+    }
+}
+
+/**
  * Object tags live in the `attributes.tags` CSV and non-object tags in their own collection — the same
  * split the real backend has, where the CSV is a **projection** of the store rather than a second source
  * of truth. Reading object edges from the CSV is what keeps the mock's two paths from disagreeing.
  */
 function tagTargets(store: MockStore, space: string, tag: string): TagAssignment[] {
+    adoptWidgetTags(store, space);
     const fromObjects = store.list<OperationalObject>(space, OPS_OBJECTS_COLL)
         .filter((o) => csvTags(o.attributes?.['tags']).includes(tag))
         .map((o) => ({
@@ -625,6 +678,7 @@ function tagTargets(store: MockStore, space: string, tag: string): TagAssignment
 }
 
 function tagsOnTarget(store: MockStore, space: string, kind: string, id: string): string[] {
+    if (kind === 'widget') adoptWidgetTags(store, space);
     const tags = kind === 'object'
         ? csvTags(store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id)?.attributes?.['tags'])
         : store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
@@ -649,9 +703,11 @@ function assignTag(store: MockStore, space: string, kind: string, id: string, ta
     }
     const existing = store.get<TagAssignment>(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id));
     if (existing) return json(existing);
-    return json(store.put(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id), {
+    const edge = store.put(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id), {
         tag, targetKind: kind, targetId: id, actor, createdAt: Date.now(),
-    } satisfies TagAssignment));
+    } satisfies TagAssignment);
+    if (kind === 'widget') projectWidgetTags(store, space, id);   // the chip row, not just the edge
+    return json(edge);
 }
 
 /** Idempotent: already-absent is success, so the boolean reports whether an edge actually went away. */
@@ -670,6 +726,7 @@ function unassignTag(store: MockStore, space: string, kind: string, id: string, 
     const key = edgeKey(tag, kind, id);
     if (!store.has(space, TAG_ASSIGNMENTS_COLL, key)) return false;
     store.delete(space, TAG_ASSIGNMENTS_COLL, key);
+    if (kind === 'widget') projectWidgetTags(store, space, id);
     return true;
 }
 
@@ -682,6 +739,9 @@ function unassignTag(store: MockStore, space: string, kind: string, id: string, 
  * and the source tag then stops existing.
  */
 function renameTagEverywhere(store: MockStore, space: string, from: string, to: string) {
+    adoptWidgetTags(store, space);
+    const widgets = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+        .filter((a) => a.tag === from && a.targetKind === 'widget').map((a) => a.targetId);
     let assignments = 0;
     let objects = 0;
     let rules = 0;
@@ -713,11 +773,16 @@ function renameTagEverywhere(store: MockStore, space: string, from: string, to: 
     if (!store.has(space, TAGS_COLL, to)) {
         store.put(space, TAGS_COLL, to, { name: to, createdAt: Date.now() } satisfies Tag);
     }
-    return { assignments, objects, rules };
+    // A widget's chips are a config-array projection, so the edge move alone leaves them stale (D7 (c)).
+    for (const id of widgets) projectWidgetTags(store, space, id);
+    return { assignments, objects, widgets: widgets.length, rules };
 }
 
 /** Retire a tag and every assignment of it — deletion leaves no orphan edges. */
 function deleteTagEverywhere(store: MockStore, space: string, name: string) {
+    adoptWidgetTags(store, space);
+    const widgets = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+        .filter((a) => a.tag === name && a.targetKind === 'widget').map((a) => a.targetId);
     let assignments = 0;
     let objects = 0;
 
@@ -738,7 +803,8 @@ function deleteTagEverywhere(store: MockStore, space: string, name: string) {
         store.delete(space, TAG_ASSIGNMENTS_COLL, edgeKey(name, a.targetKind, a.targetId));
     }
     store.delete(space, TAGS_COLL, name);
-    return { assignments, objects, rules: 0 };
+    for (const id of widgets) projectWidgetTags(store, space, id);
+    return { assignments, objects, widgets: widgets.length, rules: 0 };
 }
 
 // ── case group management (GLOSSARY §9 — Split & Merge; mirrors ObjectService) ──────────────────

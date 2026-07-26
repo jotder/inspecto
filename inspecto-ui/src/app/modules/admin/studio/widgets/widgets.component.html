@@ -96,6 +96,9 @@
                         <button mat-icon-button [routerLink]="[w.id]" matTooltip="Edit in Widget Builder" aria-label="Edit in Widget Builder">
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                         </button>
+                        <button mat-icon-button (click)="openTags(w)" [attr.aria-label]="'Tags for ' + w.id" matTooltip="Tags">
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
+                        </button>
                         <button mat-icon-button (click)="addToDashboard(w)" matTooltip="Add to dashboard" aria-label="Add to dashboard">
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:squares-plus"></mat-icon>
                         </button>

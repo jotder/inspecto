@@ -260,7 +260,6 @@ export class ExploreComponent implements OnInit {
                 data: {
                     suggestedId: this.id ?? `${viewBound ? this.viewId() : ds!.id}_${this.vizType()}`,
                     lockId: this.editing(),
-                    tags: this.tags(),
                     description: this.description(),
                     existingNames: this.existingWidgetIds(),
                 },
@@ -269,10 +268,13 @@ export class ExploreComponent implements OnInit {
             .afterClosed()
             .subscribe((result?: WidgetSaveResult) => {
                 if (!result) return;
-                const { name, tags, description } = result;
+                const { name, description } = result;
                 const widget = buildWidget(name, viewBound ? '' : ds!.id, this.vizType(), viewBound ? {} : this.controls(), {
                     options: this.options(),
-                    tags,
+                    // Carried forward from the loaded widget, never authored here: tags are assignment
+                    // edges (D7 (c)) and the server re-derives this array on write. Tag via the library
+                    // card's Tags button.
+                    tags: this.tags(),
                     description,
                     viewId: viewBound ? this.viewId() : undefined,
                     queryId: viewBound ? undefined : this.boundQueryId(),

@@ -9,7 +9,6 @@ export interface WidgetSaveData {
     suggestedId: string;
     /** True when editing — the id is fixed and the field is read-only. */
     lockId: boolean;
-    tags?: string[];
     description?: string;
     /** Ids already in use — on create the id control rejects a duplicate inline (product-wide rule). */
     existingNames?: string[];
@@ -23,12 +22,18 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
 
 export interface WidgetSaveResult {
     name: string;
-    tags?: string[];
     description?: string;
 }
 
-/** Save-as-widget dialog — names the widget (+ tags/description for the library gallery) and closes with the
- *  result (or undefined on cancel). */
+/**
+ * Save-as-widget dialog — names the widget (+ a description for the library gallery) and closes with the
+ * result (or undefined on cancel).
+ *
+ * ⚠ **No tags field, deliberately (D7 (c), 2026-07-27).** A widget's chips are a projection of the central
+ * tag assignment store, so tags are applied with the Tags button on the library card. A comma-separated
+ * field here would be a SECOND writer that resurrects config-only tags on every save — and it minted
+ * unregistered names, which is exactly what the shared vocabulary exists to prevent.
+ */
 @Component({
     selector: 'app-widget-save-dialog',
     standalone: true,
@@ -47,10 +52,6 @@ export interface WidgetSaveResult {
                     @if (form.controls.name.hasError('duplicate')) {
                         <mat-error>A widget with this id already exists.</mat-error>
                     }
-                </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Tags</mat-label>
-                    <input matInput formControlName="tags" placeholder="comma-separated, e.g. ops, billing" />
                 </mat-form-field>
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Description</mat-label>
@@ -78,7 +79,6 @@ export class WidgetSaveDialog {
                 ...(this.data.lockId ? [] : [uniqueNameValidator(this.data.existingNames ?? [])]),
             ],
         ],
-        tags: [this.data.tags?.join(', ') ?? ''],
         description: [this.data.description ?? ''],
     });
 
@@ -89,11 +89,7 @@ export class WidgetSaveDialog {
             this.form.markAllAsTouched();
             return;
         }
-        const tags = String(this.form.controls.tags.value ?? '')
-            .split(',')
-            .map((t) => t.trim())
-            .filter(Boolean);
         const description = String(this.form.controls.description.value ?? '').trim() || undefined;
-        this.ref.close({ name, tags: tags.length ? tags : undefined, description });
+        this.ref.close({ name, description });
     }
 }
