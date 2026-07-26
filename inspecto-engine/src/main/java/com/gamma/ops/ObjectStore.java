@@ -46,6 +46,12 @@ public interface ObjectStore extends AutoCloseable {
      * Physically remove an object. Throws {@link java.util.NoSuchElementException} if no object with
      * this id exists. Does not cascade to links/notes/attachments referencing the object — callers
      * that need cascading cleanup must do so themselves.
+     *
+     * <p><b>Reserved seam — no production caller and no route today.</b> Hard-delete is deliberately
+     * not a supported operation on Incidents/Cases: they are only closed, merged, or split, and there
+     * is no {@code DELETE /objects/{id}}. This method exists for the MNT-14 retention sweep, where
+     * expiry of an archived object's retention window makes it purge-eligible. Do not build cascade
+     * logic against it on the assumption that hard-delete is generally available.
      */
     void delete(String id);
 

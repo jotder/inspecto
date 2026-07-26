@@ -300,11 +300,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 - **`NoteTargets` is now misnamed.** It is the shared annotation-target vocabulary for both notes (D10)
   and tags (D7), but still lives in `com.gamma.ops.note` under a note-specific name. Rename to something
   neutral when a change is already touching it — not worth its own churn, but it will mislead a reader.
-- **`ObjectStore.delete` is unwired SPI surface** (found 2026-07-25 while researching D7). `12cf20eb`
-  added `void delete(String)` to `com.gamma.ops.ObjectStore` (`:50`) with both impls and unit tests, but
-  it has **no production caller and no route** — there is no `DELETE /objects/{id}`; Incidents/Cases are
-  only closed, merged, or split. Either wire it or drop it; leaving a tested-but-unreachable delete on an
-  SPI invites someone to assume hard-delete is a supported operation and build cascade logic against it.
+- **`ObjectStore.delete` — CALL MADE 2026-07-26: KEEP as a reserved seam, do not wire, do not drop.**
+  `12cf20eb` added `void delete(String)` to `com.gamma.ops.ObjectStore` (`:50`) with both impls and unit
+  tests; it still has **no production caller and no route** — there is no `DELETE /objects/{id}`, and
+  Incidents/Cases are only closed, merged, or split. Dropping it is wrong because **MNT-14's purge needs
+  exactly this API** (D5 retention tier: expiry makes an archived object purge-eligible, and purge is a
+  real deletion). Wiring it now would ship an unbounded hard-delete ahead of the dry-run-first sweep and
+  the legal-hold exemption that D5 requires. The seam is therefore **documented in place** as reserved-for-
+  MNT-14, which closes the actual risk (a reader assuming hard-delete is generally supported and building
+  cascade logic against it). Row closes when MNT-14 consumes it.
   ⚠ Corrects a breadcrumb that recorded this as a shipped capability — the *SPI method* shipped.
 - **`fp-query`/`fp-job`/`fp-enrich` module extraction** — **build only on explicit request.** Nobody
   has asked; it is a preference, not a need. Main-code layering is already clean and acyclic, but it
