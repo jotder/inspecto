@@ -4,12 +4,20 @@ import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 
 /**
- * The Exchange — cross-Space Dataset/Widget sharing (backend: `ExchangeRoutes`, design
- * `docs/superpower/storage-layout-and-sharing-plan.md` §3). All routes are installation-scope and
- * un-prefixed (like `/spaces`): the {@link spaceInterceptor} exempts `/exchange` so calls are never
- * rewritten into a space. The whole surface only exists on a multi-space runtime — gate UI on
- * `SessionService.exchangeEnabled` (from `bootstrap.features.exchange`); every route 409s otherwise.
+ * The Exchange — cross-Space Dataset/Widget/saved-View sharing (backend: `ExchangeRoutes`, design
+ * `docs/superpower/storage-layout-and-sharing-plan.md` §3; the saved-view kind was added by BACKLOG D9).
+ * All routes are installation-scope and un-prefixed (like `/spaces`): the {@link spaceInterceptor} exempts
+ * `/exchange` so calls are never rewritten into a space. The whole surface only exists on a multi-space
+ * runtime — gate UI on `SessionService.exchangeEnabled` (from `bootstrap.features.exchange`); every route
+ * 409s otherwise.
  */
+
+/**
+ * What the Exchange can carry. A `dataset` owns rows; a `widget` and a `link-analysis-view` are *derived*
+ * — metadata reading Datasets, so the grants of every Dataset they read travel with them and a saved view
+ * is live-mode only (it has no rows of its own to snapshot).
+ */
+export type ExchangeKind = 'dataset' | 'widget' | 'link-analysis-view';
 
 /** A published snapshot's freshness (`SnapshotMeta.toMap()`), merged into offers when one exists. */
 export interface ExchangeFreshness {
@@ -21,7 +29,7 @@ export interface ExchangeFreshness {
 
 /** One shareable-catalog entry (`Offer.toMap()` + optional freshness). */
 export interface ExchangeOffer {
-    kind: 'dataset' | 'widget';
+    kind: ExchangeKind;
     item: string;
     owner: string;
     description: string;
@@ -29,8 +37,11 @@ export interface ExchangeOffer {
     resultSet: Record<string, unknown>;
     offeredBy: string;
     offeredAt: number;
-    /** Widget offers only: the bound dataset whose grant travels with the widget. */
-    dataset: string | null;
+    /**
+     * Derived offers only (widget, saved view): every Dataset it reads, whose grants travel with it.
+     * A widget binds exactly one; a saved view may read several. Empty for a Dataset offer.
+     */
+    datasets: string[];
     freshness?: ExchangeFreshness;
 }
 
@@ -38,7 +49,7 @@ export interface ExchangeOffer {
 export interface ExchangeGrant {
     /** Deterministic: `<consumer>~<owner>~<kind>~<item>`. */
     id: string;
-    kind: 'dataset' | 'widget';
+    kind: ExchangeKind;
     item: string;
     owner: string;
     consumer: string;
@@ -70,6 +81,20 @@ export interface SharedWidgetRender {
     dataset?: string;
 }
 
+/** GET /exchange/views/{owner}/{item}?consumer= — render-only view of a shared saved View (D9). */
+export interface SharedViewRender {
+    owner: string;
+    item: string;
+    /**
+     * The saved view's config, with `query.roots`/`query.from` already rewritten to the
+     * `shared/<owner>/<dataset>` refs the consumer resolves through — so it loads unchanged.
+     */
+    content: Record<string, unknown>;
+    readOnly: true;
+    /** Every `shared/<owner>/<dataset>` ref in the view's grant closure. */
+    datasets: string[];
+}
+
 /** Wraps the `/exchange/*` routes. Stateless — grant/offer lists are per-view, not app-global. */
 @Injectable({ providedIn: 'root' })
 export class ExchangeService {
@@ -84,7 +109,7 @@ export class ExchangeService {
 
     /** Owner lists (or re-describes) a Dataset/Widget offer. 404 unknown item, 409/422 widget pairing. */
     offer(req: {
-        kind: 'dataset' | 'widget';
+        kind: ExchangeKind;
         owner: string;
         item: string;
         description?: string;
@@ -100,7 +125,7 @@ export class ExchangeService {
 
     /** Consumer requests use of an offered item. 400 self-request, 404 no offer, 409 conflict. */
     request(req: {
-        kind: 'dataset' | 'widget';
+        kind: ExchangeKind;
         owner: string;
         consumer: string;
         item: string;
@@ -152,6 +177,17 @@ export class ExchangeService {
     widget(owner: string, item: string, consumer: string): Observable<SharedWidgetRender> {
         return this.http.get<SharedWidgetRender>(
             apiUrl(`/exchange/widgets/${encodeURIComponent(owner)}/${encodeURIComponent(item)}`),
+            { params: toParams({ consumer }) },
+        );
+    }
+
+    /**
+     * Render-only view of a shared saved View for a consumer (D9). 403 = the view's grant OR any one of its
+     * datasets' grants is revoked/expired — the closure is all-or-nothing, and fail-closed.
+     */
+    view(owner: string, item: string, consumer: string): Observable<SharedViewRender> {
+        return this.http.get<SharedViewRender>(
+            apiUrl(`/exchange/views/${encodeURIComponent(owner)}/${encodeURIComponent(item)}`),
             { params: toParams({ consumer }) },
         );
     }

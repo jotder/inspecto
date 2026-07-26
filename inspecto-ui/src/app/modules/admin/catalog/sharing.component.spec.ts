@@ -13,16 +13,16 @@ import { SharingComponent } from './sharing.component';
 const OFFERS: ExchangeOffer[] = [
     {
         kind: 'dataset', item: 'fx_rates_daily', owner: 'analytics-hub', description: 'FX rates',
-        resultSet: {}, offeredBy: 'analyst', offeredAt: 1, dataset: null,
+        resultSet: {}, offeredBy: 'analyst', offeredAt: 1, datasets: [],
         freshness: { version: 'v3', rows: 42, refreshedAt: '2026-07-08T00:00:00Z', columns: [] },
     },
     {
         kind: 'dataset', item: 'customer_segments', owner: 'analytics-hub', description: 'Segments',
-        resultSet: {}, offeredBy: 'analyst', offeredAt: 2, dataset: null,
+        resultSet: {}, offeredBy: 'analyst', offeredAt: 2, datasets: [],
     },
     {
         kind: 'dataset', item: 'billing_summary', owner: 'default', description: 'Billing',
-        resultSet: {}, offeredBy: 'appUser', offeredAt: 3, dataset: null,
+        resultSet: {}, offeredBy: 'appUser', offeredAt: 3, datasets: [],
     },
 ];
 

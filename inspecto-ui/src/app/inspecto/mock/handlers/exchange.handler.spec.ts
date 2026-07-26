@@ -92,7 +92,7 @@ describe('exchangeHandler', () => {
 
         // Widget offer 409s until its bound dataset is offered — the seed already offers billing_summary.
         const offered = handler(req('POST', '/api/exchange/offers', { kind: 'widget', owner: 'default', item: 'billing_chart' }), store);
-        expect((offered?.body as ExchangeOffer).dataset).toBe('billing_summary');
+        expect((offered?.body as ExchangeOffer).datasets).toEqual(['billing_summary']);
 
         // Requesting the widget auto-creates the paired dataset request; approving activates both.
         const g = grantOf(handler(req('POST', '/api/exchange/requests',
@@ -116,6 +116,64 @@ describe('exchangeHandler', () => {
         const store = storeWithSpaces();
         store.put('default', componentCollection('widget'), 'plain', { name: 'plain', content: { viz: 'text' } });
         expect(handler(req('POST', '/api/exchange/offers', { kind: 'widget', owner: 'default', item: 'plain' }), store)?.status).toBe(422);
+    });
+
+    it('shares a saved view live, over the closure of EVERY dataset it reads (D9)', () => {
+        const store = storeWithSpaces();
+        store.put('default', componentCollection('link-analysis-view'), 'fraud_ring', {
+            name: 'fraud_ring',
+            content: {
+                sourceId: 'entity-projection',
+                query: {
+                    projections: [
+                        { datasetId: 'billing_summary', sourceCol: 'a', targetCol: 'b' },
+                        { datasetId: 'ledger', sourceCol: 'a', targetCol: 'b' },
+                    ],
+                },
+            },
+        });
+        store.put('default', componentCollection('dataset'), 'ledger', { name: 'ledger', content: {} });
+        // the seed offers billing_summary but not ledger → 409 until both are offered
+        expect(handler(req('POST', '/api/exchange/offers',
+            { kind: 'link-analysis-view', owner: 'default', item: 'fraud_ring' }), store)?.status).toBe(409);
+        expect(handler(req('POST', '/api/exchange/offers',
+            { kind: 'dataset', owner: 'default', item: 'ledger' }), store)?.status ?? 200).toBe(200);
+
+        const offered = handler(req('POST', '/api/exchange/offers',
+            { kind: 'link-analysis-view', owner: 'default', item: 'fraud_ring' }), store);
+        expect((offered?.body as ExchangeOffer).datasets).toEqual(['billing_summary', 'ledger']);
+
+        // an explicit snapshot mode is rejected, not coerced; the default is live
+        expect(handler(req('POST', '/api/exchange/requests', {
+            kind: 'link-analysis-view', owner: 'default', consumer: 'ops', item: 'fraud_ring', mode: 'snapshot',
+        }), store)?.status).toBe(422);
+        const g = grantOf(handler(req('POST', '/api/exchange/requests',
+            { kind: 'link-analysis-view', owner: 'default', consumer: 'ops', item: 'fraud_ring' }), store));
+        expect(g.mode).toBe('live');
+
+        handler(req('POST', `/api/exchange/grants/${g.id}/approve`), store);
+        const render = handler(req('GET', '/api/exchange/views/default/fraud_ring', null, { consumer: 'ops' }), store);
+        expect(render?.status ?? 200).toBe(200);
+        expect((render?.body as { content: { query: { projections: { datasetId: string }[] } } })
+            .content.query.projections.map((p) => p.datasetId))
+            .toEqual(['shared/default/billing_summary', 'shared/default/ledger']);
+
+        // revoking ONE of the two datasets closes the view (a partial closure is not a free pass)
+        handler(req('POST', '/api/exchange/grants/ops~default~dataset~ledger/revoke'), store);
+        expect(store.get<ExchangeGrant>(SERVER_SPACE, 'exchange-grant', g.id)?.status).toBe('revoked');
+        expect(handler(req('GET', '/api/exchange/views/default/fraud_ring', null, { consumer: 'ops' }), store)?.status).toBe(403);
+    });
+
+    it('422s a saved view whose source roots are not datasets (only entity-projection is shareable)', () => {
+        const store = storeWithSpaces();
+        store.put('default', componentCollection('link-analysis-view'), 'asset_flow', {
+            name: 'asset_flow',
+            content: { sourceId: 'lineage', query: { from: 'some_asset' } },
+        });
+        const r = handler(req('POST', '/api/exchange/offers',
+            { kind: 'link-analysis-view', owner: 'default', item: 'asset_flow' }), store);
+        expect(r?.status).toBe(422);
+        expect((r?.body as { error?: string })?.error).toContain('entity-projection');
     });
 
     it('sets and clears pin and expiry, and enforces expiry at render time', () => {

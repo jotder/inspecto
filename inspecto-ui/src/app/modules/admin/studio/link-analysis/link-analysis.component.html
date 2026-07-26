@@ -158,6 +158,12 @@
                         <mat-icon svgIcon="heroicons_outline:tag"></mat-icon>
                         <span>Tags</span>
                     </button>
+                    @if (shareable(view)) {
+                        <button mat-menu-item (click)="offer(view)" [attr.aria-label]="'Offer view ' + view.name + ' for sharing'">
+                            <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
+                            <span>Offer for sharing</span>
+                        </button>
+                    }
                 </ng-template>
             </mat-menu>
 

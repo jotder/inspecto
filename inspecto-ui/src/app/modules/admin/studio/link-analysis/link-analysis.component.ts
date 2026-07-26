@@ -14,7 +14,16 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
-import { PipelineSummary, PipelinesService, apiErrorMessage } from 'app/inspecto/api';
+import {
+    ExchangeService,
+    LensService,
+    PipelineSummary,
+    PipelinesService,
+    SessionService,
+    SpacesService,
+    apiErrorMessage,
+} from 'app/inspecto/api';
+import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -119,6 +128,16 @@ export class LinkAnalysisComponent implements OnInit {
     private route = inject(ActivatedRoute);
     private pivotService = inject(PivotService);
     private graphSources = inject(GraphSourcesService);
+    private spaces = inject(SpacesService);
+    private lens = inject(LensService);
+    private exchange = inject(ExchangeService);
+    /**
+     * Offering is gated on the multi-space Exchange being present AND `canOfferDatasets` — the server gates
+     * `POST /exchange/offers` on that same capability (D14: cross-space data exposure is admin-tier), and a
+     * shared view exposes its datasets' rows, so it is the same authorization question.
+     */
+    private readonly exchangeEnabled = inject(SessionService).exchangeEnabled;
+    readonly canShare = computed(() => this.exchangeEnabled() && this.lens.canOfferDatasets());
     private datasetsService = inject(DatasetsService);
     private pipelinesService = inject(PipelinesService);
     private viewsService = inject(LinkAnalysisService);
@@ -855,5 +874,33 @@ export class LinkAnalysisComponent implements OnInit {
         this.dialog.open(TagAssignmentDialog, {
             data: { targetKind: 'link-analysis-view', targetId: view.id, label: view.name },
         });
+    }
+
+    /**
+     * Offer a saved view in the Exchange catalog (D9). Only an `entity-projection` view is shareable — its
+     * roots are Datasets, whereas a lineage/provenance view's roots are catalog assets/Pipelines the
+     * Exchange cannot grant — so the action is hidden for the others rather than 422ing after the fact.
+     * The datasets it reads must already be offered; the backend 409s and we surface that as a toast.
+     */
+    offer(view: LinkAnalysisView): void {
+        const owner = this.spaces.currentSpaceId() ?? 'default';
+        this.dialog
+            .open(OfferShareDialog, { data: { kind: 'link-analysis-view', owner, item: view.id } })
+            .afterClosed()
+            .subscribe((r: OfferShareResult | undefined) => {
+                if (!r) return;
+                this.exchange
+                    .offer({ kind: 'link-analysis-view', owner, item: view.id, description: r.description })
+                    .subscribe({
+                        next: () => this.toastr.success(`View "${view.name}" offered for sharing.`),
+                        error: (e) =>
+                            this.toastr.error(apiErrorMessage(e, `Could not offer "${view.name}".`)),
+                    });
+            });
+    }
+
+    /** Whether a given saved view can be offered — see {@link offer} for why the source matters. */
+    shareable(view: LinkAnalysisView): boolean {
+        return this.canShare() && view.sourceId === 'entity-projection';
     }
 }
