@@ -92,6 +92,9 @@ public final class JobService implements AutoCloseable {
     /** This space's in-app notification feed, attached post-construction by the host (the feed is created
      *  after this service); read at run time by the {@code notification_prune} maintenance task. */
     private volatile com.gamma.notify.NotificationStore notificationStore;
+    /** This space's delivery receipts (D8), attached post-construction like the feed above; read at run
+     *  time by the {@code receipt_prune} maintenance task. */
+    private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
     /** Authored-flow store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
     private final PipelineStore flowStore;
     /** Data root under which each store is a sub-directory — a flow job reads/writes {@code <dataDir>/<store>} (T32). */
@@ -837,6 +840,17 @@ public final class JobService implements AutoCloseable {
     /** Attach this space's notification feed post-construction (the feed is created after this service). */
     public void notificationStore(com.gamma.notify.NotificationStore store) {
         this.notificationStore = store;
+    }
+
+    /** The delivery receipts the {@code receipt_prune} maintenance task prunes, or empty when the host
+     *  never attached a store. */
+    public Optional<com.gamma.notify.DeliveryReceiptStore> deliveryReceiptStore() {
+        return Optional.ofNullable(deliveryReceiptStore);
+    }
+
+    /** Attach this space's delivery receipt store post-construction (it is created after this service). */
+    public void deliveryReceiptStore(com.gamma.notify.DeliveryReceiptStore store) {
+        this.deliveryReceiptStore = store;
     }
 
     /** Install the deletion fence (T25) consulted before a delete job declaring a {@code store:} runs. */

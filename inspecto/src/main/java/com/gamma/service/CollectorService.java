@@ -412,6 +412,7 @@ public final class CollectorService implements AutoCloseable {
         // operational breadcrumbs, not a durable record, and are prunable.
         this.deliveryReceipts = new com.gamma.notify.InMemoryDeliveryReceiptStore();
         this.notificationService.deliveryReceipts(deliveryReceipts);
+        if (this.jobs != null) this.jobs.deliveryReceiptStore(deliveryReceipts);   // receipt_prune maintenance task
         this.notificationSubscriber = notificationService::onEvent;
         this.eventLog.addSubscriber(notificationSubscriber);
         String viewsFile = System.getProperty("events.views.file");

@@ -82,6 +82,35 @@ class MaintenanceLibraryTest {
         assertTrue(r.message().contains("no notification feed attached"), r.message());
     }
 
+    // ── receipt_prune (BACKLOG D8) ───────────────────────────────────────────────
+
+    @Test
+    void receiptPruneForgetsAgedDeliveryReceipts(@TempDir Path audit) throws Exception {
+        var store = new com.gamma.notify.InMemoryDeliveryReceiptStore();
+        long now = System.currentTimeMillis();
+        long old = now - Duration.ofDays(100).toMillis();
+        store.add(new com.gamma.notify.DeliveryReceipt("dold", "n-1", null, "a@x", old, null, null, false));
+        store.add(new com.gamma.notify.DeliveryReceipt("dnew", "n-2", null, "b@x", now, null, null, false));
+        try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
+             JobService js = new JobService(List.of(), new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+            js.deliveryReceiptStore(store);
+            JobConfig cfg = job(Map.of("task", "receipt_prune", "retention_days", "30"));
+            JobResult dry = new MaintenanceJob(cfg, null, audit.toString(), null, js).run(dryCtx(audit));
+            assertTrue(dry.message().contains("would remove 1 receipt(s)"), dry.message());
+            assertTrue(store.get("dold").isPresent(), "dry run must not remove");
+            JobResult real = new MaintenanceJob(cfg, null, audit.toString(), null, js).run();
+            assertTrue(real.message().contains("removed 1 receipt(s)"), real.message());
+            assertTrue(store.get("dold").isEmpty() && store.get("dnew").isPresent(), "kept the recent one only");
+        }
+    }
+
+    @Test
+    void receiptPruneWithNoStoreAttachedIsANoOp(@TempDir Path audit) throws Exception {
+        JobResult r = new MaintenanceJob(job(Map.of("task", "receipt_prune", "retention_days", "30")))
+                .run(dryCtx(audit));
+        assertTrue(r.message().contains("no delivery receipt store attached"), r.message());
+    }
+
     // ── dry run (System Maintenance MNT-1) ───────────────────────────────────────
 
     @Test

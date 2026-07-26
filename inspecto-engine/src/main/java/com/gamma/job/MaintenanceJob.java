@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.notify.DeliveryReceiptStore;
 import com.gamma.notify.NotificationStore;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signals;
@@ -52,6 +53,10 @@ import java.util.stream.Stream;
  *       (required) from this space's feed, whatever their read/archived state. <b>Deliberate
  *       forgetting</b> like the other prunes. (The default feed is in-memory and self-caps, so this
  *       matters most once a persistent notification backend lands.)</li>
+ *   <li>{@code receipt_prune} — delete delivery receipts (D8) sent more than {@code retention_days}
+ *       (required) ago, whatever status they carry. Receipts accrue per <b>external delivery</b>, so they
+ *       grow faster than notifications; this is what bounds them (the in-memory store's oldest-first cap
+ *       is a backstop, not a retention policy).</li>
  *   <li>{@code storage_report} — read-only per-axis storage usage + largest consumers over {@code dir},
  *       recorded as Run Artifacts and — on a real run with a data/write root configured — appended as one
  *       row per axis to the queryable {@code maintenance_storage} catalog Dataset (the sample series
@@ -147,6 +152,7 @@ final class MaintenanceJob implements Job {
             case "ledger_prune"       -> ledgerPrune(dryRun);
             case "runlog_prune"       -> runlogPrune(dryRun);
             case "notification_prune" -> notificationPrune(dryRun);
+            case "receipt_prune"      -> receiptPrune(dryRun);
             // Read-only observers: a dry run and a real run observe the same thing. (storage_report
             // additionally persists its sample to the maintenance_storage catalog — real runs only.)
             case "storage_report"     -> storageReport(ctx);
@@ -215,6 +221,31 @@ final class MaintenanceJob implements Job {
         }
         int removed = store.get().prune(cutoff);
         return JobResult.ok("notification_prune: removed " + removed + " notification(s) older than "
+                + days + "d", (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /**
+     * {@code receipt_prune} (BACKLOG D8): forget delivery receipts sent before {@code retention_days}
+     * (required — deliberate forgetting, like {@code notification_prune}), whatever status they carry.
+     * Receipts accumulate per <i>external delivery</i>, i.e. faster than notifications, so this is the
+     * sweep that bounds them; the in-memory store's oldest-first cap is a backstop, not retention.
+     * Reached through the hosting {@link JobService}; no store attached prunes nothing (fail-open).
+     */
+    private JobResult receiptPrune(boolean dryRun) {
+        long days = Long.parseLong(cfg.require("retention_days"));   // required: forgetting is deliberate
+        if (days < 1) throw new IllegalArgumentException("receipt_prune retention_days must be >= 1");
+        long t0 = System.nanoTime();
+        var store = host == null ? java.util.Optional.<DeliveryReceiptStore>empty() : host.deliveryReceiptStore();
+        if (store.isEmpty())
+            return JobResult.ok("receipt_prune: no delivery receipt store attached — nothing to prune", 0L);
+        long cutoff = System.currentTimeMillis() - Duration.ofDays(days).toMillis();
+        if (dryRun) {
+            int would = store.get().countPrunable(cutoff);
+            return JobResult.ok("receipt_prune[dry-run]: would remove " + would
+                    + " receipt(s) older than " + days + "d", (System.nanoTime() - t0) / 1_000_000L);
+        }
+        int removed = store.get().prune(cutoff);
+        return JobResult.ok("receipt_prune: removed " + removed + " receipt(s) older than "
                 + days + "d", (System.nanoTime() - t0) / 1_000_000L);
     }
 
