@@ -1,5 +1,9 @@
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
+import { MockStore } from '../mock-store';
+import { SIGNALS_COLL } from '../signals';
+import type { Signal } from '../../signal/signal';
+import { PIPELINES_COLL } from './pipelines.handler';
 
 /**
  * AGT-6a A1 — offline mock for `POST /agent/tools/{name}`, the deterministic single-tool dispatch the
@@ -79,10 +83,33 @@ function text(args: Record<string, unknown>, key: string): string {
     return typeof v === 'string' ? v.trim() : '';
 }
 
+function minutes(args: Record<string, unknown>, key: string, fallback: number): number {
+    const v = args[key];
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback;
+}
+
+function signalsOf(store: MockStore, space: string): Signal[] {
+    return store.list<Signal>(space, SIGNALS_COLL);
+}
+
+/**
+ * A pipeline's state as `status_get` reports it, derived from the ledger the mock actually has:
+ * `committedBatches` counts real `BATCH_COMMITTED` signals. `paused` is always false — the mock
+ * pipeline record carries no paused flag, and claiming one would be the invention this whole tool
+ * exists to avoid.
+ */
+function pipelineStatus(store: MockStore, space: string, name: string): { name: string; paused: boolean; committedBatches: number } {
+    const committedBatches = signalsOf(store, space).filter(
+        (s) => s.type === 'BATCH_COMMITTED' && s.source?.id === name,
+    ).length;
+    return { name, paused: false, committedBatches };
+}
+
 export function agentHandler(flags: MockFlags): MockHandler {
-    return (req: MockRequest) => {
+    return (req: MockRequest, store: MockStore) => {
         if (!flags.mockOps) return undefined;
         if (req.method !== 'POST') return undefined;
+        const space = req.space;
         const m = match(req.url, TOOLS);
         if (!m) return undefined;
 
@@ -232,6 +259,60 @@ export function agentHandler(flags: MockFlags): MockHandler {
                         },
                     ],
                 });
+            }
+            // AGT-6a A4-status — "why is this red". Unlike every other tool mocked here, these three
+            // answer from the MOCK STORE's own ledger rather than a canned shape: their whole value is
+            // that they report deployment state, so inventing activity would make the affordance lie.
+            // Offline the mock store IS the deployment, and an empty ledger honestly answers "nothing
+            // happened".
+            case 'status_get': {
+                const pipelineId = text(args, 'pipelineId');
+                const names = store.list<{ name: string }>(space, PIPELINES_COLL).map((p) => p.name);
+                if (!pipelineId) return json({ pipelines: names.map((n) => pipelineStatus(store, space, n)) });
+                const found = names.find((n) => n.toLowerCase() === pipelineId.toLowerCase());
+                if (!found) return error(422, `unknown pipeline: '${pipelineId}'`);
+                return json(pipelineStatus(store, space, found));
+            }
+            case 'signal_timeline': {
+                const correlationId = text(args, 'correlationId');
+                if (!correlationId) return error(422, 'correlationId is required');
+                const since = Date.now() - minutes(args, 'sinceMinutes', 1440) * 60_000;
+                const matched = signalsOf(store, space)
+                    .filter((s) => s.correlationId === correlationId && s.at >= since)
+                    .sort((a, b) => a.at - b.at);
+                if (matched.length === 0) return error(422, `no signals for correlationId '${correlationId}'`);
+                return json({
+                    correlationId,
+                    count: matched.length,
+                    timeline: matched.map((s) => ({
+                        signalId: s.signalId,
+                        at: new Date(s.at).toISOString(),
+                        type: s.type,
+                        severity: s.severity,
+                        message: typeof s.payload?.['message'] === 'string' ? s.payload['message'] : s.type,
+                        causedBy: s.payload?.['causationId'] ?? null,
+                        payload: s.payload ?? {},
+                    })),
+                });
+            }
+            case 'timeline_build': {
+                if (args['sinceMinutes'] === undefined) return error(422, 'sinceMinutes is required');
+                const since = Date.now() - minutes(args, 'sinceMinutes', 1440) * 60_000;
+                const focus = text(args, 'focus').toLowerCase();
+                const entries = signalsOf(store, space)
+                    .filter((s) => s.at >= since)
+                    .map((s) => ({
+                        at: new Date(s.at).toISOString(),
+                        kind: 'signal',
+                        summary: typeof s.payload?.['message'] === 'string' ? s.payload['message'] : s.type,
+                        ref: s.source?.id ?? s.signalId,
+                        severity: s.severity,
+                    }))
+                    // `focus` is the tool's own substring filter — the pane passes its entity id, so a
+                    // row's button shows that row's activity rather than the whole deployment's.
+                    .filter((e) => !focus || `${e.summary} ${e.ref}`.toLowerCase().includes(focus))
+                    .sort((a, b) => a.at.localeCompare(b.at));
+                return json({ count: entries.length, truncated: false, timeline: entries });
             }
             default:
                 return error(404, `unknown tool: '${tool}'`);

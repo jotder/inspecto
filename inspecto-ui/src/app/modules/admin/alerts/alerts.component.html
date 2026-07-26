@@ -30,6 +30,8 @@
             exportName="alerts"
             [rows]="alerts"
             [columns]="columnDefs"
+            [rowActions]="firedActions"
+            [pinActions]="true"
             [loading]="loading"
             noRowsTitle="No alerts fired"
             noRowsHint="Breaches of the armed alert rules will appear here."

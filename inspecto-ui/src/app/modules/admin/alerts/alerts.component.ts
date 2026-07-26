@@ -13,6 +13,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import { AlertRuleFormData, AlertRuleFormDialog, AlertRuleFormResult } from './alert-rule-form.dialog';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 
 /**
  * Alerts — the core alert engine's surface (v4.1, B5): recent fired alerts (GET /alerts) over the
@@ -87,6 +88,28 @@ export class AlertsComponent implements OnInit {
             valueGetter: (p) => p.data?.onPipeline || 'every pipeline',
         },
     ];
+
+    /**
+     * "What happened" on a fired alert (AGT-6a A4-status) — the alert IS the red thing, so this is the
+     * reference adoption. It reads the pipeline's live state plus everything the ledger recorded around
+     * it, focused on that pipeline.
+     *
+     * Ungated on purpose: it has no write path, and a Business-lens operator asking why an alert fired
+     * is exactly who needs it. Do not "make it consistent" with `ruleActions` below, which gates because
+     * it authors config.
+     */
+    get firedActions(): InspectoRowAction<FiredAlert>[] {
+        return [
+            {
+                icon: 'heroicons_outline:information-circle',
+                hint: 'What happened',
+                onClick: (a) =>
+                    this.dialog.open(AiStatusDialog, {
+                        data: { label: a.rule, pipelineId: a.pipeline } satisfies AiStatusData,
+                    }),
+            },
+        ];
+    }
 
     /** Edit/delete author monitoring config — Ops-gated (audit C3). */
     get ruleActions(): InspectoRowAction<AlertRule>[] {

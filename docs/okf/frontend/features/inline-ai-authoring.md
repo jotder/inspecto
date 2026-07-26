@@ -93,6 +93,49 @@ surface's degrade paths are what most need exercising offline. Result shapes mir
 those change, change these too. Registered in `mock-api.interceptor.ts`; the rest of `/agent/*` stays
 real.
 
+## Why is this red (`<inspecto-ai-status>`, A4-status — shipped 2026-07-26)
+
+`inspecto/ai-assist/ai-status.component.ts` (the trigger) + `ai-status.dialog.ts` (the reads + render).
+The **third** member of the family, and deliberately not a mode of either sibling:
+
+| | `<inspecto-ai-assist>` | `<inspecto-ai-explain>` | `<inspecto-ai-status>` |
+|---|---|---|---|
+| Question | help me author this | what does this word mean | what happened to this thing |
+| Answers from | a draft the pane applies | `docs/GLOSSARY.md` | **deployment state** (the ledger) |
+| Needs | pane context | nothing but declared terms | **a real entity id** |
+| Placement | in the pane's form | pane header, once | a **row** or detail header |
+| Gated | `canAuthorWorkbench()` | no | **no** |
+
+```html
+<inspecto-ai-status [label]="row.name" [pipelineId]="row.name" />
+<inspecto-ai-status [label]="incident.id" [correlationId]="incident.correlationId" />
+```
+
+**Three tools, all non-mutating, so again no new backend capability**: `status_get` (live paused state +
+committed batches), `signal_timeline` (the exact causal chain for one `correlationId`), `timeline_build`
+(everything in a window, narrowed by the tool's own `focus` substring). The dialog picks **the chain when
+the pane has a `correlationId`, the window otherwise** — the chain is the precise answer, not everything
+that happened nearby — and the status/timeline halves **degrade independently**, so an unknown pipeline
+(422) still shows activity.
+
+⚠ **This is NOT the breadth win the vocabulary half was, and must not be swept onto every pane.** It needs
+a real id, so it belongs only where the pane has one. Reference adoption: the **Alerts** pane's fired-alert
+grid (`firedActions`) — a fired Alert *is* the red thing, and it carries the `pipeline` to focus on.
+`FiredAlert` has **no `correlationId`**, hence the focused-window path there.
+
+⚠ **Offline it reflects the mock store's own ledger, and nothing more.** `agent.handler.ts` answers these
+three from `SIGNALS_COLL` + `PIPELINES_COLL` rather than a canned shape — unlike every other tool mocked
+there — because the affordance's entire value is reporting real state. An empty ledger honestly answers
+"nothing was recorded". `paused` is always `false` offline: the mock pipeline record has no such flag, and
+inventing one is exactly the lie this avoids. **The handler now takes `(req, store)`** — it previously
+ignored the store.
+
+⚠ **Not gated on `canAuthorWorkbench()`**, same reasoning as its sibling: no write path, and asking why an
+alert fired is not an authoring act. Don't "make it consistent" with the row-actions next to it.
+
+**Open:** the three other operational panes named in the plan row (Pipelines status, Incidents, Signals)
+are unadopted — per-pane, deliberately, since each addresses its entity differently. → `BACKLOG.md`.
+
 ## Explain this screen (`<inspecto-ai-explain>`, A4 — shipped 2026-07-26)
 
 The read-only half. One icon button a pane drops into its header; everything it renders lives in a
@@ -140,10 +183,6 @@ second, drifting definition of the binding vocabulary in the codebase.
   dataset + measures (`controls()`, whose `ChannelValue.agg` enum matches the tool's exactly) but saves
   exactly **one** widget; `studio/dashboards/dashboard-editor` can build a dashboard but has no measures.
   That host is a new flow, not an adoption. → `BACKLOG.md`.
-- **"Why is this red"** — A4's *other* half. The one-line plan row bundled two different affordances:
-  the vocabulary explain that shipped, and a status explain over `status_get` / `signal_timeline` /
-  `timeline_build`. The second needs real entity ids, so it only means anything on the operational panes
-  (Pipelines status, Incidents, Signals, Alerts) and is **not** a breadth win. Operator call 2026-07-26:
-  vocabulary first. → `BACKLOG.md`.
+- ~~**"Why is this red"**~~ — **SHIPPED 2026-07-26**, see *Why is this red* below.
 - **A5 (new)** — true natural-language authoring. Needs the NL→structure model hop this plan never
   scoped; see the shape warning in [[embedded-intelligence]].

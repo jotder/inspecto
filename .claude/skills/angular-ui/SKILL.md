@@ -134,6 +134,19 @@ src/app/
   user is who needs it most, so don't "make it consistent" with the authoring surface. Adopted on 11 panes.
   ⚠ A new pane's terms must also be added to the **subset** `GLOSSARY` map in `mock/handlers/agent.handler.ts`
   (verbatim from the real file) or they can't resolve offline.
+- **"Why is this red" on a ROW → `<inspecto-ai-status>`** (`inspecto/ai-assist/`, AGT-6a A4-status). The third
+  family member — `<inspecto-ai-assist>` authors, `<inspecto-ai-explain>` defines vocabulary, this one reports
+  **deployment state**: `<inspecto-ai-status [label]="row.name" [pipelineId]="row.name" />`, or pass
+  `[correlationId]` instead to get the exact causal chain rather than a time window. Three non-mutating tools
+  (`status_get` · `signal_timeline` · `timeline_build`), so again **no new backend capability**, and again
+  **NOT gated on `canAuthorWorkbench()`**. ⚠ **Not a breadth win — do NOT sweep it onto every pane**: it needs
+  a real entity id, so it belongs only on operational panes that have one (reference adoption: the Alerts
+  pane's fired-alert grid via `[rowActions]`). ⚠ Offline it answers from the **mock store's own ledger**
+  (`agent.handler.ts` now takes `(req, store)`) — an empty ledger honestly answers "nothing was recorded"
+  rather than inventing activity. Details: `docs/okf/frontend/features/inline-ai-authoring.md`.
+  ⚠ **A `[rowActions]` column on a wide grid is horizontally virtualized out of view** — ag-Grid reports it
+  as displayed while no header/button is in the DOM. Add `[pinActions]="true"` (this cost a preview cycle on
+  the Alerts grid, whose 7 columns already fill the viewport).
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL
