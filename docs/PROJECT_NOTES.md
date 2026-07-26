@@ -182,6 +182,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   form (`spaces/<id>/config/…`, `spaces/<id>/data/…`) — and the `SpaceMigrator` cannot auto-fix absolute or
   author-relative paths for the same reason. Shipped examples now: `spaces/default` (subscriber + events +
   connections), `spaces/ucc` (voucher; lowercase id `ucc`, display "UCC").
+- **`RouteModule.register(api)` runs BEFORE any Space is hosted — never call `api.service()` there.**
+  Registration only wires handlers; the Space (and therefore the per-Space service) is resolved *per
+  request*. Touching `api.service()` at registration time throws `IllegalState No spaces are hosted` and the
+  whole `ControlApi` fails to construct, so it surfaces as **every** `ControlApi*Test` erroring in setup, not
+  as one focused failure (26 of them, 2026-07-27). A per-Space migration therefore has to run **lazily on
+  first use**, guarded by a `WeakHashMap` keyed on the service (`WidgetTags.backfillOnce`) — the object-CSV
+  equivalent gets away with living in `CollectorService` only because that *is* the per-Space object.
 
 ---
 
