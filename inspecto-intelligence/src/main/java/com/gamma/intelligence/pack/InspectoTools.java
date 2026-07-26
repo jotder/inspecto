@@ -97,7 +97,7 @@ final class InspectoTools {
                 timelineBuild(service, components), diffBatches(service),
                 configVersionsDiff(components), anomalyScan(browseStores),
                 componentDraft(), queryAuthor(service, components), kpiReportBuilder(components),
-                pipelineAuthor(), suggestExpectations(browseStores),
+                pipelineAuthor(), projectionAuthor(), suggestExpectations(browseStores),
                 componentApply(controlPlane), componentRollback(controlPlane),
                 jobRun(controlPlane), pipelineRerun(controlPlane),
                 alertAck(controlPlane), scheduleApply(controlPlane),
@@ -830,6 +830,173 @@ final class InspectoTools {
             result.put("draft", draft);
             return ok(result);
         });
+    }
+
+    /**
+     * Endpoint column-name pairs, most specific first. Each entry is {@code {sourceToken, targetToken}};
+     * a column matches a token when its name equals it or carries it as a leading/trailing/underscore-
+     * delimited word ({@code caller}, {@code caller_id}, {@code a_party_from}). Ordering matters: the
+     * first pair that matches BOTH ends wins, so a table carrying both {@code caller/callee} and
+     * {@code from/to} maps the domain-specific pair.
+     */
+    private static final List<String[]> ENDPOINT_PAIRS = List.of(
+            new String[]{"caller", "callee"},
+            new String[]{"calling", "called"},
+            new String[]{"sender", "receiver"},
+            new String[]{"payer", "payee"},
+            new String[]{"origin", "destination"},
+            new String[]{"source", "target"},
+            new String[]{"src", "dst"},
+            new String[]{"from", "to"},
+            new String[]{"parent", "child"},
+            new String[]{"subscriber", "counterparty"});
+
+    /** Column-name tokens that mark a column as labelling the edge rather than being an endpoint. */
+    private static final List<String> LINK_KIND_TOKENS =
+            List.of("link_kind", "relationship", "relation", "edge_type", "call_type", "kind", "type");
+
+    /** Cap on derived {@code attrCols} — a wide table would otherwise carry a hundred attributes onto
+     *  every node, which is a rendering problem, not a mapping. The operator adds more by hand. */
+    private static final int MAX_ATTR_COLS = 8;
+
+    /**
+     * Link Analysis V2 (d), the authoring half: derive a DRAFT entity-projection mapping over one
+     * Dataset's columns — which column is the source entity, which is the target, which labels the edge,
+     * which travel as node attributes. Non-mutating and, deliberately, <em>deterministic</em>: the act
+     * being automated is column <em>selection</em>, so name-shape scoring answers it without a model, and
+     * {@code hint} narrows the candidate set rather than becoming a prompt. Natural language is AGT-6a
+     * A5's job, and this tool is its {@code derive} target — not a second path.
+     *
+     * <p><strong>The pane supplies {@code columns}.</strong> No agent tool and no tool-layer route returns
+     * a Dataset's columns (the belt only sees the operational-store {@code table} vocabulary), and the
+     * authoring pane already holds the real list — so passing it in is both cheaper and more correct than a
+     * second server-side resolver, and it dodges the {@code -Dassist.write.root} dependency that any
+     * {@link ComponentStore}-backed column lookup would inherit.
+     *
+     * <p>{@code entityType} is left <em>unset</em>: set on a single mapping it changes node ids from
+     * {@code entity:<v>} to {@code entity:<type>:<v>}, breaking byte-identity with saved views and exports.
+     * The pane requires it only once a second mapping exists, and this tool emits exactly one.
+     */
+    private static Tool projectionAuthor() {
+        ToolSpec spec = new ToolSpec("projection_author",
+                "Derive a DRAFT link-analysis entity-projection mapping over a dataset's columns: picks the "
+                        + "source/target endpoint columns by name shape, an optional link-kind column, and "
+                        + "carries the remainder as node attributes. Deterministic — no SQL, no prose. Persists "
+                        + "nothing; the operator applies it into the query panel. Args: datasetId, columns "
+                        + "([{name,type?}] or [name]), hint (optional substring narrowing the candidates).",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"datasetId\":{\"type\":\"string\"},"
+                        + "\"columns\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},"
+                        + "\"hint\":{\"type\":\"string\"}},"
+                        + "\"required\":[\"datasetId\",\"columns\"]}",
+                false, Role.USER, Capability.AUTHOR_PIPELINE);
+        return new FunctionTool(spec, call -> {
+            String datasetId = arg(call, "datasetId");
+            if (datasetId == null || datasetId.isBlank()) return error("datasetId is required");
+            List<String> columns = columnNames(call);
+            if (columns.size() < 2) {
+                return error("columns is required and must name at least two columns "
+                        + "(a projection needs a source and a target)");
+            }
+
+            List<Finding> findings = new ArrayList<>();
+            String hint = arg(call, "hint");
+            List<String> candidates = narrow(columns, hint);
+            if (candidates.size() < 2) {
+                findings.add(Finding.warning("hint",
+                        "hint '" + hint + "' matched fewer than two columns — it was ignored"));
+                candidates = columns;
+            }
+
+            String[] endpoints = pickEndpoints(candidates);
+            Map<String, Object> mapping = new LinkedHashMap<>();
+            mapping.put("datasetId", datasetId);
+            if (endpoints == null) {
+                // No guess: an arbitrary pair of columns produces a graph that looks authored and is wrong.
+                findings.add(Finding.error("projections.0.sourceCol",
+                        "no source/target column pair could be derived from " + candidates
+                                + " — pick the two endpoint columns by hand"));
+                mapping.put("sourceCol", "");
+                mapping.put("targetCol", "");
+            } else {
+                mapping.put("sourceCol", endpoints[0]);
+                mapping.put("targetCol", endpoints[1]);
+                String linkKindCol = pickLinkKind(candidates, endpoints);
+                if (linkKindCol != null) mapping.put("linkKindCol", linkKindCol);
+                List<String> attrCols = columns.stream()
+                        .filter(c -> !c.equals(endpoints[0]) && !c.equals(endpoints[1])
+                                && !c.equals(linkKindCol))
+                        .limit(MAX_ATTR_COLS)
+                        .toList();
+                if (!attrCols.isEmpty()) mapping.put("attrCols", attrCols);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("kind", "link-analysis-view");
+            result.put("id", datasetId);
+            result.put("clean", findings.isEmpty());
+            result.put("findings", findings.stream().map(InspectoTools::findingMap).toList());
+            result.put("draft", Map.of("query", Map.of("projections", List.of(mapping))));
+            return ok(result);
+        });
+    }
+
+    /** The {@code columns} argument as plain names — accepts {@code [{name,type?}]} (the documented
+     *  shape) and a bare {@code [name]} list (what a pane's column signal already holds). */
+    private static List<String> columnNames(ToolCall call) {
+        Map<String, Object> args = call.arguments() == null ? Map.of() : call.arguments();
+        if (!(args.get("columns") instanceof List<?> list)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object o : list) {
+            String name = o instanceof Map<?, ?> m ? String.valueOf(m.get("name"))
+                    : o instanceof String s ? s : null;
+            if (name != null && !name.isBlank() && !"null".equals(name) && !out.contains(name)) {
+                out.add(name.trim());
+            }
+        }
+        return out;
+    }
+
+    /** Columns whose name contains {@code hint} (case-insensitive); every column when the hint is blank. */
+    private static List<String> narrow(List<String> columns, String hint) {
+        if (hint == null || hint.isBlank()) return columns;
+        String needle = hint.trim().toLowerCase(Locale.ROOT);
+        return columns.stream().filter(c -> c.toLowerCase(Locale.ROOT).contains(needle)).toList();
+    }
+
+    /** True when {@code column} carries {@code token} as its whole name or as an underscore-delimited word. */
+    private static boolean carries(String column, String token) {
+        String c = column.toLowerCase(Locale.ROOT);
+        if (c.equals(token)) return true;
+        for (String word : c.split("[^a-z0-9]+")) {
+            if (word.equals(token)) return true;
+        }
+        return c.startsWith(token) || c.endsWith(token);
+    }
+
+    /** The derived {@code {sourceCol, targetCol}}, or {@code null} when no defensible pair exists. */
+    private static String[] pickEndpoints(List<String> columns) {
+        for (String[] pair : ENDPOINT_PAIRS) {
+            String source = columns.stream().filter(c -> carries(c, pair[0])).findFirst().orElse(null);
+            String target = columns.stream()
+                    .filter(c -> carries(c, pair[1]) && !c.equals(source)).findFirst().orElse(null);
+            if (source != null && target != null) return new String[]{source, target};
+        }
+        // Fallback: the first two id-shaped columns. Two ids in one row are an edge far more often than
+        // they are two unrelated keys, and the operator still reviews the draft before applying it.
+        List<String> ids = columns.stream().filter(c -> carries(c, "id")).limit(2).toList();
+        return ids.size() == 2 ? new String[]{ids.get(0), ids.get(1)} : null;
+    }
+
+    /** A column labelling the edge, excluding the two endpoints; {@code null} when none looks like one. */
+    private static String pickLinkKind(List<String> columns, String[] endpoints) {
+        for (String token : LINK_KIND_TOKENS) {
+            for (String c : columns) {
+                if (c.equals(endpoints[0]) || c.equals(endpoints[1])) continue;
+                if (carries(c, token)) return c;
+            }
+        }
+        return null;
     }
 
     /** Accepted measure aggregations — input matched case-insensitively, stored in the canonical casing

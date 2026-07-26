@@ -725,4 +725,104 @@ class InspectoToolsTest {
         assertFalse(ghost.ok());
         assertTrue(ghost.error().contains("unknown dataset"), ghost.error());
     }
+
+    // ── Link Analysis V2 (d): projection_author ─────────────────────────────────
+
+    /** The single derived mapping inside a {@code projection_author} result. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> mappingOf(Map<String, Object> result) {
+        Map<String, Object> draft = (Map<String, Object>) result.get("draft");
+        Map<String, Object> query = (Map<String, Object>) draft.get("query");
+        List<Map<String, Object>> projections = (List<Map<String, Object>>) query.get("projections");
+        assertEquals(1, projections.size(), "one mapping — extras are the operator's to add");
+        return projections.get(0);
+    }
+
+    @Test
+    void projectionAuthorDerivesTheEndpointPairFromColumnNameShape() {
+        Tool pa = tool(seeded(), "projection_author");
+        // A telecom-shaped column list: caller/callee wins over the generic *_id fallback, the type
+        // column labels the edge, and everything else travels as node attributes.
+        Map<String, Object> out = invoke(pa, Map.of(
+                "datasetId", "cdr",
+                "columns", List.of(
+                        Map.of("name", "caller_id", "type", "VARCHAR"),
+                        Map.of("name", "callee_id", "type", "VARCHAR"),
+                        Map.of("name", "call_type", "type", "VARCHAR"),
+                        Map.of("name", "duration_sec", "type", "BIGINT"))));
+        assertEquals("link-analysis-view", out.get("kind"));
+        assertEquals(true, out.get("clean"));
+        assertEquals(List.of(), out.get("findings"));
+
+        Map<String, Object> mapping = mappingOf(out);
+        assertEquals("cdr", mapping.get("datasetId"));
+        assertEquals("caller_id", mapping.get("sourceCol"));
+        assertEquals("callee_id", mapping.get("targetCol"));
+        assertEquals("call_type", mapping.get("linkKindCol"));
+        assertEquals(List.of("duration_sec"), mapping.get("attrCols"));
+        // entityType stays UNSET on a single mapping — setting it changes node ids from entity:<v> to
+        // entity:<type>:<v>, breaking byte-identity with existing saved views and exports.
+        assertFalse(mapping.containsKey("entityType"));
+    }
+
+    @Test
+    void projectionAuthorFallsBackToIdShapedColumnsThenRefusesToGuess() {
+        Tool pa = tool(seeded(), "projection_author");
+        Map<String, Object> ids = invoke(pa, Map.of(
+                "datasetId", "txn",
+                "columns", List.of("account_id", "merchant_id", "amount")));
+        Map<String, Object> idMapping = mappingOf(ids);
+        assertEquals("account_id", idMapping.get("sourceCol"), "a bare [name] list is accepted too");
+        assertEquals("merchant_id", idMapping.get("targetCol"));
+
+        // Nothing endpoint-shaped: the tool reports it as an anchored finding rather than mapping two
+        // arbitrary columns, which would produce a graph that looks authored and is wrong.
+        Map<String, Object> unmappable = invoke(pa, Map.of(
+                "datasetId", "readings",
+                "columns", List.of("amount", "recorded_at", "note")));
+        assertEquals(false, unmappable.get("clean"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) unmappable.get("findings");
+        assertEquals(1, findings.size());
+        assertEquals("ERROR", findings.get(0).get("severity"));
+        assertEquals("projections.0.sourceCol", findings.get(0).get("fieldPath"));
+        assertEquals("", mappingOf(unmappable).get("sourceCol"));
+    }
+
+    @Test
+    void projectionAuthorNarrowsOnHintAndIsNonMutating() {
+        Tool pa = tool(seeded(), "projection_author");
+        assertFalse(pa.spec().mutating(), "draft-only — the direct-dispatch route refuses mutating tools");
+
+        // Two candidate pairs; the hint picks the party columns over from/to.
+        List<String> columns = List.of("from_node", "to_node", "party_from", "party_to", "weight");
+        assertEquals("from_node", mappingOf(invoke(pa, Map.of(
+                "datasetId", "g", "columns", columns))).get("sourceCol"));
+        assertEquals("party_from", mappingOf(invoke(pa, Map.of(
+                "datasetId", "g", "columns", columns, "hint", "party"))).get("sourceCol"));
+
+        // A hint matching too little is ignored with a WARNING, never fatal.
+        Map<String, Object> ignored = invoke(pa, Map.of(
+                "datasetId", "g", "columns", columns, "hint", "zzz"));
+        assertEquals(false, ignored.get("clean"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) ignored.get("findings");
+        assertEquals("WARNING", findings.get(0).get("severity"));
+        assertEquals("hint", findings.get(0).get("fieldPath"));
+        assertEquals("from_node", mappingOf(ignored).get("sourceCol"), "still derived from all columns");
+    }
+
+    @Test
+    void projectionAuthorRequiresADatasetAndTwoColumns() {
+        Tool pa = tool(seeded(), "projection_author");
+        ToolResult noDataset = pa.invoke(new ToolCall("projection_author",
+                Map.of("columns", List.of("a_id", "b_id")), new RunId("t")));
+        assertFalse(noDataset.ok());
+        assertTrue(noDataset.error().contains("datasetId is required"), noDataset.error());
+
+        ToolResult oneColumn = pa.invoke(new ToolCall("projection_author",
+                Map.of("datasetId", "d", "columns", List.of("only_id")), new RunId("t")));
+        assertFalse(oneColumn.ok());
+        assertTrue(oneColumn.error().contains("at least two columns"), oneColumn.error());
+    }
 }
