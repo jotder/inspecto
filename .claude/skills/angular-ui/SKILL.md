@@ -107,7 +107,9 @@ src/app/
 - **Labelling something with cross-entity tags → `TagAssignmentDialog`** (`inspecto/tags/`, D7). Kind-
   agnostic: `dialog.open(TagAssignmentDialog, {data: {targetKind, targetId, label}})`, where `targetKind`
   is `object` or a `ComponentStore.WRITABLE_TYPES` value. Adopting it on a new pane is a menu item, not a
-  new dialog. ⚠ **Not** the mail pane's `TagDialog` — that one is bulk/tri-state and writes the
+  new dialog. ⚠ If the pane **renders the tags itself** (the widget card's chip row), it must also
+  **reload on `afterClosed()`** — the chips are a server-derived projection of the edges, so without a
+  refetch they stay stale. ⚠ **Not** the mail pane's `TagDialog` — that one is bulk/tri-state and writes the
   `attributes.tags` CSV projection; this one is single-target and writes assignment edges. Keep them
   separate: one dialog spanning both persistence paths re-creates the split-brain D7 phase 2 closed.
 - **Inline AI authoring on a pane → `<inspecto-ai-assist>`** (`inspecto/ai-assist/`, AGT-6a A1). ONE shared

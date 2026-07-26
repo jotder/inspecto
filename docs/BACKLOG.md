@@ -1,6 +1,8 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-27 (**Link-analysis V2 (d) authoring half SHIPPED end-to-end** ⇒ V2 complete and the §4
+**Updated:** 2026-07-27 (**D7 widget tags MIGRATED — call (c) built end-to-end**, so all five
+mock-whitelisted kinds are adopters and no kind carries a private tag system; the save dialog's comma field
+is gone. Same day: **Link-analysis V2 (d) authoring half SHIPPED end-to-end** ⇒ V2 complete and the §4
 Link-analysis row is retired: a new deterministic non-mutating `projection_author` tool + the query panel as
 the 5th `<inspecto-ai-assist>` adopter. It also fixed a pre-existing load-path bug — `patchFormFromView`
 ignored `projections[]`, so a multi-mapping *saved* view loaded first-only. Plan archived.) · Previously
@@ -357,39 +359,32 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   lists the vocabulary, shows *everything carrying a tag across kinds*, and renames / deletes / untags
   through `TagsService`; the offline mock answers all six routes. **D7 is complete end-to-end and the plan
   is archived.** → `okf/backend/control-plane/tags.md`
-- **D7 — assignment UI for non-object targets: SEAM SHIPPED 2026-07-26, adopters outstanding.** The
+- ~~**D7 — assignment UI for non-object targets**~~ **COMPLETE 2026-07-27 — every kind adopted.** The
   kind-agnostic `TagAssignmentDialog` (`inspecto/tags/tag-assignment.dialog.ts`) is the shared surface —
   it takes `{targetKind, targetId, label}` as data and persists through `TagsService`'s assignment edges,
   so a further adopter is **a menu item, not another dialog**. First adopter wired: the **Link Analysis
   saved-views menu** (`link-analysis-view`), following the D10 Comments idiom. Verified end-to-end offline:
   tagging a saved view makes it appear under that tag in the `/tags` pane beside object targets.
-  **Adopted on four of the five mock-whitelisted kinds** — `link-analysis-view`, `geo-map-view` (its flat
+  **ALL FIVE mock-whitelisted kinds are now adopters (2026-07-27)** — `link-analysis-view`, `geo-map-view` (its flat
   saved-views menu was refactored to the same per-view `#viewActions` submenu), `dataset` and `dashboard`
   (a Tags icon button in the card action cluster; datasets keeps the sibling `writesDisabled()` gate,
-  since assignment is a write). Verified offline: `finance` lists dashboard + dataset + object, and
-  `network` lists geo-map-view + link-analysis-view + object. ⚠ Deliberately **not** merged with the
+  since assignment is a write), and **`widget`, which needed a migration first — see the row below.**
+  Verified offline: `finance` lists dashboard + dataset + object, and `network` lists geo-map-view +
+  link-analysis-view + object + widget. ⚠ Deliberately **not** merged with the
   mail pane's `TagDialog`: that one is bulk/tri-state and persists via the `attributes.tags` CSV, and one
   dialog straddling both persistence paths is how the phase-2 split-brain returns.
-- **D7 — `widget` is the one kind deliberately NOT adopted, and it needs a call.** Widgets already render
-  a `w.tags` chip row from a **config-embedded string array** on `WidgetConfig`
-  (`widgets.component.html:84`, filtered at `widgets.component.ts:72`) — a different concept from the
-  cross-entity assignment edges, stored in a different place. Adding the Tags dialog to that card would
-  put two unrelated tag systems on one widget, one visible as chips and one only inside a dialog. Options:
-  (a) leave widget config-tags alone and never adopt the dialog there; (b) render assignment edges as a
-  second, visually distinct row; (c) migrate `WidgetConfig.tags` onto the assignment store and make the
-  chips a projection (the same move phase 2 made for `attributes.tags`) — (c) is the consistent answer but
-  is a migration, not a menu item. Not urgent; nothing is broken today.
-  **CALL MADE 2026-07-26 (operator): (c).** Design pass done → `superpower/widget-tags-assignment-migration-plan.md`;
-  **build not started.** ⚠ Four findings make it materially bigger than this row implied: there is **no Java
-  widget service** to hang a server-side re-derive on (⇒ a per-kind hook in `writeComponent`, the D6 seam —
-  a client-side re-derive in `WidgetsService` would not be phase 2's guarantee); **`renameTag`/`deleteTag`
-  deliberately skip component targets** (`objectTargetsOf`, "component targets have no CSV to project" —
-  true today, false the moment chips are a projection, and unfixable from `ObjectService`, which has no
-  `ComponentStore` handle); widget tags are **free text** while assignment `add` 404s on an unregistered
-  tag (⇒ the backfill must register the vocabulary first); and widget tags **travel in bundles today**
-  while edges do not (⇒ import must adopt, or tag loss across Spaces becomes a decision on the record).
-  Also: the save dialog's comma field must **go**, or it stays a second writer that resurrects
-  config-only tags on every save.
+- ~~**D7 — `widget` needs a call**~~ **CLOSED 2026-07-27 — call (c) built end-to-end.** `WidgetConfig.tags`
+  is now a **projection** of the assignment store, so the widget card is the fifth `TagAssignmentDialog`
+  adopter and there is no second tag system on it. New `WidgetTags` (`com.gamma.control` — at the **edge**,
+  like D6's findings gate, because the engine has no `ComponentStore`) re-derives the array on every path:
+  component write, assign/unassign, rename/delete (both now report a `widgets` count), bundle import, and a
+  per-Space backfill. The save dialog's comma field is **gone** (it was a second writer). ⚠ Load-bearing:
+  **adopt on create, overwrite on update** (a create carries bundle/seed tags; an update must not resurrect
+  a removed tag) · the backfill is **lazy, once per Space, not at `register()`** — `register` runs before any
+  Space is hosted, so `api.service()` there throws `IllegalState No spaces are hosted` and `ControlApi`
+  fails to construct (26 test errors caught it) · a no-op projection **writes nothing**, since every
+  `ComponentStore.write` archives a version · the widget card **reloads on dialog close**, unlike the
+  dashboards adopter, or the chips stay stale. Plan archived. → `okf/backend/control-plane/tags.md`
 - **D6 — no spec-authoring UI.** A `findings-spec` is authored as TOON through the generic `/components`
   CRUD, exactly as `notification-rule` shipped backend-only. A matrix/editor is a separate item; nothing is
   broken without it. → `okf/frontend/features/objects.md`

@@ -137,11 +137,12 @@ former root reference docs** (each index lists them):
   As-built lives in [`okf/frontend/features/link-analysis.md`](okf/frontend/features/link-analysis.md):
   the deterministic `projection_author` tool, the **pane**-supplied column list (no tool-layer route returns
   one), refusal instead of a guess, and the `patchFormFromView` `projections[]` fix it carried.
-- [`superpower/widget-tags-assignment-migration-plan.md`](superpower/widget-tags-assignment-migration-plan.md)
-  — **D7 widget tags → assignment store — call (c) made 2026-07-26, design pass done, build not started.**
-  Why it is a migration and not a menu item: no Java widget service to re-derive from, `renameTag`/
-  `deleteTag` skip component targets, free-text tags vs a registry that 404s, and tags that travel in
-  bundles while edges do not.
+- ~~`superpower/widget-tags-assignment-migration-plan.md`~~ — **SHIPPED end-to-end 2026-07-27 (D7 call (c)
+  — widget chips are now a projection of the assignment store), plan archived** to
+  [`archived-documents/plans-archive/widget-tags-assignment-migration-plan.md`](archived-documents/plans-archive/widget-tags-assignment-migration-plan.md).
+  As-built lives in [`okf/backend/control-plane/tags.md`](okf/backend/control-plane/tags.md): the edge-side
+  `WidgetTags` projection, adopt-on-create vs overwrite-on-update, the lazy per-Space backfill (it cannot run
+  at route registration), and why the save dialog's tags field had to go.
 - [`superpower/living-operational-system.md`](superpower/living-operational-system.md) — standing
   **architecture north-star** (seven networks over one Component metamodel); R1–R6 all shipped.
 - [`superpower/geo-map-case-studies.md`](superpower/geo-map-case-studies.md) — Geo Map CS1–CS5

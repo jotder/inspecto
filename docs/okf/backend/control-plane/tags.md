@@ -170,14 +170,49 @@ this.dialog.open(TagAssignmentDialog, { data: { targetKind: 'link-analysis-view'
 
 Adopters: **Link Analysis** and **Geo Map** saved views (per-view `#viewActions` submenu — Link Analysis
 sits beside Comments (D10) so the two annotate-a-view actions read as one family), plus **datasets** and
-**dashboards** (a Tags icon button in the card action cluster). Datasets keeps its sibling
-`writesDisabled()` gate, because assignment is a write.
+**dashboards** (a Tags icon button in the card action cluster), plus **widgets** — the one adopter that
+needed a migration first (see below). Datasets keeps its sibling `writesDisabled()` gate, because
+assignment is a write.
 
-**`widget` is deliberately not an adopter.** `WidgetConfig.tags` is a pre-existing config-embedded string
-array rendered as chips on the widget card — a *different* concept from assignment edges, in a different
-store. Wiring the dialog there would show two unrelated tag systems on one card. Reconciling them (making
-the chips a projection of the edges, as `attributes.tags` already is) is a migration, not a menu item; the
-open options are recorded in BACKLOG §6.
+### `widget` — the fifth adopter, and the only one that needed a migration (shipped 2026-07-27)
+
+`WidgetConfig.tags` was a config-embedded string array rendered as chips on the widget card: a *different*
+concept from assignment edges, in a different store, with **no vocabulary check at all** (the save dialog's
+comma field minted arbitrary names, while assigning an unregistered tag is a 404). So adopting the dialog
+there without migrating would have put two unrelated tag systems on one card. Operator call (c),
+2026-07-26: migrate — **the chips are now a projection of the edges**, exactly as `attributes.tags` is.
+
+* **The projection lives at the edge, in `WidgetTags` (`com.gamma.control`), not in `ObjectService`** — the
+  widget is a `ComponentStore` component and the engine deliberately knows nothing about that store. This
+  is the same call D6's findings gate made. `ObjectService.renameTag`/`deleteTag` therefore still move only
+  the object CSVs, and `TagRoutes` composes the component half around them.
+* **Every path that can change an edge re-derives the array:** `ComponentRoutes.writeComponent`,
+  `TagRoutes.assign`/`unassign`, `renameTag`/`deleteTag` (both now report a `widgets` count), bundle
+  import, and a per-Space backfill.
+* ⚠ **Adopt on create, overwrite on update.** A widget arriving from a bundle, a seed or a template carries
+  its tags *inside its config*, and dropping them would be silent data loss — so a create adopts the array
+  as edges (registering unknown names via `TagRoutes.ensureTag`, or they would be dropped by the 404). An
+  **update ignores the submitted array**, so a stale client re-saving a widget cannot resurrect a tag the
+  operator removed through the dialog. Removal is the dialog's job, not a smaller array's.
+* ⚠ **The save-as-widget dialog's comma field is GONE, deliberately.** Left in place it is a second writer
+  that resurrects config-only tags on every save. `explore.component` still passes the loaded widget's
+  array through, but only as carry-forward — the server re-derives it. This is a deliberate behaviour
+  regression for "save and tag in one step"; the replacement is Save → Tags.
+* ⚠ **The widget card reloads its list when the dialog closes** — unlike the dashboards adopter. The chips
+  are a projection, so without a refetch the card keeps drawing the old ones.
+* **A no-op projection writes nothing.** Every `ComponentStore.write` archives a version, so writing
+  unconditionally would fill a widget's version history with tag churn; `reproject` compares first.
+  A failed rewrite is **logged, not thrown**: the edge (the truth) is already stored, so the tag operation
+  succeeded, and the next write or backfill re-derives the array.
+* ⚠ **Bundle import must adopt, and that is a decision on the record.** Widget tags travel *inside the
+  config* across a bundle while edges are per-Space, so without the adopt in `BundleRoutes` importing a
+  tagged widget would silently lose its tags.
+* **The backfill runs from `TagRoutes.register`** (once per `ApiContext`, i.e. once per Space) rather than
+  from `CollectorService` beside the object-CSV backfill — the engine has no write root, so it cannot see
+  widgets. Idempotent twice over, so a second boot adopts nothing.
+* **Offline:** the mock mirrors the same split — it reads a widget's array as the projection, adopts config
+  tags lazily (on `GET /tags` and on any assignment read, so a seeded store migrates itself with **no
+  `MOCK_STORE_KEY` bump**) and registers the names, since the four seed packs write widget tags directly.
 
 Two shapes worth preserving:
 
