@@ -1,7 +1,39 @@
 # MNT-14 — archived-Incident retention sweep (plan)
 
-**Status:** ACTIVE — scoped 2026-07-27, build not started · **Decision of record:** BACKLOG §2 D5
-(retention tier, not archive-is-terminal) · **Home when shipped:** `docs/okf/backend/control-plane/jobs.md`
+**Status:** ACTIVE — scoped 2026-07-27; **§4 steps 1–3 BUILT + verified the same day** (G5 legal hold, G1
+purge-eligibility query, G2 bulk delete-by-target). Steps 4–6 open: `JobService` hooks, the
+`incident_purge` task itself, docs. · **Decision of record:** BACKLOG §2 D5 (retention tier, not
+archive-is-terminal) · **Home when shipped:** `docs/okf/backend/control-plane/jobs.md`
+
+> **As-built for steps 1–3** (`RetentionSweepSeamTest`, 8 tests; reactor 2296/0/0/3):
+>
+> - **G1 shipped as two `ObjectQuery` fields, not a bespoke store method** — `closedBefore` (epoch millis,
+>   `0` = no constraint) + `oldestFirst`. Chosen over the plan's recommended option (a) because
+>   `ObjectQuery` is *already* the single shape that drives both `matches()` (in-memory) and `WHERE`
+>   generation (`DbObjectStore`), so the two backends cannot diverge on the predicate — which is the whole
+>   risk G1 names. `ObjectQuery.purgeEligible(type, status, cutoff, limit)` is the one entry point; use it
+>   rather than re-deriving. **No breaking change**: a 9-arg constructor delegates to the new canonical one,
+>   so all existing positional callers still compile.
+> - ⚠ **Correctness comes from the cutoff, NOT the ordering.** Because `closedBefore` is part of the
+>   `WHERE`, every row a capped page returns is eligible whichever end of the corpus it came from — that
+>   alone kills the "0 prunable against a fully-expired corpus" failure. `oldestFirst` only decides *which*
+>   eligible objects a capped sweep takes first (longest-expired). The plan framed ordering as the fix; it
+>   is the smaller half.
+> - **G2 shipped as abstract interface methods, not throwing `default`s** — `NoteStore.deleteForTarget`,
+>   `LinkStore.removeAllIncident`, `TagAssignmentStore.removeAllForTarget`, all returning the row count.
+>   Verified first that **each interface has exactly two implementors and no test fakes or anonymous
+>   impls**, so the MAJOR-release widening §3 G2 authorised is clean. A silent no-op default would have
+>   orphaned rows, which is the exact failure these methods exist to prevent.
+> - ⚠ **The Db bulk deletes throw on `SQLException`** rather than logging and returning 0 like their
+>   sibling *reads*. A cascade that quietly "deleted 0" orphans the rows the caller is purging. This
+>   deliberately inverts the local fail-open idiom — the same inversion §3 G4 calls for.
+> - **G5 legal hold is fail-safe on anything unrecognised**: only `false`/`0`/`no`/`off` (case-insensitive)
+>   or blank clears a hold; every other value holds. The two mistakes are not symmetric — wrongly keeping a
+>   record costs storage, wrongly purging one is unrecoverable. `ObjectService.hasLegalHold(o)` is the one
+>   definition; the store cannot filter on it (attribute bag, not a column), so **the sweep must apply it
+>   itself, at purge time**.
+> - **Nothing consumes any of this yet** — no task, no route, no caller. That is what makes the slice
+>   safely shippable: with no cascade wired, nothing can orphan anything.
 
 > Per the doc lifecycle in `CLAUDE.md`: this file lives here only while the work is in flight. On ship,
 > distil the as-built facts into the OKF concept, move open items to `docs/BACKLOG.md`, and
@@ -111,12 +143,15 @@ Semantics to implement:
 
 ## 4. Build order
 
-1. **G5 legal hold** (smallest, no dependencies) → verify: a held object is excluded from eligibility.
-2. **G1 oldest-first/cutoff query** on `ObjectStore` + both backends → verify: a corpus of >10 000 archived
-   Incidents returns the *oldest* expired ones, and a reopened (`closedAt == 0`) one is never returned.
-   **This test is the whole point — write it first and make sure it fails against a newest-first query.**
-3. **G2 bulk deletes** on the three dependent stores + both backends each → verify: per store, rows for one
-   target vanish and rows for a sibling target do not.
+1. ✅ **G5 legal hold** — `ObjectService.ATTR_LEGAL_HOLD` + `hasLegalHold`. Verified: truthiness table,
+   and that an age-eligible held object still comes back from the store for the *caller* to exclude.
+2. ✅ **G1 oldest-first/cutoff query** — `ObjectQuery.closedBefore`/`oldestFirst` + both backends. Verified
+   against a corpus whose newest 500 are inside the window and whose oldest 50 are expired: a 100-row page
+   finds all 50 and offers nothing unexpired (this is the assertion that fails on the old query), plus a
+   reopened `closedAt == 0` object is never returned, plus the no-cutoff default is still newest-first.
+3. ✅ **G2 bulk deletes** on all three dependent stores × both backends. Verified per store: one target's
+   rows vanish, a sibling target's do not, and **the same id in another `targetKind` does not** (the D10
+   pair-scoping rule); `LinkStore` clears edges at *both* ends; repeat calls return 0, not an error.
 4. **G4 `JobService` hooks** + `CollectorService` wiring → verify: partial attachment refuses to run.
 5. **The task itself** — `incident_purge` (see naming, §5) in `MaintenanceJob` → verify: dry run mutates
    nothing and counts correctly; real run deletes object + notes + links + tag edges; event trail survives.

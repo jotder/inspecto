@@ -180,9 +180,17 @@ say so. "Verified" means `mvn -o clean test` passed — not that the code looks 
 ### ⚠ Count the reactor total mechanically — the eyeballed sum is wrong
 
 The recorded baseline was **2049 for months and that number is WRONG** (found 2026-07-27). Summing
-per-module `Tests run:` lines by hand silently drops modules, and it dropped two (57 and 178). Maven prints
-no grand total, so **always compute it**, from the module-summary lines only (they have no `-- in` suffix —
-the `-- in <class>` lines are per-class and double-count):
+per-module `Tests run:` lines by hand silently drops modules, and it dropped two (57 and 178).
+
+⚠ **The mechanism, confirmed 2026-07-27 — the two dropped modules are the ones Maven prefixes
+`[WARNING]`, not `[INFO]`,** because they have skipped tests. So **never anchor the grep on `[INFO]`**:
+`grep "^\[INFO\] Tests run:"` loses exactly those two modules and silently under-reports by 235, which
+looks like "227 tests vanished" once your own new tests are in. Match the *suffix*, never the prefix.
+(This trap was re-hit that same day by a sub-agent that had this section available — it is the default
+mistake, so the recipe below is the one to paste.)
+
+Maven prints no grand total, so **always compute it**, from the module-summary lines only (they have no
+`-- in` suffix — the `-- in <class>` lines are per-class and double-count):
 
 ```bash
 grep -E "Tests run:.*Skipped: [0-9]+$" full.log \
@@ -190,9 +198,10 @@ grep -E "Tests run:.*Skipped: [0-9]+$" full.log \
   | awk '{t+=$1; s+=$2} END {print "TOTAL:", t, "skipped:", s, "modules:", NR}'
 ```
 
-**Correct baseline as of 2026-07-27: 2288 tests, 0 failures, 0 errors, 3 skipped, across 14 test-bearing
-modules (16 reactor modules).** The 3 skips are pre-existing (1 in `ConfigSafetyValidatorTest`, 2 in one
-`inspecto-etl`-tier module), not a regression.
+**Correct baseline as of 2026-07-27: 2296 tests, 0 failures, 0 errors, 3 skipped, across 14 test-bearing
+modules (16 reactor modules)** — 2288 earlier the same day, +8 for `RetentionSweepSeamTest` (MNT-14). The
+3 skips are pre-existing (1 in `ConfigSafetyValidatorTest`, 2 in one `inspecto-etl`-tier module), not a
+regression — and they are *why* those two module lines carry the `[WARNING]` prefix above.
 
 ⚠ Note `bc` and `grep -P` are unavailable in this Git-Bash environment — use `awk` and POSIX classes.
 ⚠ And a total is not a verdict: confirm your own new test classes appear in the log with the counts you

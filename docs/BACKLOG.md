@@ -1,6 +1,11 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-27 (**AGT-6a plan D9 SHIPPED** — `ConfigJsonSchema` projects any `ConfigSpec` into a
+**Updated:** 2026-07-27 (**MNT-14 prerequisites G1 + G2 + G5 BUILT** — purge-eligibility now has a correct
+cutoff query on both `ObjectStore` backends, the three dependent stores have bulk delete-by-target, and
+legal hold exists as a fail-safe attribute. All additive, **nothing consumes them yet**; G4 + the
+`incident_purge` task remain. ⚠ Two framings in the scoping were off: the *cutoff* rather than the ordering
+is what kills the "0 prunable" bug, and the widening went in as plain abstract methods once it was verified
+that only the two known impls exist per interface. See §6.) · Previously 2026-07-27 (**AGT-6a plan D9 SHIPPED** — `ConfigJsonSchema` projects any `ConfigSpec` into a
 real JSON Schema and the new `config_schema` L1 read tool exposes it, closing A5's stated prerequisite;
 ⚠ deliberately *not* a tighter `component_draft` schema. Same day: **D11 MEASURED — the number is `2GB`**,
 and two of its premises are wrong: ingest peak does **not** scale with file size (~1 GiB flat at 1.0 and
@@ -499,10 +504,33 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     buffers, so a much larger box may want more than 2 GiB), non-CSV frontends, and the `materialize`
     task's real query shapes. A per-edition or RAM-relative default was not evaluated.
   - **Still an operator call** — this row brings the number D11 was declined for; it does not ship it.
-- **MNT-14 — the real prerequisites (scoped 2026-07-27).** §4 said the last blocker was the `Archived`
-  state; it already ships (see that row). The sweep's actual cost is **referential cleanup + an ordering
-  gap**, none of which exists yet. `ObjectStore.delete` is ready and unconsumed (`ObjectStore.java:39-56`,
-  zero callers) and the `receipt_prune` task (`MaintenanceJob.java:234-250`) is the template to clone, but:
+- **MNT-14 — prerequisites G1/G2/G5 BUILT 2026-07-27; G4 + the task itself remain.** §4 said the last
+  blocker was the `Archived` state; it already ships (see that row). The sweep's actual cost is
+  **referential cleanup + an ordering gap** — three of those five gaps are now closed
+  (`RetentionSweepSeamTest`, 8 tests, reactor 2296/0/0/3), all as **additive seams with no caller**, which
+  is what made a partial slice safe: with no cascade wired, nothing can orphan anything.
+  - ✅ **G1** — `ObjectQuery.closedBefore` + `oldestFirst` (not a bespoke store method: the record is
+    already the single shape driving both `matches()` and SQL `WHERE`, so the backends can't diverge on the
+    predicate). Entry point `ObjectQuery.purgeEligible(type, status, cutoff, limit)`. Non-breaking — a
+    9-arg constructor delegates to the new canonical one. ⚠ **The cutoff, not the ordering, is what fixes
+    the bug**: with `closedBefore` in the `WHERE` every row a capped page returns is eligible, so
+    "0 prunable on an expired corpus" is dead; `oldestFirst` only picks *which* eligible rows come first.
+  - ✅ **G2** — `NoteStore.deleteForTarget` · `LinkStore.removeAllIncident` (both ends) ·
+    `TagAssignmentStore.removeAllForTarget`, each returning a row count, on all 3 interfaces × 2 impls.
+    Shipped as **abstract** methods (the MAJOR widening §3 G2 allows) after verifying each interface has
+    exactly two implementors and no test fakes. ⚠ The Db impls **throw** on `SQLException` instead of
+    logging and returning 0 like their sibling reads — a cascade that quietly "deleted 0" orphans rows.
+  - ✅ **G5** — `ObjectService.ATTR_LEGAL_HOLD` + `hasLegalHold`, **fail-safe**: only `false`/`0`/`no`/`off`
+    or blank clears a hold, anything else holds. ⚠ The store cannot filter on it (attribute bag, not a
+    column), so the sweep must apply it itself **at purge time**, not only when building a preview.
+  - **Still open: G4** (4 `JobService` store hooks + `CollectorService` wiring, fail-CLOSED on partial
+    attachment) and **the `incident_purge` task**, then docs. `ObjectStore.delete` is still unconsumed
+    (`ObjectStore.java:39-56`) and `receipt_prune` (`MaintenanceJob.java:234-250`) is still the template.
+  - ⚠ **G3 stays a decision to state, not code**: `EventStore` is append-only, so a purged Incident's
+    activity trail outlives it and "purge" never means "all trace removed". Must be written down in the
+    task's Javadoc + operator docs, per the plan.
+
+  Original gap analysis, still accurate for the open half:
   - ⚠ **`ObjectStore.query` returns NEWEST-first and there is no ascending mode** (`ObjectQuery.java`,
     `MAX_LIMIT` 10 000). A sweep that takes one page therefore gets the **newest** archived Incidents and
     systematically **misses the oldest — the only purge-eligible ones**. This is a correctness trap, not a
