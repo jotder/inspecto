@@ -168,8 +168,16 @@ target kind. It takes `{targetKind, targetId, label?}` as dialog data and persis
 this.dialog.open(TagAssignmentDialog, { data: { targetKind: 'link-analysis-view', targetId: view.id, label: view.name } });
 ```
 
-First adopter: the Link Analysis saved-views menu, sitting beside Comments (D10) so the two annotate-a-view
-actions read as one family. Remaining kinds are still API-only — see BACKLOG §6.
+Adopters: **Link Analysis** and **Geo Map** saved views (per-view `#viewActions` submenu — Link Analysis
+sits beside Comments (D10) so the two annotate-a-view actions read as one family), plus **datasets** and
+**dashboards** (a Tags icon button in the card action cluster). Datasets keeps its sibling
+`writesDisabled()` gate, because assignment is a write.
+
+**`widget` is deliberately not an adopter.** `WidgetConfig.tags` is a pre-existing config-embedded string
+array rendered as chips on the widget card — a *different* concept from assignment edges, in a different
+store. Wiring the dialog there would show two unrelated tag systems on one card. Reconciling them (making
+the chips a projection of the edges, as `attributes.tags` already is) is a migration, not a menu item; the
+open options are recorded in BACKLOG §6.
 
 Two shapes worth preserving:
 

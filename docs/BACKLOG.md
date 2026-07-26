@@ -299,10 +299,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   so a further adopter is **a menu item, not another dialog**. First adopter wired: the **Link Analysis
   saved-views menu** (`link-analysis-view`), following the D10 Comments idiom. Verified end-to-end offline:
   tagging a saved view makes it appear under that tag in the `/tags` pane beside object targets.
-  **Still API-only on the remaining kinds** — `geo-map-view`, `dashboard`, `widget`, `dataset` (the mock's
-  `TAG_TARGET_KINDS` whitelist; the backend vocabulary is wider). ⚠ Deliberately **not** merged with the
+  **Adopted on four of the five mock-whitelisted kinds** — `link-analysis-view`, `geo-map-view` (its flat
+  saved-views menu was refactored to the same per-view `#viewActions` submenu), `dataset` and `dashboard`
+  (a Tags icon button in the card action cluster; datasets keeps the sibling `writesDisabled()` gate,
+  since assignment is a write). Verified offline: `finance` lists dashboard + dataset + object, and
+  `network` lists geo-map-view + link-analysis-view + object. ⚠ Deliberately **not** merged with the
   mail pane's `TagDialog`: that one is bulk/tri-state and persists via the `attributes.tags` CSV, and one
   dialog straddling both persistence paths is how the phase-2 split-brain returns.
+- **D7 — `widget` is the one kind deliberately NOT adopted, and it needs a call.** Widgets already render
+  a `w.tags` chip row from a **config-embedded string array** on `WidgetConfig`
+  (`widgets.component.html:84`, filtered at `widgets.component.ts:72`) — a different concept from the
+  cross-entity assignment edges, stored in a different place. Adding the Tags dialog to that card would
+  put two unrelated tag systems on one widget, one visible as chips and one only inside a dialog. Options:
+  (a) leave widget config-tags alone and never adopt the dialog there; (b) render assignment edges as a
+  second, visually distinct row; (c) migrate `WidgetConfig.tags` onto the assignment store and make the
+  chips a projection (the same move phase 2 made for `attributes.tags`) — (c) is the consistent answer but
+  is a migration, not a menu item. Not urgent; nothing is broken today.
 - **`NoteTargets` is now misnamed.** It is the shared annotation-target vocabulary for both notes (D10)
   and tags (D7), but still lives in `com.gamma.ops.note` under a note-specific name. Rename to something
   neutral when a change is already touching it — not worth its own churn, but it will mislead a reader.

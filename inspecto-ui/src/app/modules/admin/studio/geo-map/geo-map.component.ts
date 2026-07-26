@@ -64,6 +64,7 @@ import { GeocodeResult } from 'app/inspecto/geo';
 
 /** Annotation accent — the amber chart-token swatch (visually distinct from data kinds). */
 const NOTE_ACCENT = ICON_COLOR_SWATCHES[3];
+import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { GeoMapService, GeoMapView } from './geo-map.service';
 import { GeoAnalysisFocus, GeoAnalysisToolboxComponent } from './geo-analysis-toolbox.component';
 
@@ -757,6 +758,14 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         } finally {
             this.saving.set(false);
         }
+    }
+
+    /** Per-view tags (D7) — labels the saved view in place, through the cross-entity assignment edges.
+     *  An annotation on the view, not an edit of it, so there is nothing to reload afterwards. */
+    openTags(view: GeoMapView): void {
+        this.dialog.open(TagAssignmentDialog, {
+            data: { targetKind: 'geo-map-view', targetId: view.id, label: view.name },
+        });
     }
 
     async loadView(view: GeoMapView): Promise<void> {

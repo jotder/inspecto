@@ -14,6 +14,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { BindSharedDatasetDialog, BindSharedDatasetResult } from './bind-shared-dataset.dialog';
+import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { buildDataset, Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 
@@ -101,6 +102,14 @@ export class DatasetsComponent implements OnInit {
     /** The owner space when this dataset is bound to a cross-space shared ref, else null (scope badge). */
     sharedOwner(d: Dataset): string | null {
         return parseSharedRef(d.physicalRef)?.owner ?? null;
+    }
+
+    /** Tags on this dataset (D7) — cross-entity assignment edges, so the label is findable from `/tags`
+     *  alongside tagged incidents and saved views. An annotation, not an edit of the dataset config. */
+    openTags(d: Dataset): void {
+        this.dialog.open(TagAssignmentDialog, {
+            data: { targetKind: 'dataset', targetId: d.id, label: d.name || d.id },
+        });
     }
 
     /** Offer this dataset in the cross-space shareable catalog (owner = the active space). */

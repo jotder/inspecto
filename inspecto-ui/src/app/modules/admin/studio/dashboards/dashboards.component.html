@@ -47,6 +47,9 @@
                     <button mat-icon-button [routerLink]="[d.id]" matTooltip="Open" aria-label="Open">
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                     </button>
+                    <button mat-icon-button (click)="openTags(d)" [attr.aria-label]="'Tags for ' + d.id" matTooltip="Tags">
+                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
+                    </button>
                     <button mat-icon-button (click)="remove(d)" matTooltip="Delete" aria-label="Delete">
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                     </button>

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -8,6 +9,7 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { Dashboard } from './dashboard-types';
 import { DashboardsService } from './dashboards.service';
 
@@ -20,6 +22,7 @@ import { DashboardsService } from './dashboards.service';
     standalone: true,
     imports: [
         MatButtonModule,
+        MatDialogModule,
         MatIconModule,
         MatProgressSpinnerModule,
         MatTooltipModule,
@@ -33,6 +36,15 @@ export class DashboardsComponent implements OnInit {
     private api = inject(DashboardsService);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
+    private dialog = inject(MatDialog);
+
+    /** Tags on this dashboard (D7) — cross-entity assignment edges, so the label is findable from `/tags`
+     *  alongside tagged incidents, datasets and saved views. An annotation, not an edit of the tiles. */
+    openTags(d: Dashboard): void {
+        this.dialog.open(TagAssignmentDialog, {
+            data: { targetKind: 'dashboard', targetId: d.id, label: d.name || d.id },
+        });
+    }
 
     readonly dashboards = signal<Dashboard[]>([]);
     readonly loading = signal(false);
