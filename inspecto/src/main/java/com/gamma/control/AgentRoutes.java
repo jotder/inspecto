@@ -109,6 +109,10 @@ final class AgentRoutes implements RouteModule {
             Map<String, Object> answer = new java.util.HashMap<>();
             answer.put("value", result.get("value"));
             answer.put("derivedArgs", result.get("derivedArgs"));
+            // A5.2: present only for the tool whose NL path is a repair loop. The operator is being handed
+            // a draft a model rewrote more than once, and "3 turns, still 2 findings" is the difference
+            // between "nearly there" and "it gave up" — the surface cannot say that without the count.
+            if (result.get("turns") != null) answer.put("turns", result.get("turns"));
             return answer;
         });
         api.post("/agent/tools/(.+)", (e, m) -> {

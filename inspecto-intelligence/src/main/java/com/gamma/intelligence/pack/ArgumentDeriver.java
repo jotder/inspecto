@@ -69,13 +69,35 @@ public final class ArgumentDeriver {
     }
 
     /**
+     * A previous turn's rejected draft and the findings it drew (AGT-6a A5.2). Fed back verbatim so the next
+     * turn <b>repairs</b> rather than starts over — the findings are already anchored to a {@code fieldPath},
+     * which is the whole reason a repair loop can converge where a re-roll would not.
+     */
+    public record PriorAttempt(Map<String, Object> config, List<Map<String, Object>> findings) {}
+
+    /**
      * One turn, one offered tool. Returns the arguments to invoke {@code spec.name()} with, already merged
      * with {@code paneArgs} (which win).
      */
     public static Derivation derive(LlmGateway gateway, ToolSpec spec, String prompt, Map<String, Object> paneArgs) {
+        return derive(gateway, spec, prompt, paneArgs, null);
+    }
+
+    /**
+     * As {@link #derive(LlmGateway, ToolSpec, String, Map)}, plus a {@code prior} rejected attempt whose
+     * findings are handed back for repair (A5.2). {@code prior == null} is the A5.1 single-hop behaviour,
+     * byte-for-byte.
+     */
+    public static Derivation derive(LlmGateway gateway, ToolSpec spec, String prompt,
+                                    Map<String, Object> paneArgs, PriorAttempt prior) {
+        List<ChatMessageRecord> messages = new java.util.ArrayList<>(List.of(
+                new ChatMessageRecord(ChatRole.SYSTEM, systemPrompt(spec), Instant.now(), Map.of()),
+                new ChatMessageRecord(ChatRole.USER, prompt, Instant.now(), Map.of())));
+        if (prior != null)
+            messages.add(new ChatMessageRecord(ChatRole.USER, repairPrompt(prior), Instant.now(), Map.of()));
+
         ChatRequest request = new ChatRequest(
-                List.of(new ChatMessageRecord(ChatRole.SYSTEM, systemPrompt(spec), Instant.now(), Map.of()),
-                        new ChatMessageRecord(ChatRole.USER, prompt, Instant.now(), Map.of())),
+                messages,
                 List.of(spec),                       // exactly one — this is the containment
                 ChatOptions.defaults());
         ChatResult result = gateway.chat(request);
@@ -99,6 +121,75 @@ public final class ArgumentDeriver {
         // Pane args last: the screen's identity fields outrank anything the model said.
         if (paneArgs != null) merged.putAll(paneArgs);
         return Derivation.of(merged);
+    }
+
+    /**
+     * A copy of {@code spec} whose top-level {@code property} carries {@code schemaJson} instead of whatever
+     * it declared (AGT-6a A5.2 / plan D9). This is what turns a bare {@code {"type":"object"}} payload — the
+     * cost centre §3.4 F2 named — into a schema the transport can constrain natively.
+     *
+     * <p><b>Fails open to {@code spec}</b> on any unreadable input. A missing constraint costs a repair turn;
+     * throwing here would take away an authoring surface that works today, and the loop still validates every
+     * draft with the real {@code ConfigSpec} regardless of what the model was told.
+     */
+    public static ToolSpec withPropertySchema(ToolSpec spec, String property, String schemaJson) {
+        try {
+            Map<String, Object> schema =
+                    JSON.readValue(spec.jsonSchema(), new TypeReference<Map<String, Object>>() {});
+            if (!(schema.get("properties") instanceof Map<?, ?> props)) return spec;
+            Map<String, Object> nested = JSON.readValue(schemaJson, new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> rewritten = new LinkedHashMap<>();
+            props.forEach((k, v) -> rewritten.put(String.valueOf(k), v));
+            if (!rewritten.containsKey(property)) return spec;   // never ADD a property the tool doesn't take
+            rewritten.put(property, nested);
+            schema.put("properties", rewritten);
+            return new ToolSpec(spec.name(), spec.description(), JSON.writeValueAsString(schema),
+                    spec.mutating(), spec.requiredRole(), spec.capability());
+        } catch (Exception unreadable) {
+            return spec;
+        }
+    }
+
+    /**
+     * {@code component_draft}'s spec with {@code config} constrained by {@code kind}'s projected schema
+     * (A5.2). Lives here rather than in the agent because {@code InspectoTools} is package-private — and
+     * should stay that way; the belt is not an API surface.
+     *
+     * <p>{@code kind} comes from the <b>pane</b>, never the model: it is an identity field, and the whole
+     * point of constraining is that the model is judged by the spec it was given.
+     */
+    public static ToolSpec constrainedFor(ToolSpec spec, Object kind) {
+        if (!(kind instanceof String k) || k.isBlank()) return spec;
+        String json = InspectoTools.configSchemaJson(k);
+        return json == null ? spec : withPropertySchema(spec, "config", json);
+    }
+
+    /**
+     * The repair turn's extra message: the draft that was rejected and the findings against it. Deliberately
+     * data, not instruction-heavy prose — the system prompt already fixed the rules, and a local model that
+     * is re-told them tends to narrate instead of calling.
+     */
+    private static String repairPrompt(PriorAttempt prior) {
+        String findings = prior.findings() == null ? "" : prior.findings().stream()
+                .map(f -> "- " + f.getOrDefault("fieldPath", "(root)") + ": " + f.getOrDefault("message", ""))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        String config;
+        try {
+            config = JSON.writeValueAsString(prior.config() == null ? Map.of() : prior.config());
+        } catch (Exception unserialisable) {
+            config = "{}";
+        }
+        return """
+               That draft was rejected. Call the tool again with a corrected `config`.
+
+               Rejected config:
+               %s
+
+               Findings to fix (each is anchored to the field path that caused it):
+               %s
+
+               Fix exactly these. Keep everything else unchanged.
+               """.formatted(config, findings);
     }
 
     /**

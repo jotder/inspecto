@@ -1197,6 +1197,17 @@ final class InspectoTools {
     }
 
     /** Map a component kind to its {@link ConfigSpecs} config type ({@code alert-rule}→{@code alert}). */
+    /**
+     * The projected JSON Schema for {@code kind}'s config as JSON, or {@code null} when the kind has no
+     * structural spec (AGT-6a A5.2). Same projection the {@code config_schema} tool serves — exposed
+     * directly so the repair loop can constrain the model with it without a tool round trip.
+     */
+    public static String configSchemaJson(String kind) {
+        if (kind == null || kind.isBlank()) return null;
+        ConfigSpec cfgSpec = ConfigSpecs.forType(configType(kind));
+        return cfgSpec == null ? null : ConfigJsonSchema.toJson(cfgSpec);
+    }
+
     private static String configType(String kind) {
         String k = kind.trim().toLowerCase(Locale.ROOT);
         return k.equals("alert-rule") ? "alert" : k;

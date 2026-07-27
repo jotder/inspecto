@@ -12,6 +12,7 @@ import com.eoiagent.core.Role;
 import com.eoiagent.core.RunId;
 import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
+import com.eoiagent.core.ToolSpec;
 import com.eoiagent.core.UserId;
 import com.eoiagent.core.UserMessage;
 import com.eoiagent.host.AgentSession;
@@ -311,12 +312,97 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
                     + " request cannot be interpreted — configure one under Assist Settings, or fill the"
                     + " form directly");
         }
+        if (COMPONENT_DRAFT.equals(name)) return Optional.of(repairLoop(tool, prompt, args, session));
+
         ArgumentDeriver.Derivation derived = ArgumentDeriver.derive(gateway, tool.spec(), prompt, args);
         if (!derived.ok()) return Optional.of(Map.of("ok", false, "error", derived.error()));
 
         Map<String, Object> view = new HashMap<>(runTool(name, derived.args(), session).orElseThrow());
         view.put("derivedArgs", derived.args());
         return Optional.of(view);
+    }
+
+    /** The one tool whose NL path is a loop rather than a hop (AGT-6a A5.2). */
+    private static final String COMPONENT_DRAFT = "component_draft";
+
+    /** Hard turn cap (plan §5 D11). Three, then hand the operator the best draft and its findings. */
+    static final int MAX_REPAIR_TURNS = 3;
+
+    /**
+     * AGT-6a A5.2: the bounded repair loop for {@code component_draft}.
+     *
+     * <p>{@code component_draft} is the one tool with <b>no authoring logic</b> — it echoes {@code config}
+     * back with anchored findings — so one turn reliably yields a probably-invalid config. Converging needs
+     * those findings fed back, which is why this is a loop and {@code query_author}'s path is not.
+     *
+     * <p>Three properties are deliberate:
+     * <ul>
+     *   <li><b>Schema-constrained regeneration.</b> The offered spec's bare {@code config:{"type":"object"}}
+     *       is replaced with the kind's projected JSON Schema (plan D9), so the model is constrained by the
+     *       very spec that will judge it. The kind comes from the <b>pane</b>, never the model.</li>
+     *   <li><b>The cap is a hand-over, not a failure.</b> At {@link #MAX_REPAIR_TURNS} it returns the best
+     *       draft seen with its findings — which is exactly the A1 experience the surface already renders
+     *       for human repair, so the fallback is a working screen rather than a dead end.</li>
+     *   <li><b>Best = fewest findings, not last.</b> A later turn can regress, and handing back a worse
+     *       draft because it happened to be last would make the loop actively harmful.</li>
+     * </ul>
+     */
+    private Map<String, Object> repairLoop(Tool tool, String prompt, Map<String, Object> args, String session) {
+        Map<String, Object> paneArgs = args == null ? Map.of() : args;
+        ToolSpec spec = ArgumentDeriver.constrainedFor(tool.spec(), paneArgs.get("kind"));
+
+        Map<String, Object> best = null;
+        Map<String, Object> bestArgs = null;
+        int bestFindings = Integer.MAX_VALUE;
+        ArgumentDeriver.PriorAttempt prior = null;
+        int turn = 0;
+
+        while (turn < MAX_REPAIR_TURNS) {
+            turn++;
+            ArgumentDeriver.Derivation derived =
+                    ArgumentDeriver.derive(gateway, spec, prompt, paneArgs, prior);
+            if (!derived.ok()) {
+                // A first-turn failure means there is no draft at all — that is the caller's 422. A later
+                // one means the model degraded mid-repair; keep what we already have rather than lose it.
+                if (best == null) return Map.of("ok", false, "error", derived.error());
+                break;
+            }
+            Map<String, Object> view = new HashMap<>(runTool(tool.spec().name(), derived.args(), session).orElseThrow());
+            view.put("derivedArgs", derived.args());
+            if (Boolean.FALSE.equals(view.get("ok"))) {
+                if (best == null) return view;   // the tool itself refused (e.g. unknown kind) — not repairable
+                break;
+            }
+            List<Map<String, Object>> findings = findingsOf(view);
+            if (findings.isEmpty()) {            // clean — done, and the common good case is the fast one
+                view.put("turns", turn);
+                return view;
+            }
+            if (findings.size() < bestFindings) {
+                best = view;
+                bestArgs = derived.args();
+                bestFindings = findings.size();
+            }
+            prior = new ArgumentDeriver.PriorAttempt(configOf(bestArgs), findings);
+        }
+
+        Map<String, Object> out = new HashMap<>(best);
+        out.put("turns", turn);
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> findingsOf(Map<String, Object> view) {
+        return view.get("value") instanceof Map<?, ?> v && v.get("findings") instanceof List<?> f
+                ? (List<Map<String, Object>>) f
+                : List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> configOf(Map<String, Object> args) {
+        return args != null && args.get("config") instanceof Map<?, ?> c
+                ? (Map<String, Object>) c
+                : Map.of();
     }
 
     /** The belt indexed by {@link com.eoiagent.core.ToolSpec#name()} (AGT-6a A1). */
