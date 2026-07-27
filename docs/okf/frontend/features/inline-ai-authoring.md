@@ -99,6 +99,12 @@ surface's degrade paths are what most need exercising offline. Result shapes mir
 those change, change these too. Registered in `mock-api.interceptor.ts`; the rest of `/agent/*` stays
 real.
 
+⚠ **The mock must never be more lenient than the server** — three shipped bugs hid behind that (see the
+audit below). Its strictness is pinned in `agent.handler.spec.ts`, not left to the preview, which cannot
+catch what the mock permits. Where full parity would mean re-implementing a backend subsystem (the config
+spec system, `ConditionSql`'s typed casts), the mock mirrors **acceptance** — the same inputs are refused,
+the same inputs render nothing — and says so at the branch.
+
 ## Why is this red (`<inspecto-ai-status>`, A4-status — shipped 2026-07-26)
 
 `inspecto/ai-assist/ai-status.component.ts` (the trigger) + `ai-status.dialog.ts` (the reads + render).
@@ -351,6 +357,47 @@ than the server is worse than no mock**: it converts a hard failure into a passi
 now strict about `flow`, and `agent.handler.spec.ts` exists specifically to pin that strictness. The same
 class of divergence produced a third, cosmetic one caught in the preview — the mock's echo omitted `active`,
 rendering a phantom *"active (removed)"* row in the operator's diff.
+
+### The cross-adopter audit that followed (2026-07-27, `feb6f6e7`)
+
+Every remaining adopter was cross-checked three ways — pane `[args]` vs the tool's `jsonSchema`, the tool's
+real Java result vs its `adaptToolResult` branch, and the mock branch vs both. **The enabling fact: nothing
+validates `args` against `jsonSchema`.** `AgentRoutes` passes the body's `args` to `runTool` verbatim and
+each tool hand-checks its own; a schema/pane mismatch only bites when the tool's Java body disagrees too,
+which is exactly how the `flow` bug reached production. Two more instances were found and fixed, both
+mock-side, and one defect was uncovered that is **still open**:
+
+1. **`query_author` — the mock read `when` flat.** The server renders it through `ConditionSql`, which
+   walks a **group** (`{op, items:[{field, operator, value}]}`, the comparison under `operator`). A tree it
+   cannot read contributes no constraint ⇒ SQL with **no `WHERE` at all**, `clean:true`, no findings. The
+   mock read `{field, op, value}` and fell back to a hardcoded `cost_usd > 100`, so the A2 button showed a
+   predicate the operator never asked for, and the A5.1 derive stand-in **emitted** the flat shape — teaching
+   the derive path the one argument shape that silently drops the filter. The mock now walks the same tree
+   and, like the server, emits no `WHERE` when nothing renders. ⚠ A **flat** `when` still renders nothing
+   rather than 422ing: that is deliberate parity — the server accepts and drops it, and a stricter mock
+   would hide that.
+2. **`component_draft` — the mock validated nothing.** The tool is a *validator*; the mock accepted any
+   `kind`, echoed it back as `type`, and only flagged an empty config, so every draft was `clean:true` and
+   the A5.2 repair loop could never be seen to run offline. It now mirrors `ConfigSpecs`' required paths
+   (`DRAFT_SPECS`), refuses an unvalidatable kind with 422, and resolves `alert-rule` → type `alert`.
+   ⚠ A **subset** by design — enums, parsability and cross-field rules are not re-implemented, because that
+   would be a second, drifting copy of the config system.
+
+⚠ **OPEN — `component_draft(kind='schema')` validates the wrong `schema`.** The word names two unrelated
+things: a **registry component** (`ComponentStore.WRITABLE_TYPES`, content a bare `{fields:[{name,type}]}` —
+what the Components pane authors and what `applySchemaDraft` reads back) and the **TOON schema config**
+(`ConfigSpecs.schema()`, `raw.name` *required*, `raw.fields`) — and `component_draft` resolves the latter. So
+the A5.2 adoption always draws *"Missing required field 'raw.name'"* against a real backend, and a repaired
+`{raw:{…}}` draft is one the pane cannot apply. Pinned as a failing-shape test rather than papered over. The
+fix is a design call — reshape what the pane drafts, or accept that registry components have **no
+`ConfigSpec` at all** and A5.2 needs a different validator. → `BACKLOG.md`.
+
+⚠ **OPEN — `projection_author`'s declared `columns.items` is stale.** The pane sends a `string[]`; the schema
+says `{"items":{"type":"object"}}`. The Java `columnNames` accepts both deliberately, and so does the mock,
+so nothing breaks on this route — but it is what a model reads on the `ask` path. → `BACKLOG.md`.
+
+The two clean adopters: **`suggest_expectations`** (args, result and adapter all agree) and
+**`projection_author`** apart from the schema note above.
 
 ## Not shipped
 
