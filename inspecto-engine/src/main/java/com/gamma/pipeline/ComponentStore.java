@@ -77,7 +77,15 @@ public final class ComponentStore {
                     // that pre-fills the pattern-match builder. Per-Space authored content rather than a
                     // reserved system Space — a Space's packs may fork from another's, deliberately. Absent
                     // any, the UI's shipped PATTERN_PACKS const stays the fallback.
-                    "pattern-pack");
+                    "pattern-pack",
+                    // Rule Template (data-table Pro Max "save as rule", 2026-07-27): a saved parameterized
+                    // query template (projection + condition group / SQL override + `:fieldValue` binds).
+                    // The UI's RulesService has spoken the /components contract since it shipped, but this
+                    // was the ONE kind never widened here — so list/save/remove all 400'd against a real
+                    // server while the mock served them happily. Named `rule-template`, never bare `rule`
+                    // (docs/GLOSSARY.md §0 — Rule is always qualified; the triad is Expectation /
+                    // Decision Rule / Alert Rule, and this is none of them).
+                    "rule-template");
 
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");

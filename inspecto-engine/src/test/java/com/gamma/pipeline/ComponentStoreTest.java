@@ -101,6 +101,29 @@ class ComponentStoreTest {
         assertEquals("out", ((Map<?, ?>) ((List<?>) steps).get(1)).get("direction"));
     }
 
+    /**
+     * Every writable type must own a registry directory, or its first write blows up at runtime rather
+     * than here. Guards the seam that let {@code rule-template} rot: the UI spoke a kind the server had
+     * never been widened to, and nothing on either side asserted the two agreed.
+     */
+    @Test
+    void everyWritableTypeHasARegistryDir() {
+        for (String type : ComponentStore.WRITABLE_TYPES)
+            assertTrue(ComponentRegistry.dirForType(type).isPresent(),
+                    "writable type '" + type + "' has no ComponentRegistry.TYPE_BY_DIR entry");
+    }
+
+    @Test
+    void writesARuleTemplateUnderItsOwnDir(@TempDir Path root) throws Exception {
+        ComponentStore store = new ComponentStore(root);
+        store.write("rule-template", "high_sev", Map.of("source", "alerts", "projection", List.of("rule", "severity")));
+
+        ComponentRegistry.Component c = store.get("rule-template", "high_sev").orElseThrow();
+        assertEquals("rule-template", c.type());
+        assertEquals("alerts", c.content().get("source"));
+        assertTrue(c.path().toString().replace('\\', '/').endsWith("rule-templates/high_sev.toon"));
+    }
+
     @Test
     void rejectsUnknownTypeUnsafeIdAndConnection(@TempDir Path root) {
         ComponentStore store = new ComponentStore(root);

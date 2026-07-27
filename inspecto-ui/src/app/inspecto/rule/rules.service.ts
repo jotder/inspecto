@@ -6,23 +6,26 @@ import { RuleTemplate } from './rule-types';
 
 /**
  * Rule template store — Pro Max. Persists {@link RuleTemplate}s through the reusable component registry as the
- * `rule` component type (mock-backed today like parser `grammar`; real backend later). Keeps the rest of the
- * app from knowing rules are "just components".
+ * `rule-template` component type. Keeps the rest of the app from knowing rule templates are "just components".
+ *
+ * Named `rule-template`, never bare `rule` (docs/GLOSSARY.md §0 — Rule is always qualified, and this is none
+ * of the Expectation / Decision Rule / Alert Rule triad). It was the one UI kind missing from the backend's
+ * `ComponentStore.WRITABLE_TYPES` until 2026-07-27, so all three methods here 400'd against a real server.
  */
 @Injectable({ providedIn: 'root' })
 export class RulesService {
     private components = inject(ComponentsService);
 
     list(): Observable<RuleTemplate[]> {
-        return this.components.list('rule').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
+        return this.components.list('rule-template').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
     }
 
     save(rule: RuleTemplate): Observable<RuleTemplate> {
-        return this.components.create('rule', { id: rule.id, ...toContent(rule) }).pipe(map(() => rule));
+        return this.components.create('rule-template', { id: rule.id, ...toContent(rule) }).pipe(map(() => rule));
     }
 
     remove(id: string): Observable<unknown> {
-        return this.components.remove('rule', id);
+        return this.components.remove('rule-template', id);
     }
 }
 

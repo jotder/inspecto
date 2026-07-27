@@ -23,12 +23,12 @@ export const GRAMMAR_KIND = atomicKind('grammar', 'Parser');
 export const SCHEMA_KIND = atomicKind('schema', 'Schema');
 export const TRANSFORM_KIND = atomicKind('transform', 'Transformer');
 export const SINK_KIND = atomicKind('sink', 'Writer');
-export const RULE_KIND = atomicKind('rule', 'Rule');
+export const RULE_TEMPLATE_KIND = atomicKind('rule-template', 'Rule Template');
 // A Requirement joins the reuse-graph via its `delivered-by` ref (`requirementRefs`, C1 follow-up).
 // Its "editor" is the Requirements pane (dialog-based detail, no /:id route).
 export const REQUIREMENT_KIND: ComponentKind = { ...atomicKind('requirement', 'Requirement'), authoring: { editorKey: 'requirement' } };
 
-const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, SCHEMA_KIND, TRANSFORM_KIND, SINK_KIND, RULE_KIND, REQUIREMENT_KIND];
+const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, SCHEMA_KIND, TRANSFORM_KIND, SINK_KIND, RULE_TEMPLATE_KIND, REQUIREMENT_KIND];
 
 /**
  * The `pipeline` composite kind. Its parts are the registry components its nodes bind (parser / transform /

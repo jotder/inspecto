@@ -3,12 +3,13 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
 
-/** The reusable component-registry kinds (mirrors backend `ComponentStore.WRITABLE_TYPES`). `rule` backs the
- *  data-table Pro Max rule templates; `dataset`/`widget`/`dashboard` back Studio; `requirement` backs the
- *  Business Requirements-intake queue (C1). The backend storage enum is still closed
- *  (grammar/schema/transform/sink) — the extra kinds are mock-served (unified mock store) until
- *  persistence is widened. None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
-export type ComponentType = 'grammar' | 'schema' | 'transform' | 'sink' | 'rule' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
+/** The reusable component-registry kinds (mirrors backend `ComponentStore.WRITABLE_TYPES`). `rule-template`
+ *  backs the data-table Pro Max saved query templates; `dataset`/`widget`/`dashboard` back Studio;
+ *  `requirement` backs the Business Requirements-intake queue (C1). Every kind here is backend-persisted —
+ *  keep this union in lockstep with `WRITABLE_TYPES`, since a kind the server does not know 400s on every
+ *  list/create/remove (that is exactly how `rule-template` stayed broken; the mock served it regardless).
+ *  None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
+export type ComponentType = 'grammar' | 'schema' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
 
 /** The component kinds, in palette order, for the list/editor. */
 export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'schema', 'transform', 'sink'];

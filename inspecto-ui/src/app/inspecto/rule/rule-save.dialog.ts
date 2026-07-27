@@ -24,8 +24,8 @@ export interface RuleSaveData {
 
 /**
  * Save-as-rule dialog (Pro Max). Names the template, lets the operator set a default value for each
- * condition-derived **parameter** (`:fieldValue`), and persists it via {@link RulesService} (the mock-backed
- * `rule` component type). Closes with the saved {@link RuleTemplate}.
+ * condition-derived **parameter** (`:fieldValue`), and persists it via {@link RulesService} (the
+ * `rule-template` component type). Closes with the saved {@link RuleTemplate}.
  */
 @Component({
     selector: 'app-rule-save-dialog',

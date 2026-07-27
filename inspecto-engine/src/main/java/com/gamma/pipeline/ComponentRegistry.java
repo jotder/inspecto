@@ -63,7 +63,8 @@ public final class ComponentRegistry {
             Map.entry("channels", "channel"),                       // Notification channel destinations — NotificationRoutes
             Map.entry("notification-rules", "notification-rule"),    // Authored notification rules — NotificationRoutes
             Map.entry("findings-specs", "findings-spec"),             // C3/D6: configurable Findings sections — GET /findings/{type}
-            Map.entry("pattern-packs", "pattern-pack"));              // V2 (c)/D16: Link-Analysis pattern packs
+            Map.entry("pattern-packs", "pattern-pack"),               // V2 (c)/D16: Link-Analysis pattern packs
+            Map.entry("rule-templates", "rule-template"));            // Pro Max saved query templates — RulesService
 
     /** The on-disk sub-directory (plural) for a component {@code type} (e.g. {@code grammar} → {@code grammars}). */
     public static Optional<String> dirForType(String type) {

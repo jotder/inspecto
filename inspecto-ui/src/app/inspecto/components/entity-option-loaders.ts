@@ -56,7 +56,7 @@ export function connectionOptionLoader(): AttributeOptionLoader {
 }
 
 /** The registry-store kinds a Requirement is plausibly delivered by (see componentRefOptionLoader). */
-const DELIVERABLE_KINDS = ['dataset', 'query', 'widget', 'dashboard', 'rule', 'reconciliation'] as const;
+const DELIVERABLE_KINDS = ['dataset', 'query', 'widget', 'dashboard', 'rule-template', 'reconciliation'] as const;
 
 /**
  * Cross-kind component references in the house `<kind>/<id>` form (requirements "Delivered via"
