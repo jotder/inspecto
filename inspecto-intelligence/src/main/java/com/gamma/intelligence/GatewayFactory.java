@@ -24,17 +24,31 @@ final class GatewayFactory {
     private GatewayFactory() {
     }
 
-    static LlmGateway build() {
+    /**
+     * The gateway, plus whether it is backed by a <b>real reachable model</b> rather than the offline stub.
+     *
+     * <p>The flag exists because the two cases are not interchangeable for AGT-6a A5: the deliberative
+     * {@code /ask} loop degrades gracefully into the stub's explanatory prose, but a natural-language
+     * <b>derive</b> hop cannot — with no model there are no tool arguments to derive, and answering "I could
+     * not understand you" would blame the operator's sentence for a deployment fact. The derive route turns
+     * {@code configured=false} into a <b>503</b> instead. Callers must not infer this with
+     * {@code instanceof StubLlmGateway}: a test injects a stub that <i>does</i> answer with tool calls, and
+     * that is a configured model as far as this distinction is concerned.
+     */
+    record Gateway(LlmGateway llm, boolean configured) {}
+
+    static Gateway build() {
         ModelSettings settings = ModelSettingsStore.load().orElseGet(() -> ModelSettings.defaults("ollama"));
         String modelId = settings.model("medium");
         if (settings.local() && settings.baseUrl() != null && modelId != null) {
             return switch (settings.provider()) {
-                case "ollama" -> new OllamaChatAdapter(settings.baseUrl(), modelId);
-                case "llamacpp" -> new OpenAiCompatibleChatAdapter(settings.baseUrl(), modelId, null);
-                default -> offlineStub(settings);
+                case "ollama" -> new Gateway(new OllamaChatAdapter(settings.baseUrl(), modelId), true);
+                case "llamacpp" ->
+                        new Gateway(new OpenAiCompatibleChatAdapter(settings.baseUrl(), modelId, null), true);
+                default -> new Gateway(offlineStub(settings), false);
             };
         }
-        return offlineStub(settings);
+        return new Gateway(offlineStub(settings), false);
     }
 
     private static LlmGateway offlineStub(ModelSettings settings) {

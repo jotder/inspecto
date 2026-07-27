@@ -100,6 +100,12 @@ former root reference docs** (each index lists them):
   **NFR-7 certifications plan, DRAFT 2026-07-23** (SOC 2 Type I → II → ISO 27001 → FedRAMP
   800-53 alignment/ATO-support; HIPAA/PCI scoping statements only); control-level coverage in
   §2b, workstreams C1–C6, sequencing sign-off pending.
+- [`superpower/postgres-multi-user-plan.md`](superpower/postgres-multi-user-plan.md) — **Postgres
+  multi-user backend, PLAN ONLY 2026-07-27, build not started** (BACKLOG §6 required a plan first).
+  Pool behind `JdbcDrivers`, scheme-derived sizing, schema-per-space; phases P0–P4. ⚠ Names four
+  things that break under a pool, chiefly `DbAcquisitionLedger.record()`'s DELETE+INSERT being atomic
+  only via the single connection + monitor — **a latent data bug worth fixing (P0) even if the rest
+  stays deferred**. Two operator questions open.
 - [`superpower/deployment-topology-plan.md`](superpower/deployment-topology-plan.md) — **deployment
   topology & operations plan, DRAFT 2026-07-24** — the client-facing deployment offering: tiers T1–T4
   (workstation → single hardened server → gateway-fronted Enterprise → active/passive DR) mapped 1:1 to

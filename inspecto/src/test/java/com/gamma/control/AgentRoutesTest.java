@@ -495,6 +495,113 @@ class AgentRoutesTest {
         }
     }
 
+    // ─── AGT-6a A5.1: POST /agent/tools/{name}/derive — the NL hop, one test per gate ───
+
+    @Test
+    void deriveIsNotSwallowedByTheGreedyToolRoute(@TempDir Path dir) throws Exception {
+        // THE registration-order trap. /agent/tools/(.+) is greedy and would match "query_author/derive"
+        // as a tool NAME, answering 404 for a route that exists. If this fails, the derive route was
+        // registered after its sibling.
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        try (Ctx ctx = open(dir, agent)) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"orders over 100\",\"args\":{\"dataset\":\"orders\"}}");
+            assertEquals(200, r.statusCode());
+            assertNull(agent.lastToolArgs, "the A1 route must not have handled this");
+            assertEquals("orders over 100", agent.lastDerivePrompt);
+        }
+    }
+
+    @Test
+    void deriveEchoesDerivedArgsAndLetsThePaneWinOnIdentity(@TempDir Path dir) throws Exception {
+        // derivedArgs is non-negotiable: with a model in the loop the operator must see what their
+        // sentence became before they Apply. The pane's dataset must survive the model's opinion.
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"orders over 100\",\"args\":{\"dataset\":\"orders\"}}");
+            assertEquals(200, r.statusCode());
+            JsonNode body = V1Body.of(r.body());
+            assertEquals("orders", body.get("derivedArgs").get("dataset").asText());
+            assertEquals("amount", body.get("derivedArgs").get("when").get("field").asText());
+            assertEquals("sql", body.get("value").get("type").asText());
+        }
+    }
+
+    @Test
+    void deriveIs503WhenTheModuleIsAbsent(@TempDir Path dir) throws Exception {
+        try (Ctx ctx = open(dir, null)) {
+            assertEquals(503, send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"x\"}").statusCode());
+        }
+    }
+
+    @Test
+    void deriveIs503WhenNoModelIsConfigured(@TempDir Path dir) throws Exception {
+        // Distinct from every 422 below on purpose. "This deployment has no model" is not the operator's
+        // sentence being wrong, and telling them to rephrase would be a lie they cannot act on.
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        agent.deriveNoModel = true;
+        try (Ctx ctx = open(dir, agent)) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"orders over 100\"}");
+            assertEquals(503, r.statusCode());
+            assertTrue(r.body().contains("no local model is configured"));
+        }
+    }
+
+    @Test
+    void deriveRefusesAMutatingToolBeforeAnyModelCall(@TempDir Path dir) throws Exception {
+        // The A1 draft-only invariant, inherited. NL input must not become a second way to act.
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        try (Ctx ctx = open(dir, agent)) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/component_apply/derive",
+                    "{\"prompt\":\"apply it\"}");
+            assertEquals(403, r.statusCode());
+            assertTrue(r.body().contains("mutating"));
+            assertNull(agent.lastDerivePrompt, "a mutating tool must be refused before the model is called");
+            assertNull(agent.appliedArgs);
+        }
+    }
+
+    @Test
+    void deriveIs400WithoutAPrompt(@TempDir Path dir) throws Exception {
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            assertEquals(400, send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"args\":{\"dataset\":\"orders\"}}").statusCode());
+            assertEquals(400, send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"   \"}").statusCode(), "blank is not a prompt");
+        }
+    }
+
+    @Test
+    void deriveIs404ForAnUnknownTool(@TempDir Path dir) throws Exception {
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> r = send(ctx.port(), "POST", "/agent/tools/no_such_tool/derive",
+                    "{\"prompt\":\"x\"}");
+            assertEquals(404, r.statusCode());
+            assertTrue(r.body().contains("no_such_tool"));
+        }
+    }
+
+    @Test
+    void theTwoModelFailuresAre422AndSayDifferentThings(@TempDir Path dir) throws Exception {
+        // Malformed arguments and "answered in prose, never called the tool" are different local-model
+        // failures. Both are retryable, so both are 422 — but an operator debugging one must not be
+        // reading the other's message.
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> malformed = send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"bad json\"}");
+            assertEquals(422, malformed.statusCode());
+            assertTrue(malformed.body().contains("malformed arguments"));
+
+            HttpResponse<String> silent = send(ctx.port(), "POST", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"silent\"}");
+            assertEquals(422, silent.statusCode());
+            assertTrue(silent.body().contains("did not produce arguments"));
+            assertFalse(silent.body().contains("malformed"), "the two failures must not share a message");
+        }
+    }
+
     /** A deterministic in-memory agent — no eoiagent/model dependency needed in the core test tree. */
     private static final class FakeIntelligenceAgent implements IntelligenceAgent {
         // Stand-in for the eoiagent GoalKind enum (not on the core test classpath).
@@ -532,6 +639,42 @@ class AgentRoutesTest {
         volatile Map<String, Object> lastToolArgs;
         volatile String lastToolSession;
         volatile Map<String, Object> appliedArgs;
+
+        // AGT-6a A5.1: a stand-in for the derive hop. The route's job is the gate order and the
+        // derivedArgs echo, so the "model" here is a fixed translation keyed off the prompt: "bad json"
+        // stands in for malformed output, "silent" for a model that answered in prose with no tool call,
+        // and anything else derives a condition. deriveNoModel flips the deployment-has-no-model case.
+        volatile boolean deriveNoModel;
+        volatile String lastDerivePrompt;
+        volatile Map<String, Object> lastDeriveArgs;
+
+        @Override
+        public java.util.Optional<Map<String, Object>> deriveTool(String name, String prompt,
+                                                                  Map<String, Object> args, String session) {
+            if ("component_apply".equals(name)) {   // refused BEFORE any model call, like the real impl
+                throw new IllegalStateException("tool 'component_apply' is mutating and is not invocable directly");
+            }
+            if (!"query_author".equals(name)) return java.util.Optional.empty();
+            if (deriveNoModel) {
+                throw new UnsupportedOperationException("no local model is configured, so a natural-language"
+                        + " request cannot be interpreted");
+            }
+            this.lastDerivePrompt = prompt;
+            this.lastDeriveArgs = args;
+            this.lastToolSession = session;
+            if ("bad json".equals(prompt))
+                return java.util.Optional.of(Map.of("ok", false,
+                        "error", "the model returned malformed arguments for 'query_author'"));
+            if ("silent".equals(prompt))
+                return java.util.Optional.of(Map.of("ok", false,
+                        "error", "the model did not produce arguments for 'query_author'"));
+            Map<String, Object> derived = new java.util.LinkedHashMap<>();
+            derived.put("when", Map.of("op", ">", "field", "amount", "value", 100));
+            derived.putAll(args);                    // the pane's identity fields win, as the SPI promises
+            return java.util.Optional.of(Map.of("ok", true,
+                    "value", Map.of("type", "sql", "text", "SELECT * FROM orders WHERE amount > 100"),
+                    "derivedArgs", derived));
+        }
 
         @Override
         public java.util.Optional<Map<String, Object>> runTool(String name, Map<String, Object> args, String session) {

@@ -285,6 +285,22 @@ export class QueriesComponent implements OnInit {
         };
     }
 
+    /**
+     * The args for the natural-language variant (AGT-6a A5.1) — **identity only, deliberately.**
+     *
+     * ⚠ The pane's args are applied AFTER the model's and win, which is right for `dataset` (the screen
+     * knows it, a model can hallucinate it) and fatal for `when`: passing the condition tree here would
+     * overwrite the condition the sentence just derived, and the feature would silently do nothing while
+     * looking like it worked. That is why this is a separate accessor and not {@link aiQueryArgs}.
+     */
+    aiPromptArgs(): Record<string, unknown> {
+        const name = String(this.form.controls.name.value ?? '').trim();
+        return {
+            dataset: this.form.controls.datasetId.value,
+            ...(name ? { name } : {}),
+        };
+    }
+
     /** The current SQL as the diff baseline — `query_author` returns a `{type,text,datasetId}` draft. */
     aiCurrentQuery(): Record<string, unknown> | null {
         const text = this.form.controls.type.value === 'sql' ? this.form.controls.text.value : this.structuredSql();

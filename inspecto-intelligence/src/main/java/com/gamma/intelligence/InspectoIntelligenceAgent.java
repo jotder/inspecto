@@ -42,6 +42,7 @@ import com.gamma.intelligence.policy.AutonomyPolicyStore;
 import com.gamma.intelligence.policy.OpsMonitor;
 import com.gamma.intelligence.action.ControlPlaneClient;
 import com.gamma.intelligence.store.AgentWriteRoot;
+import com.gamma.intelligence.pack.ArgumentDeriver;
 import com.gamma.intelligence.pack.InspectoPack;
 import com.gamma.intelligence.pack.Investigator;
 import com.gamma.pipeline.ComponentStore;
@@ -98,6 +99,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     // same ToolProvider the platform assembles from, so the two never drift. Empty until then.
     private Map<String, Tool> belt = Map.of();
     private final LlmGateway gatewayOverride;
+    /** Whether {@link #gateway} is a real reachable model rather than the offline stub — see A5's 503. */
+    private boolean modelConfigured;
     private CollectorService service;
     private InspectoPack pack;
     private AgentPlatform platform;
@@ -112,7 +115,17 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
 
     /** Test seam: an explicit gateway (e.g. a deterministic {@code StubLlmGateway}) skips {@link GatewayFactory}. */
     InspectoIntelligenceAgent(LlmGateway gatewayOverride) {
+        this(gatewayOverride, true);
+    }
+
+    /**
+     * Test seam for the A5 no-model degrade: an injected gateway that must be treated as <b>unconfigured</b>,
+     * so {@link #deriveTool} answers 503 the way a deployment with no local model does. The one-arg overload
+     * says "configured" because a stub wired with {@code replyToolCalls} is standing in for a real model.
+     */
+    InspectoIntelligenceAgent(LlmGateway gatewayOverride, boolean modelConfigured) {
         this.gatewayOverride = gatewayOverride;
+        this.modelConfigured = modelConfigured;
     }
 
     @Override
@@ -129,7 +142,13 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     public void start() {
         pack = new InspectoPack(service);
         contextBroker = new ContextBroker(service);
-        gateway = gatewayOverride != null ? gatewayOverride : GatewayFactory.build();
+        if (gatewayOverride != null) {
+            gateway = gatewayOverride;                     // modelConfigured came from the test ctor
+        } else {
+            GatewayFactory.Gateway built = GatewayFactory.build();
+            gateway = built.llm();
+            modelConfigured = built.configured();
+        }
         PlatformBuilder builder = new PlatformBuilder().pack(pack).llmGateway(gateway);
         // P3 (L2): supply the human-in-the-loop approval handler only when the act tier is opted in.
         // The pack config enables MUTATING_ACTIONS off the same flag, so tools + gate move in lockstep;
@@ -260,6 +279,43 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         } else {
             view.put("error", result.error());
         }
+        return Optional.of(view);
+    }
+
+    /**
+     * AGT-6a A5.1: derive one tool's arguments from an operator sentence, then invoke it through the
+     * <b>same deterministic path</b> {@link #runTool} uses. The model contributes arguments and nothing
+     * else — it never reaches the tool, the draft, or the answer.
+     *
+     * <p>Gate order matters and is asserted by tests: unknown tool → empty (404) · <b>mutating → refused
+     * before any model call</b> (403) · no model configured → {@link UnsupportedOperationException} (503)
+     * · malformed or absent arguments → an {@code ok=false} result (422, two distinct messages).
+     * The mutating check precedes the model call deliberately: a refused tool must cost nothing and, more
+     * importantly, must never have its arguments composed as if the call were going to happen.
+     *
+     * <p>The returned map is {@link #runTool}'s, plus {@code derivedArgs} — what the sentence became.
+     * That echo is not decoration: once a model is in the loop the operator has to see the structure
+     * before they Apply, and it is the field the specs assert on.
+     */
+    @Override
+    public Optional<Map<String, Object>> deriveTool(String name, String prompt, Map<String, Object> args,
+                                                    String session) {
+        Tool tool = belt.get(name);
+        if (tool == null) return Optional.empty();
+        if (tool.spec().mutating()) {
+            throw new IllegalStateException("tool '" + name + "' is mutating and is not invocable directly"
+                    + " — mutating tools run only through the approval spine");
+        }
+        if (!modelConfigured) {
+            throw new UnsupportedOperationException("no local model is configured, so a natural-language"
+                    + " request cannot be interpreted — configure one under Assist Settings, or fill the"
+                    + " form directly");
+        }
+        ArgumentDeriver.Derivation derived = ArgumentDeriver.derive(gateway, tool.spec(), prompt, args);
+        if (!derived.ok()) return Optional.of(Map.of("ok", false, "error", derived.error()));
+
+        Map<String, Object> view = new HashMap<>(runTool(name, derived.args(), session).orElseThrow());
+        view.put("derivedArgs", derived.args());
         return Optional.of(view);
     }
 

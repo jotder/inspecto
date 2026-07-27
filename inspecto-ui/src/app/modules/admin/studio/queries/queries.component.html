@@ -120,6 +120,21 @@
                     disabledReason="Choose a dataset first"
                     (applyDraft)="applyQueryDraft($event)"
                 ></inspecto-ai-assist>
+                <!-- AGT-6a A5.1: the same tool, but the condition comes from a sentence. Queries is the
+                     flagship (plan D10) — it has the smallest nested payload and the highest daily value.
+                     ⚠ [args] is aiPromptArgs(), NOT aiQueryArgs(): pane args win, so passing the existing
+                     condition tree here would overwrite the one just derived. -->
+                <inspecto-ai-assist
+                    tool="query_author"
+                    prompting
+                    [args]="aiPromptArgs()"
+                    [current]="aiCurrentQuery()"
+                    label="Describe the query"
+                    promptHint="orders over 100 in the last week"
+                    [disabled]="!form.controls.datasetId.value"
+                    disabledReason="Choose a dataset first"
+                    (applyDraft)="applyQueryDraft($event)"
+                ></inspecto-ai-assist>
                 <span class="flex-auto"></span>
                 <button mat-button type="button" (click)="cancel()">Cancel</button>
                 <button mat-flat-button color="primary" type="submit" [disabled]="saving()">Save</button>

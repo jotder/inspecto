@@ -292,7 +292,7 @@ between A5.1 and A5.2, and pretending otherwise is how this phase overruns.
 
 | # | Slice | Effort | Deliverable |
 |---|---|---|---|
-| **A5.1** | The hop, on `query_author` | M | `/derive` route + gate order + single-offered-tool call + `derivedArgs` echo + the three distinct failure answers (503 stub / 422 `_raw` / 422 no-call). `ai-assist` gains an optional prompt input, hidden unless the pane opts in. Offline mock branch. |
+| **A5.1** ✅ **SHIPPED 2026-07-27** | The hop, on `query_author` | M | `/derive` route + gate order + single-offered-tool call + `derivedArgs` echo + the three distinct failure answers (503 stub / 422 `_raw` / 422 no-call). `ai-assist` gains an optional prompt input, hidden unless the pane opts in. Offline mock branch. |
 | **A5.2** | `ConfigSpec` → JSON Schema projection + the bounded repair loop, on `component_draft` | L | The F3 projection (un-flattened, `visibleWhen` excluded) + N-turn repair feeding findings back, with a hard turn cap. This is where the phase's cost is. |
 | **A5.3** | `pipeline_author` | M | Only after A5.2 proves convergence on a local model. |
 

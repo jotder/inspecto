@@ -19,6 +19,25 @@ import { PIPELINES_COLL } from './pipelines.handler';
  */
 
 const TOOLS = /\/agent\/tools\/([^/?]+)$/;
+/** AGT-6a A5.1. Matched BEFORE {@link TOOLS}, mirroring the backend's route-registration order. */
+const DERIVE = /\/agent\/tools\/([^/?]+)\/derive$/;
+
+/**
+ * The offline stand-in for the model hop: a deliberately crude sentence → condition reader. It exists so
+ * the surface's derive path — the prompt box, the `derivedArgs` echo, and both failure answers — is
+ * exercisable with no backend and no model, not to be a language model.
+ *
+ * Honest about what it is: it recognises `<field> over|under|above|below <number>` and nothing else. A
+ * sentence it cannot read yields **no condition**, which the caller turns into the same retryable 422 a
+ * real local model produces when it answers in prose — never a silently empty filter that looks like it
+ * worked.
+ */
+function readCondition(prompt: string): Record<string, unknown> | null {
+    const m = /(\w+)\s+(over|above|greater than|under|below|less than)\s+(-?\d+(?:\.\d+)?)/i.exec(prompt);
+    if (!m) return null;
+    const greater = /over|above|greater/i.test(m[2]);
+    return { op: greater ? '>' : '<', field: m[1].toLowerCase(), value: Number(m[3]) };
+}
 
 /** Stand-in for the real belt's mutating act tools, which the route refuses with 403. */
 const MUTATING = new Set([
@@ -114,6 +133,34 @@ export function agentHandler(flags: MockFlags): MockHandler {
         if (!flags.mockOps) return undefined;
         if (req.method !== 'POST') return undefined;
         const space = req.space;
+
+        // AGT-6a A5.1 — the derive hop. Checked FIRST, because /agent/tools/([^/?]+)$ would otherwise
+        // never match this URL at all and the route would 404 offline while working against a real
+        // backend. Rather than reimplement each tool's offline body, it derives the arguments and then
+        // RE-ENTERS this same handler on the deterministic URL: the two paths cannot drift, which is
+        // exactly the property the backend gets by reusing runTool.
+        const d = match(req.url, DERIVE);
+        if (d) {
+            const tool = d[1];
+            if (MUTATING.has(tool))          // refused before any "model" runs, like the real route
+                return error(403, `tool '${tool}' is mutating and is not invocable directly`);
+            const prompt = typeof (req.body as { prompt?: unknown } | null)?.prompt === 'string'
+                ? String((req.body as { prompt: string }).prompt).trim() : '';
+            if (!prompt) return error(400, 'prompt is required');
+            if (tool !== 'query_author')
+                return error(404, `unknown tool: '${tool}'`);   // A5.1 ships one NL tool; A5.2/A5.3 add more
+            const when = readCondition(prompt);
+            if (!when)
+                return error(422, `the model did not produce arguments for '${tool}'`
+                    + ' — rephrase the request, or fill the form directly');
+            // Schema-keyed, pane-wins: the same merge order the backend does.
+            const derivedArgs = { when, ...argsOf(req) };
+            const inner = agentHandler(flags)(
+                { ...req, url: req.url.replace(/\/derive$/, ''), body: { args: derivedArgs } }, store);
+            if (!inner || (inner.status ?? 200) >= 400) return inner;
+            return json({ value: inner.body, derivedArgs });
+        }
+
         const m = match(req.url, TOOLS);
         if (!m) return undefined;
 
@@ -167,6 +214,13 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 if (!dataset) return error(422, 'dataset is required');
                 const when = args['when'];
                 const hasFilter = typeof when === 'object' && when !== null && Object.keys(when).length > 0;
+                // Render the actual condition when it carries one (the A5.1 derive path always does).
+                // The old fixed `cost_usd > 100` predates NL input; leaving it would show a WHERE clause
+                // that contradicts the derivedArgs echo right above it, which reads as a bug in the feature.
+                const w = (when ?? {}) as { field?: unknown; op?: unknown; value?: unknown };
+                const predicate = typeof w.field === 'string' && typeof w.op === 'string' && w.value !== undefined
+                    ? `${w.field} ${w.op} ${typeof w.value === 'number' ? w.value : `'${String(w.value)}'`}`
+                    : 'cost_usd > 100';
                 const name = text(args, 'name');
                 return json({
                     kind: 'query',
@@ -176,7 +230,7 @@ export function agentHandler(flags: MockFlags): MockHandler {
                     draft: {
                         type: 'sql',
                         // The real tool renders trusted SQL server-side — the model never writes SQL text.
-                        text: `SELECT * FROM (SELECT * FROM ${dataset}) AS __q${hasFilter ? ' WHERE cost_usd > 100' : ''}`,
+                        text: `SELECT * FROM (SELECT * FROM ${dataset}) AS __q${hasFilter ? ` WHERE ${predicate}` : ''}`,
                         datasetId: dataset,
                     },
                 });

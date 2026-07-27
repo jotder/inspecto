@@ -30,6 +30,19 @@ export interface AgentAskResult {
 }
 
 /**
+ * POST /agent/tools/{name}/derive result (AGT-6a A5.1). `value` is exactly what the tool itself
+ * returned — the same shape {@link AgentService.runTool} yields — and `derivedArgs` is what the
+ * operator's sentence became.
+ *
+ * `derivedArgs` is not decoration. With a model in the loop the operator has to see the structure
+ * before they apply anything, or the draft is magic; the surface renders it above the diff.
+ */
+export interface DeriveResult<T> {
+    value: T;
+    derivedArgs: Record<string, unknown>;
+}
+
+/**
  * POST /agent/tools/component_draft result (AGT-6a A1) — a config validated against the same
  * structural spec + safety gate the control plane enforces on write. `clean` false with `findings`
  * is a SUCCESSFUL call: the findings are the repair loop, anchored to the offending field by
@@ -145,6 +158,23 @@ export class AgentService {
      */
     runTool<T>(name: string, args: Record<string, unknown>): Observable<T> {
         return this.http.post<T>(apiUrl(`/agent/tools/${encodeURIComponent(name)}`), { args });
+    }
+
+    /**
+     * {@link runTool}, but the tool's arguments come from one operator sentence (AGT-6a A5.1). The model
+     * produces only the ARGUMENTS; the tool then runs deterministically, so the draft-only, diff-and-apply
+     * contract above is unchanged — this adds a natural-language input, not a new way to act.
+     *
+     * `args` is the pane's own context and is applied AFTER the model's, so it wins: the screen knows which
+     * dataset is open and a model can hallucinate one.
+     *
+     * Status contract adds one code to {@link runTool}'s: **503 also means "no local model is configured"**,
+     * which is deliberately not a 422 — the operator's sentence is not the problem and asking them to
+     * rephrase would be a lie. 422 stays "the model produced nothing usable", and is retryable.
+     */
+    deriveTool<T>(name: string, prompt: string, args: Record<string, unknown>): Observable<DeriveResult<T>> {
+        return this.http.post<DeriveResult<T>>(
+            apiUrl(`/agent/tools/${encodeURIComponent(name)}/derive`), { prompt, args });
     }
 
     /**

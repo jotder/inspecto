@@ -1,4 +1,21 @@
 <div class="inspecto-ai-assist">
+    <!-- AGT-6a A5.1, opt-in per pane: the sentence that becomes the tool's arguments. Enter submits, so
+         the box behaves like every other single-field control in the app. -->
+    @if (prompting()) {
+        <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <mat-label>{{ label() }}</mat-label>
+            <input
+                matInput
+                type="text"
+                [placeholder]="promptHint()"
+                [value]="prompt()"
+                [disabled]="unavailable() || noModel() || !canAuthor()"
+                (input)="setPrompt($any($event.target).value)"
+                (keydown.enter)="run()"
+            />
+        </mat-form-field>
+    }
+
     <!-- The invocation affordance. Never hidden when blocked — a disabled control with a reason is
          discoverable, whereas a vanished one just looks broken. -->
     <button
@@ -14,8 +31,15 @@
         } @else {
             <mat-icon svgIcon="heroicons_outline:sparkles" />
         }
-        <span>{{ running() ? 'Working…' : label() }}</span>
+        <span>{{ running() ? 'Working…' : prompting() ? 'Draft it' : label() }}</span>
     </button>
+
+    @if (noModel()) {
+        <inspecto-alert variant="info" title="No local model configured" class="mt-3 block">
+            This backend has no local model, so a written request cannot be interpreted. Configure one under
+            Assist Settings — everything else on this screen works as usual.
+        </inspecto-alert>
+    }
 
     @if (unavailable()) {
         <inspecto-alert variant="info" title="AI assistance unavailable" class="mt-3 block">
@@ -67,6 +91,24 @@
                         </div>
                         @if (draft.note) {
                             <p class="mt-1 text-sm text-secondary">{{ draft.note }}</p>
+                        }
+
+                        <!-- What the sentence became. Non-negotiable once a model is in the loop: the
+                             operator reviews the STRUCTURE, not just the rendered result, before applying. -->
+                        @if (derivedRows().length > 0) {
+                            <!-- A <dl> may only directly contain dt/dd (or a div wrapping a pair), so the
+                                 caption is a sibling, not a child — axe flags it as `definition-list`. -->
+                            <section class="mt-3 rounded-md border border-gray-200 p-3 text-sm dark:border-gray-700">
+                                <h4 class="mb-2 font-medium">Interpreted as</h4>
+                                <dl>
+                                    @for (row of derivedRows(); track row.key) {
+                                        <div class="flex gap-2">
+                                            <dt class="font-normal text-secondary"><code>{{ row.key }}</code></dt>
+                                            <dd class="break-all">{{ row.value }}</dd>
+                                        </div>
+                                    }
+                                </dl>
+                            </section>
                         }
 
                         <!-- Anchored findings: fieldPath is what makes a finding actionable, so it is

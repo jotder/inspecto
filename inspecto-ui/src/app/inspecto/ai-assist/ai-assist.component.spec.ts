@@ -20,23 +20,42 @@ const SUGGEST_RESULT = {
     ],
 };
 
+/** The A5.1 derive envelope: the tool's own value, plus what the sentence became. */
+const DERIVE_RESULT = {
+    value: {
+        kind: 'query',
+        clean: true,
+        findings: [],
+        draft: { type: 'sql', text: 'SELECT * FROM orders WHERE amount > 100', datasetId: 'orders' },
+    },
+    derivedArgs: { when: { op: '>', field: 'amount', value: 100 }, dataset: 'orders' },
+};
+
 describe('AiAssistComponent', () => {
     let runTool: ReturnType<typeof vi.fn>;
+    let deriveTool: ReturnType<typeof vi.fn>;
     let toastr: { error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
 
     beforeEach(() => {
         // LensService persists the chosen lens — state leaks across specs otherwise.
         localStorage.removeItem('inspecto.currentLens');
         runTool = vi.fn();
+        deriveTool = vi.fn();
         toastr = { error: vi.fn(), info: vi.fn() };
     });
 
-    function create(options: { canAuthor?: boolean; tool?: 'suggest_expectations' | 'component_draft' } = {}) {
+    function create(
+        options: {
+            canAuthor?: boolean;
+            tool?: 'suggest_expectations' | 'component_draft' | 'query_author';
+            prompting?: boolean;
+        } = {},
+    ) {
         TestBed.configureTestingModule({
             imports: [AiAssistComponent],
             providers: [
                 provideNoopAnimations(),
-                { provide: AgentService, useValue: { runTool } },
+                { provide: AgentService, useValue: { runTool, deriveTool } },
                 { provide: LensService, useValue: { canAuthorWorkbench: signal(options.canAuthor ?? true) } },
                 { provide: ToastrService, useValue: toastr },
             ],
@@ -44,6 +63,7 @@ describe('AiAssistComponent', () => {
         const fixture = TestBed.createComponent(AiAssistComponent);
         fixture.componentRef.setInput('tool', options.tool ?? 'suggest_expectations');
         fixture.componentRef.setInput('args', { table: 'cdr', column: 'cost_usd' });
+        if (options.prompting) fixture.componentRef.setInput('prompting', true);
         fixture.detectChanges();
         return fixture;
     }
@@ -192,6 +212,85 @@ describe('AiAssistComponent', () => {
 
         button().click();
         expect(runTool).toHaveBeenCalled();
+    });
+
+    // ── AGT-6a A5.1: the natural-language mode ──
+
+    it('renders no prompt box unless the pane opts in', () => {
+        // Plan D10: opt-in per pane. A box on a tool whose input the screen already holds is theatre.
+        const fixture = create();
+        expect((fixture.nativeElement as HTMLElement).querySelector('input')).toBeNull();
+        expect(fixture.componentInstance.blocked()).toBe(false);
+    });
+
+    it('derives from the sentence and echoes derivedArgs before the operator can apply', () => {
+        deriveTool.mockReturnValue(of(DERIVE_RESULT));
+        const fixture = create({ tool: 'query_author', prompting: true });
+        // Empty prompt blocks — there is nothing to send, and the reason is stated, not silent.
+        expect(fixture.componentInstance.blocked()).toBe(true);
+        expect(fixture.componentInstance.blockedReason()).toContain('Describe what you want');
+
+        fixture.componentInstance.setPrompt('  orders over 100  ');
+        fixture.detectChanges();
+        clickRun(fixture);
+
+        // Trimmed, and the pane's own args ride along so the model needn't guess them.
+        expect(deriveTool).toHaveBeenCalledWith('query_author', 'orders over 100', {
+            table: 'cdr',
+            column: 'cost_usd',
+        });
+        // The tool's value is UNWRAPPED, so every existing adapter and the diff behave identically.
+        expect(fixture.componentInstance.drafts()).toHaveLength(1);
+        expect(fixture.componentInstance.derivedArgs()).toEqual(DERIVE_RESULT.derivedArgs);
+        // The echo is rendered, not merely held: with a model in the loop Apply must not be blind.
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Interpreted as');
+        expect(text).toContain('amount');
+    });
+
+    it('latches a 503 as "no model" WITHOUT disabling the deterministic surface', () => {
+        // The two 503s are different walls. No model configured must not read as "the module is absent",
+        // because the deterministic affordance on the same pane still works.
+        deriveTool.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+        const fixture = create({ tool: 'query_author', prompting: true });
+        fixture.componentInstance.setPrompt('orders over 100');
+        fixture.detectChanges();
+        clickRun(fixture);
+
+        expect(fixture.componentInstance.noModel()).toBe(true);
+        expect(fixture.componentInstance.unavailable()).toBe(false);
+        expect(fixture.componentInstance.blockedReason()).toContain('No local model');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('No local model configured');
+    });
+
+    it('keeps a 422 retryable and leaves the operator their sentence', () => {
+        deriveTool.mockReturnValue(
+            throwError(
+                () =>
+                    new HttpErrorResponse({
+                        status: 422,
+                        error: { error: { message: 'the model did not produce arguments' } },
+                    }),
+            ),
+        );
+        const fixture = create({ tool: 'query_author', prompting: true });
+        fixture.componentInstance.setPrompt('something unparseable');
+        fixture.detectChanges();
+        clickRun(fixture);
+
+        expect(toastr.error).toHaveBeenCalledWith('the model did not produce arguments');
+        expect(fixture.componentInstance.noModel()).toBe(false);
+        expect(fixture.componentInstance.prompt()).toBe('something unparseable');
+        expect(fixture.componentInstance.blocked()).toBe(false);
+    });
+
+    it('has no a11y violations in prompt mode', async () => {
+        deriveTool.mockReturnValue(of(DERIVE_RESULT));
+        const fixture = create({ tool: 'query_author', prompting: true });
+        fixture.componentInstance.setPrompt('orders over 100');
+        fixture.detectChanges();
+        clickRun(fixture);
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('recomputes the diff when the pane changes [current] while a draft is shown', () => {

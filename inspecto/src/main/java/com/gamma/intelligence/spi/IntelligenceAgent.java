@@ -99,6 +99,37 @@ public interface IntelligenceAgent extends AutoCloseable {
     }
 
     /**
+     * {@link #runTool}, but the arguments come from <b>one operator sentence</b> (AGT-6a A5.1). The model
+     * produces the tool's arguments and nothing else; the tool then runs through the same deterministic
+     * path, so every property of {@code runTool} — draft-only, result verbatim, no paraphrase — survives.
+     *
+     * <p>Implementations MUST keep this gate order, because the surface's safety rests on it:
+     * <ol>
+     *   <li>unknown tool → empty ({@code 404});</li>
+     *   <li><b>mutating tool → {@link IllegalStateException} BEFORE any model call</b> ({@code 403}). A
+     *       refused tool must never have arguments composed for it;</li>
+     *   <li>no model configured → {@link UnsupportedOperationException} ({@code 503}). This is
+     *       deliberately <b>not</b> an {@code ok=false} result: "this deployment has no model" is not the
+     *       operator's sentence being wrong, and telling them to rephrase would be a lie;</li>
+     *   <li>malformed or absent model output → an {@code ok=false} result ({@code 422}), retryable.</li>
+     * </ol>
+     *
+     * <p>The result is {@link #runTool}'s map plus <b>{@code derivedArgs}</b> — what the sentence became.
+     * The surface shows it before the operator applies anything; with a model in the loop that echo is
+     * what makes the draft reviewable rather than magic.
+     *
+     * @param prompt the operator's sentence
+     * @param args   arguments the pane already knows (dataset, table, open component id). Applied <b>after</b>
+     *               the model's, so they win — the screen knows these and a model can hallucinate them.
+     * @throws IllegalStateException         when the named tool is mutating (→ 403)
+     * @throws UnsupportedOperationException when no model is configured (→ 503)
+     */
+    default Optional<Map<String, Object>> deriveTool(String name, String prompt, Map<String, Object> args,
+                                                     String session) {
+        return Optional.empty();
+    }
+
+    /**
      * The most recent investigation Cases (AGT-5 P1 slice D), newest first, as plain JSON-friendly
      * maps — the core stays free of the {@code Case} record type, which lives in the optional
      * {@code file-processor-intelligence} module. Default empty: an implementation without an

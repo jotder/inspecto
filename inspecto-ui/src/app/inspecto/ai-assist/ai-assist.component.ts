@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input, output, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
@@ -40,7 +42,9 @@ import { AiDraft, AiToolName, adaptToolResult, configDiff } from './ai-draft';
     standalone: true,
     imports: [
         MatButtonModule,
+        MatFormFieldModule,
         MatIconModule,
+        MatInputModule,
         MatProgressSpinnerModule,
         MatTooltipModule,
         InspectoAlertComponent,
@@ -70,6 +74,20 @@ export class AiAssistComponent {
     /** Button label; panes phrase it in their own vocabulary ("Suggest expectations", "Draft SQL"). */
     readonly label = input('Suggest with AI');
 
+    /**
+     * Opt in to natural-language input (AGT-6a A5.1): a prompt box whose sentence the backend turns into
+     * the tool's arguments before running it deterministically.
+     *
+     * **Opt-in per pane, deliberately (plan D10) — not a default.** Four of the five L1 tools take
+     * structured input the pane already holds, and a prompt box on those is theatre: on Expectations, for
+     * instance, the dialog already knows `table` and `column`, and profiling them is deterministic SQL.
+     * A box that asks for what the screen can see makes the feature look clever and be worse.
+     */
+    readonly prompting = input(false, { transform: booleanAttribute });
+
+    /** Placeholder for the prompt box — panes phrase an example in their own domain. */
+    readonly promptHint = input('Describe what you want');
+
     /** Set when the pane itself knows the action is unavailable (e.g. no column selected yet). */
     readonly disabled = input(false, { transform: booleanAttribute });
 
@@ -81,6 +99,12 @@ export class AiAssistComponent {
 
     readonly running = signal(false);
     readonly drafts = signal<AiDraft[] | null>(null);
+    /** The operator's sentence, when {@link prompting} is on. */
+    readonly prompt = signal('');
+    /** What the sentence became — shown before Apply, so a model-derived draft is never magic. */
+    readonly derivedArgs = signal<Record<string, unknown> | null>(null);
+    /** Set when there is no model to interpret a sentence — distinct from {@link unavailable}. */
+    readonly noModel = signal(false);
     /** Set when the intelligence module is absent (503) — the affordance stays disabled thereafter. */
     readonly unavailable = signal(false);
     readonly showUnchanged = signal(false);
@@ -90,12 +114,22 @@ export class AiAssistComponent {
     readonly canAuthor = computed(() => this.lens.canAuthorWorkbench());
 
     readonly blocked = computed(
-        () => this.disabled() || this.running() || this.unavailable() || !this.canAuthor(),
+        () =>
+            this.disabled() ||
+            this.running() ||
+            this.unavailable() ||
+            !this.canAuthor() ||
+            // In prompt mode there is nothing to send until the operator has written a sentence, and a
+            // no-model backend can never interpret one — but the pane's other affordances stay untouched.
+            (this.prompting() && (this.noModel() || this.prompt().trim().length === 0)),
     );
 
     readonly blockedReason = computed(() => {
         if (this.unavailable()) return 'The intelligence module is not available on this backend.';
         if (!this.canAuthor()) return 'Your current lens cannot author configuration.';
+        if (this.prompting() && this.noModel())
+            return 'No local model is configured on this backend, so a written request cannot be interpreted.';
+        if (this.prompting() && this.prompt().trim().length === 0) return 'Describe what you want first.';
         return this.disabledReason();
     });
 
@@ -118,22 +152,43 @@ export class AiAssistComponent {
         if (this.blocked()) return;
         this.running.set(true);
         this.drafts.set(null);
+        this.derivedArgs.set(null);
         this.selected.set(0);
-        this.agent.runTool<unknown>(this.tool(), this.args()).subscribe({
+        const call = this.prompting()
+            ? this.agent.deriveTool<unknown>(this.tool(), this.prompt().trim(), this.args())
+            : this.agent.runTool<unknown>(this.tool(), this.args());
+        call.subscribe({
             next: (result) => {
                 this.running.set(false);
-                this.drafts.set(adaptToolResult(this.tool(), result));
+                // The derive route wraps the tool's own value alongside derivedArgs; the A1 route returns
+                // the value bare. Unwrap so every downstream adapter and the diff stay identical.
+                if (this.prompting()) {
+                    const wrapped = result as { value: unknown; derivedArgs: Record<string, unknown> };
+                    this.derivedArgs.set(wrapped?.derivedArgs ?? null);
+                    this.drafts.set(adaptToolResult(this.tool(), wrapped?.value));
+                } else {
+                    this.drafts.set(adaptToolResult(this.tool(), result));
+                }
             },
             error: (err: unknown) => {
                 this.running.set(false);
-                // 503 = the module is absent. That is not a failure of this pane, so latch it and
-                // degrade the affordance rather than letting the operator retry into the same wall.
                 const status = (err as { status?: number })?.status;
+                // 503 = the module is absent, OR (prompt mode) no local model is configured. Both are
+                // deployment facts rather than failures of this pane, so latch and explain instead of
+                // letting the operator retry into the same wall — but they are DIFFERENT walls: with no
+                // model the deterministic affordance still works, so only the prompt box degrades.
                 if (status === 503) {
-                    this.unavailable.set(true);
-                    this.toastr.info('AI assistance is not available on this backend.');
+                    if (this.prompting()) {
+                        this.noModel.set(true);
+                        this.toastr.info('No local model is configured, so written requests cannot be interpreted.');
+                    } else {
+                        this.unavailable.set(true);
+                        this.toastr.info('AI assistance is not available on this backend.');
+                    }
                     return;
                 }
+                // 422 in prompt mode = the model produced nothing usable. Retryable, and the operator's
+                // own words are the thing to change, so the message is theirs and the box keeps its text.
                 this.toastr.error(apiErrorMessage(err, 'The suggestion could not be produced.'));
             },
         });
@@ -150,9 +205,25 @@ export class AiAssistComponent {
 
     dismiss(): void {
         this.drafts.set(null);
+        this.derivedArgs.set(null);
         this.selected.set(0);
         this.showUnchanged.set(false);
     }
+
+    setPrompt(value: string): void {
+        this.prompt.set(value);
+    }
+
+    /** The derived arguments as label/value rows, so the echo renders without a JSON dump. */
+    readonly derivedRows = computed(() => {
+        const derived = this.derivedArgs();
+        return derived
+            ? Object.entries(derived).map(([key, value]) => ({
+                  key,
+                  value: typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value),
+              }))
+            : [];
+    });
 
     toggleUnchanged(): void {
         this.showUnchanged.update((v) => !v);

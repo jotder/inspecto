@@ -209,6 +209,64 @@ Entity/Link mean something here that the glossary explicitly bans using for arti
 that has nothing real to cite offline. Definitions are copied **verbatim** — a paraphrase would put a
 second, drifting definition of the binding vocabulary in the codebase.
 
+## Natural-language authoring (A5.1 — shipped 2026-07-27)
+
+`POST /agent/tools/{name}/derive` (`{prompt, args}`) turns one operator sentence into **the tool's
+arguments**, then runs the tool through the **same deterministic path** `runTool` uses. The model
+contributes arguments and nothing else — it never reaches the tool, the draft, or the answer. On the
+surface this is a **mode of `<inspecto-ai-assist>`** (`prompting`), not a fourth sibling: the draft,
+diff, Apply and `canAuthorWorkbench` gate are all unchanged, only the input differs.
+
+Adopted on **Queries only** (plan D10: opt-in per pane). A prompt box on a tool whose input the screen
+already holds is theatre — Expectations knows its `table`+`column`, and profiling them is deterministic
+SQL.
+
+**Containment is the request shape, not a policy.** `ArgumentDeriver` builds a `ChatRequest` offering
+**exactly one** non-mutating tool and reads only that call's `arguments`, so the model cannot select
+another tool or enter the deliberative loop's tool-choice/paraphrase steps. Nothing downstream has to
+remember a rule.
+
+Load-bearing details, each of which is a way this could have gone wrong:
+
+- ⚠ **The merge is schema-keyed, never `putAll`.** `query_author`'s safety story is that the *server*
+  renders the SQL and `SqlGuard`-checks it. A model that helpfully emits `sql`/`text` has those keys
+  **dropped** — a blind merge would have made the model a SQL author through the back door. Pinned by
+  `ArgumentDeriverTest.aModelEmittedSqlKeyIsDroppedNotSpliced`. An **unreadable schema drops everything**
+  and keeps only the pane's args (fail closed).
+- ⚠ **Pane args are applied LAST and win** — the screen knows which Dataset is open, a model can
+  hallucinate one. This has a sharp edge for adopters: the Queries pane passes **`aiPromptArgs()`, not
+  `aiQueryArgs()`**, because `aiQueryArgs` carries the existing `when` tree and would overwrite the
+  condition the sentence just derived — the feature would silently do nothing while looking like it
+  worked. **A new adopter must pass identity fields only.**
+- ⚠ **Three failures, three answers, deliberately distinct.** No model configured → **503**; malformed
+  arguments (`_raw`) → **422**; a prose answer with no tool call → **422 with a different message**.
+  Conflating them blames the operator's sentence for a deployment fact. On the surface the 503 sets
+  `noModel`, which is **not** `unavailable`: the deterministic affordance on the same pane still works,
+  so only the prompt box degrades.
+- ⚠ **Mutating tools are refused BEFORE any model call**, inheriting A1's draft-only invariant — a
+  refused tool must never have arguments composed for it.
+- ⚠ **Route order.** `POST /agent/tools/(.+)/derive` is registered **before** the greedy
+  `POST /agent/tools/(.+)`, which would otherwise match `query_author/derive` as a tool *name* and 404.
+  Same reason `/agent/cases/{id}/similar` precedes `/agent/cases/(.+)`. Pinned by
+  `AgentRoutesTest.deriveIsNotSwallowedByTheGreedyToolRoute`.
+- ⚠ **The derive route is as ungated as its A1 sibling** — no `Role`, no `Capability`. Do not add a
+  half-gate to one of the two routes; the authoring gates are the UI's `canAuthorWorkbench` and the
+  edition's write seam.
+- `derivedArgs` is echoed back and **rendered above the diff**. With a model in the loop that echo is
+  what makes the draft reviewable rather than magic.
+- **No-model detection is a flag, not `instanceof StubLlmGateway`** — `GatewayFactory.Gateway(llm,
+  configured)`. A test injects a stub that *does* answer with tool calls, and that is a configured model
+  for this purpose.
+
+**Offline:** the mock's `/derive` branch derives a condition from `<field> over|under <number>` and
+otherwise returns the same retryable 422 a real local model produces when it narrates. It then
+**re-enters the same handler** on the deterministic URL rather than reimplementing the tool body, so the
+two offline paths cannot drift. The mock's `query_author` now renders the *actual* derived predicate —
+its old fixed `cost_usd > 100` would contradict the `derivedArgs` echo directly above it.
+
+**Still open:** A5.2 (`component_draft` — a bounded repair *loop*, not a hop; turn cap 3 per plan D11)
+and A5.3 (`pipeline_author`). `suggest_expectations` is excluded on purpose.
+
 ## Not shipped
 
 - **`kpi_report_builder` has no viable host pane.** It emits N widgets *plus* a dashboard, and no pane

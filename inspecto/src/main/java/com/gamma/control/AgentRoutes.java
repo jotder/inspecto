@@ -71,6 +71,46 @@ final class AgentRoutes implements RouteModule {
         // (missing argument, unvalidatable kind, no write root) → 422 with its message. A draft that
         // merely has findings is a SUCCESS (ok=true, clean=false) and returns 200 — the findings are
         // what the surface renders, not an error.
+        // AGT-6a A5.1: the same dispatch, but the arguments come from one operator sentence. Registered
+        // BEFORE the greedy /agent/tools/(.+) below, which would otherwise swallow it and treat "derive"
+        // as part of the tool name (routes match in registration order, first-match — same reason
+        // /agent/cases/{id}/similar precedes /agent/cases/(.+)).
+        //
+        // The model contributes ARGUMENTS ONLY; the tool then runs through the identical deterministic
+        // path, so this route adds a natural-language input, not a new way to act. It stays exactly as
+        // ungated as its A1 sibling — no Role, no Capability. ⚠ Do not add a half-gate here alone: the
+        // authoring gates are the UI's canAuthorWorkbench and the edition's write seam, and a gate on one
+        // of the two routes would be a false sense of security plus an inconsistency to explain.
+        //
+        // Three failures, three different answers, because conflating them misleads: no model configured
+        // → 503 (a deployment fact, not a bad sentence) · malformed model output or no tool call → 422,
+        // retryable, with distinct messages.
+        api.post("/agent/tools/(.+)/derive", (e, m) -> {
+            String tool = ApiContext.name(m);
+            Map<String, Object> body = api.body(e);
+            String prompt = ApiContext.str(body, "prompt");
+            if (prompt == null || prompt.isBlank()) throw new ApiException(400, "prompt is required");
+            Map<String, Object> result;
+            try {
+                result = agentOr503(api).deriveTool(tool, prompt, mapField(body.get("args")), actorOrOperator(e))
+                        .orElseThrow(() -> new ApiException(404, "unknown tool: '" + tool + "'"));
+            } catch (IllegalStateException mutating) {
+                throw new ApiException(403, mutating.getMessage());
+            } catch (UnsupportedOperationException noModel) {
+                throw new ApiException(503, noModel.getMessage());
+            }
+            if (!Boolean.TRUE.equals(result.get("ok"))) {
+                Object error = result.get("error");
+                throw new ApiException(422, error == null ? "tool '" + tool + "' failed" : String.valueOf(error));
+            }
+            // derivedArgs travels beside the tool's own value: the operator must see what their sentence
+            // became before they Apply it. A HashMap, not Map.of — a tool may legitimately return a null
+            // value and Map.of would turn that into a 500.
+            Map<String, Object> answer = new java.util.HashMap<>();
+            answer.put("value", result.get("value"));
+            answer.put("derivedArgs", result.get("derivedArgs"));
+            return answer;
+        });
         api.post("/agent/tools/(.+)", (e, m) -> {
             String tool = ApiContext.name(m);
             Map<String, Object> result;
