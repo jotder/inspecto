@@ -120,6 +120,26 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `.toon`).
 - **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch for
   these whenever generating SQL with date/trigger columns.
+- **A new component kind needs TWO registrations, in different modules** — `ComponentStore.WRITABLE_TYPES`
+  (else every CRUD call 400s) **and** `ComponentRegistry.TYPE_BY_DIR` (else the first write has nowhere to
+  land). Adding only the first compiles and passes an unfocused build. `ComponentStoreTest`
+  `everyWritableTypeHasARegistryDir` now asserts the pair; keep it.
+- **A UI `ComponentType` the server does not know fails only at runtime, per call.** The union in
+  `inspecto-ui/src/app/inspecto/api/components.service.ts` is a hand-maintained mirror of `WRITABLE_TYPES`
+  with **nothing enforcing the mirror**. `rule-template` sat unmirrored for the entire life of the data-table
+  Pro Max "save as rule" feature (fixed 2026-07-27): list/save/remove all 400'd against a real server while
+  the mock served them happily, and the Registry's `allSettled` swallowed the failure so it never surfaced
+  as anything louder than console noise. ⚠ Two lessons that generalize: a per-kind fan-out behind
+  `Promise.allSettled` **hides a contract break as missing data**, and a docstring claiming a backend enum
+  is "still closed / real backend later" is a claim to re-verify, not to trust — that one was ~15 kinds stale.
+- **Hand-assembling a backend classpath will trip the edition model** (`.claude/launch.json`, fixed
+  2026-07-27). `inspecto-connectors` is an *optional* ServiceLoader module carrying `SmtpEmailChannel`, and it
+  is deliberately **not** in `inspecto`'s dependency tree — putting its `target/classes` on the classpath makes
+  `NotificationService.discoverChannels` find a channel whose `javax.mail` dep was never shipped, and boot dies
+  with `NoClassDefFoundError: javax/mail/Message`. Derive the list from
+  `mvn -o dependency:build-classpath -pl inspecto -am` (9 modules today) rather than globbing `*/target/classes`,
+  and put the module `target/classes` **ahead** of the `.m2` jars so fresh code shadows the stale installed
+  `file-processor-*` artifacts (that ordering also silences the duplicate-`logback.xml` warning).
 - **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push:
   `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs) and `tools/check-secrets.mjs` (a
   secret-ish key assigned a ≥16-char literal — SEC-INCIDENT-1). Both take a per-line `vocab-allow` /

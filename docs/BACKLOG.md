@@ -386,6 +386,35 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **`SpacesService.reconcile` is unguarded against a non-array `GET /spaces` body** (found 2026-07-27,
+  `inspecto-ui/src/app/inspecto/api/spaces.service.ts`). `spaces.some(...)` runs on the raw response; the
+  `catchError(() => of([]))` covers only a *failed* request, so a 200 with an unexpected shape throws during
+  app bootstrap and cascades into an `NG0201` injector error. The same unvalidated value feeds the
+  `availableSpaces` signal, so `currentSpace` (`.find`) and `showSwitcher` (`.length`) are equally exposed.
+  ⚠ **Root cause of the observed non-array is NOT known** — the envelope contract was checked and is correct
+  (backend emits `{data:[…],metadata:{apiVersion:'v1'}}`, `isV1Envelope` matches, and a live server built from
+  current source returns a proper array). It did **not** reproduce on a freshly built server, which points at
+  the stale `file-processor-deploy` bundle rather than current code. Adding the guard converts a crash into a
+  silent wrong-state, so it is worth doing **but is not a fix** — do not close this by guarding alone.
+- **Rule Template execution is unwired.** Persistence landed 2026-07-27 (`rule-template` component kind), but
+  `RuleTemplate.params`/`paramSql` are still illustrative — nothing binds the `:fieldValue` placeholders and
+  runs one server-side. The authoring + storage half is complete and tested; the engine half was never scoped.
+- **`.claude/launch.json`'s `inspector-backend` classpath is hand-maintained and machine-specific** (rebuilt
+  2026-07-27 after it had rotted to a single module and could no longer boot). It hardcodes
+  `C:/sandbox/ucc-file-processor` and 9 module `target/classes` + 30 `.m2` jars. **It goes stale whenever a
+  module's dependencies change** — regenerate with `mvn -o dependency:build-classpath -pl inspecto -am` and see
+  the `PROJECT_NOTES.md` §4 note on why `*/target/classes` globbing breaks the edition model. A launcher that
+  derives the classpath at run time (or uses the fat JAR) would retire this whole class of breakage.
+- **`tools/check-secrets.mjs` gives a FALSE RED on a local deploy bundle** (found 2026-07-27). It reports
+  *"Committed-secret guard: 4 probable secret(s)"* against `file-processor-deploy/ui/chunk-*.js`, but that
+  directory is **gitignored** (`.gitignore:44`) with **zero tracked files** — nothing is committed, and the four
+  hits are minified library property assignments (`withCredentials`, `apiKey`), not credentials. CI is unaffected
+  (a fresh clone has no such directory), but **any shift that builds the deploy bundle then follows the
+  Definition of Done sees a red security gate** and may waste time or, worse, learn to ignore it. Fix: either add
+  `file-processor-deploy` to `SKIP_DIRS`, or — better, matching the guard's own name — have it scan only
+  git-tracked files. ⚠ Do not "fix" this by adding `secret-allow` to generated bundle files; they are rebuilt.
+- **`dependency:build-classpath` litters `cp.txt` into every module dir** and they are not gitignored, so they
+  keep reappearing as untracked noise across shifts. One `.gitignore` line would end it.
 - **D8 delivery-status residuals** (shipped 2026-07-26; each deliberately deferred, not forgotten):
   - **Auto-disable / suppression policy on hard bounce + complaint** — needs an operator call. This build
     *records* status; acting on it has a denial-of-notification blast radius, so it was never in D8's scope.

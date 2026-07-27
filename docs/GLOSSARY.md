@@ -209,6 +209,12 @@ referential). Borrowed from the Great Expectations model.
 X to sink Y). Drools-style. Unified in R5 on `Condition → Evaluation → Consequence[]`; a first-class Component
 kind (`decision-rule`).
 
+**Rule Template** *(added 2026-07-27)* — A **saved parameterized query** authored from the data-table Pro Max
+"save as rule" action: a projection + condition group (or hand-edited SQL override) plus `:fieldValue` binds, so
+a job can re-run it with different values. A first-class Component kind (`rule-template`). ⛔ Never bare *rule* —
+and note it is **not** a fourth member of the triad above: it carries no engine, it is a stored query shape. The
+`:fieldValue` placeholder namespace is distinguished from `$`-Parameters and `${ENV:…}` secrets in §7.
+
 **Consequence** — A **typed action a Decision Engine produces** (`route · tag · quarantine · drop · emit-signal ·
 create-alert · start-job · trigger-pipeline · render-widget · generate-report · invoke-api`), executed via the
 Execution / Signal networks. A consequence that targets a component `invokes` it (lineage edge). ⚠️ §6-proposed → **binding** (R5).

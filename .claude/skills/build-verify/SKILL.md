@@ -86,6 +86,25 @@ with 0 test failures):
 npm run lint:tokens ; npm run test:ci ; npm run build
 ```
 
+### ⚠ …and piping a gate into `head`/`tail` reports the WRONG exit code
+
+`node tools/check-secrets.mjs | tail -5; echo $?` prints **`tail`'s** status (always `0`), not the guard's — so
+a failing gate reads as a clean pass. Observed 2026-07-27: the secrets guard was nearly filed as green this way.
+Capture the status from the command itself, redirecting instead of piping:
+
+```bash
+node tools/check-secrets.mjs > /dev/null 2>&1; echo "EXIT=$?"
+```
+
+(In Bash you can also read `${PIPESTATUS[0]}`, or set `set -o pipefail`.) This applies to **every** gate whose
+output you trim — the Maven reactor, the two Node guards, and the npm scripts.
+
+⚠ **Known pre-existing FALSE RED — `check-secrets.mjs` exits 1 on a clean tree.** Its 4 hits are all in
+`file-processor-deploy/ui/chunk-*.js`, which is **gitignored with zero tracked files** (`.gitignore:44`), and are
+minified library property assignments (`withCredentials`, `apiKey`), not credentials. CI is unaffected (a fresh
+clone has no such directory). Don't chase it as a regression, and never silence it with `secret-allow` on
+generated bundle files. → `docs/BACKLOG.md` §6.
+
 ### ⚠ …and `-pl <module> -am` is a false green for everything DOWNSTREAM
 
 `-pl X -am` builds X plus its **upstream** dependencies — never its **dependents**. So a control-plane
