@@ -3,6 +3,7 @@ import { error, json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { SIGNALS_COLL } from '../signals';
 import type { Signal } from '../../signal/signal';
+import type { Condition, ConditionGroup } from '../../query/query-types';
 import { PIPELINES_COLL } from './pipelines.handler';
 
 /**
@@ -78,7 +79,7 @@ function readFlow(prompt: string): Record<string, unknown> | null {
             id: 'flt',
             type: 'transform.filter',
             // The filter KEEPS what the sentence describes dropping, so invert the operator it read.
-            config: { where: `${cond['field']} ${cond['op'] === '<' ? '>=' : '<='} ${cond['value']}` },
+            config: { where: `${cond.field} ${cond.operator === '<' ? '>=' : '<='} ${cond.value}` },
         });
     if (/\bwrite|store|sink|save|persist\b/i.test(prompt))
         stages.push({ id: 'sink', type: 'sink.persistent', config: { store: 'drafted' } });
@@ -90,11 +91,121 @@ function readFlow(prompt: string): Record<string, unknown> | null {
     };
 }
 
-function readCondition(prompt: string): Record<string, unknown> | null {
+/**
+ * ⚠ Emits the CANONICAL leaf — `{kind:'condition', field, operator, value}`, with the comparison under
+ * `operator` (not `op`) and the operand as TEXT, wrapped by the caller in a `{op, items}` group.
+ *
+ * That is not a style choice. The server renders `when` through `ConditionSql`, which walks
+ * `items`/`conditions` and reads each leaf's `operator`; a flat `{field, op, value}` is not a group, so
+ * it contributes no constraint and `predicate()` answers `TRUE` — the tool then returns SQL with **no
+ * WHERE at all**, `clean:true`, no findings. A mock emitting the flat shape here would be teaching the
+ * derive path the one argument shape that fails silently and looks like it worked.
+ */
+function readCondition(prompt: string): Condition | null {
     const m = /(\w+)\s+(over|above|greater than|under|below|less than)\s+(-?\d+(?:\.\d+)?)/i.exec(prompt);
     if (!m) return null;
     const greater = /over|above|greater/i.test(m[2]);
-    return { op: greater ? '>' : '<', field: m[1].toLowerCase(), value: Number(m[3]) };
+    return { kind: 'condition', field: m[1].toLowerCase(), operator: greater ? '>' : '<', value: m[3] };
+}
+
+/** The one leaf as the group the tool's `when` argument must be. */
+function asGroup(condition: Condition): ConditionGroup {
+    return { kind: 'group', op: 'AND', items: [condition] };
+}
+
+/**
+ * The offline counterpart to the server's {@code ConditionSql.predicate}: walk the structured tree the
+ * pane builds and render a predicate, or `''` when the tree imposes no constraint.
+ *
+ * Deliberately **not** a reimplementation — the server's typed casts (`TRY_CAST(… AS DOUBLE)`, the
+ * boolean CASE, the LIKE escaping) are its business and copying them here would be a second, drifting
+ * SQL renderer. What must match is **acceptance**: the same trees render, the same trees render nothing,
+ * and an unreadable operator is `FALSE` rather than silently dropped. That parity is the whole point —
+ * this branch used to read a flat `{field, op, value}` and fall back to a hardcoded `cost_usd > 100`,
+ * so a real condition tree produced a WHERE clause the operator's conditions never asked for.
+ */
+function renderPredicate(node: unknown): string {
+    if (!isGroupNode(node)) return '';
+    const g = node as Record<string, unknown>;
+    const raw = g['items'] ?? g['conditions'];   // ConditionSql accepts either key
+    const items = Array.isArray(raw) ? raw : [];
+    const joiner = String(g['op'] ?? 'AND').toUpperCase() === 'OR' ? ' OR ' : ' AND ';
+    const parts = items
+        .map((item) => (isGroupNode(item) ? renderPredicate(item) : renderLeaf(item)))
+        .filter((part) => part !== '');
+    return parts.length ? `(${parts.join(joiner)})` : '';
+}
+
+/** `kind` decides when it is declared; otherwise the presence of child items does — ConditionSql's rule. */
+function isGroupNode(node: unknown): boolean {
+    if (typeof node !== 'object' || node === null || Array.isArray(node)) return false;
+    const n = node as Record<string, unknown>;
+    if (n['kind'] === 'group') return true;
+    if (n['kind'] === 'condition') return false;
+    return 'items' in n || 'conditions' in n;
+}
+
+/** One leaf, or `''` when incomplete — the server's `isComplete` gate, which is what makes a half-built
+ *  row contribute nothing instead of narrowing the result to `FALSE`. */
+function renderLeaf(node: unknown): string {
+    if (typeof node !== 'object' || node === null) return '';
+    const c = node as Record<string, unknown>;
+    const field = typeof c['field'] === 'string' ? c['field'] : '';
+    const operator = typeof c['operator'] === 'string' ? c['operator'] : '';
+    if (!field || !operator) return '';
+    const operand = (key: string) => (c[key] === undefined || c[key] === null ? '' : String(c[key]));
+    const lit = (v: string) => (/^-?\d+(?:\.\d+)?$/.test(v) ? v : `'${v.replace(/'/g, "''")}'`);
+    const value = operand('value');
+    const value2 = operand('value2');
+    if (operator === 'isNull') return `${field} IS NULL`;
+    if (operator === 'isNotNull') return `${field} IS NOT NULL`;
+    if (operator === 'between') return value && value2 ? `(${field} >= ${lit(value)} AND ${field} <= ${lit(value2)})` : '';
+    if (!value) return '';
+    switch (operator) {
+        case 'contains': return `${field} LIKE '%${value}%'`;
+        case 'startsWith': return `${field} LIKE '${value}%'`;
+        case 'endsWith': return `${field} LIKE '%${value}'`;
+        case 'in': return `${field} IN (${value.split(',').map((v) => lit(v.trim())).join(', ')})`;
+        case '=': case '!=': case '<': case '<=': case '>': case '>=':
+            return `${field} ${operator === '!=' ? '<>' : operator} ${lit(value)}`;
+        // An operator the renderer does not know narrows to nothing, exactly as ConditionSql does —
+        // never "ignore the clause", which would widen the result set instead.
+        default: return 'FALSE';
+    }
+}
+
+/**
+ * What `component_draft` will validate, and the REQUIRED field paths of each kind's `ConfigSpec` —
+ * mirrored from `ConfigSpecs` (`inspecto-config`), which the real tool resolves via `configType(kind)`.
+ * `alert-rule` maps to the `alert` type; that rename is the one place kind ≠ type.
+ *
+ * ⚠ A SUBSET, deliberately: the real spec also checks enums, int/bool parsability and cross-field rules,
+ * and re-implementing that here would be a second, drifting copy of the config system. What is mirrored
+ * is the part that decides ACCEPTANCE — an unvalidatable kind is refused, and a missing required field is
+ * a finding — because the old branch had neither, so offline every non-empty config came back
+ * `clean:true` and the A5.2 repair loop could not be exercised at all. Offline findings remain a
+ * rehearsal of the shape, never evidence that the real spec passes.
+ */
+const DRAFT_SPECS: Record<string, { type: string; required: string[] }> = {
+    pipeline: { type: 'pipeline', required: ['name', 'dirs.poll', 'dirs.database'] },
+    enrichment: { type: 'enrichment', required: ['name', 'input.database', 'output.database'] },
+    job: { type: 'job', required: ['job.name', 'job.type'] },
+    schema: { type: 'schema', required: ['raw.name'] },
+    meta: { type: 'meta', required: ['name'] },
+    'alert-rule': { type: 'alert', required: ['alert.name', 'alert.threshold', 'alert.window'] },
+    expectation: { type: 'expectation', required: ['name', 'target', 'column'] },
+    widget: { type: 'widget', required: ['vizType'] },
+    dashboard: { type: 'dashboard', required: ['tiles'] },
+};
+
+/** `RawConfig.present`: a dotted path resolves through nested maps, and a null leaf counts as absent. */
+function presentAt(config: Record<string, unknown>, path: string): boolean {
+    let node: unknown = config;
+    for (const segment of path.split('.')) {
+        if (typeof node !== 'object' || node === null || Array.isArray(node)) return false;
+        node = (node as Record<string, unknown>)[segment];
+    }
+    return node !== undefined && node !== null;
 }
 
 /** Stand-in for the real belt's mutating act tools, which the route refuses with 403. */
@@ -227,13 +338,15 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 if (!when)
                     return error(422, `the model did not produce arguments for '${tool}'`
                         + ' — rephrase the request, or fill the form directly');
-                derivedArgs = { when, ...argsOf(req) };
+                derivedArgs = { when: asGroup(when), ...argsOf(req) };
             }
             const inner = agentHandler(flags)(
                 { ...req, url: req.url.replace(/\/derive$/, ''), body: { args: derivedArgs } }, store);
             if (!inner || (inner.status ?? 200) >= 400) return inner;
-            // A5.2: the real backend may spend up to 3 repair turns. Offline the first draft is always
-            // clean by construction, so 1 is the honest number — never fake a loop that did not run.
+            // A5.2: the real backend may spend up to 3 repair turns. Offline there is no model to run a
+            // second turn with, so 1 is the honest number — never fake a loop that did not run. ⚠ It is
+            // 1 even when the draft comes back WITH findings: that is a loop which did not converge, and
+            // reporting 3 would claim repair attempts that never happened.
             return json(tool === 'query_author'
                 ? { value: inner.body, derivedArgs }
                 : { value: inner.body, derivedArgs, turns: 1 });
@@ -290,15 +403,12 @@ export function agentHandler(flags: MockFlags): MockHandler {
             case 'query_author': {
                 const dataset = text(args, 'dataset');
                 if (!dataset) return error(422, 'dataset is required');
-                const when = args['when'];
-                const hasFilter = typeof when === 'object' && when !== null && Object.keys(when).length > 0;
-                // Render the actual condition when it carries one (the A5.1 derive path always does).
-                // The old fixed `cost_usd > 100` predates NL input; leaving it would show a WHERE clause
-                // that contradicts the derivedArgs echo right above it, which reads as a bug in the feature.
-                const w = (when ?? {}) as { field?: unknown; op?: unknown; value?: unknown };
-                const predicate = typeof w.field === 'string' && typeof w.op === 'string' && w.value !== undefined
-                    ? `${w.field} ${w.op} ${typeof w.value === 'number' ? w.value : `'${String(w.value)}'`}`
-                    : 'cost_usd > 100';
+                // ⚠ `when` is a structured GROUP (`{op, items:[{field, operator, value}]}`), the shape the
+                // server's ConditionSql walks — never a flat `{field, op, value}`. A tree that renders no
+                // constraint must produce NO WHERE, because that is precisely what the real tool does with
+                // one, and the draft comes back `clean:true` either way: the missing filter is the only
+                // evidence the operator ever gets.
+                const predicate = renderPredicate(args['when']);
                 const name = text(args, 'name');
                 return json({
                     kind: 'query',
@@ -308,7 +418,7 @@ export function agentHandler(flags: MockFlags): MockHandler {
                     draft: {
                         type: 'sql',
                         // The real tool renders trusted SQL server-side — the model never writes SQL text.
-                        text: `SELECT * FROM (SELECT * FROM ${dataset}) AS __q${hasFilter ? ` WHERE ${predicate}` : ''}`,
+                        text: `SELECT * FROM (SELECT * FROM ${dataset}) AS __q${predicate ? ` WHERE ${predicate}` : ''}`,
                         datasetId: dataset,
                     },
                 });
@@ -465,12 +575,23 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 if (typeof config !== 'object' || config === null) {
                     return error(422, 'config is required and must be an object');
                 }
+                // An unvalidatable kind is a REFUSAL, not an empty pass. This branch used to accept any
+                // string and echo it back as `type`, so a wrong kind looked like a clean draft offline.
+                const spec = DRAFT_SPECS[kind.trim().toLowerCase()];
+                if (!spec) {
+                    return error(422, `no structural spec for kind '${kind}' (validatable kinds: `
+                        + `${Object.keys(DRAFT_SPECS).join(', ')})`);
+                }
                 const draft = config as Record<string, unknown>;
                 // A findings-carrying draft is a SUCCESS — the repair loop is the point of the surface.
-                const findings = Object.keys(draft).length === 0
-                    ? [{ severity: 'ERROR' as const, fieldPath: 'name', message: 'name is required' }]
-                    : [];
-                return json({ kind, type: kind, clean: findings.length === 0, findings, draft });
+                const findings = spec.required
+                    .filter((path) => !presentAt(draft, path))
+                    .map((path) => ({
+                        severity: 'ERROR' as const,
+                        fieldPath: path,
+                        message: `Missing required field '${path}'`,
+                    }));
+                return json({ kind, type: spec.type, clean: findings.length === 0, findings, draft });
             }
             // AGT-6a A4 — the two read tools behind "explain this screen". They are non-mutating reads,
             // so the real route needs no new capability; offline they answer from a small extract of
