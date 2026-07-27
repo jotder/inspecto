@@ -1,5 +1,7 @@
 package com.gamma.ops.note;
 
+import com.gamma.ops.AnnotationKinds;
+
 import java.util.List;
 
 /**
@@ -29,9 +31,9 @@ public interface NoteStore extends AutoCloseable {
     /** One target's notes, newest-first; {@code kind} {@code null} returns every note kind. */
     List<ObjectNote> forTarget(String targetKind, String targetId, NoteKind kind);
 
-    /** An {@link NoteTargets#OBJECT} target's notes, newest-first — the pre-D10 shorthand. */
+    /** An {@link AnnotationKinds#OBJECT} target's notes, newest-first — the pre-D10 shorthand. */
     default List<ObjectNote> forObject(String objectId, NoteKind kind) {
-        return forTarget(NoteTargets.OBJECT, objectId, kind);
+        return forTarget(AnnotationKinds.OBJECT, objectId, kind);
     }
 
     /**

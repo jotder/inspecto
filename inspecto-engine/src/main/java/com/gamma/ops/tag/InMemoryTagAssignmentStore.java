@@ -1,6 +1,6 @@
 package com.gamma.ops.tag;
 
-import com.gamma.ops.note.NoteTargets;
+import com.gamma.ops.AnnotationKinds;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,14 +33,14 @@ public final class InMemoryTagAssignmentStore implements TagAssignmentStore {
 
     @Override
     public synchronized boolean remove(String tag, String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         String id = targetId == null ? null : targetId.trim();
         return edges.removeIf(e -> same(e, norm(tag), tk, id));
     }
 
     @Override
     public synchronized List<String> tagsOf(String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         String id = targetId == null ? null : targetId.trim();
         // Sorted + de-duplicated: the order edges happen to have been added in is not meaningful to a
         // reader, and a stable alphabetical list keeps the UI from reshuffling chips on every refresh.
@@ -95,7 +95,7 @@ public final class InMemoryTagAssignmentStore implements TagAssignmentStore {
 
     @Override
     public synchronized int removeAllForTarget(String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         String id = targetId == null ? null : targetId.trim();
         int before = edges.size();
         edges.removeIf(e -> e.targetKind().equals(tk) && e.targetId().equals(id));

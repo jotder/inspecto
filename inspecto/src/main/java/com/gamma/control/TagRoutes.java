@@ -130,7 +130,7 @@ final class TagRoutes implements RouteModule {
             // An object's `tags` attribute is a projection of the assignment store (D7 phase 2), so object
             // targets go through ObjectService — writing the store directly would leave the CSV stale and
             // recreate exactly the split-brain phase 2 exists to remove.
-            if (com.gamma.ops.note.NoteTargets.OBJECT.equals(targetKind)) {
+            if (com.gamma.ops.AnnotationKinds.OBJECT.equals(targetKind)) {
                 api.service().objects().applyTag(targetId, tag, actor);
             } else {
                 api.service().tagAssignments()
@@ -155,7 +155,7 @@ final class TagRoutes implements RouteModule {
         return AnnotationTargets.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             boolean removed;
-            if (com.gamma.ops.note.NoteTargets.OBJECT.equals(targetKind)) {
+            if (com.gamma.ops.AnnotationKinds.OBJECT.equals(targetKind)) {
                 removed = api.service().tagAssignments().tagsOf(targetKind, targetId).contains(tag);
                 api.service().objects().removeTag(targetId, tag);   // also re-projects the CSV
             } else {

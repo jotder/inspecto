@@ -1,5 +1,7 @@
 package com.gamma.ops.note;
 
+import com.gamma.ops.AnnotationKinds;
+
 import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
@@ -16,7 +18,7 @@ import java.util.NoSuchElementException;
  * comment on a saved {@code link-analysis-view}) plugs in without becoming a special case.
  *
  * <h3>Fail-closed</h3>
- * An unknown {@code targetKind} throws {@link IllegalArgumentException} ({@link NoteTargets#require});
+ * An unknown {@code targetKind} throws {@link IllegalArgumentException} ({@link AnnotationKinds#require});
  * a known kind whose id does not resolve throws {@link NoSuchElementException}. A note is never
  * written for a target that does not exist — no orphans.
  *
@@ -51,14 +53,14 @@ public final class NoteService {
 
     /** Add a free-text comment to {@code (targetKind, targetId)}. */
     public ObjectNote comment(String targetKind, String targetId, String author, String body) {
-        String kind = NoteTargets.require(targetKind);
+        String kind = AnnotationKinds.require(targetKind);
         return add(ObjectNote.comment(kind, targetId, author, body), author, require(kind, targetId));
     }
 
     /** Attach an external-evidence reference (metadata only) to {@code (targetKind, targetId)}. */
     public ObjectNote attach(String targetKind, String targetId, String author, String name,
                              String contentType, String uri, String caption) {
-        String kind = NoteTargets.require(targetKind);
+        String kind = AnnotationKinds.require(targetKind);
         return add(ObjectNote.attachment(kind, targetId, author, name, contentType, uri, caption), author,
                 require(kind, targetId));
     }
@@ -68,7 +70,7 @@ public final class NoteService {
      * existence too, so a probe for a bogus id cannot be answered with a bland empty list.
      */
     public List<ObjectNote> notesOf(String targetKind, String targetId, NoteKind kind) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         require(tk, targetId);
         return notes.forTarget(tk, targetId, kind);
     }
@@ -80,7 +82,7 @@ public final class NoteService {
 
     /** The correlation id of an existing target, or {@link NoSuchElementException} — the D10 gate. */
     public String require(String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         if (targetId == null || targetId.isBlank())
             throw new NoSuchElementException("no " + tk + " with id '" + targetId + "'");
         String correlationId = targets.correlationIdOrNull(tk, targetId);
@@ -97,7 +99,7 @@ public final class NoteService {
                 .correlationId(correlationId == null || correlationId.isBlank() ? null : correlationId)
                 // The object phrasing is the shipped one — only non-object targets name their kind.
                 .message(stored.kind() + " on "
-                        + (NoteTargets.OBJECT.equals(stored.targetKind()) ? "" : stored.targetKind() + " ")
+                        + (AnnotationKinds.OBJECT.equals(stored.targetKind()) ? "" : stored.targetKind() + " ")
                         + stored.objectId()
                         + (actor == null || actor.isBlank() ? "" : " by " + actor))
                 .attr("objectId", stored.objectId())

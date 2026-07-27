@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.ops.note.NoteTargets;
+import com.gamma.ops.AnnotationKinds;
 import com.gamma.ops.tag.TagAssignment;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -36,7 +36,7 @@ final class WidgetTags {
     private static final Logger log = LoggerFactory.getLogger(WidgetTags.class);
 
     /** The one kind whose tags are config-embedded, so the one kind needing a projection. The
-     *  {@link NoteTargets} target kind and the {@link ComponentStore} type are the same string. */
+     *  {@link AnnotationKinds} target kind and the {@link ComponentStore} type are the same string. */
     static final String KIND = "widget";
 
     /** The content key holding the projection. */

@@ -397,9 +397,21 @@ on Resolve. One **Incident Commander** (`assignee`). Priority ladder **Critical 
 Low**. ⛔ never "Issue". *(Lifecycle renamed from open → in-progress → resolved with the mail-like
 Incidents UI, 2026-07-12 — see §13.)*
 
-**Tag** — A **user-created** label attached to an Incident or Case for cross-cutting
+**Annotation** — The umbrella term for **user-authored metadata hung off some other entity**: today a
+**Note**/attachment (D10) or a **Tag** assignment (D7). Every Annotation addresses its subject as an
+**Annotation Target** — a `(targetKind, targetId)` pair — and the valid `targetKind` set is one shared
+vocabulary (`com.gamma.ops.AnnotationKinds`), never a per-feature list. ⛔ never "attachment" for the
+umbrella (that is one specific Note kind), ⛔ never "metadata" (that is Catalog vocabulary, §3).
+
+**Annotation Target** — What an Annotation is attached to: `"object"` (an Incident/Case) plus every
+writable component type — Dataset, Dashboard, Widget, and the saved `link-analysis-view` /
+`geo-map-view`. Widening the component registry widens Annotation Targets automatically.
+
+**Tag** — A **user-created** label attached to any **Annotation Target** for cross-cutting
 grouping/filtering (the mail metaphor's "labels"). Applied **manually** (in bulk over a selection)
-or **by a Tag Rule**. ⛔ never "Label".
+or **by a Tag Rule**. ⛔ never "Label". *(Generalized beyond Incidents/Cases by D7, 2026-07-26/27 — it
+now spans all five annotatable kinds, and the tag→target edges, not the Incident's own `attributes.tags`
+CSV, are the source of truth.)*
 
 **Tag Rule** — A saved search that applies a Tag (the Gmail-filter metaphor): it auto-tags newly
 created Incidents/Cases that match its criteria and can be **applied in bulk** to existing matches.

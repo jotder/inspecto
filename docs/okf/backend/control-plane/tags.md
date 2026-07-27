@@ -27,13 +27,17 @@ That separation predates D7 and was kept.
 
 ## Addressing: `(targetKind, targetId)`, shared with notes
 
-Targets are addressed exactly as **D10 notes** are, through the same vocabulary — `NoteTargets.KINDS` =
+Targets are addressed exactly as **D10 notes** are, through the same vocabulary — `AnnotationKinds.KINDS` =
 `"object"` + `ComponentStore.WRITABLE_TYPES`. This is deliberate and load-bearing: tags and notes are the
 same shape of problem (user-authored metadata hung off an arbitrary entity), and two addressing schemes
 would drift. Widening `WRITABLE_TYPES` widens both features at once, for free.
 
-The class is called `NoteTargets` only because notes got there first. Read it as "annotation targets".
-*(Residual: the name is now misleading — renaming it is tracked in BACKLOG §6.)*
+⚠ **Two similarly-named classes, two different questions.** `com.gamma.ops.AnnotationKinds` (engine) is the
+*vocabulary* — "is that a real kind of thing to annotate". `com.gamma.control.AnnotationTargets` (control
+plane) is the *gate* — "may this caller see or annotate that specific target". The split exists because the
+engine stays identity-agnostic; don't merge them. *(Renamed from `NoteTargets` and moved out of
+`com.gamma.ops.note` on 2026-07-27 — it was named for notes only because notes got there first, and it has
+served tags since D7.)*
 
 ## Storage: a central assignment store, not per-entity fields
 
@@ -252,6 +256,6 @@ no write at all — re-tagging must not rewrite an edge's provenance.
 - **The offline mock mirrors the CSV/store split deliberately.** `mock/handlers/ops.handler.ts` reads
   *object* edges out of `attributes.tags` and keeps only non-object edges in its own collection, so the
   mock cannot drift into having two answers for one object the way a second edge collection would. Its
-  `TAG_TARGET_KINDS` is the client-side copy of `NoteTargets.KINDS` — widen both together. Route-order
+  `TAG_TARGET_KINDS` is the client-side copy of `AnnotationKinds.KINDS` — widen both together. Route-order
   trap: `/tags/{name}` is a catch-all, so every more specific `/tags/…` pattern must be matched before it
   or `DELETE /tags/rules` deletes a tag named `rules`.

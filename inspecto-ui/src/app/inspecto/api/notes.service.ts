@@ -6,7 +6,7 @@ import { ObjectNote } from './objects.service';
 
 /**
  * Kind-addressed notes (`/notes/{targetKind}/{targetId}/…`, BACKLOG D10) — the same {@link ObjectNote}
- * shape as `/objects/{id}/comments`, generalized to any target the backend's `NoteTargets` vocabulary
+ * shape as `/objects/{id}/comments`, generalized to any target the backend's `AnnotationKinds` vocabulary
  * accepts (`"object"` + `ComponentStore.WRITABLE_TYPES`, e.g. `link-analysis-view`). The driving case is
  * a per-view comment thread on a saved Link Analysis view — see `okf/frontend/features/link-analysis.md`.
  */

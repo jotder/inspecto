@@ -1,5 +1,7 @@
 package com.gamma.ops.note;
 
+import com.gamma.ops.AnnotationKinds;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -68,12 +70,12 @@ class NoteCoreTest {
     @Test
     void targetKindDefaultsToObjectAndIsCarriedByTheGenericFactories() {
         ObjectNote legacy = ObjectNote.comment("CASE-1", "alice", "hi");
-        assertEquals(NoteTargets.OBJECT, legacy.targetKind(), "the pre-D10 factory still targets an object");
+        assertEquals(AnnotationKinds.OBJECT, legacy.targetKind(), "the pre-D10 factory still targets an object");
         assertEquals("CASE-1", legacy.targetId());
-        assertEquals(NoteTargets.OBJECT,
+        assertEquals(AnnotationKinds.OBJECT,
                 new ObjectNote("N", "CASE-1", NoteKind.COMMENT, "a", "b", null, 1).targetKind(),
                 "the pre-D10 constructor still targets an object");
-        assertEquals(NoteTargets.OBJECT,
+        assertEquals(AnnotationKinds.OBJECT,
                 new ObjectNote("N", "CASE-1", null, NoteKind.COMMENT, "a", "b", null, 1).targetKind(),
                 "a blank targetKind normalises to 'object', never to null");
 
@@ -91,19 +93,19 @@ class NoteCoreTest {
 
     @Test
     void targetVocabularyIsTheComponentTypeSetPlusObject() {
-        assertTrue(NoteTargets.isKnown("object"));
-        assertTrue(NoteTargets.isKnown("LINK-ANALYSIS-VIEW"), "case-insensitive");
-        assertTrue(NoteTargets.KINDS.containsAll(com.gamma.pipeline.ComponentStore.WRITABLE_TYPES),
+        assertTrue(AnnotationKinds.isKnown("object"));
+        assertTrue(AnnotationKinds.isKnown("LINK-ANALYSIS-VIEW"), "case-insensitive");
+        assertTrue(AnnotationKinds.KINDS.containsAll(com.gamma.pipeline.ComponentStore.WRITABLE_TYPES),
                 "one vocabulary — widening the component registry widens note targets");
-        assertFalse(NoteTargets.isKnown("banana"));
-        assertFalse(NoteTargets.isKnown(null));
-        assertThrows(IllegalArgumentException.class, () -> NoteTargets.require("banana"));
+        assertFalse(AnnotationKinds.isKnown("banana"));
+        assertFalse(AnnotationKinds.isKnown(null));
+        assertThrows(IllegalArgumentException.class, () -> AnnotationKinds.require("banana"));
     }
 
     @Test
     void inMemoryReadsAreScopedToTheKindIdPair() {
         InMemoryNoteStore store = new InMemoryNoteStore();
-        store.add(new ObjectNote("N1", "X", NoteTargets.OBJECT, NoteKind.COMMENT, "a", "on the object", null, 100));
+        store.add(new ObjectNote("N1", "X", AnnotationKinds.OBJECT, NoteKind.COMMENT, "a", "on the object", null, 100));
         store.add(new ObjectNote("N2", "X", "link-analysis-view", NoteKind.COMMENT, "a", "on the view", null, 200));
 
         assertEquals(1, store.forObject("X", null).size(), "same id, different family — no bleed");
@@ -145,7 +147,7 @@ class NoteCoreTest {
             DbNoteStore store = new DbNoteStore(conn);          // ← runs the migration
             List<ObjectNote> migrated = store.forObject("CASE-1", null);
             assertEquals(1, migrated.size(), "the legacy row backfilled to targetKind 'object'");
-            assertEquals(NoteTargets.OBJECT, migrated.get(0).targetKind());
+            assertEquals(AnnotationKinds.OBJECT, migrated.get(0).targetKind());
 
             store.add(ObjectNote.comment("link-analysis-view", "CASE-1", "bob", "on the view"));
             assertEquals(1, store.forObject("CASE-1", null).size(), "the view note is not an object note");

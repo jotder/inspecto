@@ -99,7 +99,7 @@ distinct ([`GLOSSARY.md`](../../../GLOSSARY.md) §11): this studio works on **P3
     **SHIPPED end-to-end 2026-07-25** — backend (`56ca3559`), UI half same day. As built:
     `ObjectNote` carries a **`targetKind`** — ⚠ *not* its pre-existing `kind`, which is `NoteKind`
     (COMMENT/ATTACHMENT) and an orthogonal axis; the two must never be conflated. The vocabulary is
-    `NoteTargets` = `"object"` + `ComponentStore.WRITABLE_TYPES`, which already contains
+    `AnnotationKinds` = `"object"` + `ComponentStore.WRITABLE_TYPES`, which already contains
     `link-analysis-view` — **no new enum, and no competing vocabulary**, since `BundleRoutes.OWN_STORE_KINDS`
     and the Exchange axis use the same strings. **D7 inherits this scheme.** New surface is
     `GET/POST /notes/{targetKind}/{targetId}/comments|attachments`; the existing `/objects/{id}/comments`
@@ -133,7 +133,7 @@ per-Space **`pattern-pack` `ComponentStore` kind**, authored at
 * **No new endpoint and no new capability.** `/components/{type}` CRUD is generic (the `findings-spec`
   precedent), so the whole backend change is two registrations: `ComponentStore.WRITABLE_TYPES` and
   `ComponentRegistry.TYPE_BY_DIR`. Writes ride the generic `canAuthorWorkbench` gate. Version history,
-  ETags, `ComponentAccess` share filtering, `NoteTargets`, `InspectoTools` and `BundleRoutes.supported()`
+  ETags, `ComponentAccess` share filtering, `AnnotationKinds`, `InspectoTools` and `BundleRoutes.supported()`
   all read `WRITABLE_TYPES` dynamically and came free.
 * ⚠ **`WRITABLE_TYPES` is misnamed for this purpose: a kind absent from it is UNREADABLE, not merely
   read-only** — `list`/`get` call `validateType` too. There is no read-only-kind concept and this change

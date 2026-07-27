@@ -1,6 +1,6 @@
 package com.gamma.ops.tag;
 
-import com.gamma.ops.note.NoteTargets;
+import com.gamma.ops.AnnotationKinds;
 
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -18,7 +18,7 @@ import java.util.Map;
  * so a renamed tag silently split in two).
  *
  * <p><b>Addressing follows D10.</b> Targets are {@code (targetKind, targetId)} pairs drawn from
- * {@link NoteTargets} — the same vocabulary notes use. That is intentional and load-bearing: §2 of the D7
+ * {@link AnnotationKinds} — the same vocabulary notes use. That is intentional and load-bearing: §2 of the D7
  * plan requires tags and notes to address components identically rather than inventing a second scheme.
  * The class lives under {@code ops.note} only because notes got there first; read it as "annotation
  * targets". Widening {@code ComponentStore.WRITABLE_TYPES} widens both features at once.
@@ -42,7 +42,7 @@ public record TagAssignment(String tag, String targetKind, String targetId, Stri
         if (targetId == null || targetId.isBlank())
             throw new IllegalArgumentException("tag assignment requires a target id");
         tag = tag.trim();
-        targetKind = NoteTargets.require(targetKind);
+        targetKind = AnnotationKinds.require(targetKind);
         targetId = targetId.trim();
         actor = actor == null || actor.isBlank() ? "system" : actor.trim();
         if (createdAt <= 0) createdAt = System.currentTimeMillis();

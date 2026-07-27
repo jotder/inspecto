@@ -1,6 +1,6 @@
 package com.gamma.control;
 
-import com.gamma.ops.note.NoteTargets;
+import com.gamma.ops.AnnotationKinds;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
@@ -41,10 +41,10 @@ final class AnnotationTargets {
      * Existence <em>and</em> authorization for one target. Returns the event correlation id ({@code ""}
      * when there is none), or {@code null} when the target does not exist. Throws 404 when the target
      * exists but the caller may not see it (existence-hiding), and 400 on a kind outside
-     * {@link NoteTargets#KINDS}.
+     * {@link AnnotationKinds#KINDS}.
      */
     static String gate(ApiContext api, HttpExchange ex, String targetKind, String targetId) {
-        if (NoteTargets.OBJECT.equals(targetKind))
+        if (AnnotationKinds.OBJECT.equals(targetKind))
             return ObjectRoutes.visibleObjectCorrelationId(api, ex, targetId);
         Path root = api.writeRoot() == null ? null : api.writeRoot().resolve("registry");
         ComponentRegistry.Component c;

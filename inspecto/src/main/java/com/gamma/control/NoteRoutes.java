@@ -14,7 +14,7 @@ import java.util.Map;
  * in {@link ObjectRoutes} are untouched and keep working.
  *
  * <h3>Target vocabulary</h3>
- * {@link NoteTargets#KINDS} = {@code "object"} + {@link ComponentStore#WRITABLE_TYPES} (the same strings
+ * {@link AnnotationKinds#KINDS} = {@code "object"} + {@link ComponentStore#WRITABLE_TYPES} (the same strings
  * the Exchange kind axis and {@code BundleRoutes.OWN_STORE_KINDS} use). An unknown kind is a 400; a
  * known kind with an unresolvable id is a 404 — a note is never written against a target that is not
  * there.

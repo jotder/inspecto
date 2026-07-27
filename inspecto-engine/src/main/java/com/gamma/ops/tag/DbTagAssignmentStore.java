@@ -1,6 +1,6 @@
 package com.gamma.ops.tag;
 
-import com.gamma.ops.note.NoteTargets;
+import com.gamma.ops.AnnotationKinds;
 import com.gamma.util.JdbcDrivers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,7 +80,7 @@ public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma
 
     @Override
     public synchronized boolean remove(String tag, String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         String sql = "DELETE FROM " + TABLE + " WHERE tag = ? AND target_kind = ? AND target_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, tag == null ? null : tag.trim());
@@ -94,7 +94,7 @@ public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma
 
     @Override
     public synchronized List<String> tagsOf(String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         String sql = "SELECT DISTINCT tag FROM " + TABLE
                 + " WHERE target_kind = ? AND target_id = ? ORDER BY tag";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -162,7 +162,7 @@ public final class DbTagAssignmentStore implements TagAssignmentStore, com.gamma
 
     @Override
     public synchronized int removeAllForTarget(String targetKind, String targetId) {
-        String tk = NoteTargets.require(targetKind);
+        String tk = AnnotationKinds.require(targetKind);
         String sql = "DELETE FROM " + TABLE + " WHERE target_kind = ? AND target_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, tk);

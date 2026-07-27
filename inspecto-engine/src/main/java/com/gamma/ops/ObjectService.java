@@ -12,7 +12,6 @@ import com.gamma.ops.note.InMemoryNoteStore;
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.NoteService;
 import com.gamma.ops.note.NoteStore;
-import com.gamma.ops.note.NoteTargets;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.ops.queue.InMemoryQueueStore;
 import com.gamma.ops.queue.Queue;
@@ -151,7 +150,7 @@ public final class ObjectService {
         // D10: the object family's plug-in to the kind-agnostic note path — resolve the object (this is
         // what used to be require(objectId)) and hand back its correlation id; null ⇒ "no such target".
         this.noteService = new NoteService(notes, (targetKind, targetId) -> {
-            if (!NoteTargets.OBJECT.equals(targetKind)) return null;   // fail closed: not our family
+            if (!AnnotationKinds.OBJECT.equals(targetKind)) return null;   // fail closed: not our family
             OperationalObject o = store.get(targetId).orElse(null);
             if (o == null) return null;
             return o.correlationId() == null ? "" : o.correlationId();
@@ -448,21 +447,21 @@ public final class ObjectService {
 
     /** An object's tags, alphabetical, read from the assignment store (never from the CSV projection). */
     public List<String> tagsOf(String objectId) {
-        return tagAssignments.tagsOf(com.gamma.ops.note.NoteTargets.OBJECT, objectId);
+        return tagAssignments.tagsOf(com.gamma.ops.AnnotationKinds.OBJECT, objectId);
     }
 
     /** Apply one tag to an object and re-project the CSV. Idempotent; returns the updated object. */
     public OperationalObject applyTag(String objectId, String tag, String actor) {
         OperationalObject o = require(objectId);
         tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                tag, com.gamma.ops.note.NoteTargets.OBJECT, objectId, actor));
+                tag, com.gamma.ops.AnnotationKinds.OBJECT, objectId, actor));
         return projectTags(o, System.currentTimeMillis());
     }
 
     /** Remove one tag from an object and re-project the CSV. Idempotent; returns the updated object. */
     public OperationalObject removeTag(String objectId, String tag) {
         OperationalObject o = require(objectId);
-        tagAssignments.remove(tag, com.gamma.ops.note.NoteTargets.OBJECT, objectId);
+        tagAssignments.remove(tag, com.gamma.ops.AnnotationKinds.OBJECT, objectId);
         return projectTags(o, System.currentTimeMillis());
     }
 
@@ -485,7 +484,7 @@ public final class ObjectService {
             for (String tag : csv) {
                 if (known.contains(tag)) continue;
                 tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                        tag, com.gamma.ops.note.NoteTargets.OBJECT, o.id(), "migration"));
+                        tag, com.gamma.ops.AnnotationKinds.OBJECT, o.id(), "migration"));
                 created++;
             }
         }
@@ -555,7 +554,7 @@ public final class ObjectService {
     /** The ids of the objects currently carrying {@code tag} (component targets have no CSV to project). */
     private List<String> objectTargetsOf(String tag) {
         return tagAssignments.forTag(tag).stream()
-                .filter(a -> com.gamma.ops.note.NoteTargets.OBJECT.equals(a.targetKind()))
+                .filter(a -> com.gamma.ops.AnnotationKinds.OBJECT.equals(a.targetKind()))
                 .map(com.gamma.ops.tag.TagAssignment::targetId)
                 .distinct()
                 .toList();
@@ -588,7 +587,7 @@ public final class ObjectService {
     private void adoptTags(OperationalObject stored) {
         for (String tag : csvTags(stored.attributes().get(ATTR_TAGS)))
             tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                    tag, com.gamma.ops.note.NoteTargets.OBJECT, stored.id(), "system"));
+                    tag, com.gamma.ops.AnnotationKinds.OBJECT, stored.id(), "system"));
     }
 
     /**
@@ -1019,7 +1018,7 @@ public final class ObjectService {
         // D7: the survivor absorbs the union in the assignment store; the CSV below is its projection.
         for (String tag : tags)
             tagAssignments.add(com.gamma.ops.tag.TagAssignment.of(
-                    tag, com.gamma.ops.note.NoteTargets.OBJECT, survivorId, actor));
+                    tag, com.gamma.ops.AnnotationKinds.OBJECT, survivorId, actor));
         Map<String, String> union = new LinkedHashMap<>();
         if (!tags.isEmpty()) union.put(ATTR_TAGS, String.join(",", tagsOf(survivorId)));
         if (!watchers.isEmpty()) union.put(ATTR_WATCHERS, String.join(",", watchers));
@@ -1168,7 +1167,7 @@ public final class ObjectService {
 
     /** Add a free-text comment to an object (unknown id → {@link NoSuchElementException}); emits OBJECT_NOTE. */
     public ObjectNote comment(String objectId, String author, String body) {
-        return noteService.comment(NoteTargets.OBJECT, objectId, author, body);
+        return noteService.comment(AnnotationKinds.OBJECT, objectId, author, body);
     }
 
     /**
@@ -1177,7 +1176,7 @@ public final class ObjectService {
      */
     public ObjectNote attach(String objectId, String author, String name, String contentType,
                              String uri, String caption) {
-        return noteService.attach(NoteTargets.OBJECT, objectId, author, name, contentType, uri, caption);
+        return noteService.attach(AnnotationKinds.OBJECT, objectId, author, name, contentType, uri, caption);
     }
 
     /** An object's notes, newest-first; {@code kind} {@code null} returns comments and attachments alike.
@@ -1193,7 +1192,7 @@ public final class ObjectService {
      * {@link NoSuchElementException}. Returns the seeded notes in section order.
      */
     public List<ObjectNote> applyRca(String objectId, RcaTemplate template, String actor) {
-        String correlationId = noteService.require(NoteTargets.OBJECT, objectId);
+        String correlationId = noteService.require(AnnotationKinds.OBJECT, objectId);
         List<ObjectNote> seeded = new ArrayList<>();
         for (String section : template.sections())
             seeded.add(noteService.append(ObjectNote.comment(objectId, actor, "## " + section), actor, correlationId));
@@ -1255,9 +1254,9 @@ public final class ObjectService {
         if (hasLegalHold(o))
             throw new IllegalStateException("object '" + objectId + "' is under legal hold — not purgeable");
         String correlationId = o.correlationId();          // read before the row is gone
-        int notesRemoved = notes.deleteForTarget(NoteTargets.OBJECT, objectId);
+        int notesRemoved = notes.deleteForTarget(AnnotationKinds.OBJECT, objectId);
         int linksRemoved = links.removeAllIncident(objectId);
-        int tagsRemoved = tagAssignments.removeAllForTarget(NoteTargets.OBJECT, objectId);
+        int tagsRemoved = tagAssignments.removeAllForTarget(AnnotationKinds.OBJECT, objectId);
         store.delete(objectId);
         EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
                 .level(EventLevel.INFO)

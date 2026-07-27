@@ -316,8 +316,8 @@ class ObjectServiceTest {
         OperationalObject caseObj = svc.open(ObjectType.CASE, "investigation", "d", "HIGH", null, Map.of());
 
         ObjectNote c = svc.comment(caseObj.id(), "alice", "hi");
-        assertEquals(com.gamma.ops.note.NoteTargets.OBJECT, c.targetKind());
-        assertEquals(1, svc.noteStore().forTarget(com.gamma.ops.note.NoteTargets.OBJECT, caseObj.id(), null).size());
+        assertEquals(com.gamma.ops.AnnotationKinds.OBJECT, c.targetKind());
+        assertEquals(1, svc.noteStore().forTarget(com.gamma.ops.AnnotationKinds.OBJECT, caseObj.id(), null).size());
         assertTrue(svc.noteStore().forTarget("link-analysis-view", caseObj.id(), null).isEmpty(),
                 "an object note is not readable as a view note");
     }

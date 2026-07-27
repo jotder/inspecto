@@ -1,5 +1,7 @@
 package com.gamma.ops.note;
 
+import com.gamma.ops.AnnotationKinds;
+
 import com.gamma.util.JdbcDrivers;
 import com.gamma.util.JsonAttributes;
 import org.slf4j.Logger;
@@ -76,7 +78,7 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
     @Override
     public synchronized List<ObjectNote> forTarget(String targetKind, String targetId, NoteKind kind) {
         String tk = targetKind == null || targetKind.isBlank()
-                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+                ? AnnotationKinds.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
         String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE object_id = ? AND target_kind = ?"
                 + (kind == null ? "" : " AND kind = ?") + " ORDER BY created_at DESC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -97,7 +99,7 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
     @Override
     public synchronized int deleteForTarget(String targetKind, String targetId) {
         String tk = targetKind == null || targetKind.isBlank()
-                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+                ? AnnotationKinds.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
         String sql = "DELETE FROM " + TABLE + " WHERE object_id = ? AND target_kind = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, targetId);
@@ -132,7 +134,7 @@ public final class DbNoteStore implements NoteStore, com.gamma.util.BrowsableSto
             // Every pre-D10 note targets an OperationalObject, so existing rows backfill to 'object';
             // the same UPDATE also normalises a NULL written by any older writer.
             st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS target_kind VARCHAR");
-            st.execute("UPDATE " + TABLE + " SET target_kind = '" + NoteTargets.OBJECT + "' "
+            st.execute("UPDATE " + TABLE + " SET target_kind = '" + AnnotationKinds.OBJECT + "' "
                     + "WHERE target_kind IS NULL OR target_kind = ''");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise note DB schema", e);

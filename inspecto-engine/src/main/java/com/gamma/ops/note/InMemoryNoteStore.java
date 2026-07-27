@@ -1,5 +1,7 @@
 package com.gamma.ops.note;
 
+import com.gamma.ops.AnnotationKinds;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +27,7 @@ public final class InMemoryNoteStore implements NoteStore {
     @Override
     public synchronized List<ObjectNote> forTarget(String targetKind, String targetId, NoteKind kind) {
         String tk = targetKind == null || targetKind.isBlank()
-                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+                ? AnnotationKinds.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
         List<ObjectNote> out = new ArrayList<>();
         for (int i = notes.size() - 1; i >= 0; i--) {
             ObjectNote n = notes.get(i);
@@ -38,7 +40,7 @@ public final class InMemoryNoteStore implements NoteStore {
     @Override
     public synchronized int deleteForTarget(String targetKind, String targetId) {
         String tk = targetKind == null || targetKind.isBlank()
-                ? NoteTargets.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
+                ? AnnotationKinds.OBJECT : targetKind.trim().toLowerCase(java.util.Locale.ROOT);
         int before = notes.size();
         notes.removeIf(n -> n.targetKind().equals(tk) && n.objectId().equals(targetId));
         return before - notes.size();

@@ -600,7 +600,7 @@ function csvTags(csv: string | undefined): string[] {
 // ── cross-entity tag assignments (BACKLOG D7 — mirrors ops.tag.TagAssignmentStore) ───────────────
 
 /**
- * The annotation-target vocabulary, shared with notes (backend `NoteTargets.KINDS` = `"object"` +
+ * The annotation-target vocabulary, shared with notes (backend `AnnotationKinds.KINDS` = `"object"` +
  * `ComponentStore.WRITABLE_TYPES`). Keep the two in step — widening it widens both features.
  */
 export const TAG_TARGET_KINDS = [
