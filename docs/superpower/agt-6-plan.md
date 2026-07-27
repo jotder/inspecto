@@ -2,7 +2,9 @@
 
 > ## ⚠️ AS-BUILT UPDATE — 2026-07-26: A1–A4 SHIPPED, and three of this plan's premises were WRONG
 >
-> **Plan stays active** (one A2 pane + A5 + all of 6b remain). D1–D4 answered; §8 records the calls.
+> **Plan stays active** — but **all of AGT-6a's phases A1–A5 have now shipped** (A5 complete 2026-07-27).
+> What keeps this plan out of the archive is the `kpi_report_builder` **host** row + all of AGT-6b, plus two
+> OPEN defects from the cross-adopter audit (§3.4.8). D1–D4 + D8–D11 answered; §8 records the calls.
 >
 > **Correction 3 — A4 (§3.2) is TWO affordances, not one, and only one of them is a breadth win.** The
 > row's own phrasing gives it away: *"what am I looking at / why is this red"*. The first is a **vocabulary**
@@ -175,7 +177,7 @@ validated write routes.
 | **A2** | **Adoption wave 1 — the four panes with matching tools** | M | Pipelines editor (`pipeline_author`), Expectations (`suggest_expectations`), Dashboards/Widgets (`kpi_report_builder`), Queries (`query_author`). These four are first precisely because the backend tool already exists and is already validated — **zero new backend capability**. |
 | **A3** | **Context grounding** | S | Pass the pane's current component ref / Dataset ref / selected column as agent **session attributes** so the operator doesn't re-state what the screen already knows. Extends the existing `goalKind` session-attribute seam; no new route. |
 | **A4** | **Adoption wave 2 — "explain this screen" everywhere** | S | A read-only L0 affordance on the remaining panes ("what am I looking at / why is this red"), which needs no draft tool at all. Cheapest breadth win; ship after A1–A3 prove the surface. |
-| **A5** | **True natural-language authoring — the model hop** | M+L | The phase D8 split out: prose → structured tool args via a single-turn, single-tool, schema-constrained model call, then the same deterministic invoke A1 already does. **Fully scoped in §3.4** — read F1–F4 there before estimating; the hop is cheap and the *nested* schema work is not. |
+| **A5** | **True natural-language authoring — the model hop** | M+L | ✅ **COMPLETE 2026-07-27** (A5.1 `query_author` · A5.2 `component_draft` + the D9 projection · A5.3 `pipeline_author`). The phase D8 split out: prose → structured tool args via a single-turn, single-tool, schema-constrained model call, then the same deterministic invoke A1 already does. As-built + the corrected premises: **§3.4**, and `okf/frontend/features/inline-ai-authoring.md`. |
 
 ### 3.3 Invariants this must not break
 
@@ -351,6 +353,26 @@ promise honest on a build with no model configured.
   `StubLlmGateway` via the package-private test ctor) — the hop needs **no new wiring** to reach a model,
   and `StubLlmGateway.builder().replyToolCalls(...)` makes it deterministically testable.
 
+#### 3.4.8 OPEN after A5 shipped — two defects from the cross-adopter audit (2026-07-27)
+
+A5 is complete, but a sweep of every `<inspecto-ai-assist>` adopter left two defects open. They are the
+reason this plan is not archivable on AGT-6a grounds. Full detail:
+[`okf/frontend/features/inline-ai-authoring.md`](../okf/frontend/features/inline-ai-authoring.md).
+
+1. ⚠ **`component_draft(kind='schema')` validates the wrong `schema` — A5.2's adoption does not work
+   against a real backend.** The word names two unrelated things: the **registry component**
+   (`ComponentStore.WRITABLE_TYPES`, content a bare `{fields:[{name,type}]}` — what the Components pane
+   authors and what `applySchemaDraft` reads back) and the **TOON schema config** (`ConfigSpecs.schema()`,
+   `raw.name` required). `component_draft` resolves the latter, so the adoption always draws *"Missing
+   required field 'raw.name'"*, and a repaired `{raw:{…}}` draft is one the pane cannot apply. Pinned as a
+   failing-shape test rather than papered over. **The fix is a design call, not a patch:** either reshape
+   what the pane drafts, or accept that registry components have **no `ConfigSpec` at all** and A5.2 needs a
+   different validator. ⚠ This is a concrete instance of the vocabulary rule in the root `CLAUDE.md` — one
+   word naming two concepts produced a shipped defect.
+2. ⚠ **`projection_author`'s declared `columns.items` is stale.** The pane sends a `string[]`; the schema
+   says `{"items":{"type":"object"}}`. The Java `columnNames` accepts both deliberately and so does the
+   mock, so nothing breaks on the derive route — but it is what a model reads on the `ask` path.
+
 ---
 
 ## 4. AGT-6b — Agent graphs (Could, demand-gated)
@@ -460,6 +482,8 @@ what/why/spend. **No new operator surface is required** — both already exist.
 
 ---
 
-*AGT-6a is `Should`; A1–A4 shipped 2026-07-26. **A5 is scoped in §3.4 and ready to schedule pending
-D9–D11**; the `kpi_report_builder` host remains open as a separate new-flow item. AGT-6b is `Could`,
-parked behind D5 + G2.*
+*AGT-6a is `Should`; A1–A4 shipped 2026-07-26 and **A5 completed 2026-07-27, so every AGT-6a phase has
+shipped**. D9–D11 are answered. What remains under AGT-6a is the `kpi_report_builder` **host** (a new flow,
+not an adoption) plus the two OPEN audit defects in §3.4.8 — chief among them
+`component_draft(kind='schema')` resolving the wrong `schema`, which makes A5.2's shipped adoption fail
+against a real backend. AGT-6b is `Could`, parked behind D5 + G2.*
