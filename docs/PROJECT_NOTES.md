@@ -120,6 +120,18 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `.toon`).
 - **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch for
   these whenever generating SQL with date/trigger columns.
+- **`schema` names TWO unrelated config shapes — never resolve one to the other's spec.** The **registry
+  component** is a bare column list (`{fields:[{name,type[,format]}]}`, stored under `schemas/`, authored by
+  the Components pane, validated by `ConfigSpecs.schemaComponent()`); the **TOON schema config** describes a
+  raw source (`raw.name` required, `raw.format`, `mapping.canonicalName`, e.g. `events/call_schema.toon`,
+  validated by `ConfigSpecs.schema()`). `component_draft`/`config_schema` mean the **component** and route
+  through `InspectoTools.specFor`; `/validate` means the **config** and routes through `ConfigSpecs.forType`.
+  Conflating them shipped a defect that survived two slices (fixed 2026-07-27). ⚠ **Do not generalize this
+  into "registry kinds have no `ConfigSpec`"** — `widget` and `dashboard` are shared words whose specs
+  describe the registry components *accurately*; `schema` is the one overloaded word, and a blanket reroute
+  breaks two working kinds. The collision stands deliberately (renaming breaks on-disk dirs + the UI
+  `ComponentType` union) — see the exception recorded in `GLOSSARY.md`; say "schema component" / "schema
+  config" when context does not disambiguate.
 - **A new component kind needs TWO registrations, in different modules** — `ComponentStore.WRITABLE_TYPES`
   (else every CRUD call 400s) **and** `ComponentRegistry.TYPE_BY_DIR` (else the first write has nowhere to
   land). Adding only the first compiles and passes an unfocused build. `ComponentStoreTest`

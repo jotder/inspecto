@@ -3,8 +3,9 @@
 > ## ⚠️ AS-BUILT UPDATE — 2026-07-26: A1–A4 SHIPPED, and three of this plan's premises were WRONG
 >
 > **Plan stays active** — but **all of AGT-6a's phases A1–A5 have now shipped** (A5 complete 2026-07-27).
-> What keeps this plan out of the archive is the `kpi_report_builder` **host** row + all of AGT-6b, plus two
-> OPEN defects from the cross-adopter audit (§3.4.8). D1–D4 + D8–D11 answered; §8 records the calls.
+> What keeps this plan out of the archive is the `kpi_report_builder` **host** row + all of AGT-6b, plus
+> **one** remaining cross-adopter audit defect (§3.4.8 — the `schema`-kind one was fixed 2026-07-27; what
+> is left is cosmetic). D1–D4 + D8–D11 answered; §8 records the calls.
 >
 > **Correction 3 — A4 (§3.2) is TWO affordances, not one, and only one of them is a breadth win.** The
 > row's own phrasing gives it away: *"what am I looking at / why is this red"*. The first is a **vocabulary**
@@ -353,22 +354,28 @@ promise honest on a build with no model configured.
   `StubLlmGateway` via the package-private test ctor) — the hop needs **no new wiring** to reach a model,
   and `StubLlmGateway.builder().replyToolCalls(...)` makes it deterministically testable.
 
-#### 3.4.8 OPEN after A5 shipped — two defects from the cross-adopter audit (2026-07-27)
+#### 3.4.8 The cross-adopter audit (2026-07-27) — defect 1 FIXED, defect 2 still open
 
-A5 is complete, but a sweep of every `<inspecto-ai-assist>` adopter left two defects open. They are the
-reason this plan is not archivable on AGT-6a grounds. Full detail:
+A5 is complete; a sweep of every `<inspecto-ai-assist>` adopter found two defects. Full detail:
 [`okf/frontend/features/inline-ai-authoring.md`](../okf/frontend/features/inline-ai-authoring.md).
 
-1. ⚠ **`component_draft(kind='schema')` validates the wrong `schema` — A5.2's adoption does not work
-   against a real backend.** The word names two unrelated things: the **registry component**
-   (`ComponentStore.WRITABLE_TYPES`, content a bare `{fields:[{name,type}]}` — what the Components pane
-   authors and what `applySchemaDraft` reads back) and the **TOON schema config** (`ConfigSpecs.schema()`,
-   `raw.name` required). `component_draft` resolves the latter, so the adoption always draws *"Missing
-   required field 'raw.name'"*, and a repaired `{raw:{…}}` draft is one the pane cannot apply. Pinned as a
-   failing-shape test rather than papered over. **The fix is a design call, not a patch:** either reshape
-   what the pane drafts, or accept that registry components have **no `ConfigSpec` at all** and A5.2 needs a
-   different validator. ⚠ This is a concrete instance of the vocabulary rule in the root `CLAUDE.md` — one
-   word naming two concepts produced a shipped defect.
+1. ✅ **FIXED 2026-07-27 (`aa960fdc`) — `component_draft(kind='schema')` validated the wrong `schema`.** The
+   word names two unrelated shapes: the **registry component** (`ComponentStore.WRITABLE_TYPES`, a bare
+   `{fields:[{name,type}]}` — what the Components pane authors and what `applySchemaDraft` reads back) and
+   the **TOON schema config** (`ConfigSpecs.schema()`, `raw.name` required). `configType(kind)` resolved the
+   latter, so A5.2's adoption always drew *"Missing required field 'raw.name'"* and the repair loop pushed
+   the model toward a `{raw:{…}}` draft the pane cannot apply — a spurious ERROR or a dead Apply button.
+   **As fixed:** `ConfigSpecs.schemaComponent()` + `InspectoTools.specFor(kind)`; `ConfigSpecs.forType` keeps
+   the config reading for `/validate`. `config_schema` shared the resolution and advertised the wrong shape
+   to the model, so it was **two tools, not one**.
+   ⚠ **This section's own design call was WRONG — do not restore it.** It proposed accepting that "registry
+   components have no `ConfigSpec` at all". Checked against the shipped sample Space, `ConfigSpecs.widget()`
+   and `dashboard()` describe `registry/widgets/*.toon` and `registry/dashboards/*.toon` **accurately**:
+   **`schema` is the one overloaded word**, and a blanket reroute would have broken two working kinds (pinned
+   by `widgetAndDashboardKeepResolvingThroughTheirConfigSpecs`).
+   ⚠ Still a concrete instance of the root `CLAUDE.md` vocabulary rule — one word naming two concepts
+   produced a shipped defect. The collision itself **stands deliberately** (renaming breaks on-disk dirs and
+   the UI `ComponentType` union) and is now recorded as an explicit exception in `docs/GLOSSARY.md`.
 2. ⚠ **`projection_author`'s declared `columns.items` is stale.** The pane sends a `string[]`; the schema
    says `{"items":{"type":"object"}}`. The Java `columnNames` accepts both deliberately and so does the
    mock, so nothing breaks on the derive route — but it is what a model reads on the `ask` path.
@@ -484,6 +491,7 @@ what/why/spend. **No new operator surface is required** — both already exist.
 
 *AGT-6a is `Should`; A1–A4 shipped 2026-07-26 and **A5 completed 2026-07-27, so every AGT-6a phase has
 shipped**. D9–D11 are answered. What remains under AGT-6a is the `kpi_report_builder` **host** (a new flow,
-not an adoption) plus the two OPEN audit defects in §3.4.8 — chief among them
-`component_draft(kind='schema')` resolving the wrong `schema`, which makes A5.2's shipped adoption fail
-against a real backend. AGT-6b is `Could`, parked behind D5 + G2.*
+not an adoption) plus **one cosmetic** audit defect in §3.4.8 (`projection_author`'s stale `columns.items`).
+The blocking one — `component_draft(kind='schema')` resolving the wrong `schema`, which made A5.2's shipped
+adoption fail against every real backend — was **fixed 2026-07-27**. AGT-6b is `Could`, parked behind
+D5 + G2.*
