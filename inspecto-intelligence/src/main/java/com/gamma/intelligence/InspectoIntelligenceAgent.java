@@ -312,7 +312,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
                     + " request cannot be interpreted — configure one under Assist Settings, or fill the"
                     + " form directly");
         }
-        if (COMPONENT_DRAFT.equals(name)) return Optional.of(repairLoop(tool, prompt, args, session));
+        String payload = REPAIRABLE.get(name);
+        if (payload != null) return Optional.of(repairLoop(tool, payload, prompt, args, session));
 
         ArgumentDeriver.Derivation derived = ArgumentDeriver.derive(gateway, tool.spec(), prompt, args);
         if (!derived.ok()) return Optional.of(Map.of("ok", false, "error", derived.error()));
@@ -322,24 +323,35 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         return Optional.of(view);
     }
 
-    /** The one tool whose NL path is a loop rather than a hop (AGT-6a A5.2). */
-    private static final String COMPONENT_DRAFT = "component_draft";
+    /**
+     * The tools whose NL path is a loop rather than a hop, mapped to the argument the model rewrites each
+     * turn (A5.2 {@code component_draft}, A5.3 {@code pipeline_author}).
+     *
+     * <p>A tool belongs here when its result carries <b>anchored findings</b> — feedback a next turn can act
+     * on. {@code query_author} does not: it either renders a predicate or refuses, so a second turn would
+     * re-roll rather than repair, and it stays a hop.
+     */
+    private static final Map<String, String> REPAIRABLE = Map.of(
+            "component_draft", "config",
+            "pipeline_author", "flow");
 
     /** Hard turn cap (plan §5 D11). Three, then hand the operator the best draft and its findings. */
     static final int MAX_REPAIR_TURNS = 3;
 
     /**
-     * AGT-6a A5.2: the bounded repair loop for {@code component_draft}.
+     * AGT-6a A5.2/A5.3: the bounded repair loop, over the {@code payload} argument the model rewrites.
      *
-     * <p>{@code component_draft} is the one tool with <b>no authoring logic</b> — it echoes {@code config}
-     * back with anchored findings — so one turn reliably yields a probably-invalid config. Converging needs
-     * those findings fed back, which is why this is a loop and {@code query_author}'s path is not.
+     * <p>{@code component_draft} has <b>no authoring logic</b> — it echoes {@code config} back with anchored
+     * findings — so one turn reliably yields a probably-invalid config; {@code pipeline_author} parses a graph
+     * and validates it structurally. Both hand back findings a next turn can act on, which is why they loop
+     * and {@code query_author}'s path does not.
      *
      * <p>Three properties are deliberate:
      * <ul>
-     *   <li><b>Schema-constrained regeneration.</b> The offered spec's bare {@code config:{"type":"object"}}
-     *       is replaced with the kind's projected JSON Schema (plan D9), so the model is constrained by the
-     *       very spec that will judge it. The kind comes from the <b>pane</b>, never the model.</li>
+     *   <li><b>Schema-constrained regeneration.</b> The offered spec's bare {@code {"type":"object"}} payload
+     *       is replaced with a real schema, so the model is constrained by the very spec that will judge it —
+     *       projected from the kind's {@code ConfigSpec} (plan D9) for {@code component_draft}, hand-written
+     *       for a {@code flow} (D9 cannot reach an IR). The kind comes from the <b>pane</b>, never the model.</li>
      *   <li><b>The cap is a hand-over, not a failure.</b> At {@link #MAX_REPAIR_TURNS} it returns the best
      *       draft seen with its findings — which is exactly the A1 experience the surface already renders
      *       for human repair, so the fallback is a working screen rather than a dead end.</li>
@@ -347,9 +359,12 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
      *       draft because it happened to be last would make the loop actively harmful.</li>
      * </ul>
      */
-    private Map<String, Object> repairLoop(Tool tool, String prompt, Map<String, Object> args, String session) {
+    private Map<String, Object> repairLoop(Tool tool, String payload, String prompt,
+                                           Map<String, Object> args, String session) {
         Map<String, Object> paneArgs = args == null ? Map.of() : args;
-        ToolSpec spec = ArgumentDeriver.constrainedFor(tool.spec(), paneArgs.get("kind"));
+        ToolSpec spec = "flow".equals(payload)
+                ? ArgumentDeriver.constrainedFlow(tool.spec())                       // A5.3, hand-written
+                : ArgumentDeriver.constrainedFor(tool.spec(), paneArgs.get("kind")); // A5.2, projected (D9)
 
         Map<String, Object> best = null;
         Map<String, Object> bestArgs = null;
@@ -383,7 +398,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
                 bestArgs = derived.args();
                 bestFindings = findings.size();
             }
-            prior = new ArgumentDeriver.PriorAttempt(configOf(bestArgs), findings);
+            prior = new ArgumentDeriver.PriorAttempt(payload, payloadOf(bestArgs, payload), findings);
         }
 
         Map<String, Object> out = new HashMap<>(best);
@@ -398,9 +413,10 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
                 : List.of();
     }
 
+    /** The argument the repair turn hands back as "the draft that was rejected". */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> configOf(Map<String, Object> args) {
-        return args != null && args.get("config") instanceof Map<?, ?> c
+    private static Map<String, Object> payloadOf(Map<String, Object> args, String property) {
+        return args != null && args.get(property) instanceof Map<?, ?> c
                 ? (Map<String, Object>) c
                 : Map.of();
     }

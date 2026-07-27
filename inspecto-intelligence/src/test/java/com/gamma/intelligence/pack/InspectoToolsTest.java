@@ -505,9 +505,38 @@ class InspectoToolsTest {
     @SuppressWarnings("unchecked")
     void pipelineAuthorParsesWithoutSampleRows() {
         Map<String, Object> out = invoke(authorTool(), Map.of("flow", filterFlowMap()));
-        assertEquals("orders_flow", out.get("flow"));
+        assertEquals("orders_flow", out.get("name"));
         assertEquals(false, out.get("simulated"));
         assertEquals(3, ((List<Object>) out.get("nodes")).size());
+        // `flow` is the round-tripped GRAPH, not its name (A5.3) — the caller applies this, and a name
+        // string is not something a pane can adopt.
+        Map<String, Object> echoed = (Map<String, Object>) out.get("flow");
+        assertEquals("orders_flow", echoed.get("name"));
+        assertEquals(3, ((List<Object>) echoed.get("nodes")).size());
+        assertEquals(true, out.get("clean"));
+        assertEquals(List.of(), out.get("findings"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void pipelineAuthorReportsAStructurallyBrokenGraphAsFindingsNotAnError() {
+        // A5.3: an unexecutable topology must stay ok=true and carry coded findings, so the repair loop
+        // (and the human) get something anchored to act on rather than a bare refusal.
+        Map<String, Object> flow = new java.util.LinkedHashMap<>(filterFlowMap());
+        flow.put("edges", List.of(
+                Map.of("from", "acq", "to", "flt"),
+                Map.of("from", "flt", "to", "warehouse")));   // no such node
+        Map<String, Object> out = invoke(authorTool(), flow(flow));
+
+        assertEquals(false, out.get("clean"));
+        assertEquals(false, out.get("simulated"), "an unexecutable graph is never simulated");
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) out.get("findings");
+        assertTrue(findings.stream().anyMatch(f -> "DANGLING_TO".equals(f.get("code"))
+                && "edges".equals(f.get("fieldPath"))), findings.toString());
+    }
+
+    private static Map<String, Object> flow(Map<String, Object> f) {
+        return Map.of("flow", f);
     }
 
     @Test

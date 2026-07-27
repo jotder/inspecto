@@ -72,8 +72,13 @@ public final class ArgumentDeriver {
      * A previous turn's rejected draft and the findings it drew (AGT-6a A5.2). Fed back verbatim so the next
      * turn <b>repairs</b> rather than starts over — the findings are already anchored to a {@code fieldPath},
      * which is the whole reason a repair loop can converge where a re-roll would not.
+     *
+     * <p>{@code property} names the argument the model must rewrite ({@code config} for
+     * {@code component_draft}, {@code flow} for {@code pipeline_author}) — a repair turn that does not say
+     * which argument to correct invites the model to restate the whole call.
      */
-    public record PriorAttempt(Map<String, Object> config, List<Map<String, Object>> findings) {}
+    public record PriorAttempt(String property, Map<String, Object> config,
+                               List<Map<String, Object>> findings) {}
 
     /**
      * One turn, one offered tool. Returns the arguments to invoke {@code spec.name()} with, already merged
@@ -165,6 +170,18 @@ public final class ArgumentDeriver {
     }
 
     /**
+     * {@code pipeline_author}'s spec with {@code flow} constrained by the hand-written graph schema (A5.3).
+     *
+     * <p>Unlike {@link #constrainedFor} there is no {@code kind} to key on — a flow has exactly one shape —
+     * and no {@link com.gamma.config.spec.ConfigSpec} to project from, because an authored graph is an IR
+     * rather than a config type. Plan D9 therefore does not reach it; see {@code InspectoTools.flowSchemaJson}.
+     */
+    public static ToolSpec constrainedFlow(ToolSpec spec) {
+        String json = InspectoTools.flowSchemaJson();
+        return json == null ? spec : withPropertySchema(spec, "flow", json);
+    }
+
+    /**
      * The repair turn's extra message: the draft that was rejected and the findings against it. Deliberately
      * data, not instruction-heavy prose — the system prompt already fixed the rules, and a local model that
      * is re-told them tends to narrate instead of calling.
@@ -180,16 +197,16 @@ public final class ArgumentDeriver {
             config = "{}";
         }
         return """
-               That draft was rejected. Call the tool again with a corrected `config`.
+               That draft was rejected. Call the tool again with a corrected `%s`.
 
-               Rejected config:
+               Rejected `%s`:
                %s
 
                Findings to fix (each is anchored to the field path that caused it):
                %s
 
                Fix exactly these. Keep everything else unchanged.
-               """.formatted(config, findings);
+               """.formatted(prior.property(), prior.property(), config, findings);
     }
 
     /**

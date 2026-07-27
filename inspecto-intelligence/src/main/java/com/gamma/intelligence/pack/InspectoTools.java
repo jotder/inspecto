@@ -25,6 +25,8 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineGraph;
+import com.gamma.pipeline.PipelineNodeTypes;
+import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.query.ConditionSql;
@@ -1214,6 +1216,55 @@ final class InspectoTools {
     }
 
     /**
+     * A JSON Schema for {@code pipeline_author}'s {@code flow} payload (AGT-6a A5.3).
+     *
+     * <p><b>Hand-written, and that is not an oversight.</b> Plan D9 projects a schema from a
+     * {@link ConfigSpec}; an authored graph has none — it is an IR ({@code PipelineCodec}), not a config
+     * type — so the projection cannot reach it. What keeps this honest rather than a second source of truth
+     * is that the one part a model actually gets wrong, the node {@code type} vocabulary, is enumerated from
+     * the live {@link PipelineNodeTypes} registry, so a registered extension type is offerable the day it
+     * registers.
+     *
+     * <p>{@code rel} is deliberately <b>not</b> an enum: {@code route:<key>} is open-ended, so closing it
+     * would forbid the branch dispatch {@code transform.route} and {@code parser} exist to express.
+     */
+    static String flowSchemaJson() {
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("type", "object");
+        node.put("properties", Map.of(
+                "id", Map.of("type", "string", "description", "unique within the flow"),
+                "type", new LinkedHashMap<>(Map.of(
+                        "type", "string",
+                        "enum", PipelineNodeTypes.all().stream().sorted().toList())),
+                "name", Map.of("type", "string"),
+                "config", Map.of("type", "object", "description", "the node's local settings")));
+        node.put("required", List.of("id", "type"));
+
+        Map<String, Object> edge = new LinkedHashMap<>();
+        edge.put("type", "object");
+        edge.put("properties", Map.of(
+                "from", Map.of("type", "string", "description", "a node id in this flow"),
+                "to", Map.of("type", "string", "description", "a node id in this flow"),
+                "rel", Map.of("type", "string", "description",
+                        "data (default) | success | failure | unmatched | gap | on_commit | dropped |"
+                                + " invalid | duplicate | route:<key>")));
+        edge.put("required", List.of("from", "to"));
+
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("properties", Map.of(
+                "name", Map.of("type", "string", "description", "the flow's canonical id"),
+                "nodes", Map.of("type", "array", "items", node),
+                "edges", Map.of("type", "array", "items", edge)));
+        schema.put("required", List.of("name", "nodes"));
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(schema);
+        } catch (Exception unserialisable) {
+            return null;   // fails open: the deriver leaves the spec unconstrained rather than throwing
+        }
+    }
+
+    /**
      * AGT-5 P3 {@code component_apply} (act, L2): promote a validated draft into the live registry
      * (DRAFT→ACTIVE). Mutating — the eoiagent gate dry-runs it, blocks for a human approval in the
      * inbox, and audits the outcome; on approval the tool writes through the same governed control
@@ -1380,9 +1431,27 @@ final class InspectoTools {
                 return error("invalid flow: " + e.getMessage());
             }
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("flow", g.name());
+            result.put("name", g.name());
+            // The PARSED graph, not just its name (AGT-6a A5.3). This is what the caller applies, so it
+            // must be the round-tripped IR — a name string is not something a pane can adopt.
+            result.put("flow", PipelineCodec.toMap(g));
             result.put("nodes", g.nodes().stream()
                     .map(n -> Map.of("id", n.id(), "type", n.type())).toList());
+
+            // Structural validation (A5.3). `PipelineValidator` already produces coded, structured issues,
+            // so a graph draft has the same anchored-findings substrate a component draft has — which is
+            // what lets the repair loop converge on a topology rather than only on a field.
+            List<Map<String, Object>> findings = validationFindings(g);
+            boolean clean = findings.isEmpty();
+            result.put("clean", clean);
+            result.put("findings", findings);
+            if (findings.stream().anyMatch(f -> "ERROR".equals(f.get("severity")))) {
+                // Do not simulate a graph that cannot execute: the dry run would fail on the same defect
+                // and report it as a simulate error, losing the anchored code the repair turn needs.
+                result.put("simulated", false);
+                result.put("note", "graph parsed but is not executable — fix the findings first");
+                return ok(result);
+            }
 
             List<Map<String, Object>> sampleRows = listOfMapsArg(call, "sampleRows");
             if (sampleRows == null || sampleRows.isEmpty()) {
@@ -1416,6 +1485,31 @@ final class InspectoTools {
                 return error("simulate failed: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * {@link PipelineValidator}'s issues in the same {@code {severity, fieldPath, message}} shape every
+     * other draft-bearing tool returns, plus the stable {@code code}.
+     *
+     * <p>{@code fieldPath} is the <b>collection</b> the defect lives in, not an index: the validator reports
+     * by node/edge <i>id</i> (already in the message) and inventing an index here would anchor a repair turn
+     * to a position that shifts the moment the model reorders the list.
+     */
+    private static List<Map<String, Object>> validationFindings(PipelineGraph g) {
+        return PipelineValidator.validate(g).issues().stream().map(i -> {
+            Map<String, Object> f = new LinkedHashMap<>();
+            f.put("severity", i.severity().name());
+            f.put("code", i.code());
+            f.put("fieldPath", switch (i.code()) {
+                case PipelineValidator.DUPLICATE_NODE, PipelineValidator.UNKNOWN_TYPE -> "nodes";
+                case PipelineValidator.DANGLING_FROM, PipelineValidator.DANGLING_TO,
+                     PipelineValidator.ILLEGAL_EMIT, PipelineValidator.ILLEGAL_ACCEPT,
+                     PipelineValidator.ON_COMMIT_SAME_GRAPH -> "edges";
+                default -> "flow";   // EMPTY_GRAPH, NO_ENTRY, CYCLE — properties of the whole graph
+            });
+            f.put("message", i.message());
+            return f;
+        }).toList();
     }
 
     private static Map<String, Object> scanResult(String table, String column, String method,
