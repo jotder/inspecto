@@ -294,7 +294,15 @@ between A5.1 and A5.2, and pretending otherwise is how this phase overruns.
 |---|---|---|---|
 | **A5.1** ✅ **SHIPPED 2026-07-27** | The hop, on `query_author` | M | `/derive` route + gate order + single-offered-tool call + `derivedArgs` echo + the three distinct failure answers (503 stub / 422 `_raw` / 422 no-call). `ai-assist` gains an optional prompt input, hidden unless the pane opts in. Offline mock branch. |
 | **A5.2** ✅ **SHIPPED 2026-07-27** | `ConfigSpec` → JSON Schema projection + the bounded repair loop, on `component_draft` | L | Projection shipped early as D9 (`ConfigJsonSchema`). The loop: `InspectoIntelligenceAgent.repairLoop`, cap 3 (D11), findings fed back per turn, `turns` echoed to the caller. Adopted on the **Components pane's schema kind** — see the host note below. |
-| **A5.3** | `pipeline_author` | M | Unblocked: A5.2 demonstrated convergence (`ComponentDraftRepairLoopTest`). ⚠ `pipeline_author.flow` is **not** `ConfigSpec`-shaped, so D9 does not cover it — it needs a hand-written schema. |
+| **A5.3** ✅ **SHIPPED 2026-07-27** | `pipeline_author` | M | A **loop**, not the hop this table budgeted — see the premise note below. `REPAIRABLE` maps both tools to the argument they rewrite and `repairLoop` is parameterised on it; `pipeline_author` gained `clean`/`findings` from `PipelineValidator`; `flow`'s schema is hand-written (`InspectoTools.flowSchemaJson`) with node `type` enumerated from the live `PipelineNodeTypes` registry, since D9 cannot reach an IR. Adopted as a **second** `<inspecto-ai-assist>` instance on the Pipelines editor. |
+
+> ⚠ **A5.3's effort premise was WRONG too.** §3.4.3 called a graph's errors "structural, not field-level"
+> and budgeted a hop on that basis. `PipelineValidator` has always produced **coded, structured** issues
+> (`DANGLING_TO`, `CYCLE`, `NO_ENTRY`, …), so a topology has the same anchored substrate a config does and
+> converges the same way — the tool simply was not reporting them. ⚠ It also uncovered that the A2
+> adoption on Pipelines had **never worked against a real backend** (flat args where the tool wants `flow`;
+> a name string where the adapter wants the graph), both masked by an offline mock more lenient than the
+> server. → `okf/frontend/features/inline-ai-authoring.md`.
 
 > ⚠ **A5.2's host was a wrong premise in this plan.** The phasing assumed `component_draft` had a pane to
 > adopt it; it had **none** — the five `<inspecto-ai-assist>` adopters name `pipeline_author`,

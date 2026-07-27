@@ -302,6 +302,56 @@ schema kind** (`component-form.dialog`), and *only* that kind: of the dialog's f
 silently and left the row's type dropdown **blank** — it looked like the draft had worked. Caught only in
 the preview, not by any unit test.
 
+## Natural-language topologies (A5.3 — shipped 2026-07-27)
+
+`pipeline_author` completes A5. It reuses A5.2's loop rather than adding a second mechanism: the agent's
+`REPAIRABLE` map now names both tools and the argument each rewrites (`component_draft` → `config`,
+`pipeline_author` → `flow`), and `repairLoop` is parameterised on that property.
+
+⚠ **The plan's premise for this slice was WRONG.** It budgeted a *hop*, reasoning that a graph's errors are
+"structural, not field-level" and so could not be fed back. But `PipelineValidator` already reports **coded,
+structured issues** (`DANGLING_TO`, `CYCLE`, `NO_ENTRY`, `DUPLICATE_NODE`, `ILLEGAL_EMIT`, …), which is
+exactly the anchored substrate a repair turn needs. A topology converges the same way a config does.
+
+What that required of the tool, all additive:
+
+- **`pipeline_author` now validates.** It returns `clean` + `findings` in the same
+  `{severity, code, fieldPath, message}` shape every other draft-bearing tool uses. `fieldPath` is the
+  **collection** (`nodes` / `edges` / `flow`), never an index — the validator reports by *id* (already in the
+  message) and an index would anchor a repair to a position the model can reorder.
+- **⚠ An unexecutable graph stays `ok=true`.** This is the property the whole slice rests on: a refusal
+  would make the loop treat a broken topology as "not repairable" and bail on turn one, which is precisely
+  the case NL authoring exists to rescue. It is not simulated, though — a dry run would fail on the same
+  defect and report it as a simulate *error*, losing the code.
+- **`flow`'s schema is hand-written** (`InspectoTools.flowSchemaJson`), because plan D9 cannot reach an IR —
+  an authored graph has no `ConfigSpec`. What keeps it from becoming a second source of truth is that node
+  `type` is enumerated from the **live `PipelineNodeTypes` registry**, so a registered extension type is
+  offerable the day it registers. ⚠ `rel` is deliberately **not** an enum: `route:<key>` is open-ended, and
+  closing it would forbid the branch dispatch `transform.route` and `parser` exist to express.
+
+⚠ **The pane passes NO args on the prompt instance.** Pane args merge last and win, so sending the open
+graph would overwrite the topology the sentence just produced and the draft would silently equal what is
+already on screen. Identity is preserved on *apply* instead — `applyPipelineDraft` keeps the open pipeline's
+`name` and `active` whatever the model called its graph. It is a **second `<inspecto-ai-assist>` instance**,
+not a mode switch: describing a topology and checking the one on screen are different acts, and the check
+must keep working on a backend with no model.
+
+### ⚠ Two shipped A2 bugs this slice uncovered — both hidden by the mock
+
+The Pipelines pane's deterministic adoption had **never worked against a real backend**:
+
+1. It passed `{name, nodes, edges}` **flat**; the tool requires the graph under `flow` and answers
+   *"flow is required and must be an object"*. `AgentService.runTool` passes `args` through verbatim — there
+   is no wrapping anywhere.
+2. The tool's result put the flow's **name string** under `flow`, but `adaptToolResult` requires an object
+   there — so even a successful call rendered as *"no suggestion"*, with no error.
+
+Both survived because the offline mock read the flat shape and returned an object. **A mock more lenient
+than the server is worse than no mock**: it converts a hard failure into a passing rehearsal. The mock is
+now strict about `flow`, and `agent.handler.spec.ts` exists specifically to pin that strictness. The same
+class of divergence produced a third, cosmetic one caught in the preview — the mock's echo omitted `active`,
+rendering a phantom *"active (removed)"* row in the operator's diff.
+
 ## Not shipped
 
 - **`kpi_report_builder` has no viable host pane.** It emits N widgets *plus* a dashboard, and no pane
