@@ -32,6 +32,34 @@ const DERIVE = /\/agent\/tools\/([^/?]+)\/derive$/;
  * real local model produces when it answers in prose — never a silently empty filter that looks like it
  * worked.
  */
+/**
+ * AGT-6a A5.2's offline stand-in for the schema half: read field names out of the clause after "with"
+ * ("…with an id, an amount and an event date" → `id`, `amount`, `event_date`). Same contract as
+ * {@link readCondition} — a sentence it cannot read yields **nothing**, which becomes the retryable 422,
+ * never an empty schema presented as a successful draft.
+ */
+function readSchemaFields(prompt: string): Record<string, unknown>[] {
+    const clause = /\bwith\b(.+)$/i.exec(prompt);
+    if (!clause) return [];
+    return clause[1]
+        .split(/,|\band\b/i)
+        .map((part) => part.trim().replace(/^(an?|the)\s+/i, '').replace(/[.?!]+$/, '').trim())
+        .filter((name) => /^[a-z][a-z0-9 _-]*$/i.test(name) && name.length > 0)
+        .map((name) => {
+            const key = name.toLowerCase().replace(/[\s-]+/g, '_');
+            // ⚠ These must be the schema form's OWN type vocabulary (`string|integer|bigint|double|
+            // boolean|date|timestamp`). Emitting a plausible-but-foreign type like `number` applies
+            // silently and leaves the row's type dropdown BLANK — it looks like the draft worked.
+            const type = /_at$|timestamp/.test(key) ? 'timestamp'
+                : /date|time/.test(key) ? 'date'
+                    : /amount|total|price|rate|ratio/.test(key) ? 'double'
+                        : /count|qty|quantity|_id$|^id$|num/.test(key) ? 'integer'
+                            : /^is_|^has_|flag/.test(key) ? 'boolean'
+                                : 'string';
+            return { name: key, type };
+        });
+}
+
 function readCondition(prompt: string): Record<string, unknown> | null {
     const m = /(\w+)\s+(over|above|greater than|under|below|less than)\s+(-?\d+(?:\.\d+)?)/i.exec(prompt);
     if (!m) return null;
@@ -147,18 +175,32 @@ export function agentHandler(flags: MockFlags): MockHandler {
             const prompt = typeof (req.body as { prompt?: unknown } | null)?.prompt === 'string'
                 ? String((req.body as { prompt: string }).prompt).trim() : '';
             if (!prompt) return error(400, 'prompt is required');
-            if (tool !== 'query_author')
-                return error(404, `unknown tool: '${tool}'`);   // A5.1 ships one NL tool; A5.2/A5.3 add more
-            const when = readCondition(prompt);
-            if (!when)
-                return error(422, `the model did not produce arguments for '${tool}'`
-                    + ' — rephrase the request, or fill the form directly');
+            if (tool !== 'query_author' && tool !== 'component_draft')
+                return error(404, `unknown tool: '${tool}'`);   // A5.1 + A5.2; A5.3 adds pipeline_author
+
             // Schema-keyed, pane-wins: the same merge order the backend does.
-            const derivedArgs = { when, ...argsOf(req) };
+            let derivedArgs: Record<string, unknown>;
+            if (tool === 'component_draft') {
+                const fields = readSchemaFields(prompt);
+                if (!fields.length)
+                    return error(422, `the model did not produce arguments for '${tool}'`
+                        + ' — rephrase the request, or fill the form directly');
+                derivedArgs = { config: { fields }, ...argsOf(req) };
+            } else {
+                const when = readCondition(prompt);
+                if (!when)
+                    return error(422, `the model did not produce arguments for '${tool}'`
+                        + ' — rephrase the request, or fill the form directly');
+                derivedArgs = { when, ...argsOf(req) };
+            }
             const inner = agentHandler(flags)(
                 { ...req, url: req.url.replace(/\/derive$/, ''), body: { args: derivedArgs } }, store);
             if (!inner || (inner.status ?? 200) >= 400) return inner;
-            return json({ value: inner.body, derivedArgs });
+            // A5.2: the real backend may spend up to 3 repair turns. Offline the first draft is always
+            // clean by construction, so 1 is the honest number — never fake a loop that did not run.
+            return json(tool === 'component_draft'
+                ? { value: inner.body, derivedArgs, turns: 1 }
+                : { value: inner.body, derivedArgs });
         }
 
         const m = match(req.url, TOOLS);

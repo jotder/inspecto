@@ -45,10 +45,25 @@
             <div>
                 <div class="mb-1 flex items-center justify-between">
                     <span class="font-medium">Fields</span>
-                    <button type="button" mat-stroked-button (click)="addField()">
-                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                        <span class="ml-1">Add field</span>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <!-- AGT-6a A5.2: describe the schema in a sentence. `component_draft` validates the
+                             drafted config against the same ConfigSpec the server enforces, and the backend
+                             repairs it over up to 3 turns before handing it here. Schema-only by design —
+                             it is this dialog's only kind with a structural spec. -->
+                        <inspecto-ai-assist
+                            tool="component_draft"
+                            prompting
+                            [args]="aiDraftArgs"
+                            [current]="aiCurrentSchema()"
+                            label="Draft fields"
+                            promptHint="e.g. an orders schema with an id, an amount and an event date"
+                            (applyDraft)="applySchemaDraft($event)"
+                        ></inspecto-ai-assist>
+                        <button type="button" mat-stroked-button (click)="addField()">
+                            <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                            <span class="ml-1">Add field</span>
+                        </button>
+                    </div>
                 </div>
                 <div formArrayName="fields" class="space-y-2">
                     @for (f of fields.controls; track f; let i = $index) {

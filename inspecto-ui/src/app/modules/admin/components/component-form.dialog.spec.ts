@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { describe, expect, it, vi } from 'vitest';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { ComponentDef, ComponentsService } from 'app/inspecto/api';
+import { AgentService, ComponentDef, ComponentsService, LensService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ComponentFormDialog } from './component-form.dialog';
 
@@ -15,20 +15,25 @@ const SAVED: ComponentDef = {
     content: { delimiter: ',', has_header: true },
 };
 
-function create() {
+function create(kind: ComponentDef['type'] = 'grammar') {
     const ref = { close: vi.fn() };
     const api = {
         create: vi.fn(() => of(SAVED)),
         update: vi.fn(() => of(SAVED)),
     };
+    // The schema kind renders <inspecto-ai-assist> (A5.2), which injects these three. Stubbed rather
+    // than wired to real HTTP: this spec is about the dialog, and the surface has its own specs.
+    localStorage.removeItem('inspecto.currentLens');
     TestBed.configureTestingModule({
         imports: [ComponentFormDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { kind: 'grammar' } },
+            { provide: MAT_DIALOG_DATA, useValue: { kind } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ComponentsService, useValue: api },
             { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
+            { provide: AgentService, useValue: { runTool: () => of({}), deriveTool: () => of({}) } },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
         ],
     });
     const fixture = TestBed.createComponent(ComponentFormDialog);
@@ -106,5 +111,56 @@ describe('ComponentFormDialog', () => {
         c.form.patchValue({ id: 'my-sink' });
         c.submit();
         expect(api.create).toHaveBeenCalledWith('sink', expect.objectContaining({ partitions: ['month'] }));
+    });
+
+    // ── AGT-6a A5.2 ──────────────────────────────────────────────────────────────────────────────
+
+    // One create() per it(): the helper configures TestBed, which may only happen once per test.
+    it('offers AI drafting on the schema kind, the only one with a structural spec', () => {
+        expect(create('schema').fixture.nativeElement.querySelector('inspecto-ai-assist')).not.toBeNull();
+    });
+
+    it('offers no AI drafting on a kind component_draft cannot validate', () => {
+        // grammar has no ConfigSpec, so the tool would answer "no structural spec for kind" every time.
+        expect(create('grammar').fixture.nativeElement.querySelector('inspecto-ai-assist')).toBeNull();
+    });
+
+    it('applies a drafted schema by replacing the field rows, and marks the form dirty', () => {
+        const { c, api } = create('schema');
+        c.applySchemaDraft({
+            label: 'orders',
+            clean: true,
+            findings: [],
+            config: {
+                fields: [
+                    { name: 'order_id', type: 'string' },
+                    { name: 'amount', type: 'number', format: '0.00' },
+                ],
+            },
+        });
+
+        expect(c.fields.length).toBe(2);
+        expect(c.form.dirty).toBe(true);
+        // and it round-trips through the pane's OWN save path — the surface never writes
+        c.form.patchValue({ id: 'orders' });
+        c.submit();
+        expect(api.create).toHaveBeenCalledWith('schema', expect.objectContaining({
+            fields: [
+                { name: 'order_id', type: 'string' },
+                { name: 'amount', type: 'number', format: '0.00' },
+            ],
+        }));
+    });
+
+    it('ignores a draft carrying no fields rather than emptying the form', () => {
+        const { c } = create('schema');
+        const before = c.fields.length;
+        c.applySchemaDraft({ label: 'empty', clean: false, findings: [], config: {} });
+        expect(c.fields.length).toBe(before);
+    });
+
+    it('the schema kind renders with no a11y violations', async () => {
+        const { fixture } = create('schema');
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

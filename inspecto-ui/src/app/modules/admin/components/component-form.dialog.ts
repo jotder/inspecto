@@ -9,6 +9,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -66,6 +68,7 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
     imports: [
         ReactiveFormsModule, FormsModule, MatDialogModule, MatButtonModule, MatChipsModule, MatFormFieldModule,
         MatIconModule, MatInputModule, MatSelectModule, MatSlideToggleModule, StatusBadgeComponent,
+        AiAssistComponent,
     ],
     templateUrl: './component-form.dialog.html',
 })
@@ -169,6 +172,47 @@ export class ComponentFormDialog {
 
     removeField(i: number): void {
         this.fields.removeAt(i);
+    }
+
+    // ── AGT-6a A5.2: natural-language schema drafting ────────────────────────────────────────────
+    //
+    // `component_draft` is offered ONLY for the schema kind, and that is not a soft preference: it is a
+    // validator over the control plane's ConfigSpecs, and of this dialog's four kinds only `schema` has
+    // one. Offering it on grammar/transform/sink would render an affordance whose every use returns
+    // "no structural spec for kind" — worse than no button.
+    //
+    // The backend path is a bounded repair LOOP, not a single hop: one turn reliably yields a
+    // probably-invalid config, so findings are fed back over up to 3 turns. The pane does not know or
+    // care — it still just receives a draft plus findings, exactly as A1's deterministic path delivers.
+
+    /** Identity only — `kind` is the pane's, never the model's. */
+    readonly aiDraftArgs: Record<string, unknown> = { kind: 'schema' };
+
+    /** The diff baseline: what the form holds now, null while creating. */
+    readonly aiCurrentSchema = computed(() => (this.isEdit ? { fields: this.schemaFieldValues() } : null));
+
+    private schemaFieldValues(): Record<string, unknown>[] {
+        return (this.fields.value as { name: string; type: string; format: string }[])
+            .filter((f) => f.name?.trim())
+            .map((f) => (f.format?.trim()
+                ? { name: f.name.trim(), type: f.type, format: f.format.trim() }
+                : { name: f.name.trim(), type: f.type }));
+    }
+
+    /** Replace the field rows with the drafted ones. Applied through the same FormArray a human edits. */
+    applySchemaDraft(draft: AiDraft): void {
+        const drafted = draft.config?.['fields'];
+        if (!Array.isArray(drafted)) return;   // a draft with no fields is not applicable, not an error
+        this.fields.clear();
+        for (const f of drafted as Record<string, unknown>[]) {
+            this.fields.push(this.fb.group({
+                name: [str(f['name'], ''), Validators.required],
+                type: [str(f['type'], 'string')],
+                format: [str(f['format'], '')],
+            }));
+        }
+        if (this.fields.length === 0) this.addField();
+        this.form.markAsDirty();
     }
 
     addPartition(event: MatChipInputEvent): void {
