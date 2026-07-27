@@ -186,16 +186,19 @@ function renderLeaf(node: unknown): string {
  * `clean:true` and the A5.2 repair loop could not be exercised at all. Offline findings remain a
  * rehearsal of the shape, never evidence that the real spec passes.
  */
-const DRAFT_SPECS: Record<string, { type: string; required: string[] }> = {
+const DRAFT_SPECS: Record<string, { type: string; required: string[]; nonEmpty?: string[] }> = {
     pipeline: { type: 'pipeline', required: ['name', 'dirs.poll', 'dirs.database'] },
     enrichment: { type: 'enrichment', required: ['name', 'input.database', 'output.database'] },
     job: { type: 'job', required: ['job.name', 'job.type'] },
-    schema: { type: 'schema', required: ['raw.name'] },
+    // ⚠ `fields`, NOT `raw.name`: the real tool resolves this kind to `ConfigSpecs.schemaComponent()` —
+    // the REGISTRY component's bare column list — not the TOON schema config. Mirroring `raw.name` here
+    // is what made the pane's own draft always report a required field it never emits.
+    schema: { type: 'schema', required: ['fields'], nonEmpty: ['fields'] },
     meta: { type: 'meta', required: ['name'] },
     'alert-rule': { type: 'alert', required: ['alert.name', 'alert.threshold', 'alert.window'] },
     expectation: { type: 'expectation', required: ['name', 'target', 'column'] },
     widget: { type: 'widget', required: ['vizType'] },
-    dashboard: { type: 'dashboard', required: ['tiles'] },
+    dashboard: { type: 'dashboard', required: ['tiles'], nonEmpty: ['tiles'] },
 };
 
 /** `RawConfig.present`: a dotted path resolves through nested maps, and a null leaf counts as absent. */
@@ -591,6 +594,22 @@ export function agentHandler(flags: MockFlags): MockHandler {
                         fieldPath: path,
                         message: `Missing required field '${path}'`,
                     }));
+                // The two list kinds carry a server-side cross-field rule that a PRESENT but EMPTY list is
+                // still an ERROR (`at-least-one-field` / `at-least-one-tile`). Without this the mock passes
+                // `{fields:[]}` — a draft the pane's `applySchemaDraft` then discards, so Apply no-ops with
+                // no finding to explain why.
+                for (const path of spec.nonEmpty ?? []) {
+                    const value = draft[path];
+                    if (Array.isArray(value) && value.length === 0) {
+                        findings.push({
+                            severity: 'ERROR' as const,
+                            fieldPath: path,
+                            message: path === 'tiles'
+                                ? 'A dashboard needs at least one tile.'
+                                : 'A schema component needs at least one field.',
+                        });
+                    }
+                }
                 return json({ kind, type: spec.type, clean: findings.length === 0, findings, draft });
             }
             // AGT-6a A4 — the two read tools behind "explain this screen". They are non-mutating reads,

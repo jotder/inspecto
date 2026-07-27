@@ -499,6 +499,47 @@ public final class ConfigSpecs {
         return new ConfigSpec("schema", fields, List.of());
     }
 
+    /**
+     * The <b>registry component</b> named {@code schema} — a bare column list, {@code {fields:[{name,
+     * type[,format]}]}}. This is NOT {@link #schema()}, and the distinction is the whole point of it
+     * existing (found 2026-07-27).
+     *
+     * <p>The word {@code schema} names two unrelated shapes in this codebase: the <b>TOON schema config</b>
+     * above ({@code raw.name} required, {@code mapping.canonicalName}, …), which describes a raw source and
+     * is what {@code /validate} judges; and this one, the reusable registry component the Components pane
+     * authors and {@code ComponentStore} persists under {@code schemas/}. Validating a draft of one against
+     * the spec of the other yields a required-field finding no operator can act on, which is exactly how
+     * {@code component_draft(kind='schema')} was broken for two slices.
+     *
+     * <p>⚠ {@code widget} and {@code dashboard} are shared words too, but they are <b>not</b> collisions —
+     * {@link #widget()} and {@link #dashboard()} describe the registry components accurately. Do not
+     * generalize this into "registry kinds have no ConfigSpec"; {@code schema} is the one overloaded word.
+     *
+     * <p>The item shape travels in the description rather than the type system, as {@code raw.fields} does:
+     * {@link FieldType#LIST} cannot express it, and re-implementing per-item structural validation here
+     * would be a second source of truth for what a column is.
+     */
+    public static ConfigSpec schemaComponent() {
+        List<FieldSpec> fields = List.of(
+                FieldSpec.required("fields", "Field definitions", FieldType.LIST,
+                        "The columns — a list of {name, type} objects, each optionally with a 'format' "
+                                + "(e.g. a date pattern). 'type' is a logical type such as string, long, "
+                                + "double, boolean, date or timestamp.")
+        );
+        List<CrossFieldRule> rules = List.of(
+                new CrossFieldRule(
+                        "at-least-one-field",
+                        "A schema component needs at least one field.",
+                        Severity.ERROR,
+                        List.of("fields"),
+                        raw -> {
+                            Object f = at(raw, "fields");
+                            return !(f instanceof List<?> l) || !l.isEmpty();
+                        })
+        );
+        return new ConfigSpec("schema", fields, rules);
+    }
+
     // ── meta (KPI/report semantics) ──────────────────────────────────────────────
 
     public static ConfigSpec meta() {

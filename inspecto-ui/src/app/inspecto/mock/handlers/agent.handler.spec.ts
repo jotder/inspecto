@@ -202,15 +202,33 @@ describe('agentHandler · component_draft', () => {
         expect(partial.findings.map((f) => f.fieldPath)).toEqual(['job.type']);
     });
 
-    it("validates the SCHEMA kind against raw.name — the config spec, not the registry component's shape", () => {
-        // ⚠ This is the Components pane's A5.2 draft shape, and it does NOT satisfy the `schema` ConfigSpec:
-        // `component_draft(kind='schema')` validates the TOON schema type (raw.name / raw.fields), while the
-        // pane authors a registry component whose content is a bare `{fields:[…]}`. Same word, two
-        // vocabularies. Pinned as a finding rather than passed, because that is what a real backend answers.
+    it("validates the SCHEMA kind against the registry component's shape, not the TOON config's", () => {
+        // The Components pane's A5.2 draft shape. `schema` names two unrelated things — the TOON schema
+        // config (`raw.name` required) and this registry component (a bare column list) — and the tool's
+        // `kind` vocabulary is the COMPONENT one, so the pane's own draft must come back clean.
+        // Previously it resolved to the config spec and always answered "Missing required field 'raw.name'",
+        // a finding the operator could not act on and the repair loop could only make worse.
         const res = call({ kind: 'schema', config: { fields: [{ name: 'id', type: 'integer' }] } });
         const body = res?.body as { clean: boolean; findings: { fieldPath: string }[] };
 
-        expect(body.clean).toBe(false);
-        expect(body.findings.map((f) => f.fieldPath)).toEqual(['raw.name']);
+        expect(body.clean).toBe(true);
+        expect(body.findings).toEqual([]);
+    });
+
+    it('reports a schema draft that carries no fields, rather than passing it', () => {
+        // ⚠ Both halves matter. An ABSENT `fields` is the missing-required finding; a PRESENT but EMPTY one
+        // is the server's `at-least-one-field` cross-field rule. The empty case is the trap: the pane's
+        // `applySchemaDraft` discards a fieldless draft, so without a finding Apply would silently no-op.
+        const missing = call({ kind: 'schema', config: { name: 'events' } })?.body as {
+            clean: boolean; findings: { fieldPath: string }[];
+        };
+        expect(missing.clean).toBe(false);
+        expect(missing.findings.map((f) => f.fieldPath)).toEqual(['fields']);
+
+        const empty = call({ kind: 'schema', config: { fields: [] } })?.body as {
+            clean: boolean; findings: { fieldPath: string; message: string }[];
+        };
+        expect(empty.clean).toBe(false);
+        expect(empty.findings.map((f) => f.message)).toEqual(['A schema component needs at least one field.']);
     });
 });

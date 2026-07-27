@@ -404,6 +404,64 @@ class InspectoToolsTest {
         }
     }
 
+    /**
+     * The {@code schema} kind must mean the REGISTRY COMPONENT, not the TOON schema config.
+     *
+     * <p>The word names two unrelated shapes and these tools speak the component vocabulary. Resolving it
+     * through {@code ConfigSpecs.forType} made the Components pane's own draft always report *"Missing
+     * required field 'raw.name'"* — a finding no operator could act on, and one the A5.2 repair loop could
+     * only make worse by pushing the model toward a {@code {raw:{…}}} shape {@code applySchemaDraft} cannot
+     * read back, so Apply silently no-opped. Both tools are asserted: a validator and a projection that
+     * disagree about the same kind is the defect, not either half alone.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void schemaKindMeansTheRegistryComponentNotTheToonConfig() {
+        Map<String, Object> paneDraft = Map.of("fields",
+                List.of(Map.of("name", "id", "type", "integer"), Map.of("name", "seen", "type", "date", "format", "yyyy-MM-dd")));
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "schema", "config", paneDraft));
+        assertEquals(true, out.get("clean"),
+                () -> "the pane's own draft shape must validate clean, findings were: " + out.get("findings"));
+
+        Map<String, Object> schema = (Map<String, Object>) invoke(schemaTool(), Map.of("kind", "schema")).get("schema");
+        Map<String, Object> props = (Map<String, Object>) schema.get("properties");
+        assertTrue(props.containsKey("fields"), "the projection must offer the component's column list");
+        assertFalse(props.containsKey("raw.name"), "raw.name belongs to the TOON schema config, not the component");
+        assertEquals(List.of("fields"), schema.get("required"));
+    }
+
+    /** A fieldless draft is still an ERROR — absent via the required field, empty via the cross-field rule. */
+    @Test
+    void schemaComponentDraftNeedsAtLeastOneField() {
+        Map<String, Object> absent = invoke(draftTool(), Map.of("kind", "schema", "config", Map.of("name", "events")));
+        assertEquals(false, absent.get("clean"));
+
+        // The empty list is the trap the pane cannot survive: `applySchemaDraft` discards a fieldless draft,
+        // so a clean verdict here would present the operator an Apply button that does nothing.
+        Map<String, Object> empty = invoke(draftTool(),
+                Map.of("kind", "schema", "config", Map.of("fields", List.of())));
+        assertEquals(false, empty.get("clean"), "a present-but-empty field list must still be reported");
+    }
+
+    /**
+     * ⚠ {@code widget} and {@code dashboard} are shared words but NOT collisions — their {@link ConfigSpecs}
+     * specs describe the registry components accurately (checked against the shipped sample Space). The
+     * {@code schema} fix must not generalize into "registry kinds have no ConfigSpec" and reroute these.
+     */
+    @Test
+    void widgetAndDashboardKeepResolvingThroughTheirConfigSpecs() {
+        Map<String, Object> widget = invoke(draftTool(), Map.of("kind", "widget",
+                "config", Map.of("vizType", "bar", "datasetId", "events_dataset")));
+        assertEquals(true, widget.get("clean"), () -> "sample-Space widget shape: " + widget.get("findings"));
+
+        Map<String, Object> dashboard = invoke(draftTool(), Map.of("kind", "dashboard",
+                "config", Map.of("tiles", List.of(Map.of("widgetId", "events_by_type", "span", 2)))));
+        assertEquals(true, dashboard.get("clean"), () -> "sample-Space dashboard shape: " + dashboard.get("findings"));
+
+        // And the config reading of `schema` is untouched where it is the right one.
+        assertEquals("schema", invoke(schemaTool(), Map.of("kind", "schema")).get("type"));
+    }
+
     // ── AGT-5 P2 slice 1: component_draft (the validator repair loop) ────────────
 
     private static Tool draftTool() {

@@ -764,7 +764,7 @@ final class InspectoTools {
             String kind = arg(call, "kind");
             if (kind == null || kind.isBlank()) return error("kind is required");
             String type = configType(kind);
-            ConfigSpec cfgSpec = ConfigSpecs.forType(type);
+            ConfigSpec cfgSpec = specFor(kind);
             if (cfgSpec == null) {
                 return error("no structural spec for kind '" + kind + "' (known kinds: "
                         + String.join(", ", ConfigSpecs.TYPES) + ")");
@@ -794,7 +794,7 @@ final class InspectoTools {
             Map<String, Object> draft = mapArg(call, "config");
             if (draft == null) return error("config is required and must be an object");
             String type = configType(kind);
-            ConfigSpec cfgSpec = ConfigSpecs.forType(type);
+            ConfigSpec cfgSpec = specFor(kind);
             if (cfgSpec == null) {
                 return error("no structural spec for kind '" + kind
                         + "' (validatable kinds: pipeline, enrichment, job, schema, expectation, alert-rule, "
@@ -1206,13 +1206,36 @@ final class InspectoTools {
      */
     public static String configSchemaJson(String kind) {
         if (kind == null || kind.isBlank()) return null;
-        ConfigSpec cfgSpec = ConfigSpecs.forType(configType(kind));
+        ConfigSpec cfgSpec = specFor(kind);
         return cfgSpec == null ? null : ConfigJsonSchema.toJson(cfgSpec);
     }
 
     private static String configType(String kind) {
         String k = kind.trim().toLowerCase(Locale.ROOT);
         return k.equals("alert-rule") ? "alert" : k;
+    }
+
+    /**
+     * The structural spec the component tools judge {@code kind} by, or {@code null} when it has none.
+     *
+     * <p>⚠ {@code schema} does <b>not</b> resolve through {@link ConfigSpecs#forType} (fixed 2026-07-27).
+     * The word names two unrelated shapes — the TOON schema config ({@code raw.name} required) and the
+     * registry component the Components pane authors ({@code {fields:[…]}}) — and {@code forType} returns
+     * the former. These tools' {@code kind} vocabulary is the <b>component</b> one, so {@code schema} here
+     * means the component: {@link ConfigSpecs#schemaComponent()}. Sending it through {@code forType} made
+     * every draft from the pane report *"Missing required field 'raw.name'"*, and the A5.2 repair loop then
+     * pushed the model toward a {@code {raw:{…}}} shape the pane cannot read back, so Apply silently
+     * no-opped.
+     *
+     * <p>{@code forType} keeps its meaning for the config path ({@code /validate} still judges real
+     * {@code *_schema.toon} sources by {@link ConfigSpecs#schema()}) — the two readings simply do not meet
+     * in one method any more. ⚠ Only {@code schema} is overloaded: {@code widget} and {@code dashboard} are
+     * shared words whose specs describe the registry components correctly, so they must keep resolving
+     * normally.
+     */
+    private static ConfigSpec specFor(String kind) {
+        String type = configType(kind);
+        return type.equals("schema") ? ConfigSpecs.schemaComponent() : ConfigSpecs.forType(type);
     }
 
     /**

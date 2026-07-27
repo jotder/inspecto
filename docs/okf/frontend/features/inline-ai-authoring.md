@@ -383,14 +383,33 @@ mock-side, and one defect was uncovered that is **still open**:
    ⚠ A **subset** by design — enums, parsability and cross-field rules are not re-implemented, because that
    would be a second, drifting copy of the config system.
 
-⚠ **OPEN — `component_draft(kind='schema')` validates the wrong `schema`.** The word names two unrelated
-things: a **registry component** (`ComponentStore.WRITABLE_TYPES`, content a bare `{fields:[{name,type}]}` —
-what the Components pane authors and what `applySchemaDraft` reads back) and the **TOON schema config**
-(`ConfigSpecs.schema()`, `raw.name` *required*, `raw.fields`) — and `component_draft` resolves the latter. So
-the A5.2 adoption always draws *"Missing required field 'raw.name'"* against a real backend, and a repaired
-`{raw:{…}}` draft is one the pane cannot apply. Pinned as a failing-shape test rather than papered over. The
-fix is a design call — reshape what the pane drafts, or accept that registry components have **no
-`ConfigSpec` at all** and A5.2 needs a different validator. → `BACKLOG.md`.
+✅ **FIXED 2026-07-27 — `component_draft(kind='schema')` validated the wrong `schema`.** The word names two
+unrelated shapes: the **registry component** (`ComponentStore.WRITABLE_TYPES`, content a bare
+`{fields:[{name,type}]}` — what the Components pane authors and what `applySchemaDraft` reads back) and the
+**TOON schema config** (`ConfigSpecs.schema()`, `raw.name` *required*, `raw.fields`) — and `configType(kind)`
+resolved the latter. The A5.2 adoption therefore always drew *"Missing required field 'raw.name'"* against a
+real backend, and the repair loop then pushed the model toward a `{raw:{…}}` draft the pane cannot read back,
+so Apply silently no-opped. Both outcomes broken: a spurious ERROR, or a dead button.
+
+**As fixed:** `ConfigSpecs.schemaComponent()` describes the component's column list, and
+`InspectoTools.specFor(kind)` routes `schema` to it. `ConfigSpecs.forType` keeps its meaning for the config
+path — `/validate` still judges real `*_schema.toon` sources by `ConfigSpecs.schema()` — so the two readings
+no longer meet in one method. `config_schema` was fixed at the same seam: it shared the resolution and so
+*advertised* the wrong shape to the model, making this two tools rather than one.
+
+⚠ **The recorded design call rested on a premise that turned out to be false — do not restore it.** The
+reasoning was that `ConfigSpecs.TYPES` and `ComponentStore.WRITABLE_TYPES` are "disjoint vocabularies that
+happen to share three words", pointing at a general registry-side validator. Checked against the shipped
+sample Space, **two of the three shared words genuinely agree**: `ConfigSpecs.widget()` matches
+`registry/widgets/*.toon` (`vizType` required, `datasetId`, `controls`, `options`) and `dashboard()` matches
+`registry/dashboards/*.toon` (`tiles` of `{widgetId,span}`). **`schema` is the one overloaded word.** A
+blanket "registry kinds have no `ConfigSpec`" reroute would have broken two working kinds — pinned by
+`widgetAndDashboardKeepResolvingThroughTheirConfigSpecs`.
+
+⚠ A fieldless draft is still an ERROR, via the `at-least-one-field` cross-field rule as well as the required
+field. The present-but-empty case is the one that matters: `applySchemaDraft` discards a fieldless draft, so a
+`clean` verdict there would show an Apply button that does nothing. The mock mirrors both halves (`nonEmpty`),
+which also closed the same latent leniency on `dashboard.tiles`.
 
 ⚠ **OPEN — `projection_author`'s declared `columns.items` is stale.** The pane sends a `string[]`; the schema
 says `{"items":{"type":"object"}}`. The Java `columnNames` accepts both deliberately, and so does the mock,

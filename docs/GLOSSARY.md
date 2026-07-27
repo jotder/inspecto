@@ -171,6 +171,16 @@ seams: `docs/okf/backend/control-plane/onboarding-authoring.md`.)*
 Types**, and validation. It describes a **Table**'s shape. ⚠️ It is **not** a database *namespace* — say "table
 schema" if ambiguity is possible.
 
+> ⚠️ **One word, two config shapes — a known violation of "one concept → one word", recorded 2026-07-27.**
+> `schema` names both the **registry component** (a bare column list, `{fields:[{name,type[,format]}]}`, stored
+> under `schemas/` and authored by the Components pane) and the **TOON schema config** (`raw.name`,
+> `raw.format`, `mapping.canonicalName` — describing a *raw source*, e.g. `events/call_schema.toon`). They are
+> validated by two different specs (`ConfigSpecs.schemaComponent()` vs `ConfigSpecs.schema()`), and conflating
+> them broke `component_draft` for two slices. Renaming either is a breaking change to on-disk directories and
+> the UI `ComponentType` union, so the collision **stands deliberately** — say *"schema component"* or *"schema
+> config"* whenever the reading is not obvious from context, and never resolve one to the other's spec.
+> → `okf/frontend/features/inline-ai-authoring.md`.
+
 **Field** *(Attribute)* — One column in a Schema: name, selector (how to locate it in the raw file), Attribute
 Type, and optional rules.
 
