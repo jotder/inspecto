@@ -11,7 +11,10 @@ timestamp: 2026-07-16T00:00:00Z
 
 Route `/catalog/onboard/:name(/:stage)` (one matcher route — the shell survives stage navigation),
 entered from the Catalog Streams/References tabs' **Onboard Stream / Onboard Reference** header CTA
-(lens-gated `canAuthorWorkbench`). The create dialog asks the minimum (kind toggle + name +
+(lens-gated `canAuthorWorkbench`) or from the nav item **Platform ▸ Catalog ▸ Onboard Stream**, which
+links to `/catalog?onboard=stream` — `CatalogComponent.ngOnInit` selects that tab and raises the same
+create dialog *after* the rows load, so the name control can reject a duplicate inline instead of
+waiting for the server's 409. (`?onboard=reference` works the same; only Stream is in the nav.) The create dialog asks the minimum (kind toggle + name +
 optional description; directories derive from the space convention under a collapsed Advanced) and
 writes a minimal `active: false` pipeline draft + registers it — **the server-held config IS the
 draft** (shift-handover safe; no wizard state is ever stored). Vocabulary: [GLOSSARY](../../../GLOSSARY.md)
@@ -48,6 +51,16 @@ pipeline's Stage-1 output, `triggers.on_pipeline` = the engine-normalized id
 space's `enriched/` convention. **Every save re-registers** (`POST /enrichment`) because
 enrichments do not hot-reload by mtime; a register failure downgrades to a warning (the file is
 saved; it loads on restart).
+
+## Collection stage: `connector` is derived, not asked twice
+
+A **Connection** already carries its own `connector` (`ConnectionProfile.connector`), so the Collection
+stage adopts it as soon as a Connection is picked rather than trusting the select. This is not cosmetic:
+`CollectorConnectors.forConfig` dispatches on `collector.connector` and hands the profile named by
+`collector.connection` to *that* factory **without checking the two agree** — `connector: sftp` plus an
+Azure Connection silently gives the SFTP factory an Azure profile. The select still matters when there is
+no Connection, which is the local-inbox default. ⚠ Do not "simplify" this by disabling the control: a
+disabled control drops out of the schema form's value and the key would vanish from the written TOON.
 
 ## Seams & gotchas
 

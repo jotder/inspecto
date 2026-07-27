@@ -270,6 +270,21 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   panes **adopt** it, never fork it. The pane names a non-mutating agent tool, passes its own context as
   `[args]`, and applies the returned draft through **its own** validated route (the surface has no write
   path, so the human stays the audited actor). → `okf/frontend/features/inline-ai-authoring.md`.
+- 🔴 **A root-level `{ provide: MatDialog, useValue: … }` in a component spec is SILENTLY IGNORED** (found
+  2026-07-27). `MatDialogModule` sits in the standalone component's own `imports` and provides `MatDialog` at
+  the **element** level, which shadows the TestBed root provider — `catalog.component.spec.ts` had mocked it
+  since it was written while the component used the real service throughout. Reach it with
+  `TestBed.overrideComponent(C, { add: { providers: [{ provide: MatDialog, useValue: MOCK }] } })`. Applies to
+  any service a component's imported Material module also provides. ⚠ **Other specs mocking `MatDialog` at the
+  root are mocking nothing — not audited beyond that one file.**
+- ⚠ **`LensService` snaps to the read-only Business lens when `SessionService.capabilities()` is `[]`**, because
+  `allowedLenses` qualifies Builder only via `canAuthorWorkbench`. A spec mocking capabilities as `[]` sees every
+  authoring affordance hidden, and the resulting "the button never fired" failure looks like broken wiring. Pass
+  `['canAuthorWorkbench']` when testing an authoring path.
+- ⚠ **Narrowing a UI test run:** `npx vitest run <file>` fails here (`Cannot find package 'app/inspecto/api'` —
+  the path aliases come from the Angular builder). Use `npx ng test --no-watch --include='<glob>'`, and the
+  include must be a **glob**: a literal file path yields *"No test files found, exiting with code 1"*, which
+  reads like a config break rather than a bad flag.
 - ⚠ **The offline mock must never be more lenient than the server** (2026-07-27, AGT-6a A5.3). A handler
   that accepts a shape the backend rejects — or returns a richer shape than the backend returns — turns a
   hard failure into a passing rehearsal. The Pipelines `pipeline_author` adoption shipped **broken through
