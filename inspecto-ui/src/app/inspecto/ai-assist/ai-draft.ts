@@ -86,16 +86,20 @@ export function adaptToolResult(tool: AiToolName, result: unknown): AiDraft[] {
             }));
         }
         case 'pipeline_author': {
+            // `flow` is the round-tripped GRAPH (A5.3). It used to be the flow's NAME, which this branch
+            // could not read at all — every real-backend draft fell through to "no suggestion".
             const flow = result['flow'];
             if (!isRecord(flow)) return [];
             const nodes = Array.isArray(result['nodes']) ? result['nodes'].length : 0;
             const simulated = result['simulated'] === true;
             return [
                 {
-                    label: str(flow['name'], 'pipeline'),
+                    label: str(result['name'], str(flow['name'], 'pipeline')),
                     config: flow,
-                    clean: true,
-                    findings: [],
+                    // Structural validation is real (A5.3) — a dangling edge or a cycle is a finding, so
+                    // this must not keep claiming every topology is clean.
+                    clean: result['clean'] !== false,
+                    findings: findingsOf(result),
                     note: `${nodes} node${nodes === 1 ? '' : 's'}${simulated ? ' · dry-run simulated' : ''}`,
                 },
             ];

@@ -106,11 +106,24 @@
     @if (model(); as m) {
         <inspecto-ai-assist
             tool="pipeline_author"
-            [args]="{ name: m.name, nodes: m.nodes, edges: m.edges }"
+            [args]="aiFlowArgs()"
             [current]="aiCurrentPipeline()"
             label="Check this topology"
             [disabled]="!m.nodes.length"
             disabledReason="Add at least one processor first"
+            (applyDraft)="applyPipelineDraft($event)"
+        ></inspecto-ai-assist>
+
+        <!-- AGT-6a A5.3: the same tool from one sentence. A separate instance, not a mode switch on the
+             one above: describing a topology and checking the one on screen are different acts, and the
+             check must stay available on a backend with no model. -->
+        <inspecto-ai-assist
+            tool="pipeline_author"
+            prompting
+            [args]="aiPromptArgs()"
+            [current]="aiCurrentPipeline()"
+            label="Draft a topology"
+            promptHint="e.g. collect orders, drop rows under 100, write the rest to the big store"
             (applyDraft)="applyPipelineDraft($event)"
         ></inspecto-ai-assist>
     }

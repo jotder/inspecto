@@ -60,6 +60,36 @@ function readSchemaFields(prompt: string): Record<string, unknown>[] {
         });
 }
 
+/**
+ * AGT-6a A5.3's offline stand-in for the graph half: recognise the three stages a sentence can name —
+ * collect/acquire, filter/drop, write/store — and wire them in that order.
+ *
+ * ⚠ Node types must be the engine's OWN registered vocabulary (`acquisition`, `transform.filter`,
+ * `sink.persistent`). A plausible-but-unregistered type is a validator WARNING rather than an obvious
+ * break, so a wrong one here would look like a working draft — the same trap the schema half hit with
+ * `number`. Same contract as the others: an unreadable sentence yields nothing, hence a retryable 422.
+ */
+function readFlow(prompt: string): Record<string, unknown> | null {
+    const stages: { id: string; type: string; config?: Record<string, unknown> }[] = [];
+    if (/\bcollect|acquire|ingest|read\b/i.test(prompt)) stages.push({ id: 'acq', type: 'acquisition' });
+    const cond = readCondition(prompt);
+    if (cond)
+        stages.push({
+            id: 'flt',
+            type: 'transform.filter',
+            // The filter KEEPS what the sentence describes dropping, so invert the operator it read.
+            config: { where: `${cond['field']} ${cond['op'] === '<' ? '>=' : '<='} ${cond['value']}` },
+        });
+    if (/\bwrite|store|sink|save|persist\b/i.test(prompt))
+        stages.push({ id: 'sink', type: 'sink.persistent', config: { store: 'drafted' } });
+    if (stages.length < 2) return null;   // one lone node is not a topology
+    return {
+        name: 'drafted_flow',
+        nodes: stages,
+        edges: stages.slice(1).map((s, i) => ({ from: stages[i].id, to: s.id })),
+    };
+}
+
 function readCondition(prompt: string): Record<string, unknown> | null {
     const m = /(\w+)\s+(over|above|greater than|under|below|less than)\s+(-?\d+(?:\.\d+)?)/i.exec(prompt);
     if (!m) return null;
@@ -175,12 +205,18 @@ export function agentHandler(flags: MockFlags): MockHandler {
             const prompt = typeof (req.body as { prompt?: unknown } | null)?.prompt === 'string'
                 ? String((req.body as { prompt: string }).prompt).trim() : '';
             if (!prompt) return error(400, 'prompt is required');
-            if (tool !== 'query_author' && tool !== 'component_draft')
-                return error(404, `unknown tool: '${tool}'`);   // A5.1 + A5.2; A5.3 adds pipeline_author
+            if (tool !== 'query_author' && tool !== 'component_draft' && tool !== 'pipeline_author')
+                return error(404, `unknown tool: '${tool}'`);   // A5.1 + A5.2 + A5.3
 
             // Schema-keyed, pane-wins: the same merge order the backend does.
             let derivedArgs: Record<string, unknown>;
-            if (tool === 'component_draft') {
+            if (tool === 'pipeline_author') {
+                const graph = readFlow(prompt);
+                if (!graph)
+                    return error(422, `the model did not produce arguments for '${tool}'`
+                        + ' — rephrase the request, or fill the form directly');
+                derivedArgs = { flow: graph, ...argsOf(req) };
+            } else if (tool === 'component_draft') {
                 const fields = readSchemaFields(prompt);
                 if (!fields.length)
                     return error(422, `the model did not produce arguments for '${tool}'`
@@ -198,9 +234,9 @@ export function agentHandler(flags: MockFlags): MockHandler {
             if (!inner || (inner.status ?? 200) >= 400) return inner;
             // A5.2: the real backend may spend up to 3 repair turns. Offline the first draft is always
             // clean by construction, so 1 is the honest number — never fake a loop that did not run.
-            return json(tool === 'component_draft'
-                ? { value: inner.body, derivedArgs, turns: 1 }
-                : { value: inner.body, derivedArgs });
+            return json(tool === 'query_author'
+                ? { value: inner.body, derivedArgs }
+                : { value: inner.body, derivedArgs, turns: 1 });
         }
 
         const m = match(req.url, TOOLS);
@@ -309,16 +345,51 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 });
             }
             case 'pipeline_author': {
-                const nodes = Array.isArray(args['nodes']) ? args['nodes'] : [];
-                if (nodes.length === 0) return error(422, 'nodes is required and must be a non-empty array');
-                const name = text(args, 'name') || 'authored_pipeline';
+                // ⚠ The graph arrives under `flow` — the real tool 422s anything else. This branch used to
+                // read `nodes`/`edges` flat, which made the pane's (also flat, also wrong) call look like
+                // it worked offline while failing against every real backend.
+                const flow = args['flow'];
+                if (!flow || typeof flow !== 'object' || Array.isArray(flow))
+                    return error(422, 'flow is required and must be an object');
+                const graph = flow as Record<string, unknown>;
+                const nodes = Array.isArray(graph['nodes']) ? graph['nodes'] : [];
+                if (nodes.length === 0) return error(422, 'invalid flow: nodes is required and must be non-empty');
+                const name = text(graph, 'name') || 'authored_pipeline';
+                const edges = Array.isArray(graph['edges']) ? graph['edges'] : [];
+                // A subset of PipelineValidator: only DANGLING_TO, which is the defect a model actually
+                // produces. Offline findings are a rehearsal of the shape, never evidence of the real rules.
+                const ids = new Set(nodes.map((n) => String((n as Record<string, unknown>)?.['id'] ?? '')));
+                const findings = edges
+                    .filter((e) => !ids.has(String((e as Record<string, unknown>)?.['to'] ?? '')))
+                    .map((e) => ({
+                        severity: 'ERROR',
+                        code: 'DANGLING_TO',
+                        fieldPath: 'edges',
+                        message: `Edge target '${String((e as Record<string, unknown>)['to'])}' is not a node in this flow.`,
+                    }));
+                const clean = findings.length === 0;
                 return json({
-                    flow: { name, nodes, edges: Array.isArray(args['edges']) ? args['edges'] : [] },
-                    nodes: nodes.map((n, i) => ({ id: `n${i + 1}`, type: (n as Record<string, unknown>)?.['type'] ?? 'transform' })),
-                    simulated: true,
-                    seedNode: 'n1',
-                    nodeOutputs: nodes.map((_, i) => ({ id: `n${i + 1}`, rows: 1000 - i * 120 })),
-                    sinks: [],
+                    name,
+                    // Mirrors PipelineCodec.toMap, `active` included — the real echo always carries it, and
+                    // a mock that drops it renders a phantom "active (removed)" row in the operator's diff.
+                    flow: { name, active: graph['active'] === true, nodes, edges },
+                    nodes: nodes.map((n) => ({
+                        id: (n as Record<string, unknown>)?.['id'],
+                        type: (n as Record<string, unknown>)?.['type'] ?? 'transform',
+                    })),
+                    clean,
+                    findings,
+                    simulated: clean,
+                    ...(clean
+                        ? {
+                              seedNode: String((nodes[0] as Record<string, unknown>)?.['id'] ?? 'n1'),
+                              nodeOutputs: nodes.map((n, i) => ({
+                                  node: (n as Record<string, unknown>)?.['id'],
+                                  rows: 1000 - i * 120,
+                              })),
+                              sinks: [],
+                          }
+                        : { note: 'graph parsed but is not executable — fix the findings first' }),
                 });
             }
             // Link Analysis V2 (d): derive an entity-projection mapping from the column list the PANE
