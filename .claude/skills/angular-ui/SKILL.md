@@ -74,6 +74,15 @@ src/app/
     mock/                   # THE unified mock backend: MockStore (per-space, localStorage-persisted) +
                             # framework-free domain handlers + ONE mockApiInterceptor. New mock endpoints
                             # go here as handlers — never as a new per-feature mock interceptor.
+                            # ⚠ A MOCK MUST NEVER BE MORE LENIENT THAN THE SERVER (2026-07-27, AGT-6a
+                            # A5.3). A handler that accepts a shape the backend 422s, or returns a
+                            # richer shape than the backend does, converts a hard failure into a
+                            # passing rehearsal: the Pipelines `pipeline_author` adoption shipped
+                            # BROKEN through two slices (flat args where the tool wants `flow`; a name
+                            # string where the adapter wants the graph) and looked correct offline the
+                            # whole time. When adding/editing a handler, diff its accepted args AND its
+                            # result keys against the real tool/route — and pin the strictness in a
+                            # `*.handler.spec.ts`, since the preview cannot catch what the mock permits.
     theme/                  # chart-tokens.ts (the ONLY place canvas colors are hardcoded)
     testing/                # a11y.ts (expectNoA11yViolations)
     auth.service.ts, confirm.service.ts, …

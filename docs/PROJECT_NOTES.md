@@ -238,6 +238,14 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   panes **adopt** it, never fork it. The pane names a non-mutating agent tool, passes its own context as
   `[args]`, and applies the returned draft through **its own** validated route (the surface has no write
   path, so the human stays the audited actor). → `okf/frontend/features/inline-ai-authoring.md`.
+- ⚠ **The offline mock must never be more lenient than the server** (2026-07-27, AGT-6a A5.3). A handler
+  that accepts a shape the backend rejects — or returns a richer shape than the backend returns — turns a
+  hard failure into a passing rehearsal. The Pipelines `pipeline_author` adoption shipped **broken through
+  two slices** (flat args where the tool requires `flow`; a name string where `adaptToolResult` requires the
+  graph, so a successful call rendered as *"no suggestion"* with no error) and looked correct offline
+  throughout. When touching `inspecto/mock/handlers/`, diff the handler's accepted args **and** its result
+  keys against the real route, and pin the strictness in a `*.handler.spec.ts` — the preview cannot catch
+  what the mock permits.
 - **ag-Grid gotchas:** (a) action/string cell renderers don't render on first paint with static `rowData` →
   call `refreshCells({force:true, columns:[…]})` on `(firstDataRendered)`/`(rowDataUpdated)`; (b) the shared
   theme MUST be the gamma-token `themeQuartz.withParams(GAMMA_GRID_PARAMS)` (`app/inspecto/grid/index.ts`) — never
