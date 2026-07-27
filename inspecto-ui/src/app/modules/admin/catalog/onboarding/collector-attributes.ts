@@ -20,7 +20,7 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
             { value: 'kafka', label: 'Kafka' },
             { value: 'db', label: 'Database' },
         ],
-        help: 'Where files are collected from. Non-local connectors need the connectors module in this build.',
+        help: 'Where files are collected from — set automatically from the Connection once you pick one. Non-local connectors need the connectors module in this build.',
     },
     {
         key: 'connection',

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, ViewChild, inject, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, OnDestroy, ViewChild, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -91,7 +91,7 @@ import { OnboardingStateService } from './onboarding-state.service';
         </div>
     `,
 })
-export class OnboardingCollectionPaneComponent implements OnDestroy {
+export class OnboardingCollectionPaneComponent implements AfterViewInit, OnDestroy {
     protected readonly state = inject(OnboardingStateService);
     protected readonly lens = inject(LensService);
     private connections = inject(ConnectionsService);
@@ -120,8 +120,34 @@ export class OnboardingCollectionPaneComponent implements OnDestroy {
         this.state.unregisterDirtyCheck(this.dirtyCheck);
     }
 
+    ngAfterViewInit(): void {
+        // A Connection already carries its own `connector` (ConnectionProfile.connector), so asking the
+        // operator for it a second time invites a mismatch: CollectorConnectors.forConfig dispatches on
+        // `collector.connector` and hands the picked profile to THAT factory without checking it agrees
+        // (e.g. connector=sftp + an Azure Connection ⇒ the SFTP factory gets an Azure profile). The picked
+        // Connection wins from here on; the select only matters when there is no Connection (local inbox).
+        this.schemaForm?.form
+            .get('connection')
+            ?.valueChanges.subscribe((id) => this.adoptConnectorOf(String(id ?? '').trim()));
+        this.adoptConnectorOf(this.connectionId());
+    }
+
     connectionId(): string {
         return String((this.schemaForm?.value() ?? {})['connection'] ?? '').trim();
+    }
+
+    /** Align `connector` with the picked Connection's own connector. No id ⇒ leave the select alone. */
+    private adoptConnectorOf(id: string): void {
+        if (!id) return;
+        firstValueFrom(this.connections.list())
+            .then((profiles) => {
+                const connector = profiles.find((p) => p.id === id)?.connector;
+                const control = this.schemaForm?.form.get('connector');
+                if (!connector || !control || control.value === connector) return;
+                control.setValue(connector);
+                control.markAsDirty();
+            })
+            .catch(() => undefined);
     }
 
     testConnection(): void {

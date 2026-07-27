@@ -15,6 +15,7 @@ const WRITE_OK = { type: 'pipeline', written: true, path: 'x.toon', name: 'x', b
 function create(
     config: Record<string, unknown>,
     write = vi.fn((_type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK)),
+    profiles: { id: string; connector: string }[] = [],
 ) {
     TestBed.configureTestingModule({
         imports: [OnboardingCollectionPaneComponent],
@@ -22,7 +23,7 @@ function create(
             provideNoopAnimations(),
             OnboardingStateService,
             { provide: ConfigService, useValue: { write } },
-            { provide: ConnectionsService, useValue: { list: () => of([]), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) } },
+            { provide: ConnectionsService, useValue: { list: () => of(profiles), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) } },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
         ],
@@ -67,6 +68,28 @@ describe('OnboardingCollectionPaneComponent', () => {
         c.schemaForm.form.get('connector')?.setValue('sftp');
         c.schemaForm.form.get('connector')?.markAsDirty();
         expect(state.isDirty()).toBe(true);
+    });
+
+    it('adopts the picked Connection\'s own connector instead of trusting the select', async () => {
+        // The two fields can otherwise disagree, and CollectorConnectors.forConfig dispatches on
+        // `connector` while handing that factory the profile named by `connection`.
+        const { fixture, write } = create({ name: 'x', collector: { connector: 'sftp' } }, undefined, [
+            { id: 'blob_prod', connector: 'azure' },
+        ]);
+        const c = fixture.componentInstance;
+        c.schemaForm.form.get('connection')?.setValue('blob_prod');
+        await Promise.resolve();
+        expect(c.schemaForm.form.get('connector')?.value).toBe('azure');
+        c.save();
+        expect((write.mock.calls[0][1]['collector'] as Record<string, unknown>)['connector']).toBe('azure');
+    });
+
+    it('leaves the connector select alone when no Connection is picked (local inbox)', async () => {
+        const { fixture } = create({ name: 'x', collector: { connector: 'local' } }, undefined, [
+            { id: 'blob_prod', connector: 'azure' },
+        ]);
+        await Promise.resolve();
+        expect(fixture.componentInstance.schemaForm.form.get('connector')?.value).toBe('local');
     });
 
     it('has no a11y violations', async () => {
