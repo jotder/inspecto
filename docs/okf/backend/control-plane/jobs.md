@@ -237,4 +237,11 @@ Three further invariants the code enforces rather than merely documenting:
   asks, so it is asserted by a test, not just written down.
 
 Scoped to `ObjectType.INCIDENT` because `ARCHIVED` exists only in the Incident workflow; generalise when a
-second type gains a terminal archive state. Runbook: `docs/ops/backup-restore-runbook.md`.
+second type gains a terminal archive state.
+
+**Operator-facing procedure** — the worked job TOON, the dry-run-first + legal-hold steps, and the G3
+stance phrased for a legal/DPA reader live in
+[`okf/backend/build-run/operations-reference.md`](../build-run/operations-reference.md) §*Retention &
+purging*. ⚠ **Nothing schedules `incident_purge`, and nothing should.** That is the decision, not a
+residual: a shipped default that hard-deletes business records is indefensible, so standing the job up is
+an operator act exactly like `receipt_prune`.

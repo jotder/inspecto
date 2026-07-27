@@ -499,6 +499,58 @@ curl -s -X POST -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs/nig
 curl -s -H "Authorization: Bearer secret" localhost:8080/api/v1/jobs/nightly-clean/runs
 ```
 
+### Retention & purging — what each task forgets (operator policy)
+
+Retention is **never on by default**. Every task below is inert until you define a job for it, and
+each one that deletes requires an explicit `retention_days` — there is no default horizon, because
+forgetting is a policy decision and a wrong default is silent data loss.
+
+| Task | Deletes | Notes |
+|---|---|---|
+| `cleanup` | files under `dir` breaching age / count / size | the only task with a `retention_days` default (7) |
+| `ledger_prune` | acquisition-ledger fingerprints | ⚠ a pruned file still at the source **re-ingests as new** — retention must exceed the source's own file lifetime |
+| `runlog_prune` | Run history JSONL + artifacts (+ the `inspecto_job_runs` projection) | |
+| `notification_prune` | in-app notifications, whatever their read/archived state | |
+| `receipt_prune` | delivery receipts (D8) | the in-memory store's oldest-first cap at 5000 is a **backstop, not retention** |
+| `incident_purge` | **Archived Incidents and their notes, attachments, links and tag edges** | the only task that deletes operator business records — see below |
+
+#### `incident_purge` — the retention tier for Archived Incidents (MNT-14)
+
+An Incident becomes purge-eligible once `closedAt + retention_days` has passed, where `closedAt` is
+the timestamp the archive transition already stamps. Retention is therefore **derived, not stamped
+per record** — which means shortening `retention_days` later retroactively makes older records
+eligible. The sweep does not honour "what was promised when this was archived".
+
+```toon
+# incident_purge_job.toon — purge Incidents archived over 2 years ago, 03:00 on Sundays
+job:
+  name: incident-retention
+  type: maintenance
+  cron: "0 3 * * SUN"
+  task: incident_purge
+  retention_days: 730        # required — no default
+  max_count: 1000            # optional, bounds one run's blast radius (default 1000)
+```
+
+**Run it dry first.** A dry run reports the eligible count and, separately, how many were withheld
+by a legal hold — `would purge 12 incident(s) archived more than 730d ago (3 held)`. The two counts
+are always reported apart so the arithmetic adds up; a held record is never a silent skip.
+
+**Legal hold.** Set the `legalHold` attribute on an Incident (`PATCH /objects/{id}`) and it is never
+purged, however long its window has expired. The check is **fail-safe**: only an explicit
+`false`/`0`/`no`/`off` clears the hold, any other non-blank value holds — a typo must keep records,
+not delete them. It is re-checked at purge time against the live row, so a hold applied between the
+preview and the run still wins.
+
+> ⚠ **A purge is not "all trace removed" — say this before a legal or DPA reviewer asks it.**
+> The event ledger is append-only. Each purged Incident's `OBJECT_ACTIVITY` history — including the
+> record of its own purge — **survives the purge**. What retention manages is the operational record;
+> the audit log is deliberately not subject to it. This is a stated decision (MNT-14 G3), not a gap.
+> If a jurisdiction requires the trail to go too, that is a separate build and it does not exist today.
+
+Nothing schedules `incident_purge` for you. Standing up the job is an operator act, exactly like
+`receipt_prune` — shipping a default that deletes business records would be indefensible.
+
 ### Status backend — file (default) or database (`DbStatusStore`)
 
 The audit queries above (`commits`/`batches`/`files`/`lineage`/`quarantine`) and the
