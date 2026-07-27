@@ -104,8 +104,11 @@ each row's detail stays in its own section.
      **A5.1 SHIPPED end-to-end 2026-07-27** — the `/derive` hop on `query_author` + `<inspecto-ai-assist>`'s
      opt-in `prompting` mode, adopted on Queries. Plan **D9 closed** (`ConfigJsonSchema` + the
      `config_schema` L1 tool); **D10/D11 turned out to be already answered in the plan** (opt-in per pane,
-     Queries first; the turn cap is A5.2's), so A5.1 was never actually blocked. **Open: A5.2**
-     (`component_draft` — a bounded repair LOOP, not a hop) **and A5.3** (`pipeline_author`).
+     Queries first; the turn cap is A5.2's), so A5.1 was never actually blocked. **A5.2 SHIPPED
+     end-to-end 2026-07-27** — the bounded repair loop (cap 3) + schema-constrained regeneration, adopted
+     on the Components pane's **schema** kind. ⚠ Its host was a **wrong premise**: no pane adopted
+     `component_draft` at all, and of the Components dialog's four kinds only `schema` has a `ConfigSpec`.
+     **Open: A5.3** (`pipeline_author`) — now unblocked, convergence demonstrated.
      ⚠ "No new backend capability" turned out **false** for A1 — see the AGT-6a row. *(Its plan's
      **D1–D11** are a separate numbering space from §2's D1–D17 — and they now COLLIDE on D9/D10, which
      mean different things in each. Always say "plan D9" or "§2 D9".)*

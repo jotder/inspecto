@@ -264,8 +264,43 @@ otherwise returns the same retryable 422 a real local model produces when it nar
 two offline paths cannot drift. The mock's `query_author` now renders the *actual* derived predicate —
 its old fixed `cost_usd > 100` would contradict the `derivedArgs` echo directly above it.
 
-**Still open:** A5.2 (`component_draft` — a bounded repair *loop*, not a hop; turn cap 3 per plan D11)
-and A5.3 (`pipeline_author`). `suggest_expectations` is excluded on purpose.
+**Still open:** A5.3 (`pipeline_author`). `suggest_expectations` is excluded on purpose.
+
+## The bounded repair loop (A5.2 — shipped 2026-07-27)
+
+`query_author`'s NL path is one hop. `component_draft`'s is a **loop**, and the difference is structural:
+that tool has *no authoring logic* — it echoes `config` back with anchored findings — so a single turn
+reliably yields a probably-invalid config. `InspectoIntelligenceAgent.repairLoop` derives, invokes, and
+feeds the findings back for up to **3 turns** (plan D11), then hands over. The route echoes `turns`.
+
+Four properties are load-bearing:
+
+- **Schema-constrained regeneration (plan D9's payoff).** The offered spec's bare
+  `config:{"type":"object"}` — §3.4 F2's named cost centre — is replaced per call with the kind's
+  projected schema via `ArgumentDeriver.constrainedFor`, so the model is constrained by the very spec
+  that will judge it. ⚠ `kind` comes from the **pane**, never the model; it is an identity field.
+- **The cap is a hand-over, not a failure.** At 3 turns `ok` stays **true** and the draft rides out with
+  its findings — which is exactly the A1 experience the surface already renders for human repair.
+- **⚠ Best = fewest findings, not last.** A later turn can regress; returning the last draft because it
+  was last would hand back something worse than the loop already had. Pinned by a test.
+- **A first-turn failure is the caller's 422; a later one keeps what it has.** No draft is better than an
+  empty one presented as a draft, but a model that degrades mid-repair must not lose a good earlier draft.
+
+⚠ **`ArgumentDeriver.withPropertySchema` fails OPEN** to the unmodified spec on unreadable input. A missing
+constraint costs a repair turn; throwing would remove an authoring surface that works — and the loop
+validates every draft against the real `ConfigSpec` regardless of what the model was told.
+
+### Its host — and the premise that was wrong
+
+The plan assumed `component_draft` had a pane. **It had none.** Adopted on the **Components pane's
+schema kind** (`component-form.dialog`), and *only* that kind: of the dialog's four
+(grammar/schema/transform/sink) only `schema` has a `ConfigSpec`, so on the rest the tool can only answer
+*"no structural spec for kind"*. ⚠ **Do not "complete" the adoption onto the other three.**
+
+⚠ Offline, the mock's derived field types **must come from the schema form's own vocabulary**
+(`string|integer|bigint|double|boolean|date|timestamp`). An early cut emitted `number`, which applied
+silently and left the row's type dropdown **blank** — it looked like the draft had worked. Caught only in
+the preview, not by any unit test.
 
 ## Not shipped
 

@@ -293,8 +293,16 @@ between A5.1 and A5.2, and pretending otherwise is how this phase overruns.
 | # | Slice | Effort | Deliverable |
 |---|---|---|---|
 | **A5.1** ✅ **SHIPPED 2026-07-27** | The hop, on `query_author` | M | `/derive` route + gate order + single-offered-tool call + `derivedArgs` echo + the three distinct failure answers (503 stub / 422 `_raw` / 422 no-call). `ai-assist` gains an optional prompt input, hidden unless the pane opts in. Offline mock branch. |
-| **A5.2** | `ConfigSpec` → JSON Schema projection + the bounded repair loop, on `component_draft` | L | The F3 projection (un-flattened, `visibleWhen` excluded) + N-turn repair feeding findings back, with a hard turn cap. This is where the phase's cost is. |
-| **A5.3** | `pipeline_author` | M | Only after A5.2 proves convergence on a local model. |
+| **A5.2** ✅ **SHIPPED 2026-07-27** | `ConfigSpec` → JSON Schema projection + the bounded repair loop, on `component_draft` | L | Projection shipped early as D9 (`ConfigJsonSchema`). The loop: `InspectoIntelligenceAgent.repairLoop`, cap 3 (D11), findings fed back per turn, `turns` echoed to the caller. Adopted on the **Components pane's schema kind** — see the host note below. |
+| **A5.3** | `pipeline_author` | M | Unblocked: A5.2 demonstrated convergence (`ComponentDraftRepairLoopTest`). ⚠ `pipeline_author.flow` is **not** `ConfigSpec`-shaped, so D9 does not cover it — it needs a hand-written schema. |
+
+> ⚠ **A5.2's host was a wrong premise in this plan.** The phasing assumed `component_draft` had a pane to
+> adopt it; it had **none** — the five `<inspecto-ai-assist>` adopters name `pipeline_author`,
+> `query_author`, `projection_author` and `suggest_expectations`. It was in the same condition
+> `kpi_report_builder` is parked for. Resolved by adopting it on the **Components pane**, and there only
+> on the **`schema`** kind: of that dialog's four kinds (grammar/schema/transform/sink) only `schema` has
+> a `ConfigSpec`, so on the other three the tool can only ever answer *"no structural spec for kind"*.
+> An affordance whose every use fails is worse than no affordance.
 
 #### 3.4.5 What A5 changes about an earlier decision
 
