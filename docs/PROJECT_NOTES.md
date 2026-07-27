@@ -246,6 +246,13 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   throughout. When touching `inspecto/mock/handlers/`, diff the handler's accepted args **and** its result
   keys against the real route, and pin the strictness in a `*.handler.spec.ts` — the preview cannot catch
   what the mock permits.
+  ⚠ **It was not one bad branch — a deliberate audit (2026-07-27, `feb6f6e7`) found the same class live in
+  two more branches of the same file**, and a lenient mock hides *server* defects too: tightening
+  `component_draft` immediately exposed that its `schema` kind validates the wrong `schema` entirely.
+  Two rules that came out of it: (1) where full parity would mean re-implementing a backend subsystem,
+  mirror **acceptance** — the same inputs refused, the same inputs rendering nothing — and say so at the
+  branch; (2) a mock stand-in must emit the shape the **server** parses, never a convenient flat one, or it
+  teaches the wrong contract to whatever consumes it next.
 - **ag-Grid gotchas:** (a) action/string cell renderers don't render on first paint with static `rowData` →
   call `refreshCells({force:true, columns:[…]})` on `(firstDataRendered)`/`(rowDataUpdated)`; (b) the shared
   theme MUST be the gamma-token `themeQuartz.withParams(GAMMA_GRID_PARAMS)` (`app/inspecto/grid/index.ts`) — never
