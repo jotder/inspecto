@@ -73,8 +73,11 @@ each row's detail stays in its own section.
 1. **Root enablers — DRAINED, now including MNT-14.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound,
    Incidents I1 resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
    2026-07-23/24; the last survivor **MNT-14 shipped 2026-07-27** as the `incident_purge` maintenance task
-   (§2 D5's retention tier, enforced). `ObjectStore.delete` finally has its production caller. §6 carries
-   the residuals (operator retention docs, no scheduled instance) and the two wrong premises it corrected.
+   (§2 D5's retention tier, enforced). `ObjectStore.delete` finally has its production caller. **Its residuals
+   are CLOSED 2026-07-27 too** — the operator retention procedure now lives in
+   `okf/backend/build-run/operations-reference.md` §*Retention & purging*, and "no scheduled instance" was
+   resolved as **the decision, not a gap** (nothing schedules a task that hard-deletes business records —
+   standing it up is an operator act). §6 keeps the two wrong premises it corrected.
 2. **Decision gates — DRAINED 2026-07-25.** §2 is empty; see it for what each call was and where the
    rationale lives. Several rows below changed shape as a result, and three had **wrong premises**
    corrected (D3 legacy-route framing, D7 tags-are-greenfield, D14 already-tightened) — trust §2 over
@@ -98,13 +101,17 @@ each row's detail stays in its own section.
    - **AGT-6a inline AI authoring** — **A1–A4 shipped 2026-07-26**; what is left are the three
      residual rows in §3 — **A4-status closed 2026-07-26** (all four operational panes adopted), leaving
      the `kpi_report_builder` host and A5's NL model hop, each independently schedulable. **A5 is now
-     SCOPED** (2026-07-26, plan §3.4) and is a build queued behind ~~three~~ **two** plan-level calls,
-     D10–D11 — **plan D9 is CLOSED, its `ConfigSpec`→JSON-Schema projection SHIPPED 2026-07-27**
-     (`ConfigJsonSchema` + the `config_schema` L1 read tool).
+     **A5.1 SHIPPED end-to-end 2026-07-27** — the `/derive` hop on `query_author` + `<inspecto-ai-assist>`'s
+     opt-in `prompting` mode, adopted on Queries. Plan **D9 closed** (`ConfigJsonSchema` + the
+     `config_schema` L1 tool); **D10/D11 turned out to be already answered in the plan** (opt-in per pane,
+     Queries first; the turn cap is A5.2's), so A5.1 was never actually blocked. **Open: A5.2**
+     (`component_draft` — a bounded repair LOOP, not a hop) **and A5.3** (`pipeline_author`).
      ⚠ "No new backend capability" turned out **false** for A1 — see the AGT-6a row. *(Its plan's
      **D1–D11** are a separate numbering space from §2's D1–D17 — and they now COLLIDE on D9/D10, which
      mean different things in each. Always say "plan D9" or "§2 D9".)*
-   - **Generic tag system (D7)** — newly rescoped, plan-first, second-largest item on the board.
+   - ~~**Generic tag system (D7)**~~ — **COMPLETE end-to-end 2026-07-26/27**, plan archived; all five
+     annotatable kinds adopted, and the `NoteTargets` misnomer closed 2026-07-27 (→ `AnnotationKinds`).
+     Only the O(objects) startup backfill scan remains in §6, deliberately.
    - ~~Link-analysis V2~~ — **COMPLETE end-to-end 2026-07-27.** (b) sharing + (c) pattern packs + (d)'s
      vocabulary half shipped 2026-07-26; **(d)'s authoring half shipped 2026-07-27** as the deterministic
      `projection_author` tool + a `<inspecto-ai-assist>` adopter on the query panel, with the **pane**
