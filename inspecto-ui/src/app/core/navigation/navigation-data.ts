@@ -86,6 +86,9 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 icon    : 'heroicons_outline:rectangle-group',
                 children: [
                     { id: 'catalog',          title: 'Data Catalog', type: 'basic', icon: 'heroicons_outline:share',           link: '/catalog' },
+                    // Onboarding's second entry point beside the Streams-tab header CTA: the query param
+                    // opens the same create dialog on the Streams tab (see CatalogComponent.ngOnInit).
+                    { id: 'catalog-onboard',  title: 'Onboard Stream', type: 'basic', icon: 'heroicons_outline:plus-circle', link: '/catalog', queryParams: { onboard: 'stream' } },
                     { id: 'studio-datasets',  title: 'Datasets',     type: 'basic', icon: 'heroicons_outline:table-cells',     link: '/catalog/datasets' },
                     { id: 'data-browser',     title: 'Data Browser', type: 'basic', icon: 'heroicons_outline:circle-stack',    link: '/data-browser' },
                 ]

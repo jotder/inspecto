@@ -20,7 +20,16 @@ const STREAM: MetadataNode = {
 const GRAPH: MetadataGraph = { nodes: [TABLE], edges: [] };
 const EMPTY_GRAPH: MetadataGraph = { nodes: [], edges: [] };
 
-function create(overrides: Partial<CatalogService> = {}, queryParams: Record<string, string> = {}) {
+/** Only the onboarding create dialog is opened from here; it closes with no result by default. */
+const DIALOG = { open: vi.fn((_cmp: unknown, _config?: unknown) => ({ afterClosed: () => of(undefined) })) };
+
+function create(
+    overrides: Partial<CatalogService> = {},
+    queryParams: Record<string, string> = {},
+    // No capability ⇒ Builder is not an allowed lens ⇒ LensService snaps to read-only Business, which
+    // hides every authoring affordance (onboarding included). Pass this to test an authoring lens.
+    capabilities: string[] = [],
+) {
     const api = {
         tables: () => of([TABLE]),
         streams: () => of([]),
@@ -36,7 +45,7 @@ function create(overrides: Partial<CatalogService> = {}, queryParams: Record<str
             provideRouter([]),
             { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(queryParams) } } },
             { provide: CatalogService, useValue: api },
-            { provide: MatDialog, useValue: {} },
+            { provide: MatDialog, useValue: DIALOG },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             // RegistryComponent is embedded (not lazy) for the "usage" tab.
@@ -44,19 +53,41 @@ function create(overrides: Partial<CatalogService> = {}, queryParams: Record<str
             { provide: PipelinesService, useValue: { authoredList: () => of([]), authoredRaw: () => of(undefined) } },
             // The Exchange tabs gate on bootstrap.features.exchange (SharingComponent is embedded).
             // authMode 'none' keeps LensService on the honor system (R2 grant checks bypassed).
-            { provide: SessionService, useValue: { exchangeEnabled: () => true, authMode: () => 'none', capabilities: () => [] } },
+            { provide: SessionService, useValue: { exchangeEnabled: () => true, authMode: () => 'none', capabilities: () => capabilities } },
             { provide: ExchangeService, useValue: { grants: () => of([]), offers: () => of([]) } },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
             { provide: ToastrService, useValue: {} },
         ],
     });
+    // MatDialogModule (in the component's own imports) provides MatDialog at the element level, which
+    // SHADOWS a root provider — the mock has to be overridden on the component to be reached at all.
+    TestBed.overrideComponent(CatalogComponent, { add: { providers: [{ provide: MatDialog, useValue: DIALOG }] } });
     const fixture = TestBed.createComponent(CatalogComponent);
     fixture.detectChanges(); // runs ngOnInit (loads the Tables tab)
     return fixture;
 }
 
 describe('CatalogComponent', () => {
-    beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
+    beforeEach(() => {
+        localStorage.removeItem('inspecto.currentLens');
+        DIALOG.open.mockClear();
+    });
+
+    it('opens the create dialog from ?onboard=stream, AFTER the rows are in', () => {
+        // The nav item Catalog ▸ Onboard Stream is this link. The dialog must see the loaded names so a
+        // duplicate is rejected inline rather than only by the server's 409.
+        const c = create({ streams: () => of([STREAM]) }, { onboard: 'stream' }, ['canAuthorWorkbench'])
+            .componentInstance;
+        expect(c.activeTab).toBe('streams');
+        expect(DIALOG.open).toHaveBeenCalledTimes(1);
+        expect(DIALOG.open.mock.calls[0][1]).toMatchObject({ data: { kind: 'stream', existingNames: ['orders'] } });
+    });
+
+    it('does not open the dialog without ?onboard=', () => {
+        // Authoring lens, so a miss here means the deep link is absent — not that the lens hid it.
+        create({ streams: () => of([STREAM]) }, {}, ['canAuthorWorkbench']);
+        expect(DIALOG.open).not.toHaveBeenCalled();
+    });
 
     it('loads the Streams tab on init (data origins are the default tab)', () => {
         const c = create({ streams: () => of([STREAM]) }).componentInstance;

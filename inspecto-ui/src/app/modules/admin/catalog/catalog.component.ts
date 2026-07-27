@@ -188,6 +188,15 @@ export class CatalogComponent implements OnInit {
         const from = qp.get('from');
         if (from) this.graphFrom = from;
 
+        // ?onboard=stream|reference (the Catalog ▸ Onboard Stream nav item): open that tab and raise the
+        // create dialog once its rows are in, so the name control can reject a duplicate inline.
+        const onboard = qp.get('onboard');
+        if (onboard === 'stream' || onboard === 'reference') {
+            const idx = this.tabs.findIndex((t) => t.id === (onboard === 'reference' ? 'references' : 'streams'));
+            if (idx >= 0) this.tabIndex = idx;
+            this.pendingOnboard = onboard;
+        }
+
         if (this.activeTab === 'graph') {
             if (this.graphFrom.trim()) this.runGraph();
         } else {
@@ -205,14 +214,14 @@ export class CatalogComponent implements OnInit {
         } else if (this.activeTab === 'streams') {
             this.loading = true;
             this.api.streams().subscribe({
-                next: (s) => { this.streams = s; this.loading = false; },
-                error: () => { this.streams = []; this.loading = false; },
+                next: (s) => { this.streams = s; this.loading = false; this.runPendingOnboard(); },
+                error: () => { this.streams = []; this.loading = false; this.runPendingOnboard(); },
             });
         } else if (this.activeTab === 'references') {
             this.loading = true;
             this.api.references().subscribe({
-                next: (r) => { this.references = r; this.loading = false; },
-                error: () => { this.references = []; this.loading = false; },
+                next: (r) => { this.references = r; this.loading = false; this.runPendingOnboard(); },
+                error: () => { this.references = []; this.loading = false; this.runPendingOnboard(); },
             });
         } else if (this.activeTab === 'kpis') {
             this.loading = true;
@@ -258,6 +267,16 @@ export class CatalogComponent implements OnInit {
 
     onNodeRowClicked(row: MetadataNode): void {
         if (row) this.openNode(row.id);
+    }
+
+    /** A `?onboard=` deep link, consumed once the tab's rows have arrived. */
+    private pendingOnboard: 'stream' | 'reference' | null = null;
+
+    private runPendingOnboard(): void {
+        const kind = this.pendingOnboard;
+        if (!kind) return;
+        this.pendingOnboard = null;
+        this.onboard(kind);
     }
 
     /** Header CTA (Streams/References tabs, authoring lenses): open the guided onboarding. */
