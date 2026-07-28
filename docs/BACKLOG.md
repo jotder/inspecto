@@ -420,6 +420,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   current source returns a proper array). It did **not** reproduce on a freshly built server, which points at
   the stale `file-processor-deploy` bundle rather than current code. Adding the guard converts a crash into a
   silent wrong-state, so it is worth doing **but is not a fix** — do not close this by guarding alone.
+- **`InvRoutes`' hand-escaped literal can now become a bind** (found 2026-07-28 while building Rule Template
+  execution). `InvRoutes.java:192` carries the comment *"No bind-parameter support in
+  `QueryExecutor.Request` — the value is a literal, SQL-escaped"*. That premise is **no longer true**:
+  `Request` gained a `binds` component and `QueryExecutor` a `PreparedStatement` branch. Replacing that
+  hand-escape with a bind removes a hand-rolled escaping site. Small, self-contained, and strictly a
+  reduction in surface — but out of scope for the change that enabled it, so it is recorded rather than
+  bundled. ⚠ Check for other hand-escaped literals at the same time; the comment suggests this was a known
+  workaround, not a one-off.
 - **`AiDraft.prerequisites` is modelled and rendered but never generically APPLIED** (found 2026-07-28 with the
   kpi host). `ai-draft.ts:107-129` populates it and `ai-assist.component.html:176-182` renders the sentence
   *"N dependent components will be applied first"*, but nothing applies them — each adopting pane must

@@ -55,6 +55,10 @@ final class CapabilityManifest {
             new Entry("DELETE", "/decision-rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/decision-rules/([^/]+)/simulate", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/decision-rules/([^/]+)/apply", Roles.CAN_OPERATE_RUNS),
+            // RuleRoutes — read-only preview of a saved rule template, so it mirrors decision-rule
+            // `simulate`'s gate rather than `apply`'s. There is no `apply` sibling: running a rule
+            // template IS the whole operation, it has no consequences to enact.
+            new Entry("POST", "/rule-templates/([^/]+)/simulate", Roles.CAN_AUTHOR_WORKBENCH),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // ExchangeRoutes

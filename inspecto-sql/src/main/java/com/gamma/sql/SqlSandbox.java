@@ -107,6 +107,22 @@ public final class SqlSandbox implements AutoCloseable {
         return st;
     }
 
+    /**
+     * {@link #statement()}'s bound-parameter sibling, for SQL carrying positional {@code ?} placeholders
+     * (Rule Templates' {@code :name} binds). ⚠ Use this rather than {@code connection().prepareStatement}:
+     * the timeout is applied here, and a caller that reaches past it silently loses the only bound on a
+     * runaway query that the memory cap does not already cover.
+     */
+    public java.sql.PreparedStatement preparedStatement(String sql) throws SQLException {
+        java.sql.PreparedStatement ps = conn.prepareStatement(sql);
+        try {
+            ps.setQueryTimeout(queryTimeoutSeconds);
+        } catch (SQLException | RuntimeException ignored) {
+            // DuckDB's driver may not support query timeout; the memory cap is the hard backstop.
+        }
+        return ps;
+    }
+
     /** Whether {@link #seal()} has been applied. */
     public boolean isSealed() {
         return sealed;

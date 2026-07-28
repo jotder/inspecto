@@ -43,7 +43,19 @@ public final class QueryExecutor {
      * @param sort        ORDER BY terms, or empty
      */
     public record Request(String datasetName, String relationSql, String sql,
-                          int limit, int offset, List<String> projection, List<Sort> sort) {}
+                          int limit, int offset, List<String> projection, List<Sort> sort,
+                          List<String> binds) {
+
+        /** Existing callers: no bound parameters. Keeps the 7-arg shape source-compatible. */
+        public Request(String datasetName, String relationSql, String sql,
+                       int limit, int offset, List<String> projection, List<Sort> sort) {
+            this(datasetName, relationSql, sql, limit, offset, projection, sort, List.of());
+        }
+
+        public Request {
+            binds = binds == null ? List.of() : List.copyOf(binds);
+        }
+    }
 
     /** The typed, bounded result. */
     public record Result(List<ResultSetDescriptor.Column> columns, List<Map<String, Object>> rows,
@@ -61,8 +73,15 @@ public final class QueryExecutor {
                 }
             }
             String wrapped = wrap(req);
-            try (Statement st = sandbox.statement();
-                 ResultSet rs = st.executeQuery(wrapped)) {
+            // A Rule Template's `:name` holes arrive here already rewritten to positional `?` with their
+            // values in `binds` (RuleTemplate.compile). They are bound, never interpolated — so a bind
+            // value can never alter the statement's shape, whatever it contains.
+            try (Statement st = req.binds().isEmpty()
+                    ? sandbox.statement()
+                    : prepared(sandbox, wrapped, req.binds());
+                 ResultSet rs = req.binds().isEmpty()
+                    ? st.executeQuery(wrapped)
+                    : ((java.sql.PreparedStatement) st).executeQuery()) {
                 ResultSetMetaData md = rs.getMetaData();
                 int n = md.getColumnCount();
                 List<String> names = new ArrayList<>(n);
@@ -83,6 +102,23 @@ public final class QueryExecutor {
                 return new Result(columns, rows, rows.size(), truncated, (System.nanoTime() - t0) / 1_000_000);
             }
         }
+    }
+
+    /**
+     * A {@link java.sql.PreparedStatement} over {@code sql} with {@code binds} set positionally. Values are
+     * set as strings and left for DuckDB to coerce against the column's own type — the same widening the
+     * inline-literal path relied on, so a template's behaviour does not change with how it is executed.
+     */
+    private static java.sql.PreparedStatement prepared(SqlSandbox sandbox, String sql, List<String> binds)
+            throws SQLException {
+        java.sql.PreparedStatement ps = sandbox.preparedStatement(sql);
+        try {
+            for (int i = 0; i < binds.size(); i++) ps.setString(i + 1, binds.get(i));
+        } catch (SQLException e) {
+            ps.close();
+            throw e;
+        }
+        return ps;
     }
 
     /**
