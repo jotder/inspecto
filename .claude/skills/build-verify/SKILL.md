@@ -217,8 +217,11 @@ grep -E "Tests run:.*Skipped: [0-9]+$" full.log \
   | awk '{t+=$1; s+=$2} END {print "TOTAL:", t, "skipped:", s, "modules:", NR}'
 ```
 
-**Correct baseline as of 2026-07-27: 2296 tests, 0 failures, 0 errors, 3 skipped, across 14 test-bearing
-modules (16 reactor modules)** — 2288 earlier the same day, +8 for `RetentionSweepSeamTest` (MNT-14). The
+**Correct baseline as of 2026-07-28: 2335 tests, 0 failures, 0 errors, 3 skipped, across 14 test-bearing
+modules (16 reactor modules)** — it moves several times a day; re-derive, never quote. ⚠ **A sub-agent
+reported 4670 for this exact run** by summing the per-class `-- in <class>` lines *and* the module summaries:
+almost exactly double, which is the tell. If a total looks like ~2× the last baseline, that is this mistake.
+Earlier the same week: 2296, then 2288, +8 for `RetentionSweepSeamTest` (MNT-14). The
 3 skips are pre-existing (1 in `ConfigSafetyValidatorTest`, 2 in one `inspecto-etl`-tier module), not a
 regression — and they are *why* those two module lines carry the `[WARNING]` prefix above.
 
