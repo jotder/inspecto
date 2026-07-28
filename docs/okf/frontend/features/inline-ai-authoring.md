@@ -411,12 +411,30 @@ field. The present-but-empty case is the one that matters: `applySchemaDraft` di
 `clean` verdict there would show an Apply button that does nothing. The mock mirrors both halves (`nonEmpty`),
 which also closed the same latent leniency on `dashboard.tiles`.
 
-⚠ **OPEN — `projection_author`'s declared `columns.items` is stale.** The pane sends a `string[]`; the schema
-says `{"items":{"type":"object"}}`. The Java `columnNames` accepts both deliberately, and so does the mock,
-so nothing breaks on this route — but it is what a model reads on the `ask` path. → `BACKLOG.md`.
+✅ **`projection_author`'s `columns.items` is fixed** (2026-07-28) — `{"type":["object","string"]}`, the two
+spellings `columnNames()` has always read. The pane's `string[]` was right all along.
 
 The two clean adopters: **`suggest_expectations`** (args, result and adapter all agree) and
-**`projection_author`** apart from the schema note above.
+**`projection_author`**.
+
+### Why the schema is pinned by a TEST and not by runtime validation
+
+Nothing validates a call's `args` against the tool's declared `jsonSchema` — `AgentRoutes` passes them
+verbatim and `runTool` invokes with them directly — and that stays true **on purpose**.
+
+Both defects the 2026-07-27 cross-adopter audit found were the same shape: **the schema was wrong while the
+code and the caller were right.** A runtime validator would therefore not have caught either one. It would
+have done the opposite — validating `projection_author.columns` against its objects-only `items` would have
+**rejected the link-analysis panel's legitimate `string[]`**, turning a stale comment into a broken feature.
+Generalize: where the declared schema is the unreliable artifact, enforcing it converts documentation bugs
+into outages.
+
+So `ToolSchemaAdopterContractTest` (`inspecto-intelligence`) holds each schema against reality instead: every
+real `<inspecto-ai-assist>` adopter's payload — 8 payloads across 6 tools — is checked against its tool's
+declared top-level property types. ⚠ **Keep the table in step when a pane's `[args]` changes**; that is the
+whole point. ⚠ It deliberately does **not** check `required`, because the NL variants of `query_author` and
+`pipeline_author` omit `when`/`flow` so the model's derived args survive the merge — an absent key is legal
+by design here. Runtime validation is revisitable, but only after all 23 schemas have been audited.
 
 ## Not shipped
 
