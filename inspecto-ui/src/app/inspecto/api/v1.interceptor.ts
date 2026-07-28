@@ -1,6 +1,6 @@
 import { HttpInterceptorFn, HttpResponse } from '@angular/common/http';
 import { map } from 'rxjs/operators';
-import { isV1Envelope } from './v1';
+import { envelopeVersionSkew, isV1Envelope } from './v1';
 
 /**
  * Unwraps the `/api/v1` success envelope (`{data, metadata, diagnostics}` → `data`) at the one
@@ -15,9 +15,18 @@ import { isV1Envelope } from './v1';
  */
 export const v1Interceptor: HttpInterceptorFn = (req, next) =>
     next(req).pipe(
-        map((event) =>
-            event instanceof HttpResponse && isV1Envelope(event.body)
-                ? event.clone({ body: event.body.data })
-                : event,
-        ),
+        map((event) => {
+            if (!(event instanceof HttpResponse)) return event;
+            if (isV1Envelope(event.body)) return event.clone({ body: event.body.data });
+            // An envelope-shaped body we did NOT unwrap is a version skew between this bundle and the
+            // server that answered. Say so here, once, naming the request — otherwise the raw envelope
+            // reaches a feature service and fails far from the cause. See `envelopeVersionSkew`.
+            const skew = envelopeVersionSkew(event.body);
+            if (skew !== null)
+                console.error(
+                    `[api] ${req.method} ${req.url} returned an envelope with apiVersion=${skew}; this bundle unwraps only 'v1'. ` +
+                        `The body was passed through UNWRAPPED — expect shape errors downstream. Rebuild/redeploy so bundle and server agree.`,
+                );
+            return event;
+        }),
     );

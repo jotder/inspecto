@@ -59,3 +59,28 @@ export function isV1Envelope(body: unknown): body is V1Envelope {
     const b = body as Record<string, unknown>;
     return 'data' in b && (b['metadata'] as V1EnvelopeMetadata | undefined)?.apiVersion === 'v1';
 }
+
+/**
+ * The `apiVersion` of a body that is **shaped** like an envelope but was not recognised as `v1` —
+ * i.e. it carries both `data` and an object `metadata`, yet {@link isV1Envelope} declined it. Returns
+ * `null` for everything else, including legacy JSON that merely happens to have a `data` key.
+ *
+ * This exists because a declined unwrap is otherwise **silent and global**: the raw envelope reaches
+ * the feature service, which then runs array/object operations on `{data, metadata}` and fails far
+ * from the cause. That is the shape of the still-unexplained non-array `GET /spaces` body
+ * (docs/BACKLOG.md §6) — every mechanism in current source was eliminated, so the remaining
+ * candidate is an artifact/source **version skew**, which is exactly what this names.
+ *
+ * ⚠ Deliberately narrow: widening {@link isV1Envelope} itself to unwrap these would defeat its
+ * purpose (text, blobs and legacy JSON must pass through), and would silently accept a body whose
+ * contract we do not actually know.
+ */
+export function envelopeVersionSkew(body: unknown): string | null {
+    if (body === null || typeof body !== 'object') return null;
+    const b = body as Record<string, unknown>;
+    if (!('data' in b)) return null;
+    const metadata = b['metadata'];
+    if (metadata === null || typeof metadata !== 'object') return null;
+    const version = (metadata as Record<string, unknown>)['apiVersion'];
+    return version === 'v1' ? null : String(version);
+}
