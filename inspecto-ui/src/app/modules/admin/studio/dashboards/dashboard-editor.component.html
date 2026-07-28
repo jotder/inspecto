@@ -59,6 +59,36 @@
             <span class="text-secondary text-sm">{{ tiles().length }} tile(s)</span>
         </div>
 
+        <!-- AGT-6a: kpi_report_builder's host. It drafts N widgets PLUS the dashboard that tiles them,
+             so it needs a pane that can do the multi-component write and still end unsaved for review.
+             ⚠ [args] is aiKpiArgs() — identity/context ONLY (dataset + title). Pane args win over the
+             model's, so passing measures/groupBy here would overwrite what the sentence just derived. -->
+        <div class="flex flex-wrap items-end gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <mat-form-field subscriptSizing="dynamic" class="w-64">
+                <mat-label>Report dataset</mat-label>
+                <mat-select
+                    [ngModel]="kpiDataset()"
+                    (ngModelChange)="kpiDataset.set($event)"
+                    [ngModelOptions]="{ standalone: true }"
+                    aria-label="Report dataset"
+                >
+                    @for (d of datasets(); track d.id) {
+                        <mat-option [value]="d.id">{{ d.id }}</mat-option>
+                    }
+                </mat-select>
+            </mat-form-field>
+            <inspecto-ai-assist
+                tool="kpi_report_builder"
+                prompting
+                [args]="aiKpiArgs()"
+                label="Draft a KPI report"
+                promptHint="total revenue and average order value by region"
+                [disabled]="!kpiDataset() || writesDisabled()"
+                [disabledReason]="writesDisabled() ? 'Writes are disabled on this server' : 'Choose a report dataset first'"
+                (applyDraft)="applyKpiReport($event)"
+            ></inspecto-ai-assist>
+        </div>
+
         @if (filterColumns().length) {
             <div>
                 <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Cross-filter</div>

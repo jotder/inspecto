@@ -232,3 +232,72 @@ describe('agentHandler · component_draft', () => {
         expect(empty.findings.map((f) => f.message)).toEqual(['A schema component needs at least one field.']);
     });
 });
+
+/**
+ * AGT-6a — `kpi_report_builder` offline.
+ *
+ * This tool had NO mock coverage, which is how three shape divergences survived: the widget draft was
+ * `{kind, title, measures}` instead of the server's `{vizType, datasetId, controls, options.title}`,
+ * tiles were an x/y/w/h grid rect instead of `{widgetId, span}`, and the `groupBy` branch was missing
+ * entirely. A pane built on those would have saved empty widgets and untileable dashboards while
+ * looking correct offline. Shapes below are pinned against `InspectoTools.widgetDraft`/`tile`.
+ */
+describe('agentHandler · kpi_report_builder', () => {
+    const handler = agentHandler({ mockOps: true });
+    const store = new MockStore();
+    const call = (args: Record<string, unknown>) =>
+        handler(req('/api/agent/tools/kpi_report_builder', { args }), store);
+
+    it('emits one kpi widget per measure with the server’s widget-draft shape', () => {
+        const res = call({
+            dataset: 'cdr_sample',
+            title: 'Revenue Report',
+            measures: [{ agg: 'sum', field: 'revenue' }, { agg: 'count' }],
+        });
+        const body = res?.body as Record<string, unknown>;
+        expect(res?.status ?? 200).toBe(200);
+        expect(body['id']).toBe('revenue_report');
+
+        const widgets = body['widgets'] as { id: string; draft: Record<string, unknown> }[];
+        expect(widgets.map((w) => w.id)).toEqual(['revenue_report_kpi_1', 'revenue_report_kpi_2']);
+        expect(widgets[0].draft).toEqual({
+            vizType: 'kpi',
+            datasetId: 'cdr_sample',
+            controls: { value: [{ agg: 'sum', field: 'revenue' }] },
+            options: { title: 'sum revenue' },
+        });
+        // ⚠ NOT a grid rect — `DashboardTile` is `{widgetId, span}` and nothing else.
+        expect((body['draft'] as Record<string, unknown>)['tiles']).toEqual([
+            { widgetId: 'revenue_report_kpi_1', span: 1 },
+            { widgetId: 'revenue_report_kpi_2', span: 1 },
+        ]);
+    });
+
+    it('collapses to ONE span-2 bar widget when groupBy is present', () => {
+        const body = call({
+            dataset: 'cdr_sample',
+            title: 'By Region',
+            measures: [{ agg: 'sum', field: 'revenue' }],
+            groupBy: ['region', 'tariff'],
+        })?.body as Record<string, unknown>;
+
+        const widgets = body['widgets'] as { id: string; draft: Record<string, unknown> }[];
+        expect(widgets).toHaveLength(1);
+        expect(widgets[0].id).toBe('by_region_chart');
+        expect(widgets[0].draft['vizType']).toBe('bar');
+        expect(widgets[0].draft['controls']).toEqual({
+            x: [{ field: 'region' }],
+            y: [{ agg: 'sum', field: 'revenue' }],
+            series: [{ field: 'tariff' }],
+        });
+        expect((body['draft'] as Record<string, unknown>)['tiles']).toEqual([{ widgetId: 'by_region_chart', span: 2 }]);
+    });
+
+    it('rejects what the real tool rejects', () => {
+        expect(call({ title: 'x', measures: [{ agg: 'count' }] })?.status).toBe(422);
+        expect(call({ dataset: 'd', measures: [{ agg: 'count' }] })?.status).toBe(422);
+        expect(call({ dataset: 'd', title: 'x', measures: [] })?.status).toBe(422);
+        // A non-count agg without a field is a server-side 422 — the mock must not invent `*`.
+        expect(call({ dataset: 'd', title: 'x', measures: [{ agg: 'sum' }] })?.status).toBe(422);
+    });
+});

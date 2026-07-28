@@ -18,8 +18,12 @@ import { ComponentHistoryDialog } from 'app/inspecto/components/component-histor
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { DrillEvent } from '../widgets/widget-host.component';
-import { Widget } from '../widgets/widget-types';
+import { Widget, WidgetOptions, buildWidget } from '../widgets/widget-types';
 import { WidgetsService } from '../widgets/widgets.service';
+import { ControlValues } from 'app/inspecto/viz';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
+import { concatMap, from, tap } from 'rxjs';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Dashboard, DashboardTile, buildDashboard } from './dashboard-types';
@@ -64,6 +68,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         DashboardFilterBarComponent,
         DashboardDrillDrawerComponent,
         TransferMenuComponent,
+        AiAssistComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './dashboard-editor.component.html',
@@ -205,6 +210,85 @@ export class DashboardEditorComponent implements OnInit {
         this.tiles.set(d.tiles);
         this.filter.set(d.filter ?? emptyGroup('AND'));
         this.exposedFields.set(d.exposedFields ?? []);
+    }
+
+    // ── AGT-6a: kpi_report_builder host ──────────────────────────────────────────
+    // This is the tool's host pane because it is the only one that can perform the multi-component
+    // write the tool implies (N widgets THEN the dashboard that tiles them) and end in a reviewable,
+    // not-yet-saved state. `studio/widgets/explore` builds measures but is a single-widget editor by
+    // construction — one `save()` that then routes away. Here the tool builds the measures instead,
+    // so the pane only has to supply a dataset.
+
+    /** The dataset the drafted report reads — the one thing the tool needs that this pane doesn't already know. */
+    readonly kpiDataset = signal('');
+
+    /**
+     * Pane args for the assist panel. ⚠ Identity/context ONLY: pane args are applied AFTER the model's
+     * and win, so anything derivable from the sentence (measures, groupBy, filter) must NOT appear here
+     * or the derived value is silently overwritten and the feature no-ops while looking like it worked.
+     */
+    readonly aiKpiArgs = computed(() => {
+        const title = String(this.form.controls.name.value ?? '').trim();
+        return { dataset: this.kpiDataset(), ...(title ? { title } : {}) };
+    });
+
+    /**
+     * Apply a `kpi_report_builder` draft: create each prerequisite widget, then tile them here and leave
+     * the dashboard UNSAVED so the human still presses Save (the draft-only invariant — the pane writes
+     * through its own validated routes, and the operator remains the audited actor).
+     *
+     * ⚠ The widget creates are N separate non-atomic POSTs against single-component routes; no batch
+     * route exists. On a partial failure we STOP, keep the already-created widgets, and do **not** tile —
+     * a dashboard referencing widgets that were never created renders as broken tiles, which is worse
+     * than no dashboard. The orphans are named in the error and are visible in the widget library, so the
+     * operator can delete or reuse them. Deliberately NOT compensated by deleting them: an id collision
+     * means the "orphan" may be a pre-existing widget someone else owns.
+     */
+    applyKpiReport(draft: AiDraft): void {
+        const tiles = Array.isArray(draft.config['tiles']) ? (draft.config['tiles'] as DashboardTile[]) : [];
+        const widgets = (draft.prerequisites ?? []).map((p) => {
+            const c = p.config;
+            return buildWidget(
+                p.label,
+                String(c['datasetId'] ?? this.kpiDataset()),
+                String(c['vizType'] ?? 'kpi'),
+                (c['controls'] ?? {}) as ControlValues,
+                { options: c['options'] as WidgetOptions | undefined },
+            );
+        });
+        if (!widgets.length || !tiles.length) {
+            this.toastr.warning('That draft carried no widgets to place.');
+            return;
+        }
+        const created: string[] = [];
+        this.saving.set(true);
+        from(widgets)
+            .pipe(concatMap((w) => this.widgetsApi.save(w, { update: false }).pipe(tap(() => created.push(w.id)))))
+            .subscribe({
+                complete: () => {
+                    this.saving.set(false);
+                    // Re-list so the new widgets resolve through `widgetsById` and the tiles can render.
+                    this.widgetsApi.list().subscribe({
+                        next: (w) => {
+                            this.widgets.set(w);
+                            this.tiles.set(tiles);
+                            if (draft.config['filter']) this.filter.set(draft.config['filter'] as ConditionGroup);
+                            this.toastr.success(
+                                `Created ${created.length} widget${created.length === 1 ? '' : 's'} and laid out the dashboard — review it, then Save.`,
+                            );
+                        },
+                        error: () => this.toastr.warning('Widgets were created but could not be reloaded; refresh the page.'),
+                    });
+                },
+                error: (e) => {
+                    this.saving.set(false);
+                    if (e?.status === 503) this.writesDisabled.set(true);
+                    const done = created.length ? ` Already created: ${created.join(', ')}.` : '';
+                    this.toastr.error(
+                        `${apiErrorMessage(e, 'Could not create the report widgets')}. The dashboard was NOT laid out.${done}`,
+                    );
+                },
+            });
     }
 
     addWidget(widgetId: string): void {

@@ -22,13 +22,17 @@ const DS: Dataset = {
 };
 const WIDGET: Widget = { id: 'bar1', name: 'Bar 1', datasetId: 'cdr_sample', vizType: 'bar', controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }] } };
 
-function create(save = vi.fn((d: Dashboard) => of(d)), existing: Dashboard[] = []) {
+function create(
+    save = vi.fn((d: Dashboard) => of(d)),
+    existing: Dashboard[] = [],
+    widgets: Partial<WidgetsService> = {},
+) {
     TestBed.configureTestingModule({
         imports: [DashboardEditorComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: WidgetsService, useValue: { list: () => of([WIDGET]) } },
+            { provide: WidgetsService, useValue: { list: () => of([WIDGET]), ...widgets } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: DashboardsService, useValue: { get: () => of(null), list: () => of(existing), save } },
             { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
@@ -37,6 +41,81 @@ function create(save = vi.fn((d: Dashboard) => of(d)), existing: Dashboard[] = [
     });
     return TestBed.createComponent(DashboardEditorComponent);
 }
+
+// AGT-6a: this pane is `kpi_report_builder`'s host. The draft carries the dashboard in `config` and its
+// widgets in `prerequisites`, which must be CREATED before the tiles referencing them are placed.
+const KPI_DRAFT = {
+    label: 'revenue_report',
+    clean: true,
+    findings: [],
+    config: { tiles: [{ widgetId: 'revenue_report_kpi_1', span: 1 }] },
+    prerequisites: [
+        {
+            label: 'revenue_report_kpi_1',
+            clean: true,
+            findings: [],
+            config: {
+                vizType: 'kpi',
+                datasetId: 'cdr_sample',
+                controls: { value: [{ agg: 'sum', field: 'duration_s' }] },
+                options: { title: 'sum duration_s' },
+            },
+        },
+    ],
+};
+
+describe('DashboardEditorComponent — kpi_report_builder host', () => {
+    it('creates the prerequisite widgets first, then tiles them, leaving the dashboard unsaved', () => {
+        const widgetSave = vi.fn((w: Widget) => of(w));
+        const dashboardSave = vi.fn((d: Dashboard) => of(d));
+        const fixture = create(dashboardSave, [], { save: widgetSave } as Partial<WidgetsService>);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+
+        c.applyKpiReport(KPI_DRAFT);
+
+        // The widget was created through the pane's own validated route, with the SERVER's draft shape.
+        expect(widgetSave).toHaveBeenCalledTimes(1);
+        const [created, opts] = widgetSave.mock.calls[0] as unknown as [Widget, { update: boolean }];
+        expect(created.id).toBe('revenue_report_kpi_1');
+        expect(created.vizType).toBe('kpi');
+        expect(created.datasetId).toBe('cdr_sample');
+        expect(created.controls).toEqual({ value: [{ agg: 'sum', field: 'duration_s' }] });
+        expect(opts).toEqual({ update: false });
+
+        expect(c.tiles()).toEqual([{ widgetId: 'revenue_report_kpi_1', span: 1 }]);
+        // Draft-only: the human still presses Save. The pane must NOT have persisted the dashboard.
+        expect(dashboardSave).not.toHaveBeenCalled();
+    });
+
+    it('does NOT tile when a widget create fails — broken tiles are worse than no dashboard', () => {
+        const widgetSave = vi.fn(() => {
+            throw { status: 500 };
+        });
+        const fixture = create(vi.fn((d: Dashboard) => of(d)), [], { save: widgetSave } as Partial<WidgetsService>);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+
+        c.applyKpiReport(KPI_DRAFT);
+
+        expect(c.tiles()).toEqual([]);
+        expect(c.saving()).toBe(false);
+    });
+
+    it('passes identity-only args so the model’s derived measures are not overwritten', () => {
+        const fixture = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.kpiDataset.set('cdr_sample');
+        c.form.controls.name.setValue('revenue_report');
+
+        const args = c.aiKpiArgs();
+        expect(args).toEqual({ dataset: 'cdr_sample', title: 'revenue_report' });
+        // ⚠ pane args win over the model's — these must never be present.
+        expect('measures' in args).toBe(false);
+        expect('groupBy' in args).toBe(false);
+    });
+});
 
 describe('DashboardEditorComponent', () => {
     it('adds, spans and removes tiles', () => {

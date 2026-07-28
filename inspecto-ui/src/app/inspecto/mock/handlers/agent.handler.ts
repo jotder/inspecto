@@ -433,29 +433,52 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 if (!dataset) return error(422, 'dataset is required');
                 if (!title) return error(422, 'title is required');
                 if (measures.length === 0) return error(422, 'measures is required and must be a non-empty array');
+                // ⚠ These shapes are the SERVER's, verified against InspectoTools.widgetDraft/tile:
+                // a widget draft is `{vizType, datasetId, controls, options.title}` (NOT `{kind, title,
+                // measures}`) and a tile is `{widgetId, span}` (NOT an x/y/w/h grid rect). The earlier
+                // mock invented both, so an adopting pane would have saved empty widgets and untileable
+                // dashboards while looking correct offline — the same leniency trap as `pipeline_author`.
                 const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-                const widgets = measures.map((raw, i) => {
+                const norm = measures.map((raw) => {
                     const measure = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
                     const agg = text(measure, 'agg') || 'count';
-                    const field = text(measure, 'field') || '*';
+                    const field = text(measure, 'field');
+                    if (agg !== 'count' && !field) return null;
                     return {
-                        id: `${base}_kpi_${i + 1}`,
-                        draft: {
-                            kind: 'kpi',
-                            datasetId: dataset,
-                            title: text(measure, 'label') || `${agg}(${field})`,
-                            measures: [{ agg, field }],
-                        },
+                        value: { agg, field: field || '*' },
+                        label: text(measure, 'label') || `${agg} ${field || '*'}`.trim(),
                     };
                 });
-                return json({
-                    kind: 'dashboard',
-                    id: base,
-                    clean: true,
-                    findings: [],
-                    draft: { title, tiles: widgets.map((w, i) => ({ widgetId: w.id, x: (i % 3) * 4, y: Math.floor(i / 3) * 4, w: 4, h: 4 })) },
-                    widgets,
+                if (norm.some((n) => n === null)) return error(422, 'a non-count measure requires a field');
+                const kept = norm as { value: { agg: string; field: string }; label: string }[];
+                const groupBy = (Array.isArray(args['groupBy']) ? args['groupBy'] : [])
+                    .filter((g): g is string => typeof g === 'string' && g.trim() !== '')
+                    .map((g) => g.trim());
+
+                const widget = (id: string, vizType: string, controls: Record<string, unknown>, caption: string) => ({
+                    id,
+                    draft: { vizType, datasetId: dataset, controls, options: { title: caption } },
                 });
+                // No groupBy → one `kpi` widget per measure, span 1. With groupBy → ONE `bar` widget, span 2.
+                const widgets = groupBy.length
+                    ? [
+                          widget(
+                              `${base}_chart`,
+                              'bar',
+                              {
+                                  x: [{ field: groupBy[0] }],
+                                  y: kept.map((k) => k.value),
+                                  ...(groupBy.length > 1 ? { series: [{ field: groupBy[1] }] } : {}),
+                              },
+                              title,
+                          ),
+                      ]
+                    : kept.map((k, i) => widget(`${base}_kpi_${i + 1}`, 'kpi', { value: [k.value] }, k.label));
+                const tiles = widgets.map((w) => ({ widgetId: w.id, span: groupBy.length ? 2 : 1 }));
+                const filter = args['filter'];
+                const draft: Record<string, unknown> = { tiles };
+                if (filter && typeof filter === 'object' && Object.keys(filter).length) draft['filter'] = filter;
+                return json({ kind: 'dashboard', id: base, clean: true, findings: [], draft, widgets });
             }
             case 'pipeline_author': {
                 // ⚠ The graph arrives under `flow` — the real tool 422s anything else. This branch used to
