@@ -91,3 +91,6 @@ graphify-out/
 /package-lock.json
 /inspecto-issues/
 /spaces/_shared/
+
+# `mvn dependency:build-classpath` writes cp.txt into every module dir it touches
+cp.txt
