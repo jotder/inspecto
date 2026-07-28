@@ -931,7 +931,10 @@ final class InspectoTools {
                         + "([{name,type?}] or [name]), hint (optional substring narrowing the candidates).",
                 "{\"type\":\"object\",\"properties\":{"
                         + "\"datasetId\":{\"type\":\"string\"},"
-                        + "\"columns\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},"
+                        // Both spellings are load-bearing: columnNames() reads {name,type?} objects AND bare
+                        // strings, and the link-analysis panel sends string[]. Declaring objects only made the
+                        // schema lie about its own adopter.
+                        + "\"columns\":{\"type\":\"array\",\"items\":{\"type\":[\"object\",\"string\"]}},"
                         + "\"hint\":{\"type\":\"string\"}},"
                         + "\"required\":[\"datasetId\",\"columns\"]}",
                 false, Role.USER, Capability.AUTHOR_PIPELINE);

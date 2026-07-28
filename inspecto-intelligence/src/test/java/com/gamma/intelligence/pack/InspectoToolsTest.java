@@ -918,6 +918,10 @@ class InspectoToolsTest {
         Map<String, Object> idMapping = mappingOf(ids);
         assertEquals("account_id", idMapping.get("sourceCol"), "a bare [name] list is accepted too");
         assertEquals("merchant_id", idMapping.get("targetCol"));
+        // …and the declared schema must say so: the link-analysis panel sends string[], so an
+        // objects-only `items` made the tool's own contract lie about its only adopter.
+        assertTrue(pa.spec().jsonSchema().contains("\"items\":{\"type\":[\"object\",\"string\"]}"),
+                "columns.items must admit both spellings columnNames() reads");
 
         // Nothing endpoint-shaped: the tool reports it as an anchored finding rather than mapping two
         // arbitrary columns, which would produce a graph that looks authored and is wrong.
