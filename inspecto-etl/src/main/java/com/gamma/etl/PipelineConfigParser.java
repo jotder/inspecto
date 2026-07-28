@@ -58,7 +58,15 @@ final class PipelineConfigParser {
 
         // ── identity ──────────────────────────────────────────────────────────
         b.name          = String.valueOf(raw.get("name"));
-        b.pipelineName  = b.name.toLowerCase().replace(' ', '_');
+        // Identity is the one thing that must NOT move when a pipeline is renamed: ~140 call sites key on
+        // `identity().pipelineName()`, and it is further embedded in the config file name, the `dirs.*`-derived
+        // `<pipelineName>_commits.log` audit trail, the acquisition ledger's default `sourceId` (dedup +
+        // watermark state) and the Catalog Stream name. So an explicit `id` wins; deriving from `name` is the
+        // legacy fallback every pre-existing config still takes, byte-identically.
+        // ⚠ Never re-derive identity from a changed `name` — that silently orphans all of the above.
+        Object explicitId = raw.get("id");
+        String declaredId = explicitId == null ? "" : String.valueOf(explicitId).trim();
+        b.pipelineName  = declaredId.isEmpty() ? b.name.toLowerCase().replace(' ', '_') : declaredId;
         b.runTimestamp  = LocalDateTime.now()
                                        .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
 

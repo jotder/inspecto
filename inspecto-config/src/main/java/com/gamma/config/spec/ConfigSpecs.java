@@ -56,7 +56,18 @@ public final class ConfigSpecs {
     public static ConfigSpec pipeline() {
         List<FieldSpec> fields = List.of(
                 FieldSpec.required("name", "Pipeline name", FieldType.STRING,
-                        "Display name; the lowercased, underscored form is the pipeline's stable id."),
+                        "Display name. When `id` is absent the identity is derived from this (lowercased, "
+                                + "spaces underscored), which is why renaming a pipeline without an `id` is a "
+                                + "migration rather than an edit. Set `id` and this becomes a free-text label."),
+                // Splitting identity from display name: everything downstream keys on the identity
+                // (`PipelineConfig.identity().pipelineName()` — ~140 call sites), so making identity
+                // explicit is what allows `name` to change without moving files, dirs, the commit log,
+                // the acquisition ledger's sourceId and the Catalog Stream. Optional and absent from every
+                // existing config, so the derived path below stays byte-identical until an author opts in.
+                new FieldSpec("id", "Pipeline id",
+                        "Stable identity, immutable once created. Absent = derived from `name` (the legacy "
+                                + "behaviour). Lowercase letters, digits and underscores.",
+                        FieldType.STRING, false, null, List.of(), "[a-z0-9][a-z0-9_]*", null, null),
                 FieldSpec.enumField("produces", "Produces", List.of("stream", "reference"), "stream",
                         "What the output registers as in the Catalog: an event/fact Stream (default) or a "
                                 + "Reference Dataset (dimension/lookup) that enrichments can bind by name."),
