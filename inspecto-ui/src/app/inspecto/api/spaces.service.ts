@@ -124,7 +124,19 @@ export class SpacesService {
             meta: this.http
                 .get<{ multiSpace: boolean }>(apiUrl('/spaces/_meta'))
                 .pipe(catchError(() => of({ multiSpace: false }))),
-            spaces: this.http.get<Space[]>(apiUrl('/spaces')).pipe(catchError(() => of([] as Space[]))),
+            // `catchError` covers a FAILED request; a 200 carrying an unexpected shape used to reach
+            // `spaces.some(...)` and throw during bootstrap, cascading into an NG0201 injector error.
+            // ⚠ This is containment, NOT a fix — the root cause of an observed non-array is still
+            // unknown (a stale deploy bundle is the leading suspect), so it warns loudly rather than
+            // trading a crash for a silent wrong state. See docs/BACKLOG.md §6.
+            spaces: this.http.get<Space[]>(apiUrl('/spaces')).pipe(
+                map((s) => {
+                    if (Array.isArray(s)) return s;
+                    console.warn('[spaces] GET /spaces returned a non-array body; treating as no spaces', s);
+                    return [] as Space[];
+                }),
+                catchError(() => of([] as Space[])),
+            ),
         }).pipe(
             tap(({ meta, spaces }) => {
                 this.multiSpace.set(meta.multiSpace);

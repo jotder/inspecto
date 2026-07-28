@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -34,6 +34,18 @@ describe('SpacesService', () => {
         expect(svc.multiSpace()).toBe(true);
         expect(svc.availableSpaces().length).toBe(2);
         expect(svc.currentSpaceId()).toBe('alpha'); // no 'default' present → first space
+    });
+
+    it('refresh() survives a 200 carrying a non-array body', () => {
+        // Containment for the NG0201 bootstrap cascade: `spaces.some(...)` used to throw on this.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        svc.refresh().subscribe();
+        httpMock.expectOne(`${base}/spaces/_meta`).flush({ multiSpace: true });
+        httpMock.expectOne(`${base}/spaces`).flush({ data: SPACES } as unknown as Space[]);
+        expect(svc.availableSpaces()).toEqual([]);
+        expect(svc.currentSpaceId()).toBeNull();
+        expect(warn).toHaveBeenCalled(); // loud, not silent — the root cause is still unknown
+        warn.mockRestore();
     });
 
     it('refresh() prefers a persisted selection that is still valid', () => {
