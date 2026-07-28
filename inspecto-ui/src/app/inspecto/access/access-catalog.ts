@@ -20,10 +20,6 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
         id: 'workbench.author', kind: 'action', capability: 'canAuthorWorkbench',
         label: 'Author Workbench content (create / edit / delete)',
     }],
-    connections: [{
-        id: 'connections.onboard', kind: 'action', capability: 'canOnboardConnections',
-        label: 'Onboard connections (create / edit / delete)',
-    }],
     runs: [{
         id: 'runs.operate', kind: 'action', capability: 'canOperateRuns',
         label: 'Operate runs (trigger / pause / resume / reprocess)',
@@ -52,6 +48,13 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
     }, {
         id: 'menus.curate', kind: 'action', capability: 'canCurateMenus',
         label: 'Curate the space menu tree',
+    }, {
+        // Grafted here since Connections moved out of Workbench into a Settings section (2026-07-28).
+        // ⚠ An action node is keyed by the NAV id it hangs under, so a pane that stops being a nav
+        // item takes its capability out of the catalog with it — `canOnboardConnections` would
+        // silently become unconfigurable. Re-home the action whenever a pane moves.
+        id: 'connections.onboard', kind: 'action', capability: 'canOnboardConnections',
+        label: 'Onboard connections (create / edit / delete)',
     }],
 };
 

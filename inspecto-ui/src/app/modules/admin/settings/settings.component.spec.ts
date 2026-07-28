@@ -4,7 +4,14 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { BehaviorSubject } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { defaultNavigation } from 'app/core/navigation/navigation-data';
+import { GammaNavigationItem } from '@gamma/components/navigation';
 import { SettingsComponent } from './settings.component';
+
+/** Every `link` in the nav tree, at any depth. */
+function navLinks(items: readonly GammaNavigationItem[]): string[] {
+    return items.flatMap((i) => [...(i.link ? [i.link] : []), ...navLinks(i.children ?? [])]);
+}
 
 function create() {
     TestBed.configureTestingModule({
@@ -34,6 +41,16 @@ describe('SettingsComponent', () => {
         expect(el.querySelector('app-config')).toBeNull();
 
         await expectNoA11yViolations(el);
+        fixture.destroy();
+    });
+
+    it('hosts Connections as a settings section and not as a Workbench nav item', () => {
+        // Moved out of Platform ▸ Workbench 2026-07-28: it configures the platform rather than
+        // authoring anything, so it belongs beside the other admin surfaces. The /connections route
+        // stays — every section here is also its own route, and the detail workbench links into it.
+        const fixture = create();
+        expect(fixture.componentInstance.drawers.map((d) => d.id)).toContain('connections');
+        expect(navLinks(defaultNavigation)).not.toContain('/connections');
         fixture.destroy();
     });
 

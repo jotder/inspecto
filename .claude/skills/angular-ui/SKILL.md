@@ -378,6 +378,16 @@ src/app/
   Settings, + Dashboard/Assistant basics). `NavigationService` serves this const client-side (+ the
   per-space Menu Builder merge); there is no longer a Fuse `api/common/navigation` mock. Detail routes
   carry breadcrumbs.
+- ⚠ **Moving or removing a nav item is THREE edits, not one — the Access Catalog is derived from the nav
+  tree.** `ACCESS_ACTION_NODES` (`inspecto/access/access-catalog.ts`) keys each gateable functionality by
+  the **nav id it hangs under**, so deleting a nav item silently takes its capability out of the catalog
+  and it becomes unconfigurable. Re-home the action node under the item's new host. Caught by
+  `access-catalog.spec.ts`'s "the default catalog covers every declared action node" — a real failure that
+  reads as unrelated to a nav edit (2026-07-28, Connections → a Settings section). The **grant id stays the
+  same**, so `LensService.identityCapability(...)` needs no change.
+- **A Settings *section* is not a nav item.** `SettingsComponent.drawers` is the list; a section is a
+  `{id,title,icon,description,component}` row rendering an existing standalone component through
+  `NgComponentOutlet`, and its own route stays. Adding one = the drawer row + its import.
 - Global search (`layout/common/search`) is a client-side jump-to-page palette over the nav — not a backend
   search. **Opened app-wide by Ctrl/Cmd+K** (a `document:keydown` HostListener in the classic layout calls
   `SearchComponent.open()`); with an empty query it shows recents (`inspecto.search.recents`) + shell

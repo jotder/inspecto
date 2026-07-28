@@ -60,7 +60,6 @@ export const defaultNavigation: GammaNavigationItem[] = [
                     { id: 'decision-rules', title: 'Decision Rules', type: 'basic', icon: 'heroicons_outline:arrows-right-left', link: '/decision-rules' },
                     { id: 'components',  title: 'Components',  type: 'basic', icon: 'heroicons_outline:puzzle-piece',     link: '/components' },
                     { id: 'enrichment',  title: 'Enrichment',  type: 'basic', icon: 'heroicons_outline:funnel',          link: '/enrichment' },
-                    { id: 'connections', title: 'Connections', type: 'basic', icon: 'heroicons_outline:server-stack',     link: '/connections' },
                     { id: 'collectors',  title: 'Collectors',  type: 'basic', icon: 'heroicons_outline:inbox-arrow-down', link: '/collectors' },
                 ]
             },

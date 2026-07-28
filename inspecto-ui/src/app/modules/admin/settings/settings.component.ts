@@ -8,6 +8,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 
 import { AccessComponent } from 'app/modules/admin/access/access.component';
 import { ConfigComponent } from 'app/modules/admin/config/config.component';
+import { ConnectionsComponent } from 'app/modules/admin/connections/connections.component';
 import { DesignSystemComponent } from 'app/modules/admin/design-system/design-system.component';
 import { IconSettingsComponent } from 'app/modules/admin/icon-settings/icon-settings.component';
 import { MapSettingsComponent } from 'app/modules/admin/map-settings/map-settings.component';
@@ -42,6 +43,7 @@ interface SettingsDrawer {
 export class SettingsComponent {
     readonly drawers: readonly SettingsDrawer[] = [
         { id: 'config',        title: 'Config',          icon: 'heroicons_outline:adjustments-horizontal', description: 'Author and validate pipeline / job configuration.', component: ConfigComponent },
+        { id: 'connections',   title: 'Connections',     icon: 'heroicons_outline:server-stack',           description: 'Reusable remote-system connection profiles.',        component: ConnectionsComponent },
         { id: 'notifications', title: 'Notifications',   icon: 'heroicons_outline:bell',                   description: 'Delivery channels and notification preferences.',   component: NotificationCenterComponent },
         { id: 'spaces',        title: 'Spaces',          icon: 'heroicons_outline:square-3-stack-3d',      description: 'Create and manage isolated project spaces.',        component: SpacesComponent },
         { id: 'access',        title: 'Access',          icon: 'heroicons_outline:key',                    description: 'Choose what each lens shows — menus and functionalities.', component: AccessComponent },
