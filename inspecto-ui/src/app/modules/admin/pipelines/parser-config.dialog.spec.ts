@@ -123,6 +123,17 @@ describe('ParserConfigDialog', () => {
         expect(c.parsedSource().name).toBe('parsed');
     });
 
+    it('loads a chosen file into the sample content and resets the previous preview', async () => {
+        const { c } = create();
+        c.test();
+        expect(c.preview()).toBeTruthy();
+        const file = new File(['x|y\n1|2\n'], 's.psv');
+        c.onSampleFile({ 0: file, length: 1 } as unknown as FileList);
+        await new Promise((r) => setTimeout(r));
+        expect(c.sampleText()).toBe('x|y\n1|2\n');
+        expect(c.preview()).toBeNull();
+    });
+
     it('loads the ASN.1 module library on switching to asn1 and requires the schema module to save', () => {
         const { c, fixture, components } = create();
         c.onTypeChange('asn1');

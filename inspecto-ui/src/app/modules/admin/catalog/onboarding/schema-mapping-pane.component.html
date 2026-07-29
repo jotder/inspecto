@@ -23,6 +23,12 @@
             Name, type and keep the columns that reach the output. Only the types listed here are
             actually cast by the engine — anything else is stored as text.
         </p>
+        @if (typesSuggested()) {
+            <p class="text-secondary m-0 text-sm">
+                Types were suggested from your parsed sample — review them, then
+                <span class="font-medium">Validate types</span> to confirm with a real cast.
+            </p>
+        }
 
         <form [formGroup]="fieldsForm">
             <div formArrayName="fields" class="flex flex-col gap-2">

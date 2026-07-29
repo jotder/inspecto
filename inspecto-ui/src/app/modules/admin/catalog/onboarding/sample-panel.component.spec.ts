@@ -38,7 +38,17 @@ describe('OnboardingSamplePanelComponent', () => {
         expect(state.parsePreview()).toBeNull();
         fixture.detectChanges();
         expect(fixture.nativeElement.textContent).toContain('2 lines');
-        expect(fixture.nativeElement.textContent).toContain('Not tested yet');
+        expect(fixture.nativeElement.textContent).toContain('not parsed yet');
+    });
+
+    it('collapses and re-expands the raw preview', () => {
+        const { fixture, state } = create();
+        state.captureSample('s.csv', 'a,b\n1,2\n');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('pre')).toBeTruthy();
+        fixture.componentInstance.expanded.set(false);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('pre')).toBeNull();
     });
 
     it('clear removes the sample and the downstream results', () => {

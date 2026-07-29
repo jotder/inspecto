@@ -12,7 +12,6 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoBreadcrumbComponent } from 'app/inspecto/components/breadcrumb.component';
-import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { OnboardingCollectionPaneComponent } from './collection-pane.component';
 import { OnboardingEnrichmentPaneComponent } from './enrichment-pane.component';
@@ -28,8 +27,8 @@ import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './on
  * server-held pipeline draft, not a locked stepper: the rail mirrors the data path (Collect →
  * Parse → Shape → Publish), every stage is jumpable, readiness is computed from the config
  * blocks, and the whole session is resumable because the draft IS the server state (D3).
- * Opening without a stage lands on the first incomplete one. The right panel threads ONE
- * captured sample through the stages (§4.3).
+ * Opening without a stage lands on the first incomplete one. A full-width sample strip above
+ * the stage pane threads ONE captured sample through the stages (§4.3).
  */
 @Component({
     selector: 'app-onboarding-shell',
@@ -46,7 +45,6 @@ import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './on
         InspectoEmptyStateComponent,
         InspectoBreadcrumbComponent,
         StatusBadgeComponent,
-        InspectoSplitDirective,
         OnboardingSamplePanelComponent,
     ],
     templateUrl: './onboarding-shell.component.html',

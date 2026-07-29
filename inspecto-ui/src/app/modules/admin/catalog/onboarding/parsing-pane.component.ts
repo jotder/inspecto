@@ -10,10 +10,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, LensService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
 import { QueryPanelComponent } from 'app/inspecto/query/query-panel.component';
 import { QuerySource } from 'app/inspecto/query/query-types';
 import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
+import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from './onboarding-config-utils';
 import { OnboardingStateService } from './onboarding-state.service';
 
@@ -41,7 +44,9 @@ const PARSING_ROOTS = ['frontend', 'delimited', 'fixedwidth', 'json', 'text_rege
         MatProgressSpinnerModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        ChipComponent,
         InspectoSchemaFormComponent,
+        ParserTreeComponent,
         QueryPanelComponent,
     ],
     templateUrl: './parsing-pane.component.html',
@@ -85,6 +90,21 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         rows: this.state.parsePreview()?.rows ?? [],
     }));
 
+    /** Sniffed frontend suggestion — shown only while it differs from the current pick. */
+    readonly suggestion = computed<FrontendSuggestion | null>(() => {
+        const text = this.state.sample()?.text;
+        if (!text) return null;
+        const s = sniffFrontend(text);
+        return s && s.frontend !== this.frontend() ? s : null;
+    });
+
+    /** Parsed-result presentation; Tree is offered for the json frontend when the sample parses. */
+    readonly resultView = signal<'table' | 'tree'>('table');
+    readonly treeNodes = computed(() => {
+        const text = this.state.sample()?.text ?? '';
+        return this.frontend() === 'json' && text ? jsonSampleToTree(text) : null;
+    });
+
     private readonly dirtyCheck = (): boolean =>
         (this.schemaForm?.isDirty() ?? false) || this.fwForm.dirty || this.frontendTouched();
 
@@ -107,6 +127,26 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         this.frontend.set(f);
         this.frontendTouched.set(true);
         if (f === 'fixedwidth' && this.fwFields.length === 0) this.addField();
+    }
+
+    frontendLabel(f: ParsingFrontend): string {
+        return PARSING_FRONTENDS.find((x) => x.id === f)?.label ?? f;
+    }
+
+    /** One-click apply of the sniffed suggestion (frontend + delimiter prefill) — never automatic. */
+    applySuggestion(): void {
+        const s = this.suggestion();
+        if (!s) return;
+        this.setFrontend(s.frontend);
+        const delim = s.delimiter;
+        if (delim && delim !== ',') {
+            // The schema-form rebuilds its controls for the new frontend on the next render.
+            setTimeout(() => {
+                const c = this.schemaForm?.form.get('delimited__delimiter');
+                c?.setValue(delim);
+                c?.markAsDirty();
+            });
+        }
     }
 
     addField(name = '', start = 0, length = 1): void {

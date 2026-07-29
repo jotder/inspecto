@@ -64,6 +64,23 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
         expect(c.fieldRows.at(1).get('selector')?.value).toBe('1');
     });
 
+    it('prefills suggested types from the sample values and shows the suggested-types note', () => {
+        const { fixture } = create({ name: 'orders_feed' });
+        const c = fixture.componentInstance;
+        expect(c.fieldRows.at(0).get('type')?.value).toBe('DOUBLE'); // ORDER_ID: '1001', '1002'
+        expect(c.fieldRows.at(1).get('type')?.value).toBe('DOUBLE'); // QUANTITY: '3', '5'
+        expect(c.typesSuggested()).toBe(true);
+        expect(fixture.nativeElement.textContent).toContain('suggested from your parsed sample');
+    });
+
+    it('stays VARCHAR with no note when nothing is confidently typed', () => {
+        const preview: ParsingPreview = { frontend: 'json', columns: ['label'], rowCount: 1, rows: [{ label: 'ab' }], rejectedRows: 0 };
+        const { fixture } = create({ name: 'orders_feed' }, {}, preview);
+        const c = fixture.componentInstance;
+        expect(c.fieldRows.at(0).get('type')?.value).toBe('VARCHAR');
+        expect(c.typesSuggested()).toBe(false);
+    });
+
     it('derives the verbatim key as the selector for a json/text_regex sample', () => {
         const preview: ParsingPreview = { frontend: 'json', columns: ['orderId'], rowCount: 1, rows: [{ orderId: '1' }], rejectedRows: 0 };
         const { fixture } = create({ name: 'orders_feed' }, {}, preview);

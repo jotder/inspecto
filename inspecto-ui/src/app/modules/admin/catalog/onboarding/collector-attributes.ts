@@ -7,27 +7,17 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  * block reads its local inbox (`dirs.poll`) — exactly what the defaults describe.
  */
 export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
-    {
-        key: 'connector',
-        label: 'Connector',
-        type: 'select',
-        tier: 'required',
-        default: 'local',
-        options: [
-            { value: 'local', label: 'Local folder' },
-            { value: 'sftp', label: 'SFTP' },
-            { value: 'azure', label: 'Azure Blob' },
-            { value: 'kafka', label: 'Kafka' },
-            { value: 'db', label: 'Database' },
-        ],
-        help: 'Where files are collected from — set automatically from the Connection once you pick one. Non-local connectors need the connectors module in this build.',
-    },
+    // `connector` is deliberately NOT a spec: it is derived (local inbox ⇒ `local`, otherwise the
+    // picked Connection's own connector) and injected by the pane at save time. Asking for it
+    // invites a mismatch — CollectorConnectors.forConfig dispatches on `collector.connector` and
+    // hands that factory the profile named by `collector.connection` without checking they agree.
     {
         key: 'connection',
         label: 'Connection',
         type: 'autocomplete',
-        tier: 'optional',
-        help: 'Saved Connection profile id — not needed for a local folder.',
+        tier: 'required',
+        required: false,
+        help: 'Saved Connection profile — it carries the connector type (SFTP, Azure Blob, Kafka, Database).',
     },
     {
         key: 'include',

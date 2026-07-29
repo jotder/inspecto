@@ -1,4 +1,3 @@
-import { NgClass } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal, ViewChild } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -22,8 +21,11 @@ import { QueryPanelComponent, QuerySource } from 'app/inspecto/query';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { NodeConfigResult } from './node-config.dialog';
-import { ParserTreeComponent } from './parser-tree.component';
+import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
 import { modulePropFor, PARSER_TYPES, parserTypeDef, propsFor, sampleFor, toAttributeSpecs } from './parser-types';
+
+/** Sample cap — mirrors the onboarding sample panel (a scratch preview, not a data upload). */
+const MAX_SAMPLE_BYTES = 256 * 1024;
 
 /** Dialog data: the parser node to configure + its (resolved) type/category labels for the header. */
 export interface ParserConfigData {
@@ -54,7 +56,6 @@ export interface ParserConfigData {
     selector: 'app-parser-config-dialog',
     standalone: true,
     imports: [
-        NgClass,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
@@ -307,6 +308,24 @@ export class ParserConfigDialog {
             out[p.key] = v;
         }
         return out;
+    }
+
+    /** Load sample content from a local file (text, capped) — the "choose a file → view it" entry. */
+    onSampleFile(files: FileList | null): void {
+        const file = files?.[0];
+        if (!file) return;
+        const truncated = file.size > MAX_SAMPLE_BYTES;
+        file.slice(0, MAX_SAMPLE_BYTES)
+            .text()
+            .then(
+                (text) => {
+                    this.sampleText.set(text);
+                    this.preview.set(null);
+                    this.testError.set(null);
+                    if (truncated) this.toastr.info(`Sample truncated to the first ${MAX_SAMPLE_BYTES / 1024} KB.`);
+                },
+                () => this.toastr.error('Could not read the file as text.'),
+            );
     }
 
     /** The suggested grammar name for a freshly authored parser: `<type>_grammar`, sanitized. */

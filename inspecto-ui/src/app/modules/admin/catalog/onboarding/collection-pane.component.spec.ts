@@ -38,58 +38,94 @@ function create(
 describe('OnboardingCollectionPaneComponent', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
 
-    it('initialises the form from the existing collector block', () => {
+    it('initialises from the existing collector block (Connection mode for a non-local connector)', () => {
         const { fixture } = create({ name: 'x', collector: { connector: 'sftp', duplicate: { mode: 'checksum' } } });
         const c = fixture.componentInstance;
-        expect(c.initial['connector']).toBe('sftp');
+        expect(c.mode()).toBe('connection');
         expect(c.initial['duplicate__mode']).toBe('checksum');
     });
 
-    it('save nests dot keys into the collector block and marks the form pristine', () => {
+    it('local save injects connector "local" and nests dot keys, then marks the form pristine', () => {
         const { fixture, state, write } = create({ name: 'x' });
         const c = fixture.componentInstance;
-        c.schemaForm.form.get('connector')?.setValue('sftp');
-        c.schemaForm.form.get('connection')?.setValue('sftp_prod');
+        expect(c.mode()).toBe('local');
         c.schemaForm.form.get('include')?.setValue('*.csv, *.txt');
         c.save();
         expect(write).toHaveBeenCalledTimes(1);
-        const written = write.mock.calls[0][1] as Record<string, unknown>;
-        const collector = written['collector'] as Record<string, unknown>;
-        expect(collector['connector']).toBe('sftp');
-        expect(collector['connection']).toBe('sftp_prod');
+        const collector = (write.mock.calls[0][1] as Record<string, unknown>)['collector'] as Record<string, unknown>;
+        expect(collector['connector']).toBe('local');
         expect(collector['include']).toEqual(['*.csv', '*.txt']);
+        // Fresh config ⇒ the block is assigned wholesale; the cleared key survives as `undefined`
+        // (JSON drops it at the wire) — only a merge over an existing block hard-deletes it.
+        expect(collector['connection']).toBeUndefined();
         expect(state.isDirty()).toBe(false);
     });
 
-    it('registers its dirty check with the session state', () => {
-        const { fixture, state } = create({ name: 'x' });
+    it('derives the connector from the picked Connection — it is never asked', () => {
+        const { fixture, write } = create({ name: 'x' }, undefined, [{ id: 'blob_prod', connector: 'azure' }]);
         const c = fixture.componentInstance;
-        expect(state.isDirty()).toBe(false);
-        c.schemaForm.form.get('connector')?.setValue('sftp');
-        c.schemaForm.form.get('connector')?.markAsDirty();
-        expect(state.isDirty()).toBe(true);
-    });
-
-    it('adopts the picked Connection\'s own connector instead of trusting the select', async () => {
-        // The two fields can otherwise disagree, and CollectorConnectors.forConfig dispatches on
-        // `connector` while handing that factory the profile named by `connection`.
-        const { fixture, write } = create({ name: 'x', collector: { connector: 'sftp' } }, undefined, [
-            { id: 'blob_prod', connector: 'azure' },
-        ]);
-        const c = fixture.componentInstance;
+        c.setMode('connection');
+        fixture.detectChanges();
         c.schemaForm.form.get('connection')?.setValue('blob_prod');
-        await Promise.resolve();
-        expect(c.schemaForm.form.get('connector')?.value).toBe('azure');
+        expect(c.derivedConnector()).toBe('azure');
         c.save();
-        expect((write.mock.calls[0][1]['collector'] as Record<string, unknown>)['connector']).toBe('azure');
+        const collector = (write.mock.calls[0][1] as Record<string, unknown>)['collector'] as Record<string, unknown>;
+        expect(collector['connector']).toBe('azure');
+        expect(collector['connection']).toBe('blob_prod');
     });
 
-    it('leaves the connector select alone when no Connection is picked (local inbox)', async () => {
-        const { fixture } = create({ name: 'x', collector: { connector: 'local' } }, undefined, [
-            { id: 'blob_prod', connector: 'azure' },
-        ]);
-        await Promise.resolve();
-        expect(fixture.componentInstance.schemaForm.form.get('connector')?.value).toBe('local');
+    it('switching to Local inbox deletes the stored connection and writes connector "local"', () => {
+        const { fixture, write } = create(
+            { name: 'x', collector: { connector: 'sftp', connection: 'sftp_prod' } },
+            undefined,
+            [{ id: 'sftp_prod', connector: 'sftp' }],
+        );
+        const c = fixture.componentInstance;
+        expect(c.mode()).toBe('connection');
+        c.setMode('local');
+        fixture.detectChanges();
+        c.save();
+        const collector = (write.mock.calls[0][1] as Record<string, unknown>)['collector'] as Record<string, unknown>;
+        expect(collector['connector']).toBe('local');
+        expect('connection' in collector).toBe(false);
+    });
+
+    it('blocks a Connection-mode save with no Connection picked', () => {
+        const { fixture, write } = create({ name: 'x' });
+        const c = fixture.componentInstance;
+        c.setMode('connection');
+        fixture.detectChanges();
+        c.save();
+        expect(write).not.toHaveBeenCalled();
+        expect(c.saveError()).toContain('Pick a Connection');
+    });
+
+    it('blocks when the typed Connection id is not a saved profile', () => {
+        const { fixture, write } = create({ name: 'x' }, undefined, [{ id: 'blob_prod', connector: 'azure' }]);
+        const c = fixture.componentInstance;
+        c.setMode('connection');
+        fixture.detectChanges();
+        c.schemaForm.form.get('connection')?.setValue('ghost');
+        c.save();
+        expect(write).not.toHaveBeenCalled();
+        expect(c.saveError()).toContain('"ghost" is not a saved Connection');
+    });
+
+    it('grandfathers a hand-authored non-local connector with no Connection (TOON survives)', () => {
+        const { fixture, write } = create({ name: 'x', collector: { connector: 'sftp' } });
+        const c = fixture.componentInstance;
+        expect(c.mode()).toBe('connection');
+        c.save();
+        const collector = (write.mock.calls[0][1] as Record<string, unknown>)['collector'] as Record<string, unknown>;
+        expect(collector['connector']).toBe('sftp');
+        expect(c.saveError()).toBeNull();
+    });
+
+    it('a mode switch alone marks the pane dirty', () => {
+        const { fixture, state } = create({ name: 'x' });
+        expect(state.isDirty()).toBe(false);
+        fixture.componentInstance.setMode('connection');
+        expect(state.isDirty()).toBe(true);
     });
 
     it('has no a11y violations', async () => {

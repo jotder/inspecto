@@ -86,6 +86,49 @@ describe('OnboardingParsingPaneComponent', () => {
         expect((parsing['text_regex'] as Record<string, unknown>)['pattern']).toBe('(?P<a>\\d+)');
     });
 
+    it('suggests the sniffed frontend and applies it on click — never automatically', () => {
+        const { fixture, state } = create({ name: 'x' });
+        const c = fixture.componentInstance;
+        expect(c.suggestion()).toBeNull(); // no sample yet
+        state.captureSample('s.ndjson', '{"a": 1}\n{"a": 2}\n');
+        fixture.detectChanges();
+        expect(c.suggestion()?.frontend).toBe('json');
+        expect(c.frontend()).toBe('delimited'); // still the pick — suggestion only
+        expect(fixture.nativeElement.textContent).toContain('Looks like NDJSON');
+        c.applySuggestion();
+        expect(c.frontend()).toBe('json');
+        expect(c.suggestion()).toBeNull(); // matches the pick now — chip gone
+    });
+
+    it('applying a delimiter suggestion prefills the sniffed delimiter', async () => {
+        const { fixture, state } = create({ name: 'x', parsing: { frontend: 'json' } });
+        state.captureSample('s.psv', 'a|b\n1|2\n');
+        const c = fixture.componentInstance;
+        expect(c.suggestion()?.delimiter).toBe('|');
+        c.applySuggestion();
+        fixture.detectChanges(); // rebuild the schema-form for the delimited frontend
+        await new Promise((r) => setTimeout(r)); // the prefill lands after the rebuild
+        expect(c.frontend()).toBe('delimited');
+        expect(c.schemaForm?.form.get('delimited__delimiter')?.value).toBe('|');
+    });
+
+    it('offers a Tree view of a JSON sample and falls back to the table otherwise', () => {
+        const { fixture, state } = create({ name: 'x', parsing: { frontend: 'json' } });
+        state.captureSample('s.ndjson', '{"id": 1, "meta": {"tag": "x"}}\n');
+        state.parsePreview.set({ frontend: 'json', columns: ['id', 'meta'], rowCount: 1, rows: [{ id: '1' }], rejectedRows: 0 });
+        const c = fixture.componentInstance;
+        expect(c.treeNodes()).toBeTruthy();
+        expect(c.resultView()).toBe('table');
+        // Render the TREE branch (the table branch mounts the query panel, which needs the app shell's DI).
+        c.resultView.set('tree');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('app-parser-tree')).toBeTruthy();
+        expect(fixture.nativeElement.textContent).toContain('top-level keys');
+        // A non-JSON frontend has no tree offer.
+        c.setFrontend('delimited');
+        expect(c.treeNodes()).toBeNull();
+    });
+
     it('has no a11y violations', async () => {
         const { fixture } = create({ name: 'x' });
         await expectNoA11yViolations(fixture.nativeElement);

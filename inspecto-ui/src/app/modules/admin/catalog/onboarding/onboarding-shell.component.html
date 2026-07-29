@@ -100,25 +100,11 @@
                 </ul>
             </nav>
 
-            <!-- Active stage pane -->
-            <main class="min-w-0 flex-1 overflow-y-auto p-6 sm:p-8">
+            <!-- Active stage pane, with the sample-as-thread strip on top (full width) -->
+            <main class="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-6 sm:p-8">
+                <app-onboarding-sample-panel />
                 <ng-container [ngComponentOutlet]="activeComponent()" />
             </main>
-
-            <!-- Sample-as-thread panel (resizable) -->
-            <div
-                class="hidden lg:block"
-                inspectoSplit="onboard-sample"
-                #h="inspectoSplit"
-                pane="right"
-                [min]="240"
-                [max]="560"
-                [defaultWidth]="320"
-                aria-label="Resize sample panel"
-            ></div>
-            <aside class="hidden shrink-0 border-l lg:block" [style.width.px]="h.width()" aria-label="Sample panel">
-                <app-onboarding-sample-panel />
-            </aside>
         </div>
     }
 </div>

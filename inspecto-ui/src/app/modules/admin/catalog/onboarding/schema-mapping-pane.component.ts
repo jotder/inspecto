@@ -15,6 +15,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { QueryPanelComponent } from 'app/inspecto/query/query-panel.component';
 import { QuerySource } from 'app/inspecto/query/query-types';
+import { suggestTypes } from './parsing-sniff';
 import { OnboardingStateService } from './onboarding-state.service';
 
 /** The four types `TransformCompiler.direct()` actually TRY_CASTs — everything else is stored as
@@ -115,6 +116,8 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
     readonly partitionKeyControl = new FormControl('');
 
     readonly includedNames = signal<string[]>([]);
+    /** Sample-derived types were prefilled (any non-VARCHAR) — surfaces the "suggested" note. */
+    readonly typesSuggested = signal(false);
     readonly rejectedSource = computed<QuerySource>(() => ({
         name: 'rejected',
         rows: this.state.schemaPreview()?.rejectedRows ?? [],
@@ -153,15 +156,19 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
     private deriveFromSample(): void {
         const preview = this.state.parsePreview();
         if (!preview) return;
+        // Autodetected per-column types over the parsed sample — a SUGGESTION the builder can
+        // override; "Validate types" (real TRY_CAST) stays the verdict.
+        const suggested = suggestTypes(preview.columns, preview.rows);
         this.fieldRows.clear();
         preview.columns.forEach((col, i) => {
             this.addRow({
                 include: true,
                 name: sanitizeIdentifier(col, i),
                 selector: deriveSelector(preview.frontend, i, col),
-                type: 'VARCHAR',
+                type: suggested[col] ?? 'VARCHAR',
             });
         });
+        this.typesSuggested.set(Object.values(suggested).some((t) => t !== 'VARCHAR'));
         this.syncIncludedNames();
     }
 

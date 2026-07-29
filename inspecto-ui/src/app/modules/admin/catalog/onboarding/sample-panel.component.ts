@@ -4,107 +4,123 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { OnboardingStateService } from './onboarding-state.service';
 
 /** Session-held sample cap — a preview thread, not a data upload. */
 const MAX_SAMPLE_BYTES = 256 * 1024;
-const RAW_PREVIEW_LINES = 8;
+const RAW_PREVIEW_LINES = 40;
 
 /**
- * The sample-as-thread panel (design §4.3): ONE captured sample follows the builder through the
- * stages — raw here, parsed once the Parsing stage tests it, cast/mapped in later phases. The
- * sample is session-held and re-capturable (upload or paste); it never becomes part of the
- * config. Capture is allowed in every lens — it changes nothing on the server.
+ * The sample-as-thread strip (design §4.3): ONE captured sample follows the builder through the
+ * stages — raw here, parsed once the Parsing stage tests it, cast/mapped in later phases. Renders
+ * full-width ABOVE the active stage pane (choose the file, see it, then configure below); the
+ * header chips summarize the thread (raw → parsed → cast) and the raw preview collapses when the
+ * builder is done reading it. The sample is session-held and re-capturable (upload or paste); it
+ * never becomes part of the config. Capture is allowed in every lens — it changes nothing on the
+ * server.
  */
 @Component({
     selector: 'app-onboarding-sample-panel',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [FormsModule, MatButtonModule, MatIconModule, MatTooltipModule],
+    imports: [FormsModule, MatButtonModule, MatIconModule, MatTooltipModule, ChipComponent],
     template: `
-        <div class="flex h-full flex-col gap-3 overflow-y-auto p-4">
-            <h2 class="m-0 text-sm font-semibold uppercase tracking-wider text-secondary">Sample</h2>
+        <section class="rounded-lg border" aria-label="Sample">
+            <div class="flex flex-wrap items-center gap-2 px-3 py-2">
+                <mat-icon svgIcon="heroicons_outline:document-text" class="icon-size-4"></mat-icon>
+                <h2 class="m-0 text-sm font-semibold">Sample</h2>
 
-            @if (state.sample(); as s) {
-                <div class="flex items-center gap-2 text-sm">
-                    <mat-icon svgIcon="heroicons_outline:document-text" class="icon-size-4"></mat-icon>
-                    <span class="min-w-0 truncate font-medium" [matTooltip]="s.name">{{ s.name }}</span>
-                    <span class="text-secondary whitespace-nowrap">{{ lineCount() }} lines</span>
-                </div>
-                <pre
-                    class="bg-default m-0 max-h-48 overflow-auto rounded p-2 text-xs leading-relaxed"
-                    aria-label="Raw sample preview"
-                >{{ rawPreview() }}</pre>
-
-                <div class="text-sm">
-                    <div class="font-semibold">After parsing</div>
+                @if (state.sample(); as s) {
+                    <span class="min-w-0 max-w-48 truncate text-sm" [matTooltip]="s.name">{{ s.name }}</span>
+                    <inspecto-chip variant="soft">{{ lineCount() }} lines</inspecto-chip>
                     @if (state.parseError()) {
-                        <div class="text-secondary">Does not parse — see the Parsing stage.</div>
+                        <inspecto-chip variant="outline" matTooltip="Does not parse — see the Parsing stage">
+                            parse ✗
+                        </inspecto-chip>
                     } @else if (state.parsePreview(); as p) {
-                        <div class="text-secondary">
-                            {{ p.columns.length }} columns · {{ p.rowCount }} rows
-                            @if (p.rejectedRows > 0) { · {{ p.rejectedRows }} rejected }
-                        </div>
-                    } @else {
-                        <div class="text-secondary">Not tested yet — run Test parse in the Parsing stage.</div>
-                    }
-                </div>
-
-                @if (state.parsePreview(); as p) {
-                    <div class="text-sm">
-                        <div class="font-semibold">After schema</div>
+                        <inspecto-chip variant="soft" tone="primary">
+                            parsed · {{ p.columns.length }} cols · {{ p.rowCount }} rows{{
+                                p.rejectedRows > 0 ? ' · ' + p.rejectedRows + ' rejected' : ''
+                            }}
+                        </inspecto-chip>
                         @if (state.schemaError()) {
-                            <div class="text-secondary">Does not cast — see the Schema &amp; Mapping stage.</div>
+                            <inspecto-chip variant="outline" matTooltip="Does not cast — see the Schema stage">
+                                cast ✗
+                            </inspecto-chip>
                         } @else if (state.schemaPreview(); as sp) {
-                            <div class="text-secondary">
-                                {{ sp.okCount }} ok
-                                @if (sp.rejectedCount > 0) { · {{ sp.rejectedCount }} rejected }
-                            </div>
-                        } @else {
-                            <div class="text-secondary">Not tested yet — run Validate types in the Schema &amp; Mapping stage.</div>
+                            <inspecto-chip variant="soft" tone="primary">
+                                cast · {{ sp.okCount }} ok{{
+                                    sp.rejectedCount > 0 ? ' · ' + sp.rejectedCount + ' rejected' : ''
+                                }}
+                            </inspecto-chip>
                         }
-                    </div>
-                }
+                    } @else {
+                        <inspecto-chip variant="outline" matTooltip="Run Test parse in the Parsing stage">
+                            not parsed yet
+                        </inspecto-chip>
+                    }
 
-                <div class="flex flex-wrap gap-2">
+                    <span class="flex-1"></span>
                     <button mat-stroked-button type="button" (click)="fileInput.click()">Replace</button>
+                    <button mat-stroked-button type="button" (click)="pasting.set(!pasting())">Paste text</button>
                     <button mat-stroked-button type="button" (click)="clear()">Clear</button>
-                </div>
-            } @else {
-                <p class="text-secondary m-0 text-sm">
-                    Capture one representative sample — it follows you through the stages, so every
-                    test shows <em>your</em> data.
-                </p>
-                <div class="flex flex-wrap gap-2">
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="expanded.set(!expanded())"
+                        [attr.aria-label]="expanded() ? 'Collapse the raw preview' : 'Expand the raw preview'"
+                        [matTooltip]="expanded() ? 'Collapse preview' : 'Expand preview'"
+                    >
+                        <mat-icon
+                            class="icon-size-5"
+                            [svgIcon]="expanded() ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"
+                        ></mat-icon>
+                    </button>
+                } @else {
+                    <span class="text-secondary text-sm">
+                        Capture one representative sample — it follows you through the stages, so every
+                        test shows <em>your</em> data.
+                    </span>
+                    <span class="flex-1"></span>
                     <button mat-flat-button color="primary" type="button" (click)="fileInput.click()">
                         <mat-icon svgIcon="heroicons_outline:arrow-up-tray" class="icon-size-4"></mat-icon>
                         <span class="ml-1">Choose file</span>
                     </button>
                     <button mat-stroked-button type="button" (click)="pasting.set(!pasting())">Paste text</button>
-                </div>
+                }
+            </div>
+
+            @if (state.sample() && expanded()) {
+                <pre
+                    class="bg-default m-0 max-h-96 overflow-auto rounded-b-lg border-t p-3 text-xs leading-relaxed"
+                    aria-label="Raw sample preview"
+                >{{ rawPreview() }}</pre>
             }
 
             @if (pasting()) {
-                <textarea
-                    class="bg-default min-h-32 w-full rounded border p-2 font-mono text-xs"
-                    [(ngModel)]="pasteText"
-                    placeholder="Paste a few representative lines…"
-                    aria-label="Paste sample text"
-                ></textarea>
-                <button
-                    mat-flat-button
-                    color="primary"
-                    type="button"
-                    class="self-start"
-                    [disabled]="!pasteText.trim()"
-                    (click)="usePasted()"
-                >
-                    Use pasted sample
-                </button>
+                <div class="flex flex-col gap-2 border-t p-3">
+                    <textarea
+                        class="bg-default min-h-32 w-full rounded border p-2 font-mono text-xs"
+                        [(ngModel)]="pasteText"
+                        placeholder="Paste a few representative lines…"
+                        aria-label="Paste sample text"
+                    ></textarea>
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        class="self-start"
+                        [disabled]="!pasteText.trim()"
+                        (click)="usePasted()"
+                    >
+                        Use pasted sample
+                    </button>
+                </div>
             }
 
             <input #fileInput type="file" class="hidden" (change)="onFile($event)" aria-hidden="true" tabindex="-1" />
-        </div>
+        </section>
     `,
 })
 export class OnboardingSamplePanelComponent {
@@ -112,6 +128,8 @@ export class OnboardingSamplePanelComponent {
     private toastr = inject(ToastrService);
 
     readonly pasting = signal(false);
+    /** Raw preview visibility — collapsible so a long sample doesn't push the stage pane away. */
+    readonly expanded = signal(true);
     pasteText = '';
 
     readonly lineCount = computed(() => this.state.sample()?.text.split('\n').filter((l) => l.length).length ?? 0);
@@ -133,6 +151,7 @@ export class OnboardingSamplePanelComponent {
             .then((text) => {
                 this.state.captureSample(file.name, text);
                 this.pasting.set(false);
+                this.expanded.set(true);
                 if (truncated) this.toastr.info(`Sample truncated to the first ${MAX_SAMPLE_BYTES / 1024} KB.`);
             })
             .catch(() => this.toastr.error('Could not read the file as text.'));
@@ -143,6 +162,7 @@ export class OnboardingSamplePanelComponent {
         if (!text.trim()) return;
         this.state.captureSample('pasted sample', text);
         this.pasting.set(false);
+        this.expanded.set(true);
         this.pasteText = '';
     }
 

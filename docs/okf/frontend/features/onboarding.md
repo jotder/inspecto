@@ -32,14 +32,31 @@ Configured / Validated — Validated is session-only, from a passed sample test)
 Draft → Ready (all required stages configured) → Live (`active: true`). Resume lands on the first
 incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active).
 
-## Sample-as-thread
+## Sample-as-thread (a full-width strip ABOVE the stage pane)
 
 One captured sample (file ≤256KB or paste, session-held) threads through the stages: raw → parsed
 (`POST /config/preview/parsing`, real DuckDB) → cast-checked (`POST /config/preview/schema`,
-TRY_CAST). A new sample or re-parse invalidates the downstream hops. The schema pane DERIVES its
-fields from the parsed columns (frontend-aware selectors: positional for delimited/fixedwidth,
-verbatim key for json/text_regex) and offers only the four honestly-cast types
-(VARCHAR/DOUBLE/DATE/TIMESTAMP — exactly what `TransformCompiler.direct()` casts).
+TRY_CAST). A new sample or re-parse invalidates the downstream hops. Since the 2026-07-29 reflow
+the panel is a **collapsible full-width strip on top of the active stage pane** (choose the file →
+view it → configure below), not a right-hand aside: the header row carries the thread chips
+(lines / parsed / cast) and capture actions, the body shows up to 40 raw lines, and it is now
+visible on small screens too. The schema pane DERIVES its fields from the parsed columns
+(frontend-aware selectors: positional for delimited/fixedwidth, verbatim key for json/text_regex)
+and offers only the four honestly-cast types (VARCHAR/DOUBLE/DATE/TIMESTAMP — exactly what
+`TransformCompiler.direct()` casts), **prefilled with sample-suggested types**
+(`suggestTypes` in `parsing-sniff.ts` — a type is suggested only when every non-blank sampled
+value matches; "Validate types" stays the verdict).
+
+## Parsing stage flow (choose file → view → type → options → test → table/tree)
+
+The pane reads top-to-bottom under the sample strip: file-type toggle (with a **sniffed
+suggestion chip** — `sniffFrontend` recognises NDJSON / JSON-array / consistent delimiters and is
+applied only by click, never automatically, prefilling the sniffed delimiter) → per-frontend
+options → Test parse → full-width results. For the `json` frontend the results offer a
+**Table | Tree toggle**: the tree (`jsonSampleToTree` + the shared `app-parser-tree`, relocated to
+`inspecto/components/`) renders the sample's own records client-side and carries the honest note
+that the engine reads **top-level keys only** — a nested value lands as JSON text in one column
+(the flatten DSL is BACKLOG'd engine work; `parsing.json.records_path` is locked to `$`).
 
 ## Enrichment stage (Streams, optional)
 
@@ -52,15 +69,22 @@ space's `enriched/` convention. **Every save re-registers** (`POST /enrichment`)
 enrichments do not hot-reload by mtime; a register failure downgrades to a warning (the file is
 saved; it loads on restart).
 
-## Collection stage: `connector` is derived, not asked twice
+## Collection stage: Connection-first — `connector` is never asked
 
-A **Connection** already carries its own `connector` (`ConnectionProfile.connector`), so the Collection
-stage adopts it as soon as a Connection is picked rather than trusting the select. This is not cosmetic:
-`CollectorConnectors.forConfig` dispatches on `collector.connector` and hands the profile named by
-`collector.connection` to *that* factory **without checking the two agree** — `connector: sftp` plus an
-Azure Connection silently gives the SFTP factory an Azure profile. The select still matters when there is
-no Connection, which is the local-inbox default. ⚠ Do not "simplify" this by disabling the control: a
-disabled control drops out of the schema form's value and the key would vanish from the written TOON.
+Since the 2026-07-29 reflow there is **no Connector select at all**. The stage asks one question —
+**Collect from: Local inbox | Connection** — and `collector.connector` is derived and injected at
+save time (`local`, or the picked Connection's own `ConnectionProfile.connector`, shown read-only
+next to the picker). This is not cosmetic: `CollectorConnectors.forConfig` dispatches on
+`collector.connector` and hands the profile named by `collector.connection` to *that* factory
+**without checking the two agree** — `connector: sftp` plus an Azure Connection silently gives the
+SFTP factory an Azure profile. Rules encoded in `collection-pane.component.ts`:
+- Connection mode requires a **saved** profile (unknown ids are refused at save — the whole point
+  is that the id resolves to a connector); ＋New connection opens the shared `ConnectionFormDialog`.
+- A hand-authored TOON with a non-local connector and no Connection is **grandfathered**: the pane
+  keeps the stored connector rather than destroying it.
+- Switching to Local inbox deletes `collector.connection` and writes `connector: local`.
+⚠ The connector is injected in `save()`, never held in a (disabled) form control — a disabled
+control drops out of the schema form's value and the key would vanish from the written TOON.
 
 ## Seams & gotchas
 
