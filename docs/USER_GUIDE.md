@@ -458,9 +458,10 @@ Studio consumes — the umbrella over **Table** (a partitioned root of Parquet f
 Schema), **Derived Table** (materialized by a Transform or cube), and **View** (a virtual, logical
 query). Two facts set expectations:
 
-- **A Dataset is an authored definition, not a byproduct.** Going live on a Stream produces a
-  Table; it does **not** register a Dataset. To query that data in Studio, create the Dataset
-  yourself (Catalog ▸ Datasets ▸ *New dataset*) and bind it: **virtual** (a saved query) or
+- **Going live on a Stream registers its Dataset for you.** Activation also writes a Dataset bound
+  to the stream's store (skipped if one already points there), so new streams are queryable in
+  Studio immediately; if registration fails you get a warning with the manual recipe. Datasets you
+  create yourself (Catalog ▸ Datasets ▸ *New dataset*) bind either **virtual** (a saved query) or
   **physical / materialized** via a physical reference (the store name or parquet path). The
   editor's source picker is not yet wired to the Catalog's real stores (a recorded gap) — for real
   data, the physical reference is the binding that matters.

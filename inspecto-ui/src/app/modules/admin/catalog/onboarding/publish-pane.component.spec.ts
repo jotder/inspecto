@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, InboxStatus, RunsService } from 'app/inspecto/api';
+import { ComponentDef, ComponentsService, ConfigService, InboxStatus, RunsService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingPublishPaneComponent } from './publish-pane.component';
@@ -22,9 +22,18 @@ const READY_CONFIG = {
     processing: { schema_file: 'x_schema.toon' },
 };
 
-function create(config: Record<string, unknown>, opts: { api?: Partial<ConfigService>; confirm?: boolean; runsApi?: Partial<RunsService> } = {}) {
+function create(
+    config: Record<string, unknown>,
+    opts: { api?: Partial<ConfigService>; confirm?: boolean; runsApi?: Partial<RunsService>; datasets?: ComponentDef[]; components?: Partial<ComponentsService> } = {},
+) {
     const write = vi.fn((_type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK));
     const confirmFn = vi.fn(() => Promise.resolve(opts.confirm ?? true));
+    const components = {
+        list: vi.fn(() => of(opts.datasets ?? [])),
+        create: vi.fn((_t: string, c: Record<string, unknown>) =>
+            of({ type: 'dataset', name: String(c['id']), ref: `dataset/${c['id']}`, content: c } as ComponentDef)),
+        ...opts.components,
+    };
     TestBed.configureTestingModule({
         imports: [OnboardingPublishPaneComponent],
         providers: [
@@ -33,19 +42,24 @@ function create(config: Record<string, unknown>, opts: { api?: Partial<ConfigSer
             OnboardingStateService,
             { provide: ConfigService, useValue: { write, ...opts.api } },
             { provide: RunsService, useValue: { pending: vi.fn(() => of(PENDING)), ...opts.runsApi } },
+            { provide: ComponentsService, useValue: components },
             { provide: InspectoConfirmService, useValue: { confirm: confirmFn, confirmDestructive: vi.fn(() => Promise.resolve(true)) } },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
     const state = TestBed.inject(OnboardingStateService);
     state.config.set(config);
+    state.name.set(String(config['name'] ?? '')); // the shell sets this from the route param
     const fixture = TestBed.createComponent(OnboardingPublishPaneComponent);
     fixture.detectChanges();
-    return { fixture, state, write, confirmFn };
+    return { fixture, state, write, confirmFn, components };
 }
 
 describe('OnboardingPublishPaneComponent', () => {
-    beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
+    beforeEach(() => {
+        localStorage.removeItem('inspecto.currentLens');
+        Object.values(TOASTR).forEach((f) => f.mockClear());
+    });
 
     it('save writes the output block with the schema-form defaults', () => {
         const { fixture, write } = create({ name: 'x' });
@@ -75,6 +89,50 @@ describe('OnboardingPublishPaneComponent', () => {
         expect(confirmFn).toHaveBeenCalled();
         const [, config] = write.mock.calls[0] as [string, Record<string, unknown>];
         expect(config['active']).toBe(true);
+    });
+
+    /** A go-live-ready config (all required stages + saved output), optionally reference-kind. */
+    const readyConfig = (extra: Record<string, unknown> = {}) =>
+        ({ ...READY_CONFIG, output: { format: 'PARQUET' }, ...extra });
+
+    it('going live on a Stream registers the Dataset over its store (split S1)', async () => {
+        const { fixture, components } = create(readyConfig());
+        await fixture.componentInstance.activate();
+        expect(components.create).toHaveBeenCalledWith('dataset', {
+            id: 'orders_feed',
+            name: 'orders_feed',
+            kind: 'physical',
+            physicalRef: 'orders_feed',
+            description: expect.stringContaining('orders_feed'),
+        });
+        expect(TOASTR.success).toHaveBeenCalledWith(expect.stringContaining('Dataset "orders_feed" registered'));
+    });
+
+    it('skips registration when a dataset already points at the store, whatever its id', async () => {
+        const existing: ComponentDef = {
+            type: 'dataset', name: 'orders_gold', ref: 'dataset/orders_gold',
+            content: { name: 'Orders (gold)', physicalRef: 'orders_feed' },
+        };
+        const { fixture, components } = create(readyConfig(), { datasets: [existing] });
+        await fixture.componentInstance.activate();
+        expect(components.create).not.toHaveBeenCalled();
+    });
+
+    it('a registration failure downgrades to a warning — activation already succeeded', async () => {
+        const { fixture } = create(readyConfig(), {
+            components: { create: vi.fn(() => throwError(() => new Error('409'))) },
+        });
+        await fixture.componentInstance.activate();
+        expect(TOASTR.success).toHaveBeenCalledWith('"orders_feed" is live');
+        expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('could not be registered'));
+    });
+
+    it('a Reference go-live registers no Dataset — its store is consumed by name', async () => {
+        const { fixture, components, write } = create(readyConfig({ produces: 'reference' }));
+        await fixture.componentInstance.activate();
+        const [, config] = write.mock.calls[0] as [string, Record<string, unknown>];
+        expect(config['active']).toBe(true); // activation DID run — the skip is kind-scoped, not vacuous
+        expect(components.create).not.toHaveBeenCalled();
     });
 
     it('declining the confirm leaves the draft inactive', async () => {

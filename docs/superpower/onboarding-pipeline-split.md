@@ -80,10 +80,13 @@ config kind (`_enrich.toon`) that belongs to neither plane.
 
 ## 6. Slices (build order — S1–S3 independently shippable, each closes a recorded gap)
 
-- **S1 — auto-register the Dataset at go-live.** The Publish pane's activate also writes a
-  `dataset` component (physicalRef = the stream's store) unless one already points there.
-  Idempotent, no extra dialog. Closes "the Stream→Dataset hop is entirely manual"
-  (BACKLOG §4 *Catalog lifecycle*).
+- **S1 — auto-register the Dataset at go-live. ✅ SHIPPED 2026-07-30.** The Publish pane's
+  activate also writes a `dataset` component (physicalRef = the stream's normalized name = the
+  store) via the shared `ComponentsService` (not studio's `DatasetsService` — cross-feature import
+  ban). Idempotent by physicalRef (any dataset already pointing at the store wins, whatever its
+  id); failures downgrade to a warning with the manual recipe; Streams only (a Reference's store
+  is consumed by name and carries system columns). Closed "the Stream→Dataset hop is entirely
+  manual" (BACKLOG §4 *Catalog lifecycle*).
 - **S2 — the shared store/Dataset picker** (reuse map row 1), adopted by: the Dataset editor's
   source control (replaces `SAMPLE_SOURCE_NAMES`), the pipeline editor's source nodes (replaces
   free-text store names), and later the S4 template.

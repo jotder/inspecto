@@ -32,6 +32,19 @@ Configured / Validated — Validated is session-only, from a passed sample test)
 Draft → Ready (all required stages configured) → Live (`active: true`). Resume lands on the first
 incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active).
 
+**Go-live also registers the Dataset** (2026-07-30, onboarding↔pipeline split S1 —
+`superpower/onboarding-pipeline-split.md`): after the `active: true` save succeeds, the publish
+pane writes a `dataset` component (`id` = the normalized pipeline name, `kind: physical`,
+`physicalRef` = the store) via the shared `ComponentsService` — deliberately **not** studio's
+`DatasetsService` (cross-feature import ban). Idempotent by **physicalRef, not id** (any existing
+dataset pointing at the store wins); every failure downgrades to a toastr *warning* carrying the
+manual recipe, because activation has already succeeded. **Streams only** — a Reference's store is
+consumed by name in enrichments, and its upsert/SCD2 layouts carry system columns. ⚠ The registered
+dataset deliberately carries **no `sourceName`** (the editor's source select offers only
+`SAMPLE_SOURCE_NAMES`, so any value would be a lie; `physicalRef` is the binding that matters) — the
+list card therefore reads `source: data` from `fromContent`'s default until split S2 wires that picker
+to the Catalog's real stores. Do not "fix" it by inventing a sample-source value.
+
 ## Sample-as-thread (a strip at the top of the PARSING stage)
 
 One captured sample (file ≤256KB or paste, session-held) threads through the stages: raw → parsed

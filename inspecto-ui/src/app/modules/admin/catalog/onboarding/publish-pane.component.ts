@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { InboxStatus, LensService, RunsService, apiErrorMessage } from 'app/inspecto/api';
+import { ComponentsService, InboxStatus, LensService, RunsService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -20,6 +20,9 @@ import { OnboardingStateService } from './onboarding-state.service';
  * same `saveBlock` every other stage uses. Once live, a lightweight activity glance (inbox
  * pending/running, via the existing Runs API) proves the pipeline is actually doing something,
  * with a link to the full Runs page rather than duplicating it.
+ *
+ * Going live on a Stream also registers the queryable Dataset over its store (onboarding↔pipeline
+ * split S1, `docs/superpower/onboarding-pipeline-split.md`) — see {@link ensureDataset}.
  */
 @Component({
     selector: 'app-onboarding-publish-pane',
@@ -40,6 +43,7 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
     protected readonly state = inject(OnboardingStateService);
     protected readonly lens = inject(LensService);
     private runsApi = inject(RunsService);
+    private components = inject(ComponentsService);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
 
@@ -106,9 +110,45 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
             next: () => {
                 this.activating.set(false);
                 this.toastr.success(`"${name}" is live`);
+                this.ensureDataset();
                 this.refreshActivity();
             },
             error: () => this.activating.set(false),
+        });
+    }
+
+    /** Going live also registers the Dataset over the stream's store (physicalRef = the normalized
+     *  pipeline name), so the Stream→Dataset hop is no longer manual. Idempotent — a dataset
+     *  already pointing at the store wins, whatever its id. Any failure downgrades to a warning:
+     *  activation has already succeeded, and the Dataset can always be authored by hand. Streams
+     *  only — a Reference's store is consumed by name in enrichments (and its upsert/SCD2 layouts
+     *  carry system columns), not queried as a raw Dataset. */
+    private ensureDataset(): void {
+        if (this.state.kind() !== 'stream') return;
+        const store = this.state.normalizedName();
+        // The display label lives in the config (identity/display split); the route-set signal is
+        // the fallback — the same precedence normalizedName() itself uses.
+        const display = String((this.state.config() ?? {})['name'] ?? this.state.name());
+        const manualHint = `create it under Catalog ▸ Datasets with physical reference "${store}".`;
+        this.components.list('dataset').subscribe({
+            next: (defs) => {
+                if (defs.some((d) => d.content['physicalRef'] === store)) return; // already registered
+                this.components
+                    .create('dataset', {
+                        id: store,
+                        name: display,
+                        kind: 'physical',
+                        physicalRef: store,
+                        description: `Landed data of stream "${display}" — registered at go-live.`,
+                    })
+                    .subscribe({
+                        next: () =>
+                            this.toastr.success(`Dataset "${store}" registered — queryable under Catalog ▸ Datasets`),
+                        error: () =>
+                            this.toastr.warning(`The stream is live, but its Dataset could not be registered — ${manualHint}`),
+                    });
+            },
+            error: () => this.toastr.warning(`The stream is live, but the Dataset registry could not be read — ${manualHint}`),
         });
     }
 
