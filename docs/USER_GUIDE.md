@@ -360,32 +360,147 @@ come from **Settings → Map Settings**.
 
 ### 4.3 Catalog
 
-**Data Catalog** — The map of your data assets and how they connect. Its front door is the two
-data-origin tabs: **Streams** (event/fact origins — one feed: a database, a file drop) and
-**References** (dimension origins that publish a **Reference Dataset**); an origin is what a
-**Connection** plus its **Collectors** populate. Behind them it indexes every **Schema**,
-**Table**, **Derived Table**, and **View** in the Space, with search and metadata. A **Lineage**
-tab renders the read-only graph — which Stream feeds which Table, which Transform derives which
-Derived Table, which Widgets read which Datasets — so you can trace where any piece of data came
-from and what depends on it. Click a node for its detail.
+**Data Catalog** — The map of your data assets and how they connect: what exists, whether it is
+live, where its data came from, and what would notice if it changed. Its tabs:
+
+- **Streams** (the front door) — event/fact origins, one feed each (a file drop, a database dump).
+  Columns: name, **lifecycle badge** (Draft / Live), connector, Connection, Pipeline, description.
+- **References** — dimension origins that publish a **Reference Dataset** for enrichment joins;
+  same columns. An origin of either kind is what a **Connection** plus its **Collectors** populate.
+- **Tables** — every physical relation the Space knows, with freshness, row count and completeness.
+- **KPIs** — the defined KPIs: definition, grain, join keys, inputs.
+- **Lineage** — the metadata graph, drawn on demand: give it a starting node (or leave it blank for
+  the whole graph), a depth, a direction and optional node/edge-kind filters, then **Traverse**.
+  Click any node to inspect it.
+- **Usage** — the component reuse graph: which Queries, Widgets, Dashboards and other components
+  reference which, with an **Open** jump to each component's editor. Check here before deleting
+  anything.
+- **Shared with me / Shared by me** — cross-Space sharing, shown only when the Exchange feature is
+  on: request access, approve/deny/revoke, pin snapshot versions, set expiry.
+
+Click a Streams, References or Tables row for its **node detail dialog**: the node's facts, its raw
+attributes, its **neighbours** (walk the graph without leaving the dialog) and — for table-like
+nodes — a per-store **Lineage** panel (see *Tracing lineage* below). Streams and References carry
+exactly one row action, the pencil — **Open onboarding** (*Resume onboarding* on a draft). That
+pencil is the one and only alter path for a data origin.
 
 **Onboarding a data origin** — *Onboard Stream / Onboard Reference* (the header button on those
-tabs, authoring lenses) opens the guided editor: a stage rail — Collection → Parsing → Schema &
-Mapping (References: **Keys & Load**) → Enrichment *(Streams, optional)* → Go-live — over a
-server-held draft, so you can leave and resume any time (the rows appear in the Catalog as
-**Draft** until you go live). Capture one sample and each stage shows *your* data after that step:
-parse it, type it (only honestly-cast types are offered), and for Streams optionally join in a
-published Reference **by name** with transform SQL — the enrichment then runs after every
-committed batch. Go-live flips the pipeline active; an activity glance shows the inbox working.
+tabs, authoring lenses) opens the guided editor: a stage rail — **Collection → Parsing → Schema &
+Mapping → Enrichment** *(optional)* **→ Dataset & Go-live** (References: Collection → Parsing →
+**Keys & Load** → **Publish**) — over a server-held draft, so you can leave and resume any time;
+the row shows **Draft** in the Catalog until you go live. Capture one sample and each stage shows
+*your* data after that step: parse it, type it (only honestly-cast types are offered), and for
+Streams optionally join in a published Reference **by name** with transform SQL — the enrichment
+then runs after every committed batch. Go-live flips the pipeline active after a confirm; an
+activity glance shows the inbox working, with a link to the full Run history.
 
-**Datasets** — The queryable relations themselves, the umbrella over **Table** (a partitioned root
-of Parquet files described by a Schema), **Derived Table** (materialized by a Transform or cube),
-and **View** (a virtual, logical query). Browse and search Datasets, create and edit their schema
-bindings, and link them to Widgets. Datasets are what Queries run against and what most of Studio
-consumes. A Dataset also holds its own **Measures** — named aggregate expressions (e.g. `sum(...)`,
-`count`) defined once against that Dataset — so **yes, a Measure is reusable**: every Widget or KPI
-tile bound to the same Dataset picks from the same Measure list instead of re-typing the aggregate.
-Reuse is per-Dataset, not global across Datasets.
+**Changing a data origin after go-live** — the pencil reopens the same stage rail; nothing is
+locked. Two things to understand before you press Save:
+
+- **On a Live stream, saving a stage takes effect immediately.** The running service picks up the
+  changed config on its next cycle — there is no separate "publish my edits" step. (The shell's
+  reassurance that "it runs only when you go live" describes a *draft*; once Live, every save is
+  live too.)
+- **Config changes are forward-only.** New parsing or schema settings apply to *future* batches;
+  everything already written keeps the shape it had, so the Table then holds a mix of old- and
+  new-shape files. Readers that go through the engine's views (enrichments, view-backed Datasets)
+  tolerate added or reordered columns — a missing column reads as NULL — but a Dataset bound
+  directly to the physical files can currently fail on mixed schemas (a recorded gap). If you must
+  retype or drop a column, plan for the history: reprocess it, or accept the seam.
+
+**Renaming is not possible.** The name you give at creation derives the origin's identity — its
+config files, its audit trail and its duplicate-detection history all key on it. An
+identity/display-name split is under way so a friendly rename becomes safe; until it ships, choose
+names carefully. **Pausing** collection is not a Catalog action either — it lives in **Workbench ▸
+Runs** (row action Pause/Resume).
+
+**Removing a data origin — and what happens to the data**
+
+- **A Draft**: open it and use **Discard draft** (header button). After a confirm this deletes the
+  draft's config files — the pipeline and its schema/enrichment companions. It cannot be undone,
+  but it touches configuration only.
+- **A Live stream cannot be removed from the app today.** Discard is hidden once live, and the
+  server refuses to delete an active pipeline — it must be deactivated first, and there is
+  currently **no take-offline control** in the UI (a recorded gap). Retiring a Live stream today is
+  an operator step (deactivate the pipeline in its config file), after which the config can be
+  deleted.
+- **Removing a Stream never deletes its data.** Deleting the config removes the Catalog row and
+  stops future collection, but everything the stream ever produced — the partitioned Parquet, the
+  audit trail, quarantine, markers — stays on disk under the Space's data directory and remains
+  readable by anything pointed at the store.
+- **Nothing checks who depends on it.** Enrichments bound to a Reference by name, Datasets bound to
+  the stream's store, KPIs and Widgets built over its Tables — none of these block the removal, and
+  all of them dangle afterwards. The `metadata_validate` maintenance Job is the detector: it
+  reports broken references as findings; it never blocks and never repairs. Check the **Usage** tab
+  and the **Lineage** graph *before* removing, not after.
+- **The only true data purge is per-Space**: Settings ▸ Spaces ▸ *Delete & purge files*, guarded by
+  a type-the-name confirmation. There is no per-Stream purge.
+
+**Deleting data for a date — retention** — Ingested data is laid out by date (Hive partitions,
+`year=/month=/day=` by default), but **the product has no per-date delete or retention policy for
+stream data today** (a recorded gap). What does exist, all authored as maintenance Jobs
+(Workbench ▸ Jobs):
+
+- **`cleanup`** retires files by *filename pattern and file age* — good for temp/backup/log
+  hygiene, but it cannot target "the June 1st partition": the pattern matches file names only, and
+  age means file modification time, not the partition's logical date.
+- **`compact`** merges small per-batch files inside partitions — it consolidates, never deletes
+  (and a compacted batch can no longer be reprocessed).
+- **`reference_compact`** trims a versioned Reference's history (`history_days`) — the one true
+  "drop old data" task, and it applies only to upsert/SCD2 References. A Reference on the default
+  **full-replace** load policy keeps no history at all: each load replaces the published snapshot.
+
+Removing one day's partition is therefore an operator filesystem task outside the product for now;
+the readers glob whatever exists, so a removed partition simply stops appearing in queries.
+
+**Datasets** — The queryable relations themselves — what Queries run against and what most of
+Studio consumes — the umbrella over **Table** (a partitioned root of Parquet files described by a
+Schema), **Derived Table** (materialized by a Transform or cube), and **View** (a virtual, logical
+query). Two facts set expectations:
+
+- **A Dataset is an authored definition, not a byproduct.** Going live on a Stream produces a
+  Table; it does **not** register a Dataset. To query that data in Studio, create the Dataset
+  yourself (Catalog ▸ Datasets ▸ *New dataset*) and bind it: **virtual** (a saved query) or
+  **physical / materialized** via a physical reference (the store name or parquet path). The
+  editor's source picker is not yet wired to the Catalog's real stores (a recorded gap) — for real
+  data, the physical reference is the binding that matters.
+- **Deleting a Dataset deletes the definition only** — plus its version history — never the
+  underlying files. The confirm dialog means exactly what it says.
+
+In the editor you tag **Columns** with roles and formats, add **calculated columns** (row
+expressions available to everything downstream), and define **Measures** — named aggregate
+expressions (e.g. `sum(...)`, `count`) defined once against that Dataset — so **yes, a Measure is
+reusable**: every Widget or KPI tile bound to the same Dataset picks from the same Measure list
+instead of re-typing the aggregate. Reuse is per-Dataset, not global. The Dataset id is immutable
+after creation; the **History** button restores earlier versions.
+
+**Tracing lineage and provenance** — Three surfaces answer "where did this number come from," at
+different grains:
+
+1. **The Lineage tab** (asset grain) — Stream → Table → Derived Table → KPI/Report, as a graph.
+   Start from a node, traverse, click nodes for detail.
+2. **Workbench ▸ Runs → Run detail** (operational grain) — per-run tabs **Batches · Files ·
+   Lineage · Quarantine · Commits · Report**: which files arrived, which batch each landed in, what
+   was rejected, row counts, percentiles. This is the audit trail.
+3. **The node detail dialog's Lineage panel** (the bridge) — for any table-like node: *Files into
+   this store* (input file → partition → rows → pipeline) and *Consumed by* (which authored
+   Pipelines read it, into which sinks). This is the one place file-level history and asset-level
+   consumption meet.
+
+The surfaces don't yet link to each other — a Catalog row doesn't jump to its Runs, and a batch
+doesn't jump to its Catalog node (a recorded gap) — so expect one manual hop via the names. For
+investigative work over the same graphs (search, kind filters, time cutoff, saved views), use
+**Studio ▸ Link Analysis**.
+
+**Data Browser** — The Space's read-only database client (Catalog ▸ Data Browser): browse the raw
+stores and tables behind everything above — the business Parquet/CSV stores and, where enabled, the
+operational tables — the way you would in a SQL tool. Pick a store on the left to see its column
+schema and rows (paged, with an honest "showing first N" and a **Load more**), or open the SQL
+editor, which runs two ways: **in your browser** over the rows already loaded (instant, no server
+round-trip) or **Run on server** over the full store (read-only, guard-checked SQL). Use it to
+verify what actually landed after a Run, to inspect a store before pointing a Dataset at it, or to
+poke at an operational table. Nothing here is saved or shared — for a saved, reusable query that
+Widgets consume, use **Studio ▸ Query Library** instead.
 
 ---
 
