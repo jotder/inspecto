@@ -73,6 +73,15 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/onboarding-pipeline-split.md`](superpower/onboarding-pipeline-split.md) — **Onboarding ↔
+  Pipeline split, DESIGN approved 2026-07-30, no build started.** Onboard = declare the contract (metadata →
+  Table + auto-registered Dataset); Pipeline = processing over landed data; the Dataset is the handoff.
+  Engine already agrees (`on_pipeline` job trigger + `EnrichJob` chain verified in source — no new trigger
+  machinery). Pinned: D-A enrichment stage → template over the pipeline plane (`_enrich.toon`
+  grandfathered), D-B reuse the job trigger (semantics question owned by S4), D-C "Pipeline" = processing
+  graph only, UI-first, backend identifiers untouched. Slices S1–S3 (Dataset at go-live · shared store
+  picker · "Create pipeline from this Stream") are independently shippable. Standing UI mandate: reuse
+  shared components even when they need small changes.
 - [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md) — **`4.x` public-PKCE auth,
   SCOPED 2026-07-25** — the gate on the SEC-INCIDENT-1 rotation (BACKLOG §5): `4.x` must stop needing a
   client secret before the leaked secrets can be rotated. Verified against `4.x` `291c86a1`, and three
