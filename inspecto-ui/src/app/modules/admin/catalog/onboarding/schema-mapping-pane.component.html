@@ -119,7 +119,7 @@
                 }
             </div>
             @if (sp.rejectedCount > 0) {
-                <inspecto-query-panel [source]="rejectedSource()" />
+                <inspecto-data-table tier="pro" [rows]="rejectedRows()" sourceName="rejected" [autoHeight]="true" exportName="rejected-rows" />
             }
         }
     }

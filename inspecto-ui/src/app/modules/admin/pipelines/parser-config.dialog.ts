@@ -19,7 +19,7 @@ import {
     ParsersService,
 } from 'app/inspecto/api';
 import { fieldSpecsToAttributes, flattenBlock, nestKeys } from 'app/inspecto/component-model';
-import { QueryPanelComponent, QuerySource } from 'app/inspecto/query';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { NodeConfigResult } from './node-config.dialog';
@@ -82,7 +82,7 @@ function sampleFor(type: string | undefined): string {
         MatProgressSpinnerModule,
         MatSelectModule,
         MatTooltipModule,
-        QueryPanelComponent,
+        DataTableComponent,
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
         ParserTreeComponent,
@@ -128,8 +128,6 @@ export class ParserConfigDialog {
     readonly sampleText = signal('');
     readonly preview = signal<ParserPreview | null>(null);
     readonly gridRows = signal<Record<string, unknown>[]>([]);
-    /** Parsed table rows as a query-panel source (stable ref unless the rows change). */
-    readonly parsedSource = computed<QuerySource>(() => ({ name: 'parsed', rows: this.gridRows() }));
 
     readonly testing = signal(false);
     readonly testError = signal<string | null>(null);

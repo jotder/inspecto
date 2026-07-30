@@ -12,8 +12,7 @@ import { CatalogService, ConfigService, DbBrowserService, EnrichmentPreview, Len
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { SqlCodemirrorComponent } from 'app/inspecto/data-table';
-import { QueryPanelComponent } from 'app/inspecto/query/query-panel.component';
-import { QuerySource } from 'app/inspecto/query/query-types';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -51,7 +50,7 @@ interface ReferenceRow {
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
         SqlCodemirrorComponent,
-        QueryPanelComponent,
+        DataTableComponent,
     ],
     templateUrl: './enrichment-pane.component.html',
 })
@@ -75,10 +74,7 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
     readonly previewing = signal(false);
     readonly previewResult = signal<EnrichmentPreview | null>(null);
     readonly previewError = signal<string | null>(null);
-    readonly previewSource = computed<QuerySource>(() => ({
-        name: 'preview',
-        rows: this.previewResult()?.rows ?? [],
-    }));
+    readonly previewRows = computed<Record<string, unknown>[]>(() => this.previewResult()?.rows ?? []);
     /** Produced Reference Datasets bindable by name (id = the producer's normalized pipeline id). */
     readonly referenceOptions = signal<{ id: string; label: string }[]>([]);
 

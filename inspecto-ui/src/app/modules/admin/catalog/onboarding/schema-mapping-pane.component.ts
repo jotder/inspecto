@@ -13,8 +13,7 @@ import { ToastrService } from 'ngx-toastr';
 import { ConfigService, LensService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { QueryPanelComponent } from 'app/inspecto/query/query-panel.component';
-import { QuerySource } from 'app/inspecto/query/query-types';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import { suggestTypes } from './parsing-sniff';
 import { OnboardingStateService } from './onboarding-state.service';
 
@@ -69,7 +68,7 @@ interface FieldRow {
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
-        QueryPanelComponent,
+        DataTableComponent,
     ],
     templateUrl: './schema-mapping-pane.component.html',
 })
@@ -118,10 +117,7 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
     readonly includedNames = signal<string[]>([]);
     /** Sample-derived types were prefilled (any non-VARCHAR) — surfaces the "suggested" note. */
     readonly typesSuggested = signal(false);
-    readonly rejectedSource = computed<QuerySource>(() => ({
-        name: 'rejected',
-        rows: this.state.schemaPreview()?.rejectedRows ?? [],
-    }));
+    readonly rejectedRows = computed<Record<string, unknown>[]>(() => this.state.schemaPreview()?.rejectedRows ?? []);
 
     private readonly dirtyCheck = (): boolean => this.fieldsForm.dirty || this.partitionKeyControl.dirty;
 

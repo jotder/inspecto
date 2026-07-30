@@ -37,7 +37,7 @@ function saved(name: string): ComponentDef {
     return { type: 'grammar', name, ref: `grammar/${name}`, content: {} };
 }
 
-function create(opts: { data?: Partial<ParserConfigData>; grammars?: ComponentDef[]; preview?: ParserPreview } = {}) {
+async function create(opts: { data?: Partial<ParserConfigData>; grammars?: ComponentDef[]; preview?: ParserPreview } = {}) {
     const close = vi.fn();
     const components = {
         list: () => of(opts.grammars ?? []),
@@ -68,14 +68,15 @@ function create(opts: { data?: Partial<ParserConfigData>; grammars?: ComponentDe
             { provide: ToastrService, useValue: { success: () => {}, error: () => {} } },
         ],
     });
+    await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
     const fixture = TestBed.createComponent(ParserConfigDialog);
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, close, components, parsers };
 }
 
 describe('ParserConfigDialog', () => {
-    it('renders the SERVED catalog and its grammar schema as the property sheet', () => {
-        const { c, fixture } = create();
+    it('renders the SERVED catalog and its grammar schema as the property sheet', async () => {
+        const { c, fixture } = await create();
         expect(c.parserType()).toBe('delimited');
         expect(c.isHierarchical()).toBe(false);
         expect(c.parserDefs().map((p) => p.id)).toEqual(['delimited', 'xml']);
@@ -84,8 +85,8 @@ describe('ParserConfigDialog', () => {
         expect(c.schemaForm.form.get('delimited__delimiter')!.value).toBe(','); // served default applied
     });
 
-    it('rebuilds the sheet and flags hierarchical output on type change', () => {
-        const { c, fixture } = create();
+    it('rebuilds the sheet and flags hierarchical output on type change', async () => {
+        const { c, fixture } = await create();
         c.onTypeChange('xml');
         fixture.detectChanges();
         expect(c.parserType()).toBe('xml');
@@ -94,12 +95,12 @@ describe('ParserConfigDialog', () => {
         expect(c.sampleText()).toContain('<records>');
     });
 
-    it('loads a bound grammar (type + nested props) and skips the two-step save', () => {
+    it('loads a bound grammar (type + nested props) and skips the two-step save', async () => {
         const bound: ComponentDef = {
             type: 'grammar', name: 'cdr_csv', ref: 'grammar/cdr_csv',
             content: { parser_type: 'delimited', delimited: { delimiter: '|' } },
         };
-        const { c, fixture, components } = create({
+        const { c, fixture, components } = await create({
             data: { node: { id: 'parse', type: 'parser.dsv', use: 'grammar/cdr_csv' } },
             grammars: [bound],
         });
@@ -112,8 +113,8 @@ describe('ParserConfigDialog', () => {
             expect.objectContaining({ parser_type: 'delimited' }));
     });
 
-    it('two-step create: config advances to a pre-filled name, then persists the NESTED grammar', () => {
-        const { c, fixture, components, close } = create();
+    it('two-step create: config advances to a pre-filled name, then persists the NESTED grammar', async () => {
+        const { c, fixture, components, close } = await create();
         fixture.detectChanges();
         c.save();
         expect(c.step()).toBe('save');
@@ -127,8 +128,8 @@ describe('ParserConfigDialog', () => {
         expect(close).toHaveBeenCalledWith({ node: expect.objectContaining({ use: 'grammar/delimited_grammar' }) });
     });
 
-    it('blocks the save step on a duplicate name', () => {
-        const { c, fixture, components } = create({ grammars: [saved('taken')] });
+    it('blocks the save step on a duplicate name', async () => {
+        const { c, fixture, components } = await create({ grammars: [saved('taken')] });
         fixture.detectChanges();
         c.save();
         c.saveForm.patchValue({ name: 'taken' });
@@ -137,20 +138,22 @@ describe('ParserConfigDialog', () => {
         expect(components.create).not.toHaveBeenCalled();
     });
 
-    it('Test parse posts the nested grammar to the REAL preview endpoint and feeds the query panel', () => {
-        const { c, fixture, parsers } = create();
+    it('Test parse posts the nested grammar to the REAL preview endpoint and feeds the data table', async () => {
+        const { c, fixture, parsers } = await create();
         fixture.detectChanges();
         c.test();
         expect(parsers.preview).toHaveBeenCalledWith('delimited',
             { delimited: { delimiter: ',', has_header: true } }, c.sampleText());
         expect(c.preview()?.kind).toBe('table');
         expect(c.gridRows().length).toBe(1);
-        expect(c.parsedSource().rows.length).toBe(1);
-        expect(c.parsedSource().name).toBe('parsed');
+        fixture.detectChanges();
+        // The shared data-table (pro tier) over the parsed rows — its SQL editor seeds
+        // `FROM parsed`, so the author queries the sample without knowing any table name.
+        expect(fixture.nativeElement.querySelector('inspecto-data-table')).toBeTruthy();
     });
 
-    it('a hierarchical preview renders the record tree', () => {
-        const { c, fixture } = create({ preview: TREE_PREVIEW });
+    it('a hierarchical preview renders the record tree', async () => {
+        const { c, fixture } = await create({ preview: TREE_PREVIEW });
         c.onTypeChange('xml');
         fixture.detectChanges();
         c.test();
@@ -161,7 +164,7 @@ describe('ParserConfigDialog', () => {
     });
 
     it('loads a chosen file into the sample content and resets the previous preview', async () => {
-        const { c } = create();
+        const { c } = await create();
         c.test();
         expect(c.preview()).toBeTruthy();
         const file = new File(['x|y\n1|2\n'], 's.psv');
@@ -171,8 +174,8 @@ describe('ParserConfigDialog', () => {
         expect(c.preview()).toBeNull();
     });
 
-    it('maximizes a pane and restores the layout', () => {
-        const { c } = create();
+    it('maximizes a pane and restores the layout', async () => {
+        const { c } = await create();
         expect(c.paneVisible('props')).toBe(true);
         c.toggleMaximize('sample');
         expect(c.maximized()).toBe('sample');
@@ -182,8 +185,8 @@ describe('ParserConfigDialog', () => {
         expect(c.maximized()).toBeNull();
     });
 
-    it('toggles full screen via a dialog panel class', () => {
-        const { c } = create();
+    it('toggles full screen via a dialog panel class', async () => {
+        const { c } = await create();
         const ref = TestBed.inject(MatDialogRef);
         c.toggleFullscreen();
         expect(ref.addPanelClass).toHaveBeenCalledWith('dialog-fullscreen');
@@ -191,8 +194,8 @@ describe('ParserConfigDialog', () => {
         expect(ref.removePanelClass).toHaveBeenCalledWith('dialog-fullscreen');
     });
 
-    it('backToConfig() returns from the save step without losing the typed name', () => {
-        const { c, fixture } = create();
+    it('backToConfig() returns from the save step without losing the typed name', async () => {
+        const { c, fixture } = await create();
         fixture.detectChanges();
         c.save();
         c.saveForm.patchValue({ name: 'my_grammar' });
@@ -202,7 +205,7 @@ describe('ParserConfigDialog', () => {
     });
 
     it('has no a11y violations on the config step or the save step', async () => {
-        const { c, fixture } = create();
+        const { c, fixture } = await create();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
         c.save();

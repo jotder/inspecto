@@ -154,7 +154,7 @@
                     <span class="text-secondary">· sample truncated</span>
                 }
             </div>
-            <inspecto-query-panel [source]="previewSource()" />
+            <inspecto-data-table tier="pro" [rows]="previewRows()" sourceName="enriched" [autoHeight]="true" exportName="enrichment-preview" />
         }
     }
 </div>

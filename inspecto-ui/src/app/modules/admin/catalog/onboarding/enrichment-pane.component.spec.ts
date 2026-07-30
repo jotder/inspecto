@@ -27,7 +27,7 @@ const PATH_REF: MetadataNode = {
     attrs: { path: 'data/zones.csv', format: 'CSV' },
 } as MetadataNode;
 
-function create(
+async function create(
     config: Record<string, unknown>,
     opts: {
         api?: Partial<ConfigService>;
@@ -70,6 +70,7 @@ function create(
     state.name.set(String(config['name'] ?? ''));
     state.config.set(config);
     if (opts.enrichment !== undefined) state.enrichmentConfig.set(opts.enrichment);
+    await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
     const fixture = TestBed.createComponent(OnboardingEnrichmentPaneComponent);
     fixture.detectChanges();
     return { fixture, state, api: TestBed.inject(ConfigService), table };
@@ -85,8 +86,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         TOASTR.error.mockClear();
     });
 
-    it('opens as an opt-in empty state (the stage is optional) and starts on demand', () => {
-        const { fixture } = create(PIPELINE);
+    it('opens as an opt-in empty state (the stage is optional) and starts on demand', async () => {
+        const { fixture } = await create(PIPELINE);
         const c = fixture.componentInstance;
         expect(c.started()).toBe(false);
         expect(fixture.nativeElement.textContent).toContain('Optional');
@@ -95,19 +96,19 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('Transform');
     });
 
-    it('offers only pipeline-produced references, excluding this pipeline itself', () => {
+    it('offers only pipeline-produced references, excluding this pipeline itself', async () => {
         const self: MetadataNode = {
             id: 'ref:orders_feed', kind: 'REFERENCE_DATASET', label: 'self',
             attrs: { pipeline: 'orders_feed' },
         } as MetadataNode;
-        const { fixture } = create(PIPELINE, { refs: [PRODUCED_REF, PATH_REF, self] });
+        const { fixture } = await create(PIPELINE, { refs: [PRODUCED_REF, PATH_REF, self] });
         expect(fixture.componentInstance.referenceOptions()).toEqual([
             { id: 'region_dim', label: 'REGION_DIM' },
         ]);
     });
 
-    it('hydrates from an existing companion config, pristine', () => {
-        const { fixture } = create(PIPELINE, {
+    it('hydrates from an existing companion config, pristine', async () => {
+        const { fixture } = await create(PIPELINE, {
             enrichment: {
                 name: 'orders_feed_enrich',
                 references: { region_dim: { ref: 'region_dim' }, zones: { path: 'data/zones.csv', format: 'CSV' } },
@@ -123,8 +124,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(c.referencesForm.dirty).toBe(false);
     });
 
-    it('hydrates when the companion read lands after the pane mounted', () => {
-        const { fixture, state } = create(PIPELINE);
+    it('hydrates when the companion read lands after the pane mounted', async () => {
+        const { fixture, state } = await create(PIPELINE);
         expect(fixture.componentInstance.started()).toBe(false);
         state.enrichmentConfig.set({ name: 'orders_feed_enrich', transform: 'SELECT 1 FROM input' });
         fixture.detectChanges();
@@ -132,11 +133,11 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(fixture.componentInstance.sql()).toBe('SELECT 1 FROM input');
     });
 
-    it('save writes the companion with derived wiring, then hot-registers it', () => {
+    it('save writes the companion with derived wiring, then hot-registers it', async () => {
         const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
             of(WRITE_OK(type, String(cfg['name'] ?? 'x'))));
         const registerEnrichment = vi.fn((_path: string) => of(REGISTER_OK));
-        const { fixture, state } = create(PIPELINE, { api: { write, registerEnrichment } });
+        const { fixture, state } = await create(PIPELINE, { api: { write, registerEnrichment } });
         const c = fixture.componentInstance;
         c.start();
         c.addReference();
@@ -159,9 +160,9 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(TOASTR.success).toHaveBeenCalled();
     });
 
-    it('keeps the save but warns when registration fails', () => {
+    it('keeps the save but warns when registration fails', async () => {
         const registerEnrichment = vi.fn((_path: string) => throwError(() => ({ status: 503 })));
-        const { fixture, state } = create(PIPELINE, { api: { registerEnrichment } });
+        const { fixture, state } = await create(PIPELINE, { api: { registerEnrichment } });
         const c = fixture.componentInstance;
         c.start();
         c.onSqlChange('SELECT * FROM input');
@@ -170,10 +171,10 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(TOASTR.warning).toHaveBeenCalled();
     });
 
-    it('blocks save on a duplicate reference alias', () => {
+    it('blocks save on a duplicate reference alias', async () => {
         const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
             of(WRITE_OK(type, String(cfg['name'] ?? 'x'))));
-        const { fixture } = create(PIPELINE, { api: { write } });
+        const { fixture } = await create(PIPELINE, { api: { write } });
         const c = fixture.componentInstance;
         c.start();
         c.addReference();
@@ -187,10 +188,10 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(TOASTR.warning).toHaveBeenCalled();
     });
 
-    it('preview samples the stream output and runs the draft transform over it', () => {
+    it('preview samples the stream output and runs the draft transform over it', async () => {
         const previewEnrichment = vi.fn((_cfg: Record<string, unknown>, _rows: Record<string, unknown>[]) =>
             of({ columns: ['ID', 'ZONE'], rows: [{ ID: '1', ZONE: 'north' }], truncated: true }));
-        const { fixture, table } = create(PIPELINE, {
+        const { fixture, table } = await create(PIPELINE, {
             api: { previewEnrichment }, sample: [{ ID: '1', REGION: 'r1' }],
         });
         const c = fixture.componentInstance;
@@ -207,9 +208,9 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(c.previewError()).toBeNull();
     });
 
-    it('preview warns and skips the call when the stream has no data yet', () => {
+    it('preview warns and skips the call when the stream has no data yet', async () => {
         const previewEnrichment = vi.fn();
-        const { fixture } = create(PIPELINE, { api: { previewEnrichment }, sample: [] });
+        const { fixture } = await create(PIPELINE, { api: { previewEnrichment }, sample: [] });
         const c = fixture.componentInstance;
         c.start();
         c.onSqlChange('SELECT * FROM input');
@@ -219,9 +220,9 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('No data'));
     });
 
-    it('preview falls back to an empty sample (and warns) when the store is not browsable', () => {
+    it('preview falls back to an empty sample (and warns) when the store is not browsable', async () => {
         const previewEnrichment = vi.fn();
-        const { fixture } = create(PIPELINE, { api: { previewEnrichment }, sample: 'error' });
+        const { fixture } = await create(PIPELINE, { api: { previewEnrichment }, sample: 'error' });
         const c = fixture.componentInstance;
         c.start();
         c.onSqlChange('SELECT * FROM input');
@@ -230,10 +231,10 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('No data'));
     });
 
-    it('preview surfaces a transform error from the sample', () => {
+    it('preview surfaces a transform error from the sample', async () => {
         const previewEnrichment = vi.fn(() => throwError(() =>
             new HttpErrorResponse({ status: 422, error: { error: { message: 'no such column: BOGUS' } } })));
-        const { fixture } = create(PIPELINE, {
+        const { fixture } = await create(PIPELINE, {
             api: { previewEnrichment }, sample: [{ ID: '1' }],
         });
         const c = fixture.componentInstance;
@@ -245,7 +246,7 @@ describe('OnboardingEnrichmentPaneComponent', () => {
     });
 
     it('has no a11y violations in both the opt-in and form states', async () => {
-        const { fixture } = create(PIPELINE);
+        const { fixture } = await create(PIPELINE);
         await expectNoA11yViolations(fixture.nativeElement);
         fixture.componentInstance.start();
         fixture.componentInstance.addReference();

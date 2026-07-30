@@ -14,8 +14,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
-import { QueryPanelComponent } from 'app/inspecto/query/query-panel.component';
-import { QuerySource } from 'app/inspecto/query/query-types';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
@@ -50,7 +49,7 @@ const PARSING_ROOTS = ['frontend', 'delimited', 'fixedwidth', 'json', 'text_rege
         InspectoSchemaFormComponent,
         OnboardingSamplePanelComponent,
         ParserTreeComponent,
-        QueryPanelComponent,
+        DataTableComponent,
     ],
     templateUrl: './parsing-pane.component.html',
 })
@@ -81,9 +80,9 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     /** A plugin preview result (pane-local: the sample thread's parsed hop stays builtin-only). */
     readonly pluginPreview = signal<ParserPreview | null>(null);
     readonly pluginError = signal<string | null>(null);
-    readonly pluginRows = computed<QuerySource>(() => {
+    readonly pluginRows = computed<Record<string, unknown>[]>(() => {
         const p = this.pluginPreview();
-        return { name: 'parsed', rows: p?.kind === 'table' ? p.rows : [] };
+        return p?.kind === 'table' ? p.rows : [];
     });
 
     private readonly parsingBlock =
@@ -113,10 +112,7 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
 
     readonly saving = signal(false);
     readonly testing = signal(false);
-    readonly parsedSource = computed<QuerySource>(() => ({
-        name: 'parsed',
-        rows: this.state.parsePreview()?.rows ?? [],
-    }));
+    readonly parsedRows = computed<Record<string, unknown>[]>(() => this.state.parsePreview()?.rows ?? []);
 
     /** Sniffed frontend suggestion — shown only while it differs from the current pick. */
     readonly suggestion = computed<FrontendSuggestion | null>(() => {

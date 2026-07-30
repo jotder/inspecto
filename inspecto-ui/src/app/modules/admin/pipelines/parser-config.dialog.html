@@ -160,8 +160,8 @@
 
             @if (preview(); as p) {
                 @if (p.kind === 'table') {
-                    <!-- Reusable query panel over the parsed rows: projection + filter + SQL + live preview. -->
-                    <inspecto-query-panel [source]="parsedSource()" />
+                    <!-- The shared data table over the parsed rows; pro tier = SQL/filter over the sample. -->
+                    <inspecto-data-table tier="pro" [rows]="gridRows()" sourceName="parsed" [autoHeight]="true" exportName="parsed-sample" />
                 } @else {
                     <div class="overflow-auto rounded border p-2"
                          style="background: var(--gamma-bg-default); border-color: var(--gamma-border)"
