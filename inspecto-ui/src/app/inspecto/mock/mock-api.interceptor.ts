@@ -22,6 +22,7 @@ import { jobsHandler } from './handlers/jobs.handler';
 import { navHandler } from './handlers/nav.handler';
 import { onboardingHandler } from './handlers/onboarding.handler';
 import { opsHandler } from './handlers/ops.handler';
+import { parsersHandler } from './handlers/parsers.handler';
 import { pipelinesHandler } from './handlers/pipelines.handler';
 import { requirementsHandler } from './handlers/requirements.handler';
 import { settingsHandler } from './handlers/settings.handler';
@@ -63,6 +64,7 @@ const HANDLERS: MockHandler[] = [
     accessHandler(flags), // /access/* lens access config — same /catalog$ collision, so also ahead of demoHandler
     demoHandler(flags),
     onboardingHandler(flags), // /config/write|preview|pipeline/{name} + POST /runs — after demo's /config/spec + /validate
+    parsersHandler(), // /parsers catalog + stateless grammar preview (mirrors ParserRoutes)
     connectionsHandler(flags),
     componentsHandler(flags),
     pipelinesHandler(flags),

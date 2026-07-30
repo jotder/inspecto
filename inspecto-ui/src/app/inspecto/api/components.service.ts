@@ -95,18 +95,6 @@ export interface ParserTreePreview {
 /** A parse-preview result — flat for tabular formats, tree for hierarchical ones (discriminated on `kind`). */
 export type ParserPreview = ParserTablePreview | ParserTreePreview;
 
-/** One ASN.1 schema module in the library (the parser's `schema_spec` references it by name). */
-export interface Asn1Module {
-    name: string;
-    description?: string;
-}
-
-/** An ASN.1 module's downloaded source text (for the read-only viewer). */
-export interface Asn1ModuleSource {
-    name: string;
-    text: string;
-}
-
 /**
  * Component registry CRUD + per-component dry-run/test (T18/T19, §7.1–7.2). Generalises the connection
  * write pattern to the non-secret kinds; writes are write-root gated (503 when disabled). The `/test`
@@ -172,27 +160,4 @@ export class ComponentsService {
         return this.http.post<SinkPreview>(apiUrl(`/components/sink/${encodeURIComponent(id)}/test`), { sampleRows });
     }
 
-    /**
-     * Parse `sampleText` with an in-progress (unsaved) parser config — the parser-editor's build-and-test
-     * loop. Returns a flat table for tabular formats or a tree for hierarchical ones (ASN.1 / JSON / XML).
-     * Stateless (no saved component id needed), scratch-only.
-     */
-    previewParse(parserType: string, content: Record<string, unknown>, sampleText: string): Observable<ParserPreview> {
-        return this.http.post<ParserPreview>(apiUrl('/components/grammar/preview'), { parserType, content, sampleText });
-    }
-
-    /** The ASN.1 schema-module library (the parser config's `schema_spec` picker options). */
-    asn1Modules(): Observable<Asn1Module[]> {
-        return this.http.get<Asn1Module[]>(apiUrl('/asn1/modules'));
-    }
-
-    /** Download one ASN.1 module's source text for the read-only viewer. */
-    asn1Module(name: string): Observable<Asn1ModuleSource> {
-        return this.http.get<Asn1ModuleSource>(apiUrl(`/asn1/modules/${encodeURIComponent(name)}`));
-    }
-
-    /** Register a locally-uploaded ASN.1 module so it joins the library and can be referenced by name. */
-    uploadAsn1Module(name: string, text: string): Observable<Asn1Module> {
-        return this.http.post<Asn1Module>(apiUrl('/asn1/modules'), { name, text });
-    }
 }

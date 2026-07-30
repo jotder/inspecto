@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
-import { ComponentDef, ComponentsService, ParserPreview } from 'app/inspecto/api';
+import { ComponentDef, ComponentsService, ParserDef, ParserPreview, ParsersService } from 'app/inspecto/api';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ParserConfigData, ParserConfigDialog } from './parser-config.dialog';
@@ -12,21 +12,41 @@ import { ParserConfigData, ParserConfigDialog } from './parser-config.dialog';
 const TABLE_PREVIEW: ParserPreview = {
     kind: 'table', columns: ['id', 'msisdn'], rows: [{ id: '1', msisdn: 'x' }], rowCount: 1, rejectedRows: 0,
 };
+const TREE_PREVIEW: ParserPreview = {
+    kind: 'tree', recordCount: 2,
+    nodes: [{ label: 'record', type: 'element', children: [{ label: 'id', type: 'element', value: '1001' }] }],
+};
+
+/** A served catalog in the real shape (`GET /parsers`): built-ins + the preview-only XML plugin. */
+const CATALOG: ParserDef[] = [
+    {
+        id: 'delimited', label: 'Delimited — CSV / TSV / pipe, one record per line',
+        hierarchical: false, ingestable: true,
+        grammarSchema: [
+            { path: 'delimited.delimiter', label: 'Delimiter', type: 'STRING', defaultValue: ',' },
+            { path: 'delimited.has_header', label: 'First line is a header', type: 'BOOL', defaultValue: true },
+        ],
+    },
+    {
+        id: 'xml', label: 'XML — XML file format', hierarchical: true, ingestable: false,
+        grammarSchema: [{ path: 'xml.record_element', label: 'Record element', type: 'STRING' }],
+    },
+];
 
 function saved(name: string): ComponentDef {
     return { type: 'grammar', name, ref: `grammar/${name}`, content: {} };
 }
 
-function create(opts: { data?: Partial<ParserConfigData>; grammars?: ComponentDef[] } = {}) {
+function create(opts: { data?: Partial<ParserConfigData>; grammars?: ComponentDef[]; preview?: ParserPreview } = {}) {
     const close = vi.fn();
     const components = {
         list: () => of(opts.grammars ?? []),
         create: vi.fn((_t: string, c: Record<string, unknown>) => of(saved(String(c['id'])))),
         update: vi.fn((_t: string, id: string) => of(saved(id))),
-        previewParse: vi.fn(() => of(TABLE_PREVIEW)),
-        asn1Modules: vi.fn(() => of([{ name: 'cdr_3gpp_ts32297' }, { name: 'map_rel99' }])),
-        asn1Module: vi.fn((name: string) => of({ name, text: `-- source of ${name}` })),
-        uploadAsn1Module: vi.fn((name: string) => of({ name })),
+    };
+    const parsers = {
+        list: vi.fn(() => of(CATALOG)),
+        preview: vi.fn(() => of(opts.preview ?? TABLE_PREVIEW)),
     };
     TestBed.configureTestingModule({
         imports: [ParserConfigDialog],
@@ -43,84 +63,101 @@ function create(opts: { data?: Partial<ParserConfigData>; grammars?: ComponentDe
                 },
             },
             { provide: ComponentsService, useValue: components },
+            { provide: ParsersService, useValue: parsers },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
             { provide: ToastrService, useValue: { success: () => {}, error: () => {} } },
         ],
     });
     const fixture = TestBed.createComponent(ParserConfigDialog);
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, close, components };
+    return { fixture, c: fixture.componentInstance, close, components, parsers };
 }
 
 describe('ParserConfigDialog', () => {
-    it('builds the DSV property sheet by default', () => {
+    it('renders the SERVED catalog and its grammar schema as the property sheet', () => {
         const { c, fixture } = create();
-        expect(c.parserType()).toBe('dsv');
+        expect(c.parserType()).toBe('delimited');
         expect(c.isHierarchical()).toBe(false);
-        expect(c.schemaFormSpecs().some((s) => s.key === 'column_delimiter')).toBe(true);
+        expect(c.parserDefs().map((p) => p.id)).toEqual(['delimited', 'xml']);
+        expect(c.schemaFormSpecs().map((s) => s.key)).toEqual(['delimited__delimiter', 'delimited__has_header']);
         fixture.detectChanges();
-        expect(c.schemaForm.form.get('sample_rows')!.value).toBe(100); // advanced tier default still applied
+        expect(c.schemaForm.form.get('delimited__delimiter')!.value).toBe(','); // served default applied
     });
 
     it('rebuilds the sheet and flags hierarchical output on type change', () => {
         const { c, fixture } = create();
-        c.onTypeChange('json');
+        c.onTypeChange('xml');
         fixture.detectChanges();
-        expect(c.parserType()).toBe('json');
+        expect(c.parserType()).toBe('xml');
         expect(c.isHierarchical()).toBe(true);
-        expect(c.schemaFormSpecs().some((s) => s.key === 'root_path')).toBe(true);
-        expect(c.schemaFormSpecs().some((s) => s.key === 'column_delimiter')).toBe(false);
+        expect(c.schemaFormSpecs().map((s) => s.key)).toEqual(['xml__record_element']);
+        expect(c.sampleText()).toContain('<records>');
     });
 
-    it('loads a bound grammar (type + props) and skips the two-step save', () => {
-        const { c, fixture } = create({
-            data: { node: { id: 'parse', type: 'parser.dsv', use: 'grammar/my_json' } },
-            grammars: [{ type: 'grammar', name: 'my_json', ref: 'grammar/my_json', content: { parser_type: 'json', root_path: '$.items' } }],
+    it('loads a bound grammar (type + nested props) and skips the two-step save', () => {
+        const bound: ComponentDef = {
+            type: 'grammar', name: 'cdr_csv', ref: 'grammar/cdr_csv',
+            content: { parser_type: 'delimited', delimited: { delimiter: '|' } },
+        };
+        const { c, fixture, components } = create({
+            data: { node: { id: 'parse', type: 'parser.dsv', use: 'grammar/cdr_csv' } },
+            grammars: [bound],
         });
         fixture.detectChanges();
-        expect(c.parserType()).toBe('json');
-        expect(c.schemaForm.form.get('root_path')!.value).toBe('$.items');
-        expect(c.boundGrammarId()).toBe('my_json');
+        expect(c.boundGrammarId()).toBe('cdr_csv');
+        expect(c.parserType()).toBe('delimited');
+        expect(c.schemaForm.form.get('delimited__delimiter')!.value).toBe('|');
+        c.save(); // bound ⇒ straight-through update, no save step
+        expect(components.update).toHaveBeenCalledWith('grammar', 'cdr_csv',
+            expect.objectContaining({ parser_type: 'delimited' }));
     });
 
-    it('two-step create: config advances to a pre-filled name, then persists on the second save()', () => {
-        const { c, close, components } = create();
-        c.save(); // config valid ⇒ advance to the save step with a suggested name
-        expect(c.step()).toBe('save');
-        expect(c.saveForm.controls.name.value).toBe('dsv_grammar');
-        expect(components.create).not.toHaveBeenCalled();
-
-        c.saveForm.controls.name.setValue('cdr_csv');
+    it('two-step create: config advances to a pre-filled name, then persists the NESTED grammar', () => {
+        const { c, fixture, components, close } = create();
+        fixture.detectChanges();
         c.save();
-        expect(components.create).toHaveBeenCalledWith('grammar', expect.objectContaining({ id: 'cdr_csv', parser_type: 'dsv' }));
-        expect(close).toHaveBeenCalledWith({ node: expect.objectContaining({ use: 'grammar/cdr_csv' }) });
+        expect(c.step()).toBe('save');
+        expect(c.saveForm.controls.name.value).toBe('delimited_grammar');
+        c.save();
+        expect(components.create).toHaveBeenCalledWith('grammar', expect.objectContaining({
+            id: 'delimited_grammar',
+            parser_type: 'delimited',
+            delimited: { delimiter: ',', has_header: true },
+        }));
+        expect(close).toHaveBeenCalledWith({ node: expect.objectContaining({ use: 'grammar/delimited_grammar' }) });
     });
 
     it('blocks the save step on a duplicate name', () => {
-        const { c, components } = create({ grammars: [{ type: 'grammar', name: 'cdr_csv', ref: 'grammar/cdr_csv', content: { parser_type: 'dsv' } }] });
+        const { c, fixture, components } = create({ grammars: [saved('taken')] });
+        fixture.detectChanges();
         c.save();
-        c.saveForm.controls.name.setValue('cdr_csv');
+        c.saveForm.patchValue({ name: 'taken' });
         c.save();
         expect(c.saveForm.controls.name.hasError('duplicate')).toBe(true);
         expect(components.create).not.toHaveBeenCalled();
     });
 
-    it('updates instead of creating when an existing grammar is chosen from the dropdown', () => {
-        const { c, components } = create({ grammars: [{ type: 'grammar', name: 'cdr_csv', ref: 'grammar/cdr_csv', content: { parser_type: 'dsv' } }] });
-        c.onGrammarChange('cdr_csv');
-        c.save(); // bound ⇒ saves straight through, no two-step
-        expect(components.update).toHaveBeenCalledWith('grammar', 'cdr_csv', expect.objectContaining({ parser_type: 'dsv' }));
-        expect(components.create).not.toHaveBeenCalled();
-    });
-
-    it('previews a flat parse and feeds the rows to the query panel', () => {
-        const { c, components } = create();
+    it('Test parse posts the nested grammar to the REAL preview endpoint and feeds the query panel', () => {
+        const { c, fixture, parsers } = create();
+        fixture.detectChanges();
         c.test();
-        expect(components.previewParse).toHaveBeenCalled();
+        expect(parsers.preview).toHaveBeenCalledWith('delimited',
+            { delimited: { delimiter: ',', has_header: true } }, c.sampleText());
         expect(c.preview()?.kind).toBe('table');
         expect(c.gridRows().length).toBe(1);
         expect(c.parsedSource().rows.length).toBe(1);
         expect(c.parsedSource().name).toBe('parsed');
+    });
+
+    it('a hierarchical preview renders the record tree', () => {
+        const { c, fixture } = create({ preview: TREE_PREVIEW });
+        c.onTypeChange('xml');
+        fixture.detectChanges();
+        c.test();
+        fixture.detectChanges();
+        expect(c.preview()?.kind).toBe('tree');
+        expect(fixture.nativeElement.querySelector('app-parser-tree')).toBeTruthy();
+        expect(fixture.nativeElement.textContent).toContain('2 record(s)');
     });
 
     it('loads a chosen file into the sample content and resets the previous preview', async () => {
@@ -134,65 +171,39 @@ describe('ParserConfigDialog', () => {
         expect(c.preview()).toBeNull();
     });
 
-    it('loads the ASN.1 module library on switching to asn1 and requires the schema module to save', () => {
-        const { c, fixture, components } = create();
-        c.onTypeChange('asn1');
-        fixture.detectChanges();
-        expect(components.asn1Modules).toHaveBeenCalled();
-        expect(c.asn1Modules().map((mod) => mod.name)).toEqual(['cdr_3gpp_ts32297', 'map_rel99']);
-        expect(c.moduleProp()?.key).toBe('schema_spec');
-
-        c.save(); // encoding_rules has a default, but schema_spec is required and blank ⇒ blocked
-        expect(c.step()).toBe('config');
-        expect(c.moduleForm.get('schema_spec')?.touched).toBe(true);
-    });
-
-    it('binds + downloads a chosen ASN.1 module for the viewer', () => {
-        const { c, fixture, components } = create();
-        c.onTypeChange('asn1');
-        fixture.detectChanges();
-        c.moduleForm.get('schema_spec')?.setValue('map_rel99');
-        c.onModuleSelect('map_rel99');
-        expect(components.asn1Module).toHaveBeenCalledWith('map_rel99');
-        expect(c.moduleText()).toBe('-- source of map_rel99');
-    });
-
-    it('maximizes a pane and restores the split layout', () => {
+    it('maximizes a pane and restores the layout', () => {
         const { c } = create();
-        expect(c.maximized()).toBeNull();
         expect(c.paneVisible('props')).toBe(true);
-        c.toggleMaximize('output');
-        expect(c.maximized()).toBe('output');
-        expect(c.bigOutput()).toBe(true);
+        c.toggleMaximize('sample');
+        expect(c.maximized()).toBe('sample');
         expect(c.paneVisible('props')).toBe(false);
-        expect(c.paneVisible('output')).toBe(true);
-        c.toggleMaximize('output');
+        expect(c.paneVisible('sample')).toBe(true);
+        c.toggleMaximize('sample');
         expect(c.maximized()).toBeNull();
     });
 
     it('toggles full screen via a dialog panel class', () => {
-        const { c, fixture } = create();
+        const { c } = create();
         const ref = TestBed.inject(MatDialogRef);
         c.toggleFullscreen();
-        expect(c.fullscreen()).toBe(true);
         expect(ref.addPanelClass).toHaveBeenCalledWith('dialog-fullscreen');
         c.toggleFullscreen();
-        expect(c.fullscreen()).toBe(false);
         expect(ref.removePanelClass).toHaveBeenCalledWith('dialog-fullscreen');
-        fixture.detectChanges();
     });
 
     it('backToConfig() returns from the save step without losing the typed name', () => {
-        const { c } = create();
+        const { c, fixture } = create();
+        fixture.detectChanges();
         c.save();
-        c.saveForm.controls.name.setValue('cdr_csv');
+        c.saveForm.patchValue({ name: 'my_grammar' });
         c.backToConfig();
         expect(c.step()).toBe('config');
-        expect(c.saveForm.controls.name.value).toBe('cdr_csv');
+        expect(c.saveForm.controls.name.value).toBe('my_grammar');
     });
 
     it('has no a11y violations on the config step or the save step', async () => {
-        const { fixture, c } = create();
+        const { c, fixture } = create();
+        fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
         c.save();
         fixture.detectChanges();

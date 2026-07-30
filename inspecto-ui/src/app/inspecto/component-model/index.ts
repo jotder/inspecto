@@ -2,6 +2,8 @@ export * from './component-types';
 export * from './component-kind';
 export * from './refs';
 export * from './attribute-spec';
+export * from './field-spec-mapper';
+export * from './flat-keys';
 export * from './component-registry';
 export * from './editor-registry';
 export * from './component-graph';

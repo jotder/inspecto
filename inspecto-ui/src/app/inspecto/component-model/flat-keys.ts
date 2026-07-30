@@ -1,10 +1,11 @@
 /**
- * Flat-key ↔ nested-map plumbing between `<inspecto-schema-form>` and the Stage-1 pipeline TOON
- * blocks. Flat keys use a `__` path separator (`duplicate__mode` ⇒ `duplicate.mode`) because
- * Angular's `formControlName`/`FormGroup.get` treat a literal `.` as a nested-group path.
- * Framework-free and lossless for keys the form does not know about: {@link nestKeys} output is
- * deep-merged over the existing block by {@link mergeBlock}, so hand-authored keys survive a
- * guided save.
+ * Flat-key ↔ nested-map plumbing between `<inspecto-schema-form>` and nested config blocks
+ * (Stage-1 pipeline TOON blocks, parser grammars). Flat keys use a `__` path separator
+ * (`duplicate__mode` ⇒ `duplicate.mode`) because Angular's `formControlName`/`FormGroup.get`
+ * treat a literal `.` as a nested-group path. Framework-free and lossless for keys the form does
+ * not know about: {@link nestKeys} output is deep-merged over the existing block by
+ * {@link mergeBlock}, so hand-authored keys survive a guided save. (Relocated from the onboarding
+ * feature once the Pipelines parser dialog needed the same plumbing.)
  */
 
 /** The flat-key path separator (a literal `.` would collide with Angular form-path semantics). */

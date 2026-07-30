@@ -63,6 +63,14 @@ options → Test parse → full-width results. For the `json` frontend the resul
 that the engine reads **top-level keys only** — a nested value lands as JSON text in one column
 (the flatten DSL is BACKLOG'd engine work; `parsing.json.records_path` is locked to `$`).
 
+Since 2026-07-30 the toggle also appends the **served plugin parsers** (`GET /parsers` — XML today,
+ASN.1/vendor formats when their plugins deploy; `okf/backend/engine/parser-plugins.md`): their
+options form renders the served grammar schema (`fieldSpecsToAttributes`), Test parse runs the real
+`POST /parsers/{id}/preview` (table or record tree), and **Save is disabled with an honest note**
+(preview-only until the flatten configuration; ingestable customs stay TOON-authored until the
+segments editor). ⚠ The plugin preview is pane-local — the sample thread's parsed hop (and thus the
+Schema stage derivation) is fed only by the four built-ins the draft can actually go live with.
+
 ## Enrichment stage (Streams, optional)
 
 Opt-in pane authoring the companion `EnrichmentConfig` (`<pipeline>_enrich`): reference bindings

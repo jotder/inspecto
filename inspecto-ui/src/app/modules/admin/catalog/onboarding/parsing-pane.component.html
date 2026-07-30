@@ -17,12 +17,18 @@
 
             <div class="flex flex-wrap items-center gap-3">
                 <mat-button-toggle-group
-                    [value]="frontend()"
-                    (change)="setFrontend($event.value)"
+                    [value]="activeType()"
+                    (change)="setType($event.value)"
                     aria-label="File type"
                 >
                     @for (f of frontends; track f.id) {
                         <mat-button-toggle [value]="f.id" [matTooltip]="f.hint">{{ f.label }}</mat-button-toggle>
+                    }
+                    <!-- Served plugin parsers (XML today; ASN.1 / vendor formats appear when deployed) -->
+                    @for (p of pluginTypes(); track p.id) {
+                        <mat-button-toggle [value]="p.id" [matTooltip]="typeHint(p.label)">
+                            {{ typeName(p.label) }}
+                        </mat-button-toggle>
                     }
                 </mat-button-toggle-group>
                 @if (suggestion(); as sg) {
@@ -40,7 +46,7 @@
 
             <inspecto-schema-form #sf [specs]="specs()" [initial]="initial" (submitted)="save()" />
 
-            @if (frontend() === 'fixedwidth') {
+            @if (activeType() === 'fixedwidth') {
                 <div class="text-secondary text-xs font-semibold uppercase tracking-wider">Fields (name · start · length)</div>
                 <form [formGroup]="fwForm">
                     <div formArrayName="fields" class="flex flex-col gap-2">
@@ -96,7 +102,7 @@
                 <button
                     mat-flat-button
                     color="primary"
-                    [disabled]="saving() || !lens.canAuthorWorkbench()"
+                    [disabled]="saving() || !!pluginDef() || !lens.canAuthorWorkbench()"
                     (click)="save()"
                 >
                     Save parsing
@@ -105,14 +111,54 @@
                     <span class="text-secondary text-sm">No sample captured yet — use the sample panel above.</span>
                 }
             </div>
+            @if (pluginDef(); as plugin) {
+                <p class="text-secondary m-0 text-sm">
+                    @if (plugin.ingestable) {
+                        This parser loads through the pipeline TOON (a plugin ingester with segment
+                        schemas) — configure and test it here, author the pipeline in the TOON.
+                    } @else {
+                        This format previews today — loading it into Tables arrives with the flatten
+                        configuration, so the draft cannot save this type yet.
+                    }
+                </p>
+            }
 
             @if (state.parseError(); as err) {
                 <inspecto-alert variant="error" title="Sample does not parse">{{ err }}</inspecto-alert>
             }
+            @if (pluginError(); as err) {
+                <inspecto-alert variant="error" title="Sample does not parse">{{ err }}</inspecto-alert>
+            }
         </div>
 
+        <!-- Plugin parse result — full width, the served preview (table, or a record tree) -->
+        @if (pluginDef() && pluginPreview(); as p) {
+            <div class="flex flex-wrap items-center gap-3 text-sm">
+                <span class="font-semibold">Parsed sample</span>
+                @if (p.kind === 'table') {
+                    <span class="text-secondary">{{ activeType() }} · {{ p.columns.length }} columns · {{ p.rowCount }} rows</span>
+                    @if (p.rejectedRows > 0) {
+                        <span class="text-secondary">· {{ p.rejectedRows }} rejected</span>
+                    }
+                } @else {
+                    <span class="text-secondary">{{ activeType() }} · {{ p.recordCount }} records</span>
+                }
+            </div>
+            @if (p.kind === 'tree') {
+                <div class="max-h-96 overflow-auto rounded border p-2">
+                    <app-parser-tree [nodes]="p.nodes" />
+                </div>
+                <p class="text-secondary m-0 text-xs">
+                    The decoded record tree. Loading tree-shaped data into Tables needs the flatten
+                    configuration (on the backlog) — until then this preview is the authoring aid.
+                </p>
+            } @else {
+                <inspecto-query-panel [source]="pluginRows()" />
+            }
+        }
+
         <!-- Parsed result — full width, table or (for JSON samples) a record tree -->
-        @if (state.parsePreview(); as p) {
+        @if (!pluginDef() && state.parsePreview(); as p) {
             <div class="flex flex-wrap items-center gap-3 text-sm">
                 <span class="font-semibold">Parsed sample</span>
                 <span class="text-secondary">{{ p.frontend }} · {{ p.columns.length }} columns · {{ p.rowCount }} rows</span>

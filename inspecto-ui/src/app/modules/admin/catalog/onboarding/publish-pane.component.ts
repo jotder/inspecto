@@ -10,7 +10,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { PUBLISH_ATTRIBUTES } from './publish-attributes';
-import { clearMissingRoots, flattenBlock, nestKeys } from './onboarding-config-utils';
+import { clearMissingRoots, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
 
 /**

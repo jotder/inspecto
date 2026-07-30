@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from './onboarding-config-utils';
+import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from './flat-keys';
 
-describe('onboarding-config-utils', () => {
+describe('flat-keys', () => {
     it('flattens nested blocks to __-separated keys, joining lists', () => {
         expect(
             flattenBlock({ connector: 'sftp', duplicate: { mode: 'checksum' }, include: ['*.csv', '*.txt'] }),

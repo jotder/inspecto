@@ -8,7 +8,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, LensService, apiErrorMessage } from 'app/inspecto/api';
+import { ConfigService, LensService, ParserDef, ParserPreview, ParsersService, apiErrorMessage } from 'app/inspecto/api';
+import { fieldSpecsToAttributes } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -18,7 +19,7 @@ import { QuerySource } from 'app/inspecto/query/query-types';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
-import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from './onboarding-config-utils';
+import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
 
 /** The parsing-block roots this pane owns — switching frontend clears the others' sub-blocks. */
@@ -57,12 +58,33 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     protected readonly state = inject(OnboardingStateService);
     protected readonly lens = inject(LensService);
     private configApi = inject(ConfigService);
+    private parsersApi = inject(ParsersService);
     private fb = inject(FormBuilder);
     private toastr = inject(ToastrService);
 
     @ViewChild('sf') schemaForm?: InspectoSchemaFormComponent;
 
     readonly frontends = PARSING_FRONTENDS;
+
+    /** The served parser catalog (`GET /parsers`); null until it arrives — the four engine-real
+     *  built-ins render regardless, so an old server degrades to exactly the previous behavior. */
+    readonly served = signal<ParserDef[] | null>(null);
+    /** Served parsers beyond the built-ins (plugins: XML today, ASN.1/vendors when deployed). */
+    readonly pluginTypes = computed<ParserDef[]>(() =>
+        (this.served() ?? []).filter((p) => !PARSING_FRONTENDS.some((f) => f.id === p.id)),
+    );
+    /** The selected PLUGIN parser (null = one of the four built-ins is selected). */
+    readonly pluginDef = signal<ParserDef | null>(null);
+    /** The active type id — a built-in frontend or a plugin id (drives the toggle + options form). */
+    readonly activeType = computed(() => this.pluginDef()?.id ?? this.frontend());
+
+    /** A plugin preview result (pane-local: the sample thread's parsed hop stays builtin-only). */
+    readonly pluginPreview = signal<ParserPreview | null>(null);
+    readonly pluginError = signal<string | null>(null);
+    readonly pluginRows = computed<QuerySource>(() => {
+        const p = this.pluginPreview();
+        return { name: 'parsed', rows: p?.kind === 'table' ? p.rows : [] };
+    });
 
     private readonly parsingBlock =
         ((this.state.config() ?? {})['parsing'] as Record<string, unknown> | undefined) ?? {};
@@ -74,7 +96,11 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         !!((this.state.config() ?? {})['processing'] as Record<string, unknown> | undefined)?.['ingester'];
 
     readonly frontend = signal<ParsingFrontend>(normalizeFrontend(this.parsingBlock['frontend']));
-    readonly specs = computed(() => parsingAttributesFor(this.frontend()));
+    /** The options form: engine-real specs for the built-ins, the SERVED grammar schema for plugins. */
+    readonly specs = computed(() => {
+        const plugin = this.pluginDef();
+        return plugin ? fieldSpecsToAttributes(plugin.grammarSchema) : parsingAttributesFor(this.frontend());
+    });
     readonly initial = flattenBlock(this.parsingBlock);
     /** Frontend switched since load — dirty even before a field is touched. */
     private readonly frontendTouched = signal(false);
@@ -97,7 +123,7 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         const text = this.state.sample()?.text;
         if (!text) return null;
         const s = sniffFrontend(text);
-        return s && s.frontend !== this.frontend() ? s : null;
+        return s && s.frontend !== this.activeType() ? s : null;
     });
 
     /** Parsed-result presentation; Tree is offered for the json frontend when the sample parses. */
@@ -118,6 +144,11 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
             }
         }
         this.state.registerDirtyCheck(this.dirtyCheck);
+        // The catalog is additive: without it (old server / offline blip) the built-ins still work.
+        this.parsersApi.list().subscribe({
+            next: (list) => this.served.set(list),
+            error: () => this.served.set(null),
+        });
     }
 
     ngOnDestroy(): void {
@@ -125,10 +156,35 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     }
 
     setFrontend(f: ParsingFrontend): void {
-        if (f === this.frontend()) return;
+        if (f === this.frontend() && !this.pluginDef()) return;
+        this.pluginDef.set(null);
         this.frontend.set(f);
         this.frontendTouched.set(true);
         if (f === 'fixedwidth' && this.fwFields.length === 0) this.addField();
+    }
+
+    /** Toggle click: a built-in frontend id, or a served plugin id (preview-only options form). */
+    setType(id: string): void {
+        const plugin = this.pluginTypes().find((p) => p.id === id);
+        if (!plugin) {
+            this.setFrontend(id as ParsingFrontend);
+            return;
+        }
+        if (this.pluginDef()?.id === plugin.id) return;
+        // Plugin selection is a preview/authoring aid — Save stays disabled, so it is deliberately
+        // NOT part of the unsaved-changes dirty state (nothing here can be lost by navigating).
+        this.pluginDef.set(plugin);
+        this.pluginPreview.set(null);
+        this.pluginError.set(null);
+    }
+
+    /** The toggle's short name for a served label ("XML — XML file format" → "XML"). */
+    typeName(label: string): string {
+        return label.split(' — ')[0];
+    }
+
+    typeHint(label: string): string {
+        return label.split(' — ')[1] ?? '';
     }
 
     frontendLabel(f: ParsingFrontend): string {
@@ -190,6 +246,27 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     testParse(): void {
         const sample = this.state.sample();
         if (!sample) return;
+        const plugin = this.pluginDef();
+        if (plugin) {
+            // Stateless grammar preview — the plugin path (table or tree), pane-local: the sample
+            // thread's parsed hop is fed only by the built-ins the draft can actually go live with.
+            if (!this.schemaForm?.validate()) return;
+            const grammar = nestKeys(this.schemaForm.value());
+            this.testing.set(true);
+            this.pluginError.set(null);
+            this.parsersApi.preview(plugin.id, grammar, sample.text).subscribe({
+                next: (p) => {
+                    this.testing.set(false);
+                    this.pluginPreview.set(p);
+                },
+                error: (e) => {
+                    this.testing.set(false);
+                    this.pluginPreview.set(null);
+                    this.pluginError.set(apiErrorMessage(e, 'The sample does not parse with this grammar.'));
+                },
+            });
+            return;
+        }
         const parsing = this.buildParsingBlock();
         if (!parsing) return;
         const draft = mergeBlock(this.state.config() ?? {}, { parsing });

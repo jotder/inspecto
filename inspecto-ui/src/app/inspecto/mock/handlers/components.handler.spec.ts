@@ -125,20 +125,12 @@ describe('componentsHandler', () => {
         expect(studioOnly(req('GET', '/api/components/grammar'), store)).toBeUndefined(); // falls through
     });
 
-    it('previews a pasted DSV sample with the configured delimiter', () => {
+    it('no longer owns the grammar preview — that moved to the served /parsers domain', () => {
         const store = seededStore();
         const res = handler(
-            req('POST', '/api/components/grammar/preview', {
-                parserType: 'dsv',
-                content: { column_delimiter: '|', header_position: 'top' },
-                sampleText: 'a|b\n1|2\nbad_row\n3|4',
-            }),
+            req('POST', '/api/components/grammar/preview', { parserType: 'dsv', sampleText: 'a,b\n1,2' }),
             store,
         );
-        const preview = res?.body as { kind: string; columns: string[]; rowCount: number; rejectedRows: number };
-        expect(preview.kind).toBe('table');
-        expect(preview.columns).toEqual(['a', 'b']);
-        expect(preview.rowCount).toBe(2);
-        expect(preview.rejectedRows).toBe(1);
+        expect(res).toBeUndefined(); // falls through to parsers.handler / the real route
     });
 });

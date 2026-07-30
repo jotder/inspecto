@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, forkJoin, map, of, switchMap, tap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ConfigDeleteResult, ConfigService, ConfigWriteResult, Finding, ParsingPreview, SchemaPreview } from 'app/inspecto/api';
-import { mergeBlock } from './onboarding-config-utils';
+import { mergeBlock } from 'app/inspecto/component-model';
 
 /** Stage ids across both kinds — a Stream uses schema/enrichment, a Reference keys. */
 export type OnboardingStageId = 'collection' | 'parsing' | 'schema' | 'enrichment' | 'keys' | 'publish';

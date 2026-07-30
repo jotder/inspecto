@@ -89,8 +89,8 @@
             <mat-form-field subscriptSizing="dynamic" class="w-72">
                 <mat-label>Parser type</mat-label>
                 <mat-select [value]="parserType()" (selectionChange)="onTypeChange($event.value)">
-                    @for (t of parserTypes; track t.type) {
-                        <mat-option [value]="t.type">{{ t.label }}</mat-option>
+                    @for (t of parserDefs(); track t.id) {
+                        <mat-option [value]="t.id">{{ t.label }}</mat-option>
                     }
                 </mat-select>
             </mat-form-field>
@@ -118,75 +118,9 @@
                 </button>
             </div>
             <div class="overflow-y-auto pr-2" [style.maxHeight]="bigProps() ? '76vh' : '50vh'">
-                <!-- ASN.1 schema module — the one bespoke property (network-backed picker + upload). -->
-                @if (moduleProp(); as mp) {
-                    <div class="mb-3" [formGroup]="moduleForm">
-                        <div class="flex items-end gap-2">
-                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                                <mat-label>{{ mp.label }}</mat-label>
-                                <mat-select formControlName="schema_spec" (selectionChange)="onModuleSelect($event.value)">
-                                    <mat-option value="">— none —</mat-option>
-                                    @for (mod of asn1Modules(); track mod.name) {
-                                        <mat-option [value]="mod.name">{{ mod.name }}</mat-option>
-                                    }
-                                </mat-select>
-                                @if (moduleForm.get('schema_spec')?.hasError('required') && moduleForm.get('schema_spec')?.touched) {
-                                    <mat-error>{{ mp.label }} is required</mat-error>
-                                }
-                            </mat-form-field>
-                            <button mat-stroked-button type="button" class="mb-1"
-                                    matTooltip="Upload a .asn / .asn1 module" (click)="moduleFile.click()">
-                                <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                                <span class="ml-1">Upload</span>
-                            </button>
-                            <input #moduleFile type="file" class="hidden" accept=".asn,.asn1,.txt"
-                                   aria-label="Upload ASN.1 module file"
-                                   (change)="onModuleUpload($any($event.target).files); moduleFile.value = ''" />
-                        </div>
-                        @if (mp.hint) { <div class="text-secondary text-xs">{{ mp.hint }}</div> }
-                        <div class="text-secondary mt-1 text-xs">Source shows in the <span class="font-semibold">Grammar source</span> pane below ↓</div>
-                    </div>
-                }
-
-                <!-- Every other property, schema-driven: required up front, optional collapsed, advanced behind the gear. -->
+                <!-- Schema-driven from the SERVED grammar: required up front, optional collapsed, advanced behind the gear. -->
                 <inspecto-schema-form [specs]="schemaFormSpecs()" [initial]="schemaFormInitial()"></inspecto-schema-form>
             </div>
-        </section>
-    }
-
-    <!-- GRAMMAR source pane (ASN.1 schema module viewer) -->
-    @if (paneVisible('module') && parserType() === 'asn1') {
-        <section aria-label="Grammar source" class="mt-4">
-            <div class="mb-1 flex items-center gap-2">
-                <span class="text-xs font-semibold uppercase tracking-wider opacity-60">Grammar source</span>
-                <span class="flex-1"></span>
-                <button
-                    mat-icon-button
-                    type="button"
-                    [attr.aria-label]="maximized() === 'module' ? 'Restore grammar pane' : 'Maximize grammar pane'"
-                    [matTooltip]="maximized() === 'module' ? 'Restore' : 'Maximize'"
-                    (click)="toggleMaximize('module')"
-                >
-                    <mat-icon
-                        class="icon-size-5"
-                        [svgIcon]="maximized() === 'module' ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
-                    ></mat-icon>
-                </button>
-            </div>
-            @if (moduleError(); as e) {
-                <inspecto-alert class="block" variant="error" icon="heroicons_outline:x-circle">{{ e }}</inspecto-alert>
-            } @else if (moduleLoading()) {
-                <div class="flex items-center gap-2 text-sm"><mat-spinner diameter="16"></mat-spinner> Loading module…</div>
-            } @else if (moduleText() != null) {
-                <pre class="overflow-auto rounded border p-2 font-mono text-xs"
-                     style="background: var(--gamma-bg-default); border-color: var(--gamma-border)"
-                     [style.maxHeight]="bigModule() ? '76vh' : '15rem'">{{ moduleText() }}</pre>
-            } @else {
-                <div class="text-secondary rounded border border-dashed p-4 text-center text-xs"
-                     style="border-color: var(--gamma-border)">
-                    Choose a module or upload a file (above) to view its grammar source here.
-                </div>
-            }
         </section>
     }
 

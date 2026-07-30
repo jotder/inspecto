@@ -13,7 +13,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { connectionOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connections/connection-form.dialog';
 import { COLLECTOR_ATTRIBUTES } from './collector-attributes';
-import { KEY_SEP, clearMissingRoots, flattenBlock, nestKeys } from './onboarding-config-utils';
+import { KEY_SEP, clearMissingRoots, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
 
 /**

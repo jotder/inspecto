@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, ParsingPreview } from 'app/inspecto/api';
+import { ConfigService, ParserDef, ParsersService, ParsingPreview } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingParsingPaneComponent } from './parsing-pane.component';
 import { OnboardingStateService } from './onboarding-state.service';
@@ -12,13 +12,31 @@ const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn
 const PREVIEW: ParsingPreview = { frontend: 'delimited', columns: ['a'], rowCount: 1, rows: [{ a: '1' }], rejectedRows: 0 };
 const WRITE_OK = { type: 'pipeline', written: true, path: 'x.toon', name: 'x', bytes: 1, overwritten: false, findings: [] };
 
-function create(config: Record<string, unknown>, api: Partial<ConfigService> = {}) {
+/** A served catalog: the four built-ins (schemas irrelevant here) + the preview-only XML plugin. */
+const XML_DEF: ParserDef = {
+    id: 'xml', label: 'XML — XML file format', hierarchical: true, ingestable: false,
+    grammarSchema: [
+        { path: 'xml.record_element', label: 'Record element', type: 'STRING' },
+        { path: 'xml.namespace_aware', label: 'Namespace aware', type: 'BOOL', defaultValue: false },
+    ],
+};
+const CATALOG: ParserDef[] = [
+    { id: 'delimited', label: 'Delimited — …', hierarchical: false, ingestable: true, grammarSchema: [] },
+    XML_DEF,
+];
+
+function create(
+    config: Record<string, unknown>,
+    api: Partial<ConfigService> = {},
+    parsers: Partial<ParsersService> = {},
+) {
     TestBed.configureTestingModule({
         imports: [OnboardingParsingPaneComponent],
         providers: [
             provideNoopAnimations(),
             OnboardingStateService,
             { provide: ConfigService, useValue: { write: vi.fn(() => of(WRITE_OK)), previewParsing: vi.fn(() => of(PREVIEW)), ...api } },
+            { provide: ParsersService, useValue: { list: vi.fn(() => of(CATALOG)), preview: vi.fn(), ...parsers } },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
@@ -26,7 +44,7 @@ function create(config: Record<string, unknown>, api: Partial<ConfigService> = {
     state.config.set(config);
     const fixture = TestBed.createComponent(OnboardingParsingPaneComponent);
     fixture.detectChanges();
-    return { fixture, state, api: TestBed.inject(ConfigService) };
+    return { fixture, state, api: TestBed.inject(ConfigService), parsers: TestBed.inject(ParsersService) };
 }
 
 describe('OnboardingParsingPaneComponent', () => {
@@ -153,6 +171,62 @@ describe('OnboardingParsingPaneComponent', () => {
         // A non-JSON frontend has no tree offer.
         c.setFrontend('delimited');
         expect(c.treeNodes()).toBeNull();
+    });
+
+    it('offers served plugin types beyond the built-ins, with the served grammar as the form', () => {
+        const { fixture, state } = create({ name: 'x' });
+        const c = fixture.componentInstance;
+        expect(c.pluginTypes().map((p) => p.id)).toEqual(['xml']); // built-ins never duplicate
+        c.setType('xml');
+        fixture.detectChanges();
+        expect(c.activeType()).toBe('xml');
+        expect(c.specs().map((s) => s.key)).toEqual(['xml__record_element', 'xml__namespace_aware']);
+        // Preview-only: Save disabled with the honest note; selection alone is not "unsaved changes".
+        expect(fixture.nativeElement.textContent).toContain('flatten configuration');
+        const save = Array.from(fixture.nativeElement.querySelectorAll('button'))
+            .find((b) => (b as HTMLElement).textContent!.includes('Save parsing')) as HTMLButtonElement;
+        expect(save.disabled).toBe(true);
+        expect(state.isDirty()).toBe(false);
+        // Back to a built-in restores the engine-real specs + Save.
+        c.setType('delimited');
+        fixture.detectChanges();
+        expect(c.pluginDef()).toBeNull();
+        expect(c.specs().some((s) => s.key === 'delimited__delimiter')).toBe(true);
+    });
+
+    it('plugin Test parse posts the nested grammar and renders a served TREE result', () => {
+        const preview = vi.fn(() => of({
+            kind: 'tree' as const, recordCount: 2,
+            nodes: [{ label: 'order', type: 'element', children: [{ label: '@id', type: 'attr', value: '1' }] }],
+        }));
+        const { fixture, state, parsers } = create({ name: 'x' }, {}, { preview });
+        state.captureSample('s.xml', '<orders><order id="1"/><order id="2"/></orders>');
+        const c = fixture.componentInstance;
+        c.setType('xml');
+        fixture.detectChanges();
+        c.schemaForm?.form.get('xml__record_element')?.setValue('order');
+        c.testParse();
+        // The nested grammar carries the touched field AND the schema's declared defaults.
+        expect(parsers.preview).toHaveBeenCalledWith('xml',
+            { xml: { record_element: 'order', namespace_aware: false } },
+            '<orders><order id="1"/><order id="2"/></orders>');
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('app-parser-tree')).toBeTruthy();
+        expect(fixture.nativeElement.textContent).toContain('2 records');
+        // The sample thread's parsed hop stays builtin-only — a plugin preview never feeds it.
+        expect(state.parsePreview()).toBeNull();
+    });
+
+    it('a plugin preview failure surfaces the 422 reason', () => {
+        const preview = vi.fn(() => throwError(() => ({ status: 422, error: { message: 'no elements match' } })));
+        const { fixture, state } = create({ name: 'x' }, {}, { preview });
+        state.captureSample('s.xml', '<a/>');
+        const c = fixture.componentInstance;
+        c.setType('xml');
+        fixture.detectChanges();
+        c.testParse();
+        expect(c.pluginError()).toBeTruthy();
+        expect(c.pluginPreview()).toBeNull();
     });
 
     it('has no a11y violations', async () => {
