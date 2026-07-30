@@ -39,10 +39,36 @@ describe('OnboardingParsingPaneComponent', () => {
         expect(c.fwFields.length).toBe(1);
     });
 
+    it('adopts a saved json frontend on (re-)entering the stage, clean until touched', () => {
+        // Re-entering the stage rebuilds the pane from the server-held draft: the saved frontend must
+        // win, and merely rendering must NOT mark the stage dirty — a spuriously dirty pane raises the
+        // rail's unsaved-changes guard and silently blocks stage navigation.
+        const { fixture, state } = create({ name: 'x', parsing: { frontend: 'json', json: { format: 'newline' } } });
+        expect(fixture.componentInstance.frontend()).toBe('json');
+        expect(fixture.componentInstance.specs().some((s) => s.key === 'json__format')).toBe(true);
+        expect(state.isDirty()).toBe(false);
+    });
+
+    it('an unknown frontend falls back to delimited (xml/asn1 are not engine-real)', () => {
+        const { fixture } = create({ name: 'x', parsing: { frontend: 'xml' } });
+        expect(fixture.componentInstance.frontend()).toBe('delimited');
+    });
+
     it('shows the plugin banner instead of the editor for plugin-parsed pipelines', () => {
         const { fixture } = create({ name: 'x', processing: { ingester: 'com.example.Ing' } });
         expect(fixture.componentInstance.pluginManaged).toBe(true);
         expect(fixture.nativeElement.textContent).toContain('Plugin ingester');
+        // Nothing to configure here ⇒ no sample capture either.
+        expect(fixture.nativeElement.querySelector('app-onboarding-sample-panel')).toBeNull();
+    });
+
+    it('hosts the sample capture panel itself, above the file-type picker', () => {
+        const { fixture } = create({ name: 'x' });
+        const panel = fixture.nativeElement.querySelector('app-onboarding-sample-panel');
+        expect(panel).toBeTruthy();
+        const toggles = fixture.nativeElement.querySelector('mat-button-toggle-group');
+        // DOCUMENT_POSITION_FOLLOWING (4) ⇒ the picker comes after the sample panel.
+        expect(panel.compareDocumentPosition(toggles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('test parse sends the merged draft + sample and stores the preview on the session', () => {

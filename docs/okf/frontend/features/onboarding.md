@@ -32,14 +32,19 @@ Configured / Validated — Validated is session-only, from a passed sample test)
 Draft → Ready (all required stages configured) → Live (`active: true`). Resume lands on the first
 incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active).
 
-## Sample-as-thread (a full-width strip ABOVE the stage pane)
+## Sample-as-thread (a strip at the top of the PARSING stage)
 
 One captured sample (file ≤256KB or paste, session-held) threads through the stages: raw → parsed
 (`POST /config/preview/parsing`, real DuckDB) → cast-checked (`POST /config/preview/schema`,
 TRY_CAST). A new sample or re-parse invalidates the downstream hops. Since the 2026-07-29 reflow
-the panel is a **collapsible full-width strip on top of the active stage pane** (choose the file →
-view it → configure below), not a right-hand aside: the header row carries the thread chips
-(lines / parsed / cast) and capture actions, the body shows up to 40 raw lines, and it is now
+the panel is a **collapsible full-width strip mounted by the Parsing pane itself** — the stage that
+consumes it (choose the file → view it → pick a type and options below) — replacing the old
+right-hand aside. ⚠ It is deliberately **not** in the shell: on Collection/Publish it was dead
+weight, and the state is session-held in `OnboardingStateService`, so downstream stages still read
+the thread without rendering the panel (`onboarding-shell.component.spec` pins that the shell does
+not render it; the parsing pane pins that it precedes the file-type picker). It is also skipped in
+the plugin-ingester branch, where there is nothing to configure. The header row carries the thread
+chips (lines / parsed / cast) and capture actions, the body shows up to 40 raw lines, and it is now
 visible on small screens too. The schema pane DERIVES its fields from the parsed columns
 (frontend-aware selectors: positional for delimited/fixedwidth, verbatim key for json/text_regex)
 and offers only the four honestly-cast types (VARCHAR/DOUBLE/DATE/TIMESTAMP — exactly what
@@ -49,7 +54,7 @@ value matches; "Validate types" stays the verdict).
 
 ## Parsing stage flow (choose file → view → type → options → test → table/tree)
 
-The pane reads top-to-bottom under the sample strip: file-type toggle (with a **sniffed
+The pane reads top-to-bottom, starting with its own sample strip: file-type toggle (with a **sniffed
 suggestion chip** — `sniffFrontend` recognises NDJSON / JSON-array / consistent delimiters and is
 applied only by click, never automatically, prefilling the sniffed delimiter) → per-frontend
 options → Test parse → full-width results. For the `json` frontend the results offer a

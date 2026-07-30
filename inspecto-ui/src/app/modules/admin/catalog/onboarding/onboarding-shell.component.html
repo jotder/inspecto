@@ -100,9 +100,8 @@
                 </ul>
             </nav>
 
-            <!-- Active stage pane, with the sample-as-thread strip on top (full width) -->
-            <main class="flex min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-6 sm:p-8">
-                <app-onboarding-sample-panel />
+            <!-- Active stage pane (the sample strip belongs to Parsing, the stage that uses it) -->
+            <main class="flex min-w-0 flex-1 flex-col overflow-y-auto p-6 sm:p-8">
                 <ng-container [ngComponentOutlet]="activeComponent()" />
             </main>
         </div>

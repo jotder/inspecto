@@ -15,6 +15,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.component';
 import { QueryPanelComponent } from 'app/inspecto/query/query-panel.component';
 import { QuerySource } from 'app/inspecto/query/query-types';
+import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from './onboarding-config-utils';
@@ -46,6 +47,7 @@ const PARSING_ROOTS = ['frontend', 'delimited', 'fixedwidth', 'json', 'text_rege
         InspectoAlertComponent,
         ChipComponent,
         InspectoSchemaFormComponent,
+        OnboardingSamplePanelComponent,
         ParserTreeComponent,
         QueryPanelComponent,
     ],

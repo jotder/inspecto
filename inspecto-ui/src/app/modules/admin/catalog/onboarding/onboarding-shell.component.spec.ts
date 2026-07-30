@@ -65,6 +65,13 @@ describe('OnboardingShellComponent', () => {
         expect(fixture.componentInstance.activeStage().id).toBe('parsing');
     });
 
+    it('does not render the sample panel itself — it belongs to the Parsing stage', () => {
+        const fixture = create({ name: 'x' }); // lands on Collection
+        expect(fixture.componentInstance.activeStage().id).toBe('collection');
+        expect(fixture.nativeElement.querySelector('app-onboarding-sample-panel')).toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('Capture one representative sample');
+    });
+
     it('shows the not-found state for a 404 draft', () => {
         const fixture = create({ name: 'ghost' }, { read: () => throwError(() => ({ status: 404 })) });
         expect(fixture.nativeElement.textContent).toContain('No pipeline or draft named');

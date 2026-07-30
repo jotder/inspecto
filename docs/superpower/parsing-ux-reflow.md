@@ -53,12 +53,16 @@ Files: `inspecto-ui/src/app/modules/admin/catalog/onboarding/collector-attribute
 - Rewrite the pane spec's adopt-on-pick tests for the new model (note: root `{provide: MatDialog}`
   is silently shadowed in these specs — use `TestBed.overrideComponent`, PROJECT_NOTES §6).
 
-## Part B — Onboarding shell: sample panel moves on top
+## Part B — Sample panel moves on top of the PARSING pane
 
-Files: `onboarding-shell.component.html` (+spec), `sample-panel.component.ts` (+spec).
+Files: `onboarding-shell.component.html` (+spec), `sample-panel.component.ts` (+spec),
+`parsing-pane.component.html/.ts` (+spec).
 
-- Delete the right `<aside>` + `inspectoSplit="onboard-sample"` handle; render
-  `<app-onboarding-sample-panel />` full-width at the top of `<main>`, above the stage outlet.
+- Delete the right `<aside>` + `inspectoSplit="onboard-sample"` handle. **Operator revision
+  (2026-07-30): the strip is mounted by the Parsing pane, not the shell** — it was first put above
+  the stage outlet (common to every stage), which made it dead weight on Collection/Publish. The
+  shell renders no sample UI at all; state stays session-held in `OnboardingStateService` so
+  downstream stages keep reading the thread. Skipped in the plugin-ingester branch.
 - Restyle the panel as a horizontal strip: one header row (file name · line count · compact thread
   chips for raw/parsed/cast replacing the "After parsing/After schema" blocks · Replace/Clear/
   Choose file/Paste actions · collapse toggle); expanded body = the raw `pre`,

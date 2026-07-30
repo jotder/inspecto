@@ -13,12 +13,14 @@ const RAW_PREVIEW_LINES = 40;
 
 /**
  * The sample-as-thread strip (design §4.3): ONE captured sample follows the builder through the
- * stages — raw here, parsed once the Parsing stage tests it, cast/mapped in later phases. Renders
- * full-width ABOVE the active stage pane (choose the file, see it, then configure below); the
- * header chips summarize the thread (raw → parsed → cast) and the raw preview collapses when the
- * builder is done reading it. The sample is session-held and re-capturable (upload or paste); it
- * never becomes part of the config. Capture is allowed in every lens — it changes nothing on the
- * server.
+ * stages — raw here, parsed once the Parsing stage tests it, cast/mapped in later phases. It is
+ * mounted **at the top of the Parsing stage only** (the stage that consumes it: choose the file,
+ * see it, then pick a type and options below) — not in the shell, where it would be dead weight on
+ * Collection/Publish. The state it reads is session-held in {@link OnboardingStateService}, so the
+ * downstream stages still see the thread without rendering this panel. The header chips summarize
+ * the thread (raw → parsed → cast) and the raw preview collapses when the builder is done reading
+ * it. The sample is re-capturable (upload or paste) and never becomes part of the config. Capture
+ * is allowed in every lens — it changes nothing on the server.
  */
 @Component({
     selector: 'app-onboarding-sample-panel',

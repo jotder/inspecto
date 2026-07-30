@@ -18,7 +18,6 @@ import { OnboardingEnrichmentPaneComponent } from './enrichment-pane.component';
 import { OnboardingParsingPaneComponent } from './parsing-pane.component';
 import { OnboardingPlaceholderPaneComponent } from './placeholder-pane.component';
 import { OnboardingPublishPaneComponent } from './publish-pane.component';
-import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { OnboardingSchemaMappingPaneComponent } from './schema-mapping-pane.component';
 import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './onboarding-state.service';
 
@@ -27,8 +26,9 @@ import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './on
  * server-held pipeline draft, not a locked stepper: the rail mirrors the data path (Collect →
  * Parse → Shape → Publish), every stage is jumpable, readiness is computed from the config
  * blocks, and the whole session is resumable because the draft IS the server state (D3).
- * Opening without a stage lands on the first incomplete one. A full-width sample strip above
- * the stage pane threads ONE captured sample through the stages (§4.3).
+ * Opening without a stage lands on the first incomplete one. ONE captured sample threads through
+ * the stages (§4.3) — session-held in {@link OnboardingStateService}, but the capture UI lives in
+ * the Parsing stage, the stage that actually consumes it.
  */
 @Component({
     selector: 'app-onboarding-shell',
@@ -45,7 +45,6 @@ import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './on
         InspectoEmptyStateComponent,
         InspectoBreadcrumbComponent,
         StatusBadgeComponent,
-        OnboardingSamplePanelComponent,
     ],
     templateUrl: './onboarding-shell.component.html',
 })

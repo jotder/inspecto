@@ -5,6 +5,9 @@
             the pipeline TOON directly. The guided editor does not modify plugin parsing.
         </inspecto-alert>
     } @else {
+        <!-- Choose a file and view it FIRST — the sample this stage configures against. -->
+        <app-onboarding-sample-panel />
+
         <div class="flex max-w-3xl flex-col gap-4">
             <p class="text-secondary m-0">
                 How each collected file's raw bytes become rows. Pick the file type, set its options,
