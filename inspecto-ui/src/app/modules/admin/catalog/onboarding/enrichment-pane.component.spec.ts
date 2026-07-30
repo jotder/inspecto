@@ -70,7 +70,7 @@ async function create(
     state.name.set(String(config['name'] ?? ''));
     state.config.set(config);
     if (opts.enrichment !== undefined) state.enrichmentConfig.set(opts.enrichment);
-    await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
+    await TestBed.compileComponents(); // the shared data-table pulls in @defer-loaded blocks
     const fixture = TestBed.createComponent(OnboardingEnrichmentPaneComponent);
     fixture.detectChanges();
     return { fixture, state, api: TestBed.inject(ConfigService), table };

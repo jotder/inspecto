@@ -200,10 +200,11 @@ src/app/
   ⚠ **`<inspecto-query-panel>` is NOT the row-preview table** (2026-07-30) — it is the query *builder*, and
   it belongs only on the two hosts that consume its `(queryChange)` output (Studio ▸ Queries, Dataset
   editor). Five panes were mounting it `[source]`-only as a dumb preview grid, which is exactly why those
-  previews looked unlike every other table in the app; they are now `tier="pro"` data-tables (onboarding
-  parsed sample ×2, Parser dialog, rejected rows, enrichment preview). **A row preview that wants SQL gets
-  the pro tier + a `sourceName`** — the editor seeds `SELECT * FROM "<sourceName>"`, so the user queries
-  the rows without knowing any table name; never re-mount the builder to get a table.
+  previews looked unlike every other table in the app; they are now data-tables — `tier="pro"` on the
+  parsed sample (onboarding ×2 + Parser dialog), plain `standard` on the rejected rows and enrichment
+  preview. **A row preview that wants SQL gets the pro tier + a `sourceName`** — the editor seeds
+  `SELECT * FROM "<sourceName>"`, so the user queries the rows without knowing any table name. Give pro
+  only where exploring the rows is the point; never re-mount the builder to get a table.
 - **ag-Grid internals** (used inside the data-table, rarely direct): `app/inspecto/grid`
   (`INSPECTO_DEFAULT_COL_DEF`, `actionsColumn`, `fmtDateTime`, `InspectoGridThemeService`, `noRowsOverlay`).
   Bind `(firstDataRendered)` AND `(rowDataUpdated)` → `refreshActionsCells($event)` (actions column) or

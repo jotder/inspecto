@@ -47,7 +47,7 @@ async function create(config: Record<string, unknown>, api: Partial<ConfigServic
     const state = TestBed.inject(OnboardingStateService);
     state.config.set(config);
     if (parsePreview) state.parsePreview.set(parsePreview);
-    await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
+    await TestBed.compileComponents(); // the shared data-table pulls in @defer-loaded blocks
     const fixture = TestBed.createComponent(OnboardingSchemaMappingPaneComponent);
     fixture.detectChanges();
     return { fixture, state, api: TestBed.inject(ConfigService) };

@@ -63,16 +63,18 @@ options → Test parse → full-width results. For the `json` frontend the resul
 that the engine reads **top-level keys only** — a nested value lands as JSON text in one column
 (the flatten DSL is BACKLOG'd engine work; `parsing.json.records_path` is locked to `$`).
 
-**Every row-preview surface in onboarding is `<inspecto-data-table tier="pro">`** (2026-07-30) — the
-parsed sample (builtin and plugin), the schema stage's rejected rows, and the enrichment preview. They
-were `<inspecto-query-panel>` mounts bound `[source]`-only, i.e. the query *builder* used as a dumb
-table, which is why they looked unlike the ~20 other grids in the app. The pro tier keeps what a
-preview genuinely needs (search · column chooser · CSV export) and adds the **offline SQL editor over
-the sample rows**, seeded `SELECT * FROM "<sourceName>"` (`parsed` / `rejected` / `enriched`) so the
-author never has to know a table name. `query-panel` now has exactly two hosts — Studio ▸ Queries and
-the Dataset editor — the two that consume its `(queryChange)` output. ⚠ A host spec must
-`await TestBed.compileComponents()` (the pro tier `@defer`-loads CodeMirror) and stub
-`InspectoGridThemeService`, which otherwise chains to the app shell's `GAMMA_APP_CONFIG`.
+**Every row-preview surface in onboarding is `<inspecto-data-table>`** (2026-07-30). They were
+`<inspecto-query-panel>` mounts bound `[source]`-only, i.e. the query *builder* used as a dumb table,
+which is why they looked unlike the ~20 other grids in the app. Tiers are deliberate: the **parsed
+sample** (builtin, plugin, and the Pipelines Parser dialog) is `tier="pro"` with `sourceName="parsed"`,
+so its **offline SQL editor over the sample rows** comes up seeded `SELECT * FROM "parsed"` and the
+author never has to know a table name; the schema stage's **rejected rows** and the **enrichment
+preview** are the default `standard` tier — search · column chooser · CSV export, no SQL, because
+there is nothing to explore there that the pane does not already say. `query-panel` now has exactly
+two hosts — Studio ▸ Queries and the Dataset editor — the two that consume its `(queryChange)` output.
+⚠ A host spec must `await TestBed.compileComponents()` (the table `@defer`-loads blocks; the pro tier
+loads CodeMirror) and stub `InspectoGridThemeService`, which otherwise chains to the app shell's
+`GAMMA_APP_CONFIG`.
 
 Since 2026-07-30 the toggle also appends the **served plugin parsers** (`GET /parsers` — XML today,
 ASN.1/vendor formats when their plugins deploy; `okf/backend/engine/parser-plugins.md`): their
