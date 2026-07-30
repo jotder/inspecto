@@ -245,7 +245,16 @@ The Pipeline's `wiring` *is* its graph. ⛔ never "Flow".
 **Step** — One node in a Pipeline. A Step is a Parser, Transform, Enrichment, or Sink — **or** an embedded Job —
 **or** a sub-Pipeline.
 
-**Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns.
+**Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
+— or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
+sit behind one self-describing contract (`ParserPlugin`, served by `GET /parsers`): DuckDB-native reads for the
+built-ins and custom Java decoders deployed as plugins. Fully transparent — a user never needs to know which.
+
+**Grammar** — The authored options that tell a **Parser** how to read one file format (delimiter + header for
+delimited, record element for XML, schema module for ASN.1, …). Each Parser declares its grammar's schema
+(`grammarSchema`, the served `FieldSpec` vocabulary) so the options form renders generically; a Grammar
+persists as the reusable `grammar` component kind and is referenced by parser Steps via `use`.
+⛔ not "parser config" / "parse options" in UI copy — one concept, one word.
 
 **Transform** — Reshapes/derives/aggregates (cubes) data. When it materializes output it produces a **Derived
 Table**.
