@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.gamma.asn</groupId>
+        <artifactId>asn-decoders</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>asn-transform</artifactId>
+    <description>
+        Transform/flatten engine (REDESIGN.md §4.4): JDK-only JSON parser, legacy tx.json
+        config loader, function registry, and a faithful port of the legacy transformer2
+        semantics (no static state). Vendor functions live behind FunctionRegistry —
+        core stays vendor-free.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-plugin-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

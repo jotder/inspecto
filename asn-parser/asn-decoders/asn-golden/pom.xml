@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.gamma.asn</groupId>
+        <artifactId>asn-decoders</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>asn-golden</artifactId>
+    <description>
+        Phase 0 golden-corpus harness (REDESIGN.md §6): runs the legacy decoder over every
+        format with sample data and captures decoded records as canonical JSON (plus
+        flattened rows where a transform config works). The corpus under ../corpus/ is the
+        only objective definition of "current behaviour". Also hosts the parity harness
+        (ParityCheck) validating the new asn-core/asn-schema stack against that corpus.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>legacy-code</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-schema</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-transform</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <!-- vendor transform functions, discovered via ServiceLoader at runtime -->
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-plugin-vendors</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
