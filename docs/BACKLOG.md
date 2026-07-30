@@ -210,6 +210,26 @@ As-built detail for each area lives in its OKF concept (right column) — **not 
 
 ## 5. UI residuals + security-module residuals
 
+> ### 🔴 DATA-GOV-1 — the ASN.1 corpus looks like real operator CDR data, UNPUSHED and held (opened 2026-07-30)
+>
+> The 7 ASN.1 commits on local `master` (`d37eaef2..53619f13`, **not pushed** — see `SESSION_STATUS.local.md`)
+> add **~72 MB across 110 files** that appear to be **production operator data**, not synthetic fixtures:
+> raw captures under `asn-parser/config/rtdms/{etisalat,mtna,aftel,awcc_sgsn,roshan_*}`
+> (`.dat`/`.ber`/`.gz`/`.zip`/`.rar`/`.backup`) **and decoded records in plain text** —
+> `asn-parser/corpus/**/*.records.jsonl` / `*.rows.jsonl`, up to 9 MB each (CDRs already parsed into
+> readable JSON, i.e. *more* exposed than the binaries). Named operators appear in the paths.
+> *(Assessed from filenames, sizes and file roles; subscriber values deliberately not read.)*
+>
+> **Why this is a release gate, not a cleanup chore:** a push is effectively irreversible — SEC-INCIDENT-1
+> established in this very repo that deleting leaked content remediates nothing once history, forks and
+> caches hold it. The 2026-07-30 push therefore **excluded these commits deliberately** (shift 19's work
+> was cherry-picked onto the old `origin/master` instead) and local `master` diverges as a result.
+>
+> **Needs an operator decision before `d37eaef2..53619f13` is ever pushed** — options: gitignore the corpus
+> and distribute fixtures out-of-band · Git LFS with access control · replace with a synthetic/redacted
+> corpus (best for a public repo) · strip the data from those commits. Owner: the ASN shift + whoever owns
+> the customer-data agreements. ⚠ Do not resolve this by force-pushing or by resetting `master`.
+>
 > ### 🔴 SEC-INCIDENT-1 — leaked client secrets, ROTATION OUTSTANDING (opened 2026-07-25)
 >
 > Five OAuth client secrets sat in `inspecto-ui/src/environments/*.ts` and were pushed to a **PUBLIC**
