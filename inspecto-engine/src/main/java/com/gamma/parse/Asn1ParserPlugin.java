@@ -13,6 +13,7 @@ import com.gamma.config.spec.FieldType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -49,6 +50,16 @@ public final class Asn1ParserPlugin implements ParserPlugin {
     @Override
     public boolean hierarchical() {
         return true;
+    }
+
+    /**
+     * Unlike XML, ASN.1 can load to Tables today: {@code Asn1RecordIngester} flattens decoded
+     * records onto segment schemas via the existing {@code parsing.plugin} machinery. The segments
+     * are still authored in the TOON until the segments editor ships.
+     */
+    @Override
+    public Optional<String> ingesterClass() {
+        return Optional.of("com.gamma.ingester.Asn1RecordIngester");
     }
 
     @Override

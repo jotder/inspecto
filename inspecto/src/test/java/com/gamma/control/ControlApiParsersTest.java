@@ -59,12 +59,14 @@ class ControlApiParsersTest {
                 assertTrue(p.get("grammarSchema").size() > 0, p.get("id").asText() + " has no schema");
                 assertTrue(p.get("grammarSchema").get(0).hasNonNull("path"));
             }
-            for (int i : List.of(4, 5)) {
-                JsonNode plugin = list.get(i);
-                assertTrue(plugin.get("hierarchical").asBoolean());
-                assertFalse(plugin.get("ingestable").asBoolean(),
-                        "tree data cannot load to Tables before the flatten config");
-            }
+            // Both plugins are hierarchical; only ASN.1 names an ingester, and the catalog says so.
+            JsonNode xml = list.get(4);
+            assertTrue(xml.get("hierarchical").asBoolean());
+            assertFalse(xml.get("ingestable").asBoolean(),
+                    "tree data cannot load to Tables before the flatten config");
+            JsonNode asn1 = list.get(5);
+            assertTrue(asn1.get("hierarchical").asBoolean());
+            assertTrue(asn1.get("ingestable").asBoolean(), "Asn1RecordIngester flattens onto segments");
             assertTrue(list.get(0).get("ingestable").asBoolean());
         }
     }

@@ -52,7 +52,9 @@ and external entities disabled outright (XXE), grammar `xml.record_element` (loc
 path; blank = the root's direct children) / `namespace_aware` / `encoding` / `max_records`;
 `suggest()` proposes the root's repeated child. Preview-only until the flatten DSL.
 
-Second plugin: `Asn1ParserPlugin` (engine, registered via the same services file) — wraps the
+Second plugin: `Asn1ParserPlugin` (engine, registered via the same services file) — **the first
+hierarchical parser that is `ingestable: true`**, because it names an ingester
+(`com.gamma.ingester.Asn1RecordIngester`, below). Wraps the
 `asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`asn-parser/asn-decoders/asn-facade`,
 depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local repo from the
 separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
@@ -101,6 +103,35 @@ them.
 stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. The plugin
 sits on the new `asn-facade` API and serves grammar + framing; it is preview-only (no
 `ingesterClass()`).
+
+### Loading to Tables — `Asn1RecordIngester` (2026-07-31)
+
+ASN.1 loads through the **existing `parsing.plugin` machinery**, not a new path: `frontend: plugin`
++ `plugin.ingester` + `plugin.segments` + `plugin.ingester_config`. ⚠ `asn1` is a *catalog id for
+preview/authoring*, *never* a `parsing.frontend` value — `PipelineConfigParser`'s `FRONTENDS` set is
+`{delimited, fixedwidth, fixed_width, json, text_regex, plugin}` and always will be.
+
+`com.gamma.ingester.Asn1RecordIngester` (engine, alongside `TypedRecordIngester`):
+
+- **Segment key = the decoded record's own name.** For the corpus's union-style vendor grammars
+  (a SET/SEQUENCE whose tagged components are the record types) `SchemaBinder.bind` names a record
+  by the *matched alternative* — e.g. `moCallRecord` — so that name is the segment key. A
+  single-type grammar yields the root type name. An undeclared record type is `sink.junk()`,
+  mirroring how `TypedRecordIngester` treats an unknown type prefix.
+- **`raw.fields[].selector` is a DOTTED PATH**, not a positional index — the one real divergence
+  from the text ingesters. `party.number` walks the `RecordMapper.toMap` record map.
+- ⚠ **A selector must name a leaf.** A container (sub-record, or a repeated field's list) yields
+  `NULL`, not a stringified subtree — deliberately matching the legacy transform engine, which also
+  drops lists of scalars rather than inventing a join. A repeated field is not one column; give it
+  its own segment.
+- A trailing derived **`EVENT_TYPE`** column carries the segment key (the `TypedRecordIngester`
+  convention), so schemas can partition by record type without redeclaring it.
+- ⚠ **Any parse error fails the whole file** → `QUARANTINED_UNREADABLE`. These framings carry no
+  length prefix, so `SKIP_RECORD` cannot resync; half-ingesting a CDR file is worse than
+  quarantining it. Input is memory-mapped (`ByteSource.map`), so files >2 GB are fine.
+
+`ingester_config`: `grammar` (path to the `.asn` module, required) · `root_type` (required) ·
+`strictness` · `file_header_length` · `record_header_length`.
 
 Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
 - **Declarative decode profile — the remaining half.** Framing is now served (above), which was the

@@ -26,14 +26,18 @@ class ParsersTest {
     }
 
     @Test
-    void builtinsAreIngestableThePreviewOnlyPluginsAreNot() {
+    void ingestabilityTracksWhetherAParserCanActuallyLoadToTables() {
         assertTrue(Parsers.ingestable(Parsers.get("delimited").orElseThrow()));
         assertTrue(Parsers.ingestable(Parsers.get("json").orElseThrow()));
-        for (String id : List.of("xml", "asn1")) {
-            ParserPlugin p = Parsers.get(id).orElseThrow();
-            assertTrue(p.hierarchical());
-            assertFalse(Parsers.ingestable(p), "tree data cannot load to Tables before the flatten config");
-        }
+        // Both plugins are hierarchical, but they differ on ingestability — and that difference is
+        // the whole point of the flag: XML still has no ingester, ASN.1 now names one.
+        ParserPlugin xml = Parsers.get("xml").orElseThrow();
+        assertTrue(xml.hierarchical());
+        assertFalse(Parsers.ingestable(xml), "tree data cannot load to Tables before the flatten config");
+        ParserPlugin asn1 = Parsers.get("asn1").orElseThrow();
+        assertTrue(asn1.hierarchical());
+        assertTrue(Parsers.ingestable(asn1), "Asn1RecordIngester flattens onto segment schemas");
+        assertEquals("com.gamma.ingester.Asn1RecordIngester", asn1.ingesterClass().orElseThrow());
     }
 
     @Test
