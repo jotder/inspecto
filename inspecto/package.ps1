@@ -51,11 +51,40 @@ param(
     # just integrity. Provide the key via -SigningKey or $env:INSPECTO_SIGNING_KEY — never bake a key
     # into the repo/bundle (see compliance/soc2/policies/06-cryptography-policy.md).
     [switch]$Sign,
-    [string]$SigningKey = $env:INSPECTO_SIGNING_KEY
+    [string]$SigningKey = $env:INSPECTO_SIGNING_KEY,
+    # Explicit override for the GraalVM JDK cache (jlink.exe + per-target jmods/). Defaults try,
+    # in order: this param -> $env:GRAALVM_CACHE -> <repo>/.graalvm-cache (nested-in-repo layout)
+    # -> <repo>/../.graalvm-cache (sibling-of-repo layout, e.g. C:\sandbox\.graalvm-cache next to
+    # C:\sandbox\inspecto-clean). Resolved once the real path is known, below.
+    [string]$GraalvmCache = ''
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# ── LF/CRLF-safe writers for the bundled launcher scripts ──────────────────────
+# This file is itself CRLF on disk (.gitattributes: *.ps1 text eol=crlf), and a PowerShell
+# here-string (@'...'@) carries the EXACT bytes between its delimiters — so every "bash" heredoc
+# below (run.sh/ura.sh/serve.sh) already contains embedded \r\n, not \n, before it is ever
+# touched. Two bugs followed from that, both fixed by writing through these helpers instead of
+# `Set-Content -NoNewline` / `.Replace("`n","`r`n")` directly:
+#   1. The *.sh scripts were written CRLF — `#!/usr/bin/env bash\r` fails on Linux with
+#      "bad interpreter: No such file or directory" (the \r is part of the interpreter name).
+#   2. The *.bat scripts' `.Replace("`n", "`r`n")` — meant to FORCE crlf — instead matched the
+#      \n inside each already-present \r\n and produced doubled \r\r\n throughout every .bat file.
+#      cmd.exe tolerates a stray \r so this shipped unnoticed, but it was never clean.
+# Write-LfScript normalizes any \r\n/\r to bare \n first, so the SOURCE line-ending policy of
+# package.ps1 itself can never leak into the bundled scripts either way.
+function Write-LfScript {
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Content)
+    $lf = $Content -replace "`r`n", "`n" -replace "`r", "`n"
+    [System.IO.File]::WriteAllText($Path, $lf, [System.Text.UTF8Encoding]::new($false))
+}
+function Write-CrlfScript {
+    param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Content)
+    $lf = $Content -replace "`r`n", "`n" -replace "`r", "`n"
+    [System.IO.File]::WriteAllText($Path, ($lf -replace "`n", "`r`n"), [System.Text.Encoding]::ASCII)
+}
 
 # ── locate repo root (works whether called from inspecto/ or sandbox root) ──
 $scriptDir   = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -65,6 +94,24 @@ $sandboxRoot  = Split-Path -Parent $adjParserDir
 $targetDir    = Join-Path $adjParserDir 'target'
 $outZip       = Join-Path $sandboxRoot  'file-processor-deploy.zip'
 $outZipLinux  = Join-Path $sandboxRoot  'file-processor-deploy-linux.zip'
+
+# ── resolve the GraalVM cache dir (jlink.exe + per-target jmods/) ─────────────
+# Historically assumed nested at <repo>/.graalvm-cache; on this sandbox it is a SIBLING of the
+# repo (C:\sandbox\.graalvm-cache next to C:\sandbox\inspecto-clean) — a layout the old fixed path
+# could never find, so -NoRuntime was effectively forced and the Linux build silently never ran.
+# Try both, plus an explicit override, before giving up.
+$graalvmCacheDir = $null
+$cacheCandidates = @($GraalvmCache, $env:GRAALVM_CACHE,
+    (Join-Path $sandboxRoot '.graalvm-cache'),
+    (Join-Path (Split-Path -Parent $sandboxRoot) '.graalvm-cache')) | Where-Object { $_ }
+foreach ($c in $cacheCandidates) {
+    if (Test-Path $c) { $graalvmCacheDir = $c; break }
+}
+if ($graalvmCacheDir) {
+    Write-Host "GraalVM cache: $graalvmCacheDir" -ForegroundColor DarkGray
+} else {
+    Write-Host "  (no .graalvm-cache found — tried: $($cacheCandidates -join ', '))" -ForegroundColor Yellow
+}
 $bundleDir    = Join-Path $sandboxRoot  'file-processor-deploy'
 
 # ── step 1: build ─────────────────────────────────────────────────────────────
@@ -102,11 +149,19 @@ if (-not $NoUi -and (Test-Path (Join-Path $uiDir 'package.json'))) {
     Write-Host "  (no inspecto-ui/ project found — bundling API only; UI hosting will be inactive)" -ForegroundColor Yellow
 }
 
-# Discover the shaded JAR by pattern so we don't pin to a specific version number.
+# Discover the shaded JAR by pattern so we don't pin to a specific version number. Tries the
+# historical 'file-processor-*' artifactId first, then 'inspecto-processor-*' — an in-flight,
+# uncommitted rename of inspecto/pom.xml's artifactId was observed in this shared checkout
+# (2026-07-31); this is a compatibility shim to keep the build working through the transition,
+# not a decision about which name is correct. Narrow back to one pattern once the rename settles.
 $jarSrc = Get-ChildItem -Path $targetDir -Filter 'file-processor-*.jar' -ErrorAction SilentlyContinue |
           Select-Object -First 1 -ExpandProperty FullName
+if (-not $jarSrc) {
+    $jarSrc = Get-ChildItem -Path $targetDir -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+}
 if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
-    throw "JAR not found matching $targetDir\file-processor-*.jar.  Run without -NoBuild or build manually first."
+    throw "JAR not found matching $targetDir\file-processor-*.jar or inspecto-processor-*.jar.  Run without -NoBuild or build manually first."
 }
 
 # ── step 1c: Standard/Enterprise editions — build the optional edition modules ─────────────────
@@ -167,16 +222,26 @@ if ($policyJarSrc) {
 
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
 # Angular emits to ui/dist/<app>[/browser]; locate the folder that actually holds index.html.
-if ($uiBuilt -and (Test-Path $uiDistRoot)) {
+#
+# NOT gated on $uiBuilt (PKG, 2026-07-31): it used to be, so -NoUi meant "don't SHIP the UI" as well
+# as "don't rebuild it", and the bundle shipped with no ui/ while a perfectly good dist/ sat on disk.
+# The failure was silent and only visible on the deployed server: serve.sh's `[ -d ui ]` test fails,
+# no -Dui.dir is passed, and every browser request falls through ControlApi's unversioned-path guard
+# to `{"error":"not found — API routes are served under /api/v1"}` while the API itself works fine.
+# -NoUi now means exactly "skip the npm build"; whatever dist/ exists is still bundled.
+$uiBundled = $false
+if (Test-Path $uiDistRoot) {
     $indexHtml = Get-ChildItem -Path $uiDistRoot -Filter 'index.html' -Recurse -ErrorAction SilentlyContinue |
                  Select-Object -First 1
     if ($indexHtml) {
         $uiOut = "$bundleDir\ui"
         $null = New-Item -ItemType Directory $uiOut -Force
         Copy-Item -Path (Join-Path $indexHtml.DirectoryName '*') -Destination $uiOut -Recurse -Force
-        Write-Host "Bundled UI from $($indexHtml.DirectoryName) → $uiOut" -ForegroundColor Green
+        $uiBundled = $true
+        $stale = if ($uiBuilt) { '' } else { ' (pre-existing dist — NOT rebuilt this run)' }
+        Write-Host "Bundled UI from $($indexHtml.DirectoryName) → $uiOut$stale" -ForegroundColor Green
     } else {
-        Write-Host "  (UI build produced no index.html under $uiDistRoot — skipping UI bundle)" -ForegroundColor Yellow
+        Write-Host "  (no index.html under $uiDistRoot — skipping UI bundle)" -ForegroundColor Yellow
     }
 }
 
@@ -184,28 +249,39 @@ if ($uiBuilt -and (Test-Path $uiDistRoot)) {
 # Each space's pipeline configs use repo-root-relative paths (spaces/<id>/config|data/...), which
 # resolve identically from the bundle root — no path rewrite needed. Runtime state
 # (data/audit/duckdb/flows) is created on first run and is intentionally NOT bundled.
+#
+# The excluded trees are SKIPPED AT COPY TIME, not copied-then-pruned (2026-07-31): a locally running
+# ControlApi holds an exclusive handle on spaces/<id>/duckdb/*.db, so the old copy-everything pass
+# failed outright ("being used by another process") — packaging a bundle should not require stopping
+# the dev server, least of all to copy files it then deletes.
 $spacesSrc = Join-Path $sandboxRoot 'spaces'
 if (Test-Path $spacesSrc) {
     $spacesOut = Join-Path $bundleDir 'spaces'
-    Copy-Item $spacesSrc $spacesOut -Recurse -Force
     # Never ship runtime/generated trees: uat is a generated clone (tools/seed-uat.ps1) and _shared
     # holds the Exchange's runtime ledgers. _templates (the shipped template gallery) DOES ship.
-    foreach ($top in 'uat','_shared') {
-        Remove-Item (Join-Path $spacesOut $top) -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    # Per space: prune runtime state but KEEP authored config/flows/ (canonical since the
+    $skipTop = @('uat', '_shared')
+    # Per space: skip runtime state but KEEP authored config/flows/ (canonical since the
     # flows-divergence fix) and the pristine data/samples/ feeds (committed, seed scripts copy them).
-    Get-ChildItem -Path $spacesOut -Directory | ForEach-Object {
-        foreach ($gen in 'audit','duckdb','flows','views') {   # top-level runtime dirs only
-            Remove-Item (Join-Path $_.FullName $gen) -Recurse -Force -ErrorAction SilentlyContinue
-        }
-        $data = Join-Path $_.FullName 'data'
-        if (Test-Path $data) {
-            Get-ChildItem -Path $data -Force | Where-Object { $_.Name -ne 'samples' } |
-                Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+    $skipGen = @('audit', 'duckdb', 'flows', 'views')
+    $null = New-Item -ItemType Directory $spacesOut -Force
+    foreach ($entry in Get-ChildItem -Path $spacesSrc -Force) {
+        if (-not $entry.PSIsContainer) { Copy-Item $entry.FullName $spacesOut -Force; continue }
+        if ($skipTop -contains $entry.Name) { continue }
+        $spaceOut = Join-Path $spacesOut $entry.Name
+        $null = New-Item -ItemType Directory $spaceOut -Force
+        foreach ($child in Get-ChildItem -Path $entry.FullName -Force) {
+            if ($skipGen -contains $child.Name) { continue }
+            if ($child.PSIsContainer -and $child.Name -eq 'data') {
+                $dataOut = Join-Path $spaceOut 'data'
+                $null = New-Item -ItemType Directory $dataOut -Force
+                $samples = Join-Path $child.FullName 'samples'
+                if (Test-Path $samples) { Copy-Item $samples $dataOut -Recurse -Force }
+                continue
+            }
+            Copy-Item $child.FullName $spaceOut -Recurse -Force
         }
     }
-    Write-Host "Bundled spaces tree → $spacesOut (samples + config/flows kept, runtime pruned)" -ForegroundColor Green
+    Write-Host "Bundled spaces tree → $spacesOut (samples + config/flows kept, runtime skipped)" -ForegroundColor Green
 } else {
     Write-Host "  (no spaces/ tree found at $spacesSrc — skipping config bundle)" -ForegroundColor Yellow
 }
@@ -226,7 +302,7 @@ if (Test-Path $examplesSrc) {
 
 
 # ── step 5: bundle run scripts (Linux + Windows) ───────────────────────────────
-@'
+$runShContent = @'
 #!/usr/bin/env bash
 # Usage: ./run.sh <adapter>
 # Looks up the pipeline file as spaces/<space>/config/<adapter>/*_pipeline.toon (first match wins),
@@ -245,7 +321,8 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 exec "$JAVA" --enable-native-access=ALL-UNNAMED \
           -jar file-processor.jar \
           "$PIPELINE"
-'@ | Set-Content -Path "$bundleDir\run.sh" -NoNewline
+'@
+Write-LfScript -Path "$bundleDir\run.sh" -Content $runShContent
 
 $runBatContent = @'
 @echo off
@@ -274,15 +351,10 @@ if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
      -jar file-processor.jar ^
      "%PIPELINE%"
 '@
-# Write with CRLF line endings + ASCII so Windows cmd.exe parses correctly.
-[System.IO.File]::WriteAllText(
-    "$bundleDir\run.bat",
-    $runBatContent.Replace("`n", "`r`n"),
-    [System.Text.Encoding]::ASCII
-)
+Write-CrlfScript -Path "$bundleDir\run.bat" -Content $runBatContent
 
 # ── step 6: bundle ura scripts (pre-ETL utility CLI, Linux + Windows) ─────────
-@'
+$uraShContent = @'
 #!/usr/bin/env bash
 # URA File Management Suite — utility CLI runner
 #
@@ -301,7 +373,8 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 exec "$JAVA" --enable-native-access=ALL-UNNAMED \
           -cp file-processor.jar \
           com.gamma.inspector.MainApp "$@"
-'@ | Set-Content -Path "$bundleDir\ura.sh" -NoNewline
+'@
+Write-LfScript -Path "$bundleDir\ura.sh" -Content $uraShContent
 
 $uraBatContent = @'
 @echo off
@@ -318,19 +391,14 @@ if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
      -cp file-processor.jar ^
      com.gamma.inspector.MainApp %*
 '@
-# Write with CRLF line endings so Windows cmd.exe parses the batch file correctly.
-[System.IO.File]::WriteAllText(
-    "$bundleDir\ura.bat",
-    $uraBatContent.Replace("`n", "`r`n"),
-    [System.Text.Encoding]::ASCII
-)
+Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
 
 # ── step 6b: bundle serve scripts (run the control plane + operator UI) ─────────
 # Unlike run.sh (one-shot ETL), serve.sh launches the long-running ControlApi service with the
 # HTTP control plane + operator UI. It serves the bundled SPA from ./ui via -Dui.dir. Tokens are
 # read from the environment so secrets stay out of the bundle: CONTROL_TOKEN (required to use the
 # control plane) and ASSIST_TOKEN (optional, enables the assist/catalog read routes).
-@'
+$serveShContent = @'
 #!/usr/bin/env bash
 # Usage: CONTROL_TOKEN=... [ASSIST_TOKEN=...] [PORT=8080] [SPACES_ROOT=spaces] ./serve.sh
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
@@ -372,7 +440,8 @@ fi
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
-'@ | Set-Content -Path "$bundleDir\serve.sh" -NoNewline
+'@
+Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
 
 $serveBatContent = @'
 @echo off
@@ -418,11 +487,7 @@ if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)
 "%JAVA%" %OPTS% -cp %CP% com.gamma.control.ControlApi
 '@
-[System.IO.File]::WriteAllText(
-    "$bundleDir\serve.bat",
-    $serveBatContent.Replace("`n", "`r`n"),
-    [System.Text.Encoding]::ASCII
-)
+Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 
 # ── step 6c: embed a trimmed Java runtime (jlink) so the bundle is self-contained ──
 # Produces bundle/runtime/ — the run/serve/ura scripts auto-prefer it over system java.
@@ -457,22 +522,28 @@ if (-not $NoRuntime) {
     # (sun.misc.Unsafe), java.net.http (HttpClient), jdk.zipfs (.zip via NIO), java.management (JMX).
     $runtimeModules = 'java.base,java.compiler,java.desktop,java.naming,java.scripting,java.sql,jdk.httpserver,jdk.crypto.ec,jdk.unsupported,java.net.http,jdk.zipfs,java.management'
 
-    # Locate a jlink: prefer the repo's GraalVM cache, then JAVA_HOME, then PATH. This must be the
-    # Windows jlink.exe (the host-executable tool) regardless of which target(s) we build.
-    $jlink = Get-ChildItem -Path (Join-Path $sandboxRoot '.graalvm-cache') -Filter 'jlink.exe' -Recurse -ErrorAction SilentlyContinue |
-             Select-Object -First 1 -ExpandProperty FullName
+    # Locate a jlink: prefer the resolved GraalVM cache, then JAVA_HOME, then PATH. This must be
+    # the Windows jlink.exe (the host-executable tool) regardless of which target(s) we build.
+    $jlink = $null
+    if ($graalvmCacheDir) {
+        $jlink = Get-ChildItem -Path $graalvmCacheDir -Filter 'jlink.exe' -Recurse -ErrorAction SilentlyContinue |
+                 Select-Object -First 1 -ExpandProperty FullName
+    }
     if (-not $jlink -and $env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\jlink.exe")) { $jlink = "$env:JAVA_HOME\bin\jlink.exe" }
     if (-not $jlink) { $jlink = (Get-Command jlink.exe -ErrorAction SilentlyContinue).Source }
-    if (-not $jlink) { throw "jlink.exe not found (looked in .graalvm-cache, JAVA_HOME, PATH). Re-run with -NoRuntime to skip embedding a JVM." }
+    if (-not $jlink) { throw "jlink.exe not found (looked in .graalvm-cache ($graalvmCacheDir), JAVA_HOME, PATH). Re-run with -NoRuntime to skip embedding a JVM." }
 
     $runtimeOut = Join-Path $bundleDir 'runtime'
     New-JlinkRuntime -JlinkExe $jlink -Modules $runtimeModules -OutputDir $runtimeOut -PlatformLabel 'Windows'
 
     # Linux jmods dir: glob for it (don't pin the version string) so a cache refresh doesn't break this.
-    $linuxJmods = Get-ChildItem -Path (Join-Path $sandboxRoot '.graalvm-cache') -Directory -Filter '*linux*' -ErrorAction SilentlyContinue |
-                  ForEach-Object { Join-Path $_.FullName 'jmods' } |
-                  Where-Object { Test-Path $_ } |
-                  Select-Object -First 1
+    $linuxJmods = $null
+    if ($graalvmCacheDir) {
+        $linuxJmods = Get-ChildItem -Path $graalvmCacheDir -Directory -Filter '*linux*' -ErrorAction SilentlyContinue |
+                      ForEach-Object { Join-Path $_.FullName 'jmods' } |
+                      Where-Object { Test-Path $_ } |
+                      Select-Object -First 1
+    }
     if ($linuxJmods) {
         $linuxRuntimeOut = Join-Path $sandboxRoot 'file-processor-deploy-linux-runtime'
         try {
@@ -579,6 +650,22 @@ Write-Host ""
 Write-Host "Deployment bundle ready:" -ForegroundColor Green
 Write-Host "  $outZip  (+ .sha256$sigNote)"
 if ($builtLinuxRuntime) { Write-Host "  $outZipLinux  (+ .sha256$sigNote)" }
+# A bundle with no ui/ still starts and still serves /api/v1 — but every browser hit returns
+# ControlApi's `{"error":"not found — API routes are served under /api/v1"}` 404, which looks like a
+# broken deployment rather than a packaging choice. It shipped that way once (2026-07-31) precisely
+# because nothing said so. Verify the assembled bundle, not just the copy flag.
+if (-not (Test-Path (Join-Path $bundleDir 'ui\index.html'))) {
+    Write-Host ""
+    Write-Warning "NO OPERATOR UI IN THIS BUNDLE (no ui/index.html)."
+    Write-Warning "  serve.sh/serve.bat will start WITHOUT -Dui.dir, so http://<host>:<port>/ answers"
+    Write-Warning "  404 {`"error`":`"not found - API routes are served under /api/v1`"} in the browser."
+    Write-Warning "  The /api/v1 surface still works; only the SPA is missing."
+    if ($NoUi)             { Write-Warning "  Cause: -NoUi was passed and inspecto-ui/dist holds no index.html — build the UI first (npm run build in inspecto-ui/)." }
+    elseif (-not $uiBuilt) { Write-Warning "  Cause: no inspecto-ui/ project found in this checkout." }
+    else                   { Write-Warning "  Cause: the UI build produced no index.html under $uiDistRoot." }
+    Write-Host ""
+}
+
 Write-Host ""
 Write-Host "Deploy to remote server:" -ForegroundColor Cyan
 Write-Host "  1. Copy $outZip to the server"

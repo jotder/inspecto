@@ -169,6 +169,26 @@ Enterprise is a **superset** of Standard, matching `-Pedition-enterprise` = `edi
 `serve.sh`/`serve.bat` auto-detect the edition from which jars are in the bundle. Default build (no
 `-Edition`) is Personal-equivalent.
 
+### Two-target (Windows + Linux) embedded runtime — GraalVM cache location matters
+
+`package.ps1` always builds the Windows bundle; it **additionally** builds
+`file-processor-deploy-linux.zip` with a genuinely Linux-native embedded JVM (real `libjvm.so`/ELF
+`bin/java`, not a copy) whenever it can find a Linux GraalVM jmods directory — no separate flag,
+it just needs to locate the cache. **Fixed 2026-07-31:** the lookup used to be hardcoded to
+`<repo>/.graalvm-cache`, which never matches a cache kept as a **sibling of the repo**
+(`C:\sandbox\.graalvm-cache` next to `C:\sandbox\inspecto-clean`) — a real layout on this sandbox,
+under which the Linux zip silently never got built (fell through to the "no jmods cache found"
+warning with no error). Resolution order now: `-GraalvmCache <path>` → `$env:GRAALVM_CACHE` →
+`<repo>/.graalvm-cache` → `<repo>/../.graalvm-cache`. The script prints which one it picked
+(`GraalVM cache: …`) — check that line first if a two-target build looks like it only did one.
+Each JDK directory under the cache needs `bin/jlink.exe` (Windows one — always invoked regardless
+of target, only `--module-path` changes) and/or a `*linux*`-named directory with a `jmods/` dir.
+
+```powershell
+pwsh -File inspecto\package.ps1 -NoUi                       # both targets, if the cache resolves
+pwsh -File inspecto\package.ps1 -NoUi -GraalvmCache 'D:\jdks\.graalvm-cache'   # explicit override
+```
+
 ## Run
 
 ```powershell
