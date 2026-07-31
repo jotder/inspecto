@@ -102,7 +102,7 @@
                 <button
                     mat-flat-button
                     color="primary"
-                    [disabled]="saving() || !!pluginDef() || !lens.canAuthorWorkbench()"
+                    [disabled]="saving() || (!!pluginDef() && !pluginIngestable()) || !lens.canAuthorWorkbench()"
                     (click)="save()"
                 >
                     Save parsing
@@ -113,9 +113,9 @@
             </div>
             @if (pluginDef(); as plugin) {
                 <p class="text-secondary m-0 text-sm">
-                    @if (plugin.ingestable) {
-                        This parser loads through the pipeline TOON (a plugin ingester with segment
-                        schemas) — configure and test it here, author the pipeline in the TOON.
+                    @if (pluginIngestable()) {
+                        This parser loads into Tables via {{ plugin.ingesterClass }} — map its records
+                        onto segments below, and Save writes one schema per segment.
                     } @else {
                         This format previews today — loading it into Tables arrives with the flatten
                         configuration, so the draft cannot save this type yet.
@@ -148,13 +148,24 @@
                 <div class="max-h-96 overflow-auto rounded border p-2">
                     <app-parser-tree [nodes]="p.nodes" />
                 </div>
-                <p class="text-secondary m-0 text-xs">
-                    The decoded record tree. Loading tree-shaped data into Tables needs the flatten
-                    configuration (on the backlog) — until then this preview is the authoring aid.
-                </p>
+                @if (!pluginIngestable()) {
+                    <p class="text-secondary m-0 text-xs">
+                        The decoded record tree. Loading tree-shaped data into Tables needs the flatten
+                        configuration (on the backlog) — until then this preview is the authoring aid.
+                    </p>
+                }
             } @else {
                 <inspecto-data-table tier="pro" [rows]="pluginRows()" sourceName="parsed" [autoHeight]="true" exportName="parsed-sample" />
             }
+        }
+
+        <!-- Segments — only for a plugin that can actually load (names an ingester) -->
+        @if (pluginIngestable()) {
+            <app-onboarding-segments-editor
+                [tree]="pluginTreeNodes()"
+                [editable]="lens.canAuthorWorkbench()"
+                [initial]="initialSegments()"
+            />
         }
 
         <!-- Parsed result — full width, table or (for JSON samples) a record tree -->

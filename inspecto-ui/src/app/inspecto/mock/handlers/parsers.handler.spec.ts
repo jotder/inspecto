@@ -23,13 +23,20 @@ function send(method: string, url: string, body?: unknown) {
 }
 
 describe('parsersHandler', () => {
-    it('serves the catalog: built-ins first, xml hierarchical + NOT ingestable', () => {
+    it('serves the catalog: built-ins first, then the two hierarchical plugins', () => {
         const res = send('GET', '/api/parsers')!;
         const list = res.body as ParserDef[];
-        expect(list.map((p) => p.id)).toEqual(['delimited', 'fixedwidth', 'json', 'text_regex', 'xml']);
+        expect(list.map((p) => p.id)).toEqual(['delimited', 'fixedwidth', 'json', 'text_regex', 'xml', 'asn1']);
+        // Both plugins are tree-shaped; they differ on whether they can load to Tables, and that
+        // difference is exactly what a guided Save gates on.
         const xml = list[4];
         expect(xml.hierarchical).toBe(true);
         expect(xml.ingestable).toBe(false); // preview-only until the flatten configuration
+        expect(xml.ingesterClass).toBeUndefined();
+        const asn1 = list[5];
+        expect(asn1.hierarchical).toBe(true);
+        expect(asn1.ingestable).toBe(true);
+        expect(asn1.ingesterClass).toBe('com.gamma.ingester.Asn1RecordIngester');
         for (const p of list) expect(p.grammarSchema.length).toBeGreaterThan(0);
     });
 
@@ -72,7 +79,13 @@ describe('parsersHandler', () => {
     });
 
     it('refuses like the server: 404 unknown id, 400 missing/oversized sample, 422 caller errors', () => {
-        expect(send('POST', '/api/parsers/asn1/preview', { sample_text: 'x' })!.status).toBe(404);
+        expect(send('POST', '/api/parsers/made_up_format/preview', { sample_text: 'x' })!.status).toBe(404);
+        // asn1 IS in the catalog now, so it is not a 404 — the mock refuses it 422 instead, since
+        // decoding binary BER in a mock would be a second ASN.1 implementation (stricter, never
+        // more lenient, than the server).
+        const asn1 = send('POST', '/api/parsers/asn1/preview', { sample_text: 'x' })!;
+        expect(asn1.status).toBe(422);
+        expect(String((asn1.body as { error: string }).error)).toContain('not available in mock mode');
         expect(send('POST', '/api/parsers/delimited/preview', {})!.status).toBe(400);
         expect(send('POST', '/api/parsers/delimited/preview', { sample_text: 'x'.repeat(1_000_001) })!.status).toBe(400);
         const malformed = send('POST', '/api/parsers/xml/preview', { sample_text: '<a><oops' })!;

@@ -43,6 +43,11 @@ final class ParserRoutes implements RouteModule {
             // Preview and ingest are separate capabilities: a hierarchical parser without an
             // ingester previews today but cannot load to Tables until the flatten configuration.
             row.put("ingestable", Parsers.ingestable(p));
+            // The FQCN a guided Save writes to `parsing.plugin.ingester` — absent for the built-ins
+            // (they ingest through the engine's own DuckDB path, not a named class) and for
+            // preview-only plugins. Serving it is what lets the segments editor author the block
+            // without the UI hardcoding any parser's implementation class.
+            p.ingesterClass().ifPresent(fqcn -> row.put("ingesterClass", fqcn));
             row.put("grammarSchema", p.grammarSchema());
             out.add(row);
         }

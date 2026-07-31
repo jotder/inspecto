@@ -87,9 +87,25 @@ them.
   options form renders the served schema via `fieldSpecsToAttributes`
   (`inspecto/component-model/field-spec-mapper.ts` — unknown field shapes are SKIPPED, never
   guessed, the `findingsAttributes` idiom); Test parse hits `/parsers/{id}/preview` and renders
-  table or tree; **Save is disabled for plugin types** with an honest note (preview-only until
-  flatten; ingestable customs are TOON-authored until the segments editor exists). The plugin
-  preview is pane-local — the sample thread's parsed hop stays builtin-only.
+  table or tree. The plugin preview is pane-local — the sample thread's parsed hop stays
+  builtin-only.
+- **Save gating** is now per-capability, not "plugins can't save": enabled when the selected plugin
+  is `ingestable` **and** serves an `ingesterClass`; still disabled (with the honest
+  preview-only note) otherwise. XML is the latter, ASN.1 the former.
+- **Segments editor** (`segments-editor.component`, in the Parsing pane — deliberately *not* a new
+  stage: stages are static arrays with no runtime-conditional precedent, and the editor needs the
+  decoded tree directly above it). **Derive from preview** proposes one segment per record type
+  with a column per LEAF path; column names are generated through the engine's identifier rule,
+  since `Identifiers.validateSchema` makes a violation a hard startup failure. Save writes one
+  schema toon per segment via `ConfigService.write('schema', …)` at the Schema stage's convention
+  path, *then* patches `parsing.plugin` — in that order, so the pipeline never names a file that
+  does not exist yet. Partitions default to the derived `EVENT_TYPE`, because an empty
+  `partitions[]` silently sends every row to the `year=1900` sentinel partition.
+  ⚠ **Residual:** the editor re-hydrates segment *keys* from a saved config but not their columns
+  (those live in the referenced schema toons, which the pane does not read back) — re-editing an
+  existing stream needs a re-derive.
+  ⚠ Bespoke nested `FormArray` by necessity: `FieldSpec` cannot express "a list of segments, each
+  with a list of columns" — `ConfigSpecs.schema()` hits the identical wall and says so.
 - **Pipelines Parser dialog**: runs entirely on the served contract now (catalog + real preview) —
   the old mock-only `/components/grammar/preview`, the 9-type hardcoded `parser-types.ts` catalog
   and the ASN.1 module picker are **gone**; grammar components persist as

@@ -17,6 +17,13 @@ export interface ParserDef {
     label: string;
     hierarchical: boolean;
     ingestable: boolean;
+    /**
+     * FQCN of the `StreamingFileIngester` a guided Save writes to `parsing.plugin.ingester`.
+     * Absent for the built-ins (they ingest through the engine's own DuckDB path, not a named
+     * class) and for preview-only plugins — so `ingestable && ingesterClass` is what a segments
+     * editor gates on.
+     */
+    ingesterClass?: string;
     grammarSchema: ServedFieldSpec[];
 }
 

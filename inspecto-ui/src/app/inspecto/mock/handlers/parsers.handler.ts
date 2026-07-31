@@ -78,6 +78,21 @@ const CATALOG: ParserDef[] = [
             { path: 'xml.max_records', label: 'Preview records', type: 'INT', defaultValue: 50, description: 'Records materialized into the preview tree (max 1000).' },
         ],
     },
+    {
+        id: 'asn1', label: 'ASN.1 — BER/DER encoded records',
+        // Hierarchical like xml, but ingestable: Asn1RecordIngester flattens records onto segment
+        // schemas through the existing parsing.plugin machinery.
+        hierarchical: true, ingestable: true,
+        ingesterClass: 'com.gamma.ingester.Asn1RecordIngester',
+        grammarSchema: [
+            str('asn1.grammar', 'ASN.1 grammar', 'The ASN.1 module text (X.680 syntax) defining the record type.'),
+            str('asn1.root_type', 'Root type', 'Name of the type in the grammar each record binds against, e.g. Record.'),
+            { path: 'asn1.strictness', label: 'Strictness', type: 'ENUM', defaultValue: 'BER', enumValues: ['BER', 'DER', 'CER'], description: 'Encoding rules enforced while decoding: BER (permissive), DER, or CER.' },
+            { path: 'asn1.file_header_length', label: 'File header bytes', type: 'INT', defaultValue: 0, description: 'Bytes to skip at the start of the file before the first record (e.g. 50 for Huawei-framed files). 0 = none.' },
+            { path: 'asn1.record_header_length', label: 'Record header bytes', type: 'INT', defaultValue: 0, description: 'Bytes preceding each record’s TLV, skipped (e.g. 4 for Huawei-framed files). 0 = bare back-to-back TLVs. Records stay delimited by their own BER length.' },
+            { path: 'asn1.max_records', label: 'Preview records', type: 'INT', defaultValue: 50, description: 'Records materialized into the preview tree (max 1000).' },
+        ],
+    },
 ];
 
 export function parsersHandler(): MockHandler {
@@ -112,6 +127,10 @@ function parse(id: string, grammar: Record<string, unknown>, sample: string): Pa
         case 'json': return ndjson(sample);
         case 'text_regex': return textRegex(grammar, sample);
         case 'xml': return xmlTree(grammar, sample);
+        // ASN.1 is in the catalog (the segments editor gates on its ingesterClass), but its input
+        // is BINARY BER — a mock decoder would be a second ASN.1 implementation and a lie either
+        // way. Refuse honestly: STRICTER than the server, never more lenient.
+        case 'asn1': throw new Error('ASN.1 preview needs the real decoder — not available in mock mode');
         default: throw new Error(`unknown parser: ${id}`);
     }
 }
