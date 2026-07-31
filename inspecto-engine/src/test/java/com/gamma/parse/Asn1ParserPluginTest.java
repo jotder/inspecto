@@ -64,10 +64,12 @@ class Asn1ParserPluginTest {
     }
 
     @Test
-    void missingGrammarIsACallerError() {
+    void rootTypeWithoutAGrammarIsACallerError() {
+        // Not "grammar is required" any more — grammar-less IS valid (structural dump below).
+        // But a root_type with nothing to bind against is a half-filled form, so say so.
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> asn1.preview(hex(RECORD_1_HEX), grammar("root_type", "Record")));
-        assertTrue(e.getMessage().contains("asn1.grammar"));
+        assertTrue(e.getMessage().contains("asn1.grammar"), e.getMessage());
     }
 
     @Test
@@ -75,6 +77,62 @@ class Asn1ParserPluginTest {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> asn1.preview(hex(RECORD_1_HEX), grammar("grammar", GRAMMAR)));
         assertTrue(e.getMessage().contains("asn1.root_type"));
+    }
+
+    @Test
+    void withNoGrammarTheRawTlvStructureIsDumped() throws Exception {
+        ParseResult.Tree t = assertInstanceOf(ParseResult.Tree.class,
+                asn1.preview(hex(RECORD_1_HEX, RECORD_2_HEX), grammar()));
+        assertEquals(2, t.recordCount());
+
+        // Labelled by TAG, not by schema name — there is no schema.
+        ParseResult.Node rec = t.nodes().get(0);
+        assertEquals("[APPLICATION 1]", rec.label());
+        assertEquals("constructed", rec.type());
+        assertEquals(List.of("[0]", "[1]", "[2]"),
+                rec.children().stream().map(ParseResult.Node::label).toList());
+
+        // Hex is always the truth; text is only an annotation on top of it.
+        assertEquals("6869 \"hi\"", rec.children().get(1).value());
+        // 0x2A IS printable ('*'), but a 1-byte INTEGER 42 must not masquerade as text.
+        assertEquals("2A", rec.children().get(0).value());
+        assertEquals("primitive · 1B", rec.children().get(0).type());
+
+        // Nesting survives: events [2] holds the CHOICE alternative [3].
+        assertEquals(List.of("[3]"),
+                rec.children().get(2).children().stream().map(ParseResult.Node::label).toList());
+    }
+
+    @Test
+    void structuralDumpNeedsNoRootTypeAndStillHonoursFraming() throws Exception {
+        // 3 junk header bytes then one record — proves framing applies in structural mode too.
+        byte[] framed = hex("AA BB CC", RECORD_1_HEX);
+        ParseResult.Tree t = assertInstanceOf(ParseResult.Tree.class,
+                asn1.preview(framed, grammar("file_header_length", 3)));
+        assertEquals(1, t.recordCount());
+        assertEquals("[APPLICATION 1]", t.nodes().get(0).label());
+    }
+
+    @Test
+    void aLongPrimitiveValueIsTruncatedInTheStructuralDump() throws Exception {
+        // [0] PRIMITIVE, 40 printable 'A' bytes — longer than VALUE_PREVIEW_BYTES (32).
+        String payload = "41".repeat(40);
+        ParseResult.Tree t = assertInstanceOf(ParseResult.Tree.class,
+                asn1.preview(hex("80 28" + payload), grammar()));
+        String value = t.nodes().get(0).value();
+        String hex = value.substring(0, value.indexOf('…'));
+        assertEquals(Asn1ParserPlugin.VALUE_PREVIEW_BYTES * 2, hex.length(), value);  // 32 bytes of hex
+        assertEquals("41".repeat(Asn1ParserPlugin.VALUE_PREVIEW_BYTES), hex);
+        assertTrue(value.endsWith("…\""), value);   // text annotation truncated too
+    }
+
+    @Test
+    void undecodableBytesAreACallerErrorEvenWithoutAGrammar() {
+        // Tag says 127 content bytes with only 3 present — structural mode must not pretend.
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> asn1.preview(hex("61 7F 80 01 2A"), grammar()));
+        assertTrue(e.getMessage().contains("did not decode") || e.getMessage().contains("no ASN.1 records"),
+                e.getMessage());
     }
 
     @Test

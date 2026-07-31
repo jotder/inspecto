@@ -85,8 +85,8 @@ const CATALOG: ParserDef[] = [
         hierarchical: true, ingestable: true,
         ingesterClass: 'com.gamma.ingester.Asn1RecordIngester',
         grammarSchema: [
-            str('asn1.grammar', 'ASN.1 grammar', 'The ASN.1 module text (X.680 syntax) defining the record type.'),
-            str('asn1.root_type', 'Root type', 'Name of the type in the grammar each record binds against, e.g. Record.'),
+            str('asn1.grammar', 'ASN.1 grammar', 'The ASN.1 module text (X.680 syntax) defining the record type. Leave EMPTY to dump the file’s raw TLV structure instead — BER is self-describing, so an unknown file can be inspected before its module is available. A grammar is still required to ingest.'),
+            str('asn1.root_type', 'Root type', 'Name of the type in the grammar each record binds against, e.g. Record. Required when a grammar is supplied; ignored in structural mode.'),
             { path: 'asn1.strictness', label: 'Strictness', type: 'ENUM', defaultValue: 'BER', enumValues: ['BER', 'DER', 'CER'], description: 'Encoding rules enforced while decoding: BER (permissive), DER, or CER.' },
             { path: 'asn1.file_header_length', label: 'File header bytes', type: 'INT', defaultValue: 0, description: 'Bytes to skip at the start of the file before the first record (e.g. 50 for Huawei-framed files). 0 = none.' },
             { path: 'asn1.record_header_length', label: 'Record header bytes', type: 'INT', defaultValue: 0, description: 'Bytes preceding each record’s TLV, skipped (e.g. 4 for Huawei-framed files). 0 = bare back-to-back TLVs. Records stay delimited by their own BER length.' },
