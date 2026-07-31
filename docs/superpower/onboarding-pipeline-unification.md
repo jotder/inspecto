@@ -409,6 +409,36 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   on disk. Forcing `${…}` at `POST /connections` (as `rejectRawSecrets` already does for bundle import)
   is the obvious follow-up and is **not** done here — it is a breaking change to the connection API.
 
+  **Import-time referential integrity SHIPPED 2026-07-31.** Two defects, both in
+  `DataSourceRoutes.importBundle`: it registered by walking the written files in **manifest order**, so a
+  pipeline could register before the connection it binds — a "unknown connection" 422 about a connection
+  sitting in the very same bundle, decided by zip entry order; and a failure threw **mid-walk**, leaving
+  some pipelines live and the rest not, able to report only the first fault.
+
+  Now a single pre-flight pass over every written pipeline collects **all** findings — unresolvable
+  schema/grammar refs plus an unknown `collector.connection` — and returns one **422 registering nothing**
+  if any are ERROR. Then connections register first, pipelines second. Two deliberate choices: the gate
+  runs on the **written** files, not the zip entries, because a schema ref resolves relative to the file
+  naming it, so that is the only honest place to ask; and it **reuses `ConfigRoutes.schemaFileFindings`**
+  rather than re-deriving path resolution — re-deriving it is exactly the W1b trap where a validator
+  predicting resolution differently from the reader rejects configs the engine would run. A connection is
+  checked by **id** against the union of the target's registry and the bundle's own contents, so a bundle
+  that brings its own connection is complete even though nothing is registered yet when the gate runs.
+
+  `/import/preview` gained the **connection** half of the same check, so it no longer answers `valid: true`
+  on a bundle the commit then 422s. ⚠ It deliberately does **not** cover the schema half: nothing is on
+  disk at preview time, so the question is unanswerable there — this asymmetry is documented on the method
+  so nobody "simplifies" the two into one by deleting the commit-side check. Closing it properly means
+  resolving refs against the zip's entry list.
+  *Verified: 3 new tests over real HTTP in `ControlApiBundleImportTest` (unknown connection → 422 + nothing
+  registered; a bundle carrying its own connection → 200; preview agrees both ways), and `mvn -o clean
+  test` BUILD SUCCESS with 0 failures.*
+
+  ⚠ **Still not all-or-nothing about the filesystem:** files are written *before* the gate runs, so a
+  rejected import leaves the config files on disk with nothing registered. That is a strict improvement on
+  registering some and failing on others, but a true transaction (stage to a temp dir, gate, then move)
+  is still open.
+
   Remaining W3 scope: extend the closure to decision rules and reference
   datasets (both gaps confirmed in §2); add **import-time referential integrity** so a missing
   connection/schema fails at import rather than at first poll; `dirs` re-derived on the target.

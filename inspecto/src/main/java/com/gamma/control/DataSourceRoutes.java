@@ -16,6 +16,7 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -62,7 +63,15 @@ final class DataSourceRoutes implements RouteModule {
      * Dry-run an import: report what the bundle contains (kind, data sources, files), which data-source ids
      * would clash with this space, and the validation findings for each pipeline — writing nothing. Backs the
      * bulk-onboarding "preview before commit" step; pipelines are validated with the same spec + safety checks
-     * as {@code /validate}.
+     * as {@code /validate}, plus the <b>connection</b> half of the import gate (a connection is checked by id,
+     * which needs no filesystem, so preview and commit agree about a missing one).
+     *
+     * <p>⚠ {@code valid: true} is <b>not</b> the full commit gate. Commit additionally checks that every
+     * schema/grammar reference resolves, and that cannot be answered here: a schema reference resolves
+     * relative to the config file naming it, so it only becomes answerable once the files are written. So a
+     * bundle can preview clean and still be rejected at commit for an unresolvable schema path. Narrowing
+     * that gap means resolving references against the zip's own entry list, which is worth doing but is not
+     * what this does today — do not "simplify" the two into one by dropping the commit-side check.
      */
     private Object previewImport(ApiContext api, HttpExchange e) throws IOException {
         requireConfig(api);
@@ -78,11 +87,24 @@ final class DataSourceRoutes implements RouteModule {
                 .map(CollectorService.PipelineView::name).collect(Collectors.toSet());
         List<String> conflicts = dataSources.stream().filter(existing::contains).sorted().toList();
 
+        // The connection half of the import gate, evaluated from the zip bytes so preview agrees with commit
+        // about a missing connection rather than reporting `valid: true` on a bundle the commit then 422s.
+        Set<String> knownConnections = new TreeSet<>(api.service().connections().keySet());
+        bundle.configEntries().forEach((name, bytes) -> {
+            if (!name.endsWith("_connection.toon")) return;
+            String id = connectionIdOf(bytes);
+            if (id != null) knownConnections.add(id);
+        });
+
         Map<String, List<Finding>> findings = new LinkedHashMap<>();
         boolean valid = true;
         for (Map.Entry<String, byte[]> entry : bundle.configEntries().entrySet()) {
             if (!entry.getKey().endsWith("_pipeline.toon")) continue;
-            List<Finding> fs = validatePipeline(entry.getValue());
+            List<Finding> fs = new ArrayList<>(validatePipeline(entry.getValue()));
+            String conn = connectionRefOf(entry.getValue());
+            if (conn != null && !knownConnections.contains(conn))
+                fs.add(new Finding(Severity.ERROR, "collector.connection",
+                        "unknown connection '" + conn + "' — it is neither in this space nor in the bundle"));
             if (!fs.isEmpty()) findings.put(entry.getKey(), fs);
             if (fs.stream().anyMatch(f -> f.severity() == Severity.ERROR)) valid = false;
         }
@@ -114,6 +136,87 @@ final class DataSourceRoutes implements RouteModule {
         return ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), map);
     }
 
+    /**
+     * ERROR findings per bundle file for references that would not resolve in this space — the import-time
+     * referential-integrity gate. Empty means the bundle is self-consistent against the target.
+     *
+     * <p>Runs on the <b>written</b> files rather than the zip entries, deliberately: a schema reference
+     * resolves relative to the config file that names it, so the only honest way to ask "does this resolve?"
+     * is to ask it where the file actually lands. That also lets this reuse
+     * {@link ConfigRoutes#schemaFileFindings} — which already mirrors {@code PipelineConfigParser
+     * .resolveSchemaRef} — instead of re-deriving path resolution here. Re-deriving it is exactly the trap
+     * W1b hit: a validator that predicts resolution differently from the reader rejects configs the engine
+     * would run, or passes ones it would not.
+     *
+     * <p>A connection is checked by <b>id</b>, against the union of this space's registry and the ids the
+     * bundle itself carries — a bundle that brings its own connection is complete, even though that
+     * connection is not registered yet at this point.
+     */
+    private static Map<String, List<Finding>> referentialFindings(ApiContext api, Path config, List<String> written) {
+        Set<String> knownConnections = new TreeSet<>(api.service().connections().keySet());
+        for (String rel : written) {
+            if (!rel.endsWith("_connection.toon")) continue;
+            try {
+                knownConnections.add(ConnectionProfile.load(config.resolve(rel)).id());
+            } catch (RuntimeException | IOException ignored) {
+                // A connection file that will not load is reported against the pipeline that needs it
+                // (below) rather than here: "pipeline X wants connection Y" is the actionable message.
+            }
+        }
+
+        Map<String, List<Finding>> out = new LinkedHashMap<>();
+        for (String rel : written) {
+            if (!rel.endsWith("_pipeline.toon")) continue;
+            Path file = config.resolve(rel);
+            Map<String, Object> map;
+            try {
+                map = ConfigCodec.toMap(Files.readString(file));
+            } catch (RuntimeException | IOException bad) {
+                out.put(rel, List.of(new Finding(Severity.ERROR, "(parse)", "cannot parse pipeline: " + bad)));
+                continue;
+            }
+            List<Finding> fs = new ArrayList<>(
+                    ConfigRoutes.schemaFileFindings("pipeline", map, Severity.ERROR, file.getParent()));
+            String conn = connectionRef(map);
+            if (conn != null && !knownConnections.contains(conn))
+                fs.add(new Finding(Severity.ERROR, "collector.connection",
+                        "unknown connection '" + conn + "' — it is neither in this space nor in the bundle;"
+                                + " import the connection first or add it to the bundle"));
+            if (!fs.isEmpty()) out.put(rel, fs);
+        }
+        return out;
+    }
+
+    /** {@link #connectionRef} over raw TOON bytes (preview works from the zip, not from disk). */
+    private static String connectionRefOf(byte[] toon) {
+        try {
+            return connectionRef(ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8)));
+        } catch (RuntimeException bad) {
+            return null;   // a parse failure is already reported as its own ERROR by validatePipeline
+        }
+    }
+
+    /** The in-file id of a {@code *_connection.toon} from its bytes, or {@code null} if it will not parse. */
+    private static String connectionIdOf(byte[] toon) {
+        try {
+            Map<String, Object> doc = ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
+            Object block = doc.get("connection");
+            Object id = (block instanceof Map<?, ?> m ? m : doc).get("id");
+            return id == null || String.valueOf(id).isBlank() ? null : String.valueOf(id).trim();
+        } catch (RuntimeException bad) {
+            return null;
+        }
+    }
+
+    /** A pipeline's bound connection id ({@code collector.connection}), or {@code null} for a local source. */
+    private static String connectionRef(Map<String, Object> pipeline) {
+        if (!(pipeline.get("collector") instanceof Map<?, ?> collector)) return null;
+        Object id = collector.get("connection");
+        if (id == null) return null;
+        String s = String.valueOf(id).trim();
+        return s.isEmpty() ? null : s;
+    }
+
     /** Unpack a bundle zip into the bound space's {@code config/} and make the new configs live. */
     private Object importBundle(ApiContext api, HttpExchange e) throws IOException {
         Path config = requireConfig(api);
@@ -143,19 +246,32 @@ final class DataSourceRoutes implements RouteModule {
             throw new ApiException(400, jail.getMessage());
         }
 
+        // Referential integrity BEFORE anything goes live: a bundle whose pipeline names a connection or a
+        // schema file nobody has is rejected as a whole, listing every problem at once. Without this the
+        // registration loop below discovered the same breakage one file at a time and threw mid-walk,
+        // leaving some pipelines live and the rest not — and it could only ever report the first fault.
+        Map<String, List<Finding>> broken = referentialFindings(api, config, written);
+        if (!broken.isEmpty())
+            return ApiContext.respondJson(e, 422, Map.of(
+                    "error", "bundle references things this space does not have; nothing was registered",
+                    "findings", broken));
+
         List<String> pipelines = new ArrayList<>();
+        // Connections FIRST, in two passes. Registration used to follow `written` (i.e. manifest) order, so a
+        // pipeline could register before the connection it binds — a 422 that says "unknown connection" about
+        // a connection sitting in the very same bundle, decided by zip entry order.
         for (String rel : written) {
-            Path p = config.resolve(rel);
-            if (rel.endsWith("_pipeline.toon")) {
-                try {
-                    pipelines.add(api.service().registerPipeline(p));
-                } catch (IllegalArgumentException invalid) {
-                    throw new ApiException(422, "invalid pipeline " + rel + ": " + invalid.getMessage());
-                } catch (IllegalStateException clash) {
-                    throw new ApiException(409, clash.getMessage());
-                }
-            } else if (rel.endsWith("_connection.toon")) {
-                api.service().registerConnection(ConnectionProfile.load(p));
+            if (rel.endsWith("_connection.toon"))
+                api.service().registerConnection(ConnectionProfile.load(config.resolve(rel)));
+        }
+        for (String rel : written) {
+            if (!rel.endsWith("_pipeline.toon")) continue;
+            try {
+                pipelines.add(api.service().registerPipeline(config.resolve(rel)));
+            } catch (IllegalArgumentException invalid) {
+                throw new ApiException(422, "invalid pipeline " + rel + ": " + invalid.getMessage());
+            } catch (IllegalStateException clash) {
+                throw new ApiException(409, clash.getMessage());
             }
         }
 

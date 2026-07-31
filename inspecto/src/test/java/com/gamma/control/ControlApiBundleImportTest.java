@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.metrics.MetricRegistry;
+import com.gamma.service.BundleExporter;
+import com.gamma.service.DataSourceBundle;
 import com.gamma.service.SpaceManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -111,6 +113,92 @@ class ControlApiBundleImportTest {
             // a missing/invalid id → 400
             assertEquals(400, post(c.port, "/spaces/import", spaceBundle).statusCode());
         }
+    }
+
+    /**
+     * W3, 2026-07-31 — the import-time referential-integrity gate. Before it, a bundle naming a connection
+     * nobody has was written and then registered in *manifest order*, so the failure surfaced one file at a
+     * time as a 422 from `registerPipeline` (or not until the first poll), potentially after other pipelines
+     * in the same bundle had already gone live. Now nothing is registered unless every reference resolves.
+     */
+    @Test
+    void aBundleNamingAnUnknownConnectionIsRejectedAndRegistersNothing(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            byte[] bundle = bundleReferencingConnection(root, "absent_conn", false);
+
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundle);
+            assertEquals(422, imp.statusCode(), imp.body());
+            String details = V1Body.envelope(imp.body()).get("error").get("details").toString();
+            assertTrue(details.contains("absent_conn"), "names the unresolvable connection: " + details);
+            assertTrue(details.contains("collector.connection"), "attributes it to the right key: " + details);
+
+            assertTrue(idList(c.port, "/spaces/beta/datasources").isEmpty(),
+                    "nothing was registered — the gate is all-or-nothing, not best-effort");
+        }
+    }
+
+    /** A bundle that brings its own connection is complete, even though it is not registered yet when the
+     *  gate runs — the check is the union of the target's registry and the bundle's own contents. */
+    @Test
+    void aBundleCarryingItsOwnConnectionImportsCleanly(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            byte[] bundle = bundleReferencingConnection(root, "carried_conn", true);
+
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundle);
+            assertEquals(200, imp.statusCode(), imp.body());
+            assertTrue(idList(c.port, "/spaces/beta/datasources").contains("test_etl"),
+                    "the pipeline registered even though its connection was only in the bundle");
+        }
+    }
+
+    /** Preview must agree with commit about a missing connection, or `valid:true` invites a 422. */
+    @Test
+    void previewReportsAnUnknownConnectionToo(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            byte[] bundle = bundleReferencingConnection(root, "absent_conn", false);
+
+            HttpResponse<String> pv = post(c.port, "/spaces/beta/import/preview", bundle);
+            assertEquals(200, pv.statusCode(), pv.body());
+            JsonNode r = V1Body.of(pv.body());
+            assertFalse(r.get("valid").asBoolean(), "preview agrees the bundle is not importable");
+            assertTrue(r.get("findings").toString().contains("absent_conn"), r.get("findings").toString());
+
+            // And the same bundle carrying the connection previews clean.
+            JsonNode ok = V1Body.of(post(c.port, "/spaces/beta/import/preview",
+                    bundleReferencingConnection(root, "carried_conn", true)).body());
+            assertTrue(ok.get("valid").asBoolean(), "findings: " + ok.get("findings"));
+        }
+    }
+
+    /**
+     * Build a data-source bundle whose pipeline binds {@code connId}, optionally including the connection
+     * file. Constructed directly rather than exported from a live space on purpose: a space whose pipeline
+     * names a missing connection would not boot, so exporting could not produce this bundle.
+     */
+    private static byte[] bundleReferencingConnection(Path root, String connId, boolean carryConnection)
+            throws Exception {
+        Path config = root.resolve("scratch-" + connId).resolve("config");
+        Files.createDirectories(config);
+        // TestConfigs writes `pipeline_<hash>.toon`; the `*_pipeline.toon` suffix is what marks a file as a
+        // pipeline to the importer (and to the gate), so the rename is load-bearing, not cosmetic.
+        Path pipeline = config.resolve("etl_pipeline.toon");
+        Files.move(TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write(), pipeline);
+        Files.writeString(pipeline, Files.readString(pipeline)
+                + "\ncollector:\n  id: test_etl\n  connector: sftp\n  connection: " + connId + "\n");
+
+        Path conn = null;
+        if (carryConnection) {
+            conn = config.resolve(connId + "_connection.toon");
+            Files.writeString(conn, "connection:\n  id: " + connId + "\n  connector: sftp\n"
+                    + "  host: sftp.example.com\n  password: ${ENV:PW}\n");
+        }
+        // The schema TestConfigs wrote beside the pipeline must ride along, or the gate's schema half fires.
+        java.util.List<Path> schemas = new java.util.ArrayList<>();
+        try (var s = Files.list(config)) {
+            s.filter(f -> f.getFileName().toString().startsWith("schema_")).forEach(schemas::add);
+        }
+        return BundleExporter.exportDataSource(
+                new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of()), config, "alpha");
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────
