@@ -256,7 +256,7 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   otherwise emit a spurious "unresolvable" warning for a portable draft.
   *Verified: full `mvn -o clean test` reactor green, 24/24 modules; `SchemaRefResolutionTest` 8/8 (including
   a real relocate-the-directory-and-load proof, not a proxy for it) and `SchemaFileFindingsTest` 6/6.*
-- **W2 — config-key unification (U-D, U-E). 🔄 IN PROGRESS — U-E (the plugin guard) SHIPPED 2026-07-31.**
+- **W2 — config-key unification (U-D, U-E). ✅ COMPLETE 2026-07-31 — U-E `05c93cf1`, U-D `6b0dc27b`.**
   **U-E done, and it was a live bug rather than the cleanup this plan assumed.** `pluginManaged` was not a
   cosmetic read-only notice — it was a **whole-pane lockout**: any config with `parsing.plugin` or
   `processing.ingester` rendered a single "author that in the pipeline TOON directly" alert and *nothing
@@ -374,7 +374,42 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   *Verify: `lint:tokens` + full `ng test` + prod build; a spec asserting the two features render the
   same keys for the same concern; a live walk authoring one stream through each surface and diffing the
   written TOON — it must be identical.*
-- **W3 — promotion export (U-F).** One pipe; extend the closure to decision rules and reference
+- **W3 — promotion export (U-F). 🔄 IN PROGRESS — the credential leak is FIXED first (2026-07-31).**
+
+  ⚠ **Found while mapping the machinery: the zip export shipped plaintext credentials.** Both
+  `BundleExporter.exportDataSource` and `exportSpace` did a plain `Files.readAllBytes` on every file,
+  including `*_connection.toon` — and nothing upstream forces a credential to be a `${…}` reference:
+  `POST /connections` accepts a literal (`ConnectionRoutes.keepSecret` only intercepts the `***` sentinel)
+  and `connectionDoc` writes it **unmasked** to disk. So `GET /spaces/{id}/export` and
+  `GET /spaces/{id}/datasources/{ds}/export` served a zip with the password in it. This directly violated
+  the standing rule that connection credentials never travel in exports.
+
+  The irony worth recording: `ConnectionProfile.toBundleMap()` — which omits a non-reference secret rather
+  than masking it, and whose javadoc already reasons about bundles landing "in git, CI logs and support
+  tickets" — existed and was **correct**, and the *metadata-bundle* path (`BundleRoutes`) used it properly
+  and even rejects raw secrets on import. Only the zip path bypassed it. (An earlier note that
+  `toBundleMap` was entirely unused was wrong and is corrected here.)
+
+  **Fixed:** both export paths now route every `connection`-classified file through `toBundleMap()`,
+  re-wrapped under `connection:` so the entry stays a drop-in replacement. **Fail-closed**: a connection
+  file that does not parse aborts the export rather than shipping unexamined bytes, since that is precisely
+  the file whose secrets cannot be proven absent — and this is a live branch, not a theoretical one,
+  because `connector` is mandatory in `ConnectionProfile`'s constructor. Six new tests read the emitted zip
+  entry and assert the secret is absent from the bytes (literal password, secret-looking `options` keys, the
+  whole-space walk, a `${ENV:…}` reference surviving, non-connection files staying verbatim, and the
+  fail-closed abort not quoting the secret it refused to ship). One pre-existing fixture had to gain a
+  `connector` — an id-only stub was never a loadable connection file.
+  *Verified: `mvn -o clean test` BUILD SUCCESS, ~2448 tests, 0 failures — nothing depended on connection
+  files travelling byte-for-byte.*
+
+  ⚠ **Two known limits of this fix.** (1) The round-trip through `fromMap`/`toBundleMap` rewrites the file
+  in the profile's canonical shape, so an unmodelled key is dropped — the same trade the metadata bundle
+  already makes, but it means the zip is no longer byte-identical to disk for connections. (2) It closes the
+  *export* side only; **authoring** still accepts a literal credential, so secrets still rest in plaintext
+  on disk. Forcing `${…}` at `POST /connections` (as `rejectRawSecrets` already does for bundle import)
+  is the obvious follow-up and is **not** done here — it is a breaking change to the connection API.
+
+  Remaining W3 scope: extend the closure to decision rules and reference
   datasets (both gaps confirmed in §2); add **import-time referential integrity** so a missing
   connection/schema fails at import rather than at first poll; `dirs` re-derived on the target.
   *Verify: a real two-instance walk — export from one space, import into a second, and RUN it, with
