@@ -52,6 +52,14 @@ and external entities disabled outright (XXE), grammar `xml.record_element` (loc
 path; blank = the root's direct children) / `namespace_aware` / `encoding` / `max_records`;
 `suggest()` proposes the root's repeated child. Preview-only until the flatten DSL.
 
+Second plugin: `Asn1ParserPlugin` (engine, registered via the same services file) — wraps the
+`asn-facade` module's public `Asn1Decoder`/`RecordMapper` (`asn-parser/asn-decoders/asn-facade`,
+depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local repo from the
+separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
+note below). Grammar: `asn1.grammar` (the ASN.1 module text) / `asn1.root_type` / `asn1.strictness`
+(BER/DER/CER) / `asn1.max_records`. Framing is fixed to bare back-to-back TLVs (`Framing.none()`);
+no `suggest()`. Preview-only, same as XML, until the flatten DSL.
+
 ## Control plane (`ParserRoutes`, both compute-only — no write gate, no capability)
 
 - `GET /parsers` → `[{id, label, hierarchical, ingestable, grammarSchema}]`.
@@ -78,9 +86,21 @@ path; blank = the root's direct children) / `namespace_aware` / `encoding` / `ma
 
 ## ASN.1 (the operator's target format) — status
 
-Not served yet, deliberately: `asn-parser/` is a separate Maven project owned by another active
-workstream, and it is not plugin-ready (no public facade; `RecordMapper` is package-private; the
-decode tuple — grammar/root type/framing — is hardcoded in `GoldenCapture.CASES`, not config;
-two conflicting sets of Maven coordinates). The adoption prerequisites are recorded in BACKLOG §4;
-when its `ParserPlugin` jar lands, ASN.1 appears in every dropdown with its grammar (schema module
-picker as a served field) and tree preview — no UI change.
+**Served as of 2026-07-31** via `Asn1ParserPlugin` (above) — it appears in the Onboarding Parsing
+stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. What
+shipped is the minimum plugin over the new `asn-facade` API: a flat grammar (module text + root
+type name + strictness), fixed `none()` framing, preview-only (no `ingesterClass()`).
+
+Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
+- **Declarative decode profile** — today's `asn1.grammar`/`asn1.root_type`/`asn1.strictness` fields
+  are the plugin's own flat grammar, not the schema-module/root-type/framing/encoding profile
+  originally envisioned (replacing `GoldenCapture.CASES`'s hardcoded tuple); framing is fixed to
+  bare TLVs — no length-prefixed/padded/trailer framing option is exposed yet.
+- **The Maven coordinate split** — `Asn1ParserPlugin` depends on the NEW rewrite
+  (`com.gamma.asn:asn-decoders:0.1.0-SNAPSHOT`, `asn-parser/asn-decoders/`), installed to the local
+  repo as a manual step before this reactor builds (not yet resolved automatically). The OLD
+  `asn-parser-v2:1.2.1` (parent `com.gamma.asn.decoders:asn-decoders:1.1.3-dev`,
+  `asn-parser/pom.xml`) is untouched, has no consumers anywhere in the tree, and is not wired to
+  this plugin — it is dead weight the split still needs to resolve (retire, or fold in).
+- **Drop-in `plugins/` jar directory** and the **segments editor** (unlock guided Save for
+  ingestable custom parsers) — unchanged from before, apply to any custom parser, not ASN.1-specific.

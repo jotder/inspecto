@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.service.CollectorService;
@@ -16,6 +17,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,20 +48,23 @@ class ControlApiParsersTest {
     }
 
     @Test
-    void catalogServesTheBuiltinsPlusXmlWithSchemasAndHonestIngestability(@TempDir Path cfg) throws Exception {
+    void catalogServesTheBuiltinsPlusXmlAndAsn1WithSchemasAndHonestIngestability(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {
             JsonNode list = json(send(c.port, "GET", "/parsers", null));
-            assertEquals(5, list.size(), list.toString());
+            assertEquals(6, list.size(), list.toString());
             assertEquals("delimited", list.get(0).get("id").asText());
             assertEquals("xml", list.get(4).get("id").asText());
+            assertEquals("asn1", list.get(5).get("id").asText());
             for (JsonNode p : list) {
                 assertTrue(p.get("grammarSchema").size() > 0, p.get("id").asText() + " has no schema");
                 assertTrue(p.get("grammarSchema").get(0).hasNonNull("path"));
             }
-            JsonNode xml = list.get(4);
-            assertTrue(xml.get("hierarchical").asBoolean());
-            assertFalse(xml.get("ingestable").asBoolean(),
-                    "tree data cannot load to Tables before the flatten config");
+            for (int i : List.of(4, 5)) {
+                JsonNode plugin = list.get(i);
+                assertTrue(plugin.get("hierarchical").asBoolean());
+                assertFalse(plugin.get("ingestable").asBoolean(),
+                        "tree data cannot load to Tables before the flatten config");
+            }
             assertTrue(list.get(0).get("ingestable").asBoolean());
         }
     }
@@ -92,9 +97,29 @@ class ControlApiParsersTest {
     }
 
     @Test
+    void asn1PreviewReturnsATreeViaBase64Sample(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            String grammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"
+                    + "Record ::= [APPLICATION 1] SEQUENCE { id [0] INTEGER }\n"
+                    + "END\n";
+            // 61 03 { 80 01 0A } == id=10
+            byte[] sample = java.util.HexFormat.of().parseHex("610380010A");
+            String body = new ObjectMapper().writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar", grammar, "root_type", "Record")),
+                    "sample_b64", Base64.getEncoder().encodeToString(sample)));
+            JsonNode r = json(send(c.port, "POST", "/parsers/asn1/preview", body));
+            assertEquals("tree", r.get("kind").asText());
+            assertEquals(1, r.get("recordCount").asInt());
+            JsonNode id = r.get("nodes").get(0).get("children").get(0);
+            assertEquals("id", id.get("label").asText());
+            assertEquals("10", id.get("value").asText());
+        }
+    }
+
+    @Test
     void unknownParserIs404(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {
-            HttpResponse<String> res = send(c.port, "POST", "/parsers/asn1/preview",
+            HttpResponse<String> res = send(c.port, "POST", "/parsers/made_up_format/preview",
                     "{\"sample_text\":\"x\"}");
             assertEquals(404, res.statusCode(), res.body());
         }

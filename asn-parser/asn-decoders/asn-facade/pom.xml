@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>com.gamma.asn</groupId>
+        <artifactId>asn-decoders</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>asn-facade</artifactId>
+    <description>
+        Public bytes-to-records API over the new stack (ASN.1 adoption prerequisite, docs/BACKLOG.md
+        "Parsing (Stage-1)"): compiles a grammar once, then decodes a ByteSource into a lazy stream of
+        NamedNodes (RecordReader + SchemaBinder), with a public NamedNode-to-legacy-record-map converter
+        (RecordMapper, promoted out of asn-golden where it was package-private) and a convenience that
+        carries a decoded record all the way to LegacyTransformEngine's flattened rows. This is the
+        dependency surface a future com.gamma.parse.ParserPlugin adapter builds on — asn-golden stays
+        harness-only (it also pulls in legacy-code) and is not meant to be depended on by production code.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-schema</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-transform</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

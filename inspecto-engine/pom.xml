@@ -64,6 +64,16 @@
             <artifactId>file-processor-event</artifactId>
         </dependency>
 
+        <!-- asn-facade (asn-parser/asn-decoders, a standalone reactor outside the root parent's
+             version management — installed locally, not resolved from this build): the public
+             bytes-to-records API Asn1ParserPlugin decodes against. Depends only on asn-core/
+             asn-schema/asn-transform (never asn-golden/legacy-code, which are harness-only). -->
+        <dependency>
+            <groupId>com.gamma.asn</groupId>
+            <artifactId>asn-facade</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+
         <!-- DuckDB (parent-managed since WS-D). -->
         <dependency>
             <groupId>org.duckdb</groupId>

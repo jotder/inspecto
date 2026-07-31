@@ -17,6 +17,7 @@
         <module>asn-plugin-api</module>
         <module>asn-transform</module>
         <module>asn-plugin-vendors</module>
+        <module>asn-facade</module>
         <module>legacy-code</module>
         <module>asn-golden</module>
     </modules>

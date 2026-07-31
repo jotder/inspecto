@@ -14,29 +14,31 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The {@link Parsers} registry + the built-in adapters: the catalog carries the four engine
- * frontends plus the ServiceLoader-discovered XML plugin, every built-in's preview runs the real
- * DuckDB read specs, and self-description (grammar schemas) is present and sane.
+ * frontends plus the ServiceLoader-discovered XML and ASN.1 plugins, every built-in's preview runs
+ * the real DuckDB read specs, and self-description (grammar schemas) is present and sane.
  */
 class ParsersTest {
 
     @Test
     void catalogCarriesBuiltinsThenDiscoveredPlugins() {
         List<String> ids = Parsers.catalog().stream().map(ParserPlugin::id).toList();
-        assertEquals(List.of("delimited", "fixedwidth", "json", "text_regex", "xml"), ids);
+        assertEquals(List.of("delimited", "fixedwidth", "json", "text_regex", "xml", "asn1"), ids);
     }
 
     @Test
-    void builtinsAreIngestableThePreviewOnlyXmlPluginIsNot() {
+    void builtinsAreIngestableThePreviewOnlyPluginsAreNot() {
         assertTrue(Parsers.ingestable(Parsers.get("delimited").orElseThrow()));
         assertTrue(Parsers.ingestable(Parsers.get("json").orElseThrow()));
-        ParserPlugin xml = Parsers.get("xml").orElseThrow();
-        assertTrue(xml.hierarchical());
-        assertFalse(Parsers.ingestable(xml), "tree data cannot load to Tables before the flatten config");
+        for (String id : List.of("xml", "asn1")) {
+            ParserPlugin p = Parsers.get(id).orElseThrow();
+            assertTrue(p.hierarchical());
+            assertFalse(Parsers.ingestable(p), "tree data cannot load to Tables before the flatten config");
+        }
     }
 
     @Test
     void unknownIdIsEmpty() {
-        assertTrue(Parsers.get("asn1").isEmpty());
+        assertTrue(Parsers.get("made_up_format").isEmpty());
     }
 
     @Test

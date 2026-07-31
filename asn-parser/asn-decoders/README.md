@@ -157,6 +157,22 @@ pins one fast case per build; the full sweep is a manual main (see PARITY.md hea
   that PER is the one ER needing an additive change: `CompiledType` must retain constraints),
   and [MIGRATION_STATUS.md](../docs/MIGRATION_STATUS.md).
 
+## Phase 6 — engine adoption: public facade (in progress)
+
+- **asn-facade** (new module, depends only on asn-core/asn-schema/asn-transform — never
+  asn-golden or legacy-code): the public bytes→records API a future `com.gamma.parse.ParserPlugin`
+  adapter builds on (docs/BACKLOG.md "ASN.1 adoption prerequisites", items 1–2).
+  - `Asn1Decoder` — compile a grammar once (`compile`/`compileLenient`/`of`), then `decode(ByteSource, …)`
+    lazily streams schema-bound `NamedNode`s (composes `RecordReader` + `SchemaBinder` exactly like
+    `ParityCheck.checkFile`, now reusable outside the harness). `decodeToRows(...)` carries a record
+    through `RecordMapper` + `LegacyTransformEngine` to flattened rows in one call.
+  - `RecordMapper` — the `NamedNode`→legacy-record-map converter, promoted out of `asn-golden`
+    (package-private there) so production code doesn't need to depend on the harness module.
+  - Still open (items 3–6 of the same backlog entry): the declarative decode profile (replacing
+    `GoldenCapture.CASES`), the `asn-parser-v2`/`asn-decoders` coordinate split, a drop-in
+    `plugins/` jar directory, and the segments editor that unlocks guided Save for hierarchical
+    parsers.
+
 ## Not yet built (per phase plan)
 - `CompiledSchema` stable text serialization + `asn compile`/`asn dump` CLI (asn-cli module).
 - `StreamSource` (pipes), `RESYNC(pattern)` recovery, CER canonical checks (Phase 5).
