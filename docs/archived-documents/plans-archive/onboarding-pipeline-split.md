@@ -1,5 +1,23 @@
 # Onboarding ↔ Pipeline split — contract vs processing
 
+> # ⛔ SUPERSEDED 2026-07-31 — ARCHIVED FOR PROVENANCE, NOT CURRENT
+> **This plan's direction was REVERSED by the operator on 2026-07-31.** Do not build from it.
+> Current plan: [`superpower/onboarding-pipeline-unification.md`](../../superpower/onboarding-pipeline-unification.md)
+> — **one** model (`*_pipeline.toon`, the config the engine actually executes), with Onboarding as a
+> guided view over the head of the same pipeline graph. The two-plane model below (Onboard declares a
+> contract · Pipeline processes landed data · the Dataset is the handoff) no longer holds, and §7's
+> "No editor unification" non-goal is now an explicit goal.
+>
+> Three things from this plan REMAIN IN FORCE and were carried into the unification plan §6 —
+> read them there, not here:
+> 1. **S1 shipped and stays** — go-live auto-registers a `dataset` component. Nothing was reverted.
+> 2. **D-B** — no new trigger machinery; `on_pipeline` already exists.
+> 3. ⚠ **The `EnrichmentService` semantics warning (§3)** — the registered path is per-committed-batch
+>    while `EnrichJob` is a full recompute. Still a live risk; now owned by unification W4.
+>
+> D-C's vocabulary rollout was slice S5 and **never shipped**, so `GLOSSARY.md` was never changed —
+> there is nothing to unwind.
+
 > **Status: DESIGN — direction approved by the operator 2026-07-30; no build started.**
 > Decisions D-A–D-C pinned below; slices S1–S6. Standing UI mandate for every slice
 > (operator, 2026-07-30): **reuse shared components even when they need small changes** —

@@ -73,15 +73,23 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/onboarding-pipeline-split.md`](superpower/onboarding-pipeline-split.md) — **Onboarding ↔
-  Pipeline split, DESIGN approved 2026-07-30, no build started.** Onboard = declare the contract (metadata →
-  Table + auto-registered Dataset); Pipeline = processing over landed data; the Dataset is the handoff.
-  Engine already agrees (`on_pipeline` job trigger + `EnrichJob` chain verified in source — no new trigger
-  machinery). Pinned: D-A enrichment stage → template over the pipeline plane (`_enrich.toon`
-  grandfathered), D-B reuse the job trigger (semantics question owned by S4), D-C "Pipeline" = processing
-  graph only, UI-first, backend identifiers untouched. Slices S1–S3 (Dataset at go-live · shared store
-  picker · "Create pipeline from this Stream") are independently shippable. Standing UI mandate: reuse
-  shared components even when they need small changes.
+- [`superpower/onboarding-pipeline-unification.md`](superpower/onboarding-pipeline-unification.md) —
+  **Onboarding ↔ Pipeline UNIFICATION, DESIGN approved 2026-07-31, no build started. Supersedes and
+  reverses `onboarding-pipeline-split.md`** (archived to `plans-archive/`; S1 there shipped and stays).
+  **One** model: `*_pipeline.toon`/`PipelineConfig` is canonical because it is what the engine executes —
+  the authoring editor's `*_flow.toon` is not wired to the executor. Onboarding becomes a guided view over
+  the head of the same graph; "Stream" is already only a Catalog label (`kind: "STREAM"`). Pinned U-A–U-G:
+  canonical config wins · stages become typed nodes · **one schema store = path-addressed config TOON**
+  (no engine path resolves a registry schema id; `bindKindFor` never offered `schema`; 16 files vs 2
+  components) · one `AttributeSpec` table per concern with Onboarding's engine-real keys winning ·
+  plugin-parser parity · one promotion-grade export pipe (reusing the existing backend
+  `BundleExporter`/`DataSourceBundleResolver` closure walk) · no identity churn. ⚠ **W0 is a hard gate**:
+  the lift→lower round-trip is potentially lossy BOTH ways (`dirs`/dedup/quarantine have no node home;
+  the graph can express branching a flat config cannot) — prove it lossless or name the supported subset
+  before W4/W5 build. W1–W3 (schema store · config keys · export) are independently shippable and close
+  every issue the operator named. Shares a prerequisite with `BACKLOG.md` §6 path-jailing: one space-root
+  threading into `PipelineConfigParser` lands both. Standing UI mandate: reuse shared components even when
+  they need small changes.
 - [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md) — **`4.x` public-PKCE auth,
   SCOPED 2026-07-25** — the gate on the SEC-INCIDENT-1 rotation (BACKLOG §5): `4.x` must stop needing a
   client secret before the leaked secrets can be rotated. Verified against `4.x` `291c86a1`, and three

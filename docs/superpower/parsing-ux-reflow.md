@@ -18,8 +18,11 @@ Reviewing stream onboarding, the operator raised two UX problems and a target fl
 **Engine ground truth** (verified): Stage-1 parsing supports exactly `delimited`, `fixedwidth`,
 `json`, `text_regex` (+ TOON-managed `plugin`) — `xml`/`asn1` are rejected
 ([PipelineConfigParser.java:687](inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java)).
-The JSON frontend reads **top-level keys only**; nested values are stringified; `records_path` is
-locked to `$` ([DuckDbCsvIngester.java:317](inspecto-etl/src/main/java/com/gamma/etl/DuckDbCsvIngester.java)).
+~~The JSON frontend reads **top-level keys only**; nested values are stringified; `records_path` is
+locked to `$`~~ — **both halves now DONE** (nested field selectors 2026-07-31; nested
+`records_path` 2026-07-31) in
+[DuckDbCsvIngester.java](inspecto-etl/src/main/java/com/gamma/etl/DuckDbCsvIngester.java);
+see `okf/backend/config/parsing-options-reference.md` §6.4 for the as-built contract.
 `POST /config/preview/parsing` is the real engine path (rows capped at 1000). The Pipelines
 **Parser config dialog** (9 types, grammar components, tree preview, ASN.1 modules) is a UI
 prototype on a **mock-only** endpoint — `/components/grammar/preview` has no server route. The real
