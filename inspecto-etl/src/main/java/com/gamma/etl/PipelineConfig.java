@@ -800,13 +800,20 @@ public final class PipelineConfig {
      * directory). Splitting those steps lets a draft be parsed/validated from memory with no I/O via
      * {@link #fromMap(Map)}.
      *
+     * <p>A <em>relative</em> schema reference resolves against this config file's own directory first and the
+     * working directory second, so a space tree can be relocated/renamed/imported without rewriting the
+     * references inside it while every existing working-directory-relative config keeps loading unchanged.
+     *
      * @param configPath filesystem path to the pipeline {@code .toon} file
      * @throws FileNotFoundException if the pipeline or any referenced schema file is missing
      * @throws IOException           on any I/O or parse failure
      * @throws IllegalArgumentException if any managed directory is nested inside the poll dir
      */
     public static PipelineConfig load(String configPath) throws IOException {
-        PipelineConfig cfg = PipelineConfigParser.parse(ToonHelper.load(configPath), configPath);
+        // The config's own directory is the base for relative schema references (W1b): passing it needs no
+        // caller change and no space-root threading, because a loaded config always HAS a directory.
+        java.nio.file.Path here = java.nio.file.Paths.get(configPath).toAbsolutePath().getParent();
+        PipelineConfig cfg = PipelineConfigParser.parse(ToonHelper.load(configPath), configPath, here);
         cfg.prepare();
         return cfg;
     }

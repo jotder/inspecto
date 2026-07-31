@@ -20,8 +20,17 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
 * **`PipelineConfigParser`** (`inspecto-etl/src/main/java/com/gamma/etl/PipelineConfigParser.java`,
   package-private) — parses a decoded map into an immutable `PipelineConfig` (entry points
   `PipelineConfig.load(path)` / `fromMap(map)`). Pure parse, no filesystem side-effects (`prepare()` does
-  those). Resolves `schema_file`/`grammar`/`dirs.*` against the **JVM CWD** (not the space root — see
-  [gotchas](../gotchas/cross-cutting.md)).
+  those).
+  **Schema-reference resolution (W1b, 2026-07-31): config-relative first, JVM CWD second.** A relative
+  `schema_file` / `schemas[].schema_file` / `parsing.plugin.segments` value is resolved against **the config
+  file's own directory** if it exists and stays inside it, otherwise against the **JVM CWD** — so a bare
+  `orders_schema.toon` beside its pipeline is portable (the space tree can be moved, renamed, or imported
+  under a new name with no edits), while every legacy `spaces/<id>/config/...` value keeps loading unchanged.
+  `fromMap(map)` has no directory, so it takes the CWD branch only.
+  ⚠ `grammar` and `dirs.*` are **still CWD-only** — they were not part of W1b.
+  ⚠ The config-relative branch is contained (a `../` escape is skipped, not resolved); the CWD branch is
+  **not** jailed and is explicitly not a security boundary (see [gotchas](../gotchas/cross-cutting.md) and
+  `BACKLOG.md` §6).
 
 ## The three config file types per source
 

@@ -169,7 +169,9 @@ final class RunRoutes implements RouteModule {
         // ERROR here: registration loads the config for real, so an unresolvable schema_file is a
         // guaranteed failure — block with a structured, field-anchored finding instead of letting
         // PipelineConfig.load() surface it as an opaque "config is not a valid pipeline" 422.
-        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", raw, Severity.ERROR));
+        // `resolved.getParent()` so a config-relative schema reference resolves here the same way
+        // PipelineConfig.load will resolve it (W1b) — otherwise this gate 422s a config that would run.
+        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", raw, Severity.ERROR, resolved.getParent()));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("registered", false,
                     "error", "config has ERROR-level findings; not registered", "findings", findings));

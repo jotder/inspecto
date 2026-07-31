@@ -28,10 +28,18 @@ timestamp: 2026-07-16T00:00:00Z
   `clear()` in `finally` — `MultiCollectorProcessor.runAll`/`runConfigs` **and** `CollectorProcessor`'s per-batch
   executor. Miss one and that space's metrics/events silently fall back to `"default"`. See
   [multi-space](../control-plane/multi-space.md).
-* **Pipeline-internal paths resolve against the JVM CWD, not the space root.** A pipeline's `schema_file`,
-  `grammar`, and `dirs.*` are `Paths.get(...)` in `PipelineConfigParser` with no rebasing to `spaces/<id>/`.
-  Only the *space discovery* layer (`-Dspaces.root`) is space-relative. So configs under `spaces/<id>/config/`
-  must use repo/bundle-root-relative paths, and `SpaceMigrator` cannot auto-fix absolute/author-relative ones.
+* **Pipeline-internal paths resolve against the JVM CWD, not the space root — `schema_file` excepted since
+  2026-07-31.** `grammar` and `dirs.*` are still bare `Paths.get(...)` in `PipelineConfigParser` with no
+  rebasing to `spaces/<id>/`, and only the *space discovery* layer (`-Dspaces.root`) is space-relative — so
+  those must stay repo/bundle-root-relative, and `SpaceMigrator` cannot auto-fix absolute/author-relative ones.
+  **Schema references (`schema_file`, `schemas[].schema_file`, `parsing.plugin.segments`) now go through
+  `PipelineConfigParser.resolveSchemaRef`: config-relative first, CWD second** (unification W1b), so a bare
+  basename beside the pipeline is portable. ⚠ The mixed model is the trap — in one config file a bare
+  `orders_schema.toon` resolves while a bare `dirs.poll: inbox` still means `<CWD>/inbox`.
+  ⚠ ⚠ Anything that *validates* a schema reference must mirror `resolveSchemaRef` or it will reject configs
+  the engine runs. `ConfigRoutes.schemaFileFindings` is an **ERROR** gate at registration and takes a
+  `configDir` for exactly this reason; its two WARNING call sites still pass `null` (a draft has no directory),
+  so a portable draft gets a spurious "unresolvable" warning at validate/save until W3 lands.
 * **`PartitionWriter` requires non-empty partition columns** (it emits `PARTITION_BY (...)`). The unpartitioned
   single-file `COPY` path is `PartitionSinkWriter.writeUnpartitioned()`. See [output & sinks](../engine/output-sinks.md).
 * **Pipeline seed must be ≥ 1 `source_store`** — `PipelineJobRunner.seedsOf` throws on zero; multi-source merge is the

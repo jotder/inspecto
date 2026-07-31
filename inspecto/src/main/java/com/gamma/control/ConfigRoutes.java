@@ -341,32 +341,57 @@ final class ConfigRoutes implements RouteModule {
 
     /**
      * Pre-flight check that a pipeline draft's schema reference(s) resolve on <em>this server's</em>
-     * filesystem (v4.1.0). {@link PipelineConfig} resolves {@code schema_file} relative to the
-     * process working directory, so a draft that validates clean can still fail at registration
+     * filesystem (v4.1.0). A draft that validates clean can otherwise still fail at registration
      * with an opaque 422 — this surfaces it early, as a structured finding anchored to the field.
      * Checks both the legacy {@code processing.schema_file} and the multi-schema
      * {@code processing.schemas[].schema_file}. No-op for non-pipeline types.
      *
-     * @param severity WARNING at validate/save time (the file may be created later, or the config
-     *                 may be destined for another host); ERROR at register time (it will fail)
+     * <p>⚠ This must resolve references <b>exactly</b> the way {@link PipelineConfig#load} does, or it
+     * becomes a gate that rejects configs the engine would happily run. Since W1b that means
+     * config-relative first, working-directory second — hence {@code configDir}.
+     *
+     * @param severity  WARNING at validate/save time (the file may be created later, or the config
+     *                  may be destined for another host); ERROR at register time (it will fail)
+     * @param configDir directory the config lives in, so a config-relative reference resolves; {@code null}
+     *                  for a draft with no home yet, which checks the working-directory form only
      */
-    static List<Finding> schemaFileFindings(String type, Map<String, Object> draft, Severity severity) {
+    static List<Finding> schemaFileFindings(String type, Map<String, Object> draft, Severity severity,
+                                            Path configDir) {
         if (!"pipeline".equals(type)) return List.of();
         Object procObj = draft.get("processing");
         if (!(procObj instanceof Map<?, ?> proc)) return List.of();
         List<Finding> out = new ArrayList<>();
-        if (proc.get("schema_file") instanceof String s && !s.isBlank() && !Files.isRegularFile(Path.of(s)))
+        if (proc.get("schema_file") instanceof String s && !s.isBlank() && !resolves(s, configDir))
             out.add(new Finding(severity, "processing.schema_file", unresolvable(s)));
         if (proc.get("schemas") instanceof List<?> defs) {
             for (int i = 0; i < defs.size(); i++) {
                 if (defs.get(i) instanceof Map<?, ?> def
                         && def.get("schema_file") instanceof String s && !s.isBlank()
-                        && !Files.isRegularFile(Path.of(s)))
+                        && !resolves(s, configDir))
                     out.add(new Finding(severity, "processing.schemas[" + i + "].schema_file",
                             unresolvable(s)));
             }
         }
         return out;
+    }
+
+    /**
+     * For a draft that has no directory yet (validate / pre-write), where a config-relative reference
+     * cannot be checked because there is nothing to be relative to.
+     */
+    static List<Finding> schemaFileFindings(String type, Map<String, Object> draft, Severity severity) {
+        return schemaFileFindings(type, draft, severity, null);
+    }
+
+    /** Mirrors {@code PipelineConfigParser.resolveSchemaRef}: config-relative first, then the CWD. */
+    private static boolean resolves(String ref, Path configDir) {
+        Path asAuthored = Path.of(ref);
+        if (configDir != null && !asAuthored.isAbsolute()) {
+            Path base      = configDir.toAbsolutePath().normalize();
+            Path candidate = base.resolve(asAuthored).normalize();
+            if (candidate.startsWith(base) && Files.isRegularFile(candidate)) return true;
+        }
+        return Files.isRegularFile(asAuthored);
     }
 
     private static String unresolvable(String schemaPath) {

@@ -50,6 +50,16 @@ final class PipelineConfigParser {
 
     @SuppressWarnings("unchecked")
     static PipelineConfig parse(Map<String, Object> raw, String sourceLabel) throws IOException {
+        return parse(raw, sourceLabel, null);
+    }
+
+    /**
+     * @param configDir directory of the config file being parsed, used to resolve <em>relative</em> schema
+     *                  references portably; {@code null} for an in-memory draft (no file, so nothing to be
+     *                  relative to) — then only the legacy working-directory resolution applies.
+     */
+    @SuppressWarnings("unchecked")
+    static PipelineConfig parse(Map<String, Object> raw, String sourceLabel, Path configDir) throws IOException {
         Builder b = new Builder();
 
         // Column names declared by whatever schema path resolves below (raw.fields[].name ∪
@@ -270,11 +280,12 @@ final class PipelineConfigParser {
             for (var entry : ((Map<?,?>) segsRaw).entrySet()) {
                 String key        = (String) entry.getKey();
                 String schemaPath = (String) entry.getValue();
-                b.referencedFiles.add(Paths.get(schemaPath));
-                if (!Files.exists(Paths.get(schemaPath)))
+                Path   schemaFile = resolveSchemaRef(schemaPath, configDir);
+                b.referencedFiles.add(schemaFile);
+                if (!Files.exists(schemaFile))
                     throw new FileNotFoundException("Segment schema not found for '" + key + "': " + schemaPath);
                 Map<String, Object> schema = (Map<String, Object>)
-                        JToon.decode(Files.readString(Paths.get(schemaPath), StandardCharsets.UTF_8));
+                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
                 Identifiers.validateSchema(schema, "segment[" + key + "]");
                 declaredColumns.addAll(columnNamesOf(schema));
                 b.segmentSchemas.put(key, schema);
@@ -302,11 +313,12 @@ final class PipelineConfigParser {
                 String table       = (String) entry.get("table");
                 String filePattern = (String) entry.get("file_pattern");
 
-                b.referencedFiles.add(Paths.get(schemaPath));
-                if (!Files.exists(Paths.get(schemaPath)))
+                Path schemaFile = resolveSchemaRef(schemaPath, configDir);
+                b.referencedFiles.add(schemaFile);
+                if (!Files.exists(schemaFile))
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 Map<String, Object> schemaCfg = (Map<String, Object>)
-                        JToon.decode(Files.readString(Paths.get(schemaPath), StandardCharsets.UTF_8));
+                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
                 Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
                 declaredColumns.addAll(columnNamesOf(schemaCfg));
                 if (table != null && !table.isBlank())
@@ -338,11 +350,12 @@ final class PipelineConfigParser {
                             + "processing.schemas[], or a plugin ingester) — keep a draft inactive "
                             + "until its schema is attached");
             } else {
-                b.referencedFiles.add(Paths.get(schemaPath));
-                if (!Files.exists(Paths.get(schemaPath)))
+                Path schemaFile = resolveSchemaRef(schemaPath, configDir);
+                b.referencedFiles.add(schemaFile);
+                if (!Files.exists(schemaFile))
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 b.singleSchema = (Map<String, Object>)
-                        JToon.decode(Files.readString(Paths.get(schemaPath), StandardCharsets.UTF_8));
+                        JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
                 Identifiers.validateSchema(b.singleSchema, "schema_file");
                 declaredColumns.addAll(columnNamesOf(b.singleSchema));
                 validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
@@ -491,6 +504,44 @@ final class PipelineConfigParser {
         PipelineConfig cfg = new PipelineConfig(b);
         ConfigValidator.validate(cfg);  // non-fatal: logs warnings for suspicious-but-legal patterns
         return cfg;
+    }
+
+    // ── schema reference resolution ───────────────────────────────────────────
+
+    /**
+     * Resolve a schema reference to the file to actually read — <b>config-relative first, working-directory
+     * second</b> (unification W1b).
+     *
+     * <p>Why two: every schema reference on disk today is written working-directory-relative
+     * (`spaces/&lt;space&gt;/config/x_schema.toon`, and the space template literally carries a
+     * `spaces/${SPACE}/...` placeholder), so the process must be launched from the base directory or the
+     * pipeline does not load — and a space directory cannot be moved, renamed, or imported under a new name
+     * without rewriting every reference inside it. Resolving relative to the config file's OWN directory
+     * makes a bare `x_schema.toon` portable: the whole space tree relocates and still resolves. The legacy
+     * form keeps working because it is only tried second, so nothing on disk needs migrating.
+     *
+     * <p>Jailing: the config-relative candidate must stay <b>under</b> {@code configDir}. A reference that
+     * climbs out (`../../etc/passwd`) does not silently escape — it is skipped here and left to the legacy
+     * branch, which is the pre-existing (unjailed, advisory-only) behaviour rather than a new hole. Full
+     * containment enforcement is the separate systemic pass in {@code BACKLOG.md} §6; this method is
+     * deliberately not a security boundary and must not be mistaken for one.
+     *
+     * @param ref       the raw reference as authored (`processing.schema_file`, a `schemas[].schema_file`,
+     *                  or a `parsing.plugin.segments` value)
+     * @param configDir directory of the config being parsed, or {@code null} for an in-memory draft
+     * @return the path to read; absolute refs and the null-{@code configDir} case return {@code ref} as-is,
+     *         byte-identically to the pre-W1b behaviour
+     */
+    private static Path resolveSchemaRef(String ref, Path configDir) {
+        Path asAuthored = Paths.get(ref);
+        if (configDir == null || asAuthored.isAbsolute()) return asAuthored;
+
+        Path base      = configDir.toAbsolutePath().normalize();
+        Path candidate = base.resolve(asAuthored).normalize();
+        // Only prefer the portable form when it is both contained AND actually present — otherwise a legacy
+        // config (whose ref resolves from the working directory) must keep loading unchanged.
+        if (candidate.startsWith(base) && Files.exists(candidate)) return candidate;
+        return asAuthored;
     }
 
     // ── dir validation ────────────────────────────────────────────────────────

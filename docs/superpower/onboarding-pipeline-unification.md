@@ -1,6 +1,6 @@
 # Onboarding ↔ Pipeline unification — one model, one guided head
 
-> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W1a SHIPPED same day; W0/W1b/W2–W5 open.**
+> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W1 (a+b) SHIPPED same day; W0/W2–W5 open.**
 > **Supersedes `onboarding-pipeline-split.md`** (approved 2026-07-30, archived to
 > `archived-documents/plans-archive/`). That plan's two-plane model — Onboard declares a contract,
 > Pipeline processes landed data, the Dataset is the handoff — is **reversed** by this one. §6 records
@@ -190,8 +190,34 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   rather than left answering *"no structural spec for kind"*. The backend repair loop is untouched and
   generic — see BACKLOG for the follow-on.
   *Verified: full `mvn -o clean test` reactor green; UI 1890 tests + `lint:tokens` + production build green.*
-  **W1b, still open:** make schema references space-relative so they are portable AND jailed. Needs the
-  space-root threading shared with `BACKLOG.md` §6 — do that once and both land.
+  **W1b, SHIPPED 2026-07-31 — and it did NOT need the space-root threading.** The plan assumed threading a
+  `SpaceRoot` through `PipelineConfig.load`'s 8 call sites (several of which are CLI entry points with no
+  space concept, and `SpaceRoot` lives in module `inspecto`, *above* `inspecto-etl` — so the parser could not
+  even see it). Unnecessary: **a config being loaded always has a directory**, so
+  `PipelineConfig.load(configPath)` passes `Paths.get(configPath).getParent()` and no caller changed at all.
+  Resolution order in `PipelineConfigParser.resolveSchemaRef` is **config-relative first,
+  working-directory second**, applied at all three reference sites (`processing.schema_file`,
+  `processing.schemas[].schema_file`, `parsing.plugin.segments`). A bare `x_schema.toon` beside its pipeline
+  is portable — the whole space tree relocates/renames/imports and still resolves — and every existing
+  working-directory-relative config keeps loading byte-identically because its form is still tried, so
+  **nothing on disk needed migrating**.
+  ⚠ **The gate had to move with the reader.** `ConfigRoutes.schemaFileFindings` is an **ERROR**-severity
+  gate at registration (`RunRoutes`), so leaving it resolving working-directory-only would have made it
+  reject a portable config the engine runs happily — blocking the very promotion path W1b exists to enable.
+  It now takes a nullable `configDir` and mirrors `resolveSchemaRef` exactly; `RunRoutes` passes
+  `resolved.getParent()`. The two WARNING sites (validate / pre-write) still pass `null` because a draft has
+  no home yet — see W3 below.
+  ⚠ **Jailing is partial and must not be oversold:** the config-relative branch is contained (a `../`
+  escape is skipped, not resolved), but the legacy working-directory branch remains unjailed. That is
+  deliberate — full containment is the systemic pass in `BACKLOG.md` §6, and `resolveSchemaRef` carries a
+  comment saying it is not a security boundary.
+  **Still open, deliberately deferred to W3:** the *writers* still emit working-directory-relative
+  `spaces/<space>/config/x_schema.toon` (`PipelineCompiler`, `stream-bundle.ts`'s `conventionPath`, and the
+  space template's literal `spaces/${SPACE}/...` placeholder). Reading portable refs is now supported;
+  *producing* them belongs with promotion export, together with the two WARNING call sites, which would
+  otherwise emit a spurious "unresolvable" warning for a portable draft.
+  *Verified: full `mvn -o clean test` reactor green, 24/24 modules; `SchemaRefResolutionTest` 8/8 (including
+  a real relocate-the-directory-and-load proof, not a proxy for it) and `SchemaFileFindingsTest` 6/6.*
 - **W2 — config-key unification (U-D, U-E).** One spec table per concern under
   `inspecto/component-model` (or a shared `pipeline-specs.ts`), adopted by both features; plugin-parser
   guard lifted.

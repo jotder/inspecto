@@ -7,7 +7,9 @@
 
 The framework uses three config files in `.toon` format (JToon). Only the generation config is hand-authored; the other two are machine-generated and then maintained.
 
-Config files live under a space's `config/<adapter>/` directory (e.g. `spaces/<id>/config/<adapter>/`; see [Spaces](#spaces-multi-project-layout) below).  All `dirs.*` and `schema_file` paths are relative to the **sandbox root** (the JVM working directory) — for the multi-space runtime that is the repo/bundle root you launch from, so the bundled example configs use repo-root-relative paths such as `spaces/<id>/config/...` and `spaces/<id>/data/...`.
+Config files live under a space's `config/<adapter>/` directory (e.g. `spaces/<id>/config/<adapter>/`; see [Spaces](#spaces-multi-project-layout) below).  All `dirs.*` paths are relative to the **sandbox root** (the JVM working directory) — for the multi-space runtime that is the repo/bundle root you launch from, so the bundled example configs use repo-root-relative paths such as `spaces/<id>/config/...` and `spaces/<id>/data/...`.
+
+**`schema_file` is the exception since 2026-07-31 (unification W1b): it resolves config-relative first, sandbox-root second.** A relative schema reference is tried against the pipeline config's **own directory** before the working directory, so the portable form is a bare basename — `schema_file: orders_schema.toon` next to `orders_pipeline.toon`. That makes a space directory relocatable/renamable/importable with no edits to the configs inside it. The repo-root-relative form below still works and needs no migration; prefer the bare form for anything you intend to promote to another instance. Applies to `schemas[].schema_file` and `parsing.plugin.segments` values too — but **not** to `grammar` or `dirs.*`, which remain working-directory-relative.
 
 ## Spaces (multi-project layout)
 
