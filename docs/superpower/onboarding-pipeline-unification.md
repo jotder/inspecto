@@ -127,6 +127,44 @@ Answer (2) is the likely and acceptable outcome. What is *not* acceptable is dis
 the editor starts writing production configs. **Verify: a round-trip test — canonical config → lift →
 lower → canonical config — asserting byte/semantic equality over a corpus of the existing 16 configs.**
 
+### W0 finding 2026-07-31 (audited after U-D) — the lower drops the ENTIRE collector block
+
+Measured directly against `PipelineCompiler.java:83-199`, and **independently confirmed** by reading the
+`raw.put` sites rather than taking a summary on trust:
+
+- `toConfigMap()` emits **only** `name`, `active`, `trigger`, `dirs`, `output`, `processing`. **There is no
+  `collector` key constructed anywhere in the file.**
+- From the acquisition node it reads **exactly three** keys: `trigger` (:93), `poll` (:97) and
+  `file_pattern` (:118). It does **not** read `include`, `exclude`, `recursive_depth`, `connection`,
+  `discovery`, `duplicate.*`, `stability.*`, `guarantee`, `post_action.*`, `incremental.watermark`,
+  `gap_detection.*`, `fetch.*`, `retry.*` or `circuit_breaker.*`.
+
+**The sharp consequence, and it implicates U-D's own work:** the shared `COLLECTOR_ATTRIBUTES` offers 11
+keys — `connection`, `include`, `discovery`, `duplicate__mode`, `post_action__on_success`, `exclude`,
+`recursive_depth`, `duplicate__on_change`, `guarantee`, `stability__window`, `post_action__archive_path` —
+and the **intersection with the three keys the compiler reads is EMPTY**. So the Pipelines editor's
+`acquisition` form now offers 11 keys the lower discards, and offers none of the 3 it consumes.
+
+Note precisely *where* the defect is: those 11 keys are **engine-real** — `PipelineConfigParser:396-500`
+reads every one of them from a `collector:` block. **Onboarding is unaffected**, because it writes a real
+`*_pipeline.toon` that the parser reads directly (the W1b path). The gap is that **`PipelineCompiler` is
+incomplete**, not that the UI keys are wrong. U-D made the vocabulary honest; it did not — and could not —
+prove the keys survive lowering. Those are two different properties, and only the first was verified.
+
+Other roles, same audit: **GAP nodes are grouped by `compile()` and then never read**; `alert`/`event` have
+no branch in the classification loop at all; `transform.dedup.fingerprint` is collected into `dedups` and
+never inspected; and **only one persistent sink plus one quarantine sink are read** — every additional sink
+is ignored, which is exactly the multi-sink topology §3 warned a flat config cannot carry.
+
+**So W0's answer is already trending to (2), a named supported subset** — but the collector block is too
+central to leave out, so the realistic W0 scope is: teach `toConfigMap()` to emit `collector:` from the
+acquisition node, then name the subset for what genuinely cannot round-trip (multi-sink, CONTROL nodes,
+fingerprint dedup). ⚠ Extending the compiler will move the Phase-1 parity tests that currently *encode*
+this narrow output as correct — expect to update them deliberately, not to treat their failure as a
+regression. ⚠ Also revisit the U-D spec asserting `nodeAttributesFor('acquisition') === COLLECTOR_ATTRIBUTES`:
+it is right that one table serves both features, but if the editor ever needs `poll`/`trigger`/`file_pattern`
+(pipeline-level keys Onboarding authors elsewhere), that identity is the constraint to renegotiate.
+
 ## 4. Decisions pinned
 
 - **U-A — canonical model is `*_pipeline.toon` / `PipelineConfig`.** It is what the engine executes;
