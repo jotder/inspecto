@@ -13,6 +13,7 @@ import com.gamma.config.spec.FieldType;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * ASN.1 as a {@link ParserPlugin}, over the {@code asn-facade} module's public bytes-to-records
@@ -23,9 +24,10 @@ import java.util.Map;
  * honestly load to Tables until the flatten configuration exists (the tree→segments ingest bridge,
  * {@code docs/BACKLOG.md} "Parsing (Stage-1)"), so this parser is <b>preview-only</b> for now.
  *
- * <p>Framing is fixed to bare back-to-back TLVs ({@link Framing#none()}) — a declarative decode
- * profile (grammar module/root type/framing/encoding, replacing this plugin's flat grammar fields)
- * is tracked as a follow-up in the same backlog entry.
+ * <p>Framing is served, not hardcoded: {@code file_header_length} and {@code record_header_length}
+ * cover every layout in the parity corpus (see {@link #framing}). What remains for the declarative
+ * decode profile tracked in that backlog entry is sourcing the grammar from a schema-module
+ * reference rather than pasted module text.
  */
 public final class Asn1ParserPlugin implements ParserPlugin {
 
@@ -59,6 +61,12 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                 FieldSpec.enumField("asn1.strictness", "Strictness",
                         List.of("BER", "DER", "CER"), "BER",
                         "Encoding rules enforced while decoding: BER (permissive), DER, or CER."),
+                FieldSpec.withDefault("asn1.file_header_length", "File header bytes", FieldType.INT, 0,
+                        "Bytes to skip at the start of the file before the first record "
+                                + "(e.g. 50 for Huawei-framed files). 0 = none."),
+                FieldSpec.withDefault("asn1.record_header_length", "Record header bytes", FieldType.INT, 0,
+                        "Bytes preceding each record's TLV, skipped (e.g. 4 for Huawei-framed files). "
+                                + "0 = bare back-to-back TLVs. Records stay delimited by their own BER length."),
                 FieldSpec.withDefault("asn1.max_records", "Preview records", FieldType.INT, DEFAULT_RECORDS,
                         "Records materialized into the preview tree (max " + MAX_RECORDS + ")."));
     }
@@ -75,6 +83,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         if (rootType.isEmpty())
             throw new IllegalArgumentException("asn1.root_type is required");
         Strictness strictness = strictness(str(asn1.get("strictness")));
+        Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
 
         Asn1Decoder decoder;
@@ -87,7 +96,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         List<ParseError> errors = new ArrayList<>();
         List<NamedNode> records;
         try (ByteSource src = ByteSource.of(sample)) {
-            records = decoder.decode(src, Framing.none(), strictness, RecoveryPolicy.SKIP_RECORD, errors::add)
+            records = decoder.decode(src, framing, strictness, RecoveryPolicy.SKIP_RECORD, errors::add)
                     .toList();
         }
         if (records.isEmpty()) {
@@ -104,6 +113,39 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         return children.isEmpty()
                 ? ParseResult.Node.leaf(n.name(), n.typeName(), n.value())
                 : ParseResult.Node.container(n.name(), n.typeName(), children);
+    }
+
+    /**
+     * The record layout, from the two knobs real files actually vary by. 0x00/0xFF padding between
+     * records is unconditional, matching the legacy reader (`ASN1Utils.readTag` skips both before
+     * every record tag — e.g. the zero-fill in Ericsson OCC files) and the parity harness that
+     * pins the rewrite to it. ⚠ A record header made of those bytes would therefore be eaten as
+     * padding before the header is ever counted.
+     *
+     * <p>Deliberately NOT exposed: trailer length, and the length-prefix machinery
+     * ({@code lengthOffset}/{@code lengthSize}/endianness/{@code lengthIncludesHeader}) that
+     * {@link Framing.RecordHeaderSpec} can express. No file in the parity corpus uses either — every
+     * framed case is {@code skipOnly}, leaving records delimited by their own BER length — so
+     * serving those fields would be offering knobs nothing has ever needed. They stay available in
+     * asn-core the moment a real file demands them.
+     */
+    private static Framing framing(Map<String, Object> asn1) {
+        int fileHeader = nonNegative(asn1.get("file_header_length"), "file_header_length");
+        int recordHeader = nonNegative(asn1.get("record_header_length"), "record_header_length");
+        return Framing.of(new Framing.FramingSpec(fileHeader, 0, Set.of(0x00, 0xFF),
+                recordHeader == 0 ? null : Framing.RecordHeaderSpec.skipOnly(recordHeader)));
+    }
+
+    private static int nonNegative(Object v, String field) {
+        if (v == null) return 0;
+        int n;
+        try {
+            n = Integer.parseInt(String.valueOf(v).trim());
+        } catch (NumberFormatException bad) {
+            throw new IllegalArgumentException(field + " must be a number, got: " + v);
+        }
+        if (n < 0) throw new IllegalArgumentException(field + " must not be negative, got: " + n);
+        return n;
     }
 
     private static Strictness strictness(String v) {

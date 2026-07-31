@@ -57,8 +57,19 @@ Second plugin: `Asn1ParserPlugin` (engine, registered via the same services file
 depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local repo from the
 separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
 note below). Grammar: `asn1.grammar` (the ASN.1 module text) / `asn1.root_type` / `asn1.strictness`
-(BER/DER/CER) / `asn1.max_records`. Framing is fixed to bare back-to-back TLVs (`Framing.none()`);
-no `suggest()`. Preview-only, same as XML, until the flatten DSL.
+(BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_records`.
+No `suggest()`. Preview-only, same as XML, until the flatten DSL.
+
+**Framing is served, but only the knobs real files vary by.** The two length fields cover every
+layout in the parity corpus (file header 0 or 50 bytes; record header absent or 4 bytes, always
+`skipOnly` so records stay delimited by their own BER length). 0x00/0xFF inter-record padding is
+**unconditional** — the legacy `ASN1Utils.readTag` skips both before every record tag and the
+parity harness pins the rewrite to that. ⚠ Consequence: a record header made of those bytes is
+eaten as padding before the header is counted. Deliberately NOT served: trailer length and the
+length-prefix machinery (`lengthOffset`/`lengthSize`/endianness/`lengthIncludesHeader`) that
+`Framing.RecordHeaderSpec` can express — no corpus file uses either, so serving them would be
+offering knobs nothing has needed. They stay available in asn-core the moment a real file demands
+them.
 
 ## Control plane (`ParserRoutes`, both compute-only — no write gate, no capability)
 
@@ -87,15 +98,17 @@ no `suggest()`. Preview-only, same as XML, until the flatten DSL.
 ## ASN.1 (the operator's target format) — status
 
 **Served as of 2026-07-31** via `Asn1ParserPlugin` (above) — it appears in the Onboarding Parsing
-stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. What
-shipped is the minimum plugin over the new `asn-facade` API: a flat grammar (module text + root
-type name + strictness), fixed `none()` framing, preview-only (no `ingesterClass()`).
+stage's toggle and the Pipelines Parser dialog with zero UI change, exactly as designed. The plugin
+sits on the new `asn-facade` API and serves grammar + framing; it is preview-only (no
+`ingesterClass()`).
 
 Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
-- **Declarative decode profile** — today's `asn1.grammar`/`asn1.root_type`/`asn1.strictness` fields
-  are the plugin's own flat grammar, not the schema-module/root-type/framing/encoding profile
-  originally envisioned (replacing `GoldenCapture.CASES`'s hardcoded tuple); framing is fixed to
-  bare TLVs — no length-prefixed/padded/trailer framing option is exposed yet.
+- **Declarative decode profile — the remaining half.** Framing is now served (above), which was the
+  larger part of `GoldenCapture.CASES`'s hardcoded tuple. What is left is the **grammar source**:
+  the plugin takes pasted ASN.1 module *text*, where the profile envisioned a reference to a stored
+  schema module (the corpus keeps `.asn` files per vendor, e.g. `mtnOCC.asn`). Until that lands
+  there is nowhere to *store* a reusable module, and a per-vendor tx/transform config has no home
+  either.
 - **The Maven coordinate split** — `Asn1ParserPlugin` depends on the NEW rewrite
   (`com.gamma.asn:asn-decoders:0.1.0-SNAPSHOT`, `asn-parser/asn-decoders/`), installed to the local
   repo as a manual step before this reactor builds (not yet resolved automatically). The OLD

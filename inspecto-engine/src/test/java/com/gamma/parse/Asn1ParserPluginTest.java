@@ -117,6 +117,45 @@ class Asn1ParserPluginTest {
     }
 
     @Test
+    void aFileHeaderIsSkippedBeforeTheFirstRecord() throws Exception {
+        // 5 junk bytes of file header, then two ordinary records.
+        ParseResult.Tree t = (ParseResult.Tree) asn1.preview(hex("AA BB CC DD EE", RECORD_1_HEX, RECORD_2_HEX),
+                grammar("grammar", GRAMMAR, "root_type", "Record", "file_header_length", 5));
+        assertEquals(2, t.recordCount());
+        assertEquals("42", t.nodes().get(0).children().get(0).value());
+    }
+
+    @Test
+    void aPerRecordHeaderIsSkippedAndRecordsStayBerDelimited() throws Exception {
+        // 4-byte header before each record (the Huawei layout), records still delimited by their
+        // own BER length. Header bytes deliberately avoid 0x00/0xFF — those are padding.
+        ParseResult.Tree t = (ParseResult.Tree) asn1.preview(
+                hex("01 02 03 04", RECORD_1_HEX, "05 06 07 08", RECORD_2_HEX),
+                grammar("grammar", GRAMMAR, "root_type", "Record", "record_header_length", 4));
+        assertEquals(2, t.recordCount());
+        assertEquals("42", t.nodes().get(0).children().get(0).value());
+        assertEquals("7", t.nodes().get(1).children().get(0).value());
+    }
+
+    @Test
+    void zeroAndFfPaddingBetweenRecordsIsSkippedUnconditionally() throws Exception {
+        // Legacy ASN1Utils.readTag skips both before every record tag; no grammar field asks for it.
+        ParseResult.Tree t = (ParseResult.Tree) asn1.preview(
+                hex(RECORD_1_HEX, "00 00 FF FF 00", RECORD_2_HEX, "FF FF"),
+                grammar("grammar", GRAMMAR, "root_type", "Record"));
+        assertEquals(2, t.recordCount());
+        assertEquals("7", t.nodes().get(1).children().get(0).value());
+    }
+
+    @Test
+    void aNegativeFramingLengthIsACallerError() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> asn1.preview(hex(RECORD_1_HEX),
+                        grammar("grammar", GRAMMAR, "root_type", "Record", "file_header_length", -1)));
+        assertTrue(e.getMessage().contains("file_header_length"));
+    }
+
+    @Test
     void leafValuesHaveNoChildrenAndNullIsOnlyForContainers() throws Exception {
         ParseResult.Tree t = (ParseResult.Tree) asn1.preview(hex(RECORD_1_HEX),
                 grammar("grammar", GRAMMAR, "root_type", "Record"));
