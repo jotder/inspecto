@@ -14,6 +14,20 @@
                     <mat-icon svgIcon="heroicons_outline:share" class="icon-size-4"></mat-icon>
                     <span class="ml-1">View as graph</span>
                 </button>
+                <button
+                    mat-stroked-button
+                    type="button"
+                    [disabled]="exporting()"
+                    (click)="exportConfig()"
+                    matTooltip="Download this configuration as JSON — re-import it as a new Stream here or on another server"
+                >
+                    @if (exporting()) {
+                        <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-1" />
+                    } @else {
+                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray" class="icon-size-4"></mat-icon>
+                    }
+                    <span class="ml-1">Export config</span>
+                </button>
             }
             @if (lens.canAuthorWorkbench() && !state.active() && !state.missing()) {
                 <button mat-stroked-button type="button" (click)="discard()">

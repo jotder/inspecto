@@ -5,6 +5,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -20,6 +21,17 @@ import { OnboardingStateService } from './onboarding-state.service';
 /** The four types `TransformCompiler.direct()` actually TRY_CASTs — everything else is stored as
  *  text (honesty guard: no type offered here implies rigor the engine does not apply). */
 const SCHEMA_TYPES = ['VARCHAR', 'DOUBLE', 'DATE', 'TIMESTAMP'] as const;
+
+/** Data-format icon + plain-words hint per type — the Type cell renders these so a 500-column
+ *  table scans visually. Only the four honest types exist, so the map is closed. */
+const TYPE_META: Record<string, { icon: string; hint: string }> = {
+    VARCHAR: { icon: 'heroicons_outline:bars-3-bottom-left', hint: 'Text' },
+    DOUBLE: { icon: 'heroicons_outline:hashtag', hint: 'Number (floating point)' },
+    DATE: { icon: 'heroicons_outline:calendar', hint: 'Date' },
+    TIMESTAMP: { icon: 'heroicons_outline:clock', hint: 'Date & time' },
+};
+
+type SortKey = 'source' | 'name' | 'selector' | 'type';
 
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -63,6 +75,7 @@ interface FieldRow {
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
+        MatPaginatorModule,
         MatProgressSpinnerModule,
         MatSelectModule,
         MatTooltipModule,
@@ -117,6 +130,111 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
     readonly includedNames = signal<string[]>([]);
     /** Sample-derived types were prefilled (any non-VARCHAR) — surfaces the "suggested" note. */
     readonly typesSuggested = signal(false);
+
+    protected readonly typeMeta = TYPE_META;
+    typeIcon(t: string | null | undefined): string {
+        return (TYPE_META[t ?? ''] ?? TYPE_META['VARCHAR']).icon;
+    }
+
+    // ── View window over the FormArray ──────────────────────────────────────────
+    // The form stays the single source of truth; these signals only choose WHICH rows render.
+    // Deliberately NOT reactive to keystrokes in the name cells — re-sorting/re-filtering while
+    // the user types would make rows jump under the caret. The window recomputes on search/
+    // filter/sort/page changes and on structural rebuilds (derive/hydrate).
+    readonly search = signal('');
+    readonly typeFilter = signal<string>('all');
+    readonly sortKey = signal<SortKey>('source');
+    readonly sortDir = signal<1 | -1>(1);
+    readonly pageIndex = signal(0);
+    readonly pageSize = signal(50);
+    private readonly structureVersion = signal(0);
+
+    readonly totalCount = computed(() => {
+        this.structureVersion();
+        return this.fieldRows.length;
+    });
+
+    readonly filteredEntries = computed<{ group: FormGroup; index: number }[]>(() => {
+        this.structureVersion();
+        const q = this.search().trim().toUpperCase();
+        const tf = this.typeFilter();
+        const key = this.sortKey();
+        const dir = this.sortDir();
+        let entries = this.fieldRows.controls.map((group, index) => ({
+            group,
+            index,
+            v: group.getRawValue() as FieldRow,
+        }));
+        if (q)
+            entries = entries.filter(
+                ({ v }) => v.name.toUpperCase().includes(q) || String(v.selector).toUpperCase().includes(q),
+            );
+        if (tf !== 'all') entries = entries.filter(({ v }) => v.type === tf);
+        if (key === 'source') return dir === 1 ? entries : [...entries].reverse();
+        return [...entries].sort((a, b) => {
+            const av = String(a.v[key] ?? '');
+            const bv = String(b.v[key] ?? '');
+            const an = Number(av);
+            const bn = Number(bv);
+            // Numeric when both sides are numbers — delimited selectors are positions, and
+            // "10" must not sort before "2".
+            const c = av !== '' && bv !== '' && !Number.isNaN(an) && !Number.isNaN(bn)
+                ? an - bn
+                : av.localeCompare(bv);
+            return (c !== 0 ? c : a.index - b.index) * dir;
+        });
+    });
+
+    readonly pagedEntries = computed(() => {
+        const start = this.pageIndex() * this.pageSize();
+        return this.filteredEntries().slice(start, start + this.pageSize());
+    });
+
+    /** Header master-checkbox state over the FILTERED set (not just the visible page). */
+    readonly visibleIncludeState = computed<'all' | 'none' | 'some'>(() => {
+        this.includedNames(); // any row edit re-evaluates
+        const entries = this.filteredEntries();
+        if (entries.length === 0) return 'none';
+        const on = entries.filter((e) => (e.group.getRawValue() as FieldRow).include).length;
+        return on === 0 ? 'none' : on === entries.length ? 'all' : 'some';
+    });
+
+    setSearch(q: string): void {
+        this.search.set(q);
+        this.pageIndex.set(0);
+    }
+
+    setTypeFilter(t: string): void {
+        this.typeFilter.set(t);
+        this.pageIndex.set(0);
+    }
+
+    sortBy(key: Exclude<SortKey, 'source'>): void {
+        if (this.sortKey() === key) {
+            this.sortDir.update((d) => (d === 1 ? -1 : 1));
+        } else {
+            this.sortKey.set(key);
+            this.sortDir.set(1);
+        }
+        this.pageIndex.set(0);
+    }
+
+    ariaSort(key: SortKey): 'ascending' | 'descending' | null {
+        if (this.sortKey() !== key) return null;
+        return this.sortDir() === 1 ? 'ascending' : 'descending';
+    }
+
+    onPage(e: PageEvent): void {
+        this.pageIndex.set(e.pageIndex);
+        this.pageSize.set(e.pageSize);
+    }
+
+    /** Include/exclude every row matching the current search + type filter, across all pages. */
+    toggleAllVisible(checked: boolean): void {
+        for (const e of this.filteredEntries()) e.group.get('include')?.setValue(checked, { emitEvent: false });
+        this.fieldsForm.markAsDirty();
+        this.syncIncludedNames();
+    }
     readonly rejectedRows = computed<Record<string, unknown>[]>(() => this.state.schemaPreview()?.rejectedRows ?? []);
 
     private readonly dirtyCheck = (): boolean => this.fieldsForm.dirty || this.partitionKeyControl.dirty;
@@ -165,6 +283,7 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
             });
         });
         this.typesSuggested.set(Object.values(suggested).some((t) => t !== 'VARCHAR'));
+        this.structureVersion.update((v) => v + 1);
         this.syncIncludedNames();
     }
 
@@ -181,6 +300,7 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
             });
         }
         this.partitionKeyControl.setValue(String(config['partitionKey'] ?? ''), { emitEvent: false });
+        this.structureVersion.update((v) => v + 1);
         this.syncIncludedNames();
         // A freshly loaded (unedited) resume state is pristine, not dirty.
         this.fieldsForm.markAsPristine();
@@ -211,28 +331,51 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
         this.router.navigate(['/catalog', 'onboard', this.state.name(), 'parsing']);
     }
 
+    /** Clear the view filters and jump to the page holding the given row — with 500 columns a
+     *  problem row hidden by a filter or on another page would block Save with nothing visibly
+     *  wrong on screen. */
+    private revealRow(index: number): void {
+        if (index < 0) return;
+        this.search.set('');
+        this.typeFilter.set('all');
+        this.sortKey.set('source');
+        this.sortDir.set(1);
+        this.pageIndex.set(Math.floor(index / this.pageSize()));
+    }
+
     /** Validated, included rows — a schema draft's `raw.fields[]` + one straight-through
      *  `mapping.rules[]` entry each (`SchemaExtractor`'s own shape); `null` on a blocking problem. */
     private buildFields(): { fields: Record<string, string>[]; rules: Record<string, string>[] } | null {
         if (this.fieldRows.invalid) {
             this.fieldRows.controls.forEach((g) => g.markAllAsTouched());
-            this.toastr.warning('Every field name must start with a letter or _ and use only letters, digits, _.');
+            const bad = this.fieldRows.controls.findIndex((g) => g.invalid);
+            this.revealRow(bad);
+            const badName = String(this.fieldRows.at(bad)?.get('name')?.value ?? '').trim();
+            this.toastr.warning(
+                `Field ${bad + 1}${badName ? ` ("${badName}")` : ''}: names must start with a letter or _ and use only letters, digits, _.`,
+            );
             return null;
         }
-        const rows = this.fieldRows.controls.map((g) => g.getRawValue() as FieldRow).filter((r) => r.include);
-        if (rows.length === 0) {
+        const included = this.fieldRows.controls
+            .map((g, index) => ({ index, v: g.getRawValue() as FieldRow }))
+            .filter((e) => e.v.include);
+        if (included.length === 0) {
             this.toastr.warning('Include at least one field.');
             return null;
         }
-        const names = rows.map((r) => r.name.trim());
-        const dup = names.find((n, i) => names.indexOf(n) !== i);
-        if (dup) {
-            this.toastr.warning(`Duplicate field name "${dup}" — names must be unique.`);
-            return null;
+        const seen = new Set<string>();
+        for (const e of included) {
+            const n = e.v.name.trim();
+            if (seen.has(n)) {
+                this.revealRow(e.index);
+                this.toastr.warning(`Duplicate field name "${n}" — names must be unique.`);
+                return null;
+            }
+            seen.add(n);
         }
         return {
-            fields: rows.map((r) => ({ name: r.name.trim(), selector: r.selector, type: r.type })),
-            rules: rows.map((r) => ({ targetColumn: r.name.trim(), sourceExpression: r.name.trim() })),
+            fields: included.map(({ v }) => ({ name: v.name.trim(), selector: v.selector, type: v.type })),
+            rules: included.map(({ v }) => ({ targetColumn: v.name.trim(), sourceExpression: v.name.trim() })),
         };
     }
 

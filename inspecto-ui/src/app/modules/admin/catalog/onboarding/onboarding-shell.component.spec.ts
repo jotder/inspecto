@@ -7,12 +7,28 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, ConnectionsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { STREAM_BUNDLE_FORMAT, StreamBundle } from 'app/inspecto/transfer/stream-bundle';
+import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { OnboardingShellComponent } from './onboarding-shell.component';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
-function create(params: Record<string, string>, api: Partial<ConfigService> = {}) {
+const exportedBundle = (name: string): StreamBundle => ({
+    format: STREAM_BUNDLE_FORMAT,
+    version: 1,
+    exportedAt: '2026-07-31T10:00:00.000Z',
+    source: { space: 'demo', name, contentHash: 'abc' },
+    kind: 'stream',
+    pipeline: { name },
+    requires: [],
+});
+
+function create(
+    params: Record<string, string>,
+    api: Partial<ConfigService> = {},
+    transfer: Partial<StreamTransferService> = {},
+) {
     TestBed.configureTestingModule({
         imports: [OnboardingShellComponent],
         providers: [
@@ -26,6 +42,14 @@ function create(params: Record<string, string>, api: Partial<ConfigService> = {}
             { provide: ConnectionsService, useValue: { list: () => of([]), test: () => of({}) } },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
+            {
+                provide: StreamTransferService,
+                useValue: {
+                    buildExport: vi.fn(() => of({ bundle: exportedBundle(params['name']), missing: [] as string[] })),
+                    download: vi.fn(),
+                    ...transfer,
+                },
+            },
         ],
     });
     const fixture = TestBed.createComponent(OnboardingShellComponent);
@@ -119,5 +143,30 @@ describe('OnboardingShellComponent', () => {
         fixture.detectChanges();
         expect(fixture.nativeElement.textContent).toContain('Blocked');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('offers Export config and downloads the assembled bundle', () => {
+        const fixture = create({ name: 'orders_feed' });
+        expect(fixture.nativeElement.textContent).toContain('Export config');
+        const transfer = fixture.debugElement.injector.get(StreamTransferService);
+        fixture.componentInstance.exportConfig();
+        expect(transfer.buildExport).toHaveBeenCalledWith('orders_feed', 'stream', { name: 'orders_feed' });
+        expect(transfer.download).toHaveBeenCalled();
+        expect(fixture.componentInstance.exporting()).toBe(false);
+    });
+
+    it('names an unreadable satellite instead of shipping a silently partial export', () => {
+        const fixture = create({ name: 'orders_feed' }, {}, {
+            buildExport: vi.fn(() => of({
+                bundle: exportedBundle('orders_feed'),
+                missing: ['schema "orders_feed_schema"'],
+            })),
+        });
+        const transfer = fixture.debugElement.injector.get(StreamTransferService);
+        fixture.componentInstance.exportConfig();
+        expect(transfer.download).toHaveBeenCalled();   // still downloads…
+        expect(TOASTR.warning).toHaveBeenCalledWith(
+            expect.stringContaining('orders_feed_schema'),   // …but says what is missing
+        );
     });
 });

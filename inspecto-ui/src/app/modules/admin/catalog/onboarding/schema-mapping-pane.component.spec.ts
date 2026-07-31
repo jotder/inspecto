@@ -24,6 +24,14 @@ function delimitedPreview(): ParsingPreview {
     };
 }
 
+/** A CDR-scale sample: n text columns (col_0 … col_n-1), one row, all VARCHAR. */
+function widePreview(n: number): ParsingPreview {
+    const columns = Array.from({ length: n }, (_, i) => `col_${i}`);
+    const row: Record<string, unknown> = {};
+    for (const c of columns) row[c] = 'x';
+    return { frontend: 'json', columns, rowCount: 1, rows: [row], rejectedRows: 0 };
+}
+
 async function create(config: Record<string, unknown>, api: Partial<ConfigService> = {}, parsePreview: ParsingPreview | null = delimitedPreview()) {
     TestBed.configureTestingModule({
         imports: [OnboardingSchemaMappingPaneComponent],
@@ -149,6 +157,95 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
         const { fixture, state } = await create({ name: 'region_dim', produces: 'reference' });
         expect(state.kind()).toBe('reference');
         expect(fixture.nativeElement.textContent).toContain('Load policy: full replace');
+    });
+
+    it('renders only one page of a wide sample and pages through the rest', async () => {
+        const { fixture } = await create({ name: 'cdr_feed' }, {}, widePreview(120));
+        const c = fixture.componentInstance;
+        expect(c.totalCount()).toBe(120);
+        expect(c.pagedEntries().length).toBe(50); // default page size, not 120 DOM rows
+        expect(fixture.nativeElement.querySelectorAll('tbody tr').length).toBe(50);
+        c.onPage({ pageIndex: 2, pageSize: 50, length: 120, previousPageIndex: 0 });
+        expect(c.pagedEntries().length).toBe(20);
+        expect(c.pagedEntries()[0].index).toBe(100);
+    });
+
+    it('search filters by name or source across all pages', async () => {
+        const { fixture } = await create({ name: 'cdr_feed' }, {}, widePreview(30));
+        const c = fixture.componentInstance;
+        c.setSearch('col_1'); // col_1 + col_10..col_19
+        expect(c.filteredEntries().length).toBe(11);
+        expect(c.pageIndex()).toBe(0); // search resets paging
+        c.setSearch('no_such_column');
+        expect(c.filteredEntries().length).toBe(0);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain('No fields match');
+    });
+
+    it('type filter narrows to fields of the chosen type', async () => {
+        const { fixture } = await create({ name: 'cdr_feed' }, {}, widePreview(10));
+        const c = fixture.componentInstance;
+        c.fieldRows.at(3).get('type')?.setValue('DATE');
+        c.setTypeFilter('DATE');
+        expect(c.filteredEntries().length).toBe(1);
+        expect(c.filteredEntries()[0].index).toBe(3);
+    });
+
+    it('sorts by name and flips direction on a second click', async () => {
+        const preview: ParsingPreview = {
+            frontend: 'json', columns: ['banana', 'apple'], rowCount: 1,
+            rows: [{ banana: 'x', apple: 'y' }], rejectedRows: 0,
+        };
+        const { fixture } = await create({ name: 'orders_feed' }, {}, preview);
+        const c = fixture.componentInstance;
+        expect(c.pagedEntries()[0].index).toBe(0); // source order first
+        c.sortBy('name');
+        expect(c.pagedEntries()[0].group.get('name')?.value).toBe('APPLE');
+        expect(c.ariaSort('name')).toBe('ascending');
+        c.sortBy('name');
+        expect(c.pagedEntries()[0].group.get('name')?.value).toBe('BANANA');
+        expect(c.ariaSort('name')).toBe('descending');
+    });
+
+    it('master checkbox includes/excludes exactly the filtered rows', async () => {
+        const { fixture } = await create({ name: 'cdr_feed' }, {}, widePreview(20));
+        const c = fixture.componentInstance;
+        c.setSearch('col_1'); // 11 of 20
+        c.toggleAllVisible(false);
+        expect(c.includedNames().length).toBe(9); // only the matching rows were excluded
+        expect(c.visibleIncludeState()).toBe('none');
+        c.setSearch('');
+        expect(c.visibleIncludeState()).toBe('some');
+        expect(c.fieldsForm.dirty).toBe(true);
+    });
+
+    it('save reveals the page holding an invalid row hidden by search + paging', async () => {
+        const write = vi.fn((type: string) => of(WRITE_OK(type)));
+        const { fixture } = await create({ name: 'cdr_feed' }, { write }, widePreview(120));
+        const c = fixture.componentInstance;
+        c.fieldRows.at(100).get('name')?.setValue('9bad'); // starts with a digit → invalid
+        c.setSearch('col_2'); // the invalid row is now hidden entirely
+        c.save();
+        expect(write).not.toHaveBeenCalled();
+        expect(c.search()).toBe(''); // filters cleared…
+        expect(c.pageIndex()).toBe(2); // …and jumped to the page holding row 101
+        expect(String(TOASTR.warning.mock.lastCall?.[0])).toContain('101');
+    });
+
+    it('renders each type with its data-format icon', async () => {
+        const { fixture } = await create({ name: 'orders_feed' });
+        const c = fixture.componentInstance;
+        expect(c.typeIcon('VARCHAR')).toContain('bars-3-bottom-left');
+        expect(c.typeIcon('DOUBLE')).toContain('hashtag');
+        expect(c.typeIcon('DATE')).toContain('calendar');
+        expect(c.typeIcon('TIMESTAMP')).toContain('clock');
+        expect(c.typeIcon(null)).toContain('bars-3-bottom-left'); // unknown falls back to text
+        // Every offered type has its own icon (a new type must bring one, not inherit text's).
+        const icons = ['VARCHAR', 'DOUBLE', 'DATE', 'TIMESTAMP'].map((t) => c.typeIcon(t));
+        expect(new Set(icons).size).toBe(4);
+        // NOTE: rendered <mat-icon> presence is NOT asserted here — jsdom has no icon sprite, the
+        // registry error aborts the trigger view, and the count reads 0 even though the browser
+        // renders it. The visual check lives in the preview, not this spec.
     });
 
     it('has no a11y violations', async () => {

@@ -13,6 +13,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoBreadcrumbComponent } from 'app/inspecto/components/breadcrumb.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { OnboardingCollectionPaneComponent } from './collection-pane.component';
 import { OnboardingEnrichmentPaneComponent } from './enrichment-pane.component';
 import { OnboardingParsingPaneComponent } from './parsing-pane.component';
@@ -56,6 +57,9 @@ export class OnboardingShellComponent {
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
     private destroyRef = inject(DestroyRef);
+    private transfer = inject(StreamTransferService);
+
+    readonly exporting = signal(false);
 
     /** The `:stage` URL param (null = land on the first incomplete stage once loaded). */
     private readonly stageParam = signal<string | null>(null);
@@ -135,6 +139,35 @@ export class OnboardingShellComponent {
     viewAsGraph(): void {
         const id = (this.state.kind() === 'reference' ? 'ref:' : 'stream:') + this.state.normalizedName();
         this.router.navigate(['/catalog'], { queryParams: { tab: 'graph', from: id } });
+    }
+
+    /**
+     * Download this Stream's whole configuration as a portable JSON file — the pipeline body plus
+     * its schema, any per-segment plugin schemas and the enrichment companion. Read-only, so it is
+     * available in EVERY lens (a Business-lens operator handing a config to support is the point);
+     * the import side is what needs authoring rights.
+     */
+    exportConfig(): void {
+        const config = this.state.config();
+        if (!config || this.exporting()) return;
+        this.exporting.set(true);
+        this.transfer.buildExport(this.state.name(), this.state.kind(), config).subscribe({
+            next: ({ bundle, missing }) => {
+                this.exporting.set(false);
+                this.transfer.download(bundle);
+                // A satellite that could not be read is named, not swallowed — the file downloaded,
+                // but it is incomplete and re-importing it would silently lose that piece.
+                if (missing.length) {
+                    this.toastr.warning(`Exported without ${missing.join(', ')} — could not be read.`);
+                } else {
+                    this.toastr.success(`Exported "${this.state.name()}" configuration`);
+                }
+            },
+            error: (e) => {
+                this.exporting.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Could not export the configuration.'));
+            },
+        });
     }
 
     async discard(): Promise<void> {
