@@ -207,7 +207,8 @@ parsing:
   # ── frontend: json ───────────────────────────────────────────────────────────
   json:
     format: newline          # newline (NDJSON) | array | auto
-    records_path: "$"        # JSONPath to the record array, if wrapped
+    records_path: "$"        # "$" = the document IS the record array; or a dotted
+                             # path to a nested array, e.g. payload.records
     columns:                 # optional explicit typing; else all JSON
       id: BIGINT
       ts: TIMESTAMP
@@ -235,7 +236,7 @@ parsing:
 `read_csv`+`substring`; binary via the shipped `com.gamma.ingester.FixedWidthRecordIngester`
 plugin — §6.3), `json` (`read_ndjson`/`read_json`, selectors = top-level JSON keys — §6.4), and
 `text_regex` (`read_csv` 1-col + `regexp_extract` named groups, selectors = group names — §6.5).
-Not yet implemented within them: `json.records_path` other than `"$"`, `text_regex.record_split`
+Not yet implemented within them: `text_regex.record_split`
 `"\n\n"` (blank-line block records, e.g. LDIF entries), and the §8 step-1 extra delimited knobs
 (`quote`/`escape`/`comment`/`skip_junk` renames). Each unsupported knob is rejected at load with a
 clear message.
@@ -306,8 +307,24 @@ parsing:
 ```
 Malformed NDJSON lines are dropped (`json_valid` filter) — routed away from the output without
 failing the batch (they carry no `store_rejects` entry, so they do not land in the errors CSV).
-Explicit `json.columns` typing is unnecessary (the engine lands VARCHAR and types at transform);
-`records_path` other than `"$"` is rejected.
+Explicit `json.columns` typing is unnecessary (the engine lands VARCHAR and types at transform).
+
+**Nested `records_path` (2026-07-31).** When the records sit in an array *inside* the document, point
+`records_path` at it with the **same dotted convention as a field selector** — `payload.records`, or
+`$.payload.records` (the `$.` prefix is optional; escape a literal dot as `\.`, doubled in TOON). The
+two path layers are independent, so a dotted field selector still walks inside each record:
+`records_path: payload.records` + `selector: "addr.city"` works with no extra configuration.
+
+- Requires `format: array` or `auto`. A nested path with `format: newline` is **rejected at load** —
+  in NDJSON each line already IS a record, so there is no enclosing document to walk.
+- A nested path switches the reader to `read_json_objects` + `unnest(json_extract(…)::JSON[])`
+  (`DuckDbCsvIngester.buildNestedJsonReadSpec`); `records_path: "$"` keeps the original `read_json`
+  path unchanged.
+- **Mis-authored paths fail the file, they do not ingest nothing.** A path that is absent raises
+  `json.records_path not found in document: …`; one naming an object or scalar raises
+  `Conversion Error: Expected ARRAY, but got OBJECT`. An **empty** array is honestly zero records, not
+  an error. (The `[*]` wildcard form was rejected precisely because it returns zero rows silently in
+  all three cases.)
 
 ### 6.5 XML `[PLUGIN]` (or `text_regex` `[LIVE]` for *flat* XML)
 DuckDB has no core XML reader. For flat, one-element-per-line XML, `text_regex` with

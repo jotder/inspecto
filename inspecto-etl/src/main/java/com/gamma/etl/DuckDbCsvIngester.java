@@ -13,7 +13,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -326,9 +326,9 @@ public final class DuckDbCsvIngester {
             StringBuilder proj = new StringBuilder();
             for (int i = 0; i < fields.size(); i++) {
                 if (i > 0) proj.append(", ");
-                proj.append("json_extract_string(\"line\", '$.\"")
-                    .append(escapeSql(String.valueOf(fields.get(i).get("selector"))))
-                    .append("\"') AS \"").append(fields.get(i).get("name")).append('"');
+                proj.append("json_extract_string(\"line\", '")
+                    .append(jsonPath(selectorSegments(fields.get(i).get("selector")), 0))
+                    .append("') AS \"").append(fields.get(i).get("name")).append('"');
             }
             String readCsv = "(SELECT \"line\" FROM read_csv('" + escapeSql(filePath) + "'"
                     + ", columns={'line':'VARCHAR'}"
@@ -344,23 +344,39 @@ public final class DuckDbCsvIngester {
             return new ReadSpec(proj.toString(), readCsv);
         }
 
-        // format: array | auto → DuckDB read_json with an explicit all-VARCHAR columns map.
-        LinkedHashSet<String> keys = new LinkedHashSet<>();
-        for (Map<String, Object> f : fields) keys.add(String.valueOf(f.get("selector")));
+        // A nested records_path needs a different reader: read_json's columns= map describes the
+        // RECORD shape, so it cannot also describe the wrapper the records are buried in.
+        if (!"$".equals(j.recordsPath())) return buildNestedJsonReadSpec(filePath, fields, j, cfg);
+
+        // format: array | auto → DuckDB read_json with an explicit columns map. Only the ROOT
+        // segment of each selector is a real column; a nested selector's root is read as JSON so
+        // the projection below can walk into it.
+        LinkedHashMap<String, Boolean> rootIsNested = new LinkedHashMap<>();
+        for (Map<String, Object> f : fields) {
+            List<String> segs = selectorSegments(f.get("selector"));
+            rootIsNested.merge(segs.get(0), segs.size() > 1, Boolean::logicalOr);
+        }
         StringBuilder cols = new StringBuilder("{");
         boolean first = true;
-        for (String k : keys) {
+        for (Map.Entry<String, Boolean> e : rootIsNested.entrySet()) {
             if (!first) cols.append(", ");
             first = false;
-            cols.append('\'').append(escapeSql(k)).append("':'VARCHAR'");
+            cols.append('\'').append(escapeSql(e.getKey()))
+                .append("':'").append(e.getValue() ? "JSON" : "VARCHAR").append('\'');
         }
         cols.append('}');
 
         StringBuilder proj = new StringBuilder();
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
-            proj.append('"').append(fields.get(i).get("selector")).append("\" AS \"")
-                .append(fields.get(i).get("name")).append('"');
+            List<String> segs = selectorSegments(fields.get(i).get("selector"));
+            if (segs.size() == 1) {
+                proj.append('"').append(escapeSql(segs.get(0))).append('"');
+            } else {
+                proj.append("json_extract_string(\"").append(escapeSql(segs.get(0))).append("\", '")
+                    .append(jsonPath(segs, 1)).append("')");
+            }
+            proj.append(" AS \"").append(fields.get(i).get("name")).append('"');
         }
 
         StringBuilder rj = new StringBuilder("read_json('");
@@ -372,6 +388,118 @@ public final class DuckDbCsvIngester {
         rj.append(')');
 
         return new ReadSpec(proj.toString(), rj.toString());
+    }
+
+    /**
+     * Read spec for a NESTED {@code json.records_path} — the records sit in an array somewhere inside
+     * the document rather than at its top level.
+     *
+     * <p>Shape (verified against DuckDB 1.5.2 before being written here):
+     * <pre>
+     * SELECT json_extract_string(rec, '$."imsi"') AS "IMSI", …
+     *   FROM (SELECT unnest((CASE WHEN json_type(json, '$."payload"."records"') IS NULL
+     *                             THEN error('…') ELSE json_extract(json, '$."payload"."records"')
+     *                        END)::JSON[]) AS rec
+     *           FROM read_json_objects('…')) AS js
+     * </pre>
+     *
+     * <p>Three deliberate choices, each because the obvious alternative fails quietly:
+     * <ul>
+     *   <li>{@code read_json_objects} (not {@code read_json}) hands the whole document over as one
+     *       JSON value, which is what a path can be walked against. It is gz-aware and reads a
+     *       pretty-printed multi-line document.</li>
+     *   <li>The {@code ::JSON[]} <b>cast</b> rather than a {@code [*]} wildcard extract. Both explode
+     *       an array into rows, but the wildcard form returns ZERO ROWS when the path names an object
+     *       or a scalar, so a mis-authored path would ingest nothing and report success. The cast
+     *       raises {@code Conversion Error: Expected ARRAY, but got OBJECT}.</li>
+     *   <li>The {@code json_type … IS NULL} guard turns a path that is simply ABSENT into a named
+     *       error, for the same reason: {@code json_extract} of a missing key is NULL, and
+     *       {@code unnest(NULL)} is zero rows, i.e. silent. An <b>empty</b> array is left alone —
+     *       zero records is the honest answer there, not an error.</li>
+     * </ul>
+     *
+     * <p>Per-field selectors then apply to each unnested record exactly as in the {@code $} case, so
+     * dotted nested selectors ({@code addr.city}) compose with a nested records_path for free.
+     */
+    private static ReadSpec buildNestedJsonReadSpec(String filePath, List<Map<String, Object>> fields,
+                                                    PipelineConfig.Json j, PipelineConfig cfg) {
+        String recordsPath = jsonPath(recordsPathSegments(j.recordsPath()), 0);
+
+        StringBuilder proj = new StringBuilder();
+        for (int i = 0; i < fields.size(); i++) {
+            if (i > 0) proj.append(", ");
+            proj.append("json_extract_string(\"rec\", '")
+                .append(jsonPath(selectorSegments(fields.get(i).get("selector")), 0))
+                .append("') AS \"").append(fields.get(i).get("name")).append('"');
+        }
+
+        StringBuilder src = new StringBuilder("read_json_objects('");
+        src.append(escapeSql(filePath)).append('\'');
+        if (cfg.csv().inputCompression() != null && !cfg.csv().inputCompression().isBlank())
+            src.append(", compression='").append(escapeSql(cfg.csv().inputCompression())).append('\'');
+        src.append(')');
+
+        String records = "unnest((CASE WHEN json_type(\"json\", '" + recordsPath + "') IS NULL"
+                + " THEN error('json.records_path not found in document: " + escapeSql(j.recordsPath()) + "')"
+                + " ELSE json_extract(\"json\", '" + recordsPath + "') END)::JSON[])";
+
+        String from = "(SELECT " + records + " AS \"rec\" FROM " + src + ") AS js";
+        return new ReadSpec(proj.toString(), from);
+    }
+
+    /**
+     * Split a {@code json.records_path} into segments, tolerating the JSONPath-style {@code $.} prefix
+     * operators tend to write. {@code $.payload.records} and {@code payload.records} are the same
+     * path; escaping a literal dot works exactly as it does in a field selector.
+     */
+    static List<String> recordsPathSegments(String recordsPath) {
+        String p = recordsPath.trim();
+        if (p.startsWith("$.")) p = p.substring(2);
+        else if (p.startsWith("$")) p = p.substring(1);
+        return selectorSegments(p);
+    }
+
+    /**
+     * Split a JSON {@code raw.fields[].selector} into path segments on unescaped dots, so
+     * {@code addr.city} reaches a NESTED value instead of a top-level key literally named
+     * "addr.city". This is the same dotted convention {@code Asn1RecordIngester} uses for its
+     * selectors — one path notation across the ingesters, not two.
+     *
+     * <p>⚠ <b>Behaviour change (2026-07-31).</b> Before this, the whole selector was treated as one
+     * key, so a config whose JSON genuinely has a dotted key name must now escape it. Rare, but it
+     * IS a breaking change for such configs — hence the escape hatch rather than a silent
+     * reinterpretation with no way back.
+     *
+     * <p>⚠ <b>In a TOON config write the backslash doubled</b> — {@code selector: "odd\\.key"} —
+     * because TOON's own string decoder rejects a bare {@code \.} as an invalid escape sequence
+     * before this method ever sees it. The value reaching here is then {@code odd\.key}.
+     */
+    static List<String> selectorSegments(Object selector) {
+        String raw = String.valueOf(selector);
+        List<String> segments = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (c == '\\' && i + 1 < raw.length() && raw.charAt(i + 1) == '.') {
+                cur.append('.');
+                i++;
+            } else if (c == '.') {
+                segments.add(cur.toString());
+                cur.setLength(0);
+            } else {
+                cur.append(c);
+            }
+        }
+        segments.add(cur.toString());
+        return segments;
+    }
+
+    /** Segments from {@code from} onward as a DuckDB JSON path: {@code $."a"."b"}. */
+    private static String jsonPath(List<String> segments, int from) {
+        StringBuilder sb = new StringBuilder("$");
+        for (int i = from; i < segments.size(); i++)
+            sb.append(".\"").append(escapeSql(segments.get(i))).append('"');
+        return sb.toString();
     }
 
     /**

@@ -112,10 +112,128 @@ class JsonParsingTest {
     }
 
     @Test
-    void nonRootRecordsPathFailsLoad(@TempDir Path dir) {
+    void recordsPathOnNdjsonFailsLoad(@TempDir Path dir) {
+        // NDJSON has no enclosing document for a path to walk — each line already IS a record.
         String parsing = PARSING + "    records_path: \"$.data\"\n";
         Exception e = assertThrows(IllegalArgumentException.class, () -> load(dir, "rp", parsing));
         assertTrue(e.getMessage().contains("records_path"), e.getMessage());
+        assertTrue(e.getMessage().contains("newline"), e.getMessage());
+    }
+
+    // ── nested records_path ─────────────────────────────────────────────────────
+
+    /** A document whose records are buried two levels down, alongside unrelated wrapper keys. */
+    private static final String NESTED_DOC = """
+            {"meta":{"exported":"2020-04-05","count":2},
+             "payload":{"records":[
+               {"account":"A00001","event_date":"2020-04-03","amount":1},
+               {"account":"B00002","event_date":"2020-04-04","amount":2}
+             ]}}
+            """;
+
+    private static String nestedParsing(String recordsPath) {
+        return PARSING.replace("format: newline", "format: auto")
+                + "    records_path: \"" + recordsPath + "\"\n";
+    }
+
+    @Test
+    void nestedRecordsPathReadsRecordsFromInsideTheDocument(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "n1", nestedParsing("$.payload.records"));
+        assertEquals("$.payload.records", cfg.json().recordsPath());
+
+        File json = write(dir, "ev.json", NESTED_DOC);
+        try (Connection conn = open()) {
+            IngestResult r = DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(2, r.parsedRows(), "both nested records land; the wrapper is not a row");
+            assertEquals(List.of("A00001", "B00002"), col(conn, "raw_f0", "ACCOUNT_NUMBER"));
+            assertEquals(List.of("2020-04-03", "2020-04-04"), col(conn, "raw_f0", "EVENT_DATE"));
+        }
+    }
+
+    @Test
+    void recordsPathWorksWithoutTheDollarPrefix(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "n2", nestedParsing("payload.records"));
+        File json = write(dir, "ev.json", NESTED_DOC);
+        try (Connection conn = open()) {
+            assertEquals(2, DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0").parsedRows());
+        }
+    }
+
+    /**
+     * A nested records_path composes with dotted FIELD selectors — the two path layers are
+     * independent, so reaching {@code party.number} inside a nested record needs no extra machinery.
+     */
+    @Test
+    void nestedRecordsPathComposesWithDottedFieldSelectors(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema_n3.toon");
+        Files.writeString(schema, """
+                partitionKey: EVENT_DATE
+                raw:
+                  name: ev
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    ACCOUNT_NUMBER,"account",VARCHAR
+                    EVENT_DATE,"nested.event_date",DATE
+                mapping:
+                  canonicalName: ev
+                  rawName: ev
+                  rules[2]{targetColumn,sourceExpression,transformType}:
+                    ACCOUNT_NUMBER,ACCOUNT_NUMBER,DIRECT
+                    EVENT_DATE,EVENT_DATE,DIRECT
+                """, StandardCharsets.UTF_8);
+        PipelineConfig cfg = loadWithSchema(dir, "n3", nestedParsing("$.payload.records"), schema);
+
+        File json = write(dir, "ev.json", """
+                {"payload":{"records":[
+                  {"account":"A00001","nested":{"event_date":"2020-04-03"}},
+                  {"account":"B00002","nested":{"event_date":"2020-04-04"}}
+                ]}}
+                """);
+        try (Connection conn = open()) {
+            DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("2020-04-03", "2020-04-04"), col(conn, "raw_f0", "EVENT_DATE"),
+                    "the field selector walks INSIDE each unnested record");
+        }
+    }
+
+    @Test
+    void missingRecordsPathFailsTheFileRatherThanIngestingNothing(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "n4", nestedParsing("$.payload.absent"));
+        File json = write(dir, "ev.json", NESTED_DOC);
+        try (Connection conn = open()) {
+            Exception e = assertThrows(Exception.class,
+                    () -> DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0"));
+            assertTrue(e.getMessage().contains("records_path"), e.getMessage());
+        }
+    }
+
+    @Test
+    void recordsPathNamingAnObjectFailsRatherThanIngestingNothing(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "n5", nestedParsing("$.meta"));
+        File json = write(dir, "ev.json", NESTED_DOC);
+        try (Connection conn = open()) {
+            Exception e = assertThrows(Exception.class,
+                    () -> DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0"));
+            assertTrue(e.getMessage().contains("ARRAY"), e.getMessage());
+        }
+    }
+
+    @Test
+    void emptyRecordsArrayIsZeroRowsNotAnError(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "n6", nestedParsing("$.payload.records"));
+        File json = write(dir, "ev.json", "{\"payload\":{\"records\":[]}}\n");
+        try (Connection conn = open()) {
+            assertEquals(0, DuckDbCsvIngester.ingest(json, conn, cfg.schemas().single(), cfg, "raw_f0").parsedRows(),
+                    "an empty array honestly means zero records");
+        }
+    }
+
+    @Test
+    void recordsPathSegmentsToleratesTheDollarPrefixAndEscapedDots() {
+        assertEquals(List.of("payload", "records"), DuckDbCsvIngester.recordsPathSegments("$.payload.records"));
+        assertEquals(List.of("payload", "records"), DuckDbCsvIngester.recordsPathSegments("payload.records"));
+        assertEquals(List.of("odd.key"), DuckDbCsvIngester.recordsPathSegments("odd\\.key"));
+        assertEquals(List.of("data"), DuckDbCsvIngester.recordsPathSegments("$data"));
     }
 
     @Test
@@ -153,6 +271,12 @@ class JsonParsingTest {
     private static PipelineConfig load(Path dir, String tag, String parsingBlock) throws Exception {
         Path schema = dir.resolve("schema_" + tag + ".toon");
         Files.writeString(schema, SCHEMA, StandardCharsets.UTF_8);
+        return loadWithSchema(dir, tag, parsingBlock, schema);
+    }
+
+    /** As {@link #load}, but against a caller-supplied schema toon. */
+    private static PipelineConfig loadWithSchema(Path dir, String tag, String parsingBlock, Path schema)
+            throws Exception {
         String d = fwd(dir);
         String pipe =
                 "name: JSON_" + tag + "\n" +

@@ -723,7 +723,16 @@ final class PipelineConfigParser {
     /**
      * Parse the optional JSON/NDJSON frontend. Returns {@code null} unless {@code frontend: json};
      * otherwise builds a {@link PipelineConfig.Json} from the (optional) {@code json:} block.
-     * Hard-fails on an unknown {@code format} or an unsupported {@code records_path}.
+     * Hard-fails on an unknown {@code format} or a {@code records_path} the chosen format cannot honor.
+     *
+     * <p>{@code records_path} names the array holding the records. {@code "$"} (the default) means the
+     * document's top level IS that array. A nested path uses the SAME dotted convention as
+     * {@code raw.fields[].selector} — {@code payload.records}, with an optional leading {@code $.} —
+     * so there is one path notation across the JSON frontend, not two.
+     *
+     * <p>⚠ A nested path is rejected for {@code format: newline}: in NDJSON each physical line already
+     * IS one record, so there is no enclosing document for a path to walk. Accepting it silently
+     * would let a config express something the reader cannot honor.
      */
     @SuppressWarnings("unchecked")
     private static PipelineConfig.Json parseJson(Map<String, Object> csv) {
@@ -736,9 +745,11 @@ final class PipelineConfigParser {
             throw new IllegalArgumentException("json.format must be newline, array or auto (got '"
                     + format + "')");
         String recordsPath = opt(j, "records_path", "$").trim();
-        if (!recordsPath.equals("$"))
-            throw new IllegalArgumentException("json.records_path: only '$' (top-level records) is "
-                    + "supported — unwrap nested record arrays upstream or use a plugin ingester");
+        if (recordsPath.isEmpty()) recordsPath = "$";
+        if (!recordsPath.equals("$") && format.equals("newline"))
+            throw new IllegalArgumentException("json.records_path '" + recordsPath + "' needs an "
+                    + "enclosing document, but json.format is 'newline' (NDJSON), where each line is "
+                    + "already one record — use format: array or auto, or keep records_path: '$'");
         return new PipelineConfig.Json(format, recordsPath);
     }
 

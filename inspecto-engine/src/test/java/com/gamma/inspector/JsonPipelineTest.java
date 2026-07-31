@@ -78,6 +78,55 @@ class JsonPipelineTest {
         assertTrue(batches.contains(",SUCCESS,"), "batch committed SUCCESS despite the malformed line");
     }
 
+    /**
+     * A dotted selector reaches a NESTED value ({@code addr.city}), and an escaped dot
+     * ({@code odd\.key}) still addresses a top-level key that literally contains one — the
+     * back-compat hatch for configs written before nesting was supported.
+     */
+    private static final String NESTED_SCHEMA = """
+            partitionKey: EVENT_DATE
+            raw:
+              name: ev
+              format: CSV
+              fields[4]{name,selector,type}:
+                ACCOUNT_NUMBER,"account",VARCHAR
+                EVENT_DATE,"event_date",DATE
+                CITY,"addr.city",VARCHAR
+                ODD,"odd\\\\.key",VARCHAR
+            mapping:
+              canonicalName: ev
+              rawName: ev
+              rules[4]{targetColumn,sourceExpression,transformType}:
+                ACCOUNT_NUMBER,ACCOUNT_NUMBER,DIRECT
+                EVENT_DATE,EVENT_DATE,DIRECT
+                CITY,CITY,DIRECT
+                ODD,ODD,DIRECT
+            """;
+
+    @Test
+    void dottedSelectorReachesNestedValuesAndEscapedDotsStayLiteral(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, NESTED_SCHEMA).toString());
+
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path jsonl = inbox.resolve("ev.jsonl");
+        Files.writeString(jsonl, """
+                {"account":"A00001","event_date":"2020-04-03","addr":{"city":"Kabul","zip":"1001"},"odd.key":"flat"}
+                """, StandardCharsets.UTF_8);
+
+        SchemaSelector.Selection sel = new SchemaSelector.Selection(cfg.schemas().single(), null);
+        Batch batch = new Batch(cfg.identity().runTimestamp() + "_js_0002", "js", null,
+                List.of(new Batch.Member(jsonl.toFile(), 0, jsonl.toFile().length(), sel)));
+
+        BatchProcessor.process(batch, cfg, new BatchAuditWriter(
+                cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath()));
+
+        String out = readPartition(cfg, "year=2020", "month=04", "day=03");
+        assertTrue(out.contains("Kabul"), "nested addr.city extracted: " + out);
+        assertTrue(out.contains("flat"), "escaped dot addressed the literal top-level key: " + out);
+        assertFalse(out.contains("1001"), "only the selected nested field is projected: " + out);
+    }
+
     private static String readPartition(PipelineConfig cfg, String... parts) throws Exception {
         Path p = Path.of(cfg.dirs().database(), parts);
         try (Stream<Path> w = Files.walk(p)) {
@@ -87,9 +136,13 @@ class JsonPipelineTest {
     }
 
     private static Path writePipeline(Path dir) throws Exception {
+        return writePipeline(dir, SCHEMA);
+    }
+
+    private static Path writePipeline(Path dir, String schemaToon) throws Exception {
         String d = dir.toString().replace('\\', '/');
         Path schema = dir.resolve("ev_schema.toon");
-        Files.writeString(schema, SCHEMA, StandardCharsets.UTF_8);
+        Files.writeString(schema, schemaToon, StandardCharsets.UTF_8);
         Path pipe = dir.resolve("ev_pipeline.toon");
         Files.writeString(pipe, ("""
                 name: JSON_PIPE
