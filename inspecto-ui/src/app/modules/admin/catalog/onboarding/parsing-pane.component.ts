@@ -9,7 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, LensService, ParserDef, ParserPreview, ParserTreeNode, ParsersService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
-import { forkJoin, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { fieldSpecsToAttributes } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -18,7 +18,7 @@ import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.compone
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { OnboardingSegmentsEditorComponent } from './segments-editor.component';
-import { SegmentDraft, schemaDraftFor } from './segment-drafts';
+import { SegmentDraft, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } from './segment-drafts';
 import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
@@ -167,6 +167,7 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
             next: (list) => this.served.set(list),
             error: () => this.served.set(null),
         });
+        this.loadSavedSegments();
     }
 
     ngOnDestroy(): void {
@@ -321,15 +322,60 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         return `${this.base()}/config/${this.schemaNameFor(segmentKey)}.toon`;
     }
 
-    /** The segments already saved in `parsing.plugin`, re-hydrated for the editor. */
-    readonly initialSegments = computed<SegmentDraft[]>(() => {
+    /** `segment key → schema-toon path` as stored in `parsing.plugin.segments`. */
+    private savedSegmentPaths(): Record<string, unknown> {
         const plugin = this.parsingBlock['plugin'] as Record<string, unknown> | undefined;
         const segs = plugin?.['segments'];
-        if (!segs || typeof segs !== 'object') return [];
-        // The pipeline stores segment key → schema-toon PATH; the columns live in those files, which
-        // this pane does not read. Keys alone still let the operator see what exists and re-derive.
-        return Object.keys(segs as Record<string, unknown>).map((key) => ({ key, columns: [] }));
-    });
+        return segs && typeof segs === 'object' ? (segs as Record<string, unknown>) : {};
+    }
+
+    /**
+     * The segments already saved in `parsing.plugin`, re-hydrated for the editor — keys AND columns.
+     *
+     * <p>The pipeline stores only `segment key → schema-toon path`; the columns live in those toons,
+     * so each one is read back ({@link loadSavedSegments}). Starts at the keys-only shape so the
+     * editor renders immediately and degrades to the previous behavior if a read fails.
+     */
+    readonly initialSegments = signal<SegmentDraft[]>(
+        Object.keys(this.savedSegmentPaths()).map((key) => ({ key, columns: [] })),
+    );
+    readonly segmentsLoading = signal(false);
+
+    /**
+     * Read each saved segment's schema toon back so re-editing an existing stream does not require a
+     * destructive re-derive. Failures are per-segment and non-fatal: that segment stays keys-only
+     * (the operator re-derives), which is exactly the behavior before this read existed.
+     *
+     * <p>A 404 is expected and silent — the pipeline can legitimately reference a schema that was
+     * never written (interrupted save), and the Schema stage treats 404 the same way.
+     */
+    private loadSavedSegments(): void {
+        const paths = this.savedSegmentPaths();
+        const keys = Object.keys(paths);
+        if (keys.length === 0) return;
+        const reads = keys.map((key) => {
+            const name = schemaNameFromPath(paths[key]);
+            if (!name) return of<SegmentDraft>({ key, columns: [] });
+            return this.configApi.read('schema', name).pipe(
+                map((r) => segmentDraftFrom(key, r.config)),
+                catchError((e) => {
+                    if (e?.status !== 404) {
+                        this.toastr.warning(`Could not load the saved columns for segment "${key}".`);
+                    }
+                    return of<SegmentDraft>({ key, columns: [] });
+                }),
+            );
+        });
+        this.segmentsLoading.set(true);
+        forkJoin(reads).subscribe((drafts) => {
+            this.segmentsLoading.set(false);
+            // The editor's `initial` setter REBUILDS the FormArray, so applying a late read over
+            // edits the operator already made would silently discard them. They chose to start from
+            // scratch — the saved columns are no longer what they want.
+            if (this.segmentsEditor?.isDirty()) return;
+            this.initialSegments.set(drafts);
+        });
+    }
 
     /**
      * Persist an ingestable plugin parser: write each segment's schema toon, then point

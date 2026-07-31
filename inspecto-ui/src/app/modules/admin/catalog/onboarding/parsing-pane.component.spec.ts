@@ -51,6 +51,78 @@ async function create(
     return { fixture, state, api: TestBed.inject(ConfigService), parsers: TestBed.inject(ParsersService) };
 }
 
+/** An ingestable plugin: `ingestable && ingesterClass` is what unlocks the segments editor. */
+const ASN1_DEF: ParserDef = {
+    id: 'asn1', label: 'ASN.1 — BER/DER', hierarchical: true, ingestable: true,
+    ingesterClass: 'com.gamma.ingester.Asn1RecordIngester',
+    grammarSchema: [{ path: 'asn1.root_type', label: 'Root type', type: 'STRING' }],
+};
+const ASN1_CATALOG: ParserDef[] = [CATALOG[0], ASN1_DEF];
+
+/** A saved stream: one segment, whose columns live in the referenced schema toon. */
+const SAVED_SEGMENTS = {
+    name: 'cdr',
+    parsing: { frontend: 'plugin', plugin: { ingester: ASN1_DEF.ingesterClass, segments: { moCallRecord: './config/cdr_moCallRecord.toon' } } },
+};
+const SAVED_SCHEMA = {
+    type: 'schema', name: 'cdr_moCallRecord', path: './config/cdr_moCallRecord.toon',
+    config: {
+        raw: {
+            name: 'cdr_moCallRecord', format: 'CSV',
+            fields: [
+                { name: 'IMSI', selector: 'imsi', type: 'VARCHAR' },
+                { name: 'PARTY_NUMBER', selector: 'party.number', type: 'VARCHAR' },
+            ],
+        },
+    },
+};
+
+describe('OnboardingParsingPaneComponent — saved segments re-hydrate', () => {
+    beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
+
+    it('reads each segment schema back so re-editing does not need a destructive re-derive', async () => {
+        const read = vi.fn(() => of(SAVED_SCHEMA));
+        const { fixture } = await create(SAVED_SEGMENTS, { read }, { list: vi.fn(() => of(ASN1_CATALOG)) });
+        const pane = fixture.componentInstance;
+
+        // Resolved by schema-toon BASENAME, not recomputed from the segment key.
+        expect(read).toHaveBeenCalledWith('schema', 'cdr_moCallRecord');
+        expect(pane.initialSegments()).toEqual([
+            {
+                key: 'moCallRecord',
+                columns: [
+                    { name: 'IMSI', selector: 'imsi', type: 'VARCHAR' },
+                    { name: 'PARTY_NUMBER', selector: 'party.number', type: 'VARCHAR' },
+                ],
+            },
+        ]);
+        expect(pane.segmentsLoading()).toBe(false);
+    });
+
+    it('degrades to keys-only when the schema toon is missing (404), silently', async () => {
+        const read = vi.fn(() => throwError(() => ({ status: 404 })));
+        const { fixture } = await create(SAVED_SEGMENTS, { read }, { list: vi.fn(() => of(ASN1_CATALOG)) });
+
+        expect(fixture.componentInstance.initialSegments()).toEqual([{ key: 'moCallRecord', columns: [] }]);
+        expect(TOASTR.warning).not.toHaveBeenCalled();
+    });
+
+    it('warns but still renders the segment when the read fails for a real reason', async () => {
+        TOASTR.warning.mockClear();
+        const read = vi.fn(() => throwError(() => ({ status: 500 })));
+        const { fixture } = await create(SAVED_SEGMENTS, { read }, { list: vi.fn(() => of(ASN1_CATALOG)) });
+
+        expect(fixture.componentInstance.initialSegments()).toEqual([{ key: 'moCallRecord', columns: [] }]);
+        expect(TOASTR.warning).toHaveBeenCalled();
+    });
+
+    it('does not read anything when the pipeline has no saved segments', async () => {
+        const read = vi.fn(() => of(SAVED_SCHEMA));
+        await create({ name: 'cdr', parsing: { frontend: 'delimited' } }, { read });
+        expect(read).not.toHaveBeenCalled();
+    });
+});
+
 describe('OnboardingParsingPaneComponent', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
 

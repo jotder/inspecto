@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ParserTreeNode } from 'app/inspecto/api';
-import { columnNameFor, deriveSegments, IDENTIFIER_RE, schemaDraftFor } from './segment-drafts';
+import { columnNameFor, deriveSegments, IDENTIFIER_RE, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } from './segment-drafts';
+import type { SegmentDraft } from './segment-drafts';
 
 const leaf = (label: string, value = 'v'): ParserTreeNode => ({ label, value });
 const node = (label: string, children: ParserTreeNode[]): ParserTreeNode => ({ label, children });
@@ -80,5 +81,61 @@ describe('schemaDraftFor', () => {
             rawName: 'cdr_moCallRecord',
             rules: [{ targetColumn: 'IMSI', sourceExpression: 'IMSI' }],
         });
+    });
+});
+
+describe('schemaNameFromPath', () => {
+    it('takes the toon basename, so a hand-authored or other-space path still resolves', () => {
+        expect(schemaNameFromPath('spaces/demo/config/cdr_moCallRecord.toon')).toBe('cdr_moCallRecord');
+        expect(schemaNameFromPath('./config/cdr_x.toon')).toBe('cdr_x');
+    });
+
+    it('handles backslash paths — segment paths may have been written on Windows', () => {
+        expect(schemaNameFromPath('spaces\\demo\\config\\cdr_y.toon')).toBe('cdr_y');
+    });
+
+    it('returns empty for anything that is not a .toon reference, so the caller re-derives', () => {
+        expect(schemaNameFromPath('config/cdr.yaml')).toBe('');
+        expect(schemaNameFromPath(undefined)).toBe('');
+        expect(schemaNameFromPath('')).toBe('');
+    });
+});
+
+describe('segmentDraftFrom', () => {
+    it('round-trips schemaDraftFor — the columns come back intact', () => {
+        const original: SegmentDraft = {
+            key: 'moCallRecord',
+            columns: [
+                { name: 'IMSI', selector: 'imsi', type: 'VARCHAR' },
+                { name: 'PARTY_NUMBER', selector: 'party.number', type: 'VARCHAR' },
+                { name: 'DURATION', selector: 'duration', type: 'DOUBLE' },
+            ],
+        };
+        const toon = schemaDraftFor(original, 'cdr_moCallRecord');
+        expect(segmentDraftFrom('moCallRecord', toon)).toEqual(original);
+    });
+
+    it('falls back to VARCHAR for a type the editor cannot represent', () => {
+        const draft = segmentDraftFrom('s', {
+            raw: { fields: [{ name: 'N', selector: 'n', type: 'HUGEINT' }] },
+        });
+        expect(draft.columns).toEqual([{ name: 'N', selector: 'n', type: 'VARCHAR' }]);
+    });
+
+    it('accepts a lowercase declared type', () => {
+        const draft = segmentDraftFrom('s', { raw: { fields: [{ name: 'D', selector: 'd', type: 'date' }] } });
+        expect(draft.columns[0].type).toBe('DATE');
+    });
+
+    it('skips half-written rows rather than seeding an invalid column', () => {
+        const draft = segmentDraftFrom('s', {
+            raw: { fields: [{ name: 'OK', selector: 'o' }, { name: '', selector: 'x' }, { name: 'Y' }] },
+        });
+        expect(draft.columns).toEqual([{ name: 'OK', selector: 'o', type: 'VARCHAR' }]);
+    });
+
+    it('yields a keys-only draft for a missing or empty schema', () => {
+        expect(segmentDraftFrom('s', null)).toEqual({ key: 's', columns: [] });
+        expect(segmentDraftFrom('s', {})).toEqual({ key: 's', columns: [] });
     });
 });

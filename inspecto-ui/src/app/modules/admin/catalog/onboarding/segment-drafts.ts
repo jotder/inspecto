@@ -108,6 +108,49 @@ function leafSelectors(nodes: readonly ParserTreeNode[], prefix: string): string
  * legal identifier, and it keeps rows out of the `year=1900` sentinel partition an empty
  * `partitions[]` would produce.
  */
+/**
+ * The schema-toon NAME a stored segment path points at: `spaces/x/config/abcd_CALL.toon` → `abcd_CALL`.
+ *
+ * <p>Derived from the stored path rather than recomputed from the segment key, so a pipeline whose
+ * segment paths were hand-authored (or written under a different space id than the one currently
+ * selected) still re-hydrates. Returns `''` for anything that is not a `.toon` file reference —
+ * the caller treats that as "not recoverable, re-derive".
+ */
+export function schemaNameFromPath(path: unknown): string {
+    const s = String(path ?? '').trim();
+    if (!s.toLowerCase().endsWith('.toon')) return '';
+    return s.slice(0, -'.toon'.length).split(/[\\/]/).pop() ?? '';
+}
+
+/**
+ * Rebuild a segment draft from the schema toon it was written to — the inverse of
+ * {@link schemaDraftFor}, reading back the `raw.fields[]` it wrote.
+ *
+ * <p>An unrecognized `type` falls back to `VARCHAR` rather than being trusted into the editor's
+ * dropdown: the toon may have been hand-edited to a DuckDB type the editor cannot represent, and a
+ * value outside {@link SEGMENT_COLUMN_TYPES} would leave the select showing blank and silently
+ * rewrite the column on the next save.
+ */
+export function segmentDraftFrom(key: string, config: Record<string, unknown> | null | undefined): SegmentDraft {
+    const raw = ((config ?? {})['raw'] ?? {}) as Record<string, unknown>;
+    const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
+    const columns: SegmentColumnDraft[] = [];
+    for (const f of fields) {
+        const name = String(f['name'] ?? '').trim();
+        const selector = String(f['selector'] ?? '').trim();
+        if (!name || !selector) continue;   // a half-written row is not an editable column
+        const declared = String(f['type'] ?? '').toUpperCase();
+        columns.push({
+            name,
+            selector,
+            type: (SEGMENT_COLUMN_TYPES as readonly string[]).includes(declared)
+                ? (declared as SegmentColumnType)
+                : 'VARCHAR',
+        });
+    }
+    return { key, columns };
+}
+
 export function schemaDraftFor(segment: SegmentDraft, schemaName: string): Record<string, unknown> {
     return {
         partitions: [{ column: 'event_type', source: EVENT_TYPE_COLUMN, type: 'VARCHAR' }],

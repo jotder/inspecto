@@ -161,6 +161,12 @@
 
         <!-- Segments — only for a plugin that can actually load (names an ingester) -->
         @if (pluginIngestable()) {
+            @if (segmentsLoading()) {
+                <div class="flex items-center gap-2 text-sm text-secondary">
+                    <mat-progress-spinner diameter="16" mode="indeterminate" />
+                    <span>Loading the saved segment columns…</span>
+                </div>
+            }
             <app-onboarding-segments-editor
                 [tree]="pluginTreeNodes()"
                 [editable]="lens.canAuthorWorkbench()"

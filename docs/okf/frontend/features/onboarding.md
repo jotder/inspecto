@@ -32,8 +32,11 @@ Configured / Validated — Validated is session-only, from a passed sample test)
 Draft → Ready (all required stages configured) → Live (`active: true`). Resume lands on the first
 incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active).
 
-**Go-live also registers the Dataset** (2026-07-30, onboarding↔pipeline split S1 —
-`superpower/onboarding-pipeline-split.md`): after the `active: true` save succeeds, the publish
+**Go-live also registers the Dataset** (2026-07-30, shipped as S1 of the since-superseded
+onboarding↔pipeline *split* plan; the behaviour **stays** under the current
+`superpower/onboarding-pipeline-unification.md` — it is no longer "the handoff artifact between two
+planes", but Datasets remain the query surface and this is independently useful): after the
+`active: true` save succeeds, the publish
 pane writes a `dataset` component (`id` = the normalized pipeline name, `kind: physical`,
 `physicalRef` = the store) via the shared `ComponentsService` — deliberately **not** studio's
 `DatasetsService` (cross-feature import ban). Idempotent by **physicalRef, not id** (any existing
@@ -44,6 +47,47 @@ dataset deliberately carries **no `sourceName`** (the editor's source select off
 `SAMPLE_SOURCE_NAMES`, so any value would be a lie; `physicalRef` is the binding that matters) — the
 list card therefore reads `source: data` from `fromContent`'s default until split S2 wires that picker
 to the Catalog's real stores. Do not "fix" it by inventing a sample-source value.
+
+## Stream configuration export / import (2026-07-31)
+
+**Export** is a toolbar button on the onboarding shell (next to *View as graph*); **Import** is on the
+New Stream dialog, which becomes "Create from import". Format `inspecto-stream-config` v1, pure logic
+in `inspecto/transfer/stream-bundle.ts` (+ `stream-transfer.service.ts` for the I/O).
+
+⚠ **Deliberately NOT a `BundleKind`** of the Metadata Bundle (`inspecto/transfer/bundle.ts`). That
+format carries **Studio component-registry** artifacts addressed by **id** (`/components/{type}/{id}`);
+an onboarded Stream lives in the **config** namespace addressed by **path** (`ConfigService`,
+`/config/...`), and the two collide on the word *schema* — `BundleKind` already has `'schema'` meaning
+the registry component, so filing a Stream schema there would import it into the wrong store. Stream
+satellites are also **paths embedding the source space**, which must be rewritten for the target —
+something the bundle's id-based `BundleRef` cannot express. The sibling format reuses the proven
+primitives (`hashContent`, parse/validate shape, object-URL download) instead.
+
+**What travels:** the pipeline body, `processing.schema_file`'s schema, every per-segment schema of a
+plugin parser, and the `<name>_enrich` companion. **What does not:** `name` (the target names its
+own), `active` (an import is ALWAYS an inactive draft — importing as live would start processing on
+someone else's server), `dirs` (re-derived from the target convention), and a Connection referenced by
+`collector.connection` — it carries credentials, so it is reported as a **requirement** instead. A
+literal secret-looking value is masked to `***` at export and reported (a config should only hold
+`${ENV:…}` references; a literal is an authoring mistake, not something to ship to a file).
+
+⚠ **A config's OWN identity field decides the file it is written to** — `ConfigService.write` derives
+the name from the content, never from a separate argument. So every satellite must be retargeted
+*inside* its body: a schema self-names via `raw.name`, an enrichment via top-level `name`. Getting
+this wrong is destructive, and it happened: the first live round-trip wrote the enrichment back to the
+SOURCE's `<source>_enrich`, clobbering an unrelated config while leaving the imported stream with no
+enrichment. A second pass then found `output.database` keeping the **source space** — an imported
+enrichment writing into another space. Both are pinned by regression specs; the enrichment is now
+retargeted on `name`, `triggers.on_pipeline`, `input.database` and `output.database` (author's
+intermediate layout preserved, root and stream leaf re-pointed). Neither defect was visible in unit
+tests alone — reading the written files off disk is what surfaced them.
+
+⚠ Import writes **satellites before the pipeline**, so the pipeline never names a file that does not
+exist yet (the same ordering rule the Schema stage and segments editor follow), and uses **no
+`overwrite`** on the pipeline so an import can never silently replace an existing stream. Kind comes
+from the file and the toggle is locked — a Reference imported as a Stream would change its load
+semantics. Every rewrite is stated in the dialog BEFORE the write. No new mock handler is needed: both
+sides replay existing `ConfigService` reads/writes.
 
 ## Sample-as-thread (a strip at the top of the PARSING stage)
 
@@ -65,6 +109,23 @@ and offers only the four honestly-cast types (VARCHAR/DOUBLE/DATE/TIMESTAMP — 
 (`suggestTypes` in `parsing-sniff.ts` — a type is suggested only when every non-blank sampled
 value matches; "Validate types" stays the verdict).
 
+**The field editor is a paged table over the FormArray (2026-07-31)** — CDR feeds land 500+
+columns, so the flat control list became a windowed table: search (name/source) + type filter +
+sortable headers (numeric-aware for delimited's positional selectors) + `mat-paginator`
+(25/50/100, default 50 — only one page of controls is in the DOM). The **FormArray stays the
+single source of truth**; the window signals only choose which rows render, and are deliberately
+NOT reactive to name-cell keystrokes (re-sorting under the caret makes rows jump). A header
+master-checkbox includes/excludes the **filtered** set across pages (Gmail-select semantics).
+The Type cell renders a data-format icon + hint via a closed `TYPE_META` map
+(text ▬ / number # / date 📅 / date&time 🕐 — `mat-select-trigger`, icons all present in
+`heroicons-outline.svg`). ⚠ **Save reveals hidden problems**: an invalid or duplicate name on a
+filtered-out row or another page would block Save with nothing visibly wrong — `buildFields`
+clears the filters and jumps to the offending row's page, and the toast names the row. ⚠ The spec
+does NOT assert rendered `<mat-icon>` counts — jsdom has no icon sprite and the registry error
+aborts the trigger view; visual proof is a preview job. There is deliberately **no per-field
+"format" column** — a schema field is `{name, selector, type}`; date/timestamp format masks are
+pipeline-level `csv_settings`, and a per-field column would imply rigor the engine does not apply.
+
 ## Parsing stage flow (choose file → view → type → options → test → table/tree)
 
 The pane reads top-to-bottom, starting with its own sample strip: file-type toggle (with a **sniffed
@@ -73,8 +134,11 @@ applied only by click, never automatically, prefilling the sniffed delimiter) �
 options → Test parse → full-width results. For the `json` frontend the results offer a
 **Table | Tree toggle**: the tree (`jsonSampleToTree` + the shared `app-parser-tree`, relocated to
 `inspecto/components/`) renders the sample's own records client-side and carries the honest note
-that the engine reads **top-level keys only** — a nested value lands as JSON text in one column
-(the flatten DSL is BACKLOG'd engine work; `parsing.json.records_path` is locked to `$`).
+that the engine reads. ⚠ **That note is now out of date in the engine's favour** (2026-07-31): a
+dotted `raw.fields[].selector` reaches a nested value (`addr.city`), and `parsing.json.records_path`
+now accepts a dotted path to a nested record array (`payload.records`) — see
+`okf/backend/config/parsing-options-reference.md` §6.4. The tree itself is unchanged; only the
+caveat it carries needs revisiting when the pane next gets attention.
 
 **Every row-preview surface in onboarding is `<inspecto-data-table>`** (2026-07-30). They were
 `<inspecto-query-panel>` mounts bound `[source]`-only, i.e. the query *builder* used as a dumb table,
@@ -92,10 +156,36 @@ loads CodeMirror) and stub `InspectoGridThemeService`, which otherwise chains to
 Since 2026-07-30 the toggle also appends the **served plugin parsers** (`GET /parsers` — XML today,
 ASN.1/vendor formats when their plugins deploy; `okf/backend/engine/parser-plugins.md`): their
 options form renders the served grammar schema (`fieldSpecsToAttributes`), Test parse runs the real
-`POST /parsers/{id}/preview` (table or record tree), and **Save is disabled with an honest note**
-(preview-only until the flatten configuration; ingestable customs stay TOON-authored until the
-segments editor). ⚠ The plugin preview is pane-local — the sample thread's parsed hop (and thus the
-Schema stage derivation) is fed only by the four built-ins the draft can actually go live with.
+`POST /parsers/{id}/preview` (table or record tree), and **Save is disabled with an honest note** for a
+preview-only plugin (one that is not `ingestable` or names no `ingesterClass` — XML today), because
+there is nothing truthful to write. ⚠ The plugin preview is pane-local — the sample thread's parsed hop
+(and thus the Schema stage derivation) is fed only by the four built-ins the draft can actually go live
+with.
+
+**Segments editor** (`segments-editor.component`, shipped 2026-07-30) unlocks guided Save for an
+*ingestable* plugin parser. It lives in the Parsing stage rather than being a new onboarding stage
+(stages are static arrays with no runtime-conditional precedent, and the editor needs the preview tree
+directly above it). **Derive from preview** proposes one segment per record type with a column per leaf
+path — deliberately destructive, it is the "start from my data" action. Save writes one schema toon per
+segment (`ConfigService.write('schema', …)`, the Schema stage's convention-path idiom) and only then
+patches `parsing.plugin`, so the pipeline never names a schema file that does not exist yet. A bespoke
+nested `FormArray` is unavoidable: `FieldSpec` cannot express "a list of segments each with a list of
+columns".
+
+**Re-opening a saved stream restores columns, not just keys** (2026-07-31 — closes the shipped
+residual). `parsing.plugin.segments` stores only `segment key → schema-toon path`, so the pane reads
+each toon back (`ConfigService.read('schema', …)`, the same call the Schema stage uses) and rebuilds the
+column rows via `segmentDraftFrom` — the exact inverse of the `schemaDraftFor` that wrote them.
+Previously the editor re-hydrated keys alone and every re-edit needed a destructive re-derive.
+Three details that are load-bearing:
+- The schema NAME comes from the stored path's basename (`schemaNameFromPath`), not from recomputing
+  it off the segment key — so a hand-authored path, or one written under a different space id than the
+  one currently selected, still re-hydrates.
+- Reads are **per-segment and non-fatal**: a 404 is silent (a pipeline may legitimately reference a
+  schema an interrupted save never wrote) and any other error warns; either way that segment falls back
+  to keys-only, i.e. exactly the previous behaviour.
+- The late read is **dropped if the operator has already edited** — the editor's `initial` setter
+  rebuilds the whole `FormArray`, so applying it over their work would silently discard it.
 
 ## Enrichment stage (Streams, optional)
 
