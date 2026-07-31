@@ -62,6 +62,19 @@ note below). Grammar: `asn1.grammar` (the ASN.1 module text) / `asn1.root_type` 
 (BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_records`.
 No `suggest()`. Preview-only, same as XML, until the flatten DSL.
 
+**The grammar is OPTIONAL for preview — structural dump (2026-07-31).** BER is self-describing
+(every value carries its own tag and length), so with `asn1.grammar` blank the plugin skips the
+facade entirely and walks the raw TLV forest via `RecordReader` (which takes no schema), labelling
+nodes by tag — `[APPLICATION 1]`, `[0]`, `[PRIVATE 3]` — instead of by schema name. This is what
+lets an operator inspect an unknown vendor's file **before** they have its `.asn` module, which is
+exactly the onboarding situation; supply the grammar and the same bytes return with real names.
+⚠ Preview-only: **ingest still requires a grammar**, because anonymous tags cannot be mapped onto
+segment columns (a column named `[0]` is worthless). ⚠ `root_type` without a grammar is a caller
+error, not a silent fallback — it is a half-filled form.
+⚠ **Values render hex-first** (`2A`, and `6869 "hi"` for 2+ printable bytes). Text is an annotation,
+never a replacement: without a grammar there is no type, and 0x2A *is* printable, so rendering
+INTEGER 42 as `"*"` would be a lie dressed as a decoded value. Truncated at 32 bytes.
+
 **Framing is served, but only the knobs real files vary by.** The two length fields cover every
 layout in the parity corpus (file header 0 or 50 bytes; record header absent or 4 bytes, always
 `skipOnly` so records stay delimited by their own BER length). 0x00/0xFF inter-record padding is
@@ -156,11 +169,18 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   schema module (the corpus keeps `.asn` files per vendor, e.g. `mtnOCC.asn`). Until that lands
   there is nowhere to *store* a reusable module, and a per-vendor tx/transform config has no home
   either.
-- **The Maven coordinate split** — `Asn1ParserPlugin` depends on the NEW rewrite
-  (`com.gamma.asn:asn-decoders:0.1.0-SNAPSHOT`, `asn-parser/asn-decoders/`), installed to the local
-  repo as a manual step before this reactor builds (not yet resolved automatically). The OLD
-  `asn-parser-v2:1.2.1` (parent `com.gamma.asn.decoders:asn-decoders:1.1.3-dev`,
-  `asn-parser/pom.xml`) is untouched, has no consumers anywhere in the tree, and is not wired to
-  this plugin — it is dead weight the split still needs to resolve (retire, or fold in).
+- ~~**The Maven coordinate split**~~ **RESOLVED 2026-07-31.** The root `pom.xml` now aggregates
+  `asn-parser/asn-decoders`, so `com.gamma.asn:asn-facade` resolves from the reactor and the manual
+  `mvn install` is gone (verified with the local repo's `com/gamma/asn` deleted: 23 modules,
+  asn-facade [7/23] before inspecto-engine [18/23], green). Aggregation only — that tree keeps its
+  own parent and inherits nothing from `inspecto-parent`. The OLD `asn-parser-v2:1.2.1`
+  (`asn-parser/pom.xml`) is **deleted**: zero consumers, and its parent
+  `com.gamma.asn.decoders:asn-decoders:1.1.3-dev` existed nowhere, so it could not build.
+  ⚠ **`asn-parser/src/main/java` survives the deletion and must not be cleaned up as an orphan** —
+  `legacy-code/pom.xml` compiles it via `<sourceDirectory>../../src/main/java</sourceDirectory>`
+  (45 files, confirmed in the build log). It retires with `legacy-code` after Phase 4.
+- ⚠ **Corpus-backed tests `assumeTrue` and SKIP when the operator data is absent** (DATA-GOV-1), so
+  a fresh checkout without the corpus builds green — `ParityCheckTest` reporting *skipped* is the
+  expected state, not a regression.
 - **Drop-in `plugins/` jar directory** and the **segments editor** (unlock guided Save for
   ingestable custom parsers) — unchanged from before, apply to any custom parser, not ASN.1-specific.
