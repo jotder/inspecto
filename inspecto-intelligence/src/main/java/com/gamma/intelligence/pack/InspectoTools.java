@@ -1221,24 +1221,17 @@ final class InspectoTools {
     /**
      * The structural spec the component tools judge {@code kind} by, or {@code null} when it has none.
      *
-     * <p>⚠ {@code schema} does <b>not</b> resolve through {@link ConfigSpecs#forType} (fixed 2026-07-27).
-     * The word names two unrelated shapes — the TOON schema config ({@code raw.name} required) and the
-     * registry component the Components pane authors ({@code {fields:[…]}}) — and {@code forType} returns
-     * the former. These tools' {@code kind} vocabulary is the <b>component</b> one, so {@code schema} here
-     * means the component: {@link ConfigSpecs#schemaComponent()}. Sending it through {@code forType} made
-     * every draft from the pane report *"Missing required field 'raw.name'"*, and the A5.2 repair loop then
-     * pushed the model toward a {@code {raw:{…}}} shape the pane cannot read back, so Apply silently
-     * no-opped.
-     *
-     * <p>{@code forType} keeps its meaning for the config path ({@code /validate} still judges real
-     * {@code *_schema.toon} sources by {@link ConfigSpecs#schema()}) — the two readings simply do not meet
-     * in one method any more. ⚠ Only {@code schema} is overloaded: {@code widget} and {@code dashboard} are
-     * shared words whose specs describe the registry components correctly, so they must keep resolving
-     * normally.
+     * <p>Historical note (the special case removed here, unification W1 2026-07-31): {@code schema} used to
+     * bypass {@link ConfigSpecs#forType} because the word named <b>two unrelated shapes</b> — the TOON schema
+     * config ({@code raw.name} required) and a registry component the Components pane authored
+     * ({@code {fields:[…]}}). Judging a pane draft by the config spec reported *"Missing required field
+     * 'raw.name'"*, and the A5.2 repair loop then pushed the model toward a {@code {raw:{…}}} shape the pane
+     * could not read back, so Apply silently no-opped. **The registry {@code schema} component is retired**
+     * (`ComponentStore.WRITABLE_TYPES`), so the word now has exactly one meaning — the config TOON — and
+     * {@code forType} is once again the whole answer. Do not reintroduce a component reading here.
      */
     private static ConfigSpec specFor(String kind) {
-        String type = configType(kind);
-        return type.equals("schema") ? ConfigSpecs.schemaComponent() : ConfigSpecs.forType(type);
+        return ConfigSpecs.forType(configType(kind));
     }
 
     /**

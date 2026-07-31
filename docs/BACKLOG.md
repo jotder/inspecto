@@ -418,6 +418,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **AI drafting has no applicable component kind** (created 2026-07-31 by unification W1a, a deliberate
+  and recorded feature loss). `component_draft` was offered ONLY on the `component-form.dialog` `schema`
+  kind, because of that dialog's kinds only `schema` had a structural `ConfigSpec`. `schema` is no longer a
+  registry component, so the affordance was removed WITH it rather than left answering *"no structural spec
+  for kind"* on every use. **The backend repair loop is untouched and still generic** — nothing was deleted
+  server-side beyond `ConfigSpecs.schemaComponent()`. To restore the button, give a surviving kind
+  (`grammar`/`transform`/`sink`) a structural `ConfigSpec`; the dialog then renders `<inspecto-ai-assist>`
+  again with no further wiring. Related: the guided Schema stage keeps its own derive-from-sample, so a
+  Stream's schema authoring did NOT regress — only the registry pane's. `okf/frontend/features/inline-ai-authoring.md`
 - **Config-declared paths resolve unjailed against the server CWD** — one systemic pass, **not** the
   "3 sites" an earlier note claimed (inventoried 2026-07-31). Hardening, **not an open hole**: config
   writes are already privilege-gated, so this is defence-in-depth against a mis-authored or hostile

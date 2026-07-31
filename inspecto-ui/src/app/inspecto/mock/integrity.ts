@@ -15,7 +15,7 @@ import { MockStore } from './mock-store';
  * with the referencers listed. No per-kind rules to keep in sync anymore.
  */
 const COMPONENT_KINDS = [
-    'grammar', 'schema', 'transform', 'sink', 'dataset', 'query', 'widget', 'dashboard', 'geo-map-view', 'link-analysis-view',
+    'grammar', 'transform', 'sink', 'dataset', 'query', 'widget', 'dashboard', 'geo-map-view', 'link-analysis-view',
 ];
 
 /** Map a derived ref's target kind onto the store collection that holds it. */

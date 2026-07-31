@@ -58,24 +58,39 @@ class ComponentStoreTest {
     }
 
     @Test
-    void schemaComponentRoundTripsItsTabularFields(@TempDir Path root) throws Exception {
-        // probe: a schema's tabular raw.fields must survive the toToon→load round-trip
+    void tabularFieldsRoundTripThroughToon(@TempDir Path root) throws Exception {
+        // probe: nested tabular rows must survive the toToon->load round-trip. Was asserted on a
+        // `schema` component until that kind was retired (W1); `grammar` exercises the same nesting.
         ComponentStore store = new ComponentStore(root);
-        Map<String, Object> schema = Map.of(
+        Map<String, Object> grammar = Map.of(
                 "partitionKey", "EVENT_DATE",
                 "raw", Map.of("name", "orders", "format", "CSV",
                         "fields", List.of(
                                 Map.of("name", "ID", "selector", "0", "type", "VARCHAR"),
                                 Map.of("name", "AMT", "selector", "1", "type", "DOUBLE"))));
-        store.write("schema", "orders", schema);
+        store.write("grammar", "orders", grammar);
 
-        ComponentRegistry.Component c = store.get("schema", "orders").orElseThrow();
+        ComponentRegistry.Component c = store.get("grammar", "orders").orElseThrow();
         assertEquals("EVENT_DATE", c.content().get("partitionKey"));
         Object raw = c.content().get("raw");
         assertInstanceOf(Map.class, raw);
         Object fields = ((Map<?, ?>) raw).get("fields");
         assertInstanceOf(List.class, fields);
         assertEquals(2, ((List<?>) fields).size(), "both tabular field rows survive the round-trip");
+    }
+
+    /**
+     * A schema has exactly ONE home: the path-addressed config TOON the engine executes
+     * (`processing.schema_file`). The id-addressed registry copy was retired in unification W1 because
+     * nothing could run it. This guards the ambiguity from creeping back.
+     */
+    @Test
+    void schemaIsNotAWritableComponentKind(@TempDir Path root) {
+        assertFalse(ComponentStore.WRITABLE_TYPES.contains("schema"),
+                "schema lives in the config TOON only — see onboarding-pipeline-unification.md U-C");
+        ComponentStore store = new ComponentStore(root);
+        assertThrows(IllegalArgumentException.class,
+                () -> store.write("schema", "orders", Map.of("fields", List.of())));
     }
 
     @Test

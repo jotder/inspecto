@@ -29,9 +29,6 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
     putComponent(store, space, 'grammar', 'bank_mt940_csv', { delimiter: ';', has_header: true });
-    putComponent(store, space, 'schema', 'gl_posting', {
-        fields: [{ name: 'id', type: 'integer' }, { name: 'account', type: 'string' }, { name: 'entry_type', type: 'string' }, { name: 'amount_usd', type: 'decimal' }],
-    });
     putComponent(store, space, 'transform', 'drop_reversals', { type: 'transform.filter', where: "entry_type != 'reversal'" });
     putComponent(store, space, 'sink', 'audit_store', { type: 'sink.persistent', format: 'parquet', partitions: ['posting_date'] });
 

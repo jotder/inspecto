@@ -8,7 +8,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ComponentsComponent } from './components.component';
 
 const GRAMMAR: ComponentDef = { type: 'grammar', name: 'pipe', ref: 'grammar/pipe', content: { delimiter: '|', has_header: true } };
-const SCHEMA: ComponentDef = { type: 'schema', name: 'typed', ref: 'schema/typed', content: { fields: [{ name: 'id', type: 'integer' }] } };
+const TRANSFORM: ComponentDef = { type: 'transform', name: 'filt', ref: 'transform/filt', content: { type: 'transform.filter' } };
 
 /** Build the component over a stub service whose per-kind list() returns the given map. */
 function create(lists: Partial<Record<string, Observable<ComponentDef[]>>>) {
@@ -26,16 +26,16 @@ function create(lists: Partial<Record<string, Observable<ComponentDef[]>>>) {
 
 describe('ComponentsComponent', () => {
     it('lists components grouped by kind', () => {
-        const c = create({ grammar: of([GRAMMAR]), schema: of([SCHEMA]) }).componentInstance;
+        const c = create({ grammar: of([GRAMMAR]), transform: of([TRANSFORM]) }).componentInstance;
         expect(c.countFor('grammar')).toBe(1);
-        expect(c.countFor('schema')).toBe(1);
-        expect(c.countFor('transform')).toBe(0);
+        expect(c.countFor('transform')).toBe(1);
+        expect(c.countFor('sink')).toBe(0);
     });
 
     it('summarises a component per kind', () => {
         const c = create({}).componentInstance;
         expect(c.summary(GRAMMAR)).toContain('header');
-        expect(c.summary(SCHEMA)).toContain('1 field');
+        expect(c.summary(TRANSFORM)).toContain('transform.filter');
         expect(c.summary({ type: 'sink', name: 'o', ref: 'sink/o', content: { type: 'sink.view', store: 's' } })).toContain('sink.view');
     });
 

@@ -9,10 +9,10 @@ import { apiUrl } from './api-base';
  *  keep this union in lockstep with `WRITABLE_TYPES`, since a kind the server does not know 400s on every
  *  list/create/remove (that is exactly how `rule-template` stayed broken; the mock served it regardless).
  *  None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
-export type ComponentType = 'grammar' | 'schema' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
+export type ComponentType = 'grammar' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
 
 /** The component kinds, in palette order, for the list/editor. */
-export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'schema', 'transform', 'sink'];
+export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'transform', 'sink'];
 
 /**
  * One registry component (GET /components/{type}[/{id}]) — its kind, in-file identity, `<type>/<id>` ref,
@@ -143,11 +143,6 @@ export class ComponentsService {
     /** Parse raw `sampleText` with a grammar's dialect (scratch-only). */
     testGrammar(id: string, sampleText: string): Observable<GrammarPreview> {
         return this.http.post<GrammarPreview>(apiUrl(`/components/grammar/${encodeURIComponent(id)}/test`), { sampleText });
-    }
-
-    /** TRY_CAST sample rows against a schema's typed fields → data/rejected split (scratch-only). */
-    testSchema(id: string, sampleRows: Record<string, unknown>[]): Observable<RelationsPreview> {
-        return this.http.post<RelationsPreview>(apiUrl(`/components/schema/${encodeURIComponent(id)}/test`), { sampleRows });
     }
 
     /** Run a transform over sample rows through the production RowShaper (scratch-only). */

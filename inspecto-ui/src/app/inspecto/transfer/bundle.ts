@@ -6,7 +6,7 @@ import { hashContent } from './content-hash';
  * Metadata Bundle — the cross-instance transfer format (staging → production promotion). A bundle
  * carries **configuration only, never data rows**: dataset metadata, widgets, dashboards, saved
  * Link-Analysis / Geo-Map views, pipelines, and the registry pieces they reference (grammars,
- * schemas, transforms, sinks, connections). Everything here is pure and framework-free so the
+ * transforms, sinks, connections — `schema` was retired as a component kind 2026-07-31, see BundleKind). Everything here is pure and framework-free so the
  * format, dependency closure and import planning are unit-testable
  * (`docs/superpower/metadata-bundle.md`; spec: `bundle.spec.ts`).
  *
@@ -18,18 +18,24 @@ import { hashContent } from './content-hash';
 
 /** Everything a bundle can carry: the Studio/registry component kinds + the three non-component stores. */
 export type BundleKind =
-    | Extract<ComponentType, 'grammar' | 'schema' | 'transform' | 'sink' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'link-analysis-view' | 'geo-map-view'>
+    | Extract<ComponentType, 'grammar' | 'transform' | 'sink' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'link-analysis-view' | 'geo-map-view'>
     | 'connection'
     | 'authored-pipeline'
     | 'job'
-    | 'decision-rule';
+    | 'decision-rule'
+    // LEGACY, retired 2026-07-31 (unification W1): `schema` is no longer a registry component — a schema
+    // lives only in the config TOON the engine executes. Kept in the TYPE, and in KNOWN_KINDS below, so an
+    // ALREADY-EXPORTED bundle still parses and the operator gets an honest per-item "skipped: unsupported
+    // kind" row from the server. Dropping it here instead would make parseBundle reject the whole file with
+    // `unknown kind "schema"` — a hard failure over one obsolete item. Not in BUNDLE_KINDS: it must never
+    // be offered for export again.
+    | 'schema';
 
 /** Import order: referenced kinds before their referencers, so a fresh instance renders everything
  *  (jobs then decision rules come last — they trigger on / invoke pipelines, jobs and widgets). */
 export const BUNDLE_KINDS: { kind: BundleKind; label: string }[] = [
     { kind: 'connection', label: 'Connections' },
     { kind: 'grammar', label: 'Grammars' },
-    { kind: 'schema', label: 'Schemas' },
     { kind: 'transform', label: 'Transforms' },
     { kind: 'sink', label: 'Sinks' },
     { kind: 'dataset', label: 'Datasets (metadata)' },
@@ -89,8 +95,17 @@ export interface MetadataBundle {
     requires?: BundleRef[];
 }
 
-const KIND_ORDER = new Map(BUNDLE_KINDS.map((k, i) => [k.kind, i]));
-const KNOWN_KINDS = new Set(BUNDLE_KINDS.map((k) => k.kind));
+/** Kinds retired from export but still ACCEPTED on import, so an older bundle parses instead of being
+ *  rejected outright; the server then reports them per-item as skipped. */
+export const LEGACY_BUNDLE_KINDS: BundleKind[] = ['schema'];
+
+/** Sort order. Legacy kinds are appended so an item of a retired kind still gets a REAL index — a
+ *  missing one would make `byKindThenId` compute NaN and leave an old bundle's items unordered. */
+const KIND_ORDER = new Map<BundleKind, number>(
+    [...BUNDLE_KINDS.map((k) => k.kind), ...LEGACY_BUNDLE_KINDS].map((kind, i) => [kind, i]),
+);
+
+const KNOWN_KINDS = new Set<BundleKind>([...BUNDLE_KINDS.map((k) => k.kind), ...LEGACY_BUNDLE_KINDS]);
 const key = (kind: BundleKind, id: string): string => `${kind}/${id}`;
 
 const byKindThenId = (a: BundleItem, b: BundleItem): number =>

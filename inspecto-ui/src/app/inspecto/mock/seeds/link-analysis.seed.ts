@@ -28,9 +28,6 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
     ];
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
-    putComponent(store, space, 'schema', 'entity_record', {
-        fields: [{ name: 'id', type: 'string' }, { name: 'entity_type', type: 'string' }, { name: 'risk_score', type: 'decimal' }, { name: 'community', type: 'integer' }],
-    });
     putComponent(store, space, 'transform', 'min_link_weight', { type: 'transform.filter', where: 'weight >= 1' });
     putComponent(store, space, 'sink', 'graph_store', { type: 'sink.persistent', format: 'parquet', partitions: ['link_type'] });
 

@@ -30,9 +30,6 @@ export function seedFraudMgmt(store: MockStore, space: string): void {
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
     putComponent(store, space, 'grammar', 'xdr_pipe', { delimiter: '|', has_header: false });
-    putComponent(store, space, 'schema', 'scored_event', {
-        fields: [{ name: 'id', type: 'integer' }, { name: 'msisdn', type: 'string' }, { name: 'dest_country', type: 'string' }, { name: 'risk_score', type: 'decimal' }],
-    });
     putComponent(store, space, 'transform', 'keep_high_risk', { type: 'transform.filter', where: 'risk_score > 0.8' });
     putComponent(store, space, 'sink', 'fraud_case_queue', { type: 'sink.persistent', format: 'parquet', partitions: ['event_date'] });
 

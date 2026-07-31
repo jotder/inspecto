@@ -190,10 +190,10 @@ const DRAFT_SPECS: Record<string, { type: string; required: string[]; nonEmpty?:
     pipeline: { type: 'pipeline', required: ['name', 'dirs.poll', 'dirs.database'] },
     enrichment: { type: 'enrichment', required: ['name', 'input.database', 'output.database'] },
     job: { type: 'job', required: ['job.name', 'job.type'] },
-    // ⚠ `fields`, NOT `raw.name`: the real tool resolves this kind to `ConfigSpecs.schemaComponent()` —
-    // the REGISTRY component's bare column list — not the TOON schema config. Mirroring `raw.name` here
-    // is what made the pane's own draft always report a required field it never emits.
-    schema: { type: 'schema', required: ['fields'], nonEmpty: ['fields'] },
+    // `raw.name`, NOT a bare `fields`: the registry schema COMPONENT was retired 2026-07-31 (unification
+    // W1), so this kind again means the TOON schema config and the real tool resolves it through
+    // `ConfigSpecs.forType`. Keep this mirroring that — a bare column list was the component's shape.
+    schema: { type: 'schema', required: ['raw.name'] },
     meta: { type: 'meta', required: ['name'] },
     'alert-rule': { type: 'alert', required: ['alert.name', 'alert.threshold', 'alert.window'] },
     expectation: { type: 'expectation', required: ['name', 'target', 'column'] },

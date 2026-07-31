@@ -64,7 +64,6 @@ export class ComponentsComponent implements OnInit {
         const c = def.content ?? {};
         switch (def.type) {
             case 'grammar': return `delimiter ${disp(c['delimiter'], ',')}${c['has_header'] ? ', header' : ''}`;
-            case 'schema': return `${fieldCount(c)} field(s)`;
             case 'transform': return String(c['type'] ?? 'transform');
             case 'sink': return `${disp(c['type'], 'sink')} → ${disp(c['store'], '(no store)')}`;
             default: return '';
@@ -126,9 +125,4 @@ export class ComponentsComponent implements OnInit {
 
 function disp(v: unknown, dflt: string): string {
     return v == null || v === '' ? dflt : String(v);
-}
-function fieldCount(c: Record<string, unknown>): number {
-    const raw = c['raw'] as { fields?: unknown } | undefined;
-    const src = (raw?.fields ?? c['fields'] ?? c['columns']) as unknown;
-    return Array.isArray(src) ? src.length : 0;
 }

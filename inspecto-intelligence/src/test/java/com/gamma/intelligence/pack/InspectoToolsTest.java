@@ -405,42 +405,37 @@ class InspectoToolsTest {
     }
 
     /**
-     * The {@code schema} kind must mean the REGISTRY COMPONENT, not the TOON schema config.
+     * The {@code schema} kind means the TOON schema CONFIG — the only remaining reading.
      *
-     * <p>The word names two unrelated shapes and these tools speak the component vocabulary. Resolving it
-     * through {@code ConfigSpecs.forType} made the Components pane's own draft always report *"Missing
-     * required field 'raw.name'"* — a finding no operator could act on, and one the A5.2 repair loop could
-     * only make worse by pushing the model toward a {@code {raw:{…}}} shape {@code applySchemaDraft} cannot
-     * read back, so Apply silently no-opped. Both tools are asserted: a validator and a projection that
-     * disagree about the same kind is the defect, not either half alone.
+     * <p>History (inverted here 2026-07-31, unification W1): the word used to name two unrelated shapes, so
+     * these tools deliberately resolved it to the registry COMPONENT ({@code {fields:[…]}}) and this test
+     * asserted {@code raw.name} was absent. **The registry schema component is retired** — a schema now has
+     * exactly one home, the config TOON the engine executes — so the projection must once again describe
+     * that config, and {@code raw.name} is required rather than forbidden. Both tools are asserted: a
+     * validator and a projection that disagree about the same kind is the defect, not either half alone.
      */
     @Test
     @SuppressWarnings("unchecked")
-    void schemaKindMeansTheRegistryComponentNotTheToonConfig() {
-        Map<String, Object> paneDraft = Map.of("fields",
-                List.of(Map.of("name", "id", "type", "integer"), Map.of("name", "seen", "type", "date", "format", "yyyy-MM-dd")));
-        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "schema", "config", paneDraft));
+    void schemaKindMeansTheToonConfig() {
+        Map<String, Object> configDraft = Map.of(
+                "raw", Map.of("name", "events", "format", "CSV",
+                        "fields", List.of(Map.of("name", "ID", "selector", "0", "type", "VARCHAR"))));
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "schema", "config", configDraft));
         assertEquals(true, out.get("clean"),
-                () -> "the pane's own draft shape must validate clean, findings were: " + out.get("findings"));
+                () -> "the engine-executable schema shape must validate clean, findings were: " + out.get("findings"));
 
         Map<String, Object> schema = (Map<String, Object>) invoke(schemaTool(), Map.of("kind", "schema")).get("schema");
         Map<String, Object> props = (Map<String, Object>) schema.get("properties");
-        assertTrue(props.containsKey("fields"), "the projection must offer the component's column list");
-        assertFalse(props.containsKey("raw.name"), "raw.name belongs to the TOON schema config, not the component");
-        assertEquals(List.of("fields"), schema.get("required"));
+        assertNotNull(props, "the projection must describe the schema config");
+        assertFalse(props.containsKey("fields"),
+                "a bare top-level 'fields' was the retired COMPONENT shape — it must not resurface");
     }
 
-    /** A fieldless draft is still an ERROR — absent via the required field, empty via the cross-field rule. */
+    /** A draft carrying none of the config's required structure is an ERROR, not a clean verdict. */
     @Test
-    void schemaComponentDraftNeedsAtLeastOneField() {
-        Map<String, Object> absent = invoke(draftTool(), Map.of("kind", "schema", "config", Map.of("name", "events")));
-        assertEquals(false, absent.get("clean"));
-
-        // The empty list is the trap the pane cannot survive: `applySchemaDraft` discards a fieldless draft,
-        // so a clean verdict here would present the operator an Apply button that does nothing.
-        Map<String, Object> empty = invoke(draftTool(),
-                Map.of("kind", "schema", "config", Map.of("fields", List.of())));
-        assertEquals(false, empty.get("clean"), "a present-but-empty field list must still be reported");
+    void schemaDraftWithoutTheRequiredStructureIsRejected() {
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "schema", "config", Map.of("name", "events")));
+        assertEquals(false, out.get("clean"), "a draft missing raw.name must be reported, not passed through");
     }
 
     /**

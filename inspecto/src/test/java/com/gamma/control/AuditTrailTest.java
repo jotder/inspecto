@@ -31,7 +31,7 @@ class AuditTrailTest {
     @Test
     void skipsDiagnosticAndReadOnly() {
         assertNull(AuditTrail.classify("POST", "/connections/sftp1/test"));
-        assertNull(AuditTrail.classify("POST", "/components/schema/x/test"));
+        assertNull(AuditTrail.classify("POST", "/components/grammar/x/test"));
         assertNull(AuditTrail.classify("POST", "/pipelines/authored/f1/dry-run"));
         assertNull(AuditTrail.classify("POST", "/validate"));
         assertNull(AuditTrail.classify("POST", "/assist/chat"));

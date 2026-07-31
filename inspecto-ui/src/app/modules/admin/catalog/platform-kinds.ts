@@ -20,7 +20,6 @@ function atomicKind(id: string, label: string): ComponentKind {
 
 // User-facing labels mirror the flow palette taxonomy (PARSE → Parser, TRANSFORM → Transformer, SINK → Writer).
 export const GRAMMAR_KIND = atomicKind('grammar', 'Parser');
-export const SCHEMA_KIND = atomicKind('schema', 'Schema');
 export const TRANSFORM_KIND = atomicKind('transform', 'Transformer');
 export const SINK_KIND = atomicKind('sink', 'Writer');
 export const RULE_TEMPLATE_KIND = atomicKind('rule-template', 'Rule Template');
@@ -28,7 +27,7 @@ export const RULE_TEMPLATE_KIND = atomicKind('rule-template', 'Rule Template');
 // Its "editor" is the Requirements pane (dialog-based detail, no /:id route).
 export const REQUIREMENT_KIND: ComponentKind = { ...atomicKind('requirement', 'Requirement'), authoring: { editorKey: 'requirement' } };
 
-const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, SCHEMA_KIND, TRANSFORM_KIND, SINK_KIND, RULE_TEMPLATE_KIND, REQUIREMENT_KIND];
+const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, TRANSFORM_KIND, SINK_KIND, RULE_TEMPLATE_KIND, REQUIREMENT_KIND];
 
 /**
  * The `pipeline` composite kind. Its parts are the registry components its nodes bind (parser / transform /
@@ -40,7 +39,9 @@ const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, SCHEMA_KIND, TRANSFORM_KIND
 export const PIPELINE_KIND: ComponentKind<AuthoredPipeline> = {
     id: 'pipeline',
     label: 'Pipeline',
-    allowedPartKinds: ['grammar', 'schema', 'transform', 'sink'],
+    // No 'schema': it is not a registry component (retired 2026-07-31, unification W1), so a node can
+    // never bind one and advertising it would render a part that can never resolve.
+    allowedPartKinds: ['grammar', 'transform', 'sink'],
     wiring: 'graph',
     config: { validate: () => [] },
     deriveWiring: (parts: Part[], flow: AuthoredPipeline): Wiring => ({

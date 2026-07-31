@@ -42,9 +42,19 @@ public final class ComponentStore {
      * Widened (W3, 2026-07-06) with the Studio metadata kinds {@code dataset}/{@code widget}/{@code dashboard}
      * so they persist for real instead of being Angular-mock-only (unblocks the backend-backlog items that
      * all waited on this one set); each has a matching registry dir in {@link ComponentRegistry#TYPE_BY_DIR}.
+     *
+     * <p>⚠ <b>{@code schema} was REMOVED 2026-07-31 (unification W1) — do not add it back.</b> A schema had
+     * two homes: this id-addressed registry, and the path-addressed config TOON
+     * ({@code processing.schema_file} → {@code <base>/config/<pipeline>_schema.toon}). Only the config TOON
+     * is <b>executable</b>: all three schema branches in {@code PipelineConfigParser} resolve a literal path
+     * via {@code Paths.get}/{@code Files.readString}, and no code path anywhere turned a component id into a
+     * schema the engine could run. Nothing even pointed at the registry copy — {@code bindKindFor} never
+     * offered {@code schema} as a bindable kind. So this entry could only ever produce a schema that looked
+     * authored but was never used, which is exactly the ambiguity the unification removes.
+     * See {@code docs/superpower/onboarding-pipeline-unification.md} U-C.
      */
     public static final Set<String> WRITABLE_TYPES =
-            Set.of("grammar", "schema", "transform", "sink", "dataset", "widget", "dashboard", "query",
+            Set.of("grammar", "transform", "sink", "dataset", "widget", "dashboard", "query",
                     "expectation", "requirement",
                     // INV-1/INV-2 saved investigation views (2026-07-08): the UI's SavedViewStore already
                     // speaks the /components contract — widening here is what moves them off the mock store.

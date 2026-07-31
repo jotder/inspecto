@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import { AbstractControl, FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipInputEvent, MatChipsModule } from '@angular/material/chips';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -9,8 +9,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
-import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
-import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -52,12 +50,11 @@ const TRANSFORM_SUBTYPES = [
     'transform.map', 'transform.select', 'transform.derive', 'transform.filter', 'transform.validate',
     'transform.dedup.marker', 'transform.dedup.fingerprint', 'transform.route', 'transform.split', 'transform.merge',
 ];
-const SCHEMA_TYPES = ['string', 'integer', 'bigint', 'double', 'boolean', 'date', 'timestamp'];
 const SINK_KINDS = ['sink.persistent', 'sink.materialized', 'sink.view'];
 const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
 
 /**
- * Create/edit a registry component (grammar / schema / transform / sink) — generalises the connection form
+ * Create/edit a registry component (grammar / transform / sink) — generalises the connection form
  * to the non-secret kinds (T19). Structured fields per kind; a transform's operator config and free-form
  * keys are authored as JSON. An inline **Test** panel runs the saved component over a sample through the
  * production dry-run endpoints (T18) on a throwaway DuckDB — no write. Submits to POST/PUT /components/{type}.
@@ -68,7 +65,6 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
     imports: [
         ReactiveFormsModule, FormsModule, MatDialogModule, MatButtonModule, MatChipsModule, MatFormFieldModule,
         MatIconModule, MatInputModule, MatSelectModule, MatSlideToggleModule, StatusBadgeComponent,
-        AiAssistComponent,
     ],
     templateUrl: './component-form.dialog.html',
 })
@@ -82,7 +78,6 @@ export class ComponentFormDialog {
     readonly kind = this.data.kind;
     readonly isEdit = !!this.data.def;
     readonly transformSubtypes = TRANSFORM_SUBTYPES;
-    readonly schemaTypes = SCHEMA_TYPES;
     readonly sinkKinds = SINK_KINDS;
     readonly sinkFormats = SINK_FORMATS;
 
@@ -112,8 +107,6 @@ export class ComponentFormDialog {
         quote: [''],
         escape: [''],
         encoding: [''],
-        // schema
-        fields: this.fb.array([] as FormGroup[]),
         // transform
         subtype: [TRANSFORM_SUBTYPES[0]],
         config: ['{\n  "where": "CAST(amt AS INT) >= 100"\n}', [jsonValidator]],
@@ -137,15 +130,6 @@ export class ComponentFormDialog {
                 escape: str(c['escape'], ''),
                 encoding: str(c['encoding'], ''),
             });
-        } else if (this.kind === 'schema') {
-            for (const f of schemaFieldsOf(c)) {
-                this.fields.push(this.fb.group({
-                    name: [str(f['name'], ''), Validators.required],
-                    type: [str(f['type'], 'string')],
-                    format: [str(f['format'], '')],
-                }));
-            }
-            if (this.fields.length === 0) this.addField();
         } else if (this.kind === 'transform') {
             const { type, ...rest } = c as { type?: string };
             this.form.patchValue({
@@ -162,58 +146,12 @@ export class ComponentFormDialog {
         }
     }
 
-    get fields(): FormArray {
-        return this.form.get('fields') as FormArray;
-    }
-
-    addField(): void {
-        this.fields.push(this.fb.group({ name: ['', Validators.required], type: ['string'], format: [''] }));
-    }
-
-    removeField(i: number): void {
-        this.fields.removeAt(i);
-    }
-
-    // ── AGT-6a A5.2: natural-language schema drafting ────────────────────────────────────────────
-    //
-    // `component_draft` is offered ONLY for the schema kind, and that is not a soft preference: it is a
-    // validator over the control plane's ConfigSpecs, and of this dialog's four kinds only `schema` has
-    // one. Offering it on grammar/transform/sink would render an affordance whose every use returns
-    // "no structural spec for kind" — worse than no button.
-    //
-    // The backend path is a bounded repair LOOP, not a single hop: one turn reliably yields a
-    // probably-invalid config, so findings are fed back over up to 3 turns. The pane does not know or
-    // care — it still just receives a draft plus findings, exactly as A1's deterministic path delivers.
-
-    /** Identity only — `kind` is the pane's, never the model's. */
-    readonly aiDraftArgs: Record<string, unknown> = { kind: 'schema' };
-
-    /** The diff baseline: what the form holds now, null while creating. */
-    readonly aiCurrentSchema = computed(() => (this.isEdit ? { fields: this.schemaFieldValues() } : null));
-
-    private schemaFieldValues(): Record<string, unknown>[] {
-        return (this.fields.value as { name: string; type: string; format: string }[])
-            .filter((f) => f.name?.trim())
-            .map((f) => (f.format?.trim()
-                ? { name: f.name.trim(), type: f.type, format: f.format.trim() }
-                : { name: f.name.trim(), type: f.type }));
-    }
-
-    /** Replace the field rows with the drafted ones. Applied through the same FormArray a human edits. */
-    applySchemaDraft(draft: AiDraft): void {
-        const drafted = draft.config?.['fields'];
-        if (!Array.isArray(drafted)) return;   // a draft with no fields is not applicable, not an error
-        this.fields.clear();
-        for (const f of drafted as Record<string, unknown>[]) {
-            this.fields.push(this.fb.group({
-                name: [str(f['name'], ''), Validators.required],
-                type: [str(f['type'], 'string')],
-                format: [str(f['format'], '')],
-            }));
-        }
-        if (this.fields.length === 0) this.addField();
-        this.form.markAsDirty();
-    }
+    // AI drafting (AGT-6a A5.2) lived here and was offered ONLY for the `schema` kind — a validator over
+    // the control plane's ConfigSpecs, and of this dialog's kinds only `schema` had one. `schema` is no
+    // longer a registry component (retired 2026-07-31, unification W1: a schema lives solely in the config
+    // TOON the engine executes), so the affordance has no applicable kind and was removed WITH it rather
+    // than left rendering "no structural spec for kind" on every use. To bring it back, give another kind a
+    // structural ConfigSpec first — the bounded repair loop on the backend is untouched and still generic.
 
     addPartition(event: MatChipInputEvent): void {
         const value = event.value.trim();
@@ -240,16 +178,6 @@ export class ComponentFormDialog {
                 if (v.escape) out['escape'] = v.escape;
                 if (v.encoding) out['encoding'] = v.encoding;
                 return out;
-            }
-            case 'schema': {
-                const fields = (v.fields as { name: string; type: string; format: string }[])
-                    .filter((f) => f.name?.trim())
-                    .map((f) => {
-                        const field: Record<string, unknown> = { name: f.name.trim(), type: f.type };
-                        if (f.format?.trim()) field['format'] = f.format.trim();
-                        return field;
-                    });
-                return { fields };
             }
             case 'transform': {
                 // form.invalid already blocks submit() when config isn't valid JSON (jsonValidator).
@@ -322,9 +250,7 @@ export class ComponentFormDialog {
             return;
         }
         const obs: Observable<RelationsPreview | SinkPreview> =
-            this.kind === 'schema' ? this.api.testSchema(id, rows)
-            : this.kind === 'transform' ? this.api.testTransform(id, rows)
-            : this.api.testSink(id, rows);
+            this.kind === 'transform' ? this.api.testTransform(id, rows) : this.api.testSink(id, rows);
         obs.subscribe({
             next: (r) => {
                 this.testing.set(false);
@@ -356,11 +282,6 @@ function str(v: unknown, dflt: string): string {
 function num(v: unknown, dflt: number): number {
     const n = Number(v);
     return Number.isFinite(n) ? n : dflt;
-}
-function schemaFieldsOf(c: Record<string, unknown>): Record<string, unknown>[] {
-    const raw = c['raw'] as { fields?: unknown } | undefined;
-    const src = (raw?.fields ?? c['fields'] ?? c['columns']) as unknown;
-    return Array.isArray(src) ? (src.filter((x) => x && typeof x === 'object') as Record<string, unknown>[]) : [];
 }
 function partitionsOf(c: Record<string, unknown>): string[] {
     const src = c['partitions'];

@@ -306,9 +306,6 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
     // ── Registry kinds: options for the in-graph "choose a grammar/transform/sink" picker ──────
     putComponent(store, space, 'grammar', 'cdr_csv', { delimiter: ',', has_header: true });
     putComponent(store, space, 'grammar', 'pipe_delimited', { delimiter: '|', has_header: false });
-    putComponent(store, space, 'schema', 'cdr_record', {
-        fields: [{ name: 'msisdn', type: 'string' }, { name: 'duration_s', type: 'integer' }],
-    });
     putComponent(store, space, 'transform', 'drop_test_rows', {
         type: 'transform.filter', where: "msisdn NOT LIKE '0000%'",
     });

@@ -71,7 +71,7 @@ final class BundleRoutes implements RouteModule {
      *  is first: it has no outbound refs of its own and an authored pipeline's source may reference it.
      *  Authored pipelines/jobs may reference the component kinds above them; saved-view has no references. */
     private static final List<String> APPLY_ORDER =
-            List.of("connection", "grammar", "schema", "transform", "sink", "dataset", "query", "widget",
+            List.of("connection", "grammar", "transform", "sink", "dataset", "query", "widget",
                     "dashboard", "reconciliation", "authored-pipeline", "job", "saved-view");
 
     private static boolean supported(String kind) {

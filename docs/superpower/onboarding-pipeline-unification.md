@@ -1,6 +1,6 @@
 # Onboarding ↔ Pipeline unification — one model, one guided head
 
-> **Status: DESIGN — direction approved by the operator 2026-07-31. No build started.**
+> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W1a SHIPPED same day; W0/W1b/W2–W5 open.**
 > **Supersedes `onboarding-pipeline-split.md`** (approved 2026-07-30, archived to
 > `archived-documents/plans-archive/`). That plan's two-plane model — Onboard declares a contract,
 > Pipeline processes landed data, the Dataset is the handoff — is **reversed** by this one. §6 records
@@ -70,7 +70,9 @@ so **Onboarding's engine-real keys are the source of truth for the merge**, not 
   (`ComponentRoutes.java:281-288`).
 - Same document shape in both (`raw.fields[]`, `mapping.rules[]`, `partitions[]`), so this is an
   **addressing** difference, not a format one. **No converter exists** between them.
-- On disk: **16** `*_schema.toon` vs **2** `registry/schemas/*.toon`.
+- On disk: **16** `*_schema.toon` vs **one** real `registry/schemas/*.toon`
+  (`spaces/demo/.../payments_schema.toon`; the second apparent copy is the packaged
+  `file-processor-deploy/` build artifact, byte-identical). Migration was therefore a single move.
 
 **Three export pipes exist for "a pipeline", not two.**
 - Backend `BundleExporter.exportDataSource`/`exportSpace` + `DataSourceBundleResolver.resolve`
@@ -164,11 +166,32 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
 - **W0 — the round-trip gate (§3).** Blocks W4/W5 only; W1–W3 may proceed in parallel.
   *Verify: lift→lower round-trip test over the existing 16 configs, plus a written supported-subset
   statement if lossless proves impossible.*
-- **W1 — single schema store (U-C).** *The operator's stated priority.* Retire `schema` from the
-  registry's writable types, migrate the 2 components, repoint the `/test` route, make schema refs
-  space-relative.
-  *Verify: a test asserting exactly one writable schema location; full reactor; the 16 existing configs
-  still load; a schema authored in Onboarding is readable by the graph editor with no conversion step.*
+- **W1 — single schema store (U-C). ✅ W1a SHIPPED 2026-07-31 — W1b (space-relative paths) still open.**
+  *The operator's stated priority.*
+  **W1a, done:** `schema` removed from `ComponentStore.WRITABLE_TYPES`; `POST /components/schema/{id}/test`
+  and its handler deleted; `schema` dropped from `BundleRoutes.APPLY_ORDER`; `ConfigSpecs.schemaComponent()`
+  deleted and `InspectoTools.specFor` de-special-cased (the word now has ONE meaning, so `forType` is again
+  the whole answer); frontend `ComponentType`/`COMPONENT_TYPES`/`testSchema()`, `SCHEMA_KIND`,
+  `ATOMIC_KINDS`, `PIPELINE_KIND.allowedPartKinds`, `REGISTRY_KINDS`, `PIPELINE_REF_KINDS`, mock integrity
+  + 5 seeds all cleaned. The single on-disk component migrated
+  (`spaces/demo/config/registry/schemas/payments_schema.toon` → `spaces/demo/config/payments_schema.toon`;
+  its content shape already matched store A, so it was a move, not a transform). Guards added at both
+  layers: `ComponentStoreTest.schemaIsNotAWritableComponentKind` and
+  `ControlApiComponentsTest.schemaIsNotAComponentKind`.
+  ⚠ **Old bundles must still parse**: `'schema'` is KEPT in the `BundleKind` type and in a new
+  `LEGACY_BUNDLE_KINDS`, so an already-exported bundle loads and the operator gets an honest per-item
+  refusal; dropping it from the type instead would make `parseBundle` reject the WHOLE file with
+  `unknown kind "schema"` over one obsolete item. It is **not** in `BUNDLE_KINDS` — never offered for
+  export again — and `KIND_ORDER` includes legacy kinds because a missing index made the sort comparator
+  compute `NaN`. `BundleTransferService.write` refuses a legacy kind with a named reason instead of
+  attempting a write the server would answer with an opaque 400.
+  ⚠ **Deliberate feature loss, recorded not hidden:** AI drafting in `component-form.dialog` was offered
+  ONLY for `schema` (the sole dialog kind with a structural `ConfigSpec`), so it was removed WITH the kind
+  rather than left answering *"no structural spec for kind"*. The backend repair loop is untouched and
+  generic — see BACKLOG for the follow-on.
+  *Verified: full `mvn -o clean test` reactor green; UI 1890 tests + `lint:tokens` + production build green.*
+  **W1b, still open:** make schema references space-relative so they are portable AND jailed. Needs the
+  space-root threading shared with `BACKLOG.md` §6 — do that once and both land.
 - **W2 — config-key unification (U-D, U-E).** One spec table per concern under
   `inspecto/component-model` (or a shared `pipeline-specs.ts`), adopted by both features; plugin-parser
   guard lifted.

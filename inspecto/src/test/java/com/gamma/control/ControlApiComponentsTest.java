@@ -140,22 +140,22 @@ class ControlApiComponentsTest {
         }
     }
 
+    /**
+     * A schema is NOT a registry component (unification W1, 2026-07-31). It has one home: the
+     * path-addressed config TOON the engine executes. Both the CRUD and the old {@code /test} route must
+     * be gone, so an operator cannot author a schema that looks saved but can never run.
+     * The surviving TRY_CAST split lives on {@code POST /config/preview/schema}
+     * (covered by {@code ControlApiOnboardingLifecycleTest}).
+     */
     @Test
-    void schemaPreviewSplitsDataAndRejected(@TempDir Path dir) throws Exception {
+    void schemaIsNotAComponentKind(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
-            assertEquals(200, send(c.port, "POST", "/components/schema",
-                    "{\"id\":\"typed\",\"fields\":[{\"name\":\"id\",\"type\":\"integer\"},{\"name\":\"amt\",\"type\":\"double\"}]}").statusCode());
-
-            HttpResponse<String> r = send(c.port, "POST", "/components/schema/typed/test",
-                    "{\"sampleRows\":[{\"id\":\"1\",\"amt\":\"150\"},{\"id\":\"x\",\"amt\":\"50\"},{\"id\":\"3\",\"amt\":\"abc\"}]}");
-            assertEquals(200, r.statusCode(), r.body());
-            int data = 0, rejected = 0;
-            for (JsonNode rel : json(r).get("relations")) {
-                if ("data".equals(rel.get("rel").asText())) data = rel.get("rowCount").asInt();
-                if ("rejected".equals(rel.get("rel").asText())) rejected = rel.get("rowCount").asInt();
-            }
-            assertEquals(1, data);
-            assertEquals(2, rejected);
+            assertEquals(400, send(c.port, "POST", "/components/schema",
+                    "{\"id\":\"typed\",\"fields\":[{\"name\":\"id\",\"type\":\"integer\"}]}").statusCode(),
+                    "writing a schema component is refused, not silently accepted");
+            assertEquals(400, send(c.port, "GET", "/components/schema", null).statusCode());
+            assertEquals(404, send(c.port, "POST", "/components/schema/typed/test",
+                    "{\"sampleRows\":[]}").statusCode(), "the schema /test route is unregistered");
         }
     }
 

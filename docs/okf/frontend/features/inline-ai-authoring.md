@@ -300,8 +300,15 @@ validates every draft against the real `ConfigSpec` regardless of what the model
 
 The plan assumed `component_draft` had a pane. **It had none.** Adopted on the **Components pane's
 schema kind** (`component-form.dialog`), and *only* that kind: of the dialog's four
-(grammar/schema/transform/sink) only `schema` has a `ConfigSpec`, so on the rest the tool can only answer
+(grammar/schema/transform/sink) only `schema` had a `ConfigSpec`, so on the rest the tool can only answer
 *"no structural spec for kind"*. ⚠ **Do not "complete" the adoption onto the other three.**
+
+⚠ **RETIRED 2026-07-31 (unification W1).** The `schema` registry component no longer exists — a schema
+lives only in its pipeline's config TOON — so the component-draft affordance was removed from
+`component-form.dialog` **with** the kind rather than left answering *"no structural spec for kind"* on
+every use. The backend repair loop is untouched and still generic: to bring the button back, give another
+dialog kind a structural `ConfigSpec` first. The rest of this section describes the mechanism, which is
+still accurate for the surfaces that do have specs.
 
 ⚠ Offline, the mock's derived field types **must come from the schema form's own vocabulary**
 (`string|integer|bigint|double|boolean|date|timestamp`). An early cut emitted `number`, which applied

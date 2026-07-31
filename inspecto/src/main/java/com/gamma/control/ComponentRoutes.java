@@ -41,7 +41,6 @@ final class ComponentRoutes implements RouteModule {
         // T18 dry-run/test: preview a component over a sample through the production logic (scratch-only).
         api.post("/components/transform/([^/]+)/test", (e, m) -> previewTransform(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/grammar/([^/]+)/test", (e, m) -> previewGrammar(api, e, ApiContext.name(m), api.body(e)));
-        api.post("/components/schema/([^/]+)/test", (e, m) -> previewSchema(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/sink/([^/]+)/test", (e, m) -> previewSink(api, e, ApiContext.name(m), api.body(e)));
     }
 
@@ -270,22 +269,6 @@ final class ComponentRoutes implements RouteModule {
         ComponentRegistry.Component c = requireComponent(api, ex, "grammar", id);
         try {
             return ComponentPreview.grammar(c.content(), sampleText(body));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
-        } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + e.getMessage());
-        }
-    }
-
-    /**
-     * {@code POST /components/schema/{id}/test} — {@code TRY_CAST} {@code sampleRows} against a schema
-     * component's typed fields, splitting {@code data} / {@code rejected}, on a throwaway DuckDB (T18, §7.2).
-     * 404 if absent, 400 on a bad sample, 422 on a cast/SQL error. Never touches production output.
-     */
-    private Object previewSchema(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String id, Map<String, Object> body) {
-        ComponentRegistry.Component c = requireComponent(api, ex, "schema", id);
-        try {
-            return ComponentPreview.schema(c.content(), ApiContext.sampleRows(body));
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (java.sql.SQLException | IOException e) {

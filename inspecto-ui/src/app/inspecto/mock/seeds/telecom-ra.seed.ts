@@ -31,9 +31,6 @@ export function seedTelecomRa(store: MockStore, space: string): void {
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
     putComponent(store, space, 'grammar', 'switch_cdr_csv', { delimiter: ',', has_header: true });
-    putComponent(store, space, 'schema', 'cdr_record', {
-        fields: [{ name: 'id', type: 'integer' }, { name: 'msisdn', type: 'string' }, { name: 'duration_s', type: 'integer' }, { name: 'cost_usd', type: 'decimal' }],
-    });
     putComponent(store, space, 'transform', 'drop_zero_duration', { type: 'transform.filter', where: 'duration_s > 0' });
     putComponent(store, space, 'sink', 'cdr_parquet', { type: 'sink.persistent', format: 'parquet', partitions: ['event_date'] });
 

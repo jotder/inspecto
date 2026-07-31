@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, forkJoin, of } from 'rxjs';
+import { Observable, forkJoin, of, throwError } from 'rxjs';
 import { catchError, concatMap, map } from 'rxjs/operators';
 import {
     ComponentType,
@@ -105,6 +105,15 @@ export class BundleTransferService {
         if (kind === 'decision-rule') {
             const rule = { ...(content as unknown as DecisionRuleUpsert), name: id };
             return overwrite ? this.decisionRules.update(id, rule) : this.decisionRules.create(rule);
+        }
+        // A kind retired from the registry (today: `schema`) can still appear in an ALREADY-EXPORTED
+        // bundle. Refuse it here with a named reason rather than attempting a write against a kind the
+        // server no longer knows — that would surface as an opaque 400 per item. The bundle as a whole
+        // still imports; only these items are declined.
+        if (kind === 'schema') {   // the one LEGACY_BUNDLE_KINDS entry; `===` so TS narrows it away below
+            return throwError(() => new Error(
+                `"${kind}" is no longer a registry component — a schema now lives only in its pipeline's `
+                + `config (processing.schema_file). Re-author it in the Stream's Schema stage.`));
         }
         return overwrite ? this.components.update(kind, id, content) : this.components.create(kind, { id, ...content });
     }

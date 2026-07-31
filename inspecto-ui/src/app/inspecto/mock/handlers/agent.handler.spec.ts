@@ -202,34 +202,22 @@ describe('agentHandler · component_draft', () => {
         expect(partial.findings.map((f) => f.fieldPath)).toEqual(['job.type']);
     });
 
-    it("validates the SCHEMA kind against the registry component's shape, not the TOON config's", () => {
-        // The Components pane's A5.2 draft shape. `schema` names two unrelated things — the TOON schema
-        // config (`raw.name` required) and this registry component (a bare column list) — and the tool's
-        // `kind` vocabulary is the COMPONENT one, so the pane's own draft must come back clean.
-        // Previously it resolved to the config spec and always answered "Missing required field 'raw.name'",
-        // a finding the operator could not act on and the repair loop could only make worse.
-        const res = call({ kind: 'schema', config: { fields: [{ name: 'id', type: 'integer' }] } });
-        const body = res?.body as { clean: boolean; findings: { fieldPath: string }[] };
-
-        expect(body.clean).toBe(true);
-        expect(body.findings).toEqual([]);
-    });
-
-    it('reports a schema draft that carries no fields, rather than passing it', () => {
-        // ⚠ Both halves matter. An ABSENT `fields` is the missing-required finding; a PRESENT but EMPTY one
-        // is the server's `at-least-one-field` cross-field rule. The empty case is the trap: the pane's
-        // `applySchemaDraft` discards a fieldless draft, so without a finding Apply would silently no-op.
-        const missing = call({ kind: 'schema', config: { name: 'events' } })?.body as {
+    it('validates the SCHEMA kind against the TOON config shape — the only remaining reading', () => {
+        // `schema` used to name two unrelated things: the TOON config (`raw.name` required) and a registry
+        // COMPONENT (a bare column list). The component was retired 2026-07-31 (unification W1), so the
+        // word has one meaning again and this mock must mirror `ConfigSpecs.forType('schema')`. A bare
+        // `fields` list was the component's shape and must NOT validate clean any more.
+        const ok = call({ kind: 'schema', config: { raw: { name: 'events' } } })?.body as {
             clean: boolean; findings: { fieldPath: string }[];
         };
-        expect(missing.clean).toBe(false);
-        expect(missing.findings.map((f) => f.fieldPath)).toEqual(['fields']);
+        expect(ok.clean).toBe(true);
+        expect(ok.findings).toEqual([]);
 
-        const empty = call({ kind: 'schema', config: { fields: [] } })?.body as {
-            clean: boolean; findings: { fieldPath: string; message: string }[];
+        const componentShape = call({ kind: 'schema', config: { fields: [{ name: 'id', type: 'integer' }] } })?.body as {
+            clean: boolean; findings: { fieldPath: string }[];
         };
-        expect(empty.clean).toBe(false);
-        expect(empty.findings.map((f) => f.message)).toEqual(['A schema component needs at least one field.']);
+        expect(componentShape.clean).toBe(false);
+        expect(componentShape.findings.map((f) => f.fieldPath)).toEqual(['raw.name']);
     });
 });
 
