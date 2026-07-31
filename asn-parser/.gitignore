@@ -12,23 +12,23 @@ target/
 config/
 data/
 
-# The corpus keeps only AGGREGATE evidence tracked — PARITY.md, README.md,
-# SUMMARY.json and per-case report.json (counts, ratios, capture file names) —
-# never the records themselves (~37 MB across 25 files).
-corpus/**/*.jsonl
-
-# ⚠ parity.json is NOT aggregate: every one carries a 25-entry `content.examples[]`
-# of `{new, leaf, legacy}` — actual decoded FIELD VALUES, including 15-digit
-# subscriber identifiers and raw legacy bytes. Verified 2026-07-30 across all 9.
-corpus/**/parity.json
-
-# Generated parity OUTPUT — regenerable by the documented commands in
-# corpus/README.md, goes stale silently, and enumerates carrier capture
-# filenames / network-element names. Only README.md (the hand-written corpus
-# contract) is tracked.
-corpus/PARITY.md
-corpus/SUMMARY.json
-corpus/**/report.json
+# The corpus is DENY-BY-DEFAULT: everything is ignored, README.md (the
+# hand-written corpus contract) is the single exception. Enumerating known-bad
+# extensions was the old rule and it leaked — a .parquet/.txt/.csv dropped in
+# here was committable on 2026-07-31. Do not go back to a per-extension list;
+# to track a new corpus file, add an explicit `!` line and say why.
+#
+# What this holds back, concretely:
+#   *.jsonl              decoded records + rows (~37 MB across 25 files)
+#   **/parity.json       ⚠ NOT aggregate — a 25-entry `content.examples[]` of
+#                        {new, leaf, legacy}: actual decoded FIELD VALUES,
+#                        incl. 15-digit subscriber ids and raw legacy bytes
+#                        (verified 2026-07-30 across all 9)
+#   PARITY.md            generated output; regenerable per corpus/README.md,
+#   SUMMARY.json         goes stale silently, and enumerates carrier capture
+#   **/report.json       filenames / network-element names
+corpus/*
+!corpus/README.md
 
 # Archives of the above — a single `git add -A` would otherwise commit the whole
 # corpus as one blob. This is how 132 MB nearly shipped on 2026-07-30.

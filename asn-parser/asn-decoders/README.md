@@ -169,9 +169,29 @@ pins one fast case per build; the full sweep is a manual main (see PARITY.md hea
   - `RecordMapper` — the `NamedNode`→legacy-record-map converter, promoted out of `asn-golden`
     (package-private there) so production code doesn't need to depend on the harness module.
   - Still open (items 3–6 of the same backlog entry): the declarative decode profile (replacing
-    `GoldenCapture.CASES`), the `asn-parser-v2`/`asn-decoders` coordinate split, a drop-in
-    `plugins/` jar directory, and the segments editor that unlocks guided Save for hierarchical
-    parsers.
+    `GoldenCapture.CASES`), a drop-in `plugins/` jar directory, and the grammar-source half of the
+    decode profile. ~~the segments editor~~ SHIPPED 2026-07-31.
+
+### The coordinate split — RESOLVED 2026-07-31
+
+Two changes, one of which nearly went wrong:
+
+1. **This reactor is now aggregated by the root `pom.xml`** (`<module>asn-parser/asn-decoders</module>`).
+   `inspecto-engine`'s dependency on `com.gamma.asn:asn-facade` resolves from the build itself;
+   the manual `mvn install` step is gone. Verified with `~/.m2/repository/com/gamma/asn` deleted:
+   23 modules, `asn-facade` at [7/23], `inspecto-engine` at [18/23], full reactor green.
+   Aggregation only — this tree keeps its own parent (`com.gamma.asn:asn-decoders:0.1.0-SNAPSHOT`)
+   and inherits nothing from `inspecto-parent`.
+
+2. **`asn-parser/pom.xml` (`asn-parser-v2:1.2.1`) is deleted.** Zero consumers, and its parent
+   (`com.gamma.asn.decoders:asn-decoders:1.1.3-dev`) exists nowhere in the tree or the local repo,
+   so the module could not build at all.
+
+⚠ **`asn-parser/src/main/java` is NOT dead and must not be deleted with it.** `legacy-code/pom.xml`
+sets `<sourceDirectory>../../src/main/java</sourceDirectory>` — those 45 compiled files ARE the
+unmodified legacy decoder the golden-corpus harness measures parity against. Deleting the POM
+leaves the `src/` tree looking orphaned; it is not. It retires together with `legacy-code` after
+Phase 4, per that module's own description — not before.
 
 ## Not yet built (per phase plan)
 - `CompiledSchema` stable text serialization + `asn compile`/`asn dump` CLI (asn-cli module).
