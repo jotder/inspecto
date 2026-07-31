@@ -31,8 +31,16 @@ const PARSING_ROOTS = ['frontend', 'delimited', 'fixedwidth', 'json', 'text_rege
  * Parsing stage — authors the Stage-1 `parsing:` block over the four engine-real frontends and
  * chains the captured sample through `POST /config/preview/parsing`, so the builder sees THEIR
  * data parsed by the same DuckDB idioms the engine runs (D4 sample-as-thread, the raw→parsed
- * hop). A `plugin` frontend (Java ingester + segment schemas) is TOON-managed: shown, never
- * edited here.
+ * hop).
+ *
+ * <p>**Plugin parsing is authored HERE too** (unification W2 / U-E, 2026-07-31). The pane used to
+ * refuse it outright: any config with `parsing.plugin` / `processing.ingester` rendered a single
+ * "author that in the pipeline TOON directly" notice and NOTHING else. That was an honesty guard while
+ * plugin parsing really was unauthorable — but the served parser catalog, the grammar-schema options
+ * form and the segments editor all shipped, and the guard was never lifted, so it had become a trap:
+ * a plugin config saved through THIS pane's own segments editor locked itself out of ever being
+ * edited again (`savePlugin` writes `frontend: 'plugin'`, which is exactly what the guard matched).
+ * Lifting it requires {@link rehydratePlugin} — see there for why.
  */
 @Component({
     selector: 'app-onboarding-parsing-pane',
@@ -109,11 +117,16 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     private readonly parsingBlock =
         ((this.state.config() ?? {})['parsing'] as Record<string, unknown> | undefined) ?? {};
 
-    /** A plugin ingester (parsing.plugin / processing.ingester) is authored in the TOON, not here. */
-    readonly pluginManaged: boolean =
-        !!this.parsingBlock['plugin'] ||
-        String(this.parsingBlock['frontend'] ?? '') === 'plugin' ||
-        !!((this.state.config() ?? {})['processing'] as Record<string, unknown> | undefined)?.['ingester'];
+    /**
+     * FQCN this config parses through, from either key the engine accepts (`parsing.plugin.ingester`
+     * or legacy `processing.ingester`) — the handle used to re-select the served parser on load.
+     */
+    private readonly configuredIngester: string =
+        String(
+            (this.parsingBlock['plugin'] as Record<string, unknown> | undefined)?.['ingester'] ??
+                ((this.state.config() ?? {})['processing'] as Record<string, unknown> | undefined)?.['ingester'] ??
+                '',
+        ).trim();
 
     readonly frontend = signal<ParsingFrontend>(normalizeFrontend(this.parsingBlock['frontend']));
     /** The options form: engine-real specs for the built-ins, the SERVED grammar schema for plugins. */
@@ -164,7 +177,10 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         this.state.registerDirtyCheck(this.dirtyCheck);
         // The catalog is additive: without it (old server / offline blip) the built-ins still work.
         this.parsersApi.list().subscribe({
-            next: (list) => this.served.set(list),
+            next: (list) => {
+                this.served.set(list);
+                this.rehydratePlugin(list);
+            },
             error: () => this.served.set(null),
         });
         this.loadSavedSegments();
@@ -173,6 +189,40 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     ngOnDestroy(): void {
         this.state.unregisterDirtyCheck(this.dirtyCheck);
     }
+
+    /**
+     * Re-select the served parser a saved plugin config already names (unification W2 / U-E). Must run
+     * off the `/parsers` response, because the parser is identified by its **`ingesterClass`**: a guided
+     * Save writes `parsing.plugin.ingester` (the FQCN), never the parser id, so the id can only be
+     * recovered from the served catalog.
+     *
+     * <p>Without this, lifting the old whole-pane plugin lockout would be a regression dressed as a
+     * feature: `frontend: 'plugin'` normalizes to `delimited`, so the pane would confidently present a
+     * plugin pipeline as a delimited one and a Save would overwrite its parsing block.
+     *
+     * <p>Silent when the FQCN matches nothing served (plugin jar not deployed on this server). The pane
+     * then shows the built-in it normalized to — but `unservedPlugin` makes that honest in the UI rather
+     * than letting it read as "this pipeline is delimited".
+     */
+    private rehydratePlugin(list: ParserDef[]): void {
+        if (!this.configuredIngester || this.pluginDef()) return;
+        const match = list.find((p) => p.ingesterClass === this.configuredIngester);
+        // Not `setType`: that marks the selection as a user action. This is load-time state restoration,
+        // so it must NOT make the pane dirty — a dirty pane on arrival would prompt "discard changes?"
+        // for a config the operator has not touched.
+        if (match) this.pluginDef.set(match);
+    }
+
+    /**
+     * The config names an ingester no served parser provides — the plugin jar is not on this server.
+     * Surfaced so the operator sees why their plugin pipeline is showing built-in options, instead of
+     * silently reading as delimited.
+     */
+    readonly unservedPlugin = computed(() => {
+        const list = this.served();
+        if (!this.configuredIngester || !list) return null;
+        return list.some((p) => p.ingesterClass === this.configuredIngester) ? null : this.configuredIngester;
+    });
 
     setFrontend(f: ParsingFrontend): void {
         if (f === this.frontend() && !this.pluginDef()) return;

@@ -218,7 +218,33 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   otherwise emit a spurious "unresolvable" warning for a portable draft.
   *Verified: full `mvn -o clean test` reactor green, 24/24 modules; `SchemaRefResolutionTest` 8/8 (including
   a real relocate-the-directory-and-load proof, not a proxy for it) and `SchemaFileFindingsTest` 6/6.*
-- **W2 — config-key unification (U-D, U-E).** One spec table per concern under
+- **W2 — config-key unification (U-D, U-E). 🔄 IN PROGRESS — U-E (the plugin guard) SHIPPED 2026-07-31.**
+  **U-E done, and it was a live bug rather than the cleanup this plan assumed.** `pluginManaged` was not a
+  cosmetic read-only notice — it was a **whole-pane lockout**: any config with `parsing.plugin` or
+  `processing.ingester` rendered a single "author that in the pipeline TOON directly" alert and *nothing
+  else* — no sample panel, no type toggle, and no segments editor. Since `savePlugin` writes
+  `frontend: 'plugin'`, which is exactly what the guard matched, **a plugin config saved through this
+  pane's own segments editor locked itself out of ever being reopened.** The editor shipped 2026-07-31 and
+  the guard was never lifted with it.
+  Lifting it required `rehydratePlugin`, without which the fix would have been a worse regression: a guided
+  Save stores `parsing.plugin.ingester` (the **FQCN**), never the parser id, so the id is recoverable only by
+  matching `ingesterClass` against the served `/parsers` catalog — otherwise `frontend: 'plugin'` normalizes
+  to `delimited` and the pane would confidently present a plugin pipeline as delimited, and a Save would
+  overwrite its parsing block. Restoration deliberately does **not** go through `setType`, so arriving at a
+  saved stream does not mark the pane dirty. When the FQCN matches nothing served (plugin jar absent), the
+  new `unservedPlugin` alert says so instead of letting the fallback read as "this pipeline is delimited".
+  *Verified: `lint:tokens` + 1893 UI tests + production build green, and a real in-preview walk — authored an
+  ASN.1 stream with a segment, saved, **reloaded**, and the pane came back with ASN.1 selected and the
+  segment key + column re-hydrated, no lockout and no spurious alert (the exact path that was broken).*
+  **U-D still open** — the collision is confirmed and narrow: `node-attributes.ts` `collector.file` carries
+  best-guess `include`/`exclude`/`recursive`(bool)/`min_age_seconds`, while onboarding's engine-real
+  `COLLECTOR_ATTRIBUTES` has `include`/`exclude`/`recursive_depth`(number)/`stability__window` **plus**
+  `connection`, `discovery`, `duplicate__*`, `post_action__*`, `guarantee`. Per U-D the engine-real set wins;
+  `collector.database`/`collector.stream` keys (`query`, `watermark_column`, `fetch_size`, `topic`,
+  `group_id`) need checking against the engine before they are treated as canonical.
+  ⚠ **Also found, and it is a W2 item because it is exactly a key gap:** `parsing-attributes.ts` does not
+  offer `json.records_path`, which the engine gained 2026-07-31 — the UI cannot author a working engine key.
+  One spec table per concern under
   `inspecto/component-model` (or a shared `pipeline-specs.ts`), adopted by both features; plugin-parser
   guard lifted.
   *Verify: `lint:tokens` + full `ng test` + prod build; a spec asserting the two features render the

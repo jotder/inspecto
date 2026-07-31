@@ -99,8 +99,7 @@ consumes it (choose the file → view it → pick a type and options below) — 
 right-hand aside. ⚠ It is deliberately **not** in the shell: on Collection/Publish it was dead
 weight, and the state is session-held in `OnboardingStateService`, so downstream stages still read
 the thread without rendering the panel (`onboarding-shell.component.spec` pins that the shell does
-not render it; the parsing pane pins that it precedes the file-type picker). It is also skipped in
-the plugin-ingester branch, where there is nothing to configure. The header row carries the thread
+not render it; the parsing pane pins that it precedes the file-type picker). The header row carries the thread
 chips (lines / parsed / cast) and capture actions, the body shows up to 40 raw lines, and it is now
 visible on small screens too. The schema pane DERIVES its fields from the parsed columns
 (frontend-aware selectors: positional for delimited/fixedwidth, verbatim key for json/text_regex)
@@ -171,6 +170,23 @@ segment (`ConfigService.write('schema', …)`, the Schema stage's convention-pat
 patches `parsing.plugin`, so the pipeline never names a schema file that does not exist yet. A bespoke
 nested `FormArray` is unavoidable: `FieldSpec` cannot express "a list of segments each with a list of
 columns".
+
+**Re-opening a plugin stream is possible at all only since 2026-07-31** (unification W2 / U-E). Until
+then the pane held a `pluginManaged` guard that was a **whole-pane lockout**, not a read-only view: a
+config with `parsing.plugin` or `processing.ingester` rendered one "author that in the pipeline TOON
+directly" alert and nothing else. Because `savePlugin` writes `frontend: 'plugin'` — exactly what the
+guard matched — **a plugin config saved through this pane's own segments editor could never be reopened
+here.** The guard predated the served catalog, the grammar-schema options form and the segments editor,
+and was not lifted when they shipped.
+Lifting it needs `rehydratePlugin`, and that is the load-bearing part: a guided Save stores
+`parsing.plugin.ingester` (the **FQCN**), never the parser id, so the id is recoverable only by matching
+`ingesterClass` against the served `/parsers` catalog. Without it `frontend: 'plugin'` normalizes to
+`delimited`, the pane would present a plugin pipeline as delimited, and a Save would overwrite its
+parsing block. Two rules to preserve:
+- Restoration must **not** go through `setType` — that marks a user action, and a dirty pane on arrival
+  prompts "discard changes?" for a config nobody touched.
+- When the FQCN matches nothing served (plugin jar not deployed), `unservedPlugin` renders a warning
+  naming the class. Silence there would let the built-in fallback read as the pipeline's real parser.
 
 **Re-opening a saved stream restores columns, not just keys** (2026-07-31 — closes the shipped
 residual). `parsing.plugin.segments` stores only `segment key → schema-toon path`, so the pane reads

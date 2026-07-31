@@ -3,9 +3,13 @@ import { AttributeSpec } from 'app/inspecto/component-model';
 /**
  * The Parsing stage's frontend catalog + per-frontend schema-form specs, flat-keyed (`__` path
  * separator, see `onboarding-config-utils`) over the Stage-1 `parsing:` TOON block. Deliberately
- * only the FOUR engine-real, UI-authorable frontends — `plugin` (a Java ingester class + segment
- * schemas) is TOON-managed and shown read-only when already present, never offered here
- * (honesty guard: no silent no-ops).
+ * only the FOUR **built-in** frontends. Plugin parsers are NOT specced here: their options form is the
+ * SERVED `grammarSchema` from `GET /parsers` (`fieldSpecsToAttributes`), and since W2/U-E (2026-07-31) the
+ * Parsing stage authors them — the old "TOON-managed, read-only" guard is gone (it had become a lockout;
+ * see `parsing-pane.component`).
+ *
+ * ⚠ **Known gap (W2/U-D):** `json.records_path` is missing — the engine supports a nested records path
+ * (2026-07-31) but this table cannot author it, so the UI is behind an engine-real key.
  *
  * Key shape mirrors `PipelineConfigParser.mergeParsing`: shared csv-settings keys live under
  * `delimited.*` (that block IS csv_settings under its canonical name — it applies to every

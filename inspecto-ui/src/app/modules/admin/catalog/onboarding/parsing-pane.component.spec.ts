@@ -148,12 +148,62 @@ describe('OnboardingParsingPaneComponent', () => {
         expect(fixture.componentInstance.frontend()).toBe('delimited');
     });
 
-    it('shows the plugin banner instead of the editor for plugin-parsed pipelines', async () => {
-        const { fixture } = await create({ name: 'x', processing: { ingester: 'com.example.Ing' } });
-        expect(fixture.componentInstance.pluginManaged).toBe(true);
-        expect(fixture.nativeElement.textContent).toContain('Plugin ingester');
-        // Nothing to configure here ⇒ no sample capture either.
-        expect(fixture.nativeElement.querySelector('app-onboarding-sample-panel')).toBeNull();
+    /**
+     * W2/U-E. The pane used to render ONLY a "author that in the pipeline TOON" notice for these
+     * configs — which meant a plugin config saved through this pane's own segments editor could never
+     * be reopened. It must now author them, with the plugin the config names actually selected.
+     */
+    it('re-selects the served parser a saved plugin config names, and edits it', async () => {
+        const { fixture } = await create(
+            SAVED_SEGMENTS,
+            { read: vi.fn(() => of(SAVED_SCHEMA)) },
+            { list: vi.fn(() => of(ASN1_CATALOG)) },
+        );
+        const pane = fixture.componentInstance;
+
+        // Matched by ingesterClass: a guided Save writes the FQCN, never the parser id.
+        expect(pane.pluginDef()?.id).toBe('asn1');
+        expect(pane.activeType()).toBe('asn1');
+        expect(pane.unservedPlugin()).toBeNull();
+        // The editor is REACHABLE now — the old guard hid all of this.
+        expect(fixture.nativeElement.querySelector('app-onboarding-sample-panel')).toBeTruthy();
+    });
+
+    it('restoring the selection does not make the pane dirty', async () => {
+        const { fixture, state } = await create(
+            SAVED_SEGMENTS,
+            { read: vi.fn(() => of(SAVED_SCHEMA)) },
+            { list: vi.fn(() => of(ASN1_CATALOG)) },
+        );
+        // Load-time restoration is not a user edit: a dirty pane on arrival would prompt
+        // "discard changes?" for a config nobody touched.
+        expect(fixture.componentInstance.pluginDef()?.id).toBe('asn1');
+        expect(state.isDirty()).toBe(false);
+    });
+
+    /**
+     * The honest-failure case. The config names an ingester this server has no plugin for, so the pane
+     * falls back to a built-in — it must SAY so rather than silently presenting the pipeline as
+     * delimited, which is the one way lifting the guard could have been a regression.
+     */
+    it('warns when the configured ingester is not served here', async () => {
+        const { fixture } = await create(
+            { name: 'x', processing: { ingester: 'com.example.NotDeployed' } },
+            {},
+            { list: vi.fn(() => of(ASN1_CATALOG)) },
+        );
+        const pane = fixture.componentInstance;
+
+        expect(pane.unservedPlugin()).toBe('com.example.NotDeployed');
+        expect(pane.pluginDef()).toBeNull();
+        expect(fixture.nativeElement.textContent).toContain('not available');
+        expect(fixture.nativeElement.textContent).toContain('com.example.NotDeployed');
+    });
+
+    it('says nothing about plugins when the config names no ingester', async () => {
+        const { fixture } = await create({ name: 'x' });
+        expect(fixture.componentInstance.unservedPlugin()).toBeNull();
+        expect(fixture.nativeElement.textContent).not.toContain('not available');
     });
 
     it('hosts the sample capture panel itself, above the file-type picker', async () => {
