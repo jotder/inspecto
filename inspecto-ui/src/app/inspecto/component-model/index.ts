@@ -8,3 +8,4 @@ export * from './component-registry';
 export * from './editor-registry';
 export * from './component-graph';
 export * from './data-provider';
+export * from './collector-attributes';

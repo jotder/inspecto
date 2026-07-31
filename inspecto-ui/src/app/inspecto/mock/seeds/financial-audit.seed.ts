@@ -36,26 +36,26 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
         name: 'gl_load',
         active: true,
         nodes: [
-            { id: 'extract', type: 'collector.database', name: 'Extract GL postings', use: 'connections/erp_db' },
+            { id: 'extract', type: 'acquisition', name: 'Extract GL postings', use: 'connections/erp_db' },
             { id: 'clean', type: 'transform.filter', name: 'Drop reversals', config: { predicate: "entry_type != 'reversal'" } },
-            { id: 'store', type: 'sink.file', name: 'Audit parquet', config: { format: 'PARQUET', partition_by: 'posting_date' } },
+            { id: 'store', type: 'sink.persistent', name: 'Audit parquet', config: { format: 'PARQUET', partition_by: 'posting_date' } },
         ],
         edges: [
-            { from: 'extract', rel: 'success', to: 'clean' },
-            { from: 'clean', rel: 'kept', to: 'store' },
+            { from: 'extract', rel: 'data', to: 'clean' },
+            { from: 'clean', rel: 'data', to: 'store' },
         ],
     });
     store.put(space, PIPELINES_COLL, 'payments_load', {
         name: 'payments_load',
         active: true,
         nodes: [
-            { id: 'collect', type: 'collector.file', name: 'Collect bank exports', use: 'connections/bank_sftp', config: { include: 'glob:**/*.csv' } },
-            { id: 'parse', type: 'parser.dsv', name: 'Parse statement CSV', config: { delimiter: ';', header: true } },
-            { id: 'store', type: 'sink.database', name: 'Payments side' },
+            { id: 'collect', type: 'acquisition', name: 'Collect bank exports', use: 'connections/bank_sftp', config: { include: 'glob:**/*.csv' } },
+            { id: 'parse', type: 'parser', name: 'Parse statement CSV', config: { delimiter: ';', header: true } },
+            { id: 'store', type: 'sink.materialized', name: 'Payments side' },
         ],
         edges: [
-            { from: 'collect', rel: 'success', to: 'parse' },
-            { from: 'parse', rel: 'success', to: 'store' },
+            { from: 'collect', rel: 'data', to: 'parse' },
+            { from: 'parse', rel: 'data', to: 'store' },
         ],
     });
 

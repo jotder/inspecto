@@ -1,10 +1,17 @@
-import { AttributeSpec } from 'app/inspecto/component-model';
+import { AttributeSpec } from './attribute-spec';
 
 /**
- * The Collection stage's schema-form specs — flat keys (`__` path separator, see
- * `onboarding-config-utils`) over the Stage-1 `collector:` TOON block (see
- * `PipelineConfigParser`; every key here is engine-real). A pipeline with no `collector:`
- * block reads its local inbox (`dirs.poll`) — exactly what the defaults describe.
+ * **The** schema-form spec for a pipeline's `collector:` block — flat keys (`__` path separator, see
+ * `onboarding-config-utils`) over the Stage-1 `collector:` TOON block (see `PipelineConfigParser`;
+ * every key here is engine-real). A pipeline with no `collector:` block reads its local inbox
+ * (`dirs.poll`) — exactly what the defaults describe.
+ *
+ * <p>Shared (moved here 2026-07-31, W2/U-D) because **two** features author this one block: Onboarding's
+ * Collection stage and the Pipelines editor's `acquisition` node (`node-attributes.ts`). It lived under
+ * `catalog/onboarding/` while the Pipelines editor kept a second, hand-written table — and that table
+ * had drifted into keys the engine does not read (`recursive` as a boolean, `min_age_seconds`) where
+ * this one has the real ones (`recursive_depth`, `stability__window`). One concern, one table: a
+ * feature-local copy is how that drift happened.
  */
 export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
     // `connector` is deliberately NOT a spec: it is derived (local inbox ⇒ `local`, otherwise the

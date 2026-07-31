@@ -22,26 +22,49 @@ import { MockStore } from '../mock-store';
  * singleton) so authored pipelines survive a reload. Behavior is otherwise a faithful port.
  */
 
-/** The processor palette — grouped by category (Collector=SOURCE, Parser=PARSE, Transformer=TRANSFORM, Writer=SINK). */
+/**
+ * The processor palette — a **faithful port of the backend enum `BuiltinNodeType`**, which is what
+ * `GET /pipelines/node-types` really serves (via `PipelineProjection.catalog()`). Keep it that way.
+ *
+ * ⚠ **This list used to be invented** (`collector.file`, `parser.dsv`, `sink.file`, …) and not one of
+ * those strings existed server-side, so the editor could author pipelines the backend silently dropped:
+ * `PipelineValidator` only *warns* `UNKNOWN_TYPE`, and `PipelineCompiler` groups nodes by matching
+ * `type()` against this enum, so an unknown-typed node never becomes the acquisition input. Offline it
+ * all looked fine — the textbook *mock more lenient than the server* failure. Corrected 2026-07-31
+ * (W2/U-D). **Adding a type here without adding it to `BuiltinNodeType` re-opens exactly that hole.**
+ *
+ * Order, labels, descriptions, `accepts`/`emits` and `emitsNamedRoutes` all mirror the enum; the rel
+ * strings are `PipelineRel` constants. Note `acquisition` vs `adapter` replaces the old
+ * file/database/stream split — **which connector a source uses is carried by its Connection profile
+ * (`collector.connection`), not by the node type** — and `alert` is CONTROL, not a transform.
+ */
 export const NODE_TYPES: PipelineNodeType[] = [
-    // Collector (SOURCE)
-    { type: 'collector.file', category: 'SOURCE', label: 'File', description: 'Collect files from a directory or remote connection.', accepts: [], emits: ['success', 'failure'], emitsNamedRoutes: false },
-    { type: 'collector.database', category: 'SOURCE', label: 'Database extract', description: 'Extract rows from a table/query (incremental watermark).', accepts: [], emits: ['success', 'failure'], emitsNamedRoutes: false },
-    { type: 'collector.stream', category: 'SOURCE', label: 'Streaming feed', description: 'Micro-batch from a stream (Mongo / Redis / Kafka).', accepts: [], emits: ['success', 'failure'], emitsNamedRoutes: false },
-    // Parser (PARSE)
-    { type: 'parser.dsv', category: 'PARSE', label: 'DSV (delimited)', description: 'Parse delimited text (CSV / TSV / pipe).', accepts: ['data'], emits: ['success', 'unmatched'], emitsNamedRoutes: false },
-    { type: 'parser.asn1', category: 'PARSE', label: 'ASN.1', description: 'Decode ASN.1-encoded records.', accepts: ['data'], emits: ['success', 'unmatched'], emitsNamedRoutes: false },
-    { type: 'parser.text', category: 'PARSE', label: 'Text', description: 'Parse free-form or fixed-width text.', accepts: ['data'], emits: ['success', 'unmatched'], emitsNamedRoutes: false },
-    { type: 'parser.other', category: 'PARSE', label: 'Other', description: 'Custom / plugin record parser.', accepts: ['data'], emits: ['success', 'unmatched'], emitsNamedRoutes: false },
-    // Transformer (TRANSFORM)
-    { type: 'transform.record', category: 'TRANSFORM', label: 'Record transform', description: 'Derive, rename, cast or drop fields.', accepts: ['data'], emits: ['success', 'failure'], emitsNamedRoutes: false },
-    { type: 'transform.route', category: 'TRANSFORM', label: 'Route', description: 'Route records to named branches by content.', accepts: ['data'], emits: ['unmatched'], emitsNamedRoutes: true },
-    { type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: 'Keep or drop records by predicate.', accepts: ['data'], emits: ['kept', 'dropped'], emitsNamedRoutes: false },
-    { type: 'transform.aggregate', category: 'TRANSFORM', label: 'Aggregation', description: 'Group and aggregate (sum / count / …).', accepts: ['data'], emits: ['success'], emitsNamedRoutes: false },
-    { type: 'transform.alert', category: 'TRANSFORM', label: 'Alert', description: 'Raise an alert when a condition matches.', accepts: ['data'], emits: ['success'], emitsNamedRoutes: false },
-    // Writer (SINK) — added so a pipeline has an output; rename/extend as the taxonomy grows.
-    { type: 'sink.file', category: 'SINK', label: 'File writer', description: 'Write records to files (CSV / Parquet).', accepts: ['data'], emits: [], emitsNamedRoutes: false },
-    { type: 'sink.database', category: 'SINK', label: 'Database load', description: 'Load records into a database table.', accepts: ['data'], emits: [], emitsNamedRoutes: false },
+    // entry / acquisition (the collector role)
+    { type: 'acquisition', category: 'SOURCE', label: 'Acquisition', description: 'Collects files from a source (poll/listing); the pipeline entry.', accepts: [], emits: ['data', 'gap', 'failure'], emitsNamedRoutes: false },
+    { type: 'adapter', category: 'SOURCE', label: 'Adapter', description: 'Windows a stream/push source into intermediate files (by time/count/size), then lands them.', accepts: [], emits: ['data'], emitsNamedRoutes: false },
+    // parse — one type; the frontend (delimited / ASN.1 / JSON / …) is CONFIG, not a separate type
+    { type: 'parser', category: 'PARSE', label: 'Parser', description: 'Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.', accepts: ['data'], emits: ['data', 'unmatched'], emitsNamedRoutes: true },
+    // transform family
+    { type: 'transform.map', category: 'TRANSFORM', label: 'Map', description: 'Maps raw fields onto the canonical schema.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
+    { type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: 'Keeps/drops rows by predicate; index-anchored CSV row-filter.', accepts: ['data'], emits: ['data', 'dropped'], emitsNamedRoutes: false },
+    { type: 'transform.select', category: 'TRANSFORM', label: 'Select', description: 'Projects a subset / reorder of columns.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
+    { type: 'transform.derive', category: 'TRANSFORM', label: 'Derive', description: 'Adds computed columns (SQL-expression registry).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
+    { type: 'transform.validate', category: 'TRANSFORM', label: 'Validate', description: 'Splits rows into valid / invalid by rule.', accepts: ['data'], emits: ['data', 'invalid'], emitsNamedRoutes: false },
+    // marker vs fingerprint are DIFFERENT subsystems — never flatten them into one "dedup"
+    { type: 'transform.dedup.marker', category: 'TRANSFORM', label: 'Dedup (marker)', description: 'File-level dedup via marker files.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
+    { type: 'transform.dedup.fingerprint', category: 'TRANSFORM', label: 'Dedup (fingerprint)', description: 'Content-fingerprint dedup via the acquisition ledger.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
+    { type: 'transform.route', category: 'TRANSFORM', label: 'Route', description: 'Content-based routing into operator-defined branches (case / clone).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: true },
+    { type: 'transform.split', category: 'TRANSFORM', label: 'Split', description: 'Explodes one row into many (UNNEST).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
+    { type: 'transform.merge', category: 'TRANSFORM', label: 'Merge', description: 'Joins / unions multiple inbound data edges (fan-in).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
+    { type: 'enrichment', category: 'TRANSFORM', label: 'Enrichment', description: 'Joins against reference data (post-commit stage-2 join).', accepts: ['data', 'on_commit'], emits: ['data', 'on_commit'], emitsNamedRoutes: false },
+    // sink family — one family, three materialisation behaviours
+    { type: 'sink.persistent', category: 'SINK', label: 'Sink (persistent)', description: 'Writes the batch to a resting store — a Parquet file / DuckDB table.', accepts: ['data'], emits: ['success', 'failure', 'on_commit'], emitsNamedRoutes: false },
+    { type: 'sink.materialized', category: 'SINK', label: 'Sink (materialized)', description: 'Maintains a managed/temp table, upserted per batch — an incremental rollup / summary.', accepts: ['data'], emits: ['success', 'failure', 'on_commit'], emitsNamedRoutes: false },
+    { type: 'sink.view', category: 'SINK', label: 'Sink (view)', description: 'A non-persistent logical store; jobs / KPI / report / alert APIs bind to it by store name.', accepts: ['data'], emits: ['on_commit'], emitsNamedRoutes: false },
+    // reporting / notification — CONTROL: side-tasks with no downstream data edge
+    { type: 'alert', category: 'CONTROL', label: 'Alert', description: 'Raises an alert from rule / gap / failure outcomes.', accepts: ['data', 'gap', 'failure'], emits: [], emitsNamedRoutes: false },
+    { type: 'gap', category: 'CONTROL', label: 'Gap detection', description: 'Reports sequence gaps as SEQUENCE_GAP events.', accepts: ['gap'], emits: [], emitsNamedRoutes: false },
+    { type: 'event', category: 'CONTROL', label: 'Event', description: 'Emits a notification / event.', accepts: ['data', 'success', 'failure', 'gap'], emits: [], emitsNamedRoutes: false },
 ];
 
 const CATEGORY_OF = new Map(NODE_TYPES.map((t) => [t.type, t.category]));

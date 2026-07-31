@@ -10,8 +10,8 @@ const type = (t: string, category: string, label: string): PipelineNodeType =>
     ({ type: t, category, label, description: `Add a ${label}`, accepts: [], emits: [], emitsNamedRoutes: false });
 
 const GROUPS: NodeTypeGroup[] = [
-    { category: 'SOURCE', types: [type('collector.file', 'SOURCE', 'File')] },
-    { category: 'SINK', types: [type('sink.file', 'SINK', 'File writer')] },
+    { category: 'SOURCE', types: [type('acquisition', 'SOURCE', 'File')] },
+    { category: 'SINK', types: [type('sink.persistent', 'SINK', 'File writer')] },
 ];
 
 function create() {
@@ -52,7 +52,7 @@ describe('PipelinePaletteComponent', () => {
             b.getAttribute('aria-label') === 'Add File',
         );
         btn?.click();
-        expect(pick).toHaveBeenCalledWith('collector.file');
+        expect(pick).toHaveBeenCalledWith('acquisition');
     });
 
     it('has no a11y violations closed or open', async () => {

@@ -12,7 +12,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { connectionOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connections/connection-form.dialog';
-import { COLLECTOR_ATTRIBUTES } from './collector-attributes';
+import { COLLECTOR_ATTRIBUTES } from 'app/inspecto/component-model';
 import { KEY_SEP, clearMissingRoots, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
 

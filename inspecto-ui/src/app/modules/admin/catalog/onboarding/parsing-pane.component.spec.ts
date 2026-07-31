@@ -4,6 +4,7 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, ParserDef, ParsersService, ParsingPreview } from 'app/inspecto/api';
+import { dependsOnMatches } from 'app/inspecto/component-model';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingParsingPaneComponent } from './parsing-pane.component';
@@ -141,6 +142,34 @@ describe('OnboardingParsingPaneComponent', () => {
         expect(fixture.componentInstance.frontend()).toBe('json');
         expect(fixture.componentInstance.specs().some((s) => s.key === 'json__format')).toBe(true);
         expect(state.isDirty()).toBe(false);
+    });
+
+    /**
+     * W2/U-D. `json.records_path` is engine-real but was unauthorable here. It is gated on the
+     * document shape because `PipelineConfigParser.parseJson` HARD-FAILS a nested path under
+     * `format: newline` — offering it for NDJSON would author a config that cannot load.
+     */
+    it('offers the records path only for a document shape that has an enclosing document', async () => {
+        const { fixture } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'array' } } });
+        const spec = fixture.componentInstance.specs().find((s) => s.key === 'json__records_path');
+        expect(spec).toBeDefined();
+        expect(spec!.default).toBe('$');
+        // The gate itself, not just its presence: NDJSON is the one shape the engine rejects.
+        expect(dependsOnMatches(spec!.dependsOn!, { json__format: 'array' })).toBe(true);
+        expect(dependsOnMatches(spec!.dependsOn!, { json__format: 'newline' })).toBe(false);
+    });
+
+    /** The flat `__` key is worthless unless it lowers to the nested key the engine actually reads. */
+    it('writes the records path as the nested json.records_path the parser reads', async () => {
+        const write = vi.fn((_type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK));
+        const { fixture } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'array' } } }, { write });
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        c.schemaForm?.form.get('json__records_path')?.setValue('payload.records');
+        c.save();
+        const parsing = (write.mock.calls[0][1] as Record<string, unknown>)['parsing'] as Record<string, unknown>;
+        expect((parsing['json'] as Record<string, unknown>)['records_path']).toBe('payload.records');
+        expect(parsing['json__records_path']).toBeUndefined(); // the flat form must not leak to disk
     });
 
     it('an unknown frontend falls back to delimited (xml/asn1 are not engine-real)', async () => {

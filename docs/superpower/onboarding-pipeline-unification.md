@@ -236,14 +236,100 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   *Verified: `lint:tokens` + 1893 UI tests + production build green, and a real in-preview walk — authored an
   ASN.1 stream with a segment, saved, **reloaded**, and the pane came back with ASN.1 selected and the
   segment key + column re-hydrated, no lockout and no spurious alert (the exact path that was broken).*
-  **U-D still open** — the collision is confirmed and narrow: `node-attributes.ts` `collector.file` carries
-  best-guess `include`/`exclude`/`recursive`(bool)/`min_age_seconds`, while onboarding's engine-real
-  `COLLECTOR_ATTRIBUTES` has `include`/`exclude`/`recursive_depth`(number)/`stability__window` **plus**
-  `connection`, `discovery`, `duplicate__*`, `post_action__*`, `guarantee`. Per U-D the engine-real set wins;
-  `collector.database`/`collector.stream` keys (`query`, `watermark_column`, `fetch_size`, `topic`,
-  `group_id`) need checking against the engine before they are treated as canonical.
-  ⚠ **Also found, and it is a W2 item because it is exactly a key gap:** `parsing-attributes.ts` does not
-  offer `json.records_path`, which the engine gained 2026-07-31 — the UI cannot author a working engine key.
+  **U-D — `json.records_path` half SHIPPED 2026-07-31; the collector half is BLOCKED on a naming
+  decision (see below).** `parsing-attributes.ts` now offers `json__records_path`, gated
+  `dependsOn: {json__format, notEquals: 'newline'}` because `PipelineConfigParser.parseJson`
+  **hard-fails** a nested path under NDJSON — so the shape the engine rejects is simply not authorable.
+  Two specs: the gate's semantics, and that the flat key lowers to the nested `json.records_path`
+  (a flat key that leaked to disk would be silently ignored by the parser).
+  *Verified: `lint:tokens` + prod build + 1895 UI tests green (was 1893).*
+
+  ### U-D collector half — SHIPPED 2026-07-31: the UI now speaks the engine's vocabulary
+
+  *Operator decision: rename UI → engine (rather than widening `BuiltinNodeType`), so the UI became
+  honest without committing the executor to a taxonomy it does not implement.* What follows is the
+  finding as diagnosed; the resolution is at the end of this section.
+
+  Checking the collector keys against the engine (as U-D requires) turned up something larger than a
+  key collision. **Three of the four things needed for these tables to matter are real; the type
+  strings were not.** `BuiltinNodeType` (`inspecto-engine/.../BuiltinNodeType.java:26-96`) is the
+  server's authoritative catalog behind `GET /pipelines/node-types`, and it contains **no**
+  `collector.file`, `collector.database`, `collector.stream`, `sink.file`, `parser.dsv`,
+  `transform.record`, `transform.aggregate` or `transform.alert`. It has `acquisition`, `adapter`,
+  `parser`, `transform.map|filter|select|derive|validate|dedup.*|route|split|merge`, `enrichment`,
+  `sink.persistent|materialized|view`, and a fifth category **CONTROL** (`alert`, `gap`, `event`)
+  the UI does not model at all. The overlap between the UI palette and the engine is exactly
+  **`transform.filter` and `transform.route`**.
+
+  Consequences, each verified rather than inferred:
+  - `PipelineValidator` flags an unknown `type` as `UNKNOWN_TYPE` — a **warning, non-fatal** — and
+    never inspects `config` keys at all. `PipelineCodec` stores `config` as an unchecked map. So the
+    whole fictional vocabulary **persists and validates clean**.
+  - `PipelineCompiler.compile()` groups nodes by matching `type()` against `BuiltinNodeType`. A
+    `collector.file` node matches nothing, so it is **silently dropped** — it can never become the
+    acquisition input. Correcting `collector.file`'s KEYS would therefore be polishing a node the
+    compiler discards; that is why this half is blocked rather than merely unfinished.
+  - This is a textbook breach of *a mock must never be more lenient than the server*: the palette is
+    served by `mock/handlers/pipelines.handler.ts:26-45`, so the authored-pipeline editor looks
+    correct offline and cannot lower a single collector against the real backend.
+  - **This lands squarely on W0.** W0's gate is proving the lift→lower round-trip lossless. With the
+    two vocabularies disjoint, W0 cannot pass for any collector or sink node as authored today —
+    so the vocabulary reconciliation is a W0 **prerequisite**, not a W2 nicety.
+
+  The keys themselves, for whenever the decision lands (engine-real, from `PipelineConfigParser.java:396-500`):
+  `recursive` (bool) and `min_age_seconds` **do not exist** — the real keys are `recursive_depth`
+  (int) and a nested `stability.window` (duration, default `30s`). Onboarding's `COLLECTOR_ATTRIBUTES`
+  is correct; `node-attributes.ts` is not. And `collector.database`/`collector.stream` keys are not
+  pipeline-`collector:` keys **at all** — `query`, `watermark_column`, `topic`, `bootstrap_servers`
+  live in the **ConnectionProfile `options:`** map read by each connector
+  (`DbExportConnector.java:86-100`, `KafkaConnector.java:88-320`), referenced from the pipeline only
+  via `collector.connection`. `fetch_size`, `group_id` and `batch_size` are read **nowhere** in the
+  backend — `KafkaConnector` deliberately uses no consumer group (offsets come from the acquisition
+  ledger, `enable.auto.commit=false` hardcoded), so `group_id` is absent *by design*, not by omission.
+  Those three tables are thus a **different concern** from the collector block — which is why they are
+  now simply **gone** rather than merged.
+
+  #### What shipped
+
+  1. **`mock/handlers/pipelines.handler.ts` is a faithful port of `BuiltinNodeType`** — all 20 types in
+     enum order with the enum's labels, descriptions and `accepts`/`emits` (`PipelineRel` constants),
+     including the **CONTROL** category the palette never had. Five specs pin it, including one that
+     fails if any retired fiction reappears and one asserting the two dedup subsystems stay distinct.
+  2. **`node-attributes.ts` is keyed by engine types**, and `acquisition` **reuses the shared
+     `COLLECTOR_ATTRIBUTES`** — which moved to `inspecto/component-model/` in the same change, because a
+     feature-local copy is precisely how the drift happened (and a `pipelines`→`catalog/onboarding`
+     import would have broken the no-cross-feature-dependency rule). That is U-D's "one table per
+     concern", enforced by a spec asserting *object identity* between the two adopters.
+  3. **Sinks keep a schema, trimmed to what the backend reads** — `format` (CSV | PARQUET) and
+     `compression` map to `output.*`; `partition_by`, `table`, `mode`, `key_columns` are read nowhere and
+     are gone rather than left as convincing dead knobs. All three sink kinds share one table: the kind
+     is the materialisation behaviour, not a different config shape.
+  4. **The remaining `transform.*` types are deliberately unspecced** (free-form fallback) instead of
+     re-guessed — a best-guess table that looks authoritative is the thing this change removed.
+  5. **Seeds + edge rels corrected across 6 seed files**: `rel: 'success'` on collector/transform edges
+     became `data` (`success` is sink-emitted), and `kept` — never a `PipelineRel` at all — became
+     `data`. Two graphs had `filter → alert → sink` chains; since `alert` is CONTROL and emits nothing,
+     the rows now **fan out** from the filter to both, which is what the chain always meant. CS5 keeps a
+     real `success` edge on the sink that can actually emit one.
+  6. **Fictional seed config keys replaced with engine-real ones**: `min_age_seconds` → nested
+     `stability.window`, `recursive: true` → `recursive_depth`, and the DB collectors'
+     `query`/`watermark_column`/`fetch_size` → `incremental.watermark` (the SQL belongs to the
+     Connection profile). The two Kafka sources became `adapter` nodes.
+  7. **`MOCK_STORE_KEY` bumped v20 → v21.** Required, not cosmetic: a persisted store keeps its authored
+     pipelines, so without the bump every existing browser would have gone on serving the fictional
+     types and `kept` edges — corrected only for first-time visitors.
+
+  *Verified: `lint:tokens` + prod build + **1904** UI tests green, and in the offline preview (the default
+  environment has `mockFlows: false`, so Pipelines cannot load there at all): the palette renders all 20
+  engine types across all five categories, the store reseeded to v21 holding **only** engine-real types
+  and rels, all 7 seeded pipelines load, and Validate on the 19-node `mediation_backbone` returns 19
+  informational "not yet tested" findings and **zero** structural or unknown-type findings.*
+
+  ⚠ **Still open after this:** the engine has **no grouping transform**, so `transform.aggregate` became
+  `transform.derive` to keep the rename a rename — the honest modelling of a rollup is
+  `sink.materialized`, which changes graph shape and so was not done here. And `PipelineCompiler` reads
+  only a narrow set of keys per role, so a node can still carry config the compiler ignores: W0 must
+  measure that, which is now possible because the vocabulary finally matches.
   One spec table per concern under
   `inspecto/component-model` (or a shared `pipeline-specs.ts`), adopted by both features; plugin-parser
   guard lifted.

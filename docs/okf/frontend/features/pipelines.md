@@ -22,9 +22,38 @@ mirrors the backend `CsvSettings`. Parsers persist as reusable `grammar`
 [components](components.md). Backed by `PipelinesService` / `ComponentsService`; offline via the
 `mockFlows`-gated handler of the unified [mock backend](../conventions/mock-backends.md).
 
+## The node-type vocabulary is the engine's, and only the engine's (2026-07-31)
+
+The palette is a **faithful port of the backend enum `BuiltinNodeType`** — what
+`GET /pipelines/node-types` actually serves: `acquisition`/`adapter` (SOURCE), `parser` (PARSE), the
+`transform.*` family + `enrichment` (TRANSFORM), `sink.persistent|materialized|view` (SINK), and
+`alert`/`gap`/`event` (**CONTROL**). Edge `rel`s are `PipelineRel` constants (`data` is the default
+downstream edge; `success`/`failure` are **sink**-emitted; `dropped`/`invalid`/`duplicate` are the diverted
+side of a record operator; `route:*` are operator-named).
+
+⚠ **It used to be invented** — `collector.file`, `collector.database`, `collector.stream`, `sink.file`,
+`parser.dsv`, `transform.record|aggregate|alert`, plus a `kept` rel that was never a `PipelineRel`. Only
+`transform.filter` and `transform.route` overlapped with the engine, and CONTROL was missing entirely. It
+survived unnoticed because **nothing rejects it**: `PipelineValidator` flags an unknown type as
+`UNKNOWN_TYPE` (a *warning*) and never inspects config keys, `PipelineCodec` stores `config` as an
+unchecked map, and `PipelineCompiler` groups nodes by matching against the enum — so an unknown-typed node
+was **silently dropped** and could never become the acquisition input. The mock served the invented
+palette, so it all looked correct offline: the *mock more lenient than the server* failure mode.
+`pipelines.handler.spec.ts` now pins the palette to the enum. **Adding a type to the mock without adding it
+to `BuiltinNodeType` re-opens exactly this hole.**
+
+Corollary worth keeping: **which connector a source uses is carried by its Connection profile**
+(`collector.connection`), not by the node type — hence one `acquisition`, not a file/database/stream split.
+A connector's own options (`query`, `watermark_column`, `topic`, `bootstrap_servers`) live in the
+ConnectionProfile's `options:` map, read by each connector — they are **not** pipeline `collector:` keys.
+
 The generic **node-config dialog** (non-parser nodes) is schema-form-driven from the per-type tiered
-`node-attributes.ts` — tiers/keys are declared best-guess pending a firm backend node-config spec (shapes
-live in test strings, `FEATURE_INVENTORY.md` §G). Types without a schema (e.g. `transform.record`,
-plugins) fall back to the free-form key/value editor ("Additional config", collapsed when a schema exists)
-— the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
+`node-attributes.ts`, keyed by those engine types. `acquisition` **reuses the shared
+`COLLECTOR_ATTRIBUTES`** (`inspecto/component-model/`) — the same table Onboarding's Collection stage
+uses, because two hand-written tables for one `collector:` block is precisely how this feature drifted into
+keys the engine never read (`recursive` as a boolean, `min_age_seconds`; the real ones are
+`recursive_depth` and a nested `stability.window`). Sinks are specced only for the `output:` keys the
+backend reads (`format`, `compression`); the remaining `transform.*` types are **deliberately unspecced**
+rather than guessed. Types without a schema fall back to the free-form key/value editor ("Additional
+config", collapsed when a schema exists) — the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
 (product-confirmed 2026-07-02: configs stay explicit/self-documenting).

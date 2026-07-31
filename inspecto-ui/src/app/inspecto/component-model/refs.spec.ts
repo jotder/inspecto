@@ -77,9 +77,9 @@ describe('structural derivations', () => {
     it('pipeline: binds every node use ref, anchored on the node id', () => {
         const flow = {
             nodes: [
-                { id: 'c', type: 'collector.file', use: 'connections/cdr_sftp_prod' },
-                { id: 'p', type: 'parser.asn1', use: 'grammar/cdr_asn1_ber' },
-                { id: 's', type: 'sink.file' },
+                { id: 'c', type: 'acquisition', use: 'connections/cdr_sftp_prod' },
+                { id: 'p', type: 'parser', use: 'grammar/cdr_asn1_ber' },
+                { id: 's', type: 'sink.persistent' },
             ],
         };
         expect(pipelineRefs(flow)).toEqual([

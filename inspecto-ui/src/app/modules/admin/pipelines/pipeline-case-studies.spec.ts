@@ -90,7 +90,8 @@ describe('CS1 mediation_backbone — canvas scale + fan-out/fan-in', () => {
 
     it('is a 19+-node graph with 3 collectors and 3 sinks', () => {
         expect(p.nodes.length).toBeGreaterThanOrEqual(19);
-        expect(p.nodes.filter((n) => n.type.startsWith('collector.')).length).toBe(3);
+        // SOURCE is the engine's `acquisition` (files) + `adapter` (stream→file), not a `collector.*` family.
+        expect(p.nodes.filter((n) => ['acquisition', 'adapter'].includes(n.type)).length).toBe(3);
         expect(p.nodes.filter((n) => n.type.startsWith('sink.')).length).toBe(3);
     });
 
@@ -132,12 +133,13 @@ describe('CS3 audit_recon_feeds — disconnected legs on one canvas', () => {
 
     it('the billing leg is a watermarked database extract with a gap alert', () => {
         const b = p.nodes.find((n) => n.id === 'b_collect')!;
-        expect(String(b.config?.['query'])).toContain(':watermark');
+        // The watermark is the collector's own engine key; the SQL lives in the Connection profile's options.
+        expect((b.config?.['incremental'] as Record<string, unknown>)?.['watermark']).toBe('event_id');
         expect(rels(p)).toContain('gap');
     });
 
     it('loads the two sides the seeded switch_vs_billing reconciliation compares', () => {
-        const tables = p.nodes.filter((n) => n.type === 'sink.database').map((n) => n.config?.['table']);
+        const tables = p.nodes.filter((n) => n.type === 'sink.materialized').map((n) => n.config?.['table']);
         expect(tables).toContain('switch_cdr');
         expect(tables).toContain('billing_cdr');
     });
@@ -152,7 +154,8 @@ describe('CS4 format_gauntlet — every parser format, every reject wired', () =
     });
 
     it('every parser node has its unmatched branch wired to the reject pile', () => {
-        const parsers = p.nodes.filter((n) => n.type.startsWith('parser.')).map((n) => n.id);
+        // One engine parser type; the format (ASN.1 / xlsx / xml / …) is config, not a separate type.
+        const parsers = p.nodes.filter((n) => n.type === 'parser').map((n) => n.id);
         expect(parsers.length).toBe(5);
         for (const id of parsers) {
             expect(p.edges.some((e) => e.from === id && e.rel === 'unmatched' && e.to === 's_rejects'), id).toBe(true);
@@ -165,12 +168,13 @@ describe('CS5 deadletter_torture — every control relation on a deep chain', ()
 
     it('wires every control-flow relation kind', () => {
         const r = rels(p);
-        for (const rel of ['failure', 'gap', 'unmatched', 'dropped', 'invalid', 'kept', 'success']) expect(r).toContain(rel);
+        // 'kept' was never a PipelineRel — transform.filter emits data/dropped.
+        for (const rel of ['data', 'failure', 'gap', 'unmatched', 'dropped', 'invalid', 'success']) expect(r).toContain(rel);
     });
 
     it('has a 9-stage main chain and both alert severities', () => {
         expect(longestChain(p)).toBeGreaterThanOrEqual(9);
-        const severities = p.nodes.filter((n) => n.type === 'transform.alert').map((n) => n.config?.['severity']);
+        const severities = p.nodes.filter((n) => n.type === 'alert').map((n) => n.config?.['severity']);
         expect(new Set(severities)).toEqual(new Set(['WARNING', 'CRITICAL']));
     });
 

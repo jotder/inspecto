@@ -58,15 +58,21 @@ export function seedIconMap(store: MockStore, space: string): void {
         TRANSFORM: { glyph: 'transform', color: C.ENRICHMENT },
         SINK: { glyph: 'cylinder', color: C.TABLE },
         CONTROL: { glyph: 'bell', color: C.KPI },
-        'collector.file': { glyph: 'file', color: C.STREAM},
-        'collector.database': { glyph: 'database', color: C.STREAM},
-        'collector.stream': { glyph: 'stream', color: C.STREAM},
+        // Sub-type overrides, keyed by the engine's own `BuiltinNodeType` strings (W2/U-D — these were
+        // `collector.*`/`sink.file`/`transform.aggregate`, which the backend has never had). A type with
+        // no entry here falls back to its category default above, so partial coverage is fine.
+        acquisition: { glyph: 'arrow-in', color: C.STREAM },
+        adapter: { glyph: 'stream', color: C.STREAM },
+        parser: { glyph: 'lines', color: C.SCHEMA },
         'transform.filter': { glyph: 'filter', color: C.ENRICHMENT },
         'transform.route': { glyph: 'route', color: C.ENRICHMENT },
-        'transform.aggregate': { glyph: 'sigma', color: C.ENRICHMENT },
-        'transform.alert': { glyph: 'bell', color: C.KPI },
-        'sink.file': { glyph: 'write', color: C.TABLE },
-        'sink.database': { glyph: 'database', color: C.TABLE },
+        'transform.dedup.marker': { glyph: 'filter', color: C.ENRICHMENT },
+        'transform.dedup.fingerprint': { glyph: 'filter', color: C.ENRICHMENT },
+        enrichment: { glyph: 'transform', color: C.ENRICHMENT },
+        'sink.persistent': { glyph: 'cylinder', color: C.TABLE },
+        'sink.materialized': { glyph: 'write', color: C.TABLE },
+        'sink.view': { glyph: 'database', color: C.TABLE },
+        alert: { glyph: 'bell', color: C.KPI },
     };
     store.put(space, 'config', 'icon-map', iconMap);
 }

@@ -318,28 +318,28 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         name: 'cdr_ingest',
         active: true,
         nodes: [
-            { id: 'collect', type: 'collector.file', name: 'Collect CDR drops', use: 'connections/cdr_sftp_prod', config: { include: 'glob:**/*.csv.gz' } },
-            { id: 'parse', type: 'parser.dsv', name: 'Parse CSV', config: { delimiter: ',', header: true } },
+            { id: 'collect', type: 'acquisition', name: 'Collect CDR drops', use: 'connections/cdr_sftp_prod', config: { include: 'glob:**/*.csv.gz' } },
+            { id: 'parse', type: 'parser', name: 'Parse CSV', config: { delimiter: ',', header: true } },
             { id: 'filter', type: 'transform.filter', name: 'Drop test rows', config: { predicate: "msisdn NOT LIKE '0000%'" } },
-            { id: 'write', type: 'sink.file', name: 'CDR parquet', config: { format: 'PARQUET', partition_by: 'event_date' } },
+            { id: 'write', type: 'sink.persistent', name: 'CDR parquet', config: { format: 'PARQUET', partition_by: 'event_date' } },
         ],
         edges: [
-            { from: 'collect', rel: 'success', to: 'parse' },
-            { from: 'parse', rel: 'success', to: 'filter' },
-            { from: 'filter', rel: 'kept', to: 'write' },
+            { from: 'collect', rel: 'data', to: 'parse' },
+            { from: 'parse', rel: 'data', to: 'filter' },
+            { from: 'filter', rel: 'data', to: 'write' },
         ],
     };
     const subscriberLoad: AuthoredPipeline = {
         name: 'subscriber_load',
         active: false,
         nodes: [
-            { id: 'extract', type: 'collector.database', name: 'Extract subscribers' },
-            { id: 'daily', type: 'transform.aggregate', name: 'Daily counts' },
-            { id: 'load', type: 'sink.database', name: 'Load summary' },
+            { id: 'extract', type: 'acquisition', name: 'Extract subscribers' },
+            { id: 'daily', type: 'transform.derive', name: 'Daily counts' },
+            { id: 'load', type: 'sink.materialized', name: 'Load summary' },
         ],
         edges: [
-            { from: 'extract', rel: 'success', to: 'daily' },
-            { from: 'daily', rel: 'success', to: 'load' },
+            { from: 'extract', rel: 'data', to: 'daily' },
+            { from: 'daily', rel: 'data', to: 'load' },
         ],
     };
     store.put(space, PIPELINES_COLL, cdrIngest.name, cdrIngest);

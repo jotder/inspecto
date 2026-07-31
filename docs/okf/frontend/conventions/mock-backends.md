@@ -38,5 +38,10 @@ packs.
 * **Persistence**: the `MockStore` snapshots every mutation to `localStorage` (memory in tests), so authored
   mock data **survives a reload**; each space is seeded exactly once, and `reset()` restores pristine seeds
   (a schema-version bump discards old snapshots).
+  ⚠ **Correcting a seed is not enough — bump `MOCK_STORE_KEY`.** Because each space seeds exactly once and
+  the snapshot persists, a corrected seed reaches **only first-time visitors**; every existing browser goes
+  on serving the old data indefinitely. This bit the W2/U-D node-type rename (2026-07-31): without the
+  v20→v21 bump, existing sessions would have kept authoring pipelines with node types the backend has never
+  had. The version comment should say *why* it moved, so the next bump can tell which data it invalidated.
 * The Pro [data-table](../design-system/data-table.md) SQL editor runs SQL **in-browser** via AlaSQL (no
   backend) — independent of the mock layer.

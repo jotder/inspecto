@@ -168,27 +168,30 @@ describe('toCombinedG6Data', () => {
 });
 
 describe('resolveNodeIcon', () => {
+    // An exact-type rule and a category rule, so the precedence below is actually exercised. The
+    // exact rule is on a TRANSFORM type and the category rule on PARSE — with one type per category
+    // the two cases cannot share a type and still test different branches.
     const map = {
         PARSE: { glyph: 'lines', color: NODE_KIND_COLORS.SCHEMA },
-        'parser.dsv': { glyph: 'filter', color: NODE_KIND_COLORS.ENRICHMENT },
+        'transform.filter': { glyph: 'filter', color: NODE_KIND_COLORS.ENRICHMENT },
     };
 
     it('prefers an exact type rule over the category rule', () => {
-        const r = resolveNodeIcon('parser.dsv', 'PARSE', map);
+        const r = resolveNodeIcon('transform.filter', 'TRANSFORM', map);
         expect(r.color).toBe(NODE_KIND_COLORS.ENRICHMENT);
         expect(r.iconSrc.startsWith('data:image/svg+xml')).toBe(true);
     });
 
     it('falls back to the category rule, then to the built-in kind glyph', () => {
-        expect(resolveNodeIcon('parser.other', 'PARSE', map).color).toBe(NODE_KIND_COLORS.SCHEMA);
+        expect(resolveNodeIcon('parser', 'PARSE', map).color).toBe(NODE_KIND_COLORS.SCHEMA);
         // no rule for SINK in this map → built-in fallback still yields an icon
-        expect(resolveNodeIcon('sink.file', 'SINK', map).iconSrc.startsWith('data:image/svg+xml')).toBe(true);
+        expect(resolveNodeIcon('sink.persistent', 'SINK', map).iconSrc.startsWith('data:image/svg+xml')).toBe(true);
     });
 
     it('embeds iconSrc+color into toPipelineG6Data only when a map is supplied', () => {
         const g = {
             name: 'F', active: true, produces: [], consumes: [],
-            nodes: [node({ id: 'p', type: 'parser.dsv', category: 'PARSE' })],
+            nodes: [node({ id: 'p', type: 'parser', category: 'PARSE' })],
             edges: [],
         };
         expect(toPipelineG6Data(g, undefined, map).nodes[0].data.iconSrc).toBeTruthy();
@@ -211,41 +214,41 @@ describe('computeNodeStatus', () => {
     const noTests = new Map<string, TestOutcome>();
 
     it('flags a parser with no grammar as unconfigured', () => {
-        expect(computeNodeStatus({ id: 'p', type: 'parser.dsv' }, 'PARSE', refs, noTests)).toBe('unconfigured');
+        expect(computeNodeStatus({ id: 'p', type: 'parser' }, 'PARSE', refs, noTests)).toBe('unconfigured');
     });
 
     it('flags a bound-but-missing ref as dangling (only once the registry is loaded)', () => {
-        const n = { id: 'p', type: 'parser.dsv', use: 'grammar/ghost' };
+        const n = { id: 'p', type: 'parser', use: 'grammar/ghost' };
         expect(computeNodeStatus(n, 'PARSE', refs, noTests)).toBe('dangling');
         expect(computeNodeStatus(n, 'PARSE', refs, noTests, false)).toBe('configured'); // pre-load: no false flag
     });
 
     it('is configured when the ref resolves, and a recorded test outcome wins', () => {
-        const n = { id: 'p', type: 'parser.dsv', use: 'grammar/cdr_csv' };
+        const n = { id: 'p', type: 'parser', use: 'grammar/cdr_csv' };
         expect(computeNodeStatus(n, 'PARSE', refs, noTests)).toBe('configured');
         expect(computeNodeStatus(n, 'PARSE', refs, new Map([['p', 'tested']]))).toBe('tested');
         expect(computeNodeStatus(n, 'PARSE', refs, new Map([['p', 'rejects']]))).toBe('rejects');
     });
 
     it('treats a source as unconfigured until a connection is bound', () => {
-        expect(computeNodeStatus({ id: 's', type: 'collector.file' }, 'SOURCE', refs, noTests)).toBe('unconfigured');
-        expect(computeNodeStatus({ id: 's', type: 'collector.file', use: 'connections/cdr' }, 'SOURCE', refs, noTests)).toBe('configured');
+        expect(computeNodeStatus({ id: 's', type: 'acquisition' }, 'SOURCE', refs, noTests)).toBe('unconfigured');
+        expect(computeNodeStatus({ id: 's', type: 'acquisition', use: 'connections/cdr' }, 'SOURCE', refs, noTests)).toBe('configured');
     });
 });
 
 describe('validatePipeline', () => {
-    const typeCat = new Map([['collector.file', 'SOURCE'], ['parser.dsv', 'PARSE'], ['sink.file', 'SINK']]);
+    const typeCat = new Map([['acquisition', 'SOURCE'], ['parser', 'PARSE'], ['sink.persistent', 'SINK']]);
     const refs = new Set(['grammar/cdr_csv']);
 
     it('reports an error for an unconfigured node and blocks activation', () => {
         const flow: AuthoredPipeline = {
             name: 'f', active: false,
             nodes: [
-                { id: 'src', type: 'collector.file', use: 'connections/cdr' },
-                { id: 'parse', type: 'parser.dsv' },          // no grammar → error
-                { id: 'write', type: 'sink.file', use: 'sink/out' },
+                { id: 'src', type: 'acquisition', use: 'connections/cdr' },
+                { id: 'parse', type: 'parser' },          // no grammar → error
+                { id: 'write', type: 'sink.persistent', use: 'sink/out' },
             ],
-            edges: [{ from: 'src', rel: 'success', to: 'parse' }, { from: 'parse', rel: 'success', to: 'write' }],
+            edges: [{ from: 'src', rel: 'data', to: 'parse' }, { from: 'parse', rel: 'data', to: 'write' }],
         };
         const findings = validatePipeline(flow, typeCat, refs, new Map());
         expect(findings.some((f) => f.severity === 'error' && f.nodeId === 'parse')).toBe(true);
@@ -254,7 +257,7 @@ describe('validatePipeline', () => {
     it('warns when there is no source or no sink', () => {
         const flow: AuthoredPipeline = {
             name: 'f', active: false,
-            nodes: [{ id: 'parse', type: 'parser.dsv', use: 'grammar/cdr_csv' }],
+            nodes: [{ id: 'parse', type: 'parser', use: 'grammar/cdr_csv' }],
             edges: [],
         };
         const findings = validatePipeline(flow, typeCat, refs, new Map());
@@ -312,22 +315,22 @@ describe('uniqueNodeId', () => {
     it('skips ids already present on the model', () => {
         const model: AuthoredPipeline = {
             name: 'f', active: false,
-            nodes: [{ id: 'parser_dsv_1', type: 'parser.dsv' }, { id: 'parser_dsv_2', type: 'parser.dsv' }],
+            nodes: [{ id: 'parser_1', type: 'parser' }, { id: 'parser_2', type: 'parser' }],
             edges: [],
         };
-        expect(uniqueNodeId(model, 'parser.dsv')).toBe('parser_dsv_3');
+        expect(uniqueNodeId(model, 'parser')).toBe('parser_3');
     });
 });
 
 describe('authored-model reducers', () => {
     const base: AuthoredPipeline = {
         name: 'f', active: false,
-        nodes: [{ id: 'a', type: 'collector.file' }, { id: 'b', type: 'transform.filter' }],
+        nodes: [{ id: 'a', type: 'acquisition' }, { id: 'b', type: 'transform.filter' }],
         edges: [{ from: 'a', rel: 'data', to: 'b' }],
     };
 
     it('addNodeToModel appends without mutating the input', () => {
-        const next = addNodeToModel(base, { id: 'c', type: 'sink.file' });
+        const next = addNodeToModel(base, { id: 'c', type: 'sink.persistent' });
         expect(next.nodes).toHaveLength(3);
         expect(base.nodes).toHaveLength(2); // original untouched
     });
@@ -345,21 +348,22 @@ describe('authored-model reducers', () => {
     });
 
     it('removeEdgeFromModel drops only the matching edge', () => {
-        const withTwo = { ...base, edges: [...base.edges, { from: 'b', rel: 'kept', to: 'a' }] };
+        const withTwo = { ...base, edges: [...base.edges, { from: 'b', rel: 'data', to: 'a' }] };
         const next = removeEdgeFromModel(withTwo, 'a', 'b', 'data');
-        expect(next.edges).toEqual([{ from: 'b', rel: 'kept', to: 'a' }]);
+        expect(next.edges).toEqual([{ from: 'b', rel: 'data', to: 'a' }]);
     });
 
     it('setEdgeRelInModel relabels, and returns null when unchanged or colliding', () => {
-        const next = setEdgeRelInModel(base, 'a', 'b', 'data', 'kept');
-        expect(next?.edges[0].rel).toBe('kept');
+        const next = setEdgeRelInModel(base, 'a', 'b', 'data', 'dropped');
+        expect(next?.edges[0].rel).toBe('dropped');
         expect(setEdgeRelInModel(base, 'a', 'b', 'data', 'data')).toBeNull(); // unchanged
-        const withTwo = { ...base, edges: [...base.edges, { from: 'a', rel: 'kept', to: 'b' }] };
-        expect(setEdgeRelInModel(withTwo, 'a', 'b', 'data', 'kept')).toBeNull(); // would collide
+        // The collision case needs the TARGET rel to already exist on the same pair.
+        const withTwo = { ...base, edges: [...base.edges, { from: 'a', rel: 'dropped', to: 'b' }] };
+        expect(setEdgeRelInModel(withTwo, 'a', 'b', 'data', 'dropped')).toBeNull(); // would collide
     });
 
     it('applyNodePatchInModel replaces a node by id', () => {
-        const patched: AuthoredNode = { id: 'a', type: 'collector.file', name: 'Renamed' };
+        const patched: AuthoredNode = { id: 'a', type: 'acquisition', name: 'Renamed' };
         const next = applyNodePatchInModel(base, patched);
         expect(next.nodes.find((n) => n.id === 'a')?.name).toBe('Renamed');
     });
@@ -369,7 +373,7 @@ describe('candidateRelsFor', () => {
     it('offers the source node\'s emitted rels plus data and the edge\'s current rel', () => {
         const model: AuthoredPipeline = {
             name: 'f', active: false,
-            nodes: [{ id: 'a', type: 'transform.filter' }, { id: 'b', type: 'sink.file' }],
+            nodes: [{ id: 'a', type: 'transform.filter' }, { id: 'b', type: 'sink.persistent' }],
             edges: [],
         };
         const emits = new Map([['transform.filter', ['kept', 'dropped']]]);

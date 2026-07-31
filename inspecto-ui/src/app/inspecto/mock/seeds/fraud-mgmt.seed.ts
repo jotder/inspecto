@@ -37,19 +37,22 @@ export function seedFraudMgmt(store: MockStore, space: string): void {
         name: 'fraud_scoring',
         active: true,
         nodes: [
-            { id: 'collect', type: 'collector.file', name: 'Collect xDRs', use: 'connections/mediation_sftp', config: { include: 'glob:**/*.dat' } },
-            { id: 'parse', type: 'parser.dsv', name: 'Parse xDR', config: { delimiter: '|', header: false } },
-            { id: 'score', type: 'transform.aggregate', name: 'Velocity + destination scoring' },
+            { id: 'collect', type: 'acquisition', name: 'Collect xDRs', use: 'connections/mediation_sftp', config: { include: 'glob:**/*.dat' } },
+            { id: 'parse', type: 'parser', name: 'Parse xDR', config: { delimiter: '|', header: false } },
+            { id: 'score', type: 'transform.derive', name: 'Velocity + destination scoring' },
             { id: 'gate', type: 'transform.filter', name: 'Keep high-risk', config: { predicate: 'risk_score > 0.8' } },
-            { id: 'alert', type: 'transform.alert', name: 'Raise fraud alert' },
-            { id: 'queue', type: 'sink.database', name: 'Case queue' },
+            { id: 'alert', type: 'alert', name: 'Raise fraud alert' },
+            { id: 'queue', type: 'sink.materialized', name: 'Case queue' },
         ],
         edges: [
-            { from: 'collect', rel: 'success', to: 'parse' },
-            { from: 'parse', rel: 'success', to: 'score' },
-            { from: 'score', rel: 'success', to: 'gate' },
-            { from: 'gate', rel: 'kept', to: 'alert' },
-            { from: 'alert', rel: 'success', to: 'queue' },
+            { from: 'collect', rel: 'data', to: 'parse' },
+            { from: 'parse', rel: 'data', to: 'score' },
+            { from: 'score', rel: 'data', to: 'gate' },
+            // An `alert` is CONTROL: it accepts an outcome and emits nothing, so it cannot sit
+            // in-line ahead of the sink (it used to). The high-risk rows fan out — they raise the
+            // alert AND land in the case queue — which is what the old chain meant anyway.
+            { from: 'gate', rel: 'data', to: 'alert' },
+            { from: 'gate', rel: 'data', to: 'queue' },
         ],
     });
 

@@ -38,28 +38,28 @@ export function seedTelecomRa(store: MockStore, space: string): void {
         name: 'switch_cdr_ingest',
         active: true,
         nodes: [
-            { id: 'collect', type: 'collector.file', name: 'Collect switch CDRs', use: 'connections/switch_sftp', config: { include: 'glob:**/*.csv.gz' } },
-            { id: 'parse', type: 'parser.dsv', name: 'Parse CDR CSV', config: { delimiter: ',', header: true } },
+            { id: 'collect', type: 'acquisition', name: 'Collect switch CDRs', use: 'connections/switch_sftp', config: { include: 'glob:**/*.csv.gz' } },
+            { id: 'parse', type: 'parser', name: 'Parse CDR CSV', config: { delimiter: ',', header: true } },
             { id: 'filter', type: 'transform.filter', name: 'Drop zero-duration', config: { predicate: 'duration_s > 0' } },
-            { id: 'write', type: 'sink.file', name: 'Switch CDR parquet', config: { format: 'PARQUET', partition_by: 'event_date' } },
+            { id: 'write', type: 'sink.persistent', name: 'Switch CDR parquet', config: { format: 'PARQUET', partition_by: 'event_date' } },
         ],
         edges: [
-            { from: 'collect', rel: 'success', to: 'parse' },
-            { from: 'parse', rel: 'success', to: 'filter' },
-            { from: 'filter', rel: 'kept', to: 'write' },
+            { from: 'collect', rel: 'data', to: 'parse' },
+            { from: 'parse', rel: 'data', to: 'filter' },
+            { from: 'filter', rel: 'data', to: 'write' },
         ],
     });
     store.put(space, PIPELINES_COLL, 'billing_rated_load', {
         name: 'billing_rated_load',
         active: true,
         nodes: [
-            { id: 'extract', type: 'collector.database', name: 'Extract rated events', use: 'connections/billing_db' },
-            { id: 'daily', type: 'transform.aggregate', name: 'Daily rated totals' },
-            { id: 'load', type: 'sink.database', name: 'Load rated side' },
+            { id: 'extract', type: 'acquisition', name: 'Extract rated events', use: 'connections/billing_db' },
+            { id: 'daily', type: 'transform.derive', name: 'Daily rated totals' },
+            { id: 'load', type: 'sink.materialized', name: 'Load rated side' },
         ],
         edges: [
-            { from: 'extract', rel: 'success', to: 'daily' },
-            { from: 'daily', rel: 'success', to: 'load' },
+            { from: 'extract', rel: 'data', to: 'daily' },
+            { from: 'daily', rel: 'data', to: 'load' },
         ],
     });
 

@@ -34,7 +34,11 @@ type SpaceData = Record<string, Record<string, unknown>>; // collection → id �
 type StoreData = Record<string, SpaceData>; // space → collections
 
 /** Bump when the persisted shape or the seed contract changes — old snapshots are then discarded. */
-export const MOCK_STORE_KEY = 'inspecto.mock.v20'; // v20: pattern-pack component seeds (v19: case rule + flat impact attrs)
+// v21: pipeline node types + edge rels renamed to the engine's own vocabulary (W2/U-D). The bump is
+// REQUIRED, not cosmetic: a persisted v20 store keeps its authored pipelines, so without it every
+// existing browser would go on serving `collector.file`/`sink.file` nodes and `rel: 'kept'` edges that
+// the backend has never had — the seeds would be corrected only for first-time visitors.
+export const MOCK_STORE_KEY = 'inspecto.mock.v21'; // v20: pattern-pack component seeds (v19: case rule + flat impact attrs)
 
 export class MockStore {
     private data: StoreData = {};

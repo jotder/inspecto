@@ -8,8 +8,6 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  * Parsing stage authors them — the old "TOON-managed, read-only" guard is gone (it had become a lockout;
  * see `parsing-pane.component`).
  *
- * ⚠ **Known gap (W2/U-D):** `json.records_path` is missing — the engine supports a nested records path
- * (2026-07-31) but this table cannot author it, so the UI is behind an engine-real key.
  *
  * Key shape mirrors `PipelineConfigParser.mergeParsing`: shared csv-settings keys live under
  * `delimited.*` (that block IS csv_settings under its canonical name — it applies to every
@@ -61,6 +59,16 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                         { value: 'array', label: 'One JSON array of records' },
                         { value: 'auto', label: 'Auto-detect' },
                     ],
+                },
+                {
+                    key: 'json__records_path', label: 'Records path', type: 'string', tier: 'optional',
+                    default: '$', placeholder: 'payload.records',
+                    // Hidden for NDJSON on purpose: `parseJson` HARD-FAILS a nested path under
+                    // `format: newline` (each line is already a record, so there is no enclosing
+                    // document to walk). Offering the field there would author a config the parser
+                    // rejects at load. `$` = the document's top level IS the array.
+                    dependsOn: { key: 'json__format', notEquals: 'newline' },
+                    help: 'Dotted path to the array holding the records — same notation as a field selector. Blank or "$" = the whole document.',
                 },
                 { key: 'delimited__skip_header_lines', label: 'Skip leading lines', type: 'number', tier: 'advanced', min: 0 },
                 { key: 'compression', label: 'Input compression', type: 'string', tier: 'advanced', placeholder: 'gzip' },

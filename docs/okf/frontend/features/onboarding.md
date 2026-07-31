@@ -139,6 +139,16 @@ now accepts a dotted path to a nested record array (`payload.records`) — see
 `okf/backend/config/parsing-options-reference.md` §6.4. The tree itself is unchanged; only the
 caveat it carries needs revisiting when the pane next gets attention.
 
+**`records_path` became authorable 2026-07-31** (W2/U-D): `parsing-attributes.ts` offers
+`json__records_path` (default `$`) for the `json` frontend, gated
+`dependsOn: {key: 'json__format', notEquals: 'newline'}`. The gate is not cosmetic —
+`PipelineConfigParser.parseJson` **hard-fails** a nested path under `format: newline`, since in NDJSON
+each line is already a record and there is no enclosing document to walk. Hiding the field for NDJSON
+is therefore the difference between an unauthorable shape and a config that saves and then dies at
+load. Whatever authors this next must keep the flat `__` key lowering to the nested
+`json.records_path`: a flat key that reached disk would be silently ignored by the parser, which is a
+failure with no error message.
+
 **Every row-preview surface in onboarding is `<inspecto-data-table>`** (2026-07-30). They were
 `<inspecto-query-panel>` mounts bound `[source]`-only, i.e. the query *builder* used as a dumb table,
 which is why they looked unlike the ~20 other grids in the app. Tiers are deliberate: the **parsed

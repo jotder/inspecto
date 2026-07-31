@@ -22,8 +22,8 @@ function create(data: Partial<NodeConfigData> = {}) {
             {
                 provide: MAT_DIALOG_DATA,
                 useValue: {
-                    node: { id: 'parse', type: 'parser.dsv' },
-                    typeLabel: 'parser.dsv',
+                    node: { id: 'parse', type: 'parser' },
+                    typeLabel: 'parser',
                     categoryLabel: 'Parser',
                     bindKind: 'grammar',
                     ...data,
@@ -60,7 +60,7 @@ describe('NodeConfigDialog', () => {
         expect(c.componentOptions()).toEqual([]);
     });
 
-    it('uses the free-form config editor for a type with no schema (parser.dsv)', () => {
+    it('uses the free-form config editor for a type with no schema (parser)', () => {
         const c = create().componentInstance;
         expect(c.specs()).toEqual([]);
         expect(c.freeFormOpen()).toBe(true); // free-form is the primary surface
@@ -68,13 +68,13 @@ describe('NodeConfigDialog', () => {
 
     it('renders the schema-form for a known type and splits config into schema + free-form', () => {
         const fixture = create({
-            node: { id: 'w', type: 'sink.file', config: { format: 'CSV', partition_by: 'day', custom_flag: 'x' } },
-            typeLabel: 'sink.file', categoryLabel: 'Writer', bindKind: null,
+            node: { id: 'w', type: 'sink.persistent', config: { format: 'CSV', compression: 'gzip', custom_flag: 'x' } },
+            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(c.specs().map((s) => s.key)).toContain('format');
         // schema-known keys seed the schema-form; the unknown key falls to the free-form editor
-        expect(c.schemaInitial).toMatchObject({ format: 'CSV', partition_by: 'day' });
+        expect(c.schemaInitial).toMatchObject({ format: 'CSV', compression: 'gzip' });
         expect(c.schemaInitial['custom_flag']).toBeUndefined();
         expect(c.configRows.length).toBe(1);
         expect(c.freeFormOpen()).toBe(true); // an extra key is present ⇒ shown

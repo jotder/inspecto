@@ -10,7 +10,7 @@ import { TransferComponent } from './transfer.component';
 
 const DATASET_DEF = { type: 'dataset', name: 'cdr_sample', ref: 'dataset/cdr_sample', content: { name: 'cdr_sample' } };
 const WIDGET_DEF = { type: 'widget', name: 'cost_by_tariff', ref: 'widget/cost_by_tariff', content: { vizType: 'bar', datasetId: 'cdr_sample', controls: {} } };
-const PIPELINE = { name: 'cdr_ingest', active: true, nodes: [{ id: 'c', type: 'collector.file', use: 'connections/cdr_sftp_prod' }], edges: [] };
+const PIPELINE = { name: 'cdr_ingest', active: true, nodes: [{ id: 'c', type: 'acquisition', use: 'connections/cdr_sftp_prod' }], edges: [] };
 const CONNECTION = { id: 'cdr_sftp_prod', connector: 'sftp' };
 const JOB = { name: 'enrich_roaming', type: 'enrich', cron: null, onPipeline: 'cdr_ingest', enabled: true, catchUp: false, params: {}, lastStatus: 'SUCCESS' };
 

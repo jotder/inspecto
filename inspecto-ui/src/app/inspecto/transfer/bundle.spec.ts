@@ -32,9 +32,9 @@ const CONNECTION = item('connection', 'cdr_sftp_prod', { id: 'cdr_sftp_prod', co
 const PIPELINE = item('authored-pipeline', 'mediation_backbone', {
     name: 'mediation_backbone',
     nodes: [
-        { id: 'c', type: 'collector.file', use: 'connections/cdr_sftp_prod' },
-        { id: 'p', type: 'parser.asn1', use: 'grammar/cdr_asn1_ber' },
-        { id: 's', type: 'sink.file' },
+        { id: 'c', type: 'acquisition', use: 'connections/cdr_sftp_prod' },
+        { id: 'p', type: 'parser', use: 'grammar/cdr_asn1_ber' },
+        { id: 's', type: 'sink.persistent' },
     ],
     edges: [],
 });

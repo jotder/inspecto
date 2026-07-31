@@ -3,7 +3,7 @@ import { registerIntegrityRules } from '../integrity';
 import { MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { seedDefaultSpace } from '../seeds/default-space.seed';
-import { pipelinesHandler } from './pipelines.handler';
+import { NODE_TYPES, pipelinesHandler } from './pipelines.handler';
 
 const req = (method: string, url: string, body: unknown = null): MockRequest => ({
     method,
@@ -19,6 +19,57 @@ function seededStore(): MockStore {
     store.ensureSeeded('default', seedDefaultSpace);
     return store;
 }
+
+/**
+ * W2/U-D. The palette was invented and shared only `transform.filter`/`transform.route` with the
+ * backend enum `BuiltinNodeType`, so the editor authored nodes `PipelineCompiler` silently dropped —
+ * and the mock made it look correct offline. This pins the mock to the enum: if the two drift again,
+ * this fails instead of the round-trip failing quietly against a real server.
+ *
+ * Keep this list byte-identical to `BuiltinNodeType`'s `type()` values, in enum order. When the enum
+ * gains a type, update BOTH. Never add a type to the mock that the enum does not have.
+ */
+describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType enum', () => {
+    const ENUM_TYPES = [
+        'acquisition', 'adapter',
+        'parser',
+        'transform.map', 'transform.filter', 'transform.select', 'transform.derive', 'transform.validate',
+        'transform.dedup.marker', 'transform.dedup.fingerprint', 'transform.route', 'transform.split',
+        'transform.merge', 'enrichment',
+        'sink.persistent', 'sink.materialized', 'sink.view',
+        'alert', 'gap', 'event',
+    ];
+
+    it('serves exactly the enum types, in enum order', () => {
+        expect(NODE_TYPES.map((t) => t.type)).toEqual(ENUM_TYPES);
+    });
+
+    it('carries none of the invented types the editor used to author', () => {
+        const served = new Set(NODE_TYPES.map((t) => t.type));
+        for (const fiction of ['collector.file', 'collector.database', 'collector.stream', 'sink.file',
+            'sink.database', 'parser.dsv', 'parser.asn1', 'transform.record', 'transform.aggregate',
+            'transform.alert']) {
+            expect(served.has(fiction)).toBe(false);
+        }
+    });
+
+    it('models the CONTROL category the old palette omitted entirely', () => {
+        const control = NODE_TYPES.filter((t) => t.category === 'CONTROL').map((t) => t.type);
+        expect(control).toEqual(['alert', 'gap', 'event']);
+        // CONTROL nodes are side-tasks: they consume an outcome and emit no downstream edge.
+        for (const t of NODE_TYPES.filter((n) => n.category === 'CONTROL')) expect(t.emits).toEqual([]);
+    });
+
+    it('keeps the two dedup subsystems distinct rather than one flattened dedup', () => {
+        const dedups = NODE_TYPES.filter((t) => t.type.startsWith('transform.dedup')).map((t) => t.type);
+        expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup.fingerprint']);
+    });
+
+    it('only the parser and the router emit operator-named routes', () => {
+        expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type))
+            .toEqual(['parser', 'transform.route']);
+    });
+});
 
 describe('pipelinesHandler — authored DELETE referential integrity (R2)', () => {
     const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
