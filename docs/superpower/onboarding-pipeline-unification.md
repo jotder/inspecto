@@ -439,9 +439,33 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   registering some and failing on others, but a true transaction (stage to a temp dir, gate, then move)
   is still open.
 
+  **✅ The imported pipeline pointed at the SOURCE space — fixed 2026-08-01.** A pipeline's `dirs.*`,
+  `processing.schema_file`, `processing.grammar` and `parsing.plugin.segments.*` are **space-qualified**
+  (`spaces/alpha/data/orders/…`) and travelled verbatim, so importing alpha's data source into beta produced
+  a live pipeline polling, writing and quarantining inside **alpha's data plane**, and reading **alpha's
+  schema file** — silently, because a relative schema ref falls back to the working directory and therefore
+  still resolved. The import looked completely successful.
+
+  The rebase lives in **`BundleImporter.writeConfig`**, not in the route, so the **whole-space** import
+  (`SpaceManager.createFromBundle`) — which had the identical, wider defect — is fixed by the same code, and
+  the referential gate above now sees rebased paths for free. It is a **textual prefix swap**
+  (`spaces/<source_space>/` → the target space's own prefix, derived from the config dir's parent relative
+  to the CWD), deliberately not a parse/re-serialise round trip: the exporter's contract is that config
+  bytes travel verbatim, and re-emitting TOON would strip the operator's comments to correct a path.
+  `spaces/<id>/` is a distinctive literal, so a match is a path into that space by construction — which also
+  means the rule needs no key enumeration and cannot miss a path-bearing key the way an allow-list would
+  (the W0 lesson). Re-importing into the source space is a no-op. Both `POST /import` and
+  `/import/preview` now report a **`rebased`** list — an import that re-pointed directories without saying
+  so is a trap (the UI's `stream-bundle.ts` has always emitted the same operator note).
+  ⚠ **Limit, stated not papered over:** only the *relative* `spaces/<id>/` form is recognised. A deployment
+  whose `-Dspaces.root` puts spaces elsewhere writes another prefix, left verbatim — a *missed* rebase the
+  operator can see, never a wrong one.
+  *Verified: 4 new tests in `BundleImporterTest` (rebase incl. the schema ref; no `source_space` → verbatim;
+  an absolute external NAS inbox → untouched; `rebaseTargets` predicts without writing), 25/25 across the
+  bundle classes, and `mvn -o clean test` BUILD SUCCESS — 2296 tests, 0 failures.*
+
   Remaining W3 scope: extend the closure to decision rules and reference
-  datasets (both gaps confirmed in §2); add **import-time referential integrity** so a missing
-  connection/schema fails at import rather than at first poll; `dirs` re-derived on the target.
+  datasets (both gaps confirmed in §2); make the frontend formats callers of the backend pipe.
   *Verify: a real two-instance walk — export from one space, import into a second, and RUN it, with
   the only manual step being the connection credentials. The endpoint skill for any new route.*
 - **W4 — stages become typed nodes (U-B).** Gated on W0.

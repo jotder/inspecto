@@ -51,7 +51,7 @@ class BundleImporterTest {
                 "voucher/voucher_pipeline.toon", "name: VOUCHER_ETL\n",
                 "voucher/voucher_schema.toon", "raw:\n"));
 
-        List<String> written = BundleImporter.writeConfig(BundleImporter.parse(zip), config);
+        List<String> written = BundleImporter.writeConfig(BundleImporter.parse(zip), config).paths();
         assertTrue(written.contains("voucher/voucher_pipeline.toon"));
         assertEquals("name: VOUCHER_ETL\n",
                 Files.readString(config.resolve("voucher/voucher_pipeline.toon")), "bytes unpacked verbatim");
@@ -70,6 +70,79 @@ class BundleImporterTest {
                 () -> BundleImporter.writeConfig(BundleImporter.parse(zip), config));
         assertTrue(ex.getMessage().contains("escapes"), ex.getMessage());
         assertFalse(Files.exists(tmp.resolve("evil.toon")), "nothing written outside the config dir");
+    }
+
+    /**
+     * W3, 2026-08-01. A pipeline's {@code dirs.*} and its schema reference name the space they were
+     * authored in, so importing alpha's data source into another space produced a live pipeline polling,
+     * writing and quarantining inside <em>alpha's</em> data plane — and reading alpha's schema file, which
+     * still resolved because relative references fall back to the working directory. That is the whole
+     * point of the check: the import looked completely successful.
+     */
+    @Test
+    void spaceQualifiedPathsAreRebasedOntoTheTargetSpace(@TempDir Path tmp) throws Exception {
+        Path config = tmp.resolve("beta").resolve("config");
+        byte[] zip = zip(Map.of(
+                "bundle.toon", "kind: datasource\nsource_space: alpha\n",
+                "orders/orders_pipeline.toon", """
+                        name: orders
+                        dirs:
+                          poll:     spaces/alpha/data/inbox/orders
+                          database: spaces/alpha/data/orders/database
+                        processing:
+                          schema_file: spaces/alpha/config/orders/orders_schema.toon
+                        """,
+                "orders/orders_schema.toon", "raw:\n  name: ORDERS\n"));
+
+        BundleImporter.Unpacked out = BundleImporter.writeConfig(BundleImporter.parse(zip), config);
+
+        String body = Files.readString(config.resolve("orders/orders_pipeline.toon"));
+        assertFalse(body.contains("spaces/alpha/"), "no path may still point into the source space: " + body);
+        String target = tmp.resolve("beta").toString().replace('\\', '/');
+        assertTrue(body.contains(target + "/data/orders/database"), body);
+        assertTrue(body.contains(target + "/config/orders/orders_schema.toon"),
+                "the schema reference is rebased too — it resolved against the CWD and silently read alpha's");
+        assertEquals(List.of("orders/orders_pipeline.toon"), out.rebased(), "and the rewrite is reported");
+        assertTrue(body.startsWith("name: orders\n"),
+                "a textual prefix swap, so the operator's own formatting and comments survive");
+    }
+
+    @Test
+    void aBundleThatNamesNoSourceSpaceIsLeftVerbatim(@TempDir Path tmp) throws Exception {
+        // Nothing to rebase FROM — guessing would be worse than leaving the paths alone.
+        byte[] zip = zip(Map.of(
+                "bundle.toon", "kind: datasource\n",
+                "a_pipeline.toon", "name: A\ndirs:\n  poll: spaces/alpha/data/inbox/a\n"));
+
+        BundleImporter.Unpacked out = BundleImporter.writeConfig(BundleImporter.parse(zip), tmp.resolve("config"));
+        assertTrue(out.rebased().isEmpty());
+        assertTrue(Files.readString(tmp.resolve("config/a_pipeline.toon")).contains("spaces/alpha/"));
+    }
+
+    @Test
+    void configsWithNoSourceSpacePathsAreNotTouched(@TempDir Path tmp) throws Exception {
+        byte[] zip = zip(Map.of(
+                "bundle.toon", "kind: datasource\nsource_space: alpha\n",
+                // An absolute, deliberately external inbox — a NAS mount is not the source space's, and
+                // rebasing it would break a working collector.
+                "a_pipeline.toon", "name: A\ndirs:\n  poll: /mnt/nas/cdr/inbox\n"));
+
+        BundleImporter.Unpacked out = BundleImporter.writeConfig(BundleImporter.parse(zip), tmp.resolve("config"));
+        assertTrue(out.rebased().isEmpty(), "nothing matched, so nothing was rewritten");
+        assertTrue(Files.readString(tmp.resolve("config/a_pipeline.toon")).contains("/mnt/nas/cdr/inbox"));
+    }
+
+    @Test
+    void rebaseTargetsPredictsTheRewriteWithoutWriting(@TempDir Path tmp) throws Exception {
+        BundleImporter.Bundle b = BundleImporter.parse(zip(Map.of(
+                "bundle.toon", "kind: datasource\nsource_space: alpha\n",
+                "a_pipeline.toon", "name: A\ndirs:\n  poll: spaces/alpha/data/inbox/a\n",
+                "b_schema.toon", "raw:\n  name: B\n")));
+        Path config = tmp.resolve("config");
+
+        assertEquals(List.of("a_pipeline.toon"), BundleImporter.rebaseTargets(b, config),
+                "preview must name exactly what commit would rewrite");
+        assertFalse(Files.exists(config), "and write nothing");
     }
 
     @Test

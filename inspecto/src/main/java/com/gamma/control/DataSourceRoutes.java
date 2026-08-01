@@ -74,7 +74,7 @@ final class DataSourceRoutes implements RouteModule {
      * what this does today — do not "simplify" the two into one by dropping the commit-side check.
      */
     private Object previewImport(ApiContext api, HttpExchange e) throws IOException {
-        requireConfig(api);
+        Path config = requireConfig(api);
         BundleImporter.Bundle bundle;
         try {
             bundle = BundleImporter.parse(e.getRequestBody().readAllBytes());
@@ -116,6 +116,8 @@ final class DataSourceRoutes implements RouteModule {
         r.put("files", new TreeSet<>(bundle.configEntries().keySet()));
         r.put("hasSpaceToon", bundle.spaceToon() != null);
         r.put("conflicts", conflicts);
+        // What the commit would rewrite, shown before the operator commits to it.
+        r.put("rebased", BundleImporter.rebaseTargets(bundle, config));
         r.put("findings", findings);
         r.put("valid", valid);
         return r;
@@ -239,12 +241,13 @@ final class DataSourceRoutes implements RouteModule {
                     "error", "data-source id(s) already exist; re-send with ?on_conflict=overwrite to replace",
                     "conflicts", conflicts));
 
-        List<String> written;
+        BundleImporter.Unpacked unpacked;
         try {
-            written = BundleImporter.writeConfig(bundle, config);
+            unpacked = BundleImporter.writeConfig(bundle, config);
         } catch (IllegalArgumentException jail) {
             throw new ApiException(400, jail.getMessage());
         }
+        List<String> written = unpacked.paths();
 
         // Referential integrity BEFORE anything goes live: a bundle whose pipeline names a connection or a
         // schema file nobody has is rejected as a whole, listing every problem at once. Without this the
@@ -278,6 +281,8 @@ final class DataSourceRoutes implements RouteModule {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("kind", bundle.kind());
         body.put("imported", written);
+        // Named, not silent: these files had the source space's paths rewritten to this space's.
+        body.put("rebased", unpacked.rebased());
         body.put("pipelines", pipelines);
         body.put("overwritten", overwrite && !conflicts.isEmpty());
         return body;
