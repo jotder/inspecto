@@ -30,7 +30,7 @@ class BundleExporterTest {
         Path schema   = write(config.resolve("voucher/voucher_schema.toon"), "raw:\n  name: VOUCHER\n");
         Path job      = write(config.resolve("voucher/voucher_job.toon"), "job:\n  name: vh\n");
 
-        DataSourceBundle bundle = new DataSourceBundle("voucher_etl", pipeline, conn, List.of(schema), List.of(job));
+        DataSourceBundle bundle = new DataSourceBundle("voucher_etl", pipeline, conn, List.of(schema), List.of(job), List.of());
         byte[] zip = BundleExporter.exportDataSource(bundle, config, "voucher-space");
 
         Map<String, byte[]> got = unzip(zip);
@@ -92,7 +92,7 @@ class BundleExporterTest {
                 """);
 
         byte[] zip = BundleExporter.exportDataSource(
-                new DataSourceBundle("ds", pipeline, conn, List.of(), List.of()), config, "sp");
+                new DataSourceBundle("ds", pipeline, conn, List.of(), List.of(), List.of()), config, "sp");
         String entry = new String(unzip(zip).get("c_connection.toon"), StandardCharsets.UTF_8);
 
         assertFalse(entry.contains("hunter2-literal-secret"), "the literal password must not travel: " + entry);
@@ -116,7 +116,7 @@ class BundleExporterTest {
                 """);
 
         byte[] zip = BundleExporter.exportDataSource(
-                new DataSourceBundle("ds", pipeline, conn, List.of(), List.of()), config, "sp");
+                new DataSourceBundle("ds", pipeline, conn, List.of(), List.of(), List.of()), config, "sp");
         String entry = new String(unzip(zip).get("c_connection.toon"), StandardCharsets.UTF_8);
 
         assertTrue(entry.contains("${ENV:SFTP_PW}"), "a reference is not a secret — it is the portable form");
@@ -138,7 +138,7 @@ class BundleExporterTest {
                 """);
 
         byte[] zip = BundleExporter.exportDataSource(
-                new DataSourceBundle("ds", pipeline, conn, List.of(), List.of()), config, "sp");
+                new DataSourceBundle("ds", pipeline, conn, List.of(), List.of(), List.of()), config, "sp");
         String entry = new String(unzip(zip).get("c_connection.toon"), StandardCharsets.UTF_8);
 
         assertFalse(entry.contains("literal-pw"), entry);
@@ -178,7 +178,7 @@ class BundleExporterTest {
         Path pipeline = write(config.resolve("p_pipeline.toon"), "name: P\n");
         Path conn = write(config.resolve("c_connection.toon"), "connection:\n  id: C\n  password: leaked\n");
 
-        DataSourceBundle bundle = new DataSourceBundle("ds", pipeline, conn, List.of(), List.of());
+        DataSourceBundle bundle = new DataSourceBundle("ds", pipeline, conn, List.of(), List.of(), List.of());
         var e = assertThrows(java.io.IOException.class,
                 () -> BundleExporter.exportDataSource(bundle, config, "sp"));
         assertTrue(e.getMessage().contains("c_connection.toon"), "names the offending file: " + e.getMessage());
@@ -194,7 +194,7 @@ class BundleExporterTest {
         Path schema = write(config.resolve("v_schema.toon"), body);
 
         byte[] zip = BundleExporter.exportDataSource(
-                new DataSourceBundle("ds", pipeline, null, List.of(schema), List.of()), config, "sp");
+                new DataSourceBundle("ds", pipeline, null, List.of(schema), List.of(), List.of()), config, "sp");
 
         assertEquals(body, new String(unzip(zip).get("v_schema.toon"), StandardCharsets.UTF_8));
     }

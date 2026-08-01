@@ -198,7 +198,7 @@ class ControlApiBundleImportTest {
             s.filter(f -> f.getFileName().toString().startsWith("schema_")).forEach(schemas::add);
         }
         return BundleExporter.exportDataSource(
-                new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of()), config, "alpha");
+                new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of(), java.util.List.of()), config, "alpha");
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────

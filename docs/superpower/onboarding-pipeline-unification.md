@@ -480,8 +480,46 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   *No new defect surfaced. `DELETE /spaces/{id}` leaving the tree behind is by design (`purge` is
   opt-in), not a finding.*
 
-  Remaining W3 scope: extend the closure to decision rules and reference
-  datasets (both gaps confirmed in §2); make the frontend formats callers of the backend pipe.
+  **✅ The closure now reaches Decision Rules + Datasets — 2026-08-01.** Both live in the **component
+  registry** (`config/registry/<type-dir>/<id>.toon`) and are typed by their **directory**
+  (`ComponentRegistry.TYPE_BY_DIR`), never by a filename suffix — which is precisely why
+  `DataSourceBundleResolver`'s `*_connection.toon` / `*_job.toon` suffix scans could never have found them.
+  A promoted data source arrived without the rules that decide what happens to its rows, or the datasets
+  that read its output.
+
+  They sit **inside `config/`**, so only the export half was missing: `BundleImporter.writeConfig` already
+  unpacks anything config-relative and a fresh `SpaceBootstrap` boot re-scans the registry. Both are
+  **reverse** references (the component names the pipeline), exactly like jobs. Matching is deliberately
+  narrow: a **Decision Rule** by `target` case-insensitively (as `DecisionRules.forTarget` does) for the
+  default `targetType: pipeline`, or against a job **this bundle already carries** for `targetType: job` —
+  a job-targeted rule whose job stays behind must stay behind too. A **Dataset** by the first path segment
+  of `physicalRef` against the pipeline name; that is the established store-name convention rather than a
+  guess, since `DbBrowserRoutes.pipelineDatabaseDir` resolves a store name by calling `configFor(storeName)`
+  directly. A **disabled** rule still travels — `enabled` is an *evaluation*-time filter, and dropping a
+  rule someone deliberately turned off would lose their intent.
+
+  ⚠ **Known omissions, named so they are not mistaken for oversights:** a `view`-backed Dataset (its
+  `ViewStore` lives *outside* `config/`, so what it depends on cannot ride in a config bundle at all); a
+  Dataset over a bundled **job's** output store (`orders_rollup_dataset`'s `physicalRef: rollup` — resolving
+  a job's output store means following job → flow → sink, which nothing here reads today); and **Alert Rules
+  / Expectations**, which are the same shape and the same one-line addition but were outside this change's
+  scope. `.history/` snapshots are excluded by using `Files.list`, not `walk`.
+
+  **Latent hole closed in passing:** `BundleExporter.kindOf` drives the credential sanitiser, and
+  `ComponentRegistry` can *read* `registry/connections/` even though `connection` is not in
+  `ComponentStore.WRITABLE_TYPES` (nothing writes there and none exist on disk — verified). A registry file
+  classified by its directory would have travelled verbatim, so `kindOf` maps `registry/connections/*` to
+  `connection`, keeping it on the `1f62294b` sanitiser path.
+
+  *Verified by re-running the live two-space walk (2026-08-01): the zip grew 1725 → **2711 bytes** carrying
+  the rule + both `orders` datasets and correctly excluding `orders_rollup_dataset` / `ops_analytics`; after
+  import into `promo` and a trigger, `/runs/orders/quarantine` reported `reason:
+  orders_high_value_review` with the records parquet under
+  `spaces/promo/data/orders/quarantine/records/orders_high_value_review/` — **the promoted rule fired in the
+  target space**, where the pre-closure walk produced no quarantine at all. Plus 1 new resolver test
+  (11 selection assertions) and full reactor BUILD SUCCESS, 0 failures.*
+
+  Remaining W3 scope: make the frontend formats callers of the backend pipe (U-F proper).
   *Verify: the two-instance walk above, re-run once the closure widens (a decision rule / reference
   dataset must survive it too). The endpoint skill for any new route.*
 - **W4 — stages become typed nodes (U-B).** Gated on W0.

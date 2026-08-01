@@ -22,26 +22,34 @@ import java.util.List;
  * @param connection the bound {@code *_connection.toon}, or {@code null} for a local source
  * @param schemas    schema / grammar / segment files the pipeline read at parse time (may be empty)
  * @param jobs       {@code *_job.toon} files whose {@code on_pipeline} targets this pipeline (may be empty)
+ * @param components {@code config/registry/<type>/<id>.toon} component files bound to this data source —
+ *                   Decision Rules that target it and Datasets that read its store (may be empty)
  */
 public record DataSourceBundle(
         String id,
         Path pipeline,
         Path connection,
         List<Path> schemas,
-        List<Path> jobs) {
+        List<Path> jobs,
+        List<Path> components) {
 
     public DataSourceBundle {
-        schemas = List.copyOf(schemas);
-        jobs    = List.copyOf(jobs);
+        schemas    = List.copyOf(schemas);
+        jobs       = List.copyOf(jobs);
+        components = List.copyOf(components);
     }
 
-    /** Every config file in the bundle, de-duplicated, in a stable order: pipeline, connection, schemas, jobs. */
+    /**
+     * Every config file in the bundle, de-duplicated, in a stable order: pipeline, connection, schemas,
+     * jobs, registry components.
+     */
     public List<Path> files() {
         LinkedHashSet<Path> all = new LinkedHashSet<>();
         all.add(pipeline);
         if (connection != null) all.add(connection);
         all.addAll(schemas);
         all.addAll(jobs);
+        all.addAll(components);
         return List.copyOf(all);
     }
 }

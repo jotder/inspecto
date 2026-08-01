@@ -71,6 +71,107 @@ class DataSourceBundleResolverTest {
         }
     }
 
+    /**
+     * W3, 2026-08-01 — the closure now reaches the component registry. Decision Rules and Datasets live at
+     * {@code config/registry/<type-dir>/<id>.toon} and are typed by their DIRECTORY, never by a filename
+     * suffix, so the connection/job suffix scans could never have found them: a promoted data source
+     * arrived without the rules that decide what happens to its rows, or the datasets that read it.
+     */
+    @Test
+    void resolvesDecisionRulesAndDatasetsBoundToTheDataSource(@TempDir Path tmp) throws Exception {
+        Path base   = tmp.resolve("reg-space");
+        Path config = base.resolve("config");
+        Files.createDirectories(config);
+
+        Path voucherSchema = config.resolve("voucher_schema.toon");
+        Files.writeString(voucherSchema, schema("VOUCHER", "voucher"));
+        Files.writeString(config.resolve("voucher_pipeline.toon"),
+                pipeline("VOUCHER_ETL", voucherSchema, null, tmp.resolve("voucher")));
+        Files.writeString(config.resolve("voucher_job.toon"), job("voucher_heartbeat", "voucher_etl"));
+
+        Path otherSchema = config.resolve("other_schema.toon");
+        Files.writeString(otherSchema, schema("OTHER", "other"));
+        Files.writeString(config.resolve("other_pipeline.toon"),
+                pipeline("OTHER_ETL", otherSchema, null, tmp.resolve("other")));
+
+        // ── decision rules ──────────────────────────────────────────────────────────────────────────
+        Path onPipeline = component(config, "decision-rules", "voucher_hold",
+                // Upper-case target against the lowercased data-source id: matching is case-insensitive,
+                // the same rule DecisionRules.forTarget applies at evaluation time.
+                "name: voucher_hold\ntargetType: pipeline\ntarget: VOUCHER_ETL\npriority: 10\n");
+        Path disabled = component(config, "decision-rules", "voucher_disabled",
+                "name: voucher_disabled\ntarget: voucher_etl\nenabled: false\n");
+        Path defaultType = component(config, "decision-rules", "voucher_default_type",
+                // No targetType at all — defaults to `pipeline`, as DecisionRules does.
+                "name: voucher_default_type\ntarget: voucher_etl\n");
+        Path onBundledJob = component(config, "decision-rules", "job_rule",
+                "name: job_rule\ntargetType: job\ntarget: voucher_heartbeat\n");
+        Path onAbsentJob = component(config, "decision-rules", "absent_job_rule",
+                "name: absent_job_rule\ntargetType: job\ntarget: nobody_at_all\n");
+        Path otherRule = component(config, "decision-rules", "other_hold",
+                "name: other_hold\ntargetType: pipeline\ntarget: other_etl\n");
+        Path unknownType = component(config, "decision-rules", "weird",
+                "name: weird\ntargetType: galaxy\ntarget: voucher_etl\n");
+
+        // ── datasets ────────────────────────────────────────────────────────────────────────────────
+        Path dsStore = component(config, "datasets", "voucher_dataset", "physicalRef: voucher_etl\n");
+        Path dsDeep  = component(config, "datasets", "voucher_deep", "physicalRef: voucher_etl/database\n");
+        Path dsOther = component(config, "datasets", "other_dataset", "physicalRef: other_etl\n");
+        Path dsView  = component(config, "datasets", "view_backed", "view: some_saved_view\n");
+        Path dsNull  = component(config, "datasets", "null_ref", "physicalRef: null\n");
+        Path dsBroken = component(config, "datasets", "broken", "physicalRef: [[[ not toon\n");
+
+        // A ComponentStore history snapshot: NOT a component, and must not be exported as one.
+        Path history = config.resolve("registry/decision-rules/.history/voucher_hold.toon");
+        Files.createDirectories(history.getParent());
+        Files.writeString(history, "name: voucher_hold\ntarget: voucher_etl\n");
+
+        try (SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base))) {
+            DataSourceBundleResolver resolver = new DataSourceBundleResolver(ctx.service(), ctx.root().config());
+            DataSourceBundle b = resolver.resolve("voucher_etl");
+
+            assertEquals(
+                    java.util.List.of(onBundledJob, defaultType, disabled, onPipeline, dsStore, dsDeep),
+                    b.components(),
+                    "decision rules then datasets, each sorted by filename");
+
+            assertTrue(b.components().contains(disabled),
+                    "a DISABLED rule still travels — export promotes the config as authored");
+            assertFalse(b.components().contains(otherRule), "another pipeline's rule stays behind");
+            assertFalse(b.components().contains(onAbsentJob),
+                    "a job-targeted rule whose job is not in this bundle stays behind");
+            assertFalse(b.components().contains(unknownType), "an unknown targetType is not ours");
+            assertFalse(b.components().contains(dsOther), "another pipeline's dataset stays behind");
+            assertFalse(b.components().contains(dsView),
+                    "a view-backed dataset is not matched — its ViewStore lives outside config/");
+            assertFalse(b.components().contains(dsNull), "a null physicalRef references no store");
+            assertFalse(b.components().contains(dsBroken), "an unparseable component is skipped, not fatal");
+            assertFalse(b.components().contains(history), "a .history/ snapshot is not a component");
+
+            // And they reach the zip, at their config-relative registry paths.
+            byte[] zip = BundleExporter.exportDataSource(b, ctx.root().config(), "reg-space");
+            java.util.Set<String> names = new java.util.LinkedHashSet<>();
+            try (var zis = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zip))) {
+                for (var e = zis.getNextEntry(); e != null; e = zis.getNextEntry()) names.add(e.getName());
+            }
+            assertTrue(names.contains("registry/decision-rules/voucher_hold.toon"), names.toString());
+            assertTrue(names.contains("registry/datasets/voucher_dataset.toon"), names.toString());
+            assertFalse(names.contains("registry/datasets/other_dataset.toon"), names.toString());
+        } finally {
+            MDC.put(EventLog.SPACE_MDC_KEY, "reg-space");
+            try { com.gamma.acquire.AcquisitionLedgers.use(null); }
+            finally { MDC.remove(EventLog.SPACE_MDC_KEY); }
+        }
+    }
+
+    /** Write a registry component at {@code config/registry/<typeDir>/<id>.toon}. */
+    private static Path component(Path config, String typeDir, String id, String body) throws Exception {
+        Path p = config.resolve("registry").resolve(typeDir).resolve(id + ".toon");
+        Files.createDirectories(p.getParent());
+        Files.writeString(p, body);
+        return p;
+    }
+
     // ── inline TOON builders (shapes mirror the shipped sample configs) ──────────────────────────────
 
     private static String pipeline(String name, Path schemaFile, String connectionId, Path dataRoot) {

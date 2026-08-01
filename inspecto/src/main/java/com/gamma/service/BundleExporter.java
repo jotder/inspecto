@@ -25,7 +25,7 @@ import java.util.zip.ZipOutputStream;
  * root alongside config-relative file entries:
  * <ul>
  *   <li>{@link #exportDataSource} — one data source's {@link DataSourceBundle} (pipeline + connection +
- *       schemas + jobs).</li>
+ *       schemas + jobs + the registry components bound to it).</li>
  *   <li>{@link #exportSpace} — the whole {@code config/} tree plus the space's {@code space.toon}.</li>
  * </ul>
  *
@@ -160,7 +160,15 @@ public final class BundleExporter {
         return block instanceof Map<?, ?> m ? (Map<String, Object>) m : fallback;
     }
 
-    /** Classify a config file by its filename suffix (informational, for the manifest artifact list). */
+    /**
+     * Classify a config file for the manifest artifact list — and, for {@code connection}, to decide
+     * whether {@link #exportableBytes} must sanitise it.
+     *
+     * <p>Filename suffixes first (the flat {@code config/} convention), then the component registry, whose
+     * files are {@code registry/<type-dir>/<id>.toon} and carry <em>no</em> suffix — they are typed by
+     * their directory ({@code ComponentRegistry.TYPE_BY_DIR}), so a suffix scan classifies every one of
+     * them as {@code other}.
+     */
     private static String kindOf(Path file) {
         String n = file.getFileName().toString();
         if (n.endsWith("_pipeline.toon"))    return "pipeline";
@@ -171,7 +179,22 @@ public final class BundleExporter {
         if (n.endsWith("_rca.toon"))         return "rca";
         if (n.endsWith(".grammar.toon"))     return "grammar";
         if (n.endsWith("_schema.toon"))      return "schema";
-        return "other";
+        String registryDir = registryDirOf(file);
+        if (registryDir == null) return "other";
+        // ⚠ A registry-stored connection must still reach the sanitiser. `connection` is not in
+        // ComponentStore.WRITABLE_TYPES today (nothing writes registry/connections/, and none exist), but
+        // ComponentRegistry READS that dir, so a hand-placed file there would otherwise be classified by
+        // its directory and travel verbatim — the exact hole 1f62294b closed for *_connection.toon.
+        return "connections".equals(registryDir) ? "connection" : registryDir;
+    }
+
+    /** The component-type directory of a {@code registry/<type-dir>/<id>.toon} file, else {@code null}. */
+    private static String registryDirOf(Path file) {
+        Path dir = file.getParent();
+        Path up  = dir == null ? null : dir.getParent();
+        return up != null && up.getFileName() != null && "registry".equals(up.getFileName().toString())
+                ? dir.getFileName().toString()
+                : null;
     }
 
     private static byte[] zip(Map<String, byte[]> entries, Map<String, Object> manifest) throws IOException {
