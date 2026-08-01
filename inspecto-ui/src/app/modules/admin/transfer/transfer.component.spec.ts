@@ -87,8 +87,13 @@ describe('TransferComponent', () => {
         expect(job.content['lastStatus']).toBeUndefined();
     });
 
-    it('exports the selection expanded to its dependency closure', async () => {
-        const { fixture, c } = create();
+    /**
+     * U-F (2026-08-01): the closure is still the UI's (it owns the metadata network), but the CONTENT
+     * comes back from `POST /bundle/export` — the list shapes `loadAll()` holds are API display views,
+     * not transport views, and for a connection those differ in ways `/bundle/import` rejects.
+     */
+    it('exports the selection expanded to its dependency closure, with the server authoring the content', async () => {
+        const { fixture, c, http } = create();
         fixture.detectChanges();
         let captured: Blob | null = null;
         URL.createObjectURL = vi.fn((b: Blob) => {
@@ -100,12 +105,24 @@ describe('TransferComponent', () => {
         c.toggleItem({ kind: 'widget', id: 'cost_by_tariff', content: WIDGET_DEF.content });
         expect(c.selectedCount()).toBe(1);
         c.exportBundle();
+
+        const req = http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/bundle/export'));
+        expect(req.request.body.sourceSpace).toBe('staging');
+        // The widget's dataset came along, so the viz renders as-is on the target — and only the
+        // (kind, id, refs) triple is sent: the server reads the content off its own stores.
+        expect(req.request.body.items.map((i: { id: string }) => i.id)).toEqual(['cdr_sample', 'cost_by_tariff']);
+        expect(Object.keys(req.request.body.items[0])).toEqual(['kind', 'id', 'refs']);
+
+        const served = {
+            format: 'inspecto-metadata-bundle', version: 2, exportedAt: '2026-08-01T00:00:00.000Z',
+            sourceSpace: 'staging', items: [{ id: 'from_server' }],
+        };
+        req.flush({ bundle: served, missing: [] });
         click.mockRestore();
-        const bundle = JSON.parse(await captured!.text());
-        expect(bundle.format).toBe('inspecto-metadata-bundle');
-        expect(bundle.sourceSpace).toBe('staging');
-        // The widget's dataset came along, so the viz renders as-is on the target.
-        expect(bundle.items.map((i: { id: string }) => i.id)).toEqual(['cdr_sample', 'cost_by_tariff']);
+
+        // What lands on disk is the SERVER's envelope, not a locally rebuilt one.
+        expect(JSON.parse(await captured!.text())).toEqual(served);
+        http.verify();
     });
 
     /**

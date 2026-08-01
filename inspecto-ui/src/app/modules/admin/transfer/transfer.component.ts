@@ -142,11 +142,19 @@ export class TransferComponent implements OnInit {
         const all = this.allItems();
         const selected = all.filter((i) => this.isSelected(i));
         if (!selected.length) return;
-        const { bundle, missing } = this.transfer.buildExport(selected, all, this.includeDeps());
-        this.transfer.download(bundle);
-        const extra = bundle.items.length - selected.length;
-        this.toastr.success(`Exported ${bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`);
-        if (missing.length) this.toastr.warning(`Unresolved references left out: ${missing.join(', ')}`);
+        this.transfer.buildExport(selected, all, this.includeDeps())
+            .pipe(catchError((err) => of(apiErrorMessage(err, 'Export failed.'))))
+            .subscribe((res) => {
+                if (typeof res === 'string') {
+                    this.toastr.error(res);
+                    return;
+                }
+                this.transfer.download(res.bundle);
+                const extra = res.bundle.items.length - selected.length;
+                this.toastr.success(`Exported ${res.bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`);
+                if (res.missing.length) this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
+                if (res.absent.length) this.toastr.warning(`Not found on this instance: ${res.absent.join(', ')}`);
+            });
     }
 
     // ── import ──

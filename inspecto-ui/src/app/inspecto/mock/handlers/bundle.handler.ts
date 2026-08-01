@@ -8,9 +8,10 @@ import { JOBS_COLL } from './jobs.handler';
 import { PIPELINES_COLL } from './pipelines.handler';
 
 /**
- * The Metadata-Bundle import pipe (`POST /bundle/import`) — the offline half of U-F (2026-08-01),
- * added when the UI stopped fanning out one per-kind write per row and started posting the envelope
- * to the backend. Without this handler, importing a bundle would simply not work offline.
+ * The Metadata-Bundle transport pipe (`POST /bundle/export` + `POST /bundle/import`) — the offline
+ * half of U-F (2026-08-01), added when the UI stopped fanning out one per-kind write per row, and
+ * stopped authoring bundle content itself, and became a caller of the routes the backend already
+ * owned. Without this handler neither direction works offline.
  *
  * ⚠ **A mock must never be more lenient than the server.** This one exists to keep the *gates*
  * honest, because they are the whole reason the UI became a caller — a mock that happily wrote every
@@ -98,10 +99,92 @@ function introducedFindings(store: MockStore, space: string, items: IncomingItem
     return out;
 }
 
+/**
+ * The bundle **transport** view of a connection, mirroring `ConnectionProfile.toBundleMap()`: a
+ * secret-bearing field travels ONLY as a `${…}` reference — a literal is omitted entirely, never
+ * masked, because a bundle lands in git and support tickets and a `***` sentinel would round-trip
+ * into the target as a literal-looking value. Mirrored here or the offline export would hand back a
+ * bundle the (equally mirrored) import gate then refuses.
+ */
+function toBundleView(content: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(content)) {
+        if (SECRET_KEY.test(k)) {
+            if (typeof v === 'string' && v.startsWith('${')) out[k] = v;
+            continue;
+        }
+        out[k] = v && typeof v === 'object' && !Array.isArray(v)
+            ? toBundleView(v as Record<string, unknown>)
+            : v;
+    }
+    return out;
+}
+
+/** What this instance would store for an item — the export content and the `originHash` baseline. */
+function storedContent(store: MockStore, space: string, kind: string, id: string): Record<string, unknown> | null {
+    if (RETIRED.has(kind)) return null;
+    const raw = store.get<Record<string, unknown>>(space, collectionFor(kind), id);
+    if (!raw) return null;
+    return kind === 'connection' ? toBundleView(raw) : raw;
+}
+
+/**
+ * `POST /bundle/export` — read each requested item off this instance and return the v2 envelope with
+ * real content + an authoritative `provenance.contentHash`. The caller's `refs` are echoed and its
+ * `requires` stamped with `originHash` where the referent resolves here (that is what lets the
+ * target's preview distinguish *satisfied* from *present at a different version*). Requested items
+ * this instance does not hold are omitted and reported under `missing` — a partial bundle is valid.
+ */
+function exportBundle(req: MockRequest, store: MockStore) {
+    const body = (req.body ?? {}) as {
+        items?: { kind: string; id: string; refs?: unknown }[];
+        sourceSpace?: string | null;
+        requires?: { kind: string; id: string }[];
+    };
+    const requested = body.items ?? [];
+    if (!requested.length) return error(422, "export body must include a non-empty 'items' array");
+
+    const exportedAt = new Date().toISOString();
+    const sourceSpace = body.sourceSpace ?? null;
+    const items: unknown[] = [];
+    const missing: { kind: string; id: string }[] = [];
+    for (const r of requested) {
+        const content = storedContent(store, req.space, r.kind, r.id);
+        if (!content) {
+            missing.push({ kind: r.kind, id: r.id });
+            continue;
+        }
+        items.push({
+            kind: r.kind,
+            id: r.id,
+            content,
+            ...(Array.isArray(r.refs) ? { refs: r.refs } : {}),
+            provenance: { sourceSpace, exportedAt, contentHash: `sha256:${hashContent(content)}` },
+        });
+    }
+    const requires = (body.requires ?? []).map((ref) => {
+        const origin = storedContent(store, req.space, ref.kind, ref.id);
+        return origin ? { ...ref, originHash: `sha256:${hashContent(origin)}` } : ref;
+    });
+
+    return json({
+        bundle: {
+            format: 'inspecto-metadata-bundle',
+            version: 2,
+            exportedAt,
+            sourceSpace,
+            ...(requires.length ? { requires } : {}),
+            items,
+        },
+        missing,
+    });
+}
+
 export function bundleHandler(flags: MockFlags): MockHandler {
     return (req: MockRequest, store: MockStore) => {
         if (!flags.mockOps) return undefined;
         const { method, url, space } = req;
+        if (method === 'POST' && /\/bundle\/export$/.test(url)) return exportBundle(req, store);
         if (method !== 'POST' || !/\/bundle\/import$/.test(url)) return undefined;
 
         const body = (req.body ?? {}) as { bundle?: unknown; actions?: Record<string, string> };

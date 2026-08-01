@@ -547,9 +547,30 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   server verdicts painted, gate rejection handled), full UI suite **1917 passed / 0 failed**,
   `lint:tokens` clean, production build OK.*
 
-  Remaining U-F: (a) **Metadata Bundle export** still builds client-side rather than calling
-  `POST /bundle/export` — lower value, since the UI already holds the content from `loadAll()`; the backend
-  would add an authoritative `contentHash`. (b) **`stream-bundle.ts` → the datasource zip pipe is BLOCKED on
+  **✅ U-F, second half — the Metadata Bundle EXPORTS through the backend now (2026-08-01).** I had this
+  down as low value ("the UI already holds the content from `loadAll()`; the backend would add an
+  authoritative hash"). **That was wrong, and the first half is what made it wrong.** `loadAll()` holds the
+  API's *display* views, not the bundle's *transport* views, and for a connection those differ in a way that
+  is fatal: `GET /connections` masks a literal secret to `***` (and spells the base path `basePath`), while
+  `ConnectionProfile.toBundleMap()` **omits** a literal secret entirely (and spells it `base_path`) —
+  because a `***` sentinel is a persisted lie that round-trips into the target as a literal-looking value.
+  `/bundle/import`'s `rejectRawSecrets` refuses `***` by name. So **a UI-exported bundle carrying a
+  connection could not be imported anywhere.** It was latent while the fan-out wrote through
+  `POST /connections` (whose `keepSecret` swallows the sentinel); routing import through the gate made it
+  reachable. Second gain: the server stamps each external `requires` with its `originHash`, which is what
+  lets the target's preview say *present but at a different version* rather than a bare "satisfied".
+
+  The split is unchanged and deliberate: **the UI still derives the selection** — dependency closure and
+  per-item lineage `refs` come from the client-side metadata network and are sent along — **the backend owns
+  content, hashes, gates and persistence**. `buildExport` became an `Observable`, and reports two distinct
+  lists: `missing` (closure refs nothing on this instance resolves) and `absent` (requested items the
+  server's own stores do not hold). A partial bundle is still valid, so neither is fatal.
+  *Verified: 5 new mock-handler tests (content+hash, the connection strip round-tripping cleanly back
+  through the import gate, `missing`, `originHash` stamped/bare, empty-request 422), the pane's export spec
+  rewritten to assert the request carries only `(kind, id, refs)` and that the SERVER's envelope is what
+  lands on disk; full UI suite **1922 passed / 0 failed / 5 skipped**, `lint:tokens` clean, production build OK.*
+
+  Remaining U-F: (b) **`stream-bundle.ts` → the datasource zip pipe is BLOCKED on
   a product decision, not on effort**: the zip path can only export a *registered* pipeline
   (`DataSourceBundleResolver.resolve` needs `service.configFor(id)`), while the onboarding wizard exports an
   **in-flight draft** held in memory; and the download would change from `.json` to `.zip`, breaking

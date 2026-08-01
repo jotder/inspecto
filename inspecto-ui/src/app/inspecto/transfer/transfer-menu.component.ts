@@ -4,8 +4,10 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
-import { LensService } from 'app/inspecto/api';
+import { LensService, apiErrorMessage } from 'app/inspecto/api';
 import { BundleItem, BundleKind } from './bundle';
 import { BundleTransferService } from './bundle-transfer.service';
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
@@ -92,16 +94,25 @@ export class TransferMenuComponent {
             const selected: BundleItem[] = this.items()
                 .map((ref) => byKey.get(`${ref.kind}/${ref.id}`))
                 .filter((i): i is BundleItem => !!i);
-            this.busy.set(false);
             if (!selected.length) {
+                this.busy.set(false);
                 this.toastr.warning('Nothing to export yet — save the artifact first.');
                 return;
             }
-            const { bundle, missing } = this.transfer.buildExport(selected, available, includeDeps);
-            this.transfer.download(bundle);
-            const extra = bundle.items.length - selected.length;
-            this.toastr.success(`Exported ${bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`);
-            if (missing.length) this.toastr.warning(`Unresolved references left out: ${missing.join(', ')}`);
+            this.transfer.buildExport(selected, available, includeDeps)
+                .pipe(catchError((err) => of(apiErrorMessage(err, 'Export failed.'))))
+                .subscribe((res) => {
+                    this.busy.set(false);
+                    if (typeof res === 'string') {
+                        this.toastr.error(res);
+                        return;
+                    }
+                    this.transfer.download(res.bundle);
+                    const extra = res.bundle.items.length - selected.length;
+                    this.toastr.success(`Exported ${res.bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`);
+                    if (res.missing.length) this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
+                    if (res.absent.length) this.toastr.warning(`Not found on this instance: ${res.absent.join(', ')}`);
+                });
         });
     }
 

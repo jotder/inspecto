@@ -171,3 +171,81 @@ describe('bundleHandler — POST /bundle/import', () => {
         expect(out.results[0].message).toContain('content');
     });
 });
+
+describe('bundleHandler — POST /bundle/export', () => {
+    const handler = bundleHandler({ mockOps: true });
+    const exportReq = (body: unknown): MockRequest =>
+        ({ method: 'POST', url: '/api/bundle/export', body, params: {}, space: 'default' });
+
+    interface Exported {
+        bundle: {
+            format: string; sourceSpace: string | null;
+            items: { kind: string; id: string; content: Record<string, unknown>; refs?: unknown; provenance: { contentHash: string } }[];
+            requires?: { kind: string; id: string; originHash?: string }[];
+        };
+        missing: { kind: string; id: string }[];
+    }
+
+    it('reads content off the instance and stamps an authoritative hash', () => {
+        const store = new MockStore();
+        const content = { name: 'orders_ds', physicalRef: 'orders' };
+        store.put('default', componentCollection('dataset'), 'orders_ds', content);
+
+        const out = handler(exportReq({
+            items: [{ kind: 'dataset', id: 'orders_ds', refs: [] }],
+            sourceSpace: 'staging',
+        }), store)?.body as Exported;
+
+        expect(out.bundle.format).toBe('inspecto-metadata-bundle');
+        expect(out.bundle.items[0].content).toEqual(content);
+        expect(out.bundle.items[0].provenance.contentHash).toBe(`sha256:${hashContent(content)}`);
+        expect(out.missing).toEqual([]);
+    });
+
+    /**
+     * The reason export became a backend caller at all: `GET /connections` masks a literal secret to
+     * `***`, and `/bundle/import` rejects that sentinel as a raw credential — so a client-authored
+     * bundle carrying a connection could not be imported anywhere. The transport view OMITS it.
+     */
+    it('omits a literal secret from an exported connection but keeps a ${…} reference', () => {
+        const store = new MockStore();
+        store.put('default', CONNECTIONS_COLL, 'sftp_prod', {
+            id: 'sftp_prod', connector: 'sftp', host: 'h', password: '***',
+            options: { api_token: '${ENV:TOK}', region: 'eu' },
+        });
+
+        const out = handler(exportReq({ items: [{ kind: 'connection', id: 'sftp_prod' }] }), store)?.body as Exported;
+        const content = out.bundle.items[0].content;
+
+        expect(content['password']).toBeUndefined();
+        expect(content['options']).toEqual({ api_token: '${ENV:TOK}', region: 'eu' });
+        // …and the result is something the import gate accepts, which the masked form is not.
+        const back = handler(req({ bundle: envelope([{ kind: 'connection', id: 'sftp_prod', content }]) }), new MockStore())
+            ?.body as Outcome;
+        expect(back.failed).toBe(0);
+    });
+
+    it('reports a requested item this instance does not hold instead of inventing one', () => {
+        const out = handler(exportReq({ items: [{ kind: 'dataset', id: 'nope' }] }), new MockStore())?.body as Exported;
+        expect(out.bundle.items).toEqual([]);
+        expect(out.missing).toEqual([{ kind: 'dataset', id: 'nope' }]);
+    });
+
+    it('stamps originHash on a require that resolves here, and leaves an unresolvable one bare', () => {
+        const store = new MockStore();
+        const here = { name: 'here_ds' };
+        store.put('default', componentCollection('dataset'), 'here_ds', here);
+
+        const out = handler(exportReq({
+            items: [{ kind: 'widget', id: 'w1' }],
+            requires: [{ kind: 'dataset', id: 'here_ds' }, { kind: 'dataset', id: 'elsewhere' }],
+        }), store)?.body as Exported;
+
+        expect(out.bundle.requires?.[0].originHash).toBe(`sha256:${hashContent(here)}`);
+        expect(out.bundle.requires?.[1].originHash).toBeUndefined();
+    });
+
+    it('rejects an empty request rather than handing back an empty bundle', () => {
+        expect(handler(exportReq({ items: [] }), new MockStore())?.status).toBe(422);
+    });
+});

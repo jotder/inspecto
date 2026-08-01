@@ -142,12 +142,47 @@ export class BundleTransferService {
         return this.http.post<ImportOutcome>(apiUrl('/bundle/import'), { bundle, actions });
     }
 
-    /** Build a bundle for a selection, optionally expanded to its dependency closure against `available`. */
-    buildExport(selected: BundleItem[], available: BundleItem[], includeDeps: boolean): { bundle: MetadataBundle; missing: string[] } {
+    /**
+     * Build a bundle for a selection through **the backend's own export pipe** (`POST /bundle/export`) —
+     * U-F, 2026-08-01. The UI still derives the *selection*: the dependency closure and each item's
+     * lineage `refs` come from the client-side metadata network, and are sent along. What it stopped doing
+     * is authoring the *content*, because the list shapes `loadAll()` holds are the API's display views,
+     * not the bundle's transport views. Two of those differences were live promotion defects:
+     *
+     * - a **connection** came off `GET /connections` with its literal secret masked to `***` and its base
+     *   path spelled `basePath`. The bundle view ({@code ConnectionProfile.toBundleMap}) *omits* a literal
+     *   secret and spells it `base_path` — and `/bundle/import` rejects `***` as a raw credential (it is a
+     *   persisted lie that would round-trip into the target as a literal). So a UI-exported connection
+     *   could not be imported at all. That only became reachable when import became a backend caller;
+     *   the old per-kind fan-out went to `POST /connections`, whose `keepSecret` swallows the sentinel.
+     * - external `requires` now come back stamped with the source's `originHash`, which is what lets the
+     *   target's preview say *present but at a different version* instead of a bare "satisfied".
+     *
+     * `missing` stays the closure's unresolvable references (nothing on this instance to pull in);
+     * `absent` is the server's own list — requested items its stores do not hold. A partial bundle is
+     * still a valid bundle, so neither is fatal; the caller reports them.
+     */
+    buildExport(
+        selected: BundleItem[],
+        available: BundleItem[],
+        includeDeps: boolean,
+    ): Observable<{ bundle: MetadataBundle; missing: string[]; absent: string[] }> {
         let items = selected;
         let missing: string[] = [];
         if (includeDeps) ({ items, missing } = withDependencies(selected, available));
-        return { bundle: buildBundle(items, this.spaces.currentSpaceId()), missing };
+        const local = buildBundle(items, this.spaces.currentSpaceId());
+        const body = {
+            items: local.items.map((i) => ({ kind: i.kind, id: i.id, refs: i.refs })),
+            sourceSpace: local.sourceSpace,
+            requires: local.requires,
+        };
+        return this.http
+            .post<{ bundle: MetadataBundle; missing?: { kind: string; id: string }[] }>(apiUrl('/bundle/export'), body)
+            .pipe(map((res) => ({
+                bundle: res.bundle,
+                missing,
+                absent: (res.missing ?? []).map((m) => `${m.kind}/${m.id}`),
+            })));
     }
 
     /** Trigger a browser download of a bundle as pretty-printed JSON. */
