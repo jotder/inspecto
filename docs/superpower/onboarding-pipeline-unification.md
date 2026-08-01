@@ -464,10 +464,26 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   an absolute external NAS inbox → untouched; `rebaseTargets` predicts without writing), 25/25 across the
   bundle classes, and `mvn -o clean test` BUILD SUCCESS — 2296 tests, 0 failures.*
 
+  **✅ W3's verdict criterion is MET — the live two-space walk passed 2026-08-01.** Not a green unit
+  suite: the packaged fat JAR, `-Dspaces.root=spaces`, real HTTP. Exported `orders` from `demo`
+  (1725-byte zip: pipeline + schema + the rollup job), created an empty `promo`, previewed
+  (`rebased: [orders/orders_pipeline.toon]`, `valid: true`, nothing on disk), committed, then **ran it**:
+  `POST /spaces/promo/runs/orders/trigger` → 202, one file `SUCCESS` with **12 parsed rows / 0 errors**,
+  a committed batch, and the parquet readable back through `/db/table` with the `GROSS` expression
+  column materialised.
+
+  The evidence that matters: every one of the ten `dirs.*` entries plus `processing.schema_file` was
+  `spaces/demo/…` in the zip and `spaces/promo/…` on disk after import; `grep -rn 'spaces/demo'
+  spaces/promo/config/` found **nothing**; the batch's own `output_paths` was under
+  `spaces\promo\data\orders\database\…`; and demo's data plane gained **no** file during the walk.
+  Before `eb322adc` this exact walk would have written promo's output into demo — and reported success.
+  *No new defect surfaced. `DELETE /spaces/{id}` leaving the tree behind is by design (`purge` is
+  opt-in), not a finding.*
+
   Remaining W3 scope: extend the closure to decision rules and reference
   datasets (both gaps confirmed in §2); make the frontend formats callers of the backend pipe.
-  *Verify: a real two-instance walk — export from one space, import into a second, and RUN it, with
-  the only manual step being the connection credentials. The endpoint skill for any new route.*
+  *Verify: the two-instance walk above, re-run once the closure widens (a decision rule / reference
+  dataset must survive it too). The endpoint skill for any new route.*
 - **W4 — stages become typed nodes (U-B).** Gated on W0.
   *Verify: full UI gate + a live resume walk (leave mid-stage, return, state intact).*
 - **W5 — graph editor writes the canonical config (U-A).** Gated on W0. Largest piece; last.
