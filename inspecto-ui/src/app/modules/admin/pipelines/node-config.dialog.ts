@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, ViewChild } from '@angular/core';
+import { Component, computed, effect, inject, signal, viewChild, ViewChild } from '@angular/core';
 import { FormArray, FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -7,18 +7,25 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
     AuthoredNode,
+    CatalogService,
     ComponentDef,
     ComponentsService,
     ComponentTestResult,
     ComponentType,
+    ConfigService,
+    LensService,
     PipelinesService,
 } from 'app/inspecto/api';
-import { AttributeSpec } from 'app/inspecto/component-model';
+import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
+import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
 import { nodeAttributesFor } from './node-attributes';
 
@@ -64,6 +71,7 @@ export interface NodeConfigResult {
         MatSelectModule,
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
+        EnrichmentEditorComponent,
     ],
     template: `
         <h2 mat-dialog-title>Configure · {{ data.node.id }}</h2>
@@ -79,7 +87,8 @@ export interface NodeConfigResult {
                     <mat-label>Description</mat-label>
                     <input matInput formControlName="description" />
                 </mat-form-field>
-                @if (data.bindKind) {
+                <!-- Not for enrichment nodes: their "use" is the enrichment/name binding below. -->
+                @if (data.bindKind && !isEnrichment) {
                     <div class="mb-1">
                         <div class="flex items-end gap-2">
                             <mat-form-field class="flex-1" subscriptSizing="dynamic">
@@ -102,11 +111,38 @@ export interface NodeConfigResult {
                             <span class="font-mono">{{ form.value.use || '—' }}</span>
                         </p>
                     </div>
-                } @else {
+                } @else if (!isEnrichment) {
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Use (component ref)</mat-label>
                         <input matInput formControlName="use" placeholder="transform/my_component" />
                     </mat-form-field>
+                }
+
+                <!-- Enrichment (W4b): the node authors the REAL companion config through the shared
+                     editor — written via POST /config/write + registered via POST /enrichment (the
+                     per-batch path), never a full-recompute job. The node itself only carries the
+                     "use: enrichment/name" binding; the companion file is the single truth. -->
+                @if (isEnrichment) {
+                    <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Enrichment</div>
+                    @if (enrichSource() === 'loading') {
+                        <div class="flex items-center gap-2 py-3">
+                            <mat-spinner diameter="18"></mat-spinner>
+                            <span class="text-sm opacity-70">Loading the bound enrichment…</span>
+                        </div>
+                    } @else if (enrichUneditable()) {
+                        <inspecto-alert variant="warning" title="Hand-authored transform file">
+                            This enrichment uses <code>transform_file</code> — edit its TOON directly;
+                            saving here would overwrite the file reference with inline SQL.
+                        </inspecto-alert>
+                    } @else {
+                        <mat-form-field class="w-full" subscriptSizing="dynamic">
+                            <mat-label>Enrichment name</mat-label>
+                            <input matInput [formControl]="enrichName" [placeholder]="data.node.id" />
+                        </mat-form-field>
+                        <inspecto-schema-form [specs]="wiringSpecs" [initial]="wiringInitial()"
+                                              [optionLoaders]="wiringLoaders"></inspecto-schema-form>
+                        <inspecto-enrichment-editor [referenceOptions]="refOptions()" />
+                    }
                 }
 
                 <!-- Schema-driven config for known node types (required up front, rest behind disclosure). -->
@@ -180,7 +216,10 @@ export interface NodeConfigResult {
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button mat-dialog-close>Cancel</button>
-                <button type="submit" mat-flat-button color="primary">Save</button>
+                <button type="submit" mat-flat-button color="primary" [disabled]="savingEnrichment()">
+                    @if (savingEnrichment()) { <mat-spinner diameter="16" class="mr-2"></mat-spinner> }
+                    Save
+                </button>
             </mat-dialog-actions>
         </form>
     `,
@@ -189,11 +228,41 @@ export class NodeConfigDialog {
     private fb = inject(FormBuilder);
     private api = inject(PipelinesService);
     private components = inject(ComponentsService);
+    private configApi = inject(ConfigService);
+    private catalog = inject(CatalogService);
+    private lens = inject(LensService);
+    private toastr = inject(ToastrService);
     private dialog = inject(MatDialog);
     private ref = inject(MatDialogRef<NodeConfigDialog, NodeConfigResult>);
     readonly data = inject<NodeConfigData>(MAT_DIALOG_DATA);
 
     @ViewChild(InspectoSchemaFormComponent) private schemaForm?: InspectoSchemaFormComponent;
+
+    // ── enrichment nodes (W4b): the dialog authors the REAL companion `*_enrich.toon` ──
+    readonly isEnrichment = this.data.node.type === 'enrichment';
+    readonly wiringSpecs = ENRICHMENT_WIRING_ATTRIBUTES;
+    readonly wiringLoaders = { triggers__on_pipeline: pipelineOptionLoader() };
+    /** The bound companion config: `'loading'` while reading, `null` = authoring fresh. */
+    readonly enrichSource = signal<'loading' | Record<string, unknown> | null>(null);
+    /** A hand-authored `transform_file` config must not be overwritten with inline SQL. */
+    readonly enrichUneditable = computed(() => {
+        const s = this.enrichSource();
+        return typeof s === 'object' && s !== null && 'transform_file' in s;
+    });
+    readonly wiringInitial = computed<Record<string, unknown>>(() => {
+        const s = this.enrichSource();
+        if (!s || s === 'loading') return {};
+        return flattenBlock({
+            input: (s['input'] as Record<string, unknown>) ?? {},
+            output: (s['output'] as Record<string, unknown>) ?? {},
+            triggers: (s['triggers'] as Record<string, unknown>) ?? {},
+        });
+    });
+    /** Produced Reference Datasets bindable by name (same source the Onboarding stage uses). */
+    readonly refOptions = signal<{ id: string; label: string }[]>([]);
+    readonly enrichName = this.fb.control('', { nonNullable: true });
+    readonly savingEnrichment = signal(false);
+    private readonly enrichEditor = viewChild(EnrichmentEditorComponent);
 
     /** Existing components of the bound kind (the picker's options); empty until loaded / when not binding. */
     readonly componentOptions = signal<ComponentDef[]>([]);
@@ -237,9 +306,41 @@ export class NodeConfigDialog {
                 extraKeys++;
             }
         }
-        // Show the free-form editor up front only when it's the primary surface or already carries keys.
-        this.freeFormOpen.set(this.specs().length === 0 || extraKeys > 0);
+        // Show the free-form editor up front only when it's the primary surface or already carries
+        // keys. For an enrichment node the primary surface is the shared editor (W4b), so free-form
+        // only opens when legacy keys are actually present.
+        this.freeFormOpen.set(this.isEnrichment ? extraKeys > 0 : this.specs().length === 0 || extraKeys > 0);
         if (this.data.bindKind) this.loadComponents();
+        if (this.isEnrichment) this.initEnrichment();
+    }
+
+    /** Load the bound companion (when `use` names one) + the bindable Reference Datasets, and
+     *  hydrate the shared editor once both it and the config exist (the read is async). */
+    private initEnrichment(): void {
+        const use = this.data.node.use ?? '';
+        const bound = use.startsWith('enrichment/') ? use.slice('enrichment/'.length) : null;
+        this.enrichName.setValue(bound ?? this.data.node.id);
+        if (bound) {
+            this.enrichSource.set('loading');
+            this.configApi.read('enrichment', bound).subscribe({
+                next: (r) => this.enrichSource.set(r.config),
+                error: () => {
+                    this.enrichSource.set(null);
+                    this.toastr.warning(`Could not read "${bound}" — authoring a fresh enrichment.`);
+                },
+            });
+        }
+        this.catalog.references().subscribe({
+            next: (nodes) => this.refOptions.set(nodes
+                .filter((n) => typeof n.attrs?.['pipeline'] === 'string')
+                .map((n) => ({ id: String(n.attrs!['pipeline']), label: n.label }))),
+            error: () => this.refOptions.set([]),
+        });
+        effect(() => {
+            const editor = this.enrichEditor();
+            const src = this.enrichSource();
+            if (editor && src && src !== 'loading' && !editor.isDirty()) editor.hydrate(src);
+        });
     }
 
     private loadComponents(): void {
@@ -318,6 +419,10 @@ export class NodeConfigDialog {
     }
 
     save(): void {
+        if (this.isEnrichment) {
+            this.saveEnrichment();
+            return;
+        }
         if (this.schemaForm && !this.schemaForm.validate()) return;
         const v = this.form.getRawValue();
         const config: Record<string, unknown> = {};
@@ -350,4 +455,104 @@ export class NodeConfigDialog {
             value: this.fb.control(value, { nonNullable: true }),
         });
     }
+
+    // ── enrichment save (W4b): write the companion, register it, bind the node by reference ──
+
+    /**
+     * The registered-enrichment write path, IDENTICAL to the Onboarding stage's: `POST /config/write
+     * type=enrichment` (fileBase writes `<name>_enrich.toon`) then `POST /enrichment` — the per-batch
+     * partition-scoped path. ⚠ Never author through a `*_job.toon` `enrich` job: that is a FULL
+     * recompute (plan §6). The node closes carrying only `use: enrichment/<name>` — the companion
+     * file stays the single truth, never mirrored into `node.config` (the D7 split-brain lesson).
+     */
+    private saveEnrichment(): void {
+        if (this.enrichUneditable()) {
+            // Nothing here may write; still allow closing with the node's name/description edits.
+            this.closeWithBinding(this.enrichName.value.trim() || this.data.node.id);
+            return;
+        }
+        if (!this.lens.canAuthorWorkbench()) {
+            this.toastr.warning('Your lens is read-only.');
+            return;
+        }
+        if (this.schemaForm && !this.schemaForm.validate()) return;
+        const parts = this.enrichEditor()?.build();
+        if (!parts) return;
+        const name = this.enrichName.value.trim() || this.data.node.id;
+
+        // Overlay the asked wiring onto the existing config's blocks: keys this form OWNS are
+        // replaced wholesale (a cleared field deletes its key, never resurrects the old value),
+        // while unmodeled keys — `partitions` lists above all (no AttributeSpec list type) —
+        // survive the save verbatim.
+        const wiring = nestKeys(compact(this.schemaForm?.value() ?? {})) as Record<string, Record<string, unknown>>;
+        const existing = this.enrichSource();
+        const ownedLeaves = (root: string): string[] => this.wiringSpecs
+            .map((s) => s.key.split(KEY_SEP))
+            .filter(([r]) => r === root)
+            .map(([, leaf]) => leaf);
+        const block = (root: string): Record<string, unknown> => {
+            const base: Record<string, unknown> =
+                typeof existing === 'object' && existing?.[root] && typeof existing[root] === 'object'
+                    ? { ...(existing[root] as Record<string, unknown>) }
+                    : {};
+            for (const leaf of ownedLeaves(root)) delete base[leaf];
+            return { ...base, ...(wiring[root] ?? {}) };
+        };
+        const draft: Record<string, unknown> = {
+            name,
+            input: block('input'),
+            output: block('output'),
+            transform: parts.transform,
+        };
+        const triggers = block('triggers');
+        if (Object.keys(triggers).length > 0) draft['triggers'] = triggers;
+        if (Object.keys(parts.references).length > 0) draft['references'] = parts.references;
+
+        this.savingEnrichment.set(true);
+        this.configApi.write('enrichment', draft, { overwrite: true }).subscribe({
+            next: (written) => {
+                // Register every save: enrichments do NOT hot-reload by mtime.
+                this.configApi.registerEnrichment(written.path).subscribe({
+                    next: () => {
+                        this.toastr.success('Enrichment saved — runs after every committed batch');
+                        this.closeWithBinding(name);
+                    },
+                    error: (e) => {
+                        this.toastr.warning(apiErrorMessage(e,
+                            'Saved, but registering failed — it will load on the next service restart.'));
+                        this.closeWithBinding(name);
+                    },
+                });
+            },
+            error: (e) => {
+                this.savingEnrichment.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Could not save the enrichment.'));
+            },
+        });
+    }
+
+    /** Close returning the node bound to the companion by reference (plus any legacy free-form keys). */
+    private closeWithBinding(name: string): void {
+        this.savingEnrichment.set(false);
+        const v = this.form.getRawValue();
+        const config: Record<string, unknown> = {};
+        for (const row of v.config as { key: string; value: string }[]) {
+            if (row.key && row.key.trim()) config[row.key.trim()] = row.value;
+        }
+        this.ref.close({
+            node: {
+                id: this.data.node.id,
+                type: this.data.node.type,
+                name: v.name?.trim() || undefined,
+                description: v.description?.trim() || undefined,
+                use: `enrichment/${name}`,
+                config: Object.keys(config).length ? config : undefined,
+            },
+        });
+    }
+}
+
+/** Drop blank/null entries so the wiring overlay never writes an empty key over a real one. */
+function compact(m: Record<string, unknown>): Record<string, unknown> {
+    return Object.fromEntries(Object.entries(m).filter(([, v]) => v !== '' && v != null));
 }

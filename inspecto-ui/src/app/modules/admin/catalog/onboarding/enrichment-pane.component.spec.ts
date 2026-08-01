@@ -1,11 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { CatalogService, ConfigService, DbBrowserService, MetadataNode, SpacesService } from 'app/inspecto/api';
+import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingEnrichmentPaneComponent } from './enrichment-pane.component';
 import { OnboardingStateService } from './onboarding-state.service';
@@ -73,7 +75,17 @@ async function create(
     await TestBed.compileComponents(); // the shared data-table pulls in @defer-loaded blocks
     const fixture = TestBed.createComponent(OnboardingEnrichmentPaneComponent);
     fixture.detectChanges();
+    fixture.detectChanges(); // second pass: the shared editor mounts, then the hydrate effect sees it
     return { fixture, state, api: TestBed.inject(ConfigService), table };
+}
+
+/** The shared editor hosted by the pane (W4b) — starts the stage first when needed. */
+function editor(fixture: ComponentFixture<OnboardingEnrichmentPaneComponent>): EnrichmentEditorComponent {
+    if (!fixture.componentInstance.started()) {
+        fixture.componentInstance.start();
+        fixture.detectChanges();
+    }
+    return fixture.debugElement.query(By.directive(EnrichmentEditorComponent)).componentInstance;
 }
 
 const PIPELINE = { name: 'orders_feed', dirs: { poll: 'in', database: 'spaces/demo/data/orders_feed/database' } };
@@ -107,7 +119,7 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         ]);
     });
 
-    it('hydrates from an existing companion config, pristine', async () => {
+    it('hydrates the shared editor from an existing companion config, pristine', async () => {
         const { fixture } = await create(PIPELINE, {
             enrichment: {
                 name: 'orders_feed_enrich',
@@ -115,22 +127,23 @@ describe('OnboardingEnrichmentPaneComponent', () => {
                 transform: 'SELECT * FROM input i LEFT JOIN region_dim r ON i.REGION = r.region',
             },
         });
-        const c = fixture.componentInstance;
-        expect(c.started()).toBe(true);
-        expect(c.referenceRows.length).toBe(2);
-        expect(c.referenceRows.at(0).get('mode')?.value).toBe('ref');
-        expect(c.referenceRows.at(1).get('mode')?.value).toBe('path');
-        expect(c.sql()).toContain('LEFT JOIN region_dim');
-        expect(c.referencesForm.dirty).toBe(false);
+        expect(fixture.componentInstance.started()).toBe(true);
+        const ed = editor(fixture);
+        expect(ed.referenceRows.length).toBe(2);
+        expect(ed.referenceRows.at(0).get('mode')?.value).toBe('ref');
+        expect(ed.referenceRows.at(1).get('mode')?.value).toBe('path');
+        expect(ed.sql()).toContain('LEFT JOIN region_dim');
+        expect(ed.isDirty()).toBe(false);
     });
 
     it('hydrates when the companion read lands after the pane mounted', async () => {
         const { fixture, state } = await create(PIPELINE);
         expect(fixture.componentInstance.started()).toBe(false);
         state.enrichmentConfig.set({ name: 'orders_feed_enrich', transform: 'SELECT 1 FROM input' });
-        fixture.detectChanges();
+        fixture.detectChanges(); // started flips, the editor mounts
+        fixture.detectChanges(); // the hydrate effect sees the mounted editor
         expect(fixture.componentInstance.started()).toBe(true);
-        expect(fixture.componentInstance.sql()).toBe('SELECT 1 FROM input');
+        expect(editor(fixture).sql()).toBe('SELECT 1 FROM input');
     });
 
     it('save writes the companion with derived wiring, then hot-registers it', async () => {
@@ -139,11 +152,11 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         const registerEnrichment = vi.fn((_path: string) => of(REGISTER_OK));
         const { fixture, state } = await create(PIPELINE, { api: { write, registerEnrichment } });
         const c = fixture.componentInstance;
-        c.start();
-        c.addReference();
-        c.referenceRows.at(0).get('name')?.setValue('region_dim');
-        c.referenceRows.at(0).get('ref')?.setValue('region_dim');
-        c.onSqlChange('SELECT i.*, r.zone FROM input i LEFT JOIN region_dim r ON i.REGION = r.region');
+        const ed = editor(fixture);
+        ed.addReference();
+        ed.referenceRows.at(0).get('name')?.setValue('region_dim');
+        ed.referenceRows.at(0).get('ref')?.setValue('region_dim');
+        ed.onSqlChange('SELECT i.*, r.zone FROM input i LEFT JOIN region_dim r ON i.REGION = r.region');
         c.save();
 
         const [type, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
@@ -163,10 +176,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
     it('keeps the save but warns when registration fails', async () => {
         const registerEnrichment = vi.fn((_path: string) => throwError(() => ({ status: 503 })));
         const { fixture, state } = await create(PIPELINE, { api: { registerEnrichment } });
-        const c = fixture.componentInstance;
-        c.start();
-        c.onSqlChange('SELECT * FROM input');
-        c.save();
+        editor(fixture).onSqlChange('SELECT * FROM input');
+        fixture.componentInstance.save();
         expect(state.enrichmentConfig()).not.toBeNull();
         expect(TOASTR.warning).toHaveBeenCalled();
     });
@@ -175,15 +186,14 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
             of(WRITE_OK(type, String(cfg['name'] ?? 'x'))));
         const { fixture } = await create(PIPELINE, { api: { write } });
-        const c = fixture.componentInstance;
-        c.start();
-        c.addReference();
-        c.addReference();
-        c.referenceRows.at(0).get('name')?.setValue('dupe');
-        c.referenceRows.at(0).get('ref')?.setValue('a');
-        c.referenceRows.at(1).get('name')?.setValue('dupe');
-        c.referenceRows.at(1).get('ref')?.setValue('b');
-        c.save();
+        const ed = editor(fixture);
+        ed.addReference();
+        ed.addReference();
+        ed.referenceRows.at(0).get('name')?.setValue('dupe');
+        ed.referenceRows.at(0).get('ref')?.setValue('a');
+        ed.referenceRows.at(1).get('name')?.setValue('dupe');
+        ed.referenceRows.at(1).get('ref')?.setValue('b');
+        fixture.componentInstance.save();
         expect(write).not.toHaveBeenCalled();
         expect(TOASTR.warning).toHaveBeenCalled();
     });
@@ -195,8 +205,7 @@ describe('OnboardingEnrichmentPaneComponent', () => {
             api: { previewEnrichment }, sample: [{ ID: '1', REGION: 'r1' }],
         });
         const c = fixture.componentInstance;
-        c.start();
-        c.onSqlChange('SELECT * FROM input');
+        editor(fixture).onSqlChange('SELECT * FROM input');
         c.preview();
 
         expect(table).toHaveBeenCalledWith(expect.objectContaining({ name: 'orders_feed', limit: 200 }));
@@ -212,8 +221,7 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         const previewEnrichment = vi.fn();
         const { fixture } = await create(PIPELINE, { api: { previewEnrichment }, sample: [] });
         const c = fixture.componentInstance;
-        c.start();
-        c.onSqlChange('SELECT * FROM input');
+        editor(fixture).onSqlChange('SELECT * FROM input');
         c.preview();
         expect(previewEnrichment).not.toHaveBeenCalled();
         expect(c.previewResult()).toBeNull();
@@ -223,10 +231,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
     it('preview falls back to an empty sample (and warns) when the store is not browsable', async () => {
         const previewEnrichment = vi.fn();
         const { fixture } = await create(PIPELINE, { api: { previewEnrichment }, sample: 'error' });
-        const c = fixture.componentInstance;
-        c.start();
-        c.onSqlChange('SELECT * FROM input');
-        c.preview();
+        editor(fixture).onSqlChange('SELECT * FROM input');
+        fixture.componentInstance.preview();
         expect(previewEnrichment).not.toHaveBeenCalled();
         expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('No data'));
     });
@@ -238,8 +244,7 @@ describe('OnboardingEnrichmentPaneComponent', () => {
             api: { previewEnrichment }, sample: [{ ID: '1' }],
         });
         const c = fixture.componentInstance;
-        c.start();
-        c.onSqlChange('SELECT BOGUS FROM input');
+        editor(fixture).onSqlChange('SELECT BOGUS FROM input');
         c.preview();
         expect(c.previewResult()).toBeNull();
         expect(c.previewError()).toContain('BOGUS');
@@ -248,8 +253,7 @@ describe('OnboardingEnrichmentPaneComponent', () => {
     it('has no a11y violations in both the opt-in and form states', async () => {
         const { fixture } = await create(PIPELINE);
         await expectNoA11yViolations(fixture.nativeElement);
-        fixture.componentInstance.start();
-        fixture.componentInstance.addReference();
+        editor(fixture).addReference();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });

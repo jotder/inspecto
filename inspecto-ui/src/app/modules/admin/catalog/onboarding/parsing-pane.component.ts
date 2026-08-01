@@ -19,10 +19,11 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { OnboardingSegmentsEditorComponent } from './segments-editor.component';
 import { SegmentDraft, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } from './segment-drafts';
-import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
+import { PARSING_FRONTENDS, ParsingFrontend } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 import { clearMissingRoots, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
+import { stageAttributesFor } from './stage-attributes';
 
 /** The parsing-block roots this pane owns — switching frontend clears the others' sub-blocks. */
 const PARSING_ROOTS = ['frontend', 'delimited', 'fixedwidth', 'json', 'text_regex', 'encoding', 'compression', 'plugin'];
@@ -114,8 +115,7 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         return p?.kind === 'tree' ? p.nodes : null;
     });
 
-    private readonly parsingBlock =
-        ((this.state.config() ?? {})['parsing'] as Record<string, unknown> | undefined) ?? {};
+    private readonly parsingBlock = this.state.block('parsing') ?? {};
 
     /**
      * FQCN this config parses through, from either key the engine accepts (`parsing.plugin.ingester`
@@ -124,15 +124,16 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     private readonly configuredIngester: string =
         String(
             (this.parsingBlock['plugin'] as Record<string, unknown> | undefined)?.['ingester'] ??
-                ((this.state.config() ?? {})['processing'] as Record<string, unknown> | undefined)?.['ingester'] ??
+                this.state.block('processing')?.['ingester'] ??
                 '',
         ).trim();
 
     readonly frontend = signal<ParsingFrontend>(normalizeFrontend(this.parsingBlock['frontend']));
-    /** The options form: engine-real specs for the built-ins, the SERVED grammar schema for plugins. */
+    /** The options form: engine-real specs for the built-ins (via the stage lookup), the SERVED
+     *  grammar schema for plugins. */
     readonly specs = computed(() => {
         const plugin = this.pluginDef();
-        return plugin ? fieldSpecsToAttributes(plugin.grammarSchema) : parsingAttributesFor(this.frontend());
+        return plugin ? fieldSpecsToAttributes(plugin.grammarSchema) : stageAttributesFor('parsing', { frontend: this.frontend() })!;
     });
     readonly initial = flattenBlock(this.parsingBlock);
     /** Frontend switched since load — dirty even before a field is touched. */

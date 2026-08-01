@@ -12,9 +12,9 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { connectionOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { ConnectionFormDialog, ConnectionFormResult } from 'app/inspecto/connections/connection-form.dialog';
-import { COLLECTOR_ATTRIBUTES } from 'app/inspecto/component-model';
 import { KEY_SEP, clearMissingRoots, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
+import { stageAttributesFor } from './stage-attributes';
 
 /**
  * Collection stage — authors the Stage-1 `collector:` block. Connection-first: the operator picks
@@ -136,8 +136,10 @@ export class OnboardingCollectionPaneComponent implements OnDestroy {
 
     readonly optionLoaders = { connection: connectionOptionLoader() };
 
-    private readonly collectorBlock =
-        ((this.state.config() ?? {})['collector'] as Record<string, unknown> | undefined) ?? {};
+    /** The shared collector table via the stage lookup (identical to the Pipelines acquisition node's). */
+    private readonly stageSpecs = stageAttributesFor('collection')!;
+
+    private readonly collectorBlock = this.state.block('collector') ?? {};
     /** The stored connector as authored — possibly hand-written TOON this pane must not destroy. */
     private readonly storedConnector = String(this.collectorBlock['connector'] ?? '').trim().toLowerCase();
 
@@ -152,8 +154,8 @@ export class OnboardingCollectionPaneComponent implements OnDestroy {
 
     readonly specs = computed(() =>
         this.mode() === 'connection'
-            ? COLLECTOR_ATTRIBUTES
-            : COLLECTOR_ATTRIBUTES.filter((a) => a.key !== 'connection'),
+            ? this.stageSpecs
+            : this.stageSpecs.filter((a) => a.key !== 'connection'),
     );
     readonly initial = flattenBlock(this.collectorBlock);
 
@@ -259,7 +261,7 @@ export class OnboardingCollectionPaneComponent implements OnDestroy {
         if (!connector) return;
         // Cleared fields delete their key (incl. `connection` when collecting locally); keys this
         // form never owned survive the deep merge.
-        const roots = new Set(COLLECTOR_ATTRIBUTES.map((a) => a.key.split(KEY_SEP)[0]));
+        const roots = new Set(this.stageSpecs.map((a) => a.key.split(KEY_SEP)[0]));
         const collector = clearMissingRoots(nestKeys(this.schemaForm.value()), roots);
         collector['connector'] = connector;
         this.saving.set(true);

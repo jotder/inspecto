@@ -12,29 +12,43 @@ export type OnboardingStageId = 'collection' | 'parsing' | 'schema' | 'enrichmen
  *  is still to resolve. */
 export type StageStatus = 'empty' | 'configured' | 'validated' | 'blocked';
 
+/** The pipeline-config block a stage owns, or `null` for a stage authoring a companion artifact. */
+export type OnboardingStageBlock = 'collector' | 'parsing' | 'processing' | 'output' | null;
+
 export interface OnboardingStage {
     id: OnboardingStageId;
+    /**
+     * The engine node type this stage authors (`BuiltinNodeType`, what `GET /pipelines/node-types`
+     * serves) — W4a/U-B: the guided rail is a view over the head of the SAME graph the Pipelines
+     * editor edits, so every stage names its node. Both `schema` and `keys` are `parser`: schema
+     * artifacts live on the parser node (that is where `PipelineLift` carries them).
+     */
+    nodeType: string;
+    /** The config block the stage owns — the panes' read/merge root AND the findings-attribution
+     *  prefix ({@link OnboardingStateService.stageForPath} derives from it). `null` = the stage
+     *  authors a companion config (`enrichment` → `<name>_enrich`), not a block of the pipeline TOON. */
+    block: OnboardingStageBlock;
     label: string;
     icon: string;
     hint: string;
     optional?: boolean;
 }
 
-const STREAM_STAGES: OnboardingStage[] = [
-    { id: 'collection', label: 'Collection', icon: 'heroicons_outline:inbox-arrow-down', hint: 'Where the files come from' },
-    { id: 'parsing', label: 'Parsing', icon: 'heroicons_outline:code-bracket', hint: 'How raw bytes become rows' },
-    { id: 'schema', label: 'Schema & Mapping', icon: 'heroicons_outline:table-cells', hint: 'Names, types and casts' },
-    { id: 'enrichment', label: 'Enrichment', icon: 'heroicons_outline:sparkles', hint: 'Joins and aggregations', optional: true },
-    { id: 'publish', label: 'Dataset & Go-live', icon: 'heroicons_outline:rocket-launch', hint: 'Output format and activation' },
+export const STREAM_STAGES: OnboardingStage[] = [
+    { id: 'collection', nodeType: 'acquisition', block: 'collector', label: 'Collection', icon: 'heroicons_outline:inbox-arrow-down', hint: 'Where the files come from' },
+    { id: 'parsing', nodeType: 'parser', block: 'parsing', label: 'Parsing', icon: 'heroicons_outline:code-bracket', hint: 'How raw bytes become rows' },
+    { id: 'schema', nodeType: 'parser', block: 'processing', label: 'Schema & Mapping', icon: 'heroicons_outline:table-cells', hint: 'Names, types and casts' },
+    { id: 'enrichment', nodeType: 'enrichment', block: null, label: 'Enrichment', icon: 'heroicons_outline:sparkles', hint: 'Joins and aggregations', optional: true },
+    { id: 'publish', nodeType: 'sink.persistent', block: 'output', label: 'Dataset & Go-live', icon: 'heroicons_outline:rocket-launch', hint: 'Output format and activation' },
 ];
 
-const REFERENCE_STAGES: OnboardingStage[] = [
-    { id: 'collection', label: 'Collection', icon: 'heroicons_outline:inbox-arrow-down', hint: 'Where the dumps come from' },
-    { id: 'parsing', label: 'Parsing', icon: 'heroicons_outline:code-bracket', hint: 'How raw bytes become rows' },
+export const REFERENCE_STAGES: OnboardingStage[] = [
+    { id: 'collection', nodeType: 'acquisition', block: 'collector', label: 'Collection', icon: 'heroicons_outline:inbox-arrow-down', hint: 'Where the dumps come from' },
+    { id: 'parsing', nodeType: 'parser', block: 'parsing', label: 'Parsing', icon: 'heroicons_outline:code-bracket', hint: 'How raw bytes become rows' },
     // Required, not optional: a pipeline cannot arm without a schema — the keys stage IS where a
     // Reference gets its columns/types (plus the honest full-replace load-policy note).
-    { id: 'keys', label: 'Keys & Load', icon: 'heroicons_outline:key', hint: 'Columns, types and the full-replace load' },
-    { id: 'publish', label: 'Publish', icon: 'heroicons_outline:rocket-launch', hint: 'Make it bindable by name' },
+    { id: 'keys', nodeType: 'parser', block: 'processing', label: 'Keys & Load', icon: 'heroicons_outline:key', hint: 'Columns, types and the full-replace load' },
+    { id: 'publish', nodeType: 'sink.persistent', block: 'output', label: 'Publish', icon: 'heroicons_outline:rocket-launch', hint: 'Make it bindable by name' },
 ];
 
 /**
@@ -94,6 +108,13 @@ export class OnboardingStateService {
     /** Companion enrichment identity, mirroring the schema convention (`<pipeline>_schema`). */
     enrichName(): string {
         return `${this.name()}_enrich`;
+    }
+
+    /** A stage-owned config block off the server-held draft, or `null` when not yet authored —
+     *  the one read path for the panes (W4a; each pane used to re-derive this ad hoc). */
+    block(name: NonNullable<OnboardingStageBlock> | 'dirs'): Record<string, unknown> | null {
+        const v = (this.config() ?? {})[name];
+        return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
     }
 
     readonly stageStatus = computed<Record<OnboardingStageId, StageStatus>>(() => {
@@ -189,12 +210,11 @@ export class OnboardingStateService {
                     // Route each finding to its stage by fieldPath prefix (fallback: the saving stage);
                     // replace every pipeline-stage bucket — the save validated the whole config.
                     const findings = r.findings ?? [];
-                    const schemaStage: OnboardingStageId = this.kind() === 'reference' ? 'keys' : 'schema';
                     const buckets: Partial<Record<OnboardingStageId, Finding[]>> = {
                         collection: [], parsing: [], schema: [], keys: [], publish: [],
                     };
                     for (const f of findings) {
-                        const stage = this.stageForPath(f.fieldPath ?? '', schemaStage) ?? this.activeStageId();
+                        const stage = this.stageForPath(f.fieldPath ?? '') ?? this.activeStageId();
                         (buckets[stage] ??= []).push(f);
                     }
                     this.stageFindings.update((m) => ({ ...m, ...buckets }));
@@ -213,15 +233,14 @@ export class OnboardingStateService {
         );
     }
 
-    /** The stage a finding's dotted `fieldPath` belongs to, by config-block prefix — the pipeline
-     *  block→stage map (`processing.*` authors the schema artifact, whose stage id differs by kind).
-     *  Null for blank/cross-field paths (caller falls back to the saving stage). */
-    private stageForPath(path: string, schemaStage: OnboardingStageId): OnboardingStageId | null {
-        if (path.startsWith('collector')) return 'collection';
-        if (path.startsWith('parsing')) return 'parsing';
-        if (path.startsWith('processing')) return schemaStage;
-        if (path.startsWith('output') || path === 'active') return 'publish';
-        return null;
+    /** The stage a finding's dotted `fieldPath` belongs to, derived from the stage model's own
+     *  `block` ownership (W4a — no second block→stage map to drift): `stages()` already carries the
+     *  right stage per kind (`processing.*` lands on `schema` for a Stream, `keys` for a Reference).
+     *  `active` belongs to publish (go-live flips it). Null for blank/cross-field paths (caller
+     *  falls back to the saving stage). */
+    private stageForPath(path: string): OnboardingStageId | null {
+        if (path === 'active') return 'publish';
+        return this.stages().find((s) => s.block && path.startsWith(s.block))?.id ?? null;
     }
 
     /**

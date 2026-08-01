@@ -74,8 +74,9 @@ former root reference docs** (each index lists them):
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
 - [`superpower/onboarding-pipeline-unification.md`](superpower/onboarding-pipeline-unification.md) —
-  **Onboarding ↔ Pipeline UNIFICATION, DESIGN approved 2026-07-31, no build started. Supersedes and
-  reverses `onboarding-pipeline-split.md`** (archived to `plans-archive/`; S1 there shipped and stays).
+  **Onboarding ↔ Pipeline UNIFICATION, IN FLIGHT. W0–W4 shipped (through 2026-08-01); W5 (graph
+  editor writes the canonical config) is the last piece. Supersedes and reverses
+  `onboarding-pipeline-split.md`** (archived to `plans-archive/`; S1 there shipped and stays).
   **One** model: `*_pipeline.toon`/`PipelineConfig` is canonical because it is what the engine executes —
   the authoring editor's `*_flow.toon` is not wired to the executor. Onboarding becomes a guided view over
   the head of the same graph; "Stream" is already only a Catalog label (`kind: "STREAM"`). Pinned U-A–U-G:

@@ -97,10 +97,8 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
     protected readonly types = SCHEMA_TYPES;
 
     private readonly pipelineName = String((this.state.config() ?? {})['name'] ?? '');
-    protected readonly existingSchemaFile = (() => {
-        const proc = (this.state.config() ?? {})['processing'] as Record<string, unknown> | undefined;
-        return String(proc?.['schema_file'] ?? '').trim();
-    })();
+    protected readonly existingSchemaFile =
+        String(this.state.block('processing')?.['schema_file'] ?? '').trim();
 
     private base(): string {
         return this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';

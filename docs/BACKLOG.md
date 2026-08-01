@@ -418,6 +418,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **`ConfigSpecs.enrichment()` does not spec the `references:` map** (surfaced 2026-08-01 by
+  unification W4b). Per-entry keys (`ref` XOR `path`, `format`, `as_of` — `EnrichmentConfig.fromMap`
+  hard-fails them at LOAD) are validated only in the UI; a hand-authored or API-written config with a
+  bad reference passes `POST /config/write` clean and fails at registration/first run. Close it
+  server-side (fail-closed at write, like every other spec'd shape). The urgency dropped with W4b —
+  both authoring UIs now share ONE validator (`inspecto/enrichment/enrichment-editor.component.ts`)
+  — but API/hand-authored writes remain unchecked. Needs a ConfigSpec map-of-objects notion (the same
+  wall `references` hit when it was first left unspecced).
 - **AI drafting has no applicable component kind** (created 2026-07-31 by unification W1a, a deliberate
   and recorded feature loss). `component_draft` was offered ONLY on the `component-form.dialog` `schema`
   kind, because of that dialog's kinds only `schema` had a structural `ConfigSpec`. `schema` is no longer a

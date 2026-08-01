@@ -1,4 +1,4 @@
-import { type AttributeSpec, COLLECTOR_ATTRIBUTES } from 'app/inspecto/component-model';
+import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
 
 /**
  * Per-node-type config attribute schemas for the generic {@link NodeConfigDialog} — the non-parser
@@ -33,26 +33,15 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES } from 'app/inspecto/component
  * `transform.*` shapes are not specced server-side (`docs/FEATURE_INVENTORY.md` §G), and a best-guess
  * table that looks authoritative is what this change was cleaning up.
  */
-/**
- * The `output:` block a sink writes, per `PipelineCompiler.toConfigMap` → `PipelineConfigParser:255-257`:
- * `format` (CSV | PARQUET, default CSV — `PartitionWriter`), `compression`, `ducklake`. The old tables
- * also offered `partition_by`, `table`, `mode` and `key_columns`; **the backend reads none of them**, so
- * they are gone rather than kept as convincing-looking dead knobs. All three sink kinds write the same
- * `output:` block — the kind is the materialisation behaviour, not a different config shape.
- */
-const SINK_ATTRIBUTES: AttributeSpec[] = [
-    {
-        key: 'format', label: 'Format', type: 'select', tier: 'required', default: 'CSV',
-        options: [{ value: 'CSV', label: 'CSV' }, { value: 'PARQUET', label: 'Parquet' }],
-    },
-    { key: 'compression', label: 'Compression', type: 'string', tier: 'advanced', placeholder: 'zstd', help: 'Codec name, e.g. snappy / zstd / gzip.' },
-];
-
+// The `output:` block a sink writes is the SAME concern Onboarding's Dataset & Go-live stage
+// authors, so it is the shared `OUTPUT_ATTRIBUTES` (component-model) — W4a collapsed the local
+// `SINK_ATTRIBUTES` fork exactly as U-D collapsed the collector one. All three sink kinds write
+// the same block — the kind is the materialisation behaviour, not a different config shape.
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     acquisition: COLLECTOR_ATTRIBUTES,
-    'sink.persistent': SINK_ATTRIBUTES,
-    'sink.materialized': SINK_ATTRIBUTES,
-    'sink.view': SINK_ATTRIBUTES,
+    'sink.persistent': OUTPUT_ATTRIBUTES,
+    'sink.materialized': OUTPUT_ATTRIBUTES,
+    'sink.view': OUTPUT_ATTRIBUTES,
     'transform.filter': [
         { key: 'predicate', label: 'Keep-when predicate', type: 'string', tier: 'required', placeholder: 'amount > 0', help: 'Rows matching are kept; the rest go to the dropped branch.' },
     ],

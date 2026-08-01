@@ -1,55 +1,38 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { CatalogService, ConfigService, DbBrowserService, EnrichmentPreview, LensService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { SqlCodemirrorComponent } from 'app/inspecto/data-table';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { OnboardingStateService } from './onboarding-state.service';
-
-const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-
-interface ReferenceRow {
-    name: string;
-    mode: 'ref' | 'path';
-    ref: string;
-    path: string;
-    format: string;
-}
 
 /**
  * Enrichment stage (optional, Streams) — authors the companion `EnrichmentConfig`
- * (`<pipeline>_enrich`): reference bindings (first-class by name to a `produces: reference`
- * pipeline, or a direct file path) + the transform SQL. Everything else is derived and shown, not
- * asked: input = this pipeline's Stage-1 output, trigger = `on_pipeline` with the engine's
- * normalized id (what `BatchEvent.pipeline()` carries), output = the space's `enriched/` convention.
- * Saves write the config AND re-register it (`POST /enrichment`) — enrichments do not hot-reload
- * by mtime, so registration is what makes a save apply to the running service.
+ * (`<pipeline>_enrich`) through the SHARED `<inspecto-enrichment-editor>` (W4b: one editor, two
+ * adopters — the Pipelines `enrichment` node dialog is the other). This host derives everything
+ * the guided flow can know instead of asking: input = this pipeline's Stage-1 output, trigger =
+ * `on_pipeline` with the engine's normalized id (what `BatchEvent.pipeline()` carries), output =
+ * the space's `enriched/` convention. Saves write the config AND re-register it
+ * (`POST /enrichment`) — enrichments do not hot-reload by mtime, so registration is what makes a
+ * save apply to the running service.
  */
 @Component({
     selector: 'app-onboarding-enrichment-pane',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        ReactiveFormsModule,
         MatButtonModule,
-        MatFormFieldModule,
         MatIconModule,
-        MatInputModule,
         MatProgressSpinnerModule,
-        MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
-        SqlCodemirrorComponent,
+        EnrichmentEditorComponent,
         DataTableComponent,
     ],
     templateUrl: './enrichment-pane.component.html',
@@ -64,10 +47,11 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
     private catalogApi = inject(CatalogService);
     private db = inject(DbBrowserService);
     private spaces = inject(SpacesService);
-    private fb = inject(FormBuilder);
     private toastr = inject(ToastrService);
 
-    /** The form shows only once the author opts in (the stage is optional). */
+    /** The shared editor (rendered only once the author opts in — the stage is optional). */
+    private readonly editor = viewChild(EnrichmentEditorComponent);
+
     readonly started = signal(this.state.enrichmentConfig() !== null);
     readonly saving = signal(false);
     // ── transform preview (stateless dry-run over a sample of the Stage-1 output) ──
@@ -78,35 +62,19 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
     /** Produced Reference Datasets bindable by name (id = the producer's normalized pipeline id). */
     readonly referenceOptions = signal<{ id: string; label: string }[]>([]);
 
-    readonly referencesForm: FormGroup = this.fb.group({ references: this.fb.array<FormGroup>([]) });
-    get referenceRows(): FormArray<FormGroup> {
-        return this.referencesForm.controls['references'] as FormArray<FormGroup>;
-    }
-    readonly sql = signal('SELECT * FROM input');
-    private savedSql = this.sql();
-
-    /** The DuckDB views the transform can select from: `input` + each reference alias. */
-    readonly availableViews = computed(() => {
-        void this.viewsTick();
-        return ['input', ...this.referenceRows.controls
-            .map((g) => String(g.getRawValue()['name'] ?? '').trim())
-            .filter((n) => IDENTIFIER_RE.test(n))];
-    });
-    /** Bumped on reference-row edits so `availableViews` recomputes (forms aren't signals). */
-    private readonly viewsTick = signal(0);
-
-    private readonly dirtyCheck = (): boolean => this.referencesForm.dirty || this.sql() !== this.savedSql;
+    private readonly dirtyCheck = (): boolean => this.editor()?.isDirty() ?? false;
 
     constructor() {
         this.state.registerDirtyCheck(this.dirtyCheck);
         // Hydrate from the server-held companion — including when its (async) read lands after
-        // this pane mounted. Never clobber unsaved edits.
+        // this pane mounted (and when the editor itself mounts a tick after `started` flips).
+        // Never clobber unsaved edits.
         effect(() => {
             const cfg = this.state.enrichmentConfig();
-            if (cfg && !this.dirtyCheck()) {
-                this.hydrate(cfg);
-                this.started.set(true);
-            }
+            if (!cfg) return;
+            this.started.set(true);
+            const editor = this.editor();
+            if (editor && !this.dirtyCheck()) editor.hydrate(cfg);
         });
     }
 
@@ -130,52 +98,6 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         this.started.set(true);
     }
 
-    addReference(): void {
-        this.addRow({ name: '', mode: 'ref', ref: '', path: '', format: 'CSV' });
-        this.referencesForm.markAsDirty();
-    }
-
-    removeReference(i: number): void {
-        this.referenceRows.removeAt(i);
-        this.referencesForm.markAsDirty();
-        this.viewsTick.update((n) => n + 1);
-    }
-
-    private addRow(row: ReferenceRow): void {
-        const g = this.fb.group({
-            name: [row.name, [Validators.required, Validators.pattern(IDENTIFIER_RE)]],
-            mode: [row.mode],
-            ref: [row.ref],
-            path: [row.path],
-            format: [row.format],
-        });
-        g.valueChanges.subscribe(() => this.viewsTick.update((n) => n + 1));
-        this.referenceRows.push(g);
-    }
-
-    onSqlChange(value: string): void {
-        this.sql.set(value);
-    }
-
-    private hydrate(cfg: Record<string, unknown>): void {
-        const refs = (cfg['references'] ?? {}) as Record<string, Record<string, unknown>>;
-        this.referenceRows.clear();
-        for (const [name, r] of Object.entries(refs)) {
-            const byName = typeof r['ref'] === 'string' && String(r['ref']).trim() !== '';
-            this.addRow({
-                name,
-                mode: byName ? 'ref' : 'path',
-                ref: byName ? String(r['ref']) : '',
-                path: byName ? '' : String(r['path'] ?? ''),
-                format: String(r['format'] ?? 'CSV'),
-            });
-        }
-        this.sql.set(String(cfg['transform'] ?? this.sql()));
-        this.savedSql = this.sql();
-        this.referencesForm.markAsPristine();
-        this.viewsTick.update((n) => n + 1);
-    }
-
     // ── derived plumbing (shown, never asked) ────────────────────────────────────
 
     private base(): string {
@@ -186,8 +108,8 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
     inputBlock(): Record<string, unknown> {
         const existing = this.state.enrichmentConfig();
         if (existing?.['input']) return existing['input'] as Record<string, unknown>;
-        const dirs = ((this.state.config() ?? {})['dirs'] ?? {}) as Record<string, unknown>;
-        const output = ((this.state.config() ?? {})['output'] ?? {}) as Record<string, unknown>;
+        const dirs = this.state.block('dirs') ?? {};
+        const output = this.state.block('output') ?? {};
         return {
             database: String(dirs['database'] ?? ''),
             format: String(output['format'] ?? 'PARQUET').toUpperCase(),
@@ -205,55 +127,18 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         };
     }
 
-    /** Rows validated into the config's `references:` map, or null on a blocking problem. */
-    private buildReferences(): Record<string, Record<string, string>> | null {
-        if (this.referenceRows.invalid) {
-            this.referenceRows.controls.forEach((g) => g.markAllAsTouched());
-            this.toastr.warning('Every reference alias must be a valid identifier (letters, digits, _).');
-            return null;
-        }
-        const rows = this.referenceRows.controls.map((g) => g.getRawValue() as ReferenceRow);
-        const names = rows.map((r) => r.name.trim());
-        const dup = names.find((n, i) => names.indexOf(n) !== i);
-        if (dup) {
-            this.toastr.warning(`Duplicate reference alias "${dup}" — aliases must be unique.`);
-            return null;
-        }
-        const out: Record<string, Record<string, string>> = {};
-        for (const r of rows) {
-            if (r.mode === 'ref') {
-                if (!r.ref.trim()) {
-                    this.toastr.warning(`Reference "${r.name}" needs a published Reference to bind.`);
-                    return null;
-                }
-                out[r.name.trim()] = { ref: r.ref.trim() };
-            } else {
-                if (!r.path.trim()) {
-                    this.toastr.warning(`Reference "${r.name}" needs a file path.`);
-                    return null;
-                }
-                out[r.name.trim()] = { path: r.path.trim(), format: r.format };
-            }
-        }
-        return out;
-    }
-
     /** The full enrichment draft from the current form, or null on a blocking validation problem. */
     private buildDraft(): Record<string, unknown> | null {
-        const references = this.buildReferences();
-        if (references === null) return null;
-        if (!this.sql().trim()) {
-            this.toastr.warning('The transform SQL is required — it defines the enriched output.');
-            return null;
-        }
+        const parts = this.editor()?.build();
+        if (!parts) return null;
         const draft: Record<string, unknown> = {
             name: this.state.enrichName(),
             input: this.inputBlock(),
             output: this.outputBlock(),
-            transform: this.sql().trim(),
+            transform: parts.transform,
             triggers: { on_pipeline: this.state.normalizedName() },
         };
-        if (Object.keys(references).length > 0) draft['references'] = references;
+        if (Object.keys(parts.references).length > 0) draft['references'] = parts.references;
         return draft;
     }
 
@@ -327,7 +212,6 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
 
     private finishSave(draft: Record<string, unknown>): void {
         this.state.enrichmentConfig.set(draft);
-        this.savedSql = this.sql();
-        this.referencesForm.markAsPristine();
+        this.editor()?.markSaved();
     }
 }

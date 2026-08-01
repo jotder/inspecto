@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byTier, COLLECTOR_ATTRIBUTES } from 'app/inspecto/component-model';
+import { byTier, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
 import { nodeAttributesFor } from './node-attributes';
 
 /**
@@ -14,7 +14,19 @@ describe('node-attributes', () => {
         expect(specs).toBeDefined();
         const grouped = byTier(specs!);
         expect(grouped.required.map((s) => s.key)).toEqual(['format']);
-        expect(grouped.advanced.map((s) => s.key)).toEqual(['compression']);
+        // W4a moved compression advanced → optional when the table unified with Onboarding's
+        // (which always showed it) — a deliberate tier choice, not a regression.
+        expect(grouped.optional.map((s) => s.key)).toEqual(['compression']);
+    });
+
+    /** W4a: the sink's output block is the SAME shared table Onboarding's publish stage renders. */
+    it('authors the output block with the shared OUTPUT_ATTRIBUTES table', () => {
+        expect(nodeAttributesFor('sink.persistent')).toBe(OUTPUT_ATTRIBUTES);
+    });
+
+    /** The shared table's format default is the ENGINE's absent-key behaviour, not a UX suggestion. */
+    it('defaults the output format to CSV, the engine default', () => {
+        expect(OUTPUT_ATTRIBUTES.find((s) => s.key === 'format')?.default).toBe('CSV');
     });
 
     it('classifies every attribute of every known type into a tier', () => {

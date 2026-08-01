@@ -9,9 +9,9 @@ import { ComponentsService, InboxStatus, LensService, RunsService, apiErrorMessa
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { PUBLISH_ATTRIBUTES } from './publish-attributes';
 import { clearMissingRoots, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { OnboardingStateService } from './onboarding-state.service';
+import { stageAttributesFor } from './stage-attributes';
 
 /**
  * Dataset & Go-live stage — authors the Stage-1 `output:` block, then flips `active: true` once
@@ -49,10 +49,15 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
 
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
 
-    readonly attributes = PUBLISH_ATTRIBUTES;
-    readonly initial = flattenBlock(
-        ((this.state.config() ?? {})['output'] as Record<string, unknown> | undefined) ?? undefined,
-    );
+    /** The shared output table (identical to the Pipelines sink node's) — one table per concern. */
+    readonly attributes = stageAttributesFor('publish')!;
+    /** A brand-new draft SUGGESTS Parquet (the better landing format) via `initial`; the shared
+     *  table's own default stays the engine truth (CSV), so the Pipelines sink dialog never
+     *  authors a format the operator did not pick. A resumed block renders verbatim. */
+    readonly initial = (() => {
+        const output = this.state.block('output');
+        return output ? flattenBlock(output) : { format: 'PARQUET' };
+    })();
 
     readonly saving = signal(false);
     readonly activating = signal(false);

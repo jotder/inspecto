@@ -66,7 +66,16 @@ describe('OnboardingPublishPaneComponent', () => {
         fixture.componentInstance.save();
         const [type, config] = write.mock.calls[0] as [string, Record<string, unknown>];
         expect(type).toBe('pipeline');
+        // W4a: the Parquet suggestion now rides `initial` (new drafts only); the shared
+        // OUTPUT_ATTRIBUTES table's own default is the engine truth (CSV).
         expect((config['output'] as Record<string, unknown>)['format']).toBe('PARQUET');
+    });
+
+    it('a resumed output block renders verbatim — the Parquet suggestion is for new drafts only', () => {
+        const { fixture, write } = create({ name: 'x', output: { format: 'CSV' } });
+        fixture.componentInstance.save();
+        const [, config] = write.mock.calls[0] as [string, Record<string, unknown>];
+        expect((config['output'] as Record<string, unknown>)['format']).toBe('CSV');
     });
 
     it('names the other incomplete required stages when far from ready', () => {

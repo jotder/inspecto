@@ -1,6 +1,6 @@
 # Onboarding ↔ Pipeline unification — one model, one guided head
 
-> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W0 + W1 + W2 + W3 SHIPPED; W4/W5 now unblocked.**
+> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W0–W4 SHIPPED; W5 (graph editor writes the canonical config) is the last piece.**
 > **Supersedes `onboarding-pipeline-split.md`** (approved 2026-07-30, archived to
 > `archived-documents/plans-archive/`). That plan's two-plane model — Onboard declares a contract,
 > Pipeline processes landed data, the Dataset is the handoff — is **reversed** by this one. §6 records
@@ -651,8 +651,88 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   export of what the operator was looking at, and was not. `exportConfig()` now refuses while the active
   pane is dirty and says to save first.
   *Verified: a new shell spec (dirty ⇒ nothing built, nothing downloaded, warned).*
-- **W4 — stages become typed nodes (U-B).** Gated on W0.
+- **W4 — stages become typed nodes (U-B).** Gated on W0 — **now unblocked (W0 shipped 2026-08-01).**
   *Verify: full UI gate + a live resume walk (leave mid-stage, return, state intact).*
+
+  ⚠ **W4 audit 2026-08-01 — the premise has shifted; re-scope before building.** The plan framed W4 as
+  "Onboarding stages are bespoke panes → make them typed nodes rendered from one spec table." A read of the
+  current feature (`modules/admin/catalog/onboarding/`) shows **three of the six stage panes are already
+  schema-driven** via `<inspecto-schema-form>` over `AttributeSpec[]`:
+  - `collection` → `collection-pane` over `COLLECTOR_ATTRIBUTES` ✅
+  - `publish` → `publish-pane` over `PUBLISH_ATTRIBUTES` ✅
+  - `parsing` → `parsing-pane` over `parsingAttributesFor()` ✅ (plus the bespoke segments editor)
+  The remaining bespoke panes — `schema`/`keys` (`schema-mapping-pane`, nested `FormArray` field rows) and
+  `enrichment` (`enrichment-pane`, nested `FormArray` reference rows) — are **nested-list** forms, which
+  **non-goal §7 explicitly exempts** ("Not extending `FieldSpec` to nested lists; the segments editor stays
+  bespoke"). So "convert the rest to schema-form" is largely *not* wanted.
+
+  **What genuinely remains of W4 is the model spine U-B §4 names, not a pane conversion.** `OnboardingStage`
+  today is a UI descriptor (`id/label/icon/hint`, `onboarding-state.service.ts:15-21`) with **no typed
+  `type`/`config` bag** — unlike `AuthoredNode` (`{id, type, config: Record<string,unknown>}`,
+  `pipelines.service.ts:91-98`). The unfinished work is giving stages that `type`+`config` shape aligned to
+  `AuthoredNode` and a single `stageAttributesFor()`-style lookup consolidating the three existing per-pane
+  spec references — so "a guided view over the head of the same graph" is provable, not just asserted. The
+  shell's bespoke `activeComponent` switch (`onboarding-shell.component.ts:74-90`) and the state service's
+  per-block `saveBlock` (`:183-214`) are the two touchpoints.
+
+  **Operator re-scoped W4 (2026-08-01): BOTH the model spine AND enrichment unification.** Rationale given:
+  enrichment executes on the same engine (it is already `BuiltinNodeType.ENRICHMENT` there — U-B's reversal
+  of D-A made it a node in the one graph), and the UI row-list components can be reused rather than
+  re-rolled. This **deliberately narrows the §7 nested-list non-goal for the enrichment pane only** —
+  `schema`/`keys` field rows and the segments editor stay bespoke as before. ⚠ The §6 `EnrichmentService`
+  semantics warning is now LIVE, not dormant: the registered enrichment path runs **per committed batch**
+  while `EnrichJob` is a **full recompute** — relocating enrichment authoring must not silently convert
+  incremental cost into full-recompute cost. The unified surface must keep authoring on the same
+  registered-enrichment write path (`*_enrich.toon` / its route), not re-route through job creation.
+
+  ### ✅ W4 SHIPPED 2026-08-01 — both halves
+
+  **W4a — the model spine.** `OnboardingStage` now carries `nodeType` (the engine `BuiltinNodeType` the
+  stage authors) + `block` (the config block it owns), aligned to `AuthoredNode`'s `{id, type, config}`;
+  `stageForPath` findings attribution is **derived from the stage model's own block ownership** (the
+  per-kind schema/keys split falls out of `stages()` for free — no second map to drift), and the panes
+  read their block through one `state.block()` accessor. One `stageAttributesFor()` lookup is the
+  Onboarding analogue of `nodeAttributesFor()`; **`OUTPUT_ATTRIBUTES` moved to `component-model`** —
+  the pipelines `SINK_ATTRIBUTES` / onboarding `PUBLISH_ATTRIBUTES` fork was live U-D-style drift
+  (divergent defaults CSV-vs-PARQUET and tiers over the same two engine keys). The shared table keeps the
+  ENGINE default (CSV); onboarding's Parquet suggestion rides the publish pane's `initial` for new drafts
+  only (spec-pinned both ways). `stage-attributes.spec.ts` pins: every stage nodeType ∈ the pinned
+  `NODE_TYPES` palette port; identity with the pipelines tables via the shared component-model consts.
+
+  **W4b — enrichment authoring unified.** The scout finding that shaped it: the pipelines `enrichment`
+  node was an **untyped free-form bag that never reached `*_enrich.toon` and never registered** — no
+  round-trip existed at all (and `PipelineLift` structurally cannot lift one: a pipeline and its
+  enrichment are separate graphs joined by store name). Shipped:
+  - **`<inspecto-enrichment-editor>`** (`inspecto/enrichment/`) — ONE shared references+transform editor
+    (mode-discriminated rows, dup-alias/identifier/binding validation, SQL, available-views), adopted by
+    the Onboarding Enrichment pane and the Pipelines node dialog. Fixes the silent **`as_of` drop** on the
+    old pane's hydrate→save round-trip (spec-pinned; `as_of` offered in ref mode only — the engine
+    hard-rejects it on `path` refs).
+  - **`ENRICHMENT_WIRING_ATTRIBUTES`** — the wiring a host must ASK when it cannot derive it
+    (input/output stores + formats, `triggers.*`; engine-real per `EnrichmentConfig.fromMap`, PARQUET
+    defaults). ⚠ `partitions` lists deliberately NOT specced (`AttributeSpec` has no list type — a
+    comma-string knob would author a config `strList` rejects); saves carry them through **verbatim**,
+    and spec-owned keys are replaced wholesale so a cleared field deletes rather than resurrects.
+  - **The node dialog authors the REAL companion**: `POST /config/write type=enrichment` then
+    `POST /enrichment` — the same registered per-batch path Onboarding uses, **never** a job. The node
+    closes carrying only `use: enrichment/<name>` (single truth in the file; no config mirroring — the
+    D7 split-brain lesson). The category-derived `transform` component picker is suppressed for
+    enrichment nodes (it fought over `use`). A hand-authored **`transform_file`** config is refused with
+    a named alert rather than silently overwritten with inline SQL.
+
+  *Verified: `lint:tokens` + **1943** UI tests exit 0 + production build green. Live offline walk
+  (port 4205): created draft `w4_walk` → Collection saved (`collector.connector: local` derived) →
+  Enrichment via the shared editor (ref binding + `as_of: EVENT_DATE`) → mock store shows the exact
+  companion shape incl. `registered: true` → left, returned: **resume landed on Parsing (first empty
+  stage) and the enrichment stage rehydrated alias/mode/binding/as_of/SQL pristine**. Pipelines side:
+  palette-dropped an `enrichment` node onto `cdr_ingest`, Configure showed wiring + shared editor, Save
+  wrote `enrichment_1_enrich.toon` (engine-real shape, `triggers.on_pipeline: cdr_ingest`,
+  `registered: true`) and the node flipped to configured. Zero console errors; walk artifacts cleaned.*
+
+  ⚠ **Left open, recorded**: `ConfigSpecs.enrichment()` still does not spec the `references:` map
+  server-side (BACKLOG §6 — both UIs now share ONE validator, but API/hand-authored writes stay
+  unchecked); the dialog's preview affordance is Onboarding-only (a graph node has no obvious store to
+  sample until W5 lowers it).
 - **W5 — graph editor writes the canonical config (U-A).** Gated on W0. Largest piece; last.
   *Verify: full reactor; a config authored in the graph editor actually polls and commits a batch.*
 
