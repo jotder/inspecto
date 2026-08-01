@@ -14,31 +14,44 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.locks.ReentrantLock;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Characterization tests for the single shared {@code ingestLock} that serializes every ingest entry
- * path — the scheduled poll cycle ({@link CollectorService#runAllOnce()}) and the operator trigger
- * ({@link CollectorService#runPipeline(String)}) — so a manual run can never overlap a cycle (or vice
- * versa). This is the load-bearing invariant of the pending {@code PipelineScheduler} extraction
- * (modularization-optimization-plan §2.2.1a): the scheduler must receive a <em>shared reference</em> to
- * this one lock, never a clone. Pinning it here <em>before</em> the extraction turns a would-be silent
- * live-deadlock (a cloned lock compiles fine) into a red test.
+ * Characterization tests for {@link PipelineRunGuard} — the <b>per-pipeline</b> ingest exclusion every
+ * ingest entry path shares: the scheduled poll cycle ({@link CollectorService#runAllOnce()}) and the
+ * operator trigger ({@link CollectorService#runPipeline(String)}).
  *
- * <p>Both tests reflectively hold the lock from the test thread and assert the ingest path blocks until
- * it is released — a deterministic stand-in for two ingest paths racing, without needing a blocking hook
- * inside a run.
+ * <p>Two invariants, and the difference between them is the whole point of the guard:
+ * <ol>
+ *   <li><b>Same pipeline ⇒ never overlaps.</b> A manual run waits for an in-flight run of that
+ *       pipeline, so the second run re-reads the inbox only after the first has written its
+ *       {@code .processed} markers — no double-ingest. (This is what the former global
+ *       {@code ingestLock} actually protected.)</li>
+ *   <li><b>Different pipelines ⇒ never block each other.</b> The old global lock was held across an
+ *       entire cycle, so one slow pipeline delayed every other pipeline's run (head-of-line blocking).
+ *       {@link #aSlowPipelineDoesNotBlockAnUnrelatedOne} is the regression guard for that fix — it is
+ *       the test that fails if anyone re-widens the lock.</li>
+ * </ol>
+ *
+ * <p>The guard is reflected out of the service and claimed <em>from the test thread</em>, with the
+ * ingest call submitted to a separate executor. That ordering is load-bearing: claiming and then calling
+ * ingest on the <em>same</em> thread would park the test thread itself on the claim it is holding, so the
+ * test would hang instead of asserting.
  */
 class CollectorServiceIngestLockTest {
 
     private static final String CSV = "ID,AMT,EVENT_DATE\n1,10,2020-01-01\n";
 
     private static Path source(Path root) throws Exception {
-        Path toon = TestConfigs.csv(root, PipelineConfigBatchTest.miniSchema()).write();
+        return source(root, "TEST_ETL");
+    }
+
+    /** A pipeline with a seeded inbox. Distinct {@code name}s matter: same id ⇒ one pipeline to the run guard. */
+    private static Path source(Path root, String name) throws Exception {
+        Path toon = TestConfigs.csv(root, PipelineConfigBatchTest.miniSchema()).name(name).write();
         Path inbox = root.resolve("inbox");
         Files.createDirectories(inbox);
         Files.writeString(inbox.resolve("data.csv"), CSV);
@@ -53,56 +66,82 @@ class CollectorServiceIngestLockTest {
         }
     }
 
-    /** The one lock the poll cycle and every operator trigger contend on. Reflected so the test can hold it. */
-    private static ReentrantLock ingestLock(CollectorService svc) throws Exception {
-        Field f = CollectorService.class.getDeclaredField("ingestLock");
+    /** The one guard the poll cycle and every operator trigger claim from. Reflected so the test can hold a claim. */
+    private static PipelineRunGuard runGuard(CollectorService svc) throws Exception {
+        Field f = CollectorService.class.getDeclaredField("runGuard");
         f.setAccessible(true);
-        return (ReentrantLock) f.get(svc);
+        return (PipelineRunGuard) f.get(svc);
     }
 
     @Test
-    void pollCycleBlocksWhileIngestLockIsHeld(@TempDir Path dir) throws Exception {
+    void manualTriggerBlocksWhileTheSamePipelineIsClaimed(@TempDir Path dir) throws Exception {
         Path a = source(dir.resolve("a"));
         ExecutorService ex = Executors.newSingleThreadExecutor();
         try (CollectorService svc = new CollectorService(List.of(a), 3600, 1)) {
-            ReentrantLock lock = ingestLock(svc);
-            lock.lock();
-            Future<MultiCollectorProcessor.RunResult> cycle;
+            String name = svc.pipelines().get(0).name();
+            PipelineRunGuard.Claim held = runGuard(svc).acquire(name);
+            Future<?> trigger;
             try {
-                cycle = ex.submit(svc::runAllOnce);
-                assertThrows(TimeoutException.class, () -> cycle.get(500, MILLISECONDS),
-                        "runAllOnce must block on the shared ingestLock while it is held elsewhere");
-                assertEquals(0, outputCsvCount(dir.resolve("a")),
-                        "...and produce nothing while blocked");
+                trigger = ex.submit(() -> svc.runPipeline(name));
+                assertThrows(TimeoutException.class, () -> trigger.get(500, MILLISECONDS),
+                        "runPipeline must wait for an in-flight run of the SAME pipeline");
+                assertEquals(0, outputCsvCount(dir.resolve("a")), "...and produce nothing while blocked");
             } finally {
-                lock.unlock();
+                held.close();
             }
-            assertEquals(1, cycle.get(5, SECONDS).total(),
-                    "...then run to completion once the lock is released");
-            assertTrue(outputCsvCount(dir.resolve("a")) >= 1, "the unblocked cycle produced output");
+            trigger.get(5, SECONDS);
+            assertTrue(outputCsvCount(dir.resolve("a")) >= 1, "the unblocked trigger produced output");
         } finally {
             ex.shutdownNow();
         }
     }
 
     @Test
-    void manualTriggerBlocksWhileIngestLockIsHeld(@TempDir Path dir) throws Exception {
+    void pollCycleSkipsAClaimedPipelineRatherThanBlocking(@TempDir Path dir) throws Exception {
         Path a = source(dir.resolve("a"));
         ExecutorService ex = Executors.newSingleThreadExecutor();
         try (CollectorService svc = new CollectorService(List.of(a), 3600, 1)) {
             String name = svc.pipelines().get(0).name();
-            ReentrantLock lock = ingestLock(svc);
-            lock.lock();
-            Future<?> trigger;
+            PipelineRunGuard.Claim held = runGuard(svc).acquire(name);
             try {
-                trigger = ex.submit(() -> svc.runPipeline(name));
-                assertThrows(TimeoutException.class, () -> trigger.get(500, MILLISECONDS),
-                        "runPipeline must contend on the SAME ingestLock — a manual run cannot overlap a cycle");
+                // The cycle must SKIP a pipeline that is already running, not queue behind it: queueing
+                // would pile runs up behind a slow pipeline, which is the backlog the cap exists to avoid.
+                Future<MultiCollectorProcessor.RunResult> cycle = ex.submit(svc::runAllOnce);
+                MultiCollectorProcessor.RunResult r = cycle.get(5, SECONDS);
+                assertEquals(0, r.total(), "a claimed pipeline is skipped by the cycle, not run");
+                assertEquals(0, outputCsvCount(dir.resolve("a")), "...and nothing was ingested");
             } finally {
-                lock.unlock();
+                held.close();
             }
-            trigger.get(5, SECONDS);
-            assertTrue(outputCsvCount(dir.resolve("a")) >= 1, "the unblocked trigger produced output");
+            assertEquals(1, svc.runAllOnce().total(), "once released it runs on the next cycle");
+        } finally {
+            ex.shutdownNow();
+        }
+    }
+
+    @Test
+    void aSlowPipelineDoesNotBlockAnUnrelatedOne(@TempDir Path dir) throws Exception {
+        Path a = source(dir.resolve("a"));                             // TEST_ETL — held below
+        Path b = source(dir.resolve("b"), "TEST_ETL_B");                // unrelated pipeline
+        ExecutorService ex = Executors.newSingleThreadExecutor();
+        try (CollectorService svc = new CollectorService(List.of(a, b), 3600, 2)) {
+            // Read the ids back from the service rather than assuming the config's literal casing —
+            // the registered pipeline id is not necessarily the verbatim `name:` string.
+            List<String> names = svc.pipelines().stream().map(p -> p.name()).toList();
+            String aName = names.stream().filter(n -> !n.toUpperCase().endsWith("_B")).findFirst()
+                    .orElseThrow(() -> new AssertionError("no non-_B pipeline in " + names));
+            assertEquals(2, names.size(), "both pipelines registered under distinct ids: " + names);
+            PipelineRunGuard.Claim held = runGuard(svc).acquire(aName);
+            try {
+                Future<MultiCollectorProcessor.RunResult> cycle = ex.submit(svc::runAllOnce);
+                MultiCollectorProcessor.RunResult r = cycle.get(10, SECONDS);
+                assertEquals(1, r.total(),
+                        "the unrelated pipeline must still run while another is claimed (no head-of-line blocking)");
+                assertTrue(outputCsvCount(dir.resolve("b")) >= 1, "the unrelated pipeline produced output");
+                assertEquals(0, outputCsvCount(dir.resolve("a")), "the claimed pipeline did not run");
+            } finally {
+                held.close();
+            }
         } finally {
             ex.shutdownNow();
         }

@@ -11,7 +11,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>State is process-wide and keyed by pipeline id on the {@link #shared()} singleton — the same
  * cross-cycle-state idiom as {@link CircuitBreaker#shared()} / {@link StabilityGate#shared()}, since each
  * static poll cycle is a fresh run. {@code CollectorProcessor.collect} reads {@link #capFor} on the run
- * path; the scheduler calls {@link #observeCycle} once per cycle to feed the controller.
+ * path; the scheduler calls {@link #observeCycle} once per <em>pipeline run</em> to feed the controller —
+ * since the cap is per-pipeline, the duration is attributed to the pipeline that spent it rather than to
+ * every pipeline that shared a tick with it (see {@code PipelineScheduler.governRun}).
  *
  * <h3>Inert unless configured</h3>
  * The whole mechanism is opt-in: with no {@code -Dingest.maxFilesPerCycle} there is no base cap, {@link #capFor}
@@ -22,9 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * §3.5's sketch halves the cap when {@code oldestInboxAge > 3 × pollInterval} or {@code pending > 10 × cap}.
  * Both are <em>positive</em> feedback: admitting fewer files cannot reduce inbox age or pending depth — it
  * raises them — so a sustained backlog would ratchet the cap to {@link Policy#minCap()} and pin it there,
- * throttling a healthy pipeline and deepening the very backlog it was reacting to. <b>Cycle overrun</b>
- * (cycle wall time vs. the poll interval) is the signal that actually means "this cycle admitted more than it
- * could process", and it closes the loop <em>negatively</em>: admit less ⇒ the cycle shortens ⇒ the cap
+ * throttling a healthy pipeline and deepening the very backlog it was reacting to. <b>Overrun</b>
+ * (run duration vs. the poll interval) is the signal that actually means "this run admitted more than it
+ * could process", and it closes the loop <em>negatively</em>: admit less ⇒ the run shortens ⇒ the cap
  * restores. Inbox lag stays an observability/alert surface ({@code inspecto_inbox_oldest_seconds},
  * {@code InboxStatus.oldestInboxAgeSeconds}), not a throttle input.
  */
@@ -119,9 +121,10 @@ public final class IntakeGovernor {
      * <p>No-op when admission control is off or {@code adaptive=false} (a hard cap), so the hot path stays
      * exactly as it was unless an operator opted in.
      *
-     * @param pipelineIds    the pipelines that ran in this cycle
-     * @param cycleMillis    the cycle's wall-clock duration
-     * @param pollIntervalMs the scheduler's fixed poll delay — the budget one cycle is expected to fit inside
+     * @param pipelineIds    the pipelines to charge this observation to (the scheduler passes the single
+     *                       pipeline whose run was measured; a multi-element list charges them all alike)
+     * @param cycleMillis    the measured wall-clock duration
+     * @param pollIntervalMs the scheduler's fixed poll delay — the budget one run is expected to fit inside
      */
     public void observeCycle(Iterable<String> pipelineIds, long cycleMillis, long pollIntervalMs) {
         if (!policy.active() || !policy.adaptive() || pollIntervalMs <= 0) return;

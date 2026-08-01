@@ -91,7 +91,7 @@ public final class CollectorService implements AutoCloseable {
      * The active set of pipeline config paths. A {@link CopyOnWriteArrayList} (not an immutable copy)
      * so new pipelines can be added at runtime via {@link #registerPipeline(Path)} — the poll cycle
      * re-indexes from this list each tick, so an addition is picked up on the next cycle without a
-     * restart. Mutated only under {@link #ingestLock}; iteration is snapshot-safe.
+     * restart. Mutated only under {@link #registryLock}; iteration is snapshot-safe.
      */
     private final List<Path> registry;
     private final long pollSeconds;
@@ -166,17 +166,29 @@ public final class CollectorService implements AutoCloseable {
     /** Authored-flow store ({@link SpaceRoot#flowsDir()}); lets the deletion fence (T32) see flow jobs as
      *  store producers/consumers. {@code null} when no write root is configured. */
     private final PipelineStore flowStore;
-    /** Serializes ingest cycles so an operator-triggered run (Control API {@code /trigger},
-     *  {@code /runs/{name}/trigger}) can never overlap the scheduled poll cycle or another
-     *  trigger. The scheduler is already non-overlapping (fixed-delay); this guards the
-     *  cross-entrypoint case. A waiting caller re-evaluates the inbox after acquiring the lock,
-     *  by which time the prior cycle has written its {@code .processed} markers — so
-     *  already-ingested files are skipped rather than double-processed. */
-    private final ReentrantLock ingestLock = new ReentrantLock();
-    /** Off-bus worker for event-triggered runs. The bus delivers synchronously on the publishing (runner)
-     *  thread while {@link #runAllOnce} holds {@link #ingestLock}; running a triggered pipeline inline would
-     *  deadlock, so — like {@link JobService} — the handler hands off here. Shared with {@link #pipelineScheduler}
-     *  (event-trigger hand-off) and used by {@link #triggerRunAsync} (async trigger). */
+    /** Per-pipeline ingest exclusion: an operator-triggered run (Control API {@code /trigger},
+     *  {@code /runs/{name}/trigger}) can never overlap a poll-cycle run — or another trigger — <em>of the
+     *  same pipeline</em>, while different pipelines proceed concurrently. A waiting caller re-evaluates the
+     *  inbox after acquiring, by which time the prior run has written its {@code .processed} markers — so
+     *  already-ingested files are skipped rather than double-processed.
+     *  <p>This replaced a single global {@code ingestLock} held across an entire poll cycle, which serialised
+     *  <em>unrelated</em> pipelines and let one slow pipeline delay the next tick for all of them. The
+     *  invariant that lock protected was always per-pipeline; see {@link PipelineRunGuard}. */
+    private final PipelineRunGuard runGuard = new PipelineRunGuard();
+    /** Serialises registry mutation ({@link #registry} + {@link ConfigRegistry#rebuild}) against a cycle's
+     *  selection pass. Deliberately narrow — never held across a run. */
+    private final ReentrantLock registryLock = new ReentrantLock();
+    /** Off-thread worker for every ingest run that must not occupy its originating thread: the poll cycle's
+     *  dispatched per-pipeline runs, event-triggered runs, and {@link #triggerRunAsync}. Shared with
+     *  {@link #pipelineScheduler} by reference.
+     *  <p>Two reasons a run lands here rather than inline. (1) <b>Correctness</b>: the bus delivers
+     *  synchronously on the publishing (runner) thread, which holds that pipeline's {@link #runGuard} claim,
+     *  so an inline event-triggered run would block forever on the claim that thread already holds (a
+     *  {@link PipelineRunGuard} claim is not reentrant) — like {@link JobService}, the handler hands off
+     *  instead. (2) <b>Throughput</b>: a poll tick that
+     *  ran its pipelines inline would not return until the slowest finished, delaying the next tick for every
+     *  other pipeline.
+     *  <p>Closed after {@link #scheduler} in {@link #close()} so no tick can submit into a closing executor. */
     private final ExecutorService triggerWorkers = Executors.newVirtualThreadPerTaskExecutor();
     /** Live + recently-finished manual pipeline runs by {@code runId}, so {@code GET /runs/runs/{runId}} can poll an
      *  async trigger (W5b). Registered {@code RUNNING} at submit, replaced with the terminal result on completion.
@@ -221,7 +233,8 @@ public final class CollectorService implements AutoCloseable {
      *  former per-call O(n) re-parse. Rebuilt at construction and at the top of every poll cycle. */
     private final ConfigRegistry configRegistry;
     /** The scheduled + event-driven ingest driver (M2 step 2): owns the poll-cycle body, the T13 trigger
-     *  gating, and the event-trigger hand-off. Shares this service's {@link #ingestLock}, {@link #bus},
+     *  gating, and the event-trigger hand-off. Shares this service's {@link #runGuard},
+     *  {@link #registryLock}, {@link #bus},
      *  {@link #triggerWorkers}, {@link #registry}, {@link #configRegistry}, {@link #paused}/{@link #running}
      *  by reference; the operator-trigger paths ({@link #runPipeline}) stay here and lock the same lock. */
     private final PipelineScheduler pipelineScheduler;
@@ -471,11 +484,12 @@ public final class CollectorService implements AutoCloseable {
         // before the first poll cycle. Unloadable configs are warned and skipped.
         configRegistry.rebuild(this.registry);
 
-        // The loop/event-driven ingest driver (M2 step 2). Passed the SAME ingestLock/bus/triggerWorkers
-        // and the shared registry/config/paused/running state — never clones — plus the two callbacks for
-        // what stays here: the sync run-by-name (runPipeline, same ingestLock) and the DB status sync.
+        // The loop/event-driven ingest driver (M2 step 2). Passed the SAME runGuard/registryLock/bus/
+        // triggerWorkers and the shared registry/config/paused/running state — never clones — plus the two
+        // callbacks for what stays here: the sync run-by-name (runPipeline, same runGuard) and the status sync.
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,
-                this.running, this.ingestLock, this.bus, this.triggerWorkers, this.maxConcurrentRuns,
+                this.running, this.runGuard, this.registryLock, this.bus, this.triggerWorkers,
+                this.maxConcurrentRuns,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
     }
 
@@ -819,9 +833,12 @@ public final class CollectorService implements AutoCloseable {
         // flow's coalescer (off the publishing thread, see triggerWorkers). Subscribed before the first
         // poll cycle so no commit is missed; flows with no event trigger ignore every event.
         bus.subscribe(pipelineScheduler::onUpstreamCommit);
-        scheduler.everySeconds("poll-all", 0, pollSeconds, this::runAllOnce);
+        // Dispatch-and-return: the tick selects due pipelines and hands each to triggerWorkers, so a slow
+        // pipeline cannot delay the next tick for the others. runAllOnce (POST /trigger, tests) keeps the
+        // blocking path — same runs, awaited. See PipelineScheduler's "Two cycle entry points, one body".
+        scheduler.everySeconds("poll-all", 0, pollSeconds, () -> underSpace(pipelineScheduler::dispatchCycle));
         // ACQ-6 push discovery: filesystem events on local `source.discovery: watch` poll roots trigger an
-        // immediate single-pipeline run (same ingestLock as the loop above, which stays on as the backstop).
+        // immediate single-pipeline run (same runGuard as the loop above, which stays on as the backstop).
         watcher = CollectorWatcher.startFor(configRegistry.all(), name -> {
             try { runPipeline(name); }
             catch (RuntimeException ex) { log.warn("Watch-triggered run of '{}' failed: {}", name, ex.getMessage()); }
@@ -927,12 +944,12 @@ public final class CollectorService implements AutoCloseable {
             throw new IllegalStateException("pipeline id '" + id + "' is already registered from "
                     + existing.get());
         }
-        ingestLock.lock();   // serialise the registry mutation against a running poll cycle
+        registryLock.lock();   // serialise the registry mutation against a cycle's selection pass
         try {
             registry.add(norm);
             configRegistry.rebuild(registry);   // refresh the read surface now; fires catalog invalidation
         } finally {
-            ingestLock.unlock();
+            registryLock.unlock();
         }
         armReferenceRefresh(cfg);   // Reference Phase-2 P3: refresh_seconds > 0 ⇒ periodic compaction
         log.info("Registered pipeline '{}' from {} ({} pipeline(s) now active)", id, norm, registry.size());
@@ -960,7 +977,7 @@ public final class CollectorService implements AutoCloseable {
      */
     public boolean unregisterPipeline(Path path) {
         Path norm = path.toAbsolutePath().normalize();
-        ingestLock.lock();   // serialise the registry mutation against a running poll cycle
+        registryLock.lock();   // serialise the registry mutation against a cycle's selection pass
         try {
             Optional<String> id = configRegistry.idForPath(norm);
             boolean removed = registry.remove(norm);
@@ -968,6 +985,7 @@ public final class CollectorService implements AutoCloseable {
             configRegistry.rebuild(registry);   // refresh the read surface now; fires catalog invalidation
             id.ifPresent(i -> {                 // prune per-pipeline bookkeeping so it can't leak under churn
                 pipelineScheduler.forget(i);    // cadence + coalescer maps (keyed by pipeline id)
+                runGuard.forget(i);             // per-pipeline run lock (no-op while a final run is in flight)
                 paused.remove(i);               // a paused-then-deleted pipeline would otherwise linger here
                 var timer = referenceRefreshTimers.remove(i);   // else compaction of a deleted store keeps firing
                 if (timer != null) timer.cancel(false);
@@ -980,7 +998,7 @@ public final class CollectorService implements AutoCloseable {
                     .attr("configPath", norm.toString()).attr("activePipelines", registry.size()));
             return true;
         } finally {
-            ingestLock.unlock();
+            registryLock.unlock();
         }
     }
 
@@ -1304,14 +1322,16 @@ public final class CollectorService implements AutoCloseable {
     /** Run a single registered pipeline once. Empty if no pipeline by that name. */
     public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName) {
         return underSpace(() -> pathFor(pipelineName).map(p -> {
-            ingestLock.lock();   // serialize with the poll cycle / other triggers (see field doc)
-            running.add(pipelineName);
-            try {
-                pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence
-                return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink());
-            } finally {
-                running.remove(pipelineName);
-                ingestLock.unlock();
+            // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
+            // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
+            try (PipelineRunGuard.Claim claim = runGuard.acquire(pipelineName)) {
+                running.add(pipelineName);
+                try {
+                    pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());   // T13: any run resets the cadence
+                    return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink());
+                } finally {
+                    running.remove(pipelineName);
+                }
             }
         }));
     }
@@ -1319,7 +1339,7 @@ public final class CollectorService implements AutoCloseable {
     /**
      * Fire a single registered pipeline asynchronously (W5b) and return its {@code runId} so an async HTTP caller
      * can poll {@link #pipelineRunById}. Empty if no pipeline by that name. The run executes off the caller's thread
-     * on {@link #triggerWorkers} — it acquires {@link #ingestLock} there exactly like the synchronous
+     * on {@link #triggerWorkers} — it claims the pipeline from {@link #runGuard} there exactly like the synchronous
      * {@link #runPipeline}, so the request thread never blocks on the ETL run.
      */
     public Optional<String> triggerRunAsync(String pipelineName) {
@@ -1329,8 +1349,8 @@ public final class CollectorService implements AutoCloseable {
     /**
      * Back-compat for the pre-v1 trigger routes ({@code POST /runs/{name}/trigger}, {@code /collectors/{id}/notify}):
      * run a pipeline off the request thread and block for its result, so the legacy caller still receives the
-     * synchronous {@link MultiCollectorProcessor.RunResult} body while the {@link #ingestLock} is acquired on
-     * {@link #triggerWorkers} rather than the HTTP request thread. That closes the request-thread-holds-ingestLock
+     * synchronous {@link MultiCollectorProcessor.RunResult} body while the {@link #runGuard} claim is taken on
+     * {@link #triggerWorkers} rather than the HTTP request thread. That closes the request-thread-holds-the-claim
      * hazard the old inline {@link #runPipeline} call carried (the sync-bus / ingest-lock deadlock, see the lock's
      * field doc), without changing the response contract. Empty if no pipeline by that name.
      */
@@ -1409,14 +1429,17 @@ public final class CollectorService implements AutoCloseable {
         assistSlot.close();                            // release agent resources first
         intelligenceSlot.close();
         if (jobs != null) jobs.close();               // drain in-flight job runs first
-        triggerWorkers.close();                        // drain in-flight event-triggered flow runs (T13)
+        // Stop the timers BEFORE draining the workers: since the poll tick dispatches its runs onto
+        // triggerWorkers, a tick firing during the drain would submit into a closing executor. The
+        // dispatch path handles that rejection, but not generating the work is the correct order.
+        scheduler.close();
+        triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)
         enrichment.close();   // drain in-flight recomputes first
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
         this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
         try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log
-        scheduler.close();
         if (status instanceof AutoCloseable c) {       // close a DB-backed store's connection
             try { c.close(); } catch (Exception e) { log.warn("Error closing status store: {}", e.getMessage()); }
         }
