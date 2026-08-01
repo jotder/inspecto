@@ -20,7 +20,7 @@ function configure(byKind: Record<string, ModelComponent[]>, flows: { summaries?
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ComponentsDataProvider, useValue: { list: (k: string) => Promise.resolve(byKind[k] ?? []) } },
-            { provide: PipelinesService, useValue: { authoredList: () => of(summaries), authoredRaw: (id: string) => of(raw[id]) } },
+            { provide: PipelinesService, useValue: { list: () => of(summaries), pipelineGraphRaw: (id: string) => of(raw[id]) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });

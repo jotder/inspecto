@@ -112,6 +112,21 @@ export interface AuthoredPipeline {
     edges: AuthoredEdge[];
 }
 
+/** One named reason a graph cannot lower to the flat config (W5; `nodeId` absent for graph-level). */
+export interface PipelineRefusal {
+    code: string;
+    nodeId?: string;
+    message: string;
+}
+
+/** The receipt of PUT /pipelines/{name}/graph — the canonical config was validated and written. */
+export interface PipelineGraphWriteResult {
+    written: boolean;
+    path: string;
+    name: string;
+    findings: { severity: string; fieldPath?: string; message: string }[];
+}
+
 /** One produced relation at a node in a dry-run (exact count + a bounded row sample). */
 export interface DryRunRelation {
     rel: string;
@@ -224,6 +239,28 @@ export class PipelinesService {
         return this.http.get<PipelineCombined>(apiUrl('/pipelines/combined'));
     }
 
+    // ── the canonical round-trip (W5, U-A): the editor edits *_pipeline.toon itself ──
+
+    /**
+     * The LOSSLESS editable graph of a registered pipeline: lifted for topology, node configs
+     * verbatim in the config-file vocabulary, plus a synthesized node per registered enrichment
+     * companion. Round-trips through {@link savePipelineGraph}.
+     */
+    pipelineGraphRaw(name: string): Observable<AuthoredPipeline> {
+        return this.http.get<AuthoredPipeline>(apiUrl(`/pipelines/${encodeURIComponent(name)}/graph/raw`));
+    }
+
+    /**
+     * Lower the graph to the canonical `<name>_pipeline.toon` (URL name authoritative). An active
+     * graph must be complete; an inactive draft may be partial. 422 carries named `refusals[]`
+     * (UNSUPPORTED_NODE / MULTI_SINK / NO_* completeness codes) when the topology cannot be
+     * represented as a flat config, or `findings[]` when the lowered config fails the write gate.
+     */
+    savePipelineGraph(name: string, pipeline: AuthoredPipeline): Observable<PipelineGraphWriteResult> {
+        return this.http.put<PipelineGraphWriteResult>(
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/graph`), pipeline);
+    }
+
     // ── authored-pipeline CRUD + dry-run (editor; all writes 503 without -Dassist.write.root) ──
 
     /** Summaries of every authored pipeline (empty list when no write root). */
@@ -234,16 +271,6 @@ export class PipelinesService {
     /** The lossless authored definition (nodes with config) for editing — round-trips through PUT. */
     authoredRaw(id: string): Observable<AuthoredPipeline> {
         return this.http.get<AuthoredPipeline>(apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/raw`));
-    }
-
-    /** Create a new authored pipeline (409 if the name exists). */
-    createAuthored(pipeline: AuthoredPipeline): Observable<unknown> {
-        return this.http.post(apiUrl('/pipelines/authored'), pipeline);
-    }
-
-    /** Replace an authored pipeline wholesale (URL id authoritative; 422 on validation errors). */
-    replaceAuthored(id: string, pipeline: AuthoredPipeline): Observable<unknown> {
-        return this.http.put(apiUrl(`/pipelines/authored/${encodeURIComponent(id)}`), pipeline);
     }
 
     /** Delete an authored pipeline. */

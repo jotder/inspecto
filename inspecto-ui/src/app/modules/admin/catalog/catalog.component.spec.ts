@@ -50,7 +50,7 @@ function create(
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
             // RegistryComponent is embedded (not lazy) for the "usage" tab.
             { provide: ComponentsDataProvider, useValue: { list: () => Promise.resolve([]) } },
-            { provide: PipelinesService, useValue: { authoredList: () => of([]), authoredRaw: () => of(undefined) } },
+            { provide: PipelinesService, useValue: { list: () => of([]), pipelineGraphRaw: () => of(undefined) } },
             // The Exchange tabs gate on bootstrap.features.exchange (SharingComponent is embedded).
             // authMode 'none' keeps LensService on the honor system (R2 grant checks bypassed).
             { provide: SessionService, useValue: { exchangeEnabled: () => true, authMode: () => 'none', capabilities: () => capabilities } },

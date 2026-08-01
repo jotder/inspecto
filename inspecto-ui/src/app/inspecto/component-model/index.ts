@@ -10,3 +10,4 @@ export * from './component-graph';
 export * from './data-provider';
 export * from './collector-attributes';
 export * from './output-attributes';
+export * from './pipeline-scaffold';

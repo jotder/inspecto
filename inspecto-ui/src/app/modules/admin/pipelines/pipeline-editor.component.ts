@@ -23,6 +23,8 @@ import {
     AuthoredPipeline,
     AuthoredNode,
     ComponentsService,
+    ConfigService,
+    PipelineRefusal,
     PipelineRunResult,
     PipelinesService,
     PipelineSummary,
@@ -32,6 +34,7 @@ import {
     LensService,
     apiErrorMessage,
 } from 'app/inspecto/api';
+import { pipelineScaffold } from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -116,6 +119,7 @@ import {
 })
 export class PipelineEditorComponent implements OnInit {
     private api = inject(PipelinesService);
+    private configApi = inject(ConfigService);
     private components = inject(ComponentsService);
     private iconMapApi = inject(IconMapService);
     private fb = inject(FormBuilder);
@@ -243,7 +247,8 @@ export class PipelineEditorComponent implements OnInit {
 
     load(): void {
         this.loading.set(true);
-        this.api.authoredList().subscribe({
+        // W5: the editor lists REGISTERED pipelines (the canonical *_pipeline.toon), not authored flows.
+        this.api.list().subscribe({
             next: (fs) => {
                 this.flows.set(fs);
                 this.loading.set(false);
@@ -293,7 +298,8 @@ export class PipelineEditorComponent implements OnInit {
 
     select(id: string): void {
         this.clearSelection();
-        this.api.authoredRaw(id).subscribe({
+        // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
+        this.api.pipelineGraphRaw(id).subscribe({
             next: (flow) => {
                 this.model.set(flow);
                 this.selectedId.set(id); // drives the host rebuild (graphKey)
@@ -341,14 +347,27 @@ export class PipelineEditorComponent implements OnInit {
             return;
         }
         const name = this.newName.value.trim();
-        const flow: AuthoredPipeline = { name, active: false, nodes: [], edges: [] };
-        this.api.createAuthored(flow).subscribe({
-            next: () => {
-                this.creating.set(false);
-                this.flows.update((fs) => [...fs, { name, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]);
-                this.select(name);
+        // W5: a new pipeline IS a canonical draft — write the space-convention scaffold (inactive,
+        // with the parser-required dirs) and register it, then load its lifted graph.
+        this.configApi.write('pipeline', pipelineScaffold(name)).subscribe({
+            next: (written) => {
+                this.configApi.registerPipeline(written.path).subscribe({
+                    next: () => {
+                        this.creating.set(false);
+                        this.flows.update((fs) => [...fs, { name, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]);
+                        this.select(name);
+                    },
+                    error: () => {
+                        // the file exists; the row appears after the next rescan
+                        this.creating.set(false);
+                        this.select(name);
+                    },
+                });
             },
-            error: (err) => this.onWriteError(err, 'Could not create the pipeline'),
+            error: (err) => {
+                if ((err as { status?: number })?.status === 409) this.newName.setErrors({ duplicate: true });
+                else this.onWriteError(err, 'Could not create the pipeline');
+            },
         });
     }
 
@@ -409,7 +428,7 @@ export class PipelineEditorComponent implements OnInit {
         const id = this.selectedId();
         if (!m || !id) return;
         this.saving.set(true);
-        this.api.replaceAuthored(id, m).subscribe({
+        this.api.savePipelineGraph(id, m).subscribe({
             next: () => {
                 this.saving.set(false);
                 this.dirty.set(false);
@@ -417,9 +436,19 @@ export class PipelineEditorComponent implements OnInit {
             },
             error: (err) => {
                 this.saving.set(false);
-                this.onWriteError(err, 'Save failed');
+                if (!this.showRefusals(err)) this.onWriteError(err, 'Save failed');
             },
         });
+    }
+
+    /** Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_SINK / NO_*) as a toast, or false if none. */
+    private showRefusals(err: unknown): boolean {
+        const refusals = (err as { error?: { error?: { details?: { refusals?: PipelineRefusal[] } } } })
+            ?.error?.error?.details?.refusals;
+        if (!refusals?.length) return false;
+        const r = refusals[0];
+        this.toast.error(`Cannot save: ${r.message}${r.nodeId ? ` (node '${r.nodeId}')` : ''}`);
+        return true;
     }
 
     async deleteFlow(): Promise<void> {
@@ -430,7 +459,9 @@ export class PipelineEditorComponent implements OnInit {
             { title: 'Delete pipeline', confirmText: 'Delete' },
         );
         if (!ok) return;
-        this.api.deleteAuthored(id).subscribe({
+        // W5: deleting a registered pipeline discards its canonical config (the server refuses an
+        // active pipeline — deactivate first).
+        this.configApi.remove('pipeline', id).subscribe({
             next: () => {
                 this.flows.update((fs) => fs.filter((f) => f.name !== id));
                 this.model.set(null);
@@ -718,7 +749,7 @@ export class PipelineEditorComponent implements OnInit {
 
     private setActive(id: string, updated: AuthoredPipeline, ok: string): void {
         this.activating.set(true);
-        this.api.replaceAuthored(id, updated).subscribe({
+        this.api.savePipelineGraph(id, updated).subscribe({
             next: () => {
                 this.activating.set(false);
                 this.model.set(updated);
@@ -727,7 +758,7 @@ export class PipelineEditorComponent implements OnInit {
             },
             error: (err) => {
                 this.activating.set(false);
-                this.onWriteError(err, 'Update failed');
+                if (!this.showRefusals(err)) this.onWriteError(err, 'Update failed');
             },
         });
     }

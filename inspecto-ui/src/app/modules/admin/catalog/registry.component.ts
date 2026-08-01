@@ -167,11 +167,11 @@ export class RegistryComponent implements OnInit {
     /** Load authored flows as `pipeline` components, with parts derived from each node's `use=<kind>/<id>` ref. */
     private async loadPipelines(): Promise<ModelComponent[]> {
         try {
-            const flows = await firstValueFrom(this.flows.authoredList());
+            const flows = await firstValueFrom(this.flows.list());
             const loaded = await Promise.all(
                 flows.map(async (f): Promise<ModelComponent | null> => {
                     try {
-                        const flow = await firstValueFrom(this.flows.authoredRaw(f.name));
+                        const flow = await firstValueFrom(this.flows.pipelineGraphRaw(f.name));
                         const config = flow as unknown as Record<string, unknown>; // carried opaquely; parts already derived
                         return { kind: 'pipeline', id: f.name, name: flow.name || f.name, config, parts: refParts('pipeline', config, PIPELINE_REF_KINDS) };
                     } catch {

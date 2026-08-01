@@ -41,10 +41,9 @@ function create(opts: { canAuthor?: boolean } = {}) {
             {
                 provide: PipelinesService,
                 useValue: {
-                    authoredList: () => of([{ name: 'cdr_ingest' }]),
-                    authoredRaw: () => of(PIPELINE),
-                    createAuthored: vi.fn(() => of({})),
-                    replaceAuthored: vi.fn(() => of({})),
+                    list: () => of([{ name: 'cdr_ingest' }]),
+                    pipelineGraphRaw: () => of(PIPELINE),
+                    savePipelineGraph: vi.fn(() => of({ written: true })),
                 },
             },
             {

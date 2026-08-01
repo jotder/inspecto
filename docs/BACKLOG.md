@@ -418,6 +418,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
+  unification W5). W5 made the graph editor *author* the canonical `*_pipeline.toon` for the
+  single-source / single-persistent-sink subset, refusing everything else with a named code
+  (`UNSUPPORTED_NODE`/`MULTI_SINK`/…). The flat `PipelineConfig` executor still cannot *run* a
+  multi-sink, non-`gap` CONTROL, `transform.derive`/`route`, or `sink.materialized`/`view` topology —
+  those stay grandfathered `*_flow.toon`, editable-read only. Closing this = the branch-aware executor
+  of [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
+  §13 R3, which would let the editor lower (and the engine run) the full graph vocabulary. Largest
+  remaining pipeline-graph piece; explicitly out of scope for W5.
 - **`ConfigSpecs.enrichment()` does not spec the `references:` map** (surfaced 2026-08-01 by
   unification W4b). Per-entry keys (`ref` XOR `path`, `format`, `as_of` — `EnrichmentConfig.fromMap`
   hard-fails them at LOAD) are validated only in the UI; a hand-authored or API-written config with a

@@ -96,12 +96,11 @@ final class CapabilityManifest {
             // ObjectRoutes
             new Entry("POST", "/cases/rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/cases/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
-            // PipelineRoutes
-            new Entry("POST", "/pipelines/authored", Roles.CAN_AUTHOR_WORKBENCH),
-            new Entry("PUT", "/pipelines/authored/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
+            // PipelineRoutes — W5: the graph editor writes the canonical *_pipeline.toon; the
+            // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
+            // ad-hoc trigger stay for grandfathered flows.
+            new Entry("PUT", "/pipelines/([^/]+)/graph", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/pipelines/authored/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
-            new Entry("POST", "/pipelines/authored/([^/]+)/nodes", Roles.CAN_AUTHOR_WORKBENCH),
-            new Entry("POST", "/pipelines/authored/([^/]+)/edges", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             // QueueRoutes
             new Entry("POST", "/queues", Roles.CAN_AUTHOR_WORKBENCH),

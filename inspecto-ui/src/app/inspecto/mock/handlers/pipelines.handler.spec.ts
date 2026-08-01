@@ -95,14 +95,14 @@ describe('pipelinesHandler — /views (sink.view UI-consumer, T32 follow-up)', (
     const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
 
     function withView(store: MockStore): void {
-        handler(
-            req('POST', '/api/pipelines/authored', {
-                name: 'orders_etl',
-                nodes: [{ id: 'v', type: 'sink.view', name: 'orders_view' }],
-                edges: [],
-            }),
-            store,
-        );
+        // Views come from sink.view nodes on grandfathered flows — seed one directly (authoring
+        // POST /pipelines/authored retired with W5).
+        store.put('default', 'authored-pipeline', 'orders_etl', {
+            name: 'orders_etl',
+            active: false,
+            nodes: [{ id: 'v', type: 'sink.view', name: 'orders_view' }],
+            edges: [],
+        });
     }
 
     it('lists views across authored pipelines', () => {
@@ -128,23 +128,44 @@ describe('pipelinesHandler — /views (sink.view UI-consumer, T32 follow-up)', (
     });
 });
 
-describe('pipelinesHandler — authored create/update split (mirrors PipelineRoutes)', () => {
+describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower over the config)', () => {
     const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
 
-    it('409s a create on an existing id (update is PUT) — mirrors the real backend', () => {
+    it('lists the registered CANONICAL pipelines (config store), not the grandfathered flows', () => {
         const store = seededStore();
-        const dup = handler(req('POST', '/api/pipelines/authored', { name: 'cdr_ingest', nodes: [], edges: [] }), store);
-        expect(dup?.status).toBe(409);
+        const names = ((handler(req('GET', '/api/pipelines'), store)?.body as { name: string }[]) ?? []).map((p) => p.name);
+        expect(names).toContain('cdr_ingest'); // the canonical config seed
     });
 
-    it('creates via POST and upserts via PUT (URL id authoritative, create-or-replace)', () => {
+    it('lifts a config to the editable graph and lowers an edit back verbatim', () => {
         const store = seededStore();
-        handler(req('POST', '/api/pipelines/authored', { name: 'new_flow', nodes: [], edges: [] }), store);
-        expect(store.get('default', 'authored-pipeline', 'new_flow')).toBeDefined();
-        handler(req('PUT', '/api/pipelines/authored/new_flow', { nodes: [{ id: 'n1' }], edges: [] }), store);
-        expect((store.get<{ nodes: unknown[] }>('default', 'authored-pipeline', 'new_flow'))?.nodes).toHaveLength(1);
-        // PUT to an id that never existed also succeeds (backend: "create or replace, URL id is authoritative").
-        handler(req('PUT', '/api/pipelines/authored/put_only_flow', { nodes: [], edges: [] }), store);
-        expect(store.get('default', 'authored-pipeline', 'put_only_flow')).toBeDefined();
+        const raw = handler(req('GET', '/api/pipelines/cdr_ingest/graph/raw'), store)?.body as { nodes: { type: string }[] };
+        expect(raw.nodes.some((n) => n.type === 'acquisition')).toBe(true);
+        expect(raw.nodes.some((n) => n.type === 'sink.persistent')).toBe(true);
+        const put = handler(req('PUT', '/api/pipelines/cdr_ingest/graph', raw), store);
+        expect((put?.body as { written: boolean }).written).toBe(true);
+    });
+
+    it('refuses an unrepresentable topology with a named code (never silently truncates)', () => {
+        const store = seededStore();
+        const bad = {
+            active: true,
+            nodes: [
+                { id: 'acq', type: 'acquisition', config: { poll: 'in' } },
+                { id: 'd', type: 'transform.derive' },
+                { id: 'p', type: 'parser', config: { schema_file: 's.toon' } },
+                { id: 'out', type: 'sink.persistent', config: { database: 'db' } },
+            ],
+            edges: [],
+        };
+        const res = handler(req('PUT', '/api/pipelines/refuse/graph', bad), store);
+        expect(res?.status).toBe(422);
+        expect((res?.body as { refusals: { code: string }[] }).refusals[0].code).toBe('UNSUPPORTED_NODE');
+    });
+
+    it('POST/PUT /pipelines/authored are retired (405) — authoring goes through the graph now', () => {
+        const store = seededStore();
+        expect(handler(req('POST', '/api/pipelines/authored', { name: 'x', nodes: [], edges: [] }), store)?.status).toBe(405);
+        expect(handler(req('PUT', '/api/pipelines/authored/cdr_ingest', { nodes: [], edges: [] }), store)?.status).toBe(405);
     });
 });

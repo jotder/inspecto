@@ -88,12 +88,12 @@ export class BundleTransferService {
         return forkJoin({
             ...componentLists,
             connection: this.connections.list().pipe(catchError(() => of([]))),
-            pipelineNames: this.pipelines.authoredList().pipe(map((list) => list.map((p) => p.name)), catchError(() => of([] as string[]))),
+            pipelineNames: this.pipelines.list().pipe(map((list) => list.map((p) => p.name)), catchError(() => of([] as string[]))),
             jobNames: this.jobs.list().pipe(map((list) => list.map((j) => j.name)), catchError(() => of([] as string[]))),
             decisionRules: this.decisionRules.list().pipe(catchError(() => of([] as DecisionRule[]))),
         }).pipe(
             concatMap((res) => {
-                const raws = (res['pipelineNames'] as string[]).map((name) => this.pipelines.authoredRaw(name).pipe(catchError(() => of(null))));
+                const raws = (res['pipelineNames'] as string[]).map((name) => this.pipelines.pipelineGraphRaw(name).pipe(catchError(() => of(null))));
                 const jobDetails = (res['jobNames'] as string[]).map((name) => this.jobs.get(name).pipe(catchError(() => of(null))));
                 return forkJoin({
                     pipelines: raws.length ? forkJoin(raws) : of([] as (AuthoredPipeline | null)[]),

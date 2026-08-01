@@ -73,24 +73,19 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/onboarding-pipeline-unification.md`](superpower/onboarding-pipeline-unification.md) —
-  **Onboarding ↔ Pipeline UNIFICATION, IN FLIGHT. W0–W4 shipped (through 2026-08-01); W5 (graph
-  editor writes the canonical config) is the last piece. Supersedes and reverses
-  `onboarding-pipeline-split.md`** (archived to `plans-archive/`; S1 there shipped and stays).
-  **One** model: `*_pipeline.toon`/`PipelineConfig` is canonical because it is what the engine executes —
-  the authoring editor's `*_flow.toon` is not wired to the executor. Onboarding becomes a guided view over
-  the head of the same graph; "Stream" is already only a Catalog label (`kind: "STREAM"`). Pinned U-A–U-G:
-  canonical config wins · stages become typed nodes · **one schema store = path-addressed config TOON**
-  (no engine path resolves a registry schema id; `bindKindFor` never offered `schema`; 16 files vs 2
-  components) · one `AttributeSpec` table per concern with Onboarding's engine-real keys winning ·
-  plugin-parser parity · one promotion-grade export pipe (reusing the existing backend
-  `BundleExporter`/`DataSourceBundleResolver` closure walk) · no identity churn. ⚠ **W0 is a hard gate**:
-  the lift→lower round-trip is potentially lossy BOTH ways (`dirs`/dedup/quarantine have no node home;
-  the graph can express branching a flat config cannot) — prove it lossless or name the supported subset
-  before W4/W5 build. W1–W3 (schema store · config keys · export) are independently shippable and close
-  every issue the operator named. Shares a prerequisite with `BACKLOG.md` §6 path-jailing: one space-root
-  threading into `PipelineConfigParser` lands both. Standing UI mandate: reuse shared components even when
-  they need small changes.
+- ~~`superpower/onboarding-pipeline-unification.md`~~ — **SHIPPED end-to-end 2026-08-01 (W0–W5), plan
+  archived** to
+  [`archived-documents/plans-archive/onboarding-pipeline-unification.md`](archived-documents/plans-archive/onboarding-pipeline-unification.md).
+  Onboarding and Pipelines are now **one model**: `*_pipeline.toon`/`PipelineConfig` is canonical (it is
+  what the engine executes), stages are typed nodes over the head of the same graph, and the graph editor
+  writes that canonical config through the **editable lift/lower round-trip** — the W5 as-built lives in
+  [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
+  §16 (`PipelineEditable`, named `PipelineCompileException` refusals, `PUT /pipelines/{name}/graph` reusing
+  the `/config/write` gate; the old `*_flow.toon` authoring writes retired, grandfathered flows read-only).
+  Shipped U-A–U-G: canonical config wins · typed-node stages · one path-addressed schema store · one
+  `AttributeSpec` table per concern · plugin-parser parity · one promotion-grade export pipe · no identity
+  churn. Residuals in `BACKLOG.md` §6 (branch-aware executor to *run* the full graph vocabulary;
+  `ConfigSpecs.enrichment()` `references:` spec).
 - [`superpower/4x-public-pkce-plan.md`](superpower/4x-public-pkce-plan.md) — **`4.x` public-PKCE auth,
   SCOPED 2026-07-25** — the gate on the SEC-INCIDENT-1 rotation (BACKLOG §5): `4.x` must stop needing a
   client secret before the leaked secrets can be rotated. Verified against `4.x` `291c86a1`, and three

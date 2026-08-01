@@ -1,6 +1,8 @@
 # Onboarding ↔ Pipeline unification — one model, one guided head
 
-> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W0–W4 SHIPPED; W5 (graph editor writes the canonical config) is the last piece.**
+> **Status: COMPLETE — W0–W5 all SHIPPED (last: W5, 2026-08-01). The graph editor now writes the
+> canonical `*_pipeline.toon` through a lossless lift/lower round-trip. Ready to distill into the OKF
+> concept and archive.**
 > **Supersedes `onboarding-pipeline-split.md`** (approved 2026-07-30, archived to
 > `archived-documents/plans-archive/`). That plan's two-plane model — Onboard declares a contract,
 > Pipeline processes landed data, the Dataset is the handoff — is **reversed** by this one. §6 records
@@ -733,8 +735,43 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   server-side (BACKLOG §6 — both UIs now share ONE validator, but API/hand-authored writes stay
   unchecked); the dialog's preview affordance is Onboarding-only (a graph node has no obvious store to
   sample until W5 lowers it).
-- **W5 — graph editor writes the canonical config (U-A).** Gated on W0. Largest piece; last.
-  *Verify: full reactor; a config authored in the graph editor actually polls and commits a batch.*
+- **W5 — graph editor writes the canonical config (U-A). ✅ SHIPPED 2026-08-01.**
+  The editor stopped persisting its own `*_flow.toon` serialization; it now round-trips the canonical
+  `*_pipeline.toon`. As-built:
+  - **`PipelineEditable` (engine)** — the editable lift/lower pair, distinct from `PipelineCompiler`
+    (the Phase-1 typed-record parity gate). It speaks the **config-file vocabulary end to end**: node
+    config values are the raw map sections verbatim, so the HTTP boundary never carries a Java record,
+    and every section — including keys the graph does not model (`description`, `status_dir`,
+    `partitions`) — travels through a save untouched. Ownership rule: a present node owns its section
+    wholesale (cleared field ⇒ deleted key); an absent node kind's section is removed in strict mode,
+    preserved in lenient. `enrichment` nodes are ignored by the lower (their truth is the registered
+    `*_enrich.toon` companion — W4b, never a mirror).
+  - **Named refusals, not silent truncation.** `PipelineCompileException` carries stable codes —
+    `UNSUPPORTED_NODE` (a node type the flat config has no home for), `MULTI_SINK` (>1 distinct
+    persistent database dir), and the strict completeness set `NO_ACQUISITION`/`NO_PARSER`/
+    `NO_PERSISTENT_SINK`/`PARSER_NO_SCHEMA`. This closes the old `toConfigMap` behaviour of silently
+    picking the first sink. Strict mode = an `active` save or a brand-new file; an inactive draft may
+    be partial.
+  - **Routes (`PipelineRoutes`).** `GET /pipelines/{name}/graph/raw` (lift + synthesized
+    companion-enrichment nodes) and `PUT /pipelines/{name}/graph` (lower over the existing file, then
+    the SAME `ConfigSpecs.pipeline()` + `ConfigSafetyValidator` gate + atomic write that
+    `POST /config/write` uses — the editor is a *caller*, not a second write pipe). The
+    `*_flow.toon` authoring writes (`POST /pipelines/authored`, `PUT`, `/nodes`, `/edges`) are
+    **retired**; grandfathered flows stay readable / runnable / deletable, never newly written.
+  - **UI.** The editor lists registered pipelines (`GET /pipelines`), loads via `pipelineGraphRaw`,
+    saves via `savePipelineGraph` (surfacing named refusals as a toast), creates through the shared
+    `pipelineScaffold` + `POST /config/write` + register, deletes via `DELETE /config/pipeline/{name}`.
+    A pipeline whose graph uses non-lowerable types (e.g. `transform.derive`, `sink.materialized`)
+    can only be a grandfathered flow — the flat config cannot represent it.
+  - ⚠ **Left open, recorded**: the executor still runs the flat config, not the graph — W5 makes the
+    graph editor *author* the canonical config, but the branch-aware executor (doc §13 R3) that would
+    let a multi-sink / non-gap-CONTROL / rollup topology actually run is still future work. Until then
+    the named supported subset (§3) is the boundary the editor enforces.
+
+  *Verified: `PipelineEditableTest` (8, verbatim round-trip + every refusal) + the rewritten
+  `ControlApiFlowCrudTest` (7, the canonical round-trip + grandfathered reads + retired writes) green;
+  UI typecheck clean + the mock's TS lift/lower (`pipeline-editable.ts`) pins the same refusals so the
+  offline preview cannot pass a topology the server 422s.*
 
 ## 6. What this reverses, and what survives
 

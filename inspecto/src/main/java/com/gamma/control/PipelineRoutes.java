@@ -1,21 +1,31 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigCodec;
+import com.gamma.config.io.ConfigLoader;
+import com.gamma.config.spec.ConfigSpecs;
+import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.Severity;
+import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.PipelineCodec;
-import com.gamma.pipeline.PipelineEdge;
+import com.gamma.pipeline.PipelineCompileException;
+import com.gamma.pipeline.PipelineEditable;
 import com.gamma.pipeline.PipelineGraph;
-import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineProjection;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.service.CollectorService;
+import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -36,21 +46,23 @@ final class PipelineRoutes implements RouteModule {
         api.get("/pipelines", (e, m) -> flowSummaries(api));
         api.get("/pipelines/node-types", (e, m) -> PipelineProjection.catalog());
         api.get("/pipelines/combined", (e, m) -> combinedFlows(api));
+        // *_flow.toon is GRANDFATHERED (W5, plan U-A): existing files stay readable / runnable /
+        // deletable, but are never newly written — the authoring write routes are gone; the graph
+        // editor now writes the canonical *_pipeline.toon via PUT /pipelines/{name}/graph below.
         api.get("/pipelines/authored", (e, m) -> authoredFlowList(api));
-        // Writes require canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
-        api.post("/pipelines/authored", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createFlow(api, api.body(e))));
         api.get("/pipelines/authored/([^/]+)", (e, m) -> authoredFlow(api, ApiContext.name(m)));
         api.get("/pipelines/authored/([^/]+)/raw", (e, m) -> authoredFlowRaw(api, ApiContext.name(m)));
-        api.put("/pipelines/authored/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> updateFlow(api, ApiContext.name(m), api.body(e))));
         api.delete("/pipelines/authored/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteFlow(api, ApiContext.name(m))));
-        api.post("/pipelines/authored/([^/]+)/nodes", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> addFlowNode(api, ApiContext.name(m), api.body(e))));
-        api.post("/pipelines/authored/([^/]+)/edges", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> addFlowEdge(api, ApiContext.name(m), api.body(e))));
         api.post("/pipelines/authored/([^/]+)/dry-run", (e, m) -> dryRunFlow(api, ApiContext.name(m), api.body(e)));
         // A real run is an operational verb (canOperateRuns) and mirrors POST /jobs/{name}/trigger — deliberately
         // NOT ".../run": that path is the editor's scratch-only run-to-here contract (POST …/run?to={nodeId},
         // pipelines.service.ts, mock-only today) and must never fire a production run.
         api.post("/pipelines/authored/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> runFlow(api, e, ApiContext.name(m))));
         api.get("/pipelines/([^/]+)/graph", (e, m) -> graphForPipeline(api, ApiContext.name(m)));
+        // W5 (plan U-A): the editable round-trip over the canonical *_pipeline.toon.
+        api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, ApiContext.name(m)));
+        api.put("/pipelines/([^/]+)/graph", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> saveGraph(api, e, ApiContext.name(m), api.body(e))));
     }
 
     /** Lift every registered pipeline to a {@link PipelineGraph} and project a compact summary (GET /pipelines). */
@@ -119,22 +131,119 @@ final class PipelineRoutes implements RouteModule {
         return PipelineCodec.toMap(g);
     }
 
-    /** {@code POST /pipelines/authored} — create an authored flow from a posted flow definition; 409 if it exists. */
-    private Object createFlow(ApiContext api, Map<String, Object> body) throws IOException {
-        PipelineStore store = flowStore(api);
-        PipelineGraph g = parseAndValidateFlow(body);
-        String id = g.name();
-        if (flowExists(store, id))
-            throw new ApiException(409, "authored flow '" + id + "' already exists (use PUT to update)");
-        return writeFlow(store, id, g);
+    /**
+     * {@code GET /pipelines/{name}/graph/raw} — the <b>lossless editable</b> graph (W5): lifted for
+     * topology, node configs verbatim in the config-file vocabulary ({@link PipelineEditable#toMap}),
+     * plus a synthesized node per registered {@code *_enrich.toon} companion whose
+     * {@code triggers.on_pipeline} names this pipeline (W4b — the node carries only
+     * {@code use: enrichment/<name>}, never a config mirror). 404 if no such registered pipeline.
+     */
+    private Object editableGraph(ApiContext api, String name) throws IOException {
+        PipelineConfig cfg = api.service().configFor(name)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+        Path file = api.service().pathFor(name)
+                .orElseThrow(() -> new ApiException(404, "no config file for pipeline '" + name + "'"));
+        Map<String, Object> raw = ConfigLoader.filesystem().decode(file.toString());
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        attachCompanionEnrichments(api, cfg.identity().pipelineName(), editable);
+        return editable;
     }
 
-    /** {@code PUT /pipelines/authored/{id}} — create or replace an authored flow (URL id is authoritative). */
-    private Object updateFlow(ApiContext api, String id, Map<String, Object> body) throws IOException {
-        PipelineStore store = flowStore(api);
+    /**
+     * {@code PUT /pipelines/{name}/graph} — <b>lower the graph to the canonical config</b> (W5, U-A):
+     * decode + structurally validate the posted graph (URL name authoritative), lower it over the
+     * existing {@code <name>_pipeline.toon} ({@link PipelineEditable#lower} — verbatim sections,
+     * unmodeled keys preserved), run the SAME spec + safety gate as {@code POST /config/write}, and
+     * write atomically. An {@code active} graph (or a brand-new file) must be complete; an inactive
+     * draft may be partial. Unrepresentable topologies 422 with named {@code refusals[]} instead of
+     * being silently truncated.
+     */
+    private Object saveGraph(ApiContext api, HttpExchange e, String name, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
         Map<String, Object> withId = new LinkedHashMap<>(body);
-        withId.put("name", id);   // the URL id wins over any name in the body
-        return writeFlow(store, id, parseAndValidateFlow(withId));
+        withId.put("name", name);   // the URL name wins over any name in the body
+        PipelineGraph g = parseAndValidateFlow(withId);
+
+        String fileName = WriteGates.safeName(name, "pipeline name") + "_pipeline.toon";
+        Path target = WriteGates.jail(writeRoot, writeRoot.resolve(fileName), "resolved path");
+        Map<String, Object> existing = Files.exists(target)
+                ? ConfigLoader.filesystem().decode(target.toString()) : new LinkedHashMap<>();
+
+        Map<String, Object> lowered;
+        try {
+            lowered = PipelineEditable.lower(g, existing, g.active() || existing.isEmpty());
+        } catch (PipelineCompileException ex) {
+            List<Map<String, Object>> refusals = new ArrayList<>();
+            for (PipelineCompileException.Refusal r : ex.refusals()) {
+                Map<String, Object> rm = new LinkedHashMap<>();
+                rm.put("code", r.code());
+                if (r.nodeId() != null) rm.put("nodeId", r.nodeId());
+                rm.put("message", r.message());
+                refusals.add(rm);
+            }
+            return ApiContext.respondJson(e, 422, Map.of("written", false, "refusals", refusals));
+        }
+
+        // The same gate POST /config/write runs — the graph editor is a caller, not a second pipe.
+        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), lowered));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", lowered, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", lowered, Severity.WARNING));
+        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
+            return ApiContext.respondJson(e, 422, Map.of("written", false,
+                    "error", "config has ERROR-level findings; not written", "findings", findings));
+
+        byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
+        AtomicFiles.write(target, bytes, ".cfg-");
+        log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, fileName, bytes.length);
+
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("written", true);
+        r.put("path", writeRoot.relativize(target).toString().replace('\\', '/'));
+        r.put("name", name);
+        r.put("findings", findings);
+        return r;
+    }
+
+    /** Synthesize the companion-enrichment nodes for {@code editableGraph} (read-only projection). */
+    @SuppressWarnings("unchecked")
+    private void attachCompanionEnrichments(ApiContext api, String pipeline, Map<String, Object> editable) {
+        Path root = api.writeRoot();
+        if (root == null || !Files.isDirectory(root)) return;
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) editable.get("nodes");
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) editable.get("edges");
+        String sinkId = nodes.stream()
+                .filter(n -> "sink.persistent".equals(n.get("type")))
+                .filter(n -> n.get("config") instanceof Map<?, ?> c && c.get("database") != null)
+                .map(n -> String.valueOf(n.get("id"))).findFirst().orElse(null);
+        try (var files = Files.list(root)) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_enrich.toon")).toList()) {
+                Map<String, Object> enrich;
+                try {
+                    enrich = ConfigLoader.filesystem().decode(p.toString());
+                } catch (Exception ex) {
+                    continue;   // an unreadable companion never breaks the pipeline's own projection
+                }
+                if (!(enrich.get("triggers") instanceof Map<?, ?> t)
+                        || !pipeline.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) continue;
+                String ename = enrich.get("name") instanceof String s && !s.isBlank()
+                        ? s : p.getFileName().toString().replaceFirst("_enrich\\.toon$", "");
+                Map<String, Object> nm = new LinkedHashMap<>();
+                nm.put("id", ename);
+                nm.put("type", "enrichment");
+                nm.put("name", ename);
+                nm.put("use", "enrichment/" + ename);
+                nodes.add(nm);
+                if (sinkId != null) {
+                    Map<String, Object> em = new LinkedHashMap<>();
+                    em.put("from", sinkId);
+                    em.put("rel", "data");
+                    em.put("to", ename);
+                    edges.add(em);
+                }
+            }
+        } catch (IOException ignored) {
+            // listing failed — serve the pipeline's own graph without companions
+        }
     }
 
     /** {@code DELETE /pipelines/authored/{id}} — remove an authored flow; 404 if absent. */
@@ -148,49 +257,6 @@ final class PipelineRoutes implements RouteModule {
             throw new ApiException(400, e.getMessage());
         }
         return Map.of("id", id, "deleted", true, "fileRemoved", removed);
-    }
-
-    /** {@code POST /pipelines/authored/{id}/nodes} — add (or replace by id) a node, re-validate, persist. */
-    private Object addFlowNode(ApiContext api, String id, Map<String, Object> body) throws IOException {
-        PipelineStore store = flowStore(api);
-        PipelineGraph g = requireAuthoredFlow(store, id);
-        PipelineNode node;
-        try {
-            node = PipelineCodec.nodeFromMap(body);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-        List<PipelineNode> nodes = new ArrayList<>(g.nodes());
-        nodes.removeIf(n -> n.id().equals(node.id()));   // upsert by node id
-        nodes.add(node);
-        PipelineGraph updated = new PipelineGraph(g.name(), g.active(), nodes, g.edges());
-        validateFlow(updated);
-        return writeFlow(store, id, updated);
-    }
-
-    /** {@code POST /pipelines/authored/{id}/edges} — add an edge, re-validate, persist. */
-    private Object addFlowEdge(ApiContext api, String id, Map<String, Object> body) throws IOException {
-        PipelineStore store = flowStore(api);
-        PipelineGraph g = requireAuthoredFlow(store, id);
-        PipelineEdge edge;
-        try {
-            edge = PipelineCodec.edgeFromMap(body);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-        List<PipelineEdge> edges = new ArrayList<>(g.edges());
-        edges.add(edge);
-        PipelineGraph updated = new PipelineGraph(g.name(), g.active(), g.nodes(), edges);
-        validateFlow(updated);
-        return writeFlow(store, id, updated);
-    }
-
-    private PipelineGraph requireAuthoredFlow(PipelineStore store, String id) {
-        try {
-            return store.get(id).orElseThrow(() -> new ApiException(404, "no authored flow '" + id + "'"));
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
-        }
     }
 
     /** Parse a flow definition (400 on a malformed shape) and validate it (422 on validation errors). */
@@ -220,16 +286,6 @@ final class PipelineRoutes implements RouteModule {
         }
     }
 
-    private Object writeFlow(PipelineStore store, String id, PipelineGraph g) throws IOException {
-        try {
-            store.write(id, g);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
-        }
-        log.info("[PIPELINE-WRITE] wrote authored flow {}", id);
-        return PipelineProjection.graph(g);
-    }
-
     /**
      * {@code POST /pipelines/authored/{id}/dry-run} — run a bounded sample through an authored flow's
      * transform→sink subgraph on a throwaway DuckDB (T18, §7.2); per-node + per-sink row counts. 404 if the
@@ -243,6 +299,8 @@ final class PipelineRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         }
+        // W5: the editor now edits registered pipelines too — fall back to the lifted config.
+        if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
         if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         try {
             return PipelineDryRun.run(g, ApiContext.sampleRows(body));

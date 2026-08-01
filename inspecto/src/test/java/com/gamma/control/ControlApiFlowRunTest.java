@@ -63,6 +63,13 @@ class ControlApiFlowRunTest {
         }
     }
 
+    /** Write a grandfathered {@code *_flow.toon} straight into the store (no HTTP write path exists). */
+    @SuppressWarnings("unchecked")
+    private static void seedFlow(Path writeRoot, String flowJson) throws Exception {
+        new com.gamma.pipeline.PipelineStore(writeRoot.resolve("flows")).write(
+                "evt_rollup", com.gamma.pipeline.PipelineCodec.fromMap(JSON.readValue(flowJson, java.util.Map.class)));
+    }
+
     private Ctx open(Path dir, Path writeRoot, Path dataDir) throws Exception {
         Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
         String priorRoot = System.getProperty("assist.write.root");
@@ -83,8 +90,10 @@ class ControlApiFlowRunTest {
     void adhocRunExecutesTheFlowAndIsPollable(@TempDir Path dir) throws Exception {
         Path dataDir = dir.resolve("data");
         seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        // Seeded on disk directly: *_flow.toon is grandfathered (W5) — readable/runnable, never
+        // newly written over HTTP, so the old POST /pipelines/authored seeding no longer exists.
+        seedFlow(dir.resolve("wr"), FLOW);
         try (Ctx c = open(dir, dir.resolve("wr"), dataDir)) {
-            assertEquals(200, send(c.port, "POST", "/pipelines/authored", FLOW).statusCode());
 
             HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/evt_rollup/trigger?actor=rahul", null);
             assertEquals(202, r.statusCode(), r.body());

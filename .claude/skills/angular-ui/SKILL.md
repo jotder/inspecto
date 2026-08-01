@@ -123,6 +123,19 @@ src/app/
   `use: enrichment/<name>` — never mirror the config into `node.config` (split-brain). `partitions`
   lists are deliberately unspecced (`AttributeSpec` has no list type) and must travel verbatim through
   a save; a `transform_file` config is refused, not overwritten.
+- **Editing a pipeline graph → the canonical `*_pipeline.toon` round-trip** (`modules/admin/pipelines/`,
+  W5 2026-08-01). The Pipelines editor is an editor **over** the canonical config, not a second model.
+  Load with `PipelinesService.pipelineGraphRaw(name)` (`GET /pipelines/{name}/graph/raw` — the lifted,
+  lossless editable graph), save with `savePipelineGraph(name, graph)` (`PUT /pipelines/{name}/graph` —
+  the backend lowers it back over the existing file through the SAME `/config/write` gate). Create a
+  new pipeline via the shared **`pipelineScaffold(name)`** (`inspecto/component-model`) → `configApi.write('pipeline', …)` → `registerPipeline`; delete via `configApi.remove('pipeline', name)`.
+  ⚠ Node config values are the **raw config-file sections verbatim** — never a typed shape — so
+  unmodeled keys survive a save. ⚠ A `PUT …/graph` 422 carries named **`refusals[]`** (`UNSUPPORTED_NODE`
+  / `MULTI_SINK` / `NO_*`) under `error.details`; surface them, don't swallow them (the editor's
+  `showRefusals`). ⚠ The old `*_flow.toon` authoring writes (`POST /pipelines/authored`, `PUT`,
+  `/nodes`, `/edges`) are **retired** — grandfathered flows stay readable/deletable only. ⚠ The mock's
+  TS lift/lower (`mock/pipeline-editable.ts`) must keep refusing exactly what the server does, or the
+  offline preview greenlights a topology the backend 422s.
 - **Labelling something with cross-entity tags → `TagAssignmentDialog`** (`inspecto/tags/`, D7). Kind-
   agnostic: `dialog.open(TagAssignmentDialog, {data: {targetKind, targetId, label}})`, where `targetKind`
   is `object` or a `ComponentStore.WRITABLE_TYPES` value. Adopting it on a new pane is a menu item, not a

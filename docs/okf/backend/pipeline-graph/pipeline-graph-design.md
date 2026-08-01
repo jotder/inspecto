@@ -1160,7 +1160,56 @@ path — these are where "lift = thin shim" breaks.
 
 ---
 
-**Last Updated**: 2026-06-17
+## 16. The editable round-trip — the graph editor writes the canonical config (W5, 2026-08-01)
+
+The read-only lift of §15 became a **round-trip**: the Pipelines editor no longer persists its own
+`*_flow.toon`; it authors the canonical `*_pipeline.toon` the engine executes (plan U-A). The seam is a
+dedicated pair, **not** `PipelineCompiler.toConfigMap` — that class is the Phase-1 *typed-record* parity
+gate (it consumes the live `PipelineConfig` sub-records a `PipelineLift` carries). The editable pair
+speaks the **config-file vocabulary end to end**, so nothing typed crosses the HTTP boundary:
+
+- **[`PipelineEditable`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java)**
+  — `toMap(cfg, raw)` lifts topology via `PipelineLift` but swaps each node's config for the **verbatim
+  raw-map section** it owns (from the decoded file); `lower(g, existing, strict)` writes those sections
+  back over the existing file. **Ownership rule:** a present node owns its section wholesale (a cleared
+  field ⇒ a deleted key); an absent node kind's section is removed in `strict` mode, preserved in
+  lenient. Keys the graph does not model (`description`, `dirs.status_dir`, `partitions`, a single-schema
+  `dirs.quarantine` that has no owning node) **travel through a save untouched**. `enrichment` nodes are
+  ignored by the lower — their truth is the registered `*_enrich.toon` companion (never a mirror; the D7
+  split-brain lesson).
+- **Named refusals, not silent truncation.**
+  [`PipelineCompileException`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineCompileException.java)
+  carries stable codes — `UNSUPPORTED_NODE` (a node type the flat config has no home for), `MULTI_SINK`
+  (>1 distinct persistent `database` dir — the flat config expresses exactly one), and the strict
+  completeness set `NO_ACQUISITION`/`NO_PARSER`/`NO_PERSISTENT_SINK`/`PARSER_NO_SCHEMA`. This closes the
+  old `toConfigMap` behaviour of silently picking the first sink. `strict` = an `active` save or a
+  brand-new file; an **inactive draft may be partial** (it overlays only what its present nodes own, so a
+  half-built pipeline saves without erasing the rest — the same model Onboarding's stage saves use).
+- **Routes** ([`PipelineRoutes`](../../../../inspecto/src/main/java/com/gamma/control/PipelineRoutes.java)):
+  `GET /pipelines/{name}/graph/raw` (lift + a synthesized node per registered enrichment companion whose
+  `triggers.on_pipeline` names this pipeline) and `PUT /pipelines/{name}/graph` (lower over the existing
+  file, then the **same** `ConfigSpecs.pipeline()` + `ConfigSafetyValidator` gate + atomic write that
+  `POST /config/write` runs — the editor is a *caller*, not a second write pipe). The `*_flow.toon`
+  authoring writes (`POST /pipelines/authored`, `PUT`, `/nodes`, `/edges`) **retired**; grandfathered
+  flows stay readable / runnable / deletable, never newly written (`CapabilityManifest` updated to match).
+
+**Boundary (why a pipeline can be a grandfathered flow and not a canonical config):** the flat
+`PipelineConfig` cannot represent a graph that uses non-lowerable node types — `transform.derive`,
+`transform.route`, `sink.materialized`/`sink.view`, non-`gap` CONTROL, or a second persistent sink. Such
+graphs stay `*_flow.toon` and refuse to lower with a named code. Making them *run* needs the branch-aware
+executor (§13 R3), still future work — W5 makes the editor *author* the canonical subset, it does not
+widen what executes.
+
+*Verified: `PipelineEditableTest` (8 — verbatim round-trip + every refusal), the rewritten
+`ControlApiFlowCrudTest` (7 — the canonical round-trip, grandfathered reads, retired writes), full
+`inspecto-engine,inspecto` reactor 618/0/0; UI gate 1945/0 + prod build; a live offline walk (create →
+canonical `*_pipeline.toon` written with the full space-convention dir set + `registered:true` → lifted
+to the graph). The mock's TS lift/lower (`inspecto-ui/.../mock/pipeline-editable.ts`) pins the same
+refusals so the offline preview cannot pass a topology the server 422s.*
+
+---
+
+**Last Updated**: 2026-08-01 (§16 — W5 editable round-trip)
 **Status**: design finalised (decisions §9, boundaries §12); **reviewed 2026-06-16 against the engine — corrections
 + re-scoping in §13, implementation checklist in §14; pipeline-vs-job execution model formalised 2026-06-17 in §3.8
 (R6 / T23–T25).** **Phase 1 (Flow IR + legacy lift) is BUILT and green** (T1/T2/T3/T4/T5a done; full inspecto suite

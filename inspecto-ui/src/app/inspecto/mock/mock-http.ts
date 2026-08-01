@@ -32,8 +32,10 @@ export function json(body: unknown, status = 200): MockResponse {
 
 /** The legacy `{error: msg}` body handlers return for 4xx — lifted into the v1 ErrorObject at the
  *  interceptor's response edge ({@link v1ErrorBody}), exactly like the backend's `Envelope.error()`. */
-export function error(status: number, message: string): MockResponse {
-    return { status, body: { error: message } };
+export function error(status: number, message: string, details?: Record<string, unknown>): MockResponse {
+    // Extra keys ride under the v1 envelope's `error.details` (see v1ErrorBody) — used by callers
+    // that surface structured refusals/findings, e.g. the pipeline-graph lower.
+    return { status, body: { error: message, ...(details ?? {}) } };
 }
 
 /** Port of the backend `ErrorCodes.defaultFor(status)` map (403 = the core's structural PATH_JAIL_VIOLATION). */

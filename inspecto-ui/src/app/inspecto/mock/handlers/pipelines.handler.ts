@@ -14,6 +14,8 @@ import type { IconMap } from '../../api/icon-map.service';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
+import { liftConfig, lowerGraph } from '../pipeline-editable';
+import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.handler';
 
 /**
  * The Pipelines-editor mock domain (authored-DAG CRUD, graph projections, dry-run, run-to-here,
@@ -80,6 +82,7 @@ const AUTHORED_RAW = /\/pipelines\/authored\/([^/]+)\/raw$/;
 const DRY_RUN = /\/pipelines\/authored\/([^/]+)\/dry-run$/;
 const RUN_TO = /\/pipelines\/authored\/([^/]+)\/run$/;
 const AUTHORED_ID = /\/pipelines\/authored\/([^/]+)$/;
+const GRAPH_RAW = /\/pipelines\/([^/]+)\/graph\/raw$/;
 const FLOW_GRAPH = /\/pipelines\/([^/]+)\/graph$/;
 const PROV_BATCHES = /\/provenance\/batches$/;
 const PROV = /\/provenance$/;
@@ -92,40 +95,49 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
     return (req: MockRequest, store: MockStore) => {
         if (!flags.mockFlows) return undefined;
         const { method, url, space } = req;
+        // Grandfathered *_flow.toon store (read-only now). The CANONICAL pipelines the editor edits
+        // live in PIPELINE_CONFIGS_COLL (shared with onboarding — W5/U-A: one model).
         const all = (): AuthoredPipeline[] => store.list<AuthoredPipeline>(space, PIPELINES_COLL);
+        const configs = (): StoredPipelineConfig[] => store.list<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL);
+        const graphOfName = (name: string): AuthoredPipeline | undefined => {
+            const rec = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
+            return rec ? liftConfig(rec.config) : undefined;
+        };
         let m: string[] | null;
 
         if (method === 'GET' && NODE_TYPES_RE.test(url)) return json(NODE_TYPES);
-        if (method === 'GET' && COMBINED.test(url)) return json(combined(all()));
+        if (method === 'GET' && COMBINED.test(url)) return json(combined(configs().map((r) => liftConfig(r.config))));
+        // GET /pipelines/authored* — grandfathered flow reads only (writes retired with W5).
         if (method === 'GET' && AUTHORED.test(url)) return json(all().map(summaryOf));
         if (method === 'GET' && (m = match(url, AUTHORED_RAW))) {
             return json(store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]) ?? null);
         }
         if (method === 'POST' && (m = match(url, DRY_RUN))) {
-            return json(dryRun(store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1])));
+            // W5: the editor dry-runs registered pipelines — fall back to the lifted config.
+            const f = store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]) ?? graphOfName(m[1]);
+            return json(dryRun(f));
         }
         if (method === 'POST' && (m = match(url, RUN_TO))) {
             const files = (req.body as { files?: string[] })?.files ?? [];
-            const f = store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]);
+            const f = store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]) ?? graphOfName(m[1]);
             return json(runToNode(m[1], f, req.params['to'] ?? '', files));
         }
-        if (method === 'GET' && FLOWS.test(url)) return json(all().map(summaryOf));
+        // GET /pipelines — the registered canonical pipelines (what the editor lists).
+        if (method === 'GET' && FLOWS.test(url)) return json(configs().map((r) => summaryOf(liftConfig(r.config))));
+        // W5: the editable round-trip over the canonical *_pipeline.toon.
+        if (method === 'GET' && (m = match(url, GRAPH_RAW))) {
+            const g = graphOfName(m[1]);
+            return g ? json(g) : error(404, `no pipeline named '${m[1]}'`);
+        }
+        if (method === 'PUT' && (m = match(url, FLOW_GRAPH))) {
+            return saveGraph(store, space, m[1], req.body as AuthoredPipeline);
+        }
         if (method === 'GET' && (m = match(url, FLOW_GRAPH))) {
-            return json(graphOf(store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1])));
+            return json(graphOf(graphOfName(m[1])));
         }
-        if (method === 'POST' && AUTHORED.test(url)) {
-            const f = req.body as AuthoredPipeline;
-            // Mirrors the real backend: create 409s on an existing id (PipelineRoutes.createFlow) —
-            // update is PUT, same split as components (components.handler.ts).
-            if (store.get<AuthoredPipeline>(space, PIPELINES_COLL, f.name)) {
-                return error(409, `authored flow "${f.name}" already exists (use PUT to update)`);
-            }
-            return json(store.put(space, PIPELINES_COLL, f.name, f));
-        }
-        if (method === 'PUT' && (m = match(url, AUTHORED_ID))) {
-            const key = m[1];
-            return json(store.put(space, PIPELINES_COLL, key, { ...(req.body as AuthoredPipeline), name: key }));
-        }
+        // POST/PUT /pipelines/authored* retired with W5 — 405 where the path still serves reads.
+        if (method === 'POST' && AUTHORED.test(url)) return error(405, 'authored-flow writes retired (W5) — edit the pipeline graph');
+        if (method === 'PUT' && match(url, AUTHORED_ID)) return error(405, 'authored-flow writes retired (W5) — PUT /pipelines/{name}/graph');
         if (method === 'DELETE' && (m = match(url, AUTHORED_ID))) {
             // Referential integrity (R2) — e.g. a job triggering on this pipeline blocks the delete.
             const refs = store.referencesTo(space, PIPELINES_COLL, m[1]);
@@ -155,6 +167,27 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
 
         return undefined;
     };
+}
+
+/**
+ * PUT /pipelines/{name}/graph — lower the graph onto the existing canonical config (or a fresh
+ * scaffold), refusing unrepresentable topologies with named codes exactly as the backend does. The
+ * strictness here is load-bearing: a mock that accepted a MULTI_SINK graph would green-light a
+ * preview the real server 422s.
+ */
+function saveGraph(store: MockStore, space: string, name: string, body: AuthoredPipeline): MockResponse {
+    const g: AuthoredPipeline = { ...body, name };
+    const existing = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
+    const strict = g.active || !existing;
+    const result = lowerGraph(g, existing?.config ?? {}, strict);
+    if ('refusals' in result) {
+        return error(422, `graph cannot be lowered: ${result.refusals[0].code}`, { written: false, refusals: result.refusals });
+    }
+    const path = name.endsWith('_pipeline') ? `${name}.toon` : `${name}_pipeline.toon`;
+    store.put(space, PIPELINE_CONFIGS_COLL, name, {
+        id: name, path, config: result.config, registered: existing?.registered ?? true,
+    } satisfies StoredPipelineConfig);
+    return json({ written: true, path, name, findings: [] });
 }
 
 /** Every `sink.view` node across a flow, paired with its owning flow name. */

@@ -1,5 +1,6 @@
 import type { AuthoredPipeline } from '../../api/pipelines.service';
 import { PIPELINES_COLL } from '../handlers/pipelines.handler';
+import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from '../handlers/onboarding.handler';
 import { MockStore } from '../mock-store';
 import { seedOperations } from './operations.seed';
 import { seedPipelineCaseStudies } from './pipeline-case-studies.seed';
@@ -342,8 +343,38 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
             { from: 'daily', rel: 'data', to: 'load' },
         ],
     };
+    // Grandfathered *_flow.toon store (readable via /pipelines/authored, W5). subscriber_load uses
+    // transform.derive + sink.materialized — types the flat config cannot represent, so it can ONLY
+    // be a grandfathered flow. cdr_ingest is also kept here so the grandfathered read/delete surface
+    // stays demonstrable; its CANONICAL twin below is what the editor actually opens.
     store.put(space, PIPELINES_COLL, cdrIngest.name, cdrIngest);
     store.put(space, PIPELINES_COLL, subscriberLoad.name, subscriberLoad);
+
+    // cdr_ingest is all-lowerable (acquisition→parser→filter→sink.persistent), so it is a genuine
+    // CANONICAL *_pipeline.toon — the editor opens, lifts, edits and lowers it (W5/U-A). Seed it as
+    // the flat config the engine actually executes; GET /pipelines lifts it back to the graph above.
+    const cdrIngestConfig: Record<string, unknown> = {
+        name: 'cdr_ingest',
+        active: true,
+        description: 'Ingest CDR drops from the prod SFTP collector.',
+        dirs: {
+            poll: 'data/inbox/cdr_ingest',
+            database: 'data/cdr_ingest/database',
+            backup: 'data/cdr_ingest/backup',
+            temp: 'data/cdr_ingest/temp',
+            status_dir: 'data/cdr_ingest/status',
+        },
+        output: { format: 'PARQUET' },
+        collector: { connector: 'sftp', connection: 'cdr_sftp_prod', include: ['glob:**/*.csv.gz'] },
+        processing: {
+            threads: 1,
+            csv_settings: { delimiter: ',', has_header: true, include_regex: ["msisdn NOT LIKE '0000%'"] },
+            schema_file: 'cdr_ingest_schema.toon',
+        },
+    };
+    store.put(space, PIPELINE_CONFIGS_COLL, 'cdr_ingest', {
+        id: 'cdr_ingest', path: 'cdr_ingest_pipeline.toon', config: cdrIngestConfig, registered: true,
+    } satisfies StoredPipelineConfig);
 
     // ── Pipeline case-study pack CS1–CS5 (docs/superpower/pipeline-case-studies.md):
     //    five boundary-pushing authored pipelines + their reusable grammars ─────────────────────

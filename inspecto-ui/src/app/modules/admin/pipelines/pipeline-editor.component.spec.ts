@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { MatDialog } from '@angular/material/dialog';
 import { PipelineEditorComponent } from './pipeline-editor.component';
-import { AuthoredPipeline, ComponentsService, LensService, PipelinesService } from 'app/inspecto/api';
+import { AuthoredPipeline, ComponentsService, ConfigService, LensService, PipelinesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -33,15 +33,14 @@ const FLOW: AuthoredPipeline = {
 
 describe('PipelineEditorComponent', () => {
     let api: {
-        authoredList: ReturnType<typeof vi.fn>;
+        list: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
-        authoredRaw: ReturnType<typeof vi.fn>;
-        createAuthored: ReturnType<typeof vi.fn>;
-        replaceAuthored: ReturnType<typeof vi.fn>;
-        deleteAuthored: ReturnType<typeof vi.fn>;
+        pipelineGraphRaw: ReturnType<typeof vi.fn>;
+        savePipelineGraph: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
         provenance: ReturnType<typeof vi.fn>;
     };
+    let config: { write: ReturnType<typeof vi.fn>; registerPipeline: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
     let dialog: { open: ReturnType<typeof vi.fn> };
     let toast: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
 
@@ -49,16 +48,19 @@ describe('PipelineEditorComponent', () => {
         // LensService persists to localStorage; clear it so a lens set by one test/file can't leak into another.
         localStorage.removeItem('inspecto.currentLens');
         api = {
-            authoredList: vi.fn().mockReturnValue(of([])),
+            list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(
                 of([{ type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false }]),
             ),
-            authoredRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
-            createAuthored: vi.fn().mockReturnValue(of({})),
-            replaceAuthored: vi.fn().mockReturnValue(of({})),
-            deleteAuthored: vi.fn().mockReturnValue(of({})),
+            pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
+            savePipelineGraph: vi.fn().mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),
+        };
+        config = {
+            write: vi.fn().mockReturnValue(of({ written: true, path: 'x_pipeline.toon', name: 'x' })),
+            registerPipeline: vi.fn().mockReturnValue(of({ registered: true })),
+            remove: vi.fn().mockReturnValue(of({ deleted: true })),
         };
         dialog = { open: vi.fn() };
         toast = { success: vi.fn(), error: vi.fn() };
@@ -67,6 +69,7 @@ describe('PipelineEditorComponent', () => {
             providers: [
                 provideNoopAnimations(),
                 { provide: PipelinesService, useValue: api },
+                { provide: ConfigService, useValue: config },
                 { provide: ComponentsService, useValue: { list: vi.fn().mockReturnValue(of([])) } },
                 { provide: ToastrService, useValue: toast },
                 { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn().mockResolvedValue(true) } },
@@ -136,12 +139,12 @@ describe('PipelineEditorComponent', () => {
         c.model.set(structuredClone(FLOW));
         c.dirty.set(true);
         c.save();
-        expect(api.replaceAuthored).toHaveBeenCalledWith('demo', FLOW);
+        expect(api.savePipelineGraph).toHaveBeenCalledWith('demo', FLOW);
         expect(c.dirty()).toBe(false);
     });
 
     it('a 503 on create marks the editor read-only', () => {
-        api.createAuthored.mockReturnValue(throwError(() => ({ status: 503 })));
+        config.write.mockReturnValue(throwError(() => ({ status: 503 })));
         const c = make();
         c.startNew();
         c.newName.setValue('x');
@@ -254,7 +257,7 @@ describe('PipelineEditorComponent', () => {
         expect(m.active).toBe(false);
         expect(c.dirty()).toBe(true);
         // Nothing persisted: the operator still presses the existing Save.
-        expect(api.replaceAuthored).not.toHaveBeenCalled();
+        expect(api.savePipelineGraph).not.toHaveBeenCalled();
     });
 
     it('ignores a malformed draft and refuses to apply in a non-authoring lens', () => {
