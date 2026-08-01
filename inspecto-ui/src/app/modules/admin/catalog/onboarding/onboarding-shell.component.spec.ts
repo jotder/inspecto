@@ -155,6 +155,20 @@ describe('OnboardingShellComponent', () => {
         expect(fixture.componentInstance.exporting()).toBe(false);
     });
 
+    /** An export carries the SERVER-held config, so with unsaved stage edits on screen it would ship
+     *  the last saved state under the guise of "export what I'm looking at". Refuse instead. */
+    it('refuses to export an in-flight draft rather than shipping the last saved state', () => {
+        const fixture = create({ name: 'orders_feed' });
+        const state = fixture.debugElement.injector.get(OnboardingStateService);
+        state.registerDirtyCheck(() => true);
+        const transfer = fixture.debugElement.injector.get(StreamTransferService);
+        fixture.componentInstance.exportConfig();
+
+        expect(transfer.buildExport).not.toHaveBeenCalled();
+        expect(transfer.download).not.toHaveBeenCalled();
+        expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('Save this stage'));
+    });
+
     it('names an unreadable satellite instead of shipping a silently partial export', () => {
         const fixture = create({ name: 'orders_feed' }, {}, {
             buildExport: vi.fn(() => of({

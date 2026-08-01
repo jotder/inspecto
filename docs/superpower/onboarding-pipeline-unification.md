@@ -189,6 +189,10 @@ it is right that one table serves both features, but if the editor ever needs `p
   against silent no-ops; it is now obsolete because the segments editor and ASN.1 ingest shipped.
 - **U-F — one export pipe, promotion-grade.** The backend `BundleExporter`/`DataSourceBundleResolver`
   closure walk is the single pipe; the frontend formats become callers, not parallel implementations.
+  ⚠ **Qualified on delivery (2026-08-01, §5 W3):** true for the Metadata Bundle, both directions — but
+  `stream-bundle.ts` is NOT a parallel implementation of the zip pipe. It is a different *operation*
+  (clone a config into a NEW inactive draft vs. promote the same data source), so it stays. "One pipe per
+  operation", not "one pipe".
 - **U-G — no identity churn.** Carried forward from the superseded plan's D-C, which remains correct on
   this point: `pipelineName`, `*_pipeline.toon`, `BatchEvent.pipeline()` all stay. Only the *user-facing*
   vocabulary changes, and it changes toward "one thing", not toward a new name.
@@ -570,13 +574,37 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   rewritten to assert the request carries only `(kind, id, refs)` and that the SERVER's envelope is what
   lands on disk; full UI suite **1922 passed / 0 failed / 5 skipped**, `lint:tokens` clean, production build OK.*
 
-  Remaining U-F: (b) **`stream-bundle.ts` → the datasource zip pipe is BLOCKED on
-  a product decision, not on effort**: the zip path can only export a *registered* pipeline
-  (`DataSourceBundleResolver.resolve` needs `service.configFor(id)`), while the onboarding wizard exports an
-  **in-flight draft** held in memory; and the download would change from `.json` to `.zip`, breaking
-  every previously-saved stream-config file. Decide the draft story first.
-  *Verify: the two-instance walk above, re-run once the closure widens (a decision rule / reference
-  dataset must survive it too). The endpoint skill for any new route.*
+  **❌ U-F (b) — `stream-bundle.ts` → the datasource zip pipe: WILL NOT DO (2026-08-01).** Not blocked —
+  **mis-scoped**, and one of the two reasons I recorded for blocking it was simply wrong. I had written
+  that the wizard exports "an in-flight draft held in memory". It does not: `onboarding-state.service`
+  says it plainly — *the server-held config is THE draft*, every stage save is a
+  `POST /config/write overwrite:true`. So the draft is on disk, and normally registered (the create
+  dialog and the JSON import both call `registerPipeline` best-effort), which is all
+  `DataSourceBundleResolver.resolve` needs.
+
+  The real reason not to collapse them is that **they are two different operations, not two
+  implementations of one** — merging them would delete the create dialog's entire purpose:
+
+  | | stream JSON bundle | datasource zip |
+  |---|---|---|
+  | operation | **clone / seed a NEW draft** | **promote the SAME data source** |
+  | identity | operator types a new name; `dirs` re-derived, schema renamed `<name>_schema`, enrichment retargeted | preserved |
+  | `active` | forced `false` — an import must never start processing on someone else's server | preserved |
+  | space paths | re-derived from the target's convention | rebased by `BundleImporter` (`eb322adc`) |
+  | secrets | literal masked to `***`, every path listed in `masked` and surfaced as an import note ("re-enter them") | connection files re-serialised through `toBundleMap()`, literals omitted |
+  | closure | pipeline + schema + segment schemas + enrichment; a connection travels as a **requirement** | + connections, jobs, Decision Rules, Datasets |
+
+  The `***` here is deliberate and *not* the connection defect fixed in `6bd03ad2`: nothing rejects it
+  downstream (`/config/write` accepts it), and the operator is told, per path, to re-enter it. The
+  format's own header already argues the separation (id-addressed registry components vs. path-addressed
+  config TOONs that embed the source space, colliding on the word *schema*).
+
+  **✅ What the draft decision did change.** "An in-flight draft cannot be exported" is now enforced.
+  Export ships the SERVER-held config and re-reads the satellites off the server, so exporting with
+  unsaved stage edits on screen silently produced a file of the *last saved* state — it looked like an
+  export of what the operator was looking at, and was not. `exportConfig()` now refuses while the active
+  pane is dirty and says to save first.
+  *Verified: a new shell spec (dirty ⇒ nothing built, nothing downloaded, warned).*
 - **W4 — stages become typed nodes (U-B).** Gated on W0.
   *Verify: full UI gate + a live resume walk (leave mid-stage, return, state intact).*
 - **W5 — graph editor writes the canonical config (U-A).** Gated on W0. Largest piece; last.

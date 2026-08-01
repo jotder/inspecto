@@ -146,10 +146,20 @@ export class OnboardingShellComponent {
      * its schema, any per-segment plugin schemas and the enrichment companion. Read-only, so it is
      * available in EVERY lens (a Business-lens operator handing a config to support is the point);
      * the import side is what needs authoring rights.
+     *
+     * <p><b>An in-flight draft cannot be exported</b> (2026-08-01). What travels is the SERVER-held
+     * config — `state.config()` only advances on a stage save — and the satellites are read back off
+     * the server too. So exporting with unsaved stage edits on screen silently produced a file of the
+     * LAST SAVED state: it looked like an export of what the operator was looking at, and was not.
+     * Refusing beats a file that quietly disagrees with the screen; save the stage, then export.
      */
     exportConfig(): void {
         const config = this.state.config();
         if (!config || this.exporting()) return;
+        if (this.state.isDirty()) {
+            this.toastr.warning('Save this stage before exporting — an export carries the saved configuration.');
+            return;
+        }
         this.exporting.set(true);
         this.transfer.buildExport(this.state.name(), this.state.kind(), config).subscribe({
             next: ({ bundle, missing }) => {
