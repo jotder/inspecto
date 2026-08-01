@@ -358,12 +358,11 @@ counters §11.3 wants, not a new store from scratch.
 3. ~~**Pin the stale `fetchTo` doc line**~~ — ✅ settled 2026-08-01. `connectors.md` was wrong (fetch never
    went to the backup dir; backup is post-commit in `BatchProcessor.backupFile`). Rewritten, and B3a made
    the answer concrete: fetch lands in the staging tree, then renames into `dirs.poll`.
-4. **Should the `CollectorService` constructor reject duplicate pipeline ids, like `registerPipeline`
-   does?** Surfaced by B2 (see the behaviour-change note above). `registerPipeline` throws
-   `IllegalStateException` on a second file reusing a registered id; the constructor silently accepts it
-   and the duplicate is now skipped each cycle instead of double-running. Failing fast at construction
-   with the same message would make the two doors agree. Small and self-contained, but it can turn a
-   currently-starting deployment into a startup failure — hence an operator call, not a default.
+4. ~~**Should the `CollectorService` constructor reject duplicate pipeline ids?**~~ — ✅ **answered in code
+   2026-08-02 by upstream `6d371d66`** ("harden startup: reject duplicate pipeline ids…"). The constructor
+   now throws `IllegalStateException` with the same message `registerPipeline` uses, so both doors agree.
+   Surfaced by B2's behaviour-change note above; pinned by
+   `CollectorServiceTest.duplicatePipelineIdInTheRegistryIsRejectedAtConstruction`.
 
 ## 7. Gotchas (carried forward)
 
