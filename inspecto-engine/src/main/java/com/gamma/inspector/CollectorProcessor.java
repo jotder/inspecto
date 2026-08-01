@@ -256,11 +256,14 @@ public class CollectorProcessor {
 
             if (ready.isEmpty()) return List.of();
 
-            // Remote sources (SFTP/FTP/…) — Phase E: materialise the bytes into the local staging tree (the poll
-            // root, mirrored at each file's relativePath, with the source mtime preserved) so the rest of the
-            // engine — dedup, markers, ledger, backup — treats them exactly like local files with no further
-            // change. Discovery for a remote source uses the connector (not a poll walk), so staged files are
-            // never re-listed. A read-only pending scan NEVER fetches — it returns a count-only approximation.
+            // Remote sources (SFTP/FTP/…) — Phase E: fetch the bytes into the staging tree and land them
+            // atomically in the poll root (B3a), so the rest of the engine — dedup, markers, ledger, backup —
+            // treats them exactly like local files with no further change. Discovery for a remote source uses
+            // the connector (not a poll walk), so landed files are never re-listed. A read-only pending scan
+            // NEVER fetches — it returns a count-only approximation.
+            //
+            // B3b will lift this call out to its own driver; everything above it is that driver's unit. The
+            // boundary is drawn here deliberately (plan §5) so the move is a re-parenting, not a rewrite.
             if (remote) {
                 if (!emitSignals) return RemoteAcquisitionHandler.pendingRemoteApprox(cfg, ready);
                 ready = RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry);

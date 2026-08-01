@@ -279,13 +279,55 @@ so a crafted remote listing path (`../../x`) could write outside the poll root. 
 through one `contained()` path-jail helper (the house `resolve → normalize → startsWith` idiom). This was
 pre-existing, not introduced by B3 — but the new staging resolution could not be written safely without it.
 
-**B3b — the acquisition driver (NEXT).** Now that landing is atomic, acquisition can run on its own timer
-with its own budget, and ingest discovers remote-fetched files by scanning the inbox exactly like
-locally-pushed ones — which is the unification the operator asked for and removes the last in-memory
-coupling (`collect()` currently returns the fetched list straight to `BatchPlanner`). Pre-fetch dedup,
-`StabilityGate` on the listing, the watermark filter, the circuit breaker and post-actions all stay on the
-acquisition side; ingest keeps markers/dedup. Needs its own per-pipeline claim, distinct from the ingest
-run guard, so acquisition and ingest of the same pipeline can overlap safely.
+> **Operator decision 2026-08-01 — not backported.** The same unguarded resolution exists on the supported
+> `4.x` line at `inspecto/src/main/java/com/gamma/inspector/SourceProcessor.java:386` (its pre-extraction
+> home; `4.x` predates the module split, so B3a itself cannot apply there). Merge-forward policy would put a
+> `fix:` on `4.x` first. The operator chose **master only, no backport** — accepting the traversal path on
+> `4.x`. Recorded here so it is a decision on the record rather than an oversight; revisit if a `4.x`
+> deployment ever takes remote-collector input, since an untrusted remote listing is the reachable input.
+
+**B3b — the acquisition driver (NEXT — designed, not built).**
+
+Now that landing is atomic, acquisition can run on its own timer with its own budget, and ingest can
+discover remote-fetched files by scanning the inbox exactly like locally-pushed ones — the unification the
+operator asked for, and the removal of the last in-memory coupling.
+
+*The seam is already clean.* `CollectorProcessor.collect(cfg, emitSignals)`
+(`inspecto-engine/.../CollectorProcessor.java:191-278`) splits at **line 268**, where `materializeRemote`
+returns:
+
+| lines | phase | moves to |
+|---|---|---|
+| 207-268 | connector open · circuit breaker · `discover` · `StabilityGate` · gap detection · watermark filter · `materializeRemote` | **acquisition unit** |
+| 270-276 | `dedupLocal` (markers / fingerprint) · `admit` (T15 cap) | **ingest**, unchanged |
+
+Steps:
+
+1. **Extract the acquisition unit** — `CollectorProcessor.acquire(cfg)`, public, returning how many files it
+   landed. Everything above line 268, no-op for a `local` collector. This is the plan's own "draw the unit
+   boundary now, change the driver later" (§5): the poll cycle keeps calling it inline until step 3.
+2. **Ingest walks the inbox for every collector.** `collect()` stops using the configured connector for
+   discovery and always walks `dirs.poll` via `LocalFileSystemConnector` with the same
+   includes/excludes/depth. ⚠ **Do not also apply `source.stability` to that walk for a remote collector** —
+   it is tuned for the *remote* listing (e.g. an SFTP `ready_marker`), and a landed file is atomically
+   complete by construction, so gating it again is both wrong and redundant. Local collectors keep the gate:
+   it is what protects a half-written local push.
+3. **Give it a driver** in `CollectorService`: its own timer, its own process-wide budget (separate from
+   `runPermits` — network fetch and DuckDB ingest should not compete for one allowance), dispatch-and-return
+   exactly like B2, and its **own** `PipelineRunGuard` instance keyed per pipeline, so acquisition and
+   ingest of the same pipeline may overlap while two acquisitions of it may not.
+
+Known consequences to handle, not discover later:
+
+- **`countPending` changes meaning for a remote collector.** `RemoteAcquisitionHandler.pendingRemoteApprox`
+  (`CollectorProcessor.java:265`) exists only because the read-only scan must never fetch. Once ingest walks
+  the inbox, pending *is* the landed backlog — exact, not approximate — and "listed remotely but not yet
+  fetched" becomes a separate acquisition-side gauge. Decide the metric names before touching it.
+- **Fetched files become re-listable.** Today's comment at `:262` notes remote discovery bypasses the poll
+  walk "so staged files are never re-listed". After step 2 they *are* listed — which is fine (markers dedup
+  them) but means the marker path is now load-bearing for remote sources in a way it was not.
+- Pre-fetch dedup, the watermark filter, the circuit breaker and post-actions all stay on the acquisition
+  side; markers/fingerprint dedup and the T15 cap stay on the ingest side.
 
 **B4 —** the multiplexer unit gets a queue-driven driver + bounded spill-to-disk hand-off with a
 high-water mark (the §3.5 escalation, verbatim).
