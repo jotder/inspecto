@@ -113,6 +113,16 @@ src/app/
   pill — never hand-roll a `rounded-full … text-xs` span; content is projected, `(removed)` emits on
   the optional ✕; a clickable filter toggle keeps its own `<button>` around the chip for
   `aria-pressed`/keyboard).
+- **Authoring an enrichment → `<inspecto-enrichment-editor>`** (`inspecto/enrichment/`, W4b 2026-08-01).
+  ONE shared references+transform editor for the companion `*_enrich.toon`; adopters: the Onboarding
+  Enrichment stage and the Pipelines `enrichment` node dialog — never fork it. Hosts own everything
+  around it (reference options, derived-or-asked wiring via `ENRICHMENT_WIRING_ATTRIBUTES`, preview,
+  save). ⚠ The save is always `POST /config/write type=enrichment` **then** `POST /enrichment`
+  (register — no mtime hot-reload), NEVER a `*_job.toon` enrich job: the registered path is a
+  partition-scoped per-batch recompute, a job is a full rescan. The node carries only
+  `use: enrichment/<name>` — never mirror the config into `node.config` (split-brain). `partitions`
+  lists are deliberately unspecced (`AttributeSpec` has no list type) and must travel verbatim through
+  a save; a `transform_file` config is refused, not overwritten.
 - **Labelling something with cross-entity tags → `TagAssignmentDialog`** (`inspecto/tags/`, D7). Kind-
   agnostic: `dialog.open(TagAssignmentDialog, {data: {targetKind, targetId, label}})`, where `targetKind`
   is `object` or a `ComponentStore.WRITABLE_TYPES` value. Adopting it on a new pane is a menu item, not a
