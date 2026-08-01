@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, forkJoin, of, throwError } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
+import { Observable, forkJoin, of } from 'rxjs';
 import { catchError, concatMap, map } from 'rxjs/operators';
 import {
     ComponentType,
@@ -8,14 +9,37 @@ import {
     ConnectionsService,
     DecisionRule,
     DecisionRulesService,
-    DecisionRuleUpsert,
     JobsService,
     PipelinesService,
     SpacesService,
+    apiUrl,
 } from 'app/inspecto/api';
 import type { AuthoredPipeline } from 'app/inspecto/api/pipelines.service';
-import type { JobDetail, JobUpsert } from 'app/inspecto/api/jobs.service';
+import type { JobDetail } from 'app/inspecto/api/jobs.service';
 import { BUNDLE_KINDS, BundleItem, BundleKind, MetadataBundle, buildBundle, withDependencies } from './bundle';
+
+/** What the caller asks for per item; anything absent takes the server's default (existing ⇒ skip). */
+export type ImportAction = 'overwrite' | 'skip';
+
+/** Per-item outcome from `POST /bundle/import`. `unchanged` = identical hash, so nothing was written. */
+export type ImportStatus = 'imported' | 'overwritten' | 'skipped' | 'unchanged' | 'failed';
+
+export interface ImportResultRow {
+    kind: BundleKind;
+    id: string;
+    status: ImportStatus;
+    /** Why it was skipped or how it failed — server-authored, shown verbatim in the result column. */
+    message?: string;
+}
+
+export interface ImportOutcome {
+    imported: number;
+    overwritten: number;
+    skipped: number;
+    unchanged: number;
+    failed: number;
+    results: ImportResultRow[];
+}
 
 const COMPONENT_KINDS = BUNDLE_KINDS.map((k) => k.kind).filter(
     (k): k is Extract<BundleKind, ComponentType> =>
@@ -36,12 +60,19 @@ function decisionRuleContent(rule: DecisionRule): Record<string, unknown> {
 
 /**
  * The single source of Metadata-Bundle transport (R6): loading every exportable artifact off the
- * instance, writing an imported item through the right store, and building/downloading a bundle.
- * Extracted from the Settings Transfer pane so the shared import dialog and the per-surface
- * `<inspecto-transfer-menu>` reuse the exact same load/write path — one format, three surfaces.
+ * instance, applying an import, and building/downloading a bundle. Extracted from the Settings Transfer
+ * pane so the shared import dialog and the per-surface `<inspecto-transfer-menu>` reuse the exact same
+ * path — one format, three surfaces.
+ *
+ * <p><b>Import is the backend's</b> since U-F (2026-08-01): {@link #applyImport} posts the envelope to
+ * `/bundle/import` instead of fanning out one per-kind write per row. {@link #loadAll} stays client-side
+ * on purpose — it feeds the *selection* UI (what this instance has to offer, and the target index the fit
+ * check runs against), which is the UI's half of the split `BundleRoutes` was designed around: the UI
+ * derives the closure and lineage, the backend owns content, hashes, gates and persistence.
  */
 @Injectable({ providedIn: 'root' })
 export class BundleTransferService {
+    private http = inject(HttpClient);
     private components = inject(ComponentsService);
     private connections = inject(ConnectionsService);
     private pipelines = inject(PipelinesService);
@@ -87,35 +118,28 @@ export class BundleTransferService {
         );
     }
 
-    /** Write one imported item through the store that owns its kind. `overwrite` = update vs create. */
-    write(item: BundleItem, overwrite: boolean): Observable<unknown> {
-        const { kind, id, content } = item;
-        if (kind === 'connection') {
-            const profile = { ...(content as unknown as ConnectionProfile), id };
-            return overwrite ? this.connections.update(id, profile) : this.connections.create(profile);
-        }
-        if (kind === 'authored-pipeline') {
-            const pipeline = { ...(content as unknown as AuthoredPipeline), name: id };
-            return overwrite ? this.pipelines.replaceAuthored(id, pipeline) : this.pipelines.createAuthored(pipeline);
-        }
-        if (kind === 'job') {
-            const job = { ...(content as unknown as JobUpsert), name: id };
-            return overwrite ? this.jobs.update(id, job) : this.jobs.create(job);
-        }
-        if (kind === 'decision-rule') {
-            const rule = { ...(content as unknown as DecisionRuleUpsert), name: id };
-            return overwrite ? this.decisionRules.update(id, rule) : this.decisionRules.create(rule);
-        }
-        // A kind retired from the registry (today: `schema`) can still appear in an ALREADY-EXPORTED
-        // bundle. Refuse it here with a named reason rather than attempting a write against a kind the
-        // server no longer knows — that would surface as an opaque 400 per item. The bundle as a whole
-        // still imports; only these items are declined.
-        if (kind === 'schema') {   // the one LEGACY_BUNDLE_KINDS entry; `===` so TS narrows it away below
-            return throwError(() => new Error(
-                `"${kind}" is no longer a registry component — a schema now lives only in its pipeline's `
-                + `config (processing.schema_file). Re-author it in the Stream's Schema stage.`));
-        }
-        return overwrite ? this.components.update(kind, id, content) : this.components.create(kind, { id, ...content });
+    /**
+     * Apply an import through **the backend's own bundle pipe** (`POST /bundle/import`) — U-F, 2026-08-01.
+     *
+     * <p>This used to be a client-side fan-out: one `write()` per row, each going to the per-kind store
+     * (`POST /connections`, `PUT /components/{kind}/{id}`, …) in whatever order the caller looped. That was
+     * the third parallel implementation of a format the backend already owns, and it silently skipped every
+     * gate `/bundle/import` applies:
+     * - **referential integrity**, fail-closed before *any* write — an import may not INTRODUCE broken refs;
+     * - **connection secret defence-in-depth** — a secret-looking field that is present and not a `${…}`
+     *   reference fails that item, where `POST /connections` accepts a literal (its `keepSecret` only
+     *   intercepts the `***` sentinel), so the fan-out could land a raw credential on the target;
+     * - **dependency-ordered apply** (`APPLY_ORDER`), so a referenced kind is written before its referencer;
+     * - **idempotent re-promotion**: identical content hash ⇒ `unchanged`, no write at all. The fan-out had
+     *   no such status and reported a no-op re-import as a successful write.
+     *
+     * The envelope is passed through **as parsed**, not rebuilt, so each item keeps the origin
+     * `provenance.contentHash` the drift/idempotency check reads.
+     *
+     * @param actions per-item `"<kind>/<id>" → "overwrite" | "skip"`; an existing item defaults to skip
+     */
+    applyImport(bundle: MetadataBundle, actions: Record<string, ImportAction>): Observable<ImportOutcome> {
+        return this.http.post<ImportOutcome>(apiUrl('/bundle/import'), { bundle, actions });
     }
 
     /** Build a bundle for a selection, optionally expanded to its dependency closure against `available`. */

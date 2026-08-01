@@ -27,6 +27,7 @@ import { pipelinesHandler } from './handlers/pipelines.handler';
 import { requirementsHandler } from './handlers/requirements.handler';
 import { settingsHandler } from './handlers/settings.handler';
 import { biTemplatesHandler } from './handlers/bi-templates.handler';
+import { bundleHandler } from './handlers/bundle.handler';
 import { dashboardShareHandler } from './handlers/dashboard-share.handler';
 import { publicDashboardsHandler } from './handlers/public-dashboards.handler';
 import { spacesHandler } from './handlers/spaces.handler';
@@ -77,6 +78,7 @@ const HANDLERS: MockHandler[] = [
     biTemplatesHandler(flags),
     requirementsHandler(flags),
     decisionRulesHandler(flags),
+    bundleHandler(flags), // U-F: POST /bundle/import — after the per-kind domains it writes through
     healthHandler(flags), // /health/details only — the bare /health probe stays real (connectivity banner)
     jobsHandler(flags),
     assistHandler(flags),

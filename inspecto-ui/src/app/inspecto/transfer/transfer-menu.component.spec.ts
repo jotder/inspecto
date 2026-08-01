@@ -24,7 +24,7 @@ function create(opts: { afterClosed?: number; canAuthor?: boolean } = {}) {
             provideNoopAnimations(),
             { provide: BundleTransferService, useValue: { loadAll, buildExport, download } },
             { provide: MatDialog, useValue: { open } },
-            { provide: ToastrService, useValue: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } },
+            { provide: ToastrService, useValue: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() } },
             { provide: LensService, useValue: { canAuthorWorkbench: signal(opts.canAuthor !== false) } },
         ],
     });

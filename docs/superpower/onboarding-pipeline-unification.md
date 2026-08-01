@@ -519,7 +519,41 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   target space**, where the pre-closure walk produced no quarantine at all. Plus 1 new resolver test
   (11 selection assertions) and full reactor BUILD SUCCESS, 0 failures.*
 
-  Remaining W3 scope: make the frontend formats callers of the backend pipe (U-F proper).
+  **✅ U-F, first half — the Metadata Bundle IMPORTS through the backend now (2026-08-01).** The UI held a
+  third implementation of a format the backend already owns: `BundleTransferService.write()` fanned out one
+  per-kind write per row (`POST /connections`, `PUT /components/{kind}/{id}`, …) in whatever order the
+  caller looped. That skipped every gate `POST /bundle/import` applies:
+  - **referential integrity**, fail-closed before *any* write — an import may not INTRODUCE broken refs;
+  - **connection secret defence-in-depth** — a secret-looking field that is present and not a `${…}`
+    reference fails that item, where `POST /connections` accepts a literal (`keepSecret` only intercepts the
+    `***` sentinel). The fan-out could land a raw credential on the target;
+  - **dependency-ordered apply** (`APPLY_ORDER`), so a referenced kind is written before its referencer;
+  - **idempotent re-promotion** — identical content hash ⇒ `unchanged`, no write. The fan-out had no such
+    status and reported a no-op re-import as a successful write.
+
+  Both callers (Settings *Import & Export* and the shared import dialog) now post the envelope **once** and
+  paint the server's own per-item verdicts. The envelope is passed **as parsed**, never rebuilt, so each item
+  keeps the origin `provenance.contentHash` the drift/idempotency check reads. `loadAll()` stays client-side
+  on purpose — it feeds the *selection* UI and the fit-check target index, which is the UI's half of the split
+  `BundleRoutes` was designed around (UI derives closure + lineage; backend owns content, hashes, gates,
+  persistence). A whole-bundle 422/503 is reported once, leaving every row without a verdict, rather than
+  painting per-row failures the server never issued.
+
+  A **mock handler was mandatory, not optional**: no `/bundle/*` mock existed (itself evidence the UI never
+  called it), so offline import would simply have stopped working. `bundle.handler.ts` mirrors the server's
+  strictness — all five gates — because a lenient mock turns each hard failure into a passing offline
+  rehearsal, the exact trap recorded in the `angular-ui` skill.
+  *Verified: 11 new mock-handler tests pinning the gates, rewritten caller specs (one call, right body,
+  server verdicts painted, gate rejection handled), full UI suite **1917 passed / 0 failed**,
+  `lint:tokens` clean, production build OK.*
+
+  Remaining U-F: (a) **Metadata Bundle export** still builds client-side rather than calling
+  `POST /bundle/export` — lower value, since the UI already holds the content from `loadAll()`; the backend
+  would add an authoritative `contentHash`. (b) **`stream-bundle.ts` → the datasource zip pipe is BLOCKED on
+  a product decision, not on effort**: the zip path can only export a *registered* pipeline
+  (`DataSourceBundleResolver.resolve` needs `service.configFor(id)`), while the onboarding wizard exports an
+  **in-flight draft** held in memory; and the download would change from `.json` to `.zip`, breaking
+  every previously-saved stream-config file. Decide the draft story first.
   *Verify: the two-instance walk above, re-run once the closure widens (a decision rule / reference
   dataset must survive it too). The endpoint skill for any new route.*
 - **W4 — stages become typed nodes (U-B).** Gated on W0.

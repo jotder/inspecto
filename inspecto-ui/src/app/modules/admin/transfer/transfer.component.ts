@@ -6,8 +6,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
-import { from, of } from 'rxjs';
-import { catchError, concatMap, map, toArray } from 'rxjs/operators';
+import { of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
 import { LensService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -18,6 +18,8 @@ import {
     BundleItem,
     BundleKind,
     BundleTransferService,
+    ImportAction,
+    ImportStatus,
     ImportRow,
     MetadataBundle,
     TargetIndex,
@@ -28,7 +30,7 @@ import {
 
 /** An import-preview row + its post-apply outcome. */
 interface Row extends ImportRow {
-    result?: 'imported' | 'overwritten' | 'failed';
+    result?: ImportStatus;
     message?: string;
 }
 
@@ -179,33 +181,45 @@ export class TransferComponent implements OnInit {
         this.rows.update((rows) => rows.map((r) => (r.exists ? { ...r, action: 'skip' } : r)));
     }
 
+    /** Apply through the backend's bundle pipe in one call — see {@link BundleTransferService#applyImport}. */
     apply(): void {
-        if (!this.lens.canAuthorWorkbench() || this.applying()) return;
+        const source = this.bundle();
+        if (!this.lens.canAuthorWorkbench() || this.applying() || !source) return;
         const work = this.rows().filter((r) => r.action !== 'skip');
         if (!work.length) return;
+
+        const actions: Record<string, ImportAction> = {};
+        for (const r of work) if (r.action === 'overwrite') actions[`${r.item.kind}/${r.item.id}`] = 'overwrite';
+
         this.applying.set(true);
-        from(work)
-            .pipe(
-                concatMap((row) =>
-                    this.transfer.write(row.item, row.action === 'overwrite').pipe(
-                        map(() => ({ row, result: (row.action === 'overwrite' ? 'overwritten' : 'imported') as Row['result'] })),
-                        catchError((err) => of({ row, result: 'failed' as Row['result'], message: apiErrorMessage(err, 'Write failed.') })),
-                    ),
-                ),
-                toArray(),
-            )
-            .subscribe((outcomes) => {
-                this.rows.update((rows) =>
-                    rows.map((r) => {
-                        const o = outcomes.find((x) => x.row === r);
-                        return o ? { ...r, result: o.result, message: 'message' in o ? o.message : undefined } : r;
-                    }),
-                );
+        this.transfer
+            .applyImport({ ...source, items: work.map((r) => r.item) }, actions)
+            .pipe(catchError((err) => of(apiErrorMessage(err, 'Import failed.'))))
+            .subscribe((outcome) => {
                 this.applying.set(false);
                 this.applied.set(true);
-                const failed = outcomes.filter((o) => o.result === 'failed').length;
-                if (failed) this.toastr.warning(`Imported ${outcomes.length - failed} artifact(s); ${failed} failed — see the result column.`);
-                else this.toastr.success(`Imported ${outcomes.length} artifact(s)`);
+                if (typeof outcome === 'string') {
+                    // A whole-bundle gate rejection (422 integrity / 503 writes disabled): nothing was
+                    // written, so no row gets a result.
+                    this.toastr.error(outcome);
+                    return;
+                }
+                const byRef = new Map(outcome.results.map((r) => [`${r.kind}/${r.id}`, r]));
+                this.rows.update((rows) =>
+                    rows.map((r) => {
+                        const res = byRef.get(`${r.item.kind}/${r.item.id}`);
+                        return res ? { ...r, result: res.status, message: res.message } : r;
+                    }),
+                );
+                const written = outcome.imported + outcome.overwritten;
+                if (outcome.failed) {
+                    this.toastr.warning(
+                        `Imported ${written} artifact(s); ${outcome.failed} failed — see the result column.`);
+                } else if (outcome.unchanged && !written) {
+                    this.toastr.info(`Already up to date — ${outcome.unchanged} artifact(s) unchanged.`);
+                } else {
+                    this.toastr.success(`Imported ${written} artifact(s)`);
+                }
                 this.load(); // refresh target ids so a re-run of the preview reflects the writes
             });
     }
