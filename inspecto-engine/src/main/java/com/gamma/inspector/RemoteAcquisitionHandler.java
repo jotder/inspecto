@@ -30,6 +30,26 @@ import java.util.concurrent.*;
  * source-side post-actions, and dead-lettering of corrupt downloads. Observability is delegated to
  * {@link AcquisitionTelemetry}.
  *
+ * <h3>Stage, then land (B3)</h3>
+ * Bytes are fetched into a <b>staging tree outside the inbox</b> ({@code collector.fetch.staging_dir},
+ * default {@code <dirs.temp>/acquire}) and only moved into {@code dirs.poll} once complete and
+ * integrity-verified — an atomic rename, so a file <em>appears</em> in the inbox all at once, exactly as
+ * {@link com.gamma.pipeline.exec.FileLander} does for the adapter path. Three things depend on this:
+ * <ul>
+ *   <li><b>A partial download is never visible to ingest.</b> Fetch resumes by appending to the
+ *       destination, so before B3 a half-downloaded file sat in the inbox at its final name. That was
+ *       safe only because acquisition and ingest ran in the same synchronous call under one run-guard
+ *       claim; it stops being safe the moment acquisition gets its own driver, which is the point of B3.</li>
+ *   <li><b>Resume still works.</b> The staging path is <em>deterministic</em>
+ *       ({@code <staging>/<relativePath>}), not a UUID temp name, so the next attempt finds the partial
+ *       and resumes it (see {@code SftpConnector.fetchTo}, which compares the destination's size to the
+ *       remote length). A crash mid-fetch leaves the partial in staging, out of ingest's way.</li>
+ *   <li><b>A corrupt download never enters the inbox at all</b> — {@link #quarantineCorrupt} dead-letters
+ *       it straight from staging.</li>
+ * </ul>
+ * Ordering is land-then-ack: the source-side post-action (which may delete the remote original) runs
+ * <b>after</b> the local copy is durably in the inbox, never before.
+ *
  * <p>Package-private; called only from {@code CollectorProcessor.collect}. The logger keeps
  * {@code CollectorProcessor}'s category so log output is unchanged from when this code lived there.
  */
@@ -52,6 +72,7 @@ final class RemoteAcquisitionHandler {
         Path pollRoot = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String etagAlgo = cfg.collector().duplicate().algorithm();
         PipelineConfig.Fetch fetch = cfg.collector().fetch();
+        Path stagingRoot = stagingRoot(cfg, fetch);
 
         // Resolve + capability-validate the post-action once. on_unsupported=FAIL stops the cycle here, before any
         // bytes move; WARN_AND_CONTINUE/IGNORE degrade to RETAIN (null ⇒ apply nothing).
@@ -77,7 +98,7 @@ final class RemoteAcquisitionHandler {
             AcquisitionTelemetry.setActiveConnections(cfg, 1);
             try {
                 for (RemoteFile rf : toFetch)
-                    fetchOne(cfg, primary, rf, pollRoot, etagAlgo, retry, limiter, postAction, staged);
+                    fetchOne(cfg, primary, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged);
             } finally {
                 AcquisitionTelemetry.setActiveConnections(cfg, 0);
             }
@@ -104,7 +125,7 @@ final class RemoteAcquisitionHandler {
                     futures.add(ex.submit(() -> {
                         CollectorConnector c = pool.take();   // blocks until a session frees up ⇒ bounds concurrency
                         try {
-                            fetchOne(cfg, c, rf, pollRoot, etagAlgo, retry, limiter, postAction, staged);
+                            fetchOne(cfg, c, rf, pollRoot, stagingRoot, etagAlgo, retry, limiter, postAction, staged);
                         } finally {
                             pool.put(c);
                         }
@@ -126,20 +147,33 @@ final class RemoteAcquisitionHandler {
     }
 
     /**
-     * Retrieve one ready remote file: rate-limit (Phase F), fetch+integrity-verify (with retry), preserve the
-     * source mtime, apply the source-side post-action, and add the local path to {@code staged}. A fetch/integrity
-     * failure is already logged, metered and (for a corrupt download) quarantined inside {@link #fetchAndVerify};
-     * the file is simply skipped. Called from one connector session that the caller has confined to this thread.
+     * Retrieve one ready remote file: rate-limit (Phase F), fetch+integrity-verify into staging (with retry),
+     * preserve the source mtime, land it atomically in the inbox, then apply the source-side post-action and add
+     * the landed path to {@code staged}. A fetch/integrity failure is already logged, metered and (for a corrupt
+     * download) quarantined inside {@link #fetchAndVerify}; the file is simply skipped. Called from one connector
+     * session that the caller has confined to this thread.
+     *
+     * <p>The two orderings here are load-bearing. <b>mtime before the move</b>, so the file is already carrying
+     * the source mtime the instant it becomes visible in the inbox — METADATA dedup would otherwise see the
+     * fetch time for whatever window sat between landing and the stat. <b>Post-action after the move</b>, because
+     * a post-action may delete the remote original: acking the source before the local copy is durably in the
+     * inbox would lose data on a crash in between (the land-then-ack rule, see
+     * {@link com.gamma.pipeline.exec.FileLander}).
      */
     private static void fetchOne(PipelineConfig cfg, CollectorConnector connector, RemoteFile rf, Path pollRoot,
-                                 String etagAlgo, RetryPolicy retry, RateLimiter limiter, PostAction postAction,
-                                 List<RemoteFile> staged) {
+                                 Path stagingRoot, String etagAlgo, RetryPolicy retry, RateLimiter limiter,
+                                 PostAction postAction, List<RemoteFile> staged) {
         if (limiter != null && rf.hasSize()) {
             try { limiter.acquire(rf.size()); }
             catch (InterruptedException e) { Thread.currentThread().interrupt(); return; }
         }
-        Path target = pollRoot.resolve(rf.relativePath()).normalize();
-        Path fetched = fetchAndVerify(cfg, connector, rf, target, etagAlgo, retry);
+        // A remote listing is untrusted input: confine both resolutions to their root so a crafted
+        // relativePath ("../../etc/x") cannot write outside the staging tree or the inbox.
+        Path part   = contained(stagingRoot, rf.relativePath(), cfg, rf);
+        Path target = contained(pollRoot,    rf.relativePath(), cfg, rf);
+        if (part == null || target == null) return;
+
+        Path fetched = fetchAndVerify(cfg, connector, rf, part, etagAlgo, retry);
         if (fetched == null) return;   // failure already handled (event + metric + quarantine/skip)
 
         if (rf.lastModified() != null) {
@@ -147,8 +181,92 @@ final class RemoteAcquisitionHandler {
                 Files.setLastModifiedTime(fetched, java.nio.file.attribute.FileTime.from(rf.lastModified()));
             } catch (java.io.IOException ignore) { /* best-effort: mtime preservation keeps METADATA dedup stable */ }
         }
+        Path landed = land(cfg, rf, fetched, target);
+        if (landed == null) return;    // the bytes stay in staging; the next cycle re-lands them
+
         applyPostAction(cfg, connector, rf, postAction);
-        staged.add(rf.withLocalPath(fetched));
+        staged.add(rf.withLocalPath(landed));
+    }
+
+    /**
+     * The staging tree fetches materialise into: {@code collector.fetch.staging_dir} when set, else
+     * {@code <dirs.temp>/acquire}.
+     *
+     * <p>The default is a dedicated subdirectory of {@code dirs.temp} rather than {@code dirs.temp} itself
+     * (which {@code PartitionWriter} already uses for DuckDB COPY staging). Keeping staging a sibling of the
+     * inbox under the same space-convention root also makes the land a same-filesystem rename in the normal
+     * layout — the property that makes it atomic.
+     *
+     * <p>Throws, before any bytes move, when the staging tree would sit <b>inside</b> {@code dirs.poll}: that
+     * puts partial downloads back in the inbox and defeats the entire mechanism. {@code PipelineConfigParser}
+     * already forbids every other dir from living under the inbox for the same family of reasons, and
+     * {@code resolvePostAction} sets the precedent for failing a remote cycle here rather than later.
+     */
+    private static Path stagingRoot(PipelineConfig cfg, PipelineConfig.Fetch fetch) {
+        String configured = fetch.stagingDir();
+        String temp = cfg.dirs().temp();
+        if ((configured == null || configured.isBlank()) && (temp == null || temp.isBlank()))
+            throw new IllegalStateException("Pipeline '" + cfg.identity().pipelineName()
+                    + "' fetches from a remote collector but has neither collector.fetch.staging_dir nor "
+                    + "dirs.temp — one is required, so downloads can complete outside the inbox before landing");
+        Path root = ((configured != null && !configured.isBlank())
+                ? Paths.get(configured)
+                : Paths.get(temp).resolve("acquire")).toAbsolutePath().normalize();
+        Path pollRoot = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        if (root.startsWith(pollRoot))
+            throw new IllegalStateException("Pipeline '" + cfg.identity().pipelineName()
+                    + "' has collector.fetch.staging_dir (" + root + ") inside dirs.poll (" + pollRoot
+                    + ") — staging must be outside the inbox, or partial downloads become visible to ingest");
+        return root;
+    }
+
+    /**
+     * Resolve {@code relativePath} under {@code root}, or {@code null} (logged + metered as a fetch failure) when
+     * it escapes — a remote listing is untrusted input. Mirrors the house path-jail idiom (resolve, normalise,
+     * {@code startsWith}) used by {@code WriteGates} and {@code LocalConnectionWorkbench}.
+     */
+    private static Path contained(Path root, String relativePath, PipelineConfig cfg, RemoteFile rf) {
+        Path resolved = root.resolve(relativePath).normalize();
+        if (resolved.startsWith(root)) return resolved;
+        AcquisitionTelemetry.incDownloadsFailed(cfg);
+        AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
+                "Rejected path escaping " + root + ": " + relativePath, rf.relativePath());
+        log.warn("Remote listing on {} offered a path escaping {}: {} — skipping",
+                cfg.identity().pipelineName(), root, relativePath);
+        return null;
+    }
+
+    /**
+     * Move a complete, verified staging file into the inbox so it becomes visible all at once. Returns the landed
+     * path, or {@code null} when the move failed — in which case the bytes stay in staging and the next cycle
+     * re-lands them (the file is simply not ingested this cycle), which is why this is a skip and not a throw.
+     *
+     * <p>A non-atomic filesystem falls back to {@code REPLACE_EXISTING}, matching
+     * {@link com.gamma.pipeline.exec.FileLander}. That fallback is a real (if unavoidable) downgrade — a copy
+     * rather than a rename, so a large file is briefly visible half-written — hence the warning: it means
+     * {@code staging_dir} and {@code dirs.poll} are on different filesystems and should be moved together.
+     */
+    private static Path land(PipelineConfig cfg, RemoteFile rf, Path staged, Path target) {
+        try {
+            if (target.getParent() != null) Files.createDirectories(target.getParent());
+            try {
+                Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                log.warn("Atomic rename unavailable for {} on {} — staging_dir and dirs.poll are on different "
+                                + "filesystems; falling back to a copy, which is briefly visible half-written",
+                        rf.relativePath(), cfg.identity().pipelineName());
+                Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return target;
+        } catch (java.io.IOException e) {
+            AcquisitionTelemetry.incDownloadsFailed(cfg);
+            AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
+                    "Could not land " + rf.relativePath() + " in the inbox (" + e.getMessage() + ")",
+                    rf.relativePath());
+            log.warn("Could not land {} in the inbox on {}: {} — the bytes stay staged for the next cycle",
+                    rf.relativePath(), cfg.identity().pipelineName(), e.getMessage());
+            return null;
+        }
     }
 
     /**

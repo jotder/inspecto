@@ -12,14 +12,37 @@ timestamp: 2026-06-28T00:00:00Z
 ## The SPI (in the core; implemented in [connectors](../modules/connectors.md))
 
 * `CollectorConnector` (`inspecto-acquire/src/main/java/com/gamma/acquire/CollectorConnector.java`) — `discover`,
-  `readiness`, `open` (stream bytes), `fetchTo` (materialise straight to the backup dir, never temp-then-move),
-  `post` (RETAIN/DELETE/MOVE/RENAME/TAG), and a `Capability` enum. *(Renamed from `CollectorConnector` per the
-  Source→Collector glossary flip.)*
+  `readiness`, `open` (stream bytes), `fetchTo` (materialise the bytes at the destination it is given —
+  see below), `post` (RETAIN/DELETE/MOVE/RENAME/TAG), and a `Capability` enum. *(Renamed from
+  `CollectorConnector` per the Source→Collector glossary flip.)*
 * `CollectorConnectorFactory` (`…/acquire/CollectorConnectorFactory.java`) — `scheme()` + `create(cfg, profile)`
   + the optional `workbench(profile)` hook (below), registered via `META-INF/services`.
 * `ConnectionWorkbench` (`…/acquire/ConnectionWorkbench.java`) — the graded probe / explore / sample SPI
   behind the connection-workbench routes (below); implementations hold one session per instance, like a
   connector.
+
+### Where `fetchTo` materialises — stage, then land (B3)
+
+A connector writes to the destination `RemoteAcquisitionHandler` hands it, and that destination is **never
+the inbox**. Fetches go to a staging tree — `collector.fetch.staging_dir`, default `<dirs.temp>/acquire` —
+and only once the file is complete and integrity-verified is it **atomically renamed** into `dirs.poll`.
+Backup is a separate, later step (`BatchProcessor.backupFile`, post-commit), not where fetch lands.
+
+Three properties depend on this, all pinned by `RemoteAcquisitionStagingTest`:
+
+* **A partial download is never ingestible.** `fetchTo` resumes by appending to its destination, so if that
+  destination were the inbox a half-downloaded file would sit there under its final name. That used to be
+  safe only because acquisition and ingest ran in one synchronous call under a single run-guard claim — the
+  coupling the branch-aware-executor work removes.
+* **Resume still works**, because the staging path is deterministic (`<staging>/<relativePath>`), not a
+  UUID temp name: the next attempt finds the partial and continues it. `SftpConnector.fetchTo` compares the
+  destination's size to the remote length to decide the offset.
+* **A corrupt download never enters the inbox** — it is dead-lettered to quarantine straight from staging.
+
+`staging_dir` must be outside `dirs.poll` (refused at fetch time if not — it would defeat the whole
+mechanism) and should be on the same filesystem, or the rename degrades to a non-atomic copy and warns.
+The ordering is land-then-ack: a source-side `post` action that deletes the remote original runs only
+*after* the local copy is durably in the inbox.
 
 ## Concrete connectors (`inspecto-connectors/`)
 

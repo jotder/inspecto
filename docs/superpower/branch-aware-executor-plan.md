@@ -2,9 +2,10 @@
 
 > **Status: IN FLIGHT (opened 2026-08-01).** Operator decisions taken 2026-08-01 reordered the stages:
 > **throughput/decoupling (Stage B) goes first**; multi-destination sinks become a later slice
-> expressed as a plural `sinks:` section. **B1 (per-pipeline run guard) and B2 (non-blocking dispatch)
-> are shipped and green (full reactor 2451/0/0, 3 skipped).** B3 (acquisition as its own driver) is next.
-> Stage A (the executor bridge) is deferred behind B; Stage C is unstarted.
+> expressed as a plural `sinks:` section. **Shipped: B1 (per-pipeline run guard) + B2 (non-blocking
+> dispatch) — committed `2f4348f5`, full reactor 2451/0/0 · B3a (stage-then-land) — inspecto-engine
+> 791/0/0.** B3b (the acquisition driver itself) is next. Stage A (the executor bridge) is deferred
+> behind B; Stage C is unstarted.
 
 ## 0. Decisions of record (2026-08-01)
 
@@ -237,8 +238,54 @@ now uses distinct ids; `TestConfigs` gained a `name(String)` setter so tests sto
 timers still fire would submit into a closing executor. `dispatch` also handles the
 `RejectedExecutionException` by releasing the claim it took, so a rejected dispatch cannot leak one.
 
-**B3 — (NEXT)** acquisition becomes its own driver with its own concurrency budget, handing off a **durable**
-descriptor set (the `RemoteFile`/ledger pair is already that descriptor).
+**B3 — acquisition becomes its own driver** with its own concurrency budget, handing off a **durable**
+descriptor set.
+
+⚠ **Correction to this item's premise, from mapping the code (2026-08-01).** Two things it assumed are
+wrong, and one of them makes B3 unsafe as originally written:
+
+1. **The ledger is not usable as the hand-off.** `AcquisitionLedger` is written *once, post-commit*
+   (`BatchProcessor.java:178-181`) and is **in-memory by default** (`-Dacquire.ledger.backend=memory`).
+   It is a terminal-fact store, not a progression record — it cannot tell a separate driver what is
+   staged and ready. Making it one is Stage C's job, not B3's.
+   **The durable descriptor is therefore the filesystem**, which is also what the operator asked for
+   ("download to inbox/backup and read from there / for local files (someone pushed)") and how local
+   pushes already work. No new store.
+2. **Fetch wrote *into the inbox*, and resume appends in place.** `SftpConnector.fetchTo` compares the
+   destination's size to the remote length and appends, so a partial download sat in `dirs.poll` under
+   its final name. That was safe **only** because acquisition and ingest ran in the same synchronous
+   `collect()` call under one run-guard claim. Decoupling them — the entire point of B3 — would have made
+   partial files ingestible. This is the R6/T23 anti-pattern (a second driver over the same inbox) and it
+   is why B3 splits in two.
+
+**B3a — stage, then land. ✅ SHIPPED 2026-08-01 (inspecto-engine 791/0/0, +4).**
+
+`RemoteAcquisitionHandler` now fetches into a staging tree outside the inbox
+(`collector.fetch.staging_dir`, default `<dirs.temp>/acquire` — this finally *implements* a config key that
+was parsed and round-tripped but never acted on) and atomically renames into `dirs.poll` only once the file
+is complete and integrity-verified. Resume survives because the staging path is deterministic, not a UUID
+temp name. A corrupt download is dead-lettered from staging and never enters the inbox. Post-action runs
+**after** landing (land-then-ack: never delete the remote original before the local copy is durably
+visible). mtime is set **before** the move, so the file carries the source mtime the instant it appears —
+otherwise METADATA dedup would briefly see the fetch time.
+
+Staging inside `dirs.poll` is refused before any bytes move — it would defeat the mechanism, and
+`PipelineConfigParser.validateDirs` already forbids every other dir from living under the inbox.
+A non-atomic filesystem falls back to a copy **with a warning**: that is a real downgrade (briefly visible
+half-written), so `staging_dir` and `dirs.poll` belong on one filesystem.
+
+⚠ Also closed here: `fetchOne` resolved `pollRoot.resolve(rf.relativePath())` with **no containment check**,
+so a crafted remote listing path (`../../x`) could write outside the poll root. Both resolutions now go
+through one `contained()` path-jail helper (the house `resolve → normalize → startsWith` idiom). This was
+pre-existing, not introduced by B3 — but the new staging resolution could not be written safely without it.
+
+**B3b — the acquisition driver (NEXT).** Now that landing is atomic, acquisition can run on its own timer
+with its own budget, and ingest discovers remote-fetched files by scanning the inbox exactly like
+locally-pushed ones — which is the unification the operator asked for and removes the last in-memory
+coupling (`collect()` currently returns the fetched list straight to `BatchPlanner`). Pre-fetch dedup,
+`StabilityGate` on the listing, the watermark filter, the circuit breaker and post-actions all stay on the
+acquisition side; ingest keeps markers/dedup. Needs its own per-pipeline claim, distinct from the ingest
+run guard, so acquisition and ingest of the same pipeline can overlap safely.
 
 **B4 —** the multiplexer unit gets a queue-driven driver + bounded spill-to-disk hand-off with a
 high-water mark (the §3.5 escalation, verbatim).
@@ -266,8 +313,9 @@ counters §11.3 wants, not a new store from scratch.
    B lands, so the reversal is defensible on review.
 2. **Stage C now or after B?** B10 puts per-file stage tracking at phase 4.5/6; the operator's model
    implies it is co-equal with B ("full housekeeping for all files, its stages").
-3. **Pin the stale `fetchTo` doc line** (§3) — `connectors.md:15` (backup dir) vs the acquisition
-   roadmap (poll-root staging tree). Cheap to settle against code; blocks nothing but will mislead.
+3. ~~**Pin the stale `fetchTo` doc line**~~ — ✅ settled 2026-08-01. `connectors.md` was wrong (fetch never
+   went to the backup dir; backup is post-commit in `BatchProcessor.backupFile`). Rewritten, and B3a made
+   the answer concrete: fetch lands in the staging tree, then renames into `dirs.poll`.
 4. **Should the `CollectorService` constructor reject duplicate pipeline ids, like `registerPipeline`
    does?** Surfaced by B2 (see the behaviour-change note above). `registerPipeline` throws
    `IllegalStateException` on a second file reusing a registered id; the constructor silently accepts it
@@ -287,6 +335,13 @@ counters §11.3 wants, not a new store from scratch.
   dispatches onto `triggerWorkers` (B2).
 - ⚠ `TestConfigs` defaults every pipeline to id `TEST_ETL`. Any test registering two pipelines must call
   `.name(...)`, or they are one pipeline to the run guard and only one runs.
+- ⚠ Fetch **stages outside the inbox and lands atomically** (B3a). Do not point `fetchTo` at `dirs.poll`
+  again — resume appends in place, so that puts partial downloads where ingest can see them. The staging
+  path must stay **deterministic** or resume restarts from zero.
+- ⚠ A remote listing's `relativePath` is **untrusted input** — always resolve it through the `contained()`
+  path jail before writing.
+- ⚠ The acquisition ledger is written **post-commit and is in-memory by default**. It cannot be used as a
+  work queue or a progress record until Stage C changes it.
 - ⚠ Markers **LAST** is a crash-ordering invariant, not a style choice — preserve it through any
   re-homing.
 - ⚠ B9 stands: multi-sink commit is **not** cross-branch transactional. A clone may have some
