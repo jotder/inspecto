@@ -114,6 +114,7 @@ public final class PipelineLift {
         if (!src.includes().isEmpty()) c.put("includes", src.includes());
         if (!src.excludes().isEmpty()) c.put("excludes", src.excludes());
         c.put("recursive_depth", src.recursiveDepth());
+        c.put("discovery", src.discovery());   // W0: poll|watch — carried so the collector block round-trips
         // typed sub-records — never null (Source canonical ctor defaults them), carried verbatim
         c.put("stability", src.stability());
         c.put("incremental", src.incremental());

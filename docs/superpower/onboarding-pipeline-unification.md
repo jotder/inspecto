@@ -1,6 +1,6 @@
 # Onboarding ↔ Pipeline unification — one model, one guided head
 
-> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W1 (a+b) SHIPPED same day; W0/W2–W5 open.**
+> **Status: IN FLIGHT — direction approved by the operator 2026-07-31. W0 + W1 + W2 + W3 SHIPPED; W4/W5 now unblocked.**
 > **Supersedes `onboarding-pipeline-split.md`** (approved 2026-07-30, archived to
 > `archived-documents/plans-archive/`). That plan's two-plane model — Onboard declares a contract,
 > Pipeline processes landed data, the Dataset is the handoff — is **reversed** by this one. §6 records
@@ -165,6 +165,47 @@ regression. ⚠ Also revisit the U-D spec asserting `nodeAttributesFor('acquisit
 it is right that one table serves both features, but if the editor ever needs `poll`/`trigger`/`file_pattern`
 (pipeline-level keys Onboarding authors elsewhere), that identity is the constraint to renegotiate.
 
+### ✅ W0 SHIPPED 2026-08-01 — the collector block now round-trips losslessly; subset named
+
+`toConfigMap()` now emits a `collector:` block, reconstructing the parser's `source:` shape
+(`PipelineConfigParser:390-500`) from the lifted acquisition node's typed sub-records. The lift already
+carried them verbatim on the `acq` node (`stability`/`fetch`/`retry`/`circuit_breaker`/`post_action`/
+`guarantee`, plus `duplicate`+`incremental` on the fingerprint dedup node and `gap_detection` on the gap
+node); `PipelineCompiler.collectorBlock()` is their inverse, emitting only keys that differ from the
+parser's implicit-LOCAL defaults so a plain local pipeline stays terse. One lift gap was closed to make
+this whole: **`discovery` was never carried by `PipelineLift.acquisitionNode`** — added, else `watch`
+could not round-trip.
+
+**W0's answer is (1), a field-by-field coverage map — proven, not asserted.** `PipelineCompilerTest.
+collectorBlockRoundTripsEverySourceSubRecord` authors a config with a full collector block (every Phase
+B–F sub-record) and drives `load → lift → toConfigMap → toToon → load`, asserting each sub-record
+recovered *and* the whole `Collector` record equal end to end. `PipelineExecutionParityTest` (5 tests)
+still runs the rebuilt config end-to-end, so the added block is proven not merely equal but *executable*.
+The Phase-1 parity tests the audit warned would move did **not** need editing — none pinned the "no
+collector key" shape; the block is additive and the existing `assertSame` node-identity checks still hold.
+
+⚠ **Durations are emitted in whole seconds** (`"45s"`): every source duration here is second-granular by
+construction (`window`/`initial_delay`/`max_delay`/`cooldown`), and the parser's `toMillis` reads a bare
+number as seconds — a sub-second value would not round-trip, but none is authored. `rate_limit` round-trips
+as a bare bytes/second number (`parseRate` reads it back exactly).
+
+**Named supported subset — what the lower still cannot carry (unchanged by W0, these are graph-shape, not
+key, gaps):**
+- **Multi-sink** — `toConfigMap` reads one persistent sink (first with a `database` dir) + one quarantine
+  sink; additional sinks are dropped. A flat `PipelineConfig` cannot express fan-out (§3).
+- **CONTROL nodes beyond `gap`** — `alert`/`event` have no branch in `compile()`; only `gap` lowers.
+- **Grouping transforms** — the engine has no rollup transform; `transform.aggregate` is a rename of
+  `transform.derive`. Honest rollup modelling is `sink.materialized` (changes graph shape).
+- **Operational, non-data knobs** — `status_dir`/`errors`/`log_dir` are intentionally omitted (status is
+  disabled in the rebuilt config; does not affect data output).
+
+So the graph editor (W4/W5) may author any single-source, single-persistent-sink pipeline — the full
+collector surface included — and refuse multi-sink / non-gap CONTROL / grouped-rollup topologies until the
+branch-aware executor (doc §13 R3) lands. **W4/W5 are unblocked.**
+
+*Verified: `PipelineCompilerTest` (3), `PipelineExecutionParityTest` (5), `PipelineLiftTest` (3) all green
+offline with the DuckDB native-access flag.*
+
 ## 4. Decisions pinned
 
 - **U-A — canonical model is `*_pipeline.toon` / `PipelineConfig`.** It is what the engine executes;
@@ -205,9 +246,10 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
 
 ## 5. Workstreams (build order; W1–W3 independently shippable and close the operator's named issues)
 
-- **W0 — the round-trip gate (§3).** Blocks W4/W5 only; W1–W3 may proceed in parallel.
-  *Verify: lift→lower round-trip test over the existing 16 configs, plus a written supported-subset
-  statement if lossless proves impossible.*
+- **W0 — the round-trip gate (§3). ✅ SHIPPED 2026-08-01.** `toConfigMap()` emits `collector:`; the
+  round-trip is proven lossless for the collector shape (`collectorBlockRoundTripsEverySourceSubRecord`),
+  and the supported subset (single-source / single-persistent-sink; no multi-sink, non-gap CONTROL, or
+  grouped rollup) is named in §3. W4/W5 unblocked.
 - **W1 — single schema store (U-C). ✅ W1a SHIPPED 2026-07-31 — W1b (space-relative paths) still open.**
   *The operator's stated priority.*
   **W1a, done:** `schema` removed from `ComponentStore.WRITABLE_TYPES`; `POST /components/schema/{id}/test`
@@ -378,7 +420,11 @@ carries no root field. **Do that threading once and both land.** See `BACKLOG.md
   *Verify: `lint:tokens` + full `ng test` + prod build; a spec asserting the two features render the
   same keys for the same concern; a live walk authoring one stream through each surface and diffing the
   written TOON — it must be identical.*
-- **W3 — promotion export (U-F). 🔄 IN PROGRESS — the credential leak is FIXED first (2026-07-31).**
+- **W3 — promotion export (U-F). ✅ COMPLETE 2026-08-01.** Credential leak fixed, import-time referential
+  integrity, space rebasing on import, closure widened to Decision Rules + Datasets, and the Metadata Bundle
+  now goes through the backend in BOTH directions (import `8c9e0988`, export `6bd03ad2`). Verdict criterion
+  met twice via the live two-space walk. U-F (b) closed as will-not-do — `stream-bundle.ts` is a separate
+  operation, not a parallel implementation. Detail below and in §5's per-item blocks.
 
   ⚠ **Found while mapping the machinery: the zip export shipped plaintext credentials.** Both
   `BundleExporter.exportDataSource` and `exportSpace` did a plain `Files.readAllBytes` on every file,

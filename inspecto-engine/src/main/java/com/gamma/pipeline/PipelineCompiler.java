@@ -92,6 +92,14 @@ public final class PipelineCompiler {
         raw.put("active", g.active());
         putIfPresent(raw, "trigger", acq.cfg("trigger"));   // T13: entry-node trigger round-trips (§3.6)
 
+        // ── collector (W0): reconstruct the source: block the parser reads (PipelineConfigParser:390-500).
+        // The lift carries the acquisition node's typed sub-records verbatim (Stability/Fetch/Retry/…), plus
+        // Duplicate + Incremental on the fingerprint node and GapDetection on the gap node; this emits their
+        // inverse in the raw map shape fromMap re-parses. Absent ⇒ the parser's implicit LOCAL default, so
+        // a plain local pipeline still emits a block that re-parses to the identical Collector record. ──
+        Map<String, Object> collector = collectorBlock(g, acq, c);
+        if (!collector.isEmpty()) raw.put("collector", collector);
+
         // ── dirs (data-relevant only; status_dir/errors/log_dir intentionally omitted) ──
         Map<String, Object> dirs = new LinkedHashMap<>();
         putIfPresent(dirs, "poll", acq.cfg("poll"));
@@ -196,6 +204,118 @@ public final class PipelineCompiler {
 
         raw.put("processing", proc);
         return raw;
+    }
+
+    /**
+     * Reconstruct the {@code collector:} block the parser reads ({@link com.gamma.etl.PipelineConfigParser}
+     * lines 390-500) from the lifted acquisition node's typed sub-records (plus {@code duplicate}/
+     * {@code incremental} on the fingerprint dedup node and {@code gap_detection} on the gap node). Only keys
+     * that differ from the parser's implicit LOCAL defaults are emitted, so a plain local pipeline stays terse
+     * while still re-parsing to the identical {@code Collector} record. Durations are emitted in seconds
+     * ({@code "<n>s"}) — every source duration here is second-granular by construction.
+     */
+    private static Map<String, Object> collectorBlock(PipelineGraph g, PipelineNode acq, Compiled c) {
+        Map<String, Object> src = new LinkedHashMap<>();
+
+        // ── identity / discovery (emit only when != the parser's implicit LOCAL defaults) ──
+        Object id = acq.cfg("id");
+        if (id != null && !id.equals(g.name())) src.put("id", id);
+        Object connector = acq.cfg("connector");
+        if (connector != null && !"local".equals(connector)) src.put("connector", connector);
+        if (acq.use() != null && acq.use().startsWith("connection/"))
+            src.put("connection", acq.use().substring("connection/".length()));
+        if (acq.cfg("includes") instanceof List<?> inc && !inc.isEmpty()) src.put("include", inc);
+        if (acq.cfg("excludes") instanceof List<?> exc && !exc.isEmpty()) src.put("exclude", exc);
+        if (acq.cfg("recursive_depth") instanceof Integer d && d != -1) src.put("recursive_depth", d);
+        Object discovery = acq.cfg("discovery");
+        if (discovery != null && !"poll".equals(discovery)) src.put("discovery", discovery);
+
+        // ── stability (Phase B) — absent ⇒ DISABLED ──
+        if (acq.cfg("stability") instanceof PipelineConfig.Stability st && st.enabled()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("window", durationSeconds(st.windowMillis()));
+            m.put("size_checks", st.sizeChecks());
+            if (st.readyMarker() != null) m.put("ready_marker", st.readyMarker());
+            m.put("exclude_temp_files", st.excludeTempFiles());
+            if (!st.tempPatterns().isEmpty()) m.put("exclude_temp_patterns", st.tempPatterns());
+            src.put("stability", m);
+        }
+
+        // ── guarantee (Phase D) — absent ⇒ BEST_EFFORT ──
+        if (acq.cfg("guarantee") instanceof PipelineConfig.Guarantee guar
+                && guar != PipelineConfig.Guarantee.BEST_EFFORT)
+            src.put("guarantee", guar.name());
+
+        // ── fetch (Phase E/F) — absent ⇒ DEFAULT ──
+        if (acq.cfg("fetch") instanceof PipelineConfig.Fetch f && !f.equals(PipelineConfig.Fetch.DEFAULT)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("mode", f.mode());
+            if (f.stagingDir() != null) m.put("staging_dir", f.stagingDir());
+            m.put("parallel_fetch", f.parallelFetch());
+            if (f.rateLimitBytesPerSec() > 0) m.put("rate_limit", f.rateLimitBytesPerSec());
+            src.put("fetch", m);
+        }
+
+        // ── retry (Phase F) — absent ⇒ a single attempt ──
+        if (acq.cfg("retry") instanceof PipelineConfig.Retry r && r.enabled()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("count", r.count());
+            m.put("backoff", r.backoff());
+            m.put("initial_delay", durationSeconds(r.initialDelayMillis()));
+            m.put("max_delay", durationSeconds(r.maxDelayMillis()));
+            src.put("retry", m);
+        }
+
+        // ── circuit breaker (Phase F) — absent ⇒ never trips ──
+        if (acq.cfg("circuit_breaker") instanceof PipelineConfig.CircuitBreaker cb && cb.enabled()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("failure_threshold", cb.failureThreshold());
+            m.put("cooldown", durationSeconds(cb.cooldownMillis()));
+            src.put("circuit_breaker", m);
+        }
+
+        // ── post_action (Phase F) — absent ⇒ RETAIN ──
+        if (acq.cfg("post_action") instanceof PipelineConfig.PostActionConfig pa && pa.active()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("on_success", pa.onSuccess());
+            if (pa.archivePath() != null) m.put("archive_path", pa.archivePath());
+            if (!pa.tags().isEmpty()) m.put("tags", pa.tags());
+            m.put("on_unsupported", pa.onUnsupported());
+            src.put("post_action", m);
+        }
+
+        // ── duplicate + incremental live on the fingerprint dedup node (content-based dedup only) ──
+        c.dedups().stream()
+                .filter(d -> BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type().equals(d.type()))
+                .findFirst().ifPresent(fp -> {
+            if (fp.cfg("duplicate") instanceof PipelineConfig.Duplicate dup && dup.contentBased()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("mode", dup.mode());
+                m.put("algorithm", dup.algorithm());
+                m.put("on_change", dup.onChange());
+                src.put("duplicate", m);
+            }
+            if (fp.cfg("incremental") instanceof PipelineConfig.Incremental in && in.enabled()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("watermark", in.watermark());
+                src.put("incremental", m);
+            }
+        });
+
+        // ── gap_detection lives on the gap node (Phase D) — absent ⇒ off ──
+        c.gap().ifPresent(gapNode -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("enabled", true);
+            putIfPresent(m, "sequence", gapNode.cfg("sequence"));
+            src.put("gap_detection", m);
+        });
+
+        return src;
+    }
+
+    /** Emit a millisecond duration as a whole-second string ({@code "30s"}) the parser's {@code toMillis} reads. */
+    private static String durationSeconds(long millis) {
+        return (millis / 1000L) + "s";
     }
 
     private static Map<String, Object> csvSettingsToMap(PipelineConfig.CsvSettings c) {
