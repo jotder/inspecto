@@ -427,6 +427,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   of [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
   §13 R3, which would let the editor lower (and the engine run) the full graph vocabulary. Largest
   remaining pipeline-graph piece; explicitly out of scope for W5.
+  - **IN FLIGHT — plan of record:**
+    [`superpower/branch-aware-executor-plan.md`](superpower/branch-aware-executor-plan.md). The operator
+    reordered the stages 2026-08-01: **throughput/decoupling (Stage B) first**, multi-destination sinks
+    later as a plural `sinks:` section, the executor bridge (Stage A) deferred behind B.
+    Shipped so far: **B1** per-pipeline run guard (`ingestLock` was one global lock across the whole
+    cycle), **B2** non-blocking poll dispatch (a tick no longer waits on the runs it starts), **B3a**
+    remote fetches stage outside the inbox and land atomically. Next: **B3b** (acquisition gets its own
+    driver), then B4/B5. Note the real multi-destination limit is **one destination per pipeline** — a
+    config-format gap (`PipelineConfig.Output` is a single record), not an executor gap.
   - **Duplicate pipeline id at construction — DECIDED 2026-08-01: fail fast.** `CollectorService`'s
     constructor accepted two config files declaring the same in-file `name:`, while
     `registerPipeline` rejected exactly that at runtime. The two surfaces now agree: a new

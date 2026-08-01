@@ -161,12 +161,20 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 - **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — tests call
   `runPipeline("up_stream")`, not `"UP_STREAM"`.
-- **Synchronous bus + `ingestLock` ⇒ deadlock** — the event bus publishes **synchronously on the publishing
-  thread**, and `ingestLock` is held during a cycle. An event-triggered run dispatched **inline** would
-  deadlock. Hand off to an off-bus virtual-thread pool (`triggerWorkers`) — same reason `JobService` hands off.
-  The last inline holdout, the pre-v1 legacy trigger/notify routes, moved off the request thread 2026-07-24
+- **Synchronous bus + a held run claim ⇒ never dispatch inline** — the event bus publishes **synchronously on
+  the publishing thread**, which holds that pipeline's `PipelineRunGuard` claim. An event-triggered run of the
+  **same** pipeline dispatched inline blocks forever on the claim its own thread holds. Hand off to an off-bus
+  virtual-thread pool (`triggerWorkers`) — same reason `JobService` hands off. The last inline holdout, the
+  pre-v1 legacy trigger/notify routes, moved off the request thread 2026-07-24
   (`CollectorService.runPipelineOffThread` → submit to `triggerWorkers`, block for the result; the pre-v1
-  `200 RunResult` body is preserved). So no HTTP request thread holds `ingestLock` anymore.
+  `200 RunResult` body is preserved). So no HTTP request thread holds a run claim.
+  <br>⚠ **The rule outlived its original name.** Until 2026-08-01 this was one global `ingestLock`, a
+  `ReentrantLock` held across an entire poll cycle for every pipeline. Two things changed: exclusion is now
+  **per pipeline** (`PipelineRunGuard`), so unrelated pipelines never block each other and the poll tick
+  dispatches-and-returns; and the guard is a **non-reentrant** binary semaphore, because a claim is taken on
+  the selecting thread and released by the thread that ran the work. Note the old wording was itself wrong:
+  a re-entrant lock would *not* have deadlocked on an inline same-pipeline run — it would have silently
+  re-entered and **double-ingested the inbox**. The hand-off is what makes the claim mean anything.
 - **`JobService` total concurrency is bounded only when asked** — `-Djobs.maxConcurrentRuns` (default `0` =
   unbounded) installs a `Semaphore` acquired on the **worker** thread inside `submitRun`/`submitAdhocRun`,
   never the caller, so a full pool queues Runs rather than blocking cron/event/manual dispatch. Distinct from

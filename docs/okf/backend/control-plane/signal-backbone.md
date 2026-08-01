@@ -44,7 +44,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   (caught a real bug: `report` declared `emits=[]` while firing `REPORT_READY`).
 * **`BatchAuditWriter`** additively emits `pipeline.batch.committed|failed` Signals alongside the
   pre-existing `BatchEvent` fan-out (both fire; `BatchEventBus` itself is untouched — see the
-  `ingestLock` note below for why a full bus migration was deliberately not attempted).
+  run-claim hand-off note below for why a full bus migration was deliberately not attempted).
 * **`DottedPath`** (`inspecto-util/src/main/java/com/gamma/util/DottedPath.java`) — one shared `a.b.c`
   resolver now used by `{{template}}` interpolation (`NotificationTemplate`), `$signal.<path>` job
   binds (`ParameterResolver`), and `when:` guards (`WhenGuard`) — replacing three independently
@@ -106,7 +106,7 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   session open via eoiagent's `SessionRequest.attributes` map (the least-invasive seam found; the
   attributes map is a supply-side seam — actually surfacing it into the model's prompt is the eoiagent
   host layer's concern, not this repo's).
-* **`SignalIngress`** (`inspecto-intelligence/.../context/SignalIngress.java`) — an `ingestLock`-safe
+* **`SignalIngress`** (`inspecto-intelligence/.../context/SignalIngress.java`) — a run-claim-safe
   `EventLog` subscriber (bounded queue, sheds rather than blocks, own daemon virtual-thread executor —
   mirrors `FailureReactor`'s pattern) retaining a window of *elevated* signals (severity ≥ ERROR, or
   the canonical failure types). **Shipped tested but deliberately unwired**: its ERROR+/failure floor
@@ -156,10 +156,10 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
 
 ## Gotchas
 
-* **The `ingestLock` deadlock seam is load-bearing for every piece above that subscribes to
-  `EventLog`.** `CollectorService`/`CollectorProcessor` hold `ingestLock` across a poll cycle; any
-  subscriber (`SignalIngress`, `BatchAuditWriter`, a future triage consumer) that starts new
-  synchronous work inline risks deadlock — hand off to a bounded queue + its own virtual-thread
+* **The run-claim hand-off seam is load-bearing for every piece above that subscribes to
+  `EventLog`.** The publishing thread holds that pipeline's `PipelineRunGuard` claim (before 2026-08-01,
+  the global `ingestLock`); any subscriber (`SignalIngress`, `BatchAuditWriter`, a future triage consumer)
+  that starts new synchronous work inline risks blocking on it — hand off to a bounded queue + its own virtual-thread
   executor, exactly `FailureReactor`'s and `SignalIngress`'s pattern. Never "simplify" a subscriber to
   run inline.
 * **`EventLog.global()` is JVM-wide.** A default-space `CollectorService` in a test rides the global

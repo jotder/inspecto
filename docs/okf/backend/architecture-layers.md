@@ -101,8 +101,9 @@ Direct files / lines, role, and outbound `com.gamma` dependencies (import counts
 - **Threading model:** a 2-thread daemon `Scheduler` (`service/Scheduler.java:38`) only *triggers*
   work (poll-all, sla-sweep, cron); real work hands off to per-purpose virtual-thread executors —
   `CollectorService.triggerWorkers`, `ControlApi`'s HTTP executor (one virtual thread per request),
-  `NotificationService`'s own executor. `ingestLock` serializes the three ingest entry paths
-  (poll cycle, manual run, event trigger).
+  `NotificationService`'s own executor. `PipelineRunGuard` serialises the three ingest entry paths
+  (poll cycle, manual run, event trigger) **per pipeline** — different pipelines never block each other,
+  and the poll tick itself dispatches and returns rather than waiting on the runs it starts (B2).
 - **Shutdown:** `CollectorService.close()` (`CollectorService.java:1122-1151`) is a hand-ordered
   sequence (watcher → agents → jobs → workers → enrichment → subscribers → scheduler → stores →
   events last) with per-step try/catch but **no overall deadline**; `ControlApi.close()` uses

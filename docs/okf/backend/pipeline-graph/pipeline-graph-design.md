@@ -254,7 +254,7 @@ throttling**, and the levers already exist:
 | Pressure source | Bounded by (today) |
 |---|---|
 | Input faster than processed | Files accumulate **durably at the source**; `batch.max_files`/`max_bytes` bound how candidates are *grouped into batches*, and (when `-Dingest.maxFilesPerCycle` is set — T15) a per-cycle **intake cap** bounds how many are *admitted at all*. Unadmitted work waits on disk, never in memory. |
-| Cycle overrun | The poll scheduler is **fixed-delay + non-overlapping** (`ingestLock`) — a slow cycle delays the next, never runs concurrently. Slow downstream ⇒ fewer cycles ⇒ inbox grows ⇒ visible lag, not memory blowup. |
+| Cycle overrun | The poll scheduler is fixed-delay, and **non-overlap is now per pipeline, not global** (B2, 2026-08-01): a tick dispatches and returns, so a slow pipeline no longer delays every other pipeline's next tick. Two runs of the *same* pipeline still never overlap — `PipelineRunGuard` makes the cycle **skip** a pipeline that is still running rather than queue behind it. Slow downstream ⇒ that pipeline is skipped on later ticks ⇒ its inbox grows ⇒ visible lag, not memory blowup. |
 | Worker pressure | Semaphores: `sources.max × processing.threads × duckdb_threads` is a fixed ceiling; a shared global permit budget caps the whole graph. |
 | Per-batch memory / spill | DuckDB `memory_limit`, `max_temp_directory_size`, auto-chunking bound peak memory regardless of batch size. |
 | Slow / failing branch (sink) | Per-source `CircuitBreaker` trips and stops feeding it (records dead-letter / stay at source); per-sink `RateLimiter` (token bucket, already used for fetch) caps egress. |
@@ -332,8 +332,8 @@ nodes:
 ```
 
 **Coalescing under the back-pressure budget.** An event does **not** spawn a run directly — it marks the entry
-"work available", and the scheduler admits it under the *same* non-overlapping `ingestLock` + concurrency + lag
-budget as a timer tick (§3.5). A `coalesce:` / debounce window collapses event storms (1,000 file-arrival events ⇒
+"work available", and the scheduler admits it under the *same* per-pipeline non-overlap (`PipelineRunGuard`) +
+concurrency + lag budget as a timer tick (§3.5). A `coalesce:` / debounce window collapses event storms (1,000 file-arrival events ⇒
 **one** admitted run that drains the pending set, not 1,000 overlapping runs). Event-driven flows thus stay inside
 the pull/admission back-pressure model instead of bypassing it. A flow never overlaps itself.
 
@@ -869,7 +869,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   follow-up).** Entry-node **triggers** (§3.6): `com.gamma.pipeline.PipelineTrigger` parses `schedule`(every/cron) /
   `event`(on/from/coalesce) / `manual` / absent⇒DEFAULT_POLL and classifies the driving scheduler (LOOP/EVENT/MANUAL,
   §3.8). **Event coalescing**: `com.gamma.pipeline.exec.TriggerCoalescer` collapses an event storm into one non-overlapping
-  run (current run + at most one follow-up; lost-wakeup-free) — the in-process form of the `ingestLock` debounce.
+  run (current run + at most one follow-up; lost-wakeup-free) — the in-process form of the run-guard debounce.
   **`adapter` land-then-ack**: `AdapterWindow` (max_records/max_bytes/max_age flush policy) + `FileLander`
   (temp→fsync→atomic rename→ack-LAST = at-least-once). **Per-node `enabled:`**: `PipelineNode.enabled()` + `PipelineExecutor`
   bypasses a disabled node. **Live wiring (done 2026-06-17, the follow-up):** an optional top-level `trigger:` block on
@@ -879,7 +879,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   `SCHEDULE_INTERVAL` by elapsed `everyMs`, `SCHEDULE_CRON` by `CronExpression.next` since last run; `EVENT`/`MANUAL`
   are excluded from the loop. `EVENT` flows fire from a bus subscriber (`onUpstreamCommit`) that signals a per-flow
   `TriggerCoalescer` **off the publishing thread** (a vthread `triggerWorkers` pool — the bus is synchronous and
-  `ingestLock` is held during a cycle, so an inline run would deadlock); `MANUAL` runs only via `runPipeline`/the
+  the publishing thread holds that pipeline's run claim, so an inline run would block on it); `MANUAL` runs only via `runPipeline`/the
   trigger endpoint. 21 tests (16 prior + `CollectorServiceTriggerTest` 5: default-poll/interval-gate/manual/cron/event).
   **Only remaining:** the `adapter` stream-consumer runtime (Kafka/webhook/WatchService) — a separate seam, no v1
   streaming.

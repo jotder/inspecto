@@ -218,7 +218,7 @@ second pilot class (alert triage) and a periodic state-watch trigger are deferre
   wired into `InspectoIntelligenceAgent` (durable store when a write root is set), always present when
   the module is loaded so operators can configure policy before any driver exists.
 - **ops_monitor loop (slice 2)** — `OpsMonitor` is the L3 driver: a live `EventLog` subscriber
-  (same `ingestLock`-safe type-check→bounded-offer→daemon-vthread-handoff as `TriageQueue`; opt-in
+  (same run-claim-safe type-check→bounded-offer→daemon-vthread-handoff as `TriageQueue`; opt-in
   `-Dintelligence.opsmonitor.enabled`) that watches for a `pipeline.batch.failed` Signal (pilot action
   class `batch_rerun`), extracts pipeline (subject) + batchId (correlationId), dedupes per batch, and
   calls `AutonomyPolicyEngine.authorize("batch_rerun")`: **DENY** → record SKIPPED + do nothing;
@@ -363,8 +363,8 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
 
 ## Gotchas / seams
 
-- **`ingestLock` deadlock rule** governs every `EventLog`/Signal-bus subscriber: subscribers run
-  synchronously on the emitting thread (which may hold `ingestLock`), so `TriageQueue`/`SignalIngress`
+- **Run-claim hand-off rule** governs every `EventLog`/Signal-bus subscriber: subscribers run
+  synchronously on the emitting thread (which holds that pipeline's `PipelineRunGuard` claim), so `TriageQueue`/`SignalIngress`
   do only a type-check + bounded-queue offer on that thread, then hand off to their own daemon
   virtual-thread executor. Never run investigation inline. See [[signal-backbone]].
 - **eoiagent SNAPSHOT distribution**: Inspecto CI builds eoiagent from `jotder/inspect-agent` source
@@ -377,7 +377,7 @@ UI half, result-shape adapters and the pane adoptions: [[inline-ai-authoring]].
   `Investigator(service, components, browseStores, gateway)` test ctors; `toResult(AgentAnswer)` seam.
 - **`EventLog.global()` is JVM-wide** — scope Signal-tool test assertions by a unique correlationId.
 - **Two parallel bus systems stay separate**: the canonical Signal bus (`EventLog`, `EventType.SIGNAL`)
-  vs. the legacy `BatchEventBus` (`FailureReactor`) — no migration, per the standing `ingestLock`
+  vs. the legacy `BatchEventBus` (`FailureReactor`) — no migration, per the standing run-claim
   decision.
 
 ## Still open (parent plan archived 2026-07-25: `archived-documents/plans-archive/embedded-intelligence-plan.md`, §8)

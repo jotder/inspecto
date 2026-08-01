@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: Events & Metrics
-description: EventLog (synchronous bus + the ingestLock deadlock seam), MetricRegistry, the StabilityGate, notifications + audit trail, and alert-rule authoring.
+description: EventLog (synchronous bus + the run-claim hand-off seam), MetricRegistry, the StabilityGate, notifications + audit trail, and alert-rule authoring.
 resource: inspecto-event/src/main/java/com/gamma/event/EventLog.java
 tags: [control-plane, events, metrics, observability, deadlock]
 timestamp: 2026-07-16T00:00:00Z
@@ -12,9 +12,11 @@ timestamp: 2026-07-16T00:00:00Z
 * **`EventLog`** (`inspecto-event/src/main/java/com/gamma/event/EventLog.java`) — the event bus. `global()` +
   per-space instances; `current()` routes by the calling thread's `space` MDC, falling back to global.
   **Emission is synchronous on the publishing thread** (`emit()` calls each subscriber inline). This is the
-  deadlock seam: `CollectorProcessor` holds `ingestLock` through a poll cycle, so a subscriber that triggered a
-  new ingest **inline** would re-enter `ingestLock` and deadlock — hence event-triggered work is handed to an
-  off-bus virtual-thread pool (see [jobs](jobs.md)). `emit()` uses no SLF4J (avoids re-entrant capture) and
+  hand-off seam: the publishing thread holds that pipeline's `PipelineRunGuard` claim, so a subscriber that
+  triggered a new ingest of the **same** pipeline inline would block forever on the claim its own thread holds
+  — hence event-triggered work is handed to an off-bus virtual-thread pool (see [jobs](jobs.md)). Before
+  2026-08-01 this was the global `ingestLock`; being re-entrant, it would have double-ingested rather than
+  hung (see [cross-cutting gotchas](../gotchas/cross-cutting.md)). `emit()` uses no SLF4J (avoids re-entrant capture) and
   swallows subscriber errors. A startup store-swap (`InMemoryEventStore` → configured backend) drains the old
   store oldest-first so nothing is lost.
 * **`MetricRegistry`** (`inspecto-event/src/main/java/com/gamma/metrics/MetricRegistry.java`) — counters/gauges/
@@ -29,7 +31,7 @@ timestamp: 2026-07-16T00:00:00Z
 ## Notifications & audit trail (shipped 2026-06-29, `ddfa288`)
 
 * **`NotificationService`** — an `EventLog` subscriber that **hands off to a virtual-thread
-  executor** (never runs inline — the sync-bus/`ingestLock` deadlock seam above). Feed routes under
+  executor** (never runs inline — the sync-bus/run-claim hand-off seam above). Feed routes under
   `/notifications/*` (list / unread-count / read / read-all / delete), real-time via **SSE**
   `GET /notifications/stream` (blocking handler on a virtual thread, heartbeat, close-hook registry),
   and `NotificationRateLimiter` (rolling per-hour cap on identical notifications — the anti-loop

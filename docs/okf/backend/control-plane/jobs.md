@@ -18,8 +18,8 @@ virtual-thread `workers` executor. Three trigger modes:
   stays as a second line of defence against the cancel/fire race).
 * **Event** — jobs with `on_pipeline` subscribe to the `BatchEventBus`; `onBatchEvent` matches a `SUCCESS`
   status + pipeline name, then `submit()`s. This is the **deadlock-safe** path — `submit` hands work to
-  `workers` and returns immediately, so the synchronous [event bus](events-metrics.md) never holds
-  `ingestLock` across a new run.
+  `workers` and returns immediately, so the synchronous [event bus](events-metrics.md) never holds a
+  `PipelineRunGuard` claim across a new run.
 * **Manual** — `POST /jobs/{name}/trigger`. The legacy unversioned call stays **synchronous and unchanged**;
   the same route under `/api/v1` is **async** (W5): it returns `202` + `{runId, …}` + a `Location` header,
   the caller polls `GET /jobs/runs/{runId}`, and an `Idempotency-Key` header replays the cached response on

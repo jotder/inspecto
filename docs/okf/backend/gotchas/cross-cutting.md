@@ -18,10 +18,16 @@ timestamp: 2026-07-16T00:00:00Z
 * **`BatchEvent.pipeline()` is the LOWERCASED pipeline name** (`cfg.identity().pipelineName()`). Any name
   matching against it (triggers, `runPipeline`, `pathFor`) must use the lowercased id — e.g.
   `runPipeline("up_stream")`, not `"UP_STREAM"`.
-* **Synchronous bus + `ingestLock` ⇒ deadlock** — the [event bus](../control-plane/events-metrics.md) publishes
-  synchronously on the publishing thread, and `ingestLock` is held during a cycle. An event-triggered run
-  dispatched **inline** would deadlock — hand off to the off-bus virtual-thread pool (`triggerWorkers` /
-  `JobService.submit`). See [jobs](../control-plane/jobs.md).
+* **Synchronous bus + a held run claim ⇒ never dispatch inline** — the
+  [event bus](../control-plane/events-metrics.md) publishes synchronously on the publishing thread, and that
+  thread holds the emitting pipeline's `PipelineRunGuard` claim. An event-triggered run dispatched **inline**
+  blocks forever on the claim its own thread holds; hand off to the off-bus virtual-thread pool
+  (`triggerWorkers` / `JobService.submit`). See [jobs](../control-plane/jobs.md).
+  <br>⚠ *This rule outlived the thing it was named after.* Until 2026-08-01 it was the global `ingestLock`,
+  a `ReentrantLock` — and because that lock was **re-entrant**, an inline same-pipeline run would not have
+  deadlocked at all: it would have silently re-entered and **double-ingested the inbox**, which is worse than
+  a hang. `PipelineRunGuard` is a non-reentrant binary semaphore precisely so the failure is loud. The
+  hand-off is what makes the claim mean anything either way.
 * **The per-space `space` MDC must reach EVERY worker thread on the execution path.** Singleton routing reads
   the MDC on the *current* thread, and MDC does **not** cross thread-pool boundaries. Each executor running
   ingest/commit work must `MDC.getCopyOfContextMap()` on the caller + `setContextMap` on the worker +
