@@ -169,11 +169,14 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   schema module (the corpus keeps `.asn` files per vendor, e.g. `mtnOCC.asn`). Until that lands
   there is nowhere to *store* a reusable module, and a per-vendor tx/transform config has no home
   either.
-- ~~**The Maven coordinate split**~~ **RESOLVED 2026-07-31.** The root `pom.xml` now aggregates
+- ~~**The Maven coordinate split**~~ **RESOLVED 2026-08-01.** The root `pom.xml` now aggregates
   `asn-parser/asn-decoders`, so `com.gamma.asn:asn-facade` resolves from the reactor and the manual
   `mvn install` is gone (verified with the local repo's `com/gamma/asn` deleted: 23 modules,
-  asn-facade [7/23] before inspecto-engine [18/23], green). Aggregation only — that tree keeps its
-  own parent and inherits nothing from `inspecto-parent`. The OLD `asn-parser-v2:1.2.1`
+  asn-facade [7/23] before inspecto-engine, `mvn -o clean test` green, 2178 tests). Aggregation
+  only — that tree keeps its own parent and inherits nothing from `inspecto-parent`. *(First
+  documented as done 2026-07-31, but that pom edit was never committed — the `<modules>` entry was
+  lost across a shift and re-landed 2026-08-01; a fresh `~/.m2` still needed the manual install in
+  between.)* The OLD `asn-parser-v2:1.2.1`
   (`asn-parser/pom.xml`) is **deleted**: zero consumers, and its parent
   `com.gamma.asn.decoders:asn-decoders:1.1.3-dev` existed nowhere, so it could not build.
   ⚠ **`asn-parser/src/main/java` survives the deletion and must not be cleaned up as an orphan** —

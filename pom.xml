@@ -32,6 +32,16 @@
         and package.ps1 builds `-pl inspecto -am` from the root for the same reason.
     -->
     <modules>
+        <!--
+            asn-parser/asn-decoders is a SEPARATE reactor (its own parent com.gamma.asn:asn-decoders,
+            release 25) aggregated here ONLY so com.gamma.asn:asn-facade:0.1.0-SNAPSHOT — which
+            inspecto-engine depends on — resolves from this build instead of a manual `mvn install`.
+            Aggregation only: that tree inherits NOTHING from inspecto-parent (modules and inheritance
+            are orthogonal). It must precede inspecto-engine so asn-facade is built first. Its
+            corpus-backed asn-golden/legacy-code tests `assumeTrue`/SKIP when the operator CDR corpus
+            is absent (DATA-GOV-1), so a fresh checkout still builds green.
+        -->
+        <module>asn-parser/asn-decoders</module>
         <module>inspecto-api</module>
         <module>inspecto-util</module>
         <module>inspecto-config</module>

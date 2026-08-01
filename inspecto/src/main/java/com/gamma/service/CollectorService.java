@@ -229,6 +229,46 @@ public final class CollectorService implements AutoCloseable {
     /** A pipeline's identity + current state, for the Control API's listing. */
     public record PipelineView(String name, String configPath, boolean paused, int committedBatches) {}
 
+    /**
+     * Reject a registry in which two <em>different</em> files declare the same in-file {@code name} —
+     * the construction-time counterpart of the collision check in {@link #registerPipeline(Path)}, with
+     * the same {@link IllegalStateException} message.
+     *
+     * <p>Without this, a duplicate id was accepted silently and then behaved incoherently: every
+     * id-keyed structure in the service (the {@link #paused}/{@link #running} sets,
+     * {@link PipelineScheduler}'s cadence map, {@link com.gamma.acquire.IntakeGovernor} caps,
+     * {@link ConfigRegistry#getPath}) collapses the two into one logical pipeline, while the run path
+     * iterates registered <em>paths</em> and so ran both — concurrently, under one identity, writing to
+     * the same name-keyed status/audit/log destinations. {@link ConfigRegistry#rebuild} warns about the
+     * collision and keeps the later path, but that only fixes the read surface. Failing at construction
+     * makes the two surfaces agree: a duplicate id is never registrable, at boot or at runtime.
+     *
+     * <p>Called as the first statement of the shared constructor, before any store, executor, or
+     * {@code EventLog} registration exists, so the throw cannot leak a half-built service. That costs an
+     * extra parse of each config at startup (the registry is re-indexed properly a few lines later);
+     * with a handful of configs per space this is negligible and buys the leak-free failure.
+     *
+     * <p>Files that fail to parse are skipped here, not reported: {@code rebuild} already warns about
+     * them and the service has always tolerated an unloadable config rather than refusing to start.
+     *
+     * @throws IllegalStateException if two distinct paths in {@code registry} declare the same pipeline id
+     */
+    private static void requireDistinctPipelineIds(List<Path> registry) {
+        Map<String, Path> byId = new java.util.LinkedHashMap<>();
+        for (Path p : registry) {
+            String id;
+            try {
+                id = PipelineConfig.load(p.toString()).identity().pipelineName();
+            } catch (Exception e) {
+                continue;   // unloadable — ConfigRegistry.rebuild warns and skips it
+            }
+            Path prev = byId.putIfAbsent(id, p);
+            if (prev != null && !prev.equals(p)) {
+                throw new IllegalStateException("pipeline id '" + id + "' is already registered from " + prev);
+            }
+        }
+    }
+
     public CollectorService(List<Path> registry, long pollSeconds, int maxConcurrentRuns) {
         this(registry, List.of(), pollSeconds, maxConcurrentRuns);
     }
@@ -301,6 +341,7 @@ public final class CollectorService implements AutoCloseable {
                   List<JobConfig> jobConfigs, List<SemanticModel> semanticModels,
                   List<com.gamma.alert.AlertRule> alertRules,
                   long pollSeconds, int maxConcurrentRuns, StatusStore statusStore, SpaceRoot root) {
+        requireDistinctPipelineIds(registry);   // fail fast before anything is allocated (see the method doc)
         this.root              = root;
         this.spaceId           = root.id();
         // The default space reuses the process-wide log (so legacy single-tenant behaviour is unchanged and

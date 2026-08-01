@@ -18,6 +18,7 @@ public final class TestConfigs {
 
     private final Path dir;
     private final String schemaToon;
+    private String  name          = "TEST_ETL";
     private String  format        = "CSV";
     private String  compression   = null;
     private String  delimiter     = ",";
@@ -39,6 +40,9 @@ public final class TestConfigs {
         return new TestConfigs(dir, schemaToon);
     }
 
+    /** The in-file {@code name} (pipeline id). Set it when a test registers more than one config in
+     *  one {@code CollectorService} — a duplicate id is rejected at construction. */
+    public TestConfigs name(String n)          { this.name = n; return this; }
     public TestConfigs format(String f)        { this.format = f; return this; }
     public TestConfigs compression(String c)   { this.compression = c; return this; }
     public TestConfigs delimiter(String d)     { this.delimiter = d; return this; }
@@ -68,7 +72,7 @@ public final class TestConfigs {
         String compLine = compression != null ? "  compression: " + compression + "\n" : "";
 
         String toon = """
-                name: TEST_ETL
+                name: %s
                 active: true
                 version: 1
                 dirs:
@@ -100,7 +104,7 @@ public final class TestConfigs {
                     skip_tail_columns: %d
                     date_formats[%d]: %s
                     timestamp_formats[%d]: %s
-                """.formatted(dir, dir, dir, dir, dir, dir, dir, dir, dir,
+                """.formatted(name, dir, dir, dir, dir, dir, dir, dir, dir, dir,
                 format, compLine, duplicateCheck,
                 schema.toString().replace("\\", "/"),
                 delimiter, hasHeader, skipHeader, skipJunk, skipTail, skipTailCols,

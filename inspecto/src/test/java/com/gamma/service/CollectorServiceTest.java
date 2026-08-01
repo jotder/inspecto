@@ -24,7 +24,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class CollectorServiceTest {
 
     private static Path source(Path root, String inboxCsv) throws Exception {
-        Path toon = TestConfigs.csv(root, PipelineConfigBatchTest.miniSchema()).write();
+        return source(root, inboxCsv, "TEST_ETL");
+    }
+
+    /** A source with an explicit pipeline id — two configs in one service must not share a name. */
+    private static Path source(Path root, String inboxCsv, String name) throws Exception {
+        Path toon = TestConfigs.csv(root, PipelineConfigBatchTest.miniSchema()).name(name).write();
         Path inbox = root.resolve("inbox");
         Files.createDirectories(inbox);
         Files.writeString(inbox.resolve("data.csv"), inboxCsv);
@@ -41,8 +46,8 @@ class CollectorServiceTest {
 
     @Test
     void runAllOnceProducesOutputAndEmitsCommitEvents(@TempDir Path dir) throws Exception {
-        Path a = source(dir.resolve("a"), "ID,AMT,EVENT_DATE\n1,10,2020-01-01\n2,20,2020-01-02\n");
-        Path b = source(dir.resolve("b"), "ID,AMT,EVENT_DATE\n3,30,2020-02-01\n");
+        Path a = source(dir.resolve("a"), "ID,AMT,EVENT_DATE\n1,10,2020-01-01\n2,20,2020-01-02\n", "ETL_A");
+        Path b = source(dir.resolve("b"), "ID,AMT,EVENT_DATE\n3,30,2020-02-01\n", "ETL_B");
 
         List<BatchEvent> events = Collections.synchronizedList(new ArrayList<>());
         try (CollectorService svc = new CollectorService(List.of(a, b), 3600, 2)) {
@@ -60,6 +65,20 @@ class CollectorServiceTest {
             assertTrue(events.stream().allMatch(e -> !e.partitions().isEmpty()),
                     "commit events carry the written partitions (for downstream enrichment)");
         }
+    }
+
+    @Test
+    void duplicatePipelineIdInTheRegistryIsRejectedAtConstruction(@TempDir Path dir) throws Exception {
+        // Two distinct files both declaring `name: DUPE` — every id-keyed structure in the service
+        // collapses them into one logical pipeline, so construction must refuse them outright
+        // (same rule, and same message, as registerPipeline's runtime collision check).
+        Path a = source(dir.resolve("a"), "ID,AMT,EVENT_DATE\n1,10,2020-01-01\n", "DUPE");
+        Path b = source(dir.resolve("b"), "ID,AMT,EVENT_DATE\n3,30,2020-02-01\n", "DUPE");
+
+        // The id is normalised to lower case by PipelineConfig.identity().pipelineName().
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> new CollectorService(List.of(a, b), 3600, 2));
+        assertEquals("pipeline id 'dupe' is already registered from " + a, e.getMessage());
     }
 
     @Test
