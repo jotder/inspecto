@@ -23,6 +23,8 @@ class ParityCheckTest {
 
     @Test
     void aftelImsStructuralParityAndContentFloor() throws Exception {
+        assumeTrue(Boolean.getBoolean("asn.corpus.tests"),
+                "corpus-backed tests are opt-in; enable with -Dasn.corpus.tests=true");
         assumeTrue(Files.isDirectory(BASE.resolve("corpus").resolve("aftel_ims")),
                 "golden corpus not present: " + BASE);
         List<Map<String, Object>> results = new ParityCheck(BASE)

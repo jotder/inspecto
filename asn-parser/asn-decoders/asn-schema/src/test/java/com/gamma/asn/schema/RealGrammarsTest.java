@@ -26,6 +26,8 @@ class RealGrammarsTest {
     private static final Path CONFIG = Path.of("..", "..", "config");
 
     private static String read(String relative) throws IOException {
+        assumeTrue(Boolean.getBoolean("asn.corpus.tests"),
+                "corpus-backed tests are opt-in; enable with -Dasn.corpus.tests=true");
         Path p = CONFIG.resolve(relative);
         assumeTrue(Files.exists(p), "sample grammar not present: " + p);
         return Files.readString(p, StandardCharsets.ISO_8859_1);

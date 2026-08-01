@@ -182,8 +182,12 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   ⚠ **`asn-parser/src/main/java` survives the deletion and must not be cleaned up as an orphan** —
   `legacy-code/pom.xml` compiles it via `<sourceDirectory>../../src/main/java</sourceDirectory>`
   (45 files, confirmed in the build log). It retires with `legacy-code` after Phase 4.
-- ⚠ **Corpus-backed tests `assumeTrue` and SKIP when the operator data is absent** (DATA-GOV-1), so
-  a fresh checkout without the corpus builds green — `ParityCheckTest` reporting *skipped* is the
-  expected state, not a regression.
+- ⚠ **Corpus-backed tests are opt-in AND data-gated** (DATA-GOV-1). `RealGrammarsTest` (asn-schema)
+  and `ParityCheckTest` (asn-golden) `assumeTrue` on **both** `-Dasn.corpus.tests=true` **and** the
+  operator data being present on disk, so by default — and on any corpus-less checkout, including a
+  `git worktree` (the corpus is gitignored, so worktrees never receive it) — they SKIP and the build
+  is green; *skipped* is the expected state, not a regression. Exercise them where the corpus lives
+  (the main checkout) with `mvn test -Dasn.corpus.tests=true`. The property alone does nothing
+  without the data; the data alone no longer runs them without the property (2026-08-01).
 - **Drop-in `plugins/` jar directory** and the **segments editor** (unlock guided Save for
   ingestable custom parsers) — unchanged from before, apply to any custom parser, not ASN.1-specific.
