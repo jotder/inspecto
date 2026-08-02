@@ -5,9 +5,10 @@
 > expressed as a plural `sinks:` section. **Shipped: B1 (per-pipeline run guard) + B2 (non-blocking
 > dispatch) — committed `2f4348f5`, full reactor 2451/0/0 · B3a (stage-then-land) — inspecto-engine
 > 791/0/0 · B3b (the acquisition driver) — steps 1–2 `1328c0f1`, step 3 `a4edbe19`, inspecto 645/0/0,
-> full reactor 2205/0/0.** **B4 (queue-driven multiplexer) is next.** Stage A (the executor bridge) is
-> deferred behind B; Stage C is unstarted. B3b as-built facts are in §"B3b — the acquisition driver"
-> below (marked ✅) and distilled into [engine/ingestion](../okf/backend/engine/ingestion.md) +
+> full reactor 2205/0/0 · B4 (acquisition back-pressure) — `eb69f1ee`, full reactor green.** **B5
+> (reconcile §3.8) is next**, then Stage B is closed. Stage A (the executor bridge) is deferred behind B;
+> Stage C is unstarted. B3b/B4 as-built facts are in the §"B3b/B4" sections below (marked ✅) and distilled
+> into [engine/ingestion](../okf/backend/engine/ingestion.md) +
 > [acquisition/framework](../okf/backend/acquisition/framework.md).
 
 ## 0. Decisions of record (2026-08-01)
@@ -345,8 +346,32 @@ Known consequences to handle, not discover later:
 - Pre-fetch dedup, the watermark filter, the circuit breaker and post-actions all stay on the acquisition
   side; markers/fingerprint dedup and the T15 cap stay on the ingest side.
 
-**B4 —** the multiplexer unit gets a queue-driven driver + bounded spill-to-disk hand-off with a
-high-water mark (the §3.5 escalation, verbatim).
+**B4 — acquisition back-pressure on inbox high-water (✅ SHIPPED — `eb69f1ee`).**
+
+> **Scope decided 2026-08-02 (operator).** The line below said "the multiplexer unit gets a queue-driven
+> driver + the §3.5 escalation, *verbatim*." On building it that proved mis-sequenced and largely
+> unnecessary as literally written:
+> - **The verbatim §3.5 escalation is per-`data`-edge, intra-flow** ("de-schedule the *upstream node*"),
+>   which needs the **node-level flow executor — Stage A — that is deferred behind Stage B**. Today a batch
+>   runs its subgraph synchronously; there are no inter-node edges to queue on.
+> - **The skew/starvation motivation (§4b) is already met by B2 + B3b:** B2 made poll non-overlap
+>   per-pipeline (a slow pipeline's tick dispatches-and-returns), and B3b decoupled acquisition from ingest.
+> - An explicit RAM/spill work-queue at the multiplexer would **re-introduce the very model D7/B2/§3.5
+>   rejected** (no inter-node queues; the durable inbox *is* the queue), for a problem with **no SLA**.
+>
+> The realizable, non-speculative slice — the one edge that *does* exist post-B3b — is **acquire → ingest**,
+> whose spill-to-disk queue **is already the durable inbox**. So B4 shipped as: `selectDueForAcquire` skips a
+> pipeline whose `countPending` (the exact backlog from B3b) has reached `-Dacquire.backpressure.highWater`
+> (0 = off), emitting `inspecto_acquire_backpressure_skips_total`. This de-schedules the *producer*
+> (acquisition) when the inbox is full — negative feedback, and deliberately the mirror of T15, which must
+> not throttle the ingest *consumer* on backlog (positive feedback). **This resolves open decision #1's
+> justification of record: skew/latency, now concretely "don't let a slow ingest make acquisition fill local
+> disk."** **Deferred companion (BACKLOG §6):** `acquire.maxFilesPerCycle` to bound a *single* cycle's fetch
+> volume — the high-water gate bounds backlog across ticks, not within one.
+
+The original design (kept for provenance):
+The multiplexer unit gets a queue-driven driver + bounded spill-to-disk hand-off with a high-water mark
+(the §3.5 escalation, verbatim).
 
 **B5 —** reconcile §3.8: state precisely how "collection is a unit" differs from the deleted `ingest`
 job type (one execution model with explicit hand-off, not a second scheduler racing the same inbox).
@@ -366,9 +391,10 @@ counters §11.3 wants, not a new store from scratch.
 
 *(1 and 2 answered — see §0. Remaining:)*
 
-1. **Justification of record for Stage B** — proposed: skew/latency (one slow stream starving others),
-   since there is no throughput target to miss. Confirm this is the case to write into §3.5/§3.8 when
-   B lands, so the reversal is defensible on review.
+1. ~~**Justification of record for Stage B**~~ — ✅ **resolved 2026-08-02 (B4).** Skew/latency, made
+   concrete: *"don't let a slow ingest make acquisition fetch unboundedly and fill local disk."* B4 exercises
+   §3.5 on the acquire→ingest edge (durable inbox = the spill queue), throttling the producer — negative
+   feedback, no throughput SLA needed. Write this into §3.5/§3.8 with B5.
 2. **Stage C now or after B?** B10 puts per-file stage tracking at phase 4.5/6; the operator's model
    implies it is co-equal with B ("full housekeeping for all files, its stages").
 3. ~~**Pin the stale `fetchTo` doc line**~~ — ✅ settled 2026-08-01. `connectors.md` was wrong (fetch never

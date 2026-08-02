@@ -444,15 +444,25 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     cycle), **B2** non-blocking poll dispatch (a tick no longer waits on the runs it starts), **B3a**
     remote fetches stage outside the inbox and land atomically, **B3b** acquisition has its own driver —
     `dispatchAcquireCycle()` on `acquire.pollSeconds`/`acquire.maxConcurrent` with a dedicated per-pipeline
-    `acquireGuard`; the poll tick is ingest-only; `countPending` is now the exact landed backlog.
-    Next: **B4** (queue-driven multiplexer + bounded spill), then B5. Note the real multi-destination limit
-    is **one destination per pipeline** — a config-format gap (`PipelineConfig.Output` is a single record),
-    not an executor gap.
+    `acquireGuard`; the poll tick is ingest-only; `countPending` is now the exact landed backlog, **B4**
+    acquisition back-pressure — `selectDueForAcquire` skips a pipeline whose `countPending` reached
+    `-Dacquire.backpressure.highWater` (0=off), so a slow ingest cannot make acquisition fill local disk;
+    the durable inbox is the spill queue (§3.5), throttling the producer (negative feedback, unlike T15).
+    Next: **B5** (reconcile §3.8 docs) closes Stage B. ⚠ **B4 was rescoped** from the plan's "queue-driven
+    multiplexer, §3.5 verbatim": the verbatim per-edge escalation needs the deferred Stage A, and B2+B3b
+    already met the skew motivation — see the plan's B4 section. Note the real multi-destination limit is
+    **one destination per pipeline** — a config-format gap (`PipelineConfig.Output` is a single record), not
+    an executor gap.
     - **Deferred from B3b — acquisition-side "listed remotely but not yet fetched" gauge.** With ingest now
       walking the inbox, `countPending` is the exact *landed* backlog; the remote-side pending signal ("the
       connector listed N files we have not fetched yet") is a distinct, still-unbuilt metric. Decide its
       name (e.g. `inspecto_files_awaiting_fetch`) before adding it. No metric was renamed in B3b — none was
       misleading.
+    - **Deferred from B4 — `acquire.maxFilesPerCycle`.** B4's high-water gate bounds inbox backlog *across*
+      acquire ticks, not *within* one: a single cycle still fetches the whole discovered listing, so one tick
+      can overshoot the mark. A per-cycle acquisition intake cap (the acquisition-side mirror of T15's
+      `-Dingest.maxFilesPerCycle`, oldest-first) would bound a single fetch. Build only if overshoot is a
+      real problem — the across-tick gate already bounds steady-state.
   - **Duplicate pipeline id at construction — DECIDED 2026-08-01: fail fast.** `CollectorService`'s
     constructor accepted two config files declaring the same in-file `name:`, while
     `registerPipeline` rejected exactly that at runtime. The two surfaces now agree: a new

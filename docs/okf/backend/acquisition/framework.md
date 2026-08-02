@@ -25,6 +25,19 @@ one pipeline never overlap. `acquire` is a no-op for a `local` collector. Author
 > (B3a stage-then-rename) and duplicates are caught by markers/fingerprint dedup — but it is why the two
 > guards are deliberately not one.
 
+**Back-pressure (B4).** Acquisition de-schedules itself when the inbox it feeds is full: if a pipeline's
+inbox backlog (`CollectorProcessor.countPending`, the exact landed count from B3b) has reached
+`-Dacquire.backpressure.highWater`, `selectDueForAcquire` skips that pipeline this tick and bumps
+`inspecto_acquire_backpressure_skips_total`. The already-landed files wait in the **durable inbox — which is
+the spill-to-disk hand-off queue** of the design's §3.5 escalation — until ingest drains them below the mark.
+This throttles the *producer* (acquisition), so it is **negative** feedback, and is therefore the opposite of
+T15/`IntakeGovernor`, which deliberately does **not** throttle on inbox lag because throttling the *ingest
+consumer* on backlog would be positive feedback. The mark is **0 = off by default** (like
+`-Dingest.maxFilesPerCycle`); a failed pending scan returns `-1` and so fails open (never pauses).
+⚠ The gate bounds backlog **across** ticks, not within one: a single acquire cycle still fetches the whole
+discovered listing, so one tick can overshoot the mark. Bounding a single cycle's fetch volume is a separate,
+deferred knob (`acquire.maxFilesPerCycle`, BACKLOG §6).
+
 ## Phases
 
 * **A — Discovery.** `CollectorConnectors.forConfig(cfg)` resolves the [connector](connectors.md): scheme
