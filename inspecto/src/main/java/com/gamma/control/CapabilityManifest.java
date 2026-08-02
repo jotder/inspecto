@@ -100,6 +100,9 @@ final class CapabilityManifest {
             // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
             // ad-hoc trigger stay for grandfathered flows.
             new Entry("PUT", "/pipelines/([^/]+)/graph", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/pipelines/([^/]+)/save-as-template", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/pipelines/([^/]+)/label", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/pipelines/([^/]+)/rename", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/pipelines/authored/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             // QueueRoutes

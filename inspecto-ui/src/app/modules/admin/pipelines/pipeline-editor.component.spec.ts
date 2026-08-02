@@ -39,10 +39,12 @@ describe('PipelineEditorComponent', () => {
         savePipelineGraph: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
         provenance: ReturnType<typeof vi.fn>;
+        saveAsTemplate: ReturnType<typeof vi.fn>;
+        label: ReturnType<typeof vi.fn>;
     };
     let config: { write: ReturnType<typeof vi.fn>; registerPipeline: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
     let dialog: { open: ReturnType<typeof vi.fn> };
-    let toast: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> };
+    let toast: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
 
     beforeEach(() => {
         // LensService persists to localStorage; clear it so a lens set by one test/file can't leak into another.
@@ -56,6 +58,12 @@ describe('PipelineEditorComponent', () => {
             savePipelineGraph: vi.fn().mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),
+            saveAsTemplate: vi.fn().mockReturnValue(
+                of({ written: true, path: 'demo_copy_pipeline.toon', id: 'demo_copy', source: 'demo', template: true, notes: [] }),
+            ),
+            label: vi.fn().mockReturnValue(
+                of({ written: true, path: 'demo_pipeline.toon', id: 'demo', name: 'Demo (EU)', stampedId: true }),
+            ),
         };
         config = {
             write: vi.fn().mockReturnValue(of({ written: true, path: 'x_pipeline.toon', name: 'x' })),
@@ -63,7 +71,7 @@ describe('PipelineEditorComponent', () => {
             remove: vi.fn().mockReturnValue(of({ deleted: true })),
         };
         dialog = { open: vi.fn() };
-        toast = { success: vi.fn(), error: vi.fn() };
+        toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
         TestBed.configureTestingModule({
             imports: [PipelineEditorComponent],
             providers: [
@@ -289,5 +297,76 @@ describe('PipelineEditorComponent', () => {
         // Pane args are merged last and win. Passing the open graph here would replace the topology the
         // sentence just produced, and the draft would silently equal what is already on screen.
         expect(make().aiPromptArgs()).toEqual({});
+    });
+
+    // ── save-as-template / rename (T4) ──
+
+    it('save-as-template posts the new id and selects the created template', () => {
+        const c = make();
+        c.flows.set([{ name: 'demo', active: false, nodeCount: 2, edgeCount: 1, produces: [], consumes: [] }]);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of({ id: 'demo_copy', displayName: 'Demo copy' }) });
+
+        c.saveAsTemplate();
+
+        expect(api.saveAsTemplate).toHaveBeenCalledWith('demo', 'demo_copy', 'Demo copy');
+        // The new row is flagged, so the toolbar hides Activate without waiting for a refetch.
+        expect(c.flows().find((f) => f.name === 'demo_copy')?.template).toBe(true);
+        expect(c.selectedId()).toBe('demo_copy');
+    });
+
+    it('offers the existing ids to the dialog so a duplicate is blocked before the server 409s', () => {
+        const c = make();
+        c.flows.set([
+            { name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+            { name: 'other', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+        ]);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+        c.saveAsTemplate();
+
+        expect(dialog.open.mock.calls[0][1].data).toEqual({ source: 'demo', existingNames: ['demo', 'other'] });
+        expect(api.saveAsTemplate).not.toHaveBeenCalled(); // cancelled
+    });
+
+    it('a template hides Activate — the server refuses to run it, so the affordance would only fail', () => {
+        const c = make();
+        c.flows.set([
+            { name: 'tpl', active: false, template: true, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+        ]);
+        c.selectedId.set('tpl');
+        expect(c.isTemplate()).toBe(true);
+
+        c.selectedId.set('missing');
+        expect(c.isTemplate()).toBe(false);
+    });
+
+    it('rename patches only the label — the identity still addresses the pipeline', () => {
+        const c = make();
+        c.flows.set([{ name: 'demo', active: true, nodeCount: 2, edgeCount: 1, produces: [], consumes: [] }]);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'Demo (EU)' }) });
+
+        c.renamePipeline();
+
+        expect(api.label).toHaveBeenCalledWith('demo', 'Demo (EU)');
+        const row = c.flows()[0];
+        expect(row.name).toBe('demo'); // identity unchanged — run URLs and history still resolve
+        expect(row.displayName).toBe('Demo (EU)');
+        expect(c.selectedId()).toBe('demo');
+    });
+
+    it('surfaces a failed template copy instead of leaving a phantom row', () => {
+        const c = make();
+        c.flows.set([{ name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of({ id: 'taken' }) });
+        api.saveAsTemplate.mockReturnValue(throwError(() => ({ status: 409, error: { error: { message: 'taken' } } })));
+
+        c.saveAsTemplate();
+
+        expect(toast.error).toHaveBeenCalled();
+        expect(c.flows().some((f) => f.name === 'taken')).toBe(false);
     });
 });

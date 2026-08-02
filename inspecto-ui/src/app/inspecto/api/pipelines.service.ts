@@ -8,12 +8,20 @@ export type PipelineNodeCategory = 'SOURCE' | 'PARSE' | 'TRANSFORM' | 'SINK' | '
 
 /** A compact pipeline entry (GET /pipelines) — one per registered pipeline, lifted to a pipeline graph. */
 export interface PipelineSummary {
+    /** The pipeline's identity (the normalised id) — what every other route keys on. */
     name: string;
     active: boolean;
     nodeCount: number;
     edgeCount: number;
     produces: string[];
     consumes: string[];
+    /**
+     * A non-runnable authoring template (`template: true`). Absent ⇒ an ordinary pipeline. A template is
+     * refused by every run path server-side, so the UI hides run affordances rather than guarding them.
+     */
+    template?: boolean;
+    /** The display name, sent only when it differs from {@link name}; absent ⇒ the id IS the label. */
+    displayName?: string;
 }
 
 /** One node in a pipeline graph projection (structural only — no raw config; the inspector shows this). */
@@ -214,6 +222,28 @@ export interface ProvenanceCount {
     rowCount: number;
 }
 
+/** The result of copying a pipeline into a template (POST /pipelines/{name}/save-as-template). */
+export interface PipelineTemplateResult {
+    written: boolean;
+    path: string;
+    id: string;
+    source: string;
+    template: boolean;
+    /** Human-readable remarks about the copy (e.g. whether the schema file could be copied). */
+    notes: string[];
+}
+
+/** The result of relabelling a pipeline (POST /pipelines/{name}/label). */
+export interface PipelineLabelResult {
+    written: boolean;
+    path: string;
+    /** The pipeline's identity — unchanged by a relabel, and still what every route keys on. */
+    id: string;
+    name: string;
+    /** True when this relabel pinned the previously-derived identity as an explicit `id:`. */
+    stampedId: boolean;
+}
+
 /** Read-only pipeline-graph projection + authored-pipeline CRUD/dry-run for the editor (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class PipelinesService {
@@ -259,6 +289,28 @@ export class PipelinesService {
     savePipelineGraph(name: string, pipeline: AuthoredPipeline): Observable<PipelineGraphWriteResult> {
         return this.http.put<PipelineGraphWriteResult>(
             apiUrl(`/pipelines/${encodeURIComponent(name)}/graph`), pipeline);
+    }
+
+    /**
+     * Copy a pipeline into a non-runnable authoring template. The server repoints every environment
+     * binding (dirs, stream, collector id, DuckLake path) into a `templates/<id>/` sandbox and copies the
+     * schema, so the copy cannot read or write anything the source owns — and `template: true` keeps it
+     * unrunnable until an operator deliberately clears it. 409 when `id` is already taken.
+     */
+    saveAsTemplate(name: string, id: string, displayName?: string): Observable<PipelineTemplateResult> {
+        return this.http.post<PipelineTemplateResult>(
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/save-as-template`),
+            displayName ? { id, name: displayName } : { id });
+    }
+
+    /**
+     * Change a pipeline's DISPLAY name only. The server pins the current identity as an explicit `id:`
+     * first, so the config file, audit trail, ledger keys and Catalog Stream all stay where they are —
+     * this is a relabel, not a migration, and {@link PipelineSummary.name} is unchanged afterwards.
+     */
+    label(name: string, displayName: string): Observable<PipelineLabelResult> {
+        return this.http.post<PipelineLabelResult>(
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/label`), { name: displayName });
     }
 
     // ── authored-pipeline CRUD + dry-run (editor; all writes 503 without -Dassist.write.root) ──

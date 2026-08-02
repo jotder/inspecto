@@ -47,6 +47,8 @@ import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { ParserConfigDialog } from './parser-config.dialog';
+import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
+import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
 import {
@@ -136,6 +138,14 @@ export class PipelineEditorComponent implements OnInit {
     readonly iconMap = signal<IconMap>({});
     readonly selectedId = signal<string | null>(null);
     readonly model = signal<AuthoredPipeline | null>(null);
+
+    /** The list row for the selected pipeline — carries the `template` flag and the display name. */
+    readonly selectedSummary = computed(() => {
+        const id = this.selectedId();
+        return id ? (this.flows().find((f) => f.name === id) ?? null) : null;
+    });
+    /** True when the selection is a non-runnable authoring template — it must not offer Activate. */
+    readonly isTemplate = computed(() => this.selectedSummary()?.template === true);
 
     /** The selected pipeline as a transfer reference — what the export/import menu offers. */
     readonly transferItems = computed(() => {
@@ -449,6 +459,74 @@ export class PipelineEditorComponent implements OnInit {
         const r = refusals[0];
         this.toast.error(`Cannot save: ${r.message}${r.nodeId ? ` (node '${r.nodeId}')` : ''}`);
         return true;
+    }
+
+    /**
+     * Copy the selected pipeline into a non-runnable template. The server does the neutralising (dirs,
+     * stream, collector id, schema copy) — the UI only names it, then selects the result so the operator
+     * lands in the copy rather than having to hunt for it.
+     */
+    saveAsTemplate(): void {
+        const id = this.selectedId();
+        if (!id) return;
+        this.dialog
+            .open(PipelineTemplateDialog, {
+                width: '32rem',
+                data: { source: id, existingNames: this.flows().map((f) => f.name) },
+            })
+            .afterClosed()
+            .subscribe((res?: PipelineTemplateResultData) => {
+                if (!res) return;
+                this.api.saveAsTemplate(id, res.id, res.displayName).subscribe({
+                    next: (written) => {
+                        this.flows.update((fs) => [
+                            ...fs,
+                            {
+                                name: res.id,
+                                active: false,
+                                template: true,
+                                displayName: res.displayName,
+                                nodeCount: 0,
+                                edgeCount: 0,
+                                produces: [],
+                                consumes: [],
+                            },
+                        ]);
+                        this.select(res.id);   // reloads the real graph, correcting the optimistic counts
+                        this.toast.success(`Created template '${res.id}'`);
+                        // e.g. the schema could not be copied — the operator must repoint it before editing.
+                        written.notes?.forEach((n) => this.toast.info(n));
+                    },
+                    error: (err) => this.onWriteError(err, 'Could not create the template'),
+                });
+            });
+    }
+
+    /**
+     * Relabel the selected pipeline. Its identity is unchanged, so {@link selectedId} still addresses it
+     * and only the list label is patched.
+     */
+    renamePipeline(): void {
+        const id = this.selectedId();
+        if (!id) return;
+        this.dialog
+            .open(PipelineRenameDialog, {
+                width: '32rem',
+                data: { id, displayName: this.selectedSummary()?.displayName ?? id },
+            })
+            .afterClosed()
+            .subscribe((res?: PipelineRenameResultData) => {
+                if (!res) return;
+                this.api.label(id, res.name).subscribe({
+                    next: () => {
+                        this.flows.update((fs) =>
+                            fs.map((f) => (f.name === id ? { ...f, displayName: res.name } : f)),
+                        );
+                        this.toast.success(`Renamed to '${res.name}'`);
+                    },
+                    error: (err) => this.onWriteError(err, 'Rename failed'),
+                });
+            });
     }
 
     async deleteFlow(): Promise<void> {

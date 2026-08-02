@@ -34,6 +34,25 @@ class AcquisitionLedgerTest {
         assertTrue(ledger.find("OTHER", "a/b.csv").isEmpty());
 
         dbWatermarkContract(ledger);
+        renameSourceContract(ledger);
+    }
+
+    /** A pipeline rename's identity migration (T3, plan §3.2): fingerprints AND the DB watermark move together. */
+    private static void renameSourceContract(AcquisitionLedger ledger) {
+        ledger.record(new LedgerEntry("rn-old", "x.csv", "x.csv", 10, "cs", null, null, 100L, 200L, LedgerEntry.PROCESSED));
+        ledger.recordDbWatermark("rn-old", "wm-1");
+
+        ledger.renameSource("rn-old", "rn-new");
+
+        assertTrue(ledger.find("rn-old", "x.csv").isEmpty(), "old source id no longer resolves");
+        assertEquals(10, ledger.find("rn-new", "x.csv").orElseThrow().size(), "fingerprint moved to the new id");
+        assertTrue(ledger.dbWatermark("rn-old").isEmpty(), "old watermark key no longer resolves");
+        assertEquals("wm-1", ledger.dbWatermark("rn-new").orElseThrow(), "watermark moved to the new id");
+
+        // a target id already holding its own row is untouched by an unrelated rename
+        ledger.record(new LedgerEntry("keep", "y.csv", "y.csv", 5, "cs2", null, null, 1L, 2L, LedgerEntry.PROCESSED));
+        ledger.renameSource("rn-new", "rn-final");
+        assertEquals(5, ledger.find("keep", "y.csv").orElseThrow().size());
     }
 
     /** The row-level DB-export watermark contract: empty until recorded, then read-back + upsert, keyed per source. */

@@ -90,6 +90,17 @@ public interface AcquisitionLedger extends AutoCloseable {
      */
     default void maintenance() {}
 
+    /**
+     * Repoint every fingerprint and the DB-export watermark from {@code oldSourceId} to {@code newSourceId}
+     * (a pipeline rename's identity migration, S5/S6) — the source's already-recorded state moves with it,
+     * so a re-scan under the new id still recognises files it already ingested instead of treating them all
+     * as new. Only safe while the source is not running (the caller must guarantee that). Returns the number
+     * of ledger rows moved. The default implementation moves nothing, matching a ledger with no durable state.
+     */
+    default int renameSource(String oldSourceId, String newSourceId) {
+        return 0;
+    }
+
     /** Release resources (e.g. a DuckDB connection). Idempotent; no-op for in-memory. */
     @Override
     default void close() {}

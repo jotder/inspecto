@@ -209,6 +209,7 @@ final class PipelineScheduler {
                 if (cfg == null) continue;                                   // unloadable — already warned
                 String id = cfg.identity().pipelineName();
                 if (paused.contains(id) || !cfg.active()) continue;          // paused or not activated
+                if (cfg.template()) continue;                                // authoring template — never runs
                 if (!dueThisTick(cfg, id, nowMs)) continue;                  // T13: trigger gates the loop
                 // Per-pipeline exclusion: a pipeline still running from an earlier tick is SKIPPED, not
                 // queued — queueing would pile runs up behind a slow pipeline. Its cadence baseline is

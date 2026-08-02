@@ -64,6 +64,8 @@ final class RunRoutes implements RouteModule {
 
         api.post("/runs/([^/]+)/reprocess", ApiContext.withCapability("canOperateRuns", (e, m) -> {
             var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
+            if (api.service().isTemplate(ApiContext.name(m)))   // a template has no committed batches anyway
+                throw new ApiException(409, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
             String batchId = ApiContext.str(api.body(e), "batchId");
             if (batchId == null) throw new ApiException(400, "body must include 'batchId'");
             ReprocessCommand.run(path.toString(), batchId);
@@ -90,12 +92,16 @@ final class RunRoutes implements RouteModule {
      * even the legacy path no longer holds the ingest lock on the request thread. 404 if no such pipeline.
      */
     private Object triggerPipeline(ApiContext api, HttpExchange e, String name) throws IOException {
-        if (ApiContext.v1(e)) {
-            String runId = api.service().triggerRunAsync(name).orElseThrow(() -> notFound(name));
-            e.getResponseHeaders().set("Location", "/api/v1/runs/runs/" + runId);
-            return ApiContext.respondJson(e, 202, Map.of("runId", runId, "pipeline", name, "status", "running"));
+        try {
+            if (ApiContext.v1(e)) {
+                String runId = api.service().triggerRunAsync(name).orElseThrow(() -> notFound(name));
+                e.getResponseHeaders().set("Location", "/api/v1/runs/runs/" + runId);
+                return ApiContext.respondJson(e, 202, Map.of("runId", runId, "pipeline", name, "status", "running"));
+            }
+            return api.service().runPipelineOffThread(name).orElseThrow(() -> notFound(name));
+        } catch (IllegalStateException notRunnable) {
+            throw new ApiException(409, notRunnable.getMessage());   // a `template: true` pipeline
         }
-        return api.service().runPipelineOffThread(name).orElseThrow(() -> notFound(name));
     }
 
     /** {@code GET /runs/runs/{runId}} — poll one manual pipeline run's status (W5b); 404 once evicted or unknown. */

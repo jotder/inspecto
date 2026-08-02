@@ -161,6 +161,17 @@ public final class ConfigSpecs {
 
         int cores = Runtime.getRuntime().availableProcessors();
         List<CrossFieldRule> rules = List.of(
+                // The parser refuses this combination too (that is what makes the guarantee hold for a
+                // hand-edited file), but a load-time throw would surface as a config that silently vanished
+                // from the read surface. Catching it here turns it into a 422 at the moment of authoring.
+                new CrossFieldRule(
+                        "template-cannot-be-active",
+                        "template: true and active: true contradict — a template is a non-runnable authoring "
+                                + "starting point; remove template: true to arm the pipeline for execution.",
+                        Severity.ERROR,
+                        List.of("template", "active"),
+                        raw -> !(Boolean.parseBoolean(str(raw, "template"))
+                                && Boolean.parseBoolean(str(raw, "active")))),
                 new CrossFieldRule(
                         "plugin-ingester-requires-segments",
                         "processing.segments must be a non-empty map when processing.ingester is set.",

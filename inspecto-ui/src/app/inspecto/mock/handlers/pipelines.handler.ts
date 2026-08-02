@@ -84,6 +84,8 @@ const RUN_TO = /\/pipelines\/authored\/([^/]+)\/run$/;
 const AUTHORED_ID = /\/pipelines\/authored\/([^/]+)$/;
 const GRAPH_RAW = /\/pipelines\/([^/]+)\/graph\/raw$/;
 const FLOW_GRAPH = /\/pipelines\/([^/]+)\/graph$/;
+const SAVE_AS_TEMPLATE = /\/pipelines\/([^/]+)\/save-as-template$/;
+const LABEL = /\/pipelines\/([^/]+)\/label$/;
 const PROV_BATCHES = /\/provenance\/batches$/;
 const PROV = /\/provenance$/;
 const ICON_MAP_RE = /\/config\/icon-map$/;
@@ -123,11 +125,17 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
             return json(runToNode(m[1], f, req.params['to'] ?? '', files));
         }
         // GET /pipelines — the registered canonical pipelines (what the editor lists).
-        if (method === 'GET' && FLOWS.test(url)) return json(configs().map((r) => summaryOf(liftConfig(r.config))));
+        if (method === 'GET' && FLOWS.test(url)) return json(configs().map(configSummary));
         // W5: the editable round-trip over the canonical *_pipeline.toon.
         if (method === 'GET' && (m = match(url, GRAPH_RAW))) {
             const g = graphOfName(m[1]);
             return g ? json(g) : error(404, `no pipeline named '${m[1]}'`);
+        }
+        if (method === 'POST' && (m = match(url, SAVE_AS_TEMPLATE))) {
+            return saveAsTemplate(store, space, m[1], req.body as { id?: string; name?: string });
+        }
+        if (method === 'POST' && (m = match(url, LABEL))) {
+            return relabel(store, space, m[1], req.body as { name?: string });
         }
         if (method === 'PUT' && (m = match(url, FLOW_GRAPH))) {
             return saveGraph(store, space, m[1], req.body as AuthoredPipeline);
@@ -221,6 +229,127 @@ function viewData(flows: AuthoredPipeline[], name: string, limit: number): MockR
         rows,
     };
     return json(data);
+}
+
+/**
+ * The `GET /pipelines` row for a stored config. `template`/`displayName` come from the CONFIG, not the
+ * lifted graph — matching `PipelineRoutes.flowSummaries`, which reads them off `PipelineConfig` and emits
+ * each only when set (so an ordinary pipeline's row is byte-identical to before).
+ */
+function configSummary(r: StoredPipelineConfig): PipelineSummary {
+    const cfg = r.config;
+    const s = summaryOf(liftConfig(cfg));
+    // ⚠ `liftConfig` puts the raw `name:` on the graph, but the server's PipelineLift puts the derived
+    // IDENTITY there — and `name` is what every other route is keyed by. Left as the display name, a
+    // relabelled pipeline would list under its new label and then 404 on `GET /pipelines/{name}/graph/raw`.
+    s.name = r.id;
+    if (cfg['template'] === true || cfg['template'] === 'true') s.template = true;
+    const display = typeof cfg['name'] === 'string' ? (cfg['name'] as string) : '';
+    if (display && display !== s.name) s.displayName = display;
+    return s;
+}
+
+/** The server's identity rule: lowercase, spaces → underscores (`PipelineConfigParser`). */
+function derivedId(name: string): string {
+    return name.trim().toLowerCase().replace(/ /g, '_');
+}
+
+/**
+ * `POST /pipelines/{name}/save-as-template` — mirrors `PipelineRoutes.saveAsTemplate`.
+ *
+ * ⚠ Keep the gates AND the neutralising in lockstep with the server. If this accepted an id the backend
+ * refuses, or left a `dirs` entry pointing at the source, the offline preview would greenlight exactly the
+ * collision the feature exists to prevent.
+ */
+function saveAsTemplate(
+    store: MockStore,
+    space: string,
+    source: string,
+    body: { id?: string; name?: string },
+): MockResponse {
+    const src = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, source);
+    if (!src) return error(404, `no pipeline named '${source}'`);
+    const raw = (body?.id ?? '').trim();
+    if (!raw) return error(400, "body must include 'id' (the new template's pipeline id)");
+    const id = raw.toLowerCase();
+    if (!/^[a-z0-9][a-z0-9_]*$/.test(id))
+        return error(422, `id '${id}' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)`);
+    if (store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, id))
+        return error(409, `pipeline id '${id}' is already registered`);
+
+    const cfg = { ...(src.config as Record<string, unknown>) };
+    const sandbox = `templates/${id}`;
+    const notes: string[] = [];
+
+    cfg['name'] = (body.name ?? '').trim() || id;
+    cfg['id'] = id;
+    cfg['template'] = true;
+    cfg['active'] = false;
+    cfg['stream'] = id;
+
+    // Every dir moves into the sandbox — the well-known leaf names, then anything else by its own key.
+    const leaf: Record<string, string> = { poll: 'inbox', status_dir: 'status', log_dir: 'logs' };
+    const dirs: Record<string, unknown> = {};
+    const srcDirs = (src.config['dirs'] ?? {}) as Record<string, unknown>;
+    for (const k of Object.keys(srcDirs)) {
+        dirs[k] = k === 'status_file' ? `${sandbox}/status/${id}_status.csv` : `${sandbox}/${leaf[k] ?? k}`;
+    }
+    if (!dirs['poll']) dirs['poll'] = `${sandbox}/inbox`;
+    if (!dirs['database']) dirs['database'] = `${sandbox}/database`;
+    cfg['dirs'] = dirs;
+
+    // The collector id is the acquisition ledger's dedup key; `source:` is the legacy spelling.
+    const colKey = 'collector' in src.config || !('source' in src.config) ? 'collector' : 'source';
+    cfg[colKey] = { ...((src.config[colKey] ?? {}) as Record<string, unknown>), id };
+
+    const out = src.config['output'] as Record<string, unknown> | undefined;
+    if (out) {
+        const copy = { ...out };
+        const lake = copy['ducklake'] as Record<string, unknown> | undefined;
+        if (lake && 'data_path' in lake) copy['ducklake'] = { ...lake, data_path: `${sandbox}/ducklake` };
+        cfg['output'] = copy;
+    }
+
+    const processing = src.config['processing'] as Record<string, unknown> | undefined;
+    const schemaRef = processing?.['schema_file'];
+    if (processing && typeof schemaRef === 'string' && schemaRef.trim()) {
+        cfg['processing'] = { ...processing, schema_file: `${id}_schema.toon` };
+        notes.push(`copied the schema to ${id}_schema.toon`);
+    }
+
+    store.put(space, PIPELINE_CONFIGS_COLL, id, {
+        id,
+        path: `${id}_pipeline.toon`,
+        config: cfg,
+        registered: true,
+    });
+    return json({
+        written: true,
+        path: `${id}_pipeline.toon`,
+        id,
+        source,
+        template: true,
+        notes,
+        findings: [],
+    });
+}
+
+/** `POST /pipelines/{name}/label` — mirrors `PipelineRoutes.relabel`: stamp `id`, then set `name`. */
+function relabel(store: MockStore, space: string, name: string, body: { name?: string }): MockResponse {
+    const rec = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
+    if (!rec) return error(404, `no pipeline named '${name}'`);
+    const label = (body?.name ?? '').trim();
+    if (!label) return error(400, "body must include 'name' (the new display name)");
+
+    const declared = rec.config['id'];
+    const stampedId = !(typeof declared === 'string' && declared.trim());
+    const id = stampedId ? derivedId(String(rec.config['name'] ?? name)) : String(declared).trim();
+    // The record key and file name are the IDENTITY — a relabel must not move either.
+    store.put(space, PIPELINE_CONFIGS_COLL, name, {
+        ...rec,
+        config: { ...rec.config, name: label, id },
+    });
+    return json({ written: true, path: rec.path, id, name: label, stampedId, findings: [] });
 }
 
 function summaryOf(f: AuthoredPipeline): PipelineSummary {

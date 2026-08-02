@@ -4,6 +4,7 @@ import { MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { seedDefaultSpace } from '../seeds/default-space.seed';
 import { NODE_TYPES, pipelinesHandler } from './pipelines.handler';
+import { PIPELINE_CONFIGS_COLL } from './onboarding.handler';
 
 const req = (method: string, url: string, body: unknown = null): MockRequest => ({
     method,
@@ -167,5 +168,93 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
         const store = seededStore();
         expect(handler(req('POST', '/api/pipelines/authored', { name: 'x', nodes: [], edges: [] }), store)?.status).toBe(405);
         expect(handler(req('PUT', '/api/pipelines/authored/cdr_ingest', { nodes: [], edges: [] }), store)?.status).toBe(405);
+    });
+});
+
+/**
+ * T4 — save-as-template / label offline.
+ *
+ * The mock must refuse exactly what `PipelineRoutes` refuses AND neutralise exactly what it
+ * neutralises. A lenient mock here is worse than none: the whole feature is the promise that a copy
+ * cannot touch its source, so a mock that left one `dirs` entry pointing at the original would let the
+ * preview greenlight precisely the collision this exists to prevent.
+ */
+describe('pipelinesHandler — save-as-template mirrors the server gates and neutralising', () => {
+    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+    const post = (url: string, body: unknown, store: MockStore) => handler(req('POST', url, body), store);
+
+    it('refuses an unknown source (404), a missing id (400), a bad id (422) and a taken id (409)', () => {
+        const store = seededStore();
+        expect(post('/api/pipelines/nope/save-as-template', { id: 'x' }, store)?.status).toBe(404);
+        expect(post('/api/pipelines/cdr_ingest/save-as-template', {}, store)?.status).toBe(400);
+        for (const bad of ['Orders EU', 'orders-eu', '_x', 'x!']) {
+            expect(post('/api/pipelines/cdr_ingest/save-as-template', { id: bad }, store)?.status,
+                `${bad} must be refused`).toBe(422);
+        }
+        expect(post('/api/pipelines/cdr_ingest/save-as-template', { id: 'cdr_ingest' }, store)?.status).toBe(409);
+    });
+
+    it('shares no dirs, stream or collector id with the source, and is never active', () => {
+        const store = seededStore();
+        const src = store.get<{ config: Record<string, unknown> }>('default', PIPELINE_CONFIGS_COLL, 'cdr_ingest')!;
+        const srcDirs = { ...(src.config['dirs'] as Record<string, string>) };
+
+        expect(post('/api/pipelines/cdr_ingest/save-as-template', { id: 'cdr_eu' }, store)?.status ?? 200).toBe(200);
+
+        const tpl = store.get<{ config: Record<string, unknown> }>('default', PIPELINE_CONFIGS_COLL, 'cdr_eu')!;
+        expect(tpl.config['template']).toBe(true);
+        expect(tpl.config['active']).toBe(false);
+        expect(tpl.config['id']).toBe('cdr_eu');
+        expect(tpl.config['stream']).toBe('cdr_eu');
+
+        const tplDirs = tpl.config['dirs'] as Record<string, string>;
+        expect(Object.keys(tplDirs)).toEqual(Object.keys(srcDirs));
+        for (const k of Object.keys(srcDirs)) {
+            expect(tplDirs[k], `dirs.${k} must not be shared`).not.toBe(srcDirs[k]);
+            expect(tplDirs[k]).toContain('templates/cdr_eu');
+        }
+        const col = (tpl.config['collector'] ?? tpl.config['source']) as Record<string, unknown>;
+        expect(col['id']).toBe('cdr_eu');
+    });
+
+    it('lists the template with its flag and display name, still keyed by identity', () => {
+        const store = seededStore();
+        post('/api/pipelines/cdr_ingest/save-as-template', { id: 'cdr_eu', name: 'CDR (EU)' }, store);
+
+        const rows = handler(req('GET', '/api/pipelines'), store)?.body as
+            { name: string; template?: boolean; displayName?: string; active: boolean }[];
+        const row = rows.find((r) => r.name === 'cdr_eu')!;
+        expect(row.template).toBe(true);
+        expect(row.displayName).toBe('CDR (EU)');
+        expect(row.active).toBe(false);
+        // An ordinary pipeline carries neither key — the server emits them only when set.
+        const plain = rows.find((r) => r.name === 'cdr_ingest')!;
+        expect(plain.template).toBeUndefined();
+    });
+});
+
+describe('pipelinesHandler — label relabels without moving the identity', () => {
+    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+
+    it('stamps the derived id, keeps the record key, and reports stampedId once', () => {
+        const store = seededStore();
+        const first = handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: 'CDR (EU)' }), store)?.body as
+            { id: string; name: string; stampedId: boolean };
+        expect(first).toMatchObject({ id: 'cdr_ingest', name: 'CDR (EU)', stampedId: true });
+
+        // Still addressable by identity — the whole point of stamping before relabelling.
+        expect(handler(req('GET', '/api/pipelines/cdr_ingest/graph/raw'), store)?.status ?? 200).toBe(200);
+        const rows = handler(req('GET', '/api/pipelines'), store)?.body as { name: string; displayName?: string }[];
+        expect(rows.find((r) => r.name === 'cdr_ingest')?.displayName).toBe('CDR (EU)');
+
+        const second = handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: 'CDR (APAC)' }), store)?.body as
+            { stampedId: boolean };
+        expect(second.stampedId).toBe(false); // idempotent
+    });
+
+    it('refuses an unknown pipeline (404) and a blank name (400)', () => {
+        const store = seededStore();
+        expect(handler(req('POST', '/api/pipelines/nope/label', { name: 'X' }), store)?.status).toBe(404);
+        expect(handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: '  ' }), store)?.status).toBe(400);
     });
 });

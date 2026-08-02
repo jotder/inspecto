@@ -178,6 +178,29 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
         }
     }
 
+    @Override
+    public synchronized int renameSource(String oldSourceId, String newSourceId) {
+        try {
+            int moved;
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE " + TABLE + " SET source_id = ? WHERE source_id = ?")) {
+                ps.setString(1, newSourceId);
+                ps.setString(2, oldSourceId);
+                moved = ps.executeUpdate();
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE " + WM_TABLE + " SET source_key = ? WHERE source_key = ?")) {
+                ps.setString(1, newSourceId);
+                ps.setString(2, oldSourceId);
+                ps.executeUpdate();
+            }
+            return moved;
+        } catch (SQLException ex) {
+            throw new IllegalStateException(
+                    "could not rename ledger source " + oldSourceId + " -> " + newSourceId + ": " + ex.getMessage(), ex);
+        }
+    }
+
     /** CHECKPOINT + VACUUM, each best-effort — Postgres restricts CHECKPOINT to superusers, DuckDB allows both. */
     @Override
     public synchronized void maintenance() {

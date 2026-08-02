@@ -43,6 +43,9 @@ public final class EventType {
     public static final String PIPELINE_UNREGISTERED = "PIPELINE_UNREGISTERED";
     public static final String PIPELINE_PAUSED     = "PIPELINE_PAUSED";
     public static final String PIPELINE_RESUMED    = "PIPELINE_RESUMED";
+    /** A pipeline's identity migrated to a new id (full rename, not a display-name-only {@code label}).
+     *  {@code oldId}/{@code newId} attributes carry both ids; {@link Event#pipeline()} is the new id. */
+    public static final String PIPELINE_RENAMED    = "PIPELINE_RENAMED";
 
     // ── batch / ingest facts (the headline operational signal) ──────────────────────
     public static final String BATCH_COMMITTED  = "BATCH_COMMITTED";

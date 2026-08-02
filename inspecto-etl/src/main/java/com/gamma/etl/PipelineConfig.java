@@ -613,6 +613,21 @@ public final class PipelineConfig {
      */
     private final boolean active;
 
+    /**
+     * Whether this is a non-runnable authoring <b>template</b> ({@code template:} top-level key, v5.4.0).
+     * A template is a starting point for standing up a similar pipeline: it parses and validates like any
+     * other config, but it is <b>never registered</b> — {@code SpaceBootstrap} skips it at boot and
+     * {@link com.gamma.service.CollectorService#registerPipeline} refuses it. Because every run path
+     * (trigger route, poll cycle, scheduler) goes through the run registry, not being in it makes a
+     * template structurally unreachable rather than merely gated.
+     *
+     * <p>This is deliberately stronger than {@code active: false}: an inactive pipeline is still
+     * registered and can still be run on demand via {@code POST /runs/{name}/trigger}.
+     *
+     * <p><b>Default is {@code false}</b>, so every pre-existing config is unaffected.
+     */
+    private final boolean template;
+
     /** What the output registers as in the Catalog ({@code produces:}, v5.1.0; default STREAM). */
     private final Produces produces;
 
@@ -675,6 +690,8 @@ public final class PipelineConfig {
     public Collector      collector()  { return collector; }
     /** Whether this pipeline is activated for execution ({@code active:}, default {@code false}). */
     public boolean        active()     { return active; }
+    /** Whether this is a non-runnable authoring template ({@code template:}, default {@code false}). */
+    public boolean        template()   { return template; }
     /** What the output registers as in the Catalog ({@code produces:}, default {@link Produces#STREAM}). */
     public Produces       produces()   { return produces; }
     /** Whether this pipeline's output is a Reference Dataset ({@code produces: reference}). */
@@ -727,6 +744,7 @@ public final class PipelineConfig {
                 b.sourceDiscovery);
         this.statusDirToPrepare = b.statusDirToPrepare;
         this.active = b.active;
+        this.template = b.template;
         this.produces = b.produces;
         this.reference = b.reference;
         this.stream = b.stream;
@@ -770,6 +788,7 @@ public final class PipelineConfig {
         this.collector = src.collector;
         this.statusDirToPrepare = src.statusDirToPrepare;
         this.active = src.active;
+        this.template = src.template;
         this.produces = src.produces;
         this.reference = src.reference;
         this.stream = src.stream;
@@ -849,6 +868,7 @@ public final class PipelineConfig {
         String pipelineName  = "";
         String runTimestamp  = "";
         boolean active       = false;   // opt-in: a pipeline runs only with `active: true`
+        boolean template     = false;   // `template: true` ⇒ never registered, so never runnable
         Produces produces    = Produces.STREAM;   // catalog product; `produces: reference` ⇒ Reference Dataset
         Reference reference  = Reference.DEFAULT;  // `reference:` block; full-replace/no-key when absent
         String   stream;                           // logical Catalog Stream; parser defaults it to pipelineName

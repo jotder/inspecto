@@ -8,6 +8,10 @@ import com.gamma.config.spec.Severity;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.event.Event;
+import com.gamma.event.EventType;
+import com.gamma.pipeline.ComponentRegistry;
+import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineCompileException;
 import com.gamma.pipeline.PipelineEditable;
@@ -18,6 +22,7 @@ import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.service.CollectorService;
+import com.gamma.service.DbStatusStore;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
@@ -25,12 +30,18 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Flow graph routes ({@code /pipelines*}): the read-only lifted-pipeline projections (T31) and the
@@ -63,14 +74,33 @@ final class PipelineRoutes implements RouteModule {
         api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, ApiContext.name(m)));
         api.put("/pipelines/([^/]+)/graph", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> saveGraph(api, e, ApiContext.name(m), api.body(e))));
+        // Authoring, not operating: copying a pipeline into a template writes config and runs nothing.
+        api.post("/pipelines/([^/]+)/save-as-template", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> saveAsTemplate(api, e, ApiContext.name(m), api.body(e))));
+        api.post("/pipelines/([^/]+)/label", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> relabel(api, e, ApiContext.name(m), api.body(e))));
+        // T3: the full identity migration `label` deliberately doesn't do — see `rename`'s javadoc.
+        api.post("/pipelines/([^/]+)/rename", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> rename(api, e, ApiContext.name(m), api.body(e))));
     }
 
     /** Lift every registered pipeline to a {@link PipelineGraph} and project a compact summary (GET /pipelines). */
     private Object flowSummaries(ApiContext api) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (CollectorService.PipelineView pv : api.service().pipelines()) {
-            api.service().configFor(pv.name())
-                    .ifPresent(c -> out.add(PipelineProjection.summary(PipelineLift.lift(c))));
+            api.service().configFor(pv.name()).ifPresent(c -> {
+                Map<String, Object> s = PipelineProjection.summary(PipelineLift.lift(c));
+                // Emitted only when set, so an ordinary pipeline's payload is unchanged. Kept out of
+                // PipelineGraph/PipelineProjection deliberately: `template` is a config-level lifecycle
+                // flag like `active`, not part of the structural graph the projection describes.
+                if (c.template()) s.put("template", true);
+                // `name` in the projection is the lifted IDENTITY (PipelineLift uses pipelineName), which is
+                // what every other route keys on — so the display name is carried separately, and only when
+                // it actually differs. Absent ⇒ the id is the label, exactly as before.
+                if (!c.identity().name().equals(c.identity().pipelineName()))
+                    s.put("displayName", c.identity().name());
+                out.add(s);
+            });
         }
         return out;
     }
@@ -202,6 +232,628 @@ final class PipelineRoutes implements RouteModule {
         r.put("name", name);
         r.put("findings", findings);
         return r;
+    }
+
+    /** Identity of a {@link Finding} for before/after comparison — its anchor plus its message. */
+    private static String findingKey(Finding f) {
+        return f.fieldPath() + "|" + f.message();
+    }
+
+    /**
+     * {@code POST /pipelines/{name}/label} — change a pipeline's <b>display name</b> while its identity
+     * stays exactly where it is (v5.4.0). The cheap, safe half of "rename".
+     *
+     * <p>{@code ConfigSpecs.pipeline()} splits {@code name} (display) from {@code id} (stable identity), but
+     * every config written so far omits {@code id}, so identity is <em>derived</em> from the name — and that
+     * derived string is embedded in the config filename, the {@code <id>_commits.log}, the run-timestamped
+     * audit CSVs {@code FileStatusStore.readRuns} globs by id prefix, the acquisition ledger's
+     * {@code source_id} and the Catalog Stream. Editing {@code name} on such a config would silently move
+     * all of it — which is why the parser warns never to re-derive identity from a changed name.
+     *
+     * <p>So this route <b>stamps {@code id} with today's derived value first</b>, pinning the identity, and
+     * only then sets the new {@code name}. Nothing observable changes except the label: the file keeps its
+     * {@code <id>_pipeline.toon} name, the dirs, audit trail, ledger keys and Stream are untouched, and no
+     * dependent config needs rewriting. Stamping is idempotent — a config that already declares {@code id}
+     * is relabelled without touching it.
+     *
+     * <p>Moving the identity itself (renaming the file, the audit trail and the ledger keys, and rewriting
+     * every dependent reference) is the separate migration tracked in
+     * {@code docs/superpower/pipeline-rename-and-template-plan.md} §3, deliberately not done here.
+     *
+     * <p>Fail-closed gate order: write-root 503 → unknown pipeline 404 → path jail 403 → missing
+     * {@code name} 400 → spec + safety findings 422 → write atomically in place.
+     */
+    private Object relabel(ApiContext api, HttpExchange e, String source, Map<String, Object> body)
+            throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
+        Path srcPath = api.service().pathFor(source)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+        WriteGates.jail(writeRoot, srcPath, "config path");   // refuse a config outside the write root
+        PipelineConfig live = api.service().configFor(source)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+
+        String raw = ApiContext.str(body, "name");
+        if (raw == null || raw.isBlank())
+            throw new ApiException(400, "body must include 'name' (the new display name)");
+        String label = raw.trim();
+
+        Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
+        String id = live.identity().pipelineName();
+        boolean stampedId = !(src.get("id") instanceof String s && !s.isBlank());
+
+        // Rebuild with name + id first so the stamped identity reads as a header rather than a trailing key.
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("name", label);
+        out.put("id", id);
+        src.forEach((k, v) -> {
+            if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
+        });
+
+        // The full gate still runs, but a relabel may only be blocked by findings it INTRODUCES. This route
+        // rewrites no paths, and a config already on disk was never subjected to the write-time safety policy
+        // — so re-punishing it here would make any pipeline whose data lives outside the default allowed
+        // roots impossible to rename, which is most of them in a real deployment.
+        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+        Set<String> preExisting = new HashSet<>();
+        ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(findingKey(f)));
+        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+                .forEach(f -> preExisting.add(findingKey(f)));
+        List<Finding> introduced = findings.stream()
+                .filter(f -> f.severity() == Severity.ERROR)
+                .filter(f -> !preExisting.contains(findingKey(f)))
+                .toList();
+        if (!introduced.isEmpty())
+            return ApiContext.respondJson(e, 422, Map.of("written", false,
+                    "error", "the new name introduces ERROR-level findings; not written",
+                    "findings", introduced));
+
+        byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
+        AtomicFiles.write(srcPath, bytes, ".cfg-");
+        log.info("[PIPELINE-LABEL] pipeline '{}' relabelled to '{}'{}",
+                id, label, stampedId ? " (identity stamped as id: " + id + ")" : "");
+
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("written", true);
+        r.put("path", writeRoot.relativize(srcPath).toString().replace('\\', '/'));
+        r.put("id", id);
+        r.put("name", label);
+        r.put("stampedId", stampedId);
+        r.put("findings", findings);
+        return r;
+    }
+
+    /**
+     * {@code POST /pipelines/{name}/rename} — <b>full identity migration</b> (T3, plan §3): moves the id
+     * itself, not just the display name. {@link #relabel} deliberately stops short of this because most
+     * renames don't need it; this route is for the rest — every artifact keyed by the old id moves too, so
+     * a re-scan under the new id still recognises files it already ingested (the acquisition ledger, S5/S6)
+     * and the run history under the new id includes everything recorded under the old one (the commit log
+     * and audit CSVs, S2/S3; the DuckDB status mirror, S4).
+     *
+     * <p>{@code dirs.*} are deliberately left pointing where they already do (plan §1.1) — relocating a
+     * Stage-1 output tree is a bulk data move with real blast radius, not this route's job; a caller that
+     * asks for it ({@code relocateDirs: true}) gets a 422 rather than a silently-ignored request.
+     *
+     * <p>Steps 2–7 below are not one transaction and cannot be (DuckDB, the filesystem and the config write
+     * are three different failure domains) — see the {@code catch} block for the failure posture this
+     * implies. Body: {@code { newId, newName?, relocateDirs?: false, rewriteDependents?: true }}.
+     *
+     * <p>Fail-closed gate order: write-root 503 → source unknown 404 → path jail 403 → {@code newId} shape
+     * 400/422 → source active 409 → source running 409 → {@code newId} taken 409 → {@code relocateDirs}
+     * unsupported 422 → migrate.
+     */
+    private Object rename(ApiContext api, HttpExchange e, String source, Map<String, Object> body)
+            throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
+        Path srcPath = api.service().pathFor(source)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+        WriteGates.jail(writeRoot, srcPath, "config path");
+        PipelineConfig live = api.service().configFor(source)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+
+        String rawId = ApiContext.str(body, "newId");
+        if (rawId == null || rawId.isBlank())
+            throw new ApiException(400, "body must include 'newId'");
+        String newId = rawId.trim().toLowerCase();
+        if (!newId.matches("[a-z0-9][a-z0-9_]*"))
+            throw new ApiException(422, "newId '" + newId
+                    + "' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)");
+
+        String oldId = live.identity().pipelineName();
+        WriteGates.conflictIf(live.active(),
+                "pipeline '" + oldId + "' is active; deactivate (active: false) before renaming");
+        WriteGates.conflictIf(api.service().isRunning(oldId),
+                "pipeline '" + oldId + "' is currently running; wait for it to finish before renaming");
+        WriteGates.conflictIf(api.service().pathFor(newId).isPresent(),
+                "pipeline id '" + newId + "' is already registered");
+        String newFileName = WriteGates.safeName(newId, "pipeline id") + "_pipeline.toon";
+        Path newPath = WriteGates.jail(writeRoot, writeRoot.resolve(newFileName), "resolved path");
+        WriteGates.conflictIf(Files.exists(newPath), "file exists: " + newFileName);
+
+        if (Boolean.parseBoolean(String.valueOf(body.getOrDefault("relocateDirs", "false"))))
+            throw new ApiException(422, "relocateDirs is not yet supported — rename leaves dirs.* pointing "
+                    + "where they already do (plan §1.1); relocate the data tree manually if that's needed");
+        boolean rewriteDependents = !"false".equalsIgnoreCase(
+                String.valueOf(body.getOrDefault("rewriteDependents", "true")));
+
+        List<String> journal = new ArrayList<>();
+        Path journalFile = writeRoot.resolve("rename.journal");
+
+        // Step 1 (S9): evict per-pipeline bookkeeping + the run registry. Cheaply reversible on failure —
+        // re-registering the same path restores exactly what this undid.
+        api.service().unregisterPipeline(srcPath);
+        journalStep(journalFile, oldId, newId, "unregistered source", journal);
+
+        try {
+            // Step 2 (S5, S6): ledger fingerprints + DB-export watermark.
+            int ledgerRows = com.gamma.acquire.AcquisitionLedgers.shared().renameSource(oldId, newId);
+            journalStep(journalFile, oldId, newId, "ledger rows moved: " + ledgerRows, journal);
+
+            // Step 3 (S2, S3): the persistent commit log + run-timestamped audit CSVs.
+            int auditFiles = renameAuditFiles(live, oldId, newId);
+            journalStep(journalFile, oldId, newId, "audit files renamed: " + auditFiles, journal);
+
+            // Step 4 (S4): the DuckDB status mirror, when DB-backed; no-op for the file-only default.
+            if (api.service().statusStore() instanceof DbStatusStore db) {
+                db.renamePipeline(oldId, newId);
+                journalStep(journalFile, oldId, newId, "status DB rows updated", journal);
+            }
+
+            // Step 6: write the new config — the SAME spec + safety gate POST /config/write runs — then
+            // remove the old file. Landing this after the state moves (not before) is deliberate: a crash
+            // here leaves the old config's file in place, so the catch block's recovery has something to
+            // re-register.
+            Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
+            String newRawName = ApiContext.str(body, "newName");
+            String label = (newRawName == null || newRawName.isBlank())
+                    ? String.valueOf(src.getOrDefault("name", oldId)) : newRawName.trim();
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("name", label);
+            out.put("id", newId);
+            src.forEach((k, v) -> {
+                if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
+            });
+
+            // As in `relabel`: `dirs.*` are untouched (plan §1.1), so a config whose data lives outside the
+            // default allowed roots was never subject to the write-time safety policy — re-punishing it here
+            // would make any such deployment unrenameable. Block only on findings the rewrite INTRODUCES.
+            List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
+            findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+            Set<String> preExisting = new HashSet<>();
+            ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(findingKey(f)));
+            ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+                    .forEach(f -> preExisting.add(findingKey(f)));
+            List<Finding> introduced = findings.stream()
+                    .filter(f -> f.severity() == Severity.ERROR)
+                    .filter(f -> !preExisting.contains(findingKey(f)))
+                    .toList();
+            if (!introduced.isEmpty()) {
+                api.service().registerPipeline(srcPath);   // the config write never happened — restore visibility
+                return ApiContext.respondJson(e, 422, Map.of("written", false,
+                        "error", "the renamed config introduces ERROR-level findings; not written",
+                        "findings", introduced, "journal", journal));
+            }
+            byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
+            AtomicFiles.write(newPath, bytes, ".cfg-");
+            Files.deleteIfExists(srcPath);
+            journalStep(journalFile, oldId, newId, "wrote " + newFileName + "; removed source config", journal);
+
+            // Step 7: dependent configs (plan §1 table) — enrich/job triggers, expectation/decision-rule
+            // targets, dataset store references. Best-effort per file (see rewriteDependents); never
+            // throws, so it never leaves the migration stuck between a written config and registration.
+            int dependents = rewriteDependents ? rewriteDependents(writeRoot, oldId, newId) : 0;
+            if (rewriteDependents)
+                journalStep(journalFile, oldId, newId, "dependents rewritten: " + dependents, journal);
+
+            // Step 8 (S7): re-register under the new identity — fires catalog invalidation as a side effect.
+            api.service().registerPipeline(newPath);
+            journalStep(journalFile, oldId, newId, "registered " + newId, journal);
+
+            // Step 9 (S10 stays untouched — history keeps recording what was true then).
+            api.service().eventLog().emit(Event.builder(EventType.PIPELINE_RENAMED)
+                    .source(PipelineRoutes.class.getName()).pipeline(newId)
+                    .message("Pipeline '" + oldId + "' renamed to '" + newId + "'")
+                    .attr("oldId", oldId).attr("newId", newId));
+            log.info("[PIPELINE-RENAME] '{}' -> '{}' ({} ledger row(s), {} audit file(s), {} dependent(s))",
+                    oldId, newId, ledgerRows, auditFiles, dependents);
+
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("written", true);
+            r.put("oldId", oldId);
+            r.put("id", newId);
+            r.put("name", label);
+            r.put("path", writeRoot.relativize(newPath).toString().replace('\\', '/'));
+            r.put("ledgerRowsMoved", ledgerRows);
+            r.put("auditFilesRenamed", auditFiles);
+            r.put("dependentsRewritten", dependents);
+            r.put("findings", findings);
+            r.put("journal", journal);
+            return r;
+        } catch (RuntimeException | IOException ex) {
+            // Steps 2-7 are not one transaction (plan §3.3 "Failure posture"). The old config file is still
+            // on disk in every failure path except the one already handled above (which restores it
+            // itself), so re-registering it keeps the pipeline reachable rather than silently vanishing
+            // from the registry — though state already moved under steps completed before the failure
+            // (named in `journal`) stays moved; this is the plan's documented residual risk, not a bug.
+            if (Files.exists(srcPath)) api.service().registerPipeline(srcPath);
+            log.warn("[PIPELINE-RENAME] '{}' -> '{}' failed after {}", oldId, newId, journal, ex);
+            throw new ApiException(500, "rename of '" + oldId + "' to '" + newId + "' failed after "
+                    + journal.size() + " step(s) — see server log / rename.journal for detail: " + ex.getMessage());
+        }
+    }
+
+    /** Append one line to {@code <writeRoot>/rename.journal} (plan §3.3) — best-effort; a journal write
+     *  failure must never abort a migration step that already succeeded. */
+    private void journalStep(Path journalFile, String oldId, String newId, String step, List<String> journal) {
+        journal.add(step);
+        try {
+            Files.writeString(journalFile, Instant.now() + " " + oldId + " -> " + newId + " : " + step + System.lineSeparator(),
+                    StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException ex) {
+            log.warn("[PIPELINE-RENAME] could not append to rename.journal: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Rename the persistent commit log and every run-timestamped audit CSV from an {@code oldId} prefix to
+     * a {@code newId} prefix, in place (S2, S3) — {@code dirs.*} themselves are untouched (plan §1.1), only
+     * each filename's identity prefix moves. Mirrors the glob {@link com.gamma.service.FileStatusStore}
+     * itself uses to read them, so a rename here is exactly what makes them findable under the new id
+     * afterwards. Returns the count of files renamed.
+     */
+    private int renameAuditFiles(PipelineConfig oldCfg, String oldId, String newId) throws IOException {
+        int count = 0;
+        Path statusParent = null;
+        String commitLogPath = oldCfg.dirs().commitLogPath();
+        if (commitLogPath != null && !commitLogPath.isBlank()) {
+            Path clp = Path.of(commitLogPath);
+            statusParent = clp.getParent();
+            if (Files.exists(clp)) {
+                Files.move(clp, statusParent.resolve(newId + "_commits.log"));
+                count++;
+            }
+        }
+        if (statusParent == null) {
+            String statusFile = oldCfg.dirs().statusFilePath();
+            if (statusFile == null || statusFile.isBlank()) return count;
+            statusParent = Path.of(statusFile).toAbsolutePath().getParent();
+        }
+        if (statusParent == null || !Files.isDirectory(statusParent)) return count;
+        for (String infix : List.of("_status_", "_batches_", "_lineage_")) {
+            List<Path> matches = new ArrayList<>();
+            try (DirectoryStream<Path> ds = Files.newDirectoryStream(statusParent, oldId + infix + "*.csv")) {
+                ds.forEach(matches::add);
+            }
+            for (Path p : matches) {
+                String name = p.getFileName().toString();
+                Files.move(p, statusParent.resolve(newId + name.substring(oldId.length())));
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Rewrite every dependent config's reference to {@code oldId} into {@code newId} (plan §1's dependent
+     * table): {@code *_enrich.toon} triggers, {@code *_job.toon} triggers, {@code expectation}/
+     * {@code decision-rule} pipeline targets, and {@code dataset} store references. Best-effort per file —
+     * one malformed sibling must never abort a rename whose state-moving steps already committed. Returns
+     * the total count of files rewritten.
+     */
+    private int rewriteDependents(Path writeRoot, String oldId, String newId) {
+        int count = rewriteEnrichTriggers(writeRoot, oldId, newId);
+        count += rewriteJobTriggers(writeRoot, oldId, newId);
+        count += rewriteComponentTargets(writeRoot, "expectation", oldId, newId);
+        count += rewriteComponentTargets(writeRoot, "decision-rule", oldId, newId);
+        count += rewriteDatasetRefs(writeRoot, oldId, newId);
+        return count;
+    }
+
+    /** {@code triggers.on_pipeline} in every {@code *_enrich.toon} directly under the write root. */
+    @SuppressWarnings("unchecked")
+    private int rewriteEnrichTriggers(Path writeRoot, String oldId, String newId) {
+        if (!Files.isDirectory(writeRoot)) return 0;
+        int count = 0;
+        try (Stream<Path> files = Files.list(writeRoot)) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_enrich.toon")).toList()) {
+                try {
+                    Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
+                    if (!(raw.get("triggers") instanceof Map<?, ?> t)
+                            || !oldId.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) continue;
+                    Map<String, Object> triggers = new LinkedHashMap<>((Map<String, Object>) t);
+                    triggers.put("on_pipeline", newId);
+                    Map<String, Object> out = new LinkedHashMap<>(raw);
+                    out.put("triggers", triggers);
+                    AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".enr-");
+                    count++;
+                } catch (Exception ex) {
+                    log.warn("[PIPELINE-RENAME] skipping unreadable enrichment {}: {}", p, ex.getMessage());
+                }
+            }
+        } catch (IOException ex) {
+            log.warn("[PIPELINE-RENAME] could not list enrichments under {}: {}", writeRoot, ex.getMessage());
+        }
+        return count;
+    }
+
+    /** Top-level {@code on_pipeline} in every {@code jobs/*_job.toon} under the write root. */
+    private int rewriteJobTriggers(Path writeRoot, String oldId, String newId) {
+        Path jobsDir = writeRoot.resolve("jobs");
+        if (!Files.isDirectory(jobsDir)) return 0;
+        int count = 0;
+        try (Stream<Path> files = Files.list(jobsDir)) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_job.toon")).toList()) {
+                try {
+                    Map<String, Object> raw = ConfigLoader.filesystem().decode(p.toString());
+                    if (!oldId.equalsIgnoreCase(String.valueOf(raw.get("on_pipeline")))) continue;
+                    Map<String, Object> out = new LinkedHashMap<>(raw);
+                    out.put("on_pipeline", newId);
+                    AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".job-");
+                    count++;
+                } catch (Exception ex) {
+                    log.warn("[PIPELINE-RENAME] skipping unreadable job {}: {}", p, ex.getMessage());
+                }
+            }
+        } catch (IOException ex) {
+            log.warn("[PIPELINE-RENAME] could not list jobs under {}: {}", jobsDir, ex.getMessage());
+        }
+        return count;
+    }
+
+    /**
+     * {@code target} on every {@code type} component (expectation / decision-rule) whose {@code targetType}
+     * is {@code pipeline} (the default when absent) and whose {@code target} names {@code oldId} —
+     * mirrors {@code DataSourceBundleResolver.ruleTargets}'s matching rule.
+     */
+    private int rewriteComponentTargets(Path writeRoot, String type, String oldId, String newId) {
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        int count = 0;
+        for (ComponentRegistry.Component c : store.list(type)) {
+            Map<String, Object> content = c.content();
+            String targetType = String.valueOf(content.getOrDefault("targetType", "pipeline"));
+            if (!"pipeline".equalsIgnoreCase(targetType)) continue;
+            String target = content.get("target") == null ? "" : String.valueOf(content.get("target")).trim();
+            if (!oldId.equalsIgnoreCase(target)) continue;
+            Map<String, Object> updated = new LinkedHashMap<>(content);
+            updated.put("target", newId);
+            try {
+                store.write(type, c.name(), updated);
+                count++;
+            } catch (IOException ex) {
+                log.warn("[PIPELINE-RENAME] could not rewrite {} '{}': {}", type, c.name(), ex.getMessage());
+            }
+        }
+        return count;
+    }
+
+    /**
+     * {@code sourceName} and/or the first path segment of {@code physicalRef} on every {@code dataset}
+     * component that reads {@code oldId}'s store — mirrors
+     * {@code DataSourceBundleResolver.datasetReadsStore}'s {@code physicalRef} rule, widened to
+     * {@code sourceName} (a {@code kind: virtual} dataset's direct store reference, which that resolver
+     * does not need to check but a rename does — an unrewritten one would silently start reading nothing).
+     */
+    private int rewriteDatasetRefs(Path writeRoot, String oldId, String newId) {
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        int count = 0;
+        for (ComponentRegistry.Component c : store.list("dataset")) {
+            Map<String, Object> content = c.content();
+            Map<String, Object> updated = new LinkedHashMap<>(content);
+            boolean changed = false;
+
+            Object sn = content.get("sourceName");
+            if (sn != null && oldId.equalsIgnoreCase(String.valueOf(sn).trim())) {
+                updated.put("sourceName", newId);
+                changed = true;
+            }
+
+            Object ref = content.get("physicalRef");
+            String refStr = ref == null ? "" : String.valueOf(ref).trim();
+            if (!refStr.isEmpty() && !"null".equals(refStr)) {
+                int slash = refStr.indexOf('/');
+                String head = slash < 0 ? refStr : refStr.substring(0, slash);
+                if (head.equalsIgnoreCase(oldId)) {
+                    updated.put("physicalRef", newId + (slash < 0 ? "" : refStr.substring(slash)));
+                    changed = true;
+                }
+            }
+
+            if (!changed) continue;
+            try {
+                store.write("dataset", c.name(), updated);
+                count++;
+            } catch (IOException ex) {
+                log.warn("[PIPELINE-RENAME] could not rewrite dataset '{}': {}", c.name(), ex.getMessage());
+            }
+        }
+        return count;
+    }
+
+    /**
+     * {@code POST /pipelines/{name}/save-as-template} — copy a pipeline into a non-runnable authoring
+     * <b>template</b> (v5.4.0): a starting point for standing up a <em>similar</em> stream that cannot
+     * touch the pipeline it was copied from, even if someone tries to run it.
+     *
+     * <p>Two halves make that true. The written config carries {@code template: true}, which
+     * {@link com.gamma.service.CollectorService} refuses to run and {@code PipelineScheduler} skips; and
+     * every <em>environment binding</em> is repointed by {@link #neutralizeForTemplate} into a
+     * {@code templates/<id>/} sandbox, so even after the flag is cleared the copy reads its own inbox and
+     * writes its own output, audit trail and ledger keys. Belt (the flag) and braces (the bindings) —
+     * because the flag is what the operator clears when promoting, and at that moment the bindings are all
+     * that stands between a fresh pipeline and the original's data.
+     *
+     * <p>Companion configs ({@code *_enrich.toon}, {@code *_job.toon}) and anything targeting the source
+     * (expectations, alert rules, datasets) are deliberately <b>not</b> copied: a template describes one
+     * pipeline, and wiring it up is an explicit act, not a side effect of copying.
+     *
+     * <p>Fail-closed gate order: write-root 503 → unknown source 404 → missing/invalid {@code id} 400/422
+     * → id taken 409 → path jail 403 → file exists 409 → spec + safety findings 422 → write atomically.
+     */
+    private Object saveAsTemplate(ApiContext api, HttpExchange e, String source, Map<String, Object> body)
+            throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
+        Path srcPath = api.service().pathFor(source)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+
+        String rawId = ApiContext.str(body, "id");
+        if (rawId == null || rawId.isBlank())
+            throw new ApiException(400, "body must include 'id' (the new template's pipeline id)");
+        String id = rawId.trim().toLowerCase();
+        if (!id.matches("[a-z0-9][a-z0-9_]*"))
+            throw new ApiException(422, "id '" + id
+                    + "' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)");
+
+        // The id must be free as a live pipeline AND on disk — either would collide at registration.
+        WriteGates.conflictIf(api.service().pathFor(id).isPresent(),
+                "pipeline id '" + id + "' is already registered");
+        String fileName = WriteGates.safeName(id, "pipeline id") + "_pipeline.toon";
+        Path target = WriteGates.jail(writeRoot, writeRoot.resolve(fileName), "resolved path");
+        WriteGates.conflictIf(Files.exists(target), "file exists: " + fileName);
+
+        String displayName = ApiContext.str(body, "name");
+        List<String> notes = new ArrayList<>();
+        Map<String, Object> tpl = neutralizeForTemplate(
+                ConfigLoader.filesystem().decode(srcPath.toString()), id,
+                (displayName == null || displayName.isBlank()) ? id : displayName.trim(),
+                srcPath, writeRoot, notes);
+
+        // The same gate POST /config/write runs — a template is still a real config and must be safe.
+        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), tpl));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", tpl, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", tpl, Severity.WARNING));
+        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
+            return ApiContext.respondJson(e, 422, Map.of("written", false,
+                    "error", "config has ERROR-level findings; not written", "findings", findings));
+
+        byte[] bytes = ConfigCodec.toToon(tpl).getBytes(StandardCharsets.UTF_8);
+        AtomicFiles.write(target, bytes, ".tpl-");
+        log.info("[PIPELINE-TEMPLATE] copied '{}' to template '{}' at {} ({} bytes)",
+                source, id, fileName, bytes.length);
+
+        // Register it so it shows up in GET /pipelines for editing/promotion. Safe: every run path
+        // (trigger, reprocess, poll cycle) refuses a template, so being in the registry cannot run it.
+        api.service().registerPipeline(target);
+
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("written", true);
+        r.put("path", writeRoot.relativize(target).toString().replace('\\', '/'));
+        r.put("id", id);
+        r.put("source", source);
+        r.put("template", true);
+        r.put("notes", notes);
+        r.put("findings", findings);
+        return r;
+    }
+
+    /**
+     * Build the template config from {@code src}: a verbatim copy with its identity replaced and every
+     * <b>environment binding</b> repointed into a {@code templates/<id>/} sandbox.
+     *
+     * <p>Repointed (each one is a way a naive copy would collide with the original): {@code dirs.*} —
+     * chiefly {@code poll}, whose reuse would make two pipelines race for the same inbox, and
+     * {@code database}, which also determines where the audit CSVs and the persistent
+     * {@code <id>_commits.log} land · {@code stream}, which defaults to the pipeline id and would
+     * otherwise silently join the source's Catalog Stream · the collector's {@code id}, which is the
+     * acquisition ledger's {@code source_id} and therefore the dedup + watermark key · the DuckLake
+     * {@code data_path} · and {@code processing.schema_file}, copied so editing the template's schema
+     * cannot edit the source's.
+     *
+     * <p>Carried verbatim: everything else — parsing/CSV settings, threads, dedup policy, output format,
+     * connector/discovery/post-action, {@code produces}/{@code reference}, and {@code trigger} (inert
+     * while the config is a template, and the operator's intent worth preserving).
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> neutralizeForTemplate(Map<String, Object> src, String id,
+                                                             String displayName, Path srcPath,
+                                                             Path writeRoot, List<String> notes)
+            throws IOException {
+        Map<String, Object> t = new LinkedHashMap<>(src);
+        String sandbox = "templates/" + id;
+
+        t.put("name", displayName);
+        t.put("id", id);            // explicit identity, so a later display-name edit is a relabel
+        t.put("template", true);
+        t.put("active", false);     // `template: true` + `active: true` is refused by the parser
+        t.put("stream", id);        // never inherit the source's Catalog Stream
+
+        // dirs: every path the engine reads or writes moves into the sandbox. The well-known keys get
+        // their conventional leaf name; any other key present is mapped under the sandbox by its own name
+        // so a key added later still lands inside it rather than being left pointing at the source.
+        Map<String, String> leaf = Map.of("poll", "inbox", "status_dir", "status", "log_dir", "logs");
+        Map<String, Object> dirs = new LinkedHashMap<>();
+        if (src.get("dirs") instanceof Map<?, ?> sd) {
+            for (Map.Entry<?, ?> en : sd.entrySet()) {
+                String k = String.valueOf(en.getKey());
+                // a literal status CSV path, not a directory — keep it a file path inside the sandbox
+                dirs.put(k, "status_file".equals(k)
+                        ? sandbox + "/status/" + id + "_status.csv"
+                        : sandbox + "/" + leaf.getOrDefault(k, k));
+            }
+        }
+        dirs.putIfAbsent("poll", sandbox + "/inbox");         // spec-required
+        dirs.putIfAbsent("database", sandbox + "/database");  // spec-required
+        t.put("dirs", dirs);
+
+        // The collector's id is the acquisition ledger's source_id; `source:` is the legacy spelling.
+        String colKey = src.containsKey("collector") || !src.containsKey("source") ? "collector" : "source";
+        if (src.get(colKey) instanceof Map<?, ?> sc) {
+            Map<String, Object> col = new LinkedHashMap<>((Map<String, Object>) sc);
+            col.put("id", id);
+            t.put(colKey, col);
+        } else {
+            t.put(colKey, new LinkedHashMap<>(Map.of("id", id)));
+        }
+
+        if (src.get("output") instanceof Map<?, ?> so) {
+            Map<String, Object> out = new LinkedHashMap<>((Map<String, Object>) so);
+            if (out.get("ducklake") instanceof Map<?, ?> dl) {
+                Map<String, Object> lake = new LinkedHashMap<>((Map<String, Object>) dl);
+                if (lake.containsKey("data_path")) lake.put("data_path", sandbox + "/ducklake");
+                out.put("ducklake", lake);
+            }
+            t.put("output", out);
+        }
+
+        copySchemaFile(src, t, id, srcPath, writeRoot, notes);
+        return t;
+    }
+
+    /**
+     * Copy the source's {@code processing.schema_file} next to the template and repoint at the copy, so the
+     * two configs never share a schema an operator might edit. A relative reference resolves against the
+     * source config's own directory first and the working directory second — the same order
+     * {@link PipelineConfig#load} uses. When it cannot be resolved or read the original value is left
+     * alone (harmless: the parser reads it, never writes it) and a note explains why.
+     */
+    @SuppressWarnings("unchecked")
+    private static void copySchemaFile(Map<String, Object> src, Map<String, Object> t, String id,
+                                       Path srcPath, Path writeRoot, List<String> notes) throws IOException {
+        if (!(src.get("processing") instanceof Map<?, ?> sp)) return;
+        Map<String, Object> processing = new LinkedHashMap<>((Map<String, Object>) sp);
+        Object ref = processing.get("schema_file");
+        if (ref == null || String.valueOf(ref).isBlank()) return;   // inline schemas / segments: nothing to copy
+
+        Path from = Path.of(String.valueOf(ref));
+        if (!from.isAbsolute()) {
+            Path here = srcPath.toAbsolutePath().getParent();
+            Path beside = here == null ? null : here.resolve(from);
+            from = (beside != null && Files.isReadable(beside)) ? beside : from.toAbsolutePath();
+        }
+        if (!Files.isReadable(from)) {
+            notes.add("schema_file '" + ref + "' could not be read, so it still points at the source's schema"
+                    + " — repoint it before editing the schema");
+            return;
+        }
+        Path schemaTarget = WriteGates.jail(writeRoot, writeRoot.resolve(id + "_schema.toon"), "schema path");
+        if (Files.exists(schemaTarget)) {
+            notes.add("schema_file left as '" + ref + "': " + schemaTarget.getFileName() + " already exists");
+            return;
+        }
+        AtomicFiles.write(schemaTarget, Files.readAllBytes(from), ".sch-");
+        processing.put("schema_file", writeRoot.relativize(schemaTarget).toString().replace('\\', '/'));
+        t.put("processing", processing);
+        notes.add("copied the schema to " + schemaTarget.getFileName());
     }
 
     /** Synthesize the companion-enrichment nodes for {@code editableGraph} (read-only projection). */

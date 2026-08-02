@@ -85,6 +85,21 @@ final class PipelineConfigParser {
         // OFF so a freshly-dropped or half-edited config never executes until explicitly armed.
         b.active = Boolean.parseBoolean(String.valueOf(raw.getOrDefault("active", "false")));
 
+        // ── template gate (additive, v5.4.0; absent ⇒ false = an ordinary pipeline) ──
+        // A template is an authoring starting point, never a runnable pipeline: it is skipped at boot and
+        // refused by registerPipeline, so it never enters the run registry that every run path consults.
+        // Stronger than `active: false`, which still registers and can still be triggered on demand.
+        b.template = Boolean.parseBoolean(String.valueOf(raw.getOrDefault("template", "false")));
+        // `template: true` + `active: true` is a contradiction, and refusing it HERE is what makes the
+        // template guarantee hold everywhere: every authoring path (POST /config/write, PUT
+        // /pipelines/{name}/graph, a hand-edited file, boot) funnels through this parse, so a template can
+        // never be armed into the poll cycle without first clearing the flag.
+        if (b.template && b.active) {
+            throw new IllegalArgumentException(
+                    "pipeline '" + b.name + "' is a template and cannot be active; "
+                            + "remove `template: true` to arm it for execution");
+        }
+
         // ── catalog product (additive, v5.1.0; absent ⇒ stream = today's behaviour) ──
         // 'produces: reference' registers this pipeline's output in the catalog as a standalone
         // Reference Dataset (dimension/lookup origin) instead of a Stream; enrichments bind it by name.

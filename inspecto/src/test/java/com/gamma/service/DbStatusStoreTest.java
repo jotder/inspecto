@@ -166,6 +166,35 @@ class DbStatusStoreTest {
         assertTrue(db.quarantine(cfg).isEmpty());
     }
 
+    /** A pipeline rename's identity migration (T3, plan §3): every table's `pipeline` column moves together. */
+    @Test
+    void renamePipelineMovesAllRowsAtomically(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = runOnePipeline(dir);
+        FileStatusStore file = new FileStatusStore();
+        db.sync(file, List.of(cfg));
+        String oldName = cfg.identity().pipelineName();
+        int batchesBefore = db.batches(cfg).size();
+        int commitsBefore = db.committedBatches(cfg).size();
+        assertTrue(batchesBefore > 0 && commitsBefore > 0, "the run left rows to move");
+
+        db.renamePipeline(oldName, "renamed_id");
+
+        assertTrue(db.batches(cfg).isEmpty(), "the old id has no rows left in any table");
+        assertTrue(db.committedBatches(cfg).isEmpty());
+        assertEquals(batchesBefore, countRows("inspecto_status_batches", "renamed_id"), "batches moved");
+        assertEquals(commitsBefore, countRows("inspecto_status_commits", "renamed_id"), "commits moved");
+    }
+
+    private int countRows(String table, String pipeline) throws Exception {
+        try (var ps = conn.prepareStatement("SELECT COUNT(*) FROM " + table + " WHERE pipeline = ?")) {
+            ps.setString(1, pipeline);
+            try (var rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
+    }
+
     /** Pre-rebrand ucc_status_* tables are renamed on connect and their rows survive. */
     @Test
     void migratesLegacyUccTablesPreservingRows() throws Exception {

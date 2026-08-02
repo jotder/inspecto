@@ -191,6 +191,34 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
         }
     }
 
+    /**
+     * Repoint every row's {@code pipeline} column from {@code oldName} to {@code newName} (a pipeline
+     * rename's identity migration, S4) — one transaction across all five tables so a crash mid-rename
+     * never leaves some tables renamed and others not.
+     */
+    public synchronized void renamePipeline(String oldName, String newName) {
+        boolean autoCommit = true;
+        try {
+            autoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE)) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE " + t + " SET pipeline = ? WHERE pipeline = ?")) {
+                    ps.setString(1, newName);
+                    ps.setString(2, oldName);
+                    ps.executeUpdate();
+                }
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            log.warn("Status DB rename failed, rolling back: {}", e.getMessage());
+            try { conn.rollback(); } catch (SQLException ignore) { /* best effort */ }
+            throw new IllegalStateException("could not rename status rows " + oldName + " -> " + newName + ": " + e.getMessage(), e);
+        } finally {
+            try { conn.setAutoCommit(autoCommit); } catch (SQLException ignore) { /* best effort */ }
+        }
+    }
+
     private void deletePipeline(String pipeline) throws SQLException {
         for (String t : List.of(T_COMMITS, T_BATCHES, T_FILES, T_LINEAGE, T_QUARANTINE)) {
             try (PreparedStatement ps = conn.prepareStatement("DELETE FROM " + t + " WHERE pipeline = ?")) {

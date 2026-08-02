@@ -1319,8 +1319,34 @@ public final class CollectorService implements AutoCloseable {
         return configRegistry.getPath(pipelineName);
     }
 
+    /**
+     * Refuse to run a {@code template: true} pipeline (v5.4.0). A template is an authoring starting point
+     * whose {@code dirs.*}, {@code stream} and {@code collector.id} are deliberately repointed away from the
+     * pipeline it was copied from, so running it would create a half-configured sink — and an operator who
+     * copied a template expects it to be inert, not live.
+     *
+     * <p>Checked on every <em>manual</em> run entry point rather than only inside {@link #runPipeline}: the
+     * async paths hand off to a worker thread, so a throw from deeper in would surface as a failed run record
+     * instead of a refusal the caller can see. The poll cycle is covered separately by
+     * {@code PipelineScheduler.selectDue}, and being armed at all is refused by {@code PipelineConfigParser}.
+     *
+     * @throws IllegalStateException if {@code pipelineName} resolves to a template (mapped 409 by the routes)
+     */
+    private void refuseIfTemplate(String pipelineName) {
+        if (isTemplate(pipelineName)) {
+            throw new IllegalStateException("pipeline '" + pipelineName + "' is a template and is not runnable; "
+                    + "remove `template: true` to arm it for execution");
+        }
+    }
+
+    /** Whether {@code pipelineName} is a non-runnable authoring template ({@code template: true}, v5.4.0). */
+    public boolean isTemplate(String pipelineName) {
+        return configFor(pipelineName).filter(PipelineConfig::template).isPresent();
+    }
+
     /** Run a single registered pipeline once. Empty if no pipeline by that name. */
     public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName) {
+        refuseIfTemplate(pipelineName);
         return underSpace(() -> pathFor(pipelineName).map(p -> {
             // Block until THIS pipeline is free (a cycle run of it, or another trigger, may be in flight);
             // unrelated pipelines are unaffected. See PipelineRunGuard for why blocking is right here.
@@ -1356,6 +1382,7 @@ public final class CollectorService implements AutoCloseable {
      */
     public Optional<MultiCollectorProcessor.RunResult> runPipelineOffThread(String pipelineName) {
         if (pathFor(pipelineName).isEmpty()) return Optional.empty();
+        refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         try {
             return Optional.of(triggerWorkers.submit(
                     () -> runPipeline(pipelineName).orElse(new MultiCollectorProcessor.RunResult(0, 0))).get());
@@ -1372,6 +1399,7 @@ public final class CollectorService implements AutoCloseable {
     /** {@link #triggerRunAsync(String)} with an explicit trigger label ({@code manual} | {@code notify} — ACQ-6). */
     public Optional<String> triggerRunAsync(String pipelineName, String trigger) {
         if (pathFor(pipelineName).isEmpty()) return Optional.empty();
+        refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         String runId = newPipelineRunId(pipelineName);
         String start = LocalDateTime.now().format(RUN_AT_TS);
         liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start, null, "RUNNING", -1, -1, null));
@@ -1399,6 +1427,20 @@ public final class CollectorService implements AutoCloseable {
     private String newPipelineRunId(String name) {
         return name.toLowerCase().replace(' ', '_') + "-"
                 + LocalDateTime.now().format(RUN_ID_TS) + "-" + runSeq.incrementAndGet();
+    }
+
+    /**
+     * Whether {@code pipelineName} currently holds its {@link PipelineRunGuard} claim. {@code isRunning}
+     * itself is documented "diagnostics / tests — never a gate" for the run path, whose own exclusion is
+     * the claim, not this readout. This accessor exists for the ONE caller that legitimately needs a
+     * best-effort pre-flight check before a destructive operation the guard cannot otherwise prevent: a
+     * pipeline rename mutates persistent state (ledger keys, audit files) that a concurrent run would be
+     * reading and writing under the OLD id — {@code active: false} alone does not rule that out, since an
+     * inactive pipeline is still manually triggerable. TOCTOU-limited (a run can start immediately after
+     * this returns false), so it narrows the window rather than closing it.
+     */
+    public boolean isRunning(String pipelineName) {
+        return runGuard.isRunning(pipelineName);
     }
 
     /** Pause a pipeline (the poll cycle skips it). Returns false if not registered. */

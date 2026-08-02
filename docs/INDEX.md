@@ -178,6 +178,19 @@ former root reference docs** (each index lists them):
   case-study pack (spec-pinned demo seeds) — reference.
 - [`superpower/pipeline-case-studies.md`](superpower/pipeline-case-studies.md) — Pipelines CS1–CS5
   case-study pack (spec-pinned demo seeds) — reference.
+- ~~`superpower/pipeline-rename-and-template-plan.md`~~ — **ALL PHASES SHIPPED 2026-08-02, plan archived**
+  to [`archived-documents/plans-archive/pipeline-rename-and-template-plan.md`](archived-documents/plans-archive/pipeline-rename-and-template-plan.md).
+  As-built lives in [`okf/backend/control-plane/pipeline-identity.md`](okf/backend/control-plane/pipeline-identity.md):
+  the three-tier cost model (`label` display-only → `save-as-template` a fully-isolated non-runnable sibling
+  → `rename` the full id migration), the `template: true` gate at the three places work actually starts
+  (never "unregister it" — `ConfigRegistry` rebuilds from the run registry, so that would hide it from the
+  UI), the recurring findings-diff gotcha (`dirs.*` outside the default allowed roots were never subject to
+  the write-time safety policy — block only on findings a rewrite *introduces*, found by a test in both
+  `label` and `rename`), and `rename`'s full inventory of persistent state that moves (ledger `source_id` on
+  BOTH backends incl. the in-memory default, the commit log + audit CSVs, the DuckDB status mirror,
+  dependent enrich/job/expectation/decision-rule/dataset configs) plus its one deliberate exception to
+  "`PipelineRunGuard.isRunning` is never a gate." Residuals in `docs/BACKLOG.md` §4: no UI action wired to
+  the full `rename` route yet; `rename.journal` is an audit trail, not an automated resume mechanism.
 
 ---
 

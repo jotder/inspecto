@@ -25,3 +25,7 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
 * [API stability policy](api-stability.md) - the Java `@PublicApi` surface contract (the HTTP counterpart is [api-v1](api-v1.md)).
 * [Metadata bundle](metadata-bundle.md) - export/preview/import of authored config across installs (`BundleRoutes`; schema in `docs/api/schemas/`).
 * [Onboarding authoring](onboarding-authoring.md) - the draft lifecycle (`/config/*`), stateless sample previews, the pipeline/enrichment register pair, and `produces: reference`.
+* [Pipeline identity: rename & Save-as-template](pipeline-identity.md) - `label` (display-only) vs
+  `save-as-template` (a non-runnable, fully isolated sibling) vs `rename` (the full id migration —
+  ledger, audit trail, DuckDB mirror, dependent configs); the shared findings-diff gotcha and the one
+  deliberate exception to "`PipelineRunGuard.isRunning` is never a gate."
