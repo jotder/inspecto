@@ -213,6 +213,11 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
             container: this.hostEl.nativeElement,
             data: (this.data ?? { nodes: [], edges: [] }) as unknown as GraphData,
             autoFit: 'view',
+            // G6 defaults to [0.01, 10] — 1% (nodes vanish to specks) up to 1000% (one tile fills the
+            // canvas). Neither end is a state anyone wants to land in, and scroll-wheel zoom reaches
+            // both in a flick. Floor stays well under any `autoFit: 'view'` a real pipeline needs so
+            // the fit is never clipped.
+            zoomRange: [0.25, 3],
             node: {
                 // Uniform rounded "processor" tile (NiFi style); the category icon + outline distinguish kinds.
                 type: 'rect',

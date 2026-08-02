@@ -266,6 +266,11 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             container: this.hostEl.nativeElement,
             data: this.data as unknown as GraphData,
             autoFit: 'view',
+            // See the pipeline editor canvas: G6's default [0.01, 10] lets a flick of the wheel land on
+            // specks or on one node filling the viewport. Floored much lower than the editor's because
+            // this host is shared with Link Analysis and the catalog metadata graph, where a
+            // several-hundred-node `autoFit: 'view'` legitimately needs to zoom well out.
+            zoomRange: [0.05, 4],
             node: {
                 // Icon tile (rounded rect + glyph) when the data carries a resolved icon (flow/pipeline views);
                 // otherwise the per-kind shape (the catalog metadata graph).
