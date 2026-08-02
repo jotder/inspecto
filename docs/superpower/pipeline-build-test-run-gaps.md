@@ -40,11 +40,22 @@ silent activation failures, save-time surprises); Step 5 fills the hole itself.
 
 Shipping buttons that 404 is worse than not shipping them. **Decide per button: implement or remove.**
 
-> **CORRECTION (2026-08-02, during the fix).** The table above understated it for the node Test button.
-> There is **no `/components/*` route anywhere in the Java backend** — not the dotted-type variant, not
-> the bare `transform`/`grammar`/`sink` ones. The whole `/components` surface is mock-only. (An earlier
-> exploration pass reported `ComponentRoutes.java:42-44` as the registration site; **that file does not
-> exist**. Treat the original table's Reality column for row 2 as wrong.)
+> **RETRACTED (2026-08-02).** An earlier revision of this file claimed there was "no `/components/*`
+> route anywhere in the Java backend" and that `ComponentRoutes.java` did not exist. **That was wrong**
+> — the file is at `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java` and registers the
+> test routes at lines 42-44, exactly as originally reported. The bad claim came from a grep run with a
+> stale working directory (inside `inspecto-ui/`, which contains no Java). The original table above is
+> correct; trust it.
+>
+> Verified live against a running backend: `GET /components/grammar` → **200**;
+> `POST /components/transform.filter/filter_1/test` → **404**. The routes take a *literal*
+> `transform`/`grammar`/`sink` segment plus a **registered component name**, and the dialog sends the
+> node's dotted type + node id, so both segments miss.
+>
+> This means a real fix is plausible rather than impossible: map the dotted type to its family segment
+> and pass the node's registry ref. It is not a pure repoint, though — a node with inline config binds
+> no registered component, so there is nothing for `previewTransform` to look up. Scope that before
+> ungating.
 >
 > **Resolved by gating, not deleting.** Both affordances are now hidden unless
 > `environment.mockFlows` is on — the flag whose own comment already scopes it to "dry-run,

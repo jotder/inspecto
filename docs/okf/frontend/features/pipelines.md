@@ -92,11 +92,21 @@ first-only toast — an n-problem graph used to mean n save→fix→save cycles.
 ### Two editor test affordances are mock-only (2026-08-02)
 
 *Run to here* (inspector) and *Test processor* (node-config dialog) are gated behind
-`environment.mockFlows`. Neither backend route exists: `POST /pipelines/authored/{id}/run?to=` is
-reserved-but-unregistered (`PipelineRoutes.java:69`, deliberately — it must never fire a production
-run), and there is **no `/components/*` route in the Java backend at all**. They are kept rather than
-deleted because `run-to-here.dialog.ts` is the finished UI for the still-open "test against real data"
-work — see [`../../../BACKLOG.md`](../../../BACKLOG.md). Ungate them when that backend lands.
+`environment.mockFlows`, because both 404 against a real backend — for **different reasons**:
+
+- *Run to here* — `POST /pipelines/authored/{id}/run?to=` is reserved-but-unregistered
+  (`PipelineRoutes.java:69`), deliberately: it must never fire a production run. Genuinely absent.
+- *Test processor* — the route **does** exist
+  (`ComponentRoutes.java:42-44`, `POST /components/{transform|grammar|sink}/{id}/test`). The dialog
+  simply addresses it wrongly, sending the node's dotted type (`transform.filter`) and node id
+  (`filter_1`) where the route wants the literal family segment and a **registered component name**.
+
+⚠ Don't collapse those two into "no backend". The second is a plausible repoint — map dotted type to
+family, pass the node's registry ref — with one catch that makes it more than a URL change: a node
+carrying inline config binds no registered component, so there is nothing to look up.
+
+Both are kept rather than deleted because `run-to-here.dialog.ts` is the finished UI for the still-open
+"test against real data" work — see [`../../../BACKLOG.md`](../../../BACKLOG.md).
 
 Corollary worth keeping: **which connector a source uses is carried by its Connection profile**
 (`collector.connection`), not by the node type — hence one `acquisition`, not a file/database/stream split.

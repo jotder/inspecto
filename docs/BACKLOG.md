@@ -434,9 +434,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   failure, no save-time surprises — but **a user still cannot test a pipeline against their own data.**
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
-    ⚠ The original write-up was wrong about the node-Test route: there is **no `/components/*` route
-    anywhere in the Java backend**, and `ComponentRoutes.java` does not exist. The whole surface is
-    mock-only.
+    ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —
+    **that was wrong** (bad grep, stale cwd). `ComponentRoutes.java:42-44` registers
+    `POST /components/{transform|grammar|sink}/{id}/test`; the dialog just sends the wrong two segments
+    (dotted node type + node id instead of the family + a *registered component name*). Verified live:
+    list 200, dotted-type test 404. A real repoint is plausible, but a node with inline config binds no
+    registered component, so it is not purely a URL fix.
   - ~~G2 no authoring-time signal~~ **CLOSED** — `lowerable` added to `GET /pipelines/node-types`
     (`PipelineProjection.catalog()` + new `PipelineEditable.isLowerable`); non-lowerable palette
     entries are disabled/dimmed/non-draggable. Verified live: **9 enabled / 11 disabled of 20**. The
