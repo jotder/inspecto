@@ -10,6 +10,7 @@ import {
     ConfigService,
     IconMapService,
     LensService,
+    PipelineCombined,
     PipelineNodeType,
     PipelinesService,
 } from 'app/inspecto/api';
@@ -27,11 +28,25 @@ const TYPES: PipelineNodeType[] = [
  * The host is now a thin wrapper around the editor, so these render it for real. Safe in jsdom
  * precisely because nothing is open on arrival: no tab ⇒ no G6 canvas ⇒ the empty state renders.
  */
+const COMBINED: PipelineCombined = {
+    flows: [{ name: 'cdr_etl', active: true }],
+    nodes: [{ id: 'cdr_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', flow: 'cdr_etl' }],
+    edges: [],
+    links: [],
+};
+
+let combinedCalls = 0;
+
 function build() {
+    combinedCalls = 0;
     const stub = {
         list: () => of([{ name: 'cdr_etl', active: true, nodeCount: 1, edgeCount: 0, produces: [], consumes: [] }]),
         nodeTypes: () => of(TYPES),
         provenanceBatches: () => of([]),
+        combined: () => {
+            combinedCalls++;
+            return of(COMBINED);
+        },
     } as unknown as PipelinesService;
     TestBed.configureTestingModule({
         imports: [PipelinesComponent],
@@ -55,7 +70,7 @@ describe('PipelinesComponent', () => {
         const fixture = build();
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        expect(c.mode()).toBe('combined');
+        expect(c.mode()).toBe('view');
 
         const editor = fixture.debugElement.children[0].query(
             (n) => n.componentInstance instanceof PipelineEditorComponent,
@@ -84,5 +99,52 @@ describe('PipelinesComponent', () => {
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('No pipeline open');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    describe('topology (third mode)', () => {
+        it('does not fetch the expensive combined topology until Topology is entered', () => {
+            const fixture = build();
+            fixture.detectChanges();
+            expect(combinedCalls).toBe(0); // the whole point of the on-demand rework
+
+            fixture.componentInstance.setMode('topology');
+            expect(combinedCalls).toBe(1);
+            expect(fixture.componentInstance.combined()?.flows.length).toBe(1);
+            // Every pipeline is pre-selected so the first look shows the whole picture.
+            expect(fixture.componentInstance.combinedSelected()).toEqual(['cdr_etl']);
+        });
+
+        it('re-entering Topology reuses what it already loaded', () => {
+            const fixture = build();
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            c.setMode('topology');
+            c.setMode('editor');
+            c.setMode('topology');
+            expect(combinedCalls).toBe(1);
+        });
+
+        it('resolves a clicked node, and an empty selection still shows every pipeline', () => {
+            const fixture = build();
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            c.setMode('topology');
+
+            c.onNodeClick('cdr_etl/acq');
+            expect(c.selectedNode()?.id).toBe('cdr_etl/acq');
+
+            c.setCombinedSelected([]);
+            expect(c.combinedG6()?.nodes.length).toBe(1);
+        });
+
+        it('switching lens clears the topology node selection', () => {
+            const fixture = build();
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            c.setMode('topology');
+            c.onNodeClick('cdr_etl/acq');
+            c.setMode('view');
+            expect(c.selectedNode()).toBeNull();
+        });
     });
 });

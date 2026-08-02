@@ -1,23 +1,176 @@
-<!-- One shell for both modes. View is the identical editor with every mutating affordance withheld
-     (`readOnly`), not a separate read-only page — so switching lens never relearns the layout.
+<!-- Three lenses. View and Edit are the SAME editor component — View just passes `readOnly`, so
+     switching between them never relearns the layout. Topology is the genuinely different one: every
+     chosen pipeline on one canvas, joined at the stores they share, with the classic page chrome. -->
+@if (mode() === 'topology') {
+    <div class="flex min-w-0 flex-auto flex-col">
+        <!-- Header -->
+        <div class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent">
+            <div>
+                <h1 class="text-3xl font-extrabold leading-none tracking-tight">Pipelines</h1>
+                <div class="text-secondary mt-1.5">
+                    One or many pipelines as a node graph, joined at their shared stores — read-only
+                </div>
+            </div>
+            <div class="mt-4 flex items-center gap-3 sm:mt-0">
+                <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+                <ng-container *ngTemplateOutlet="modeToggle"></ng-container>
+                <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['authored-pipeline']" (changed)="load()" label="Import / export pipelines" />
+                <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh pipelines">
+                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+                </button>
+            </div>
+        </div>
 
-     The admin shell scrolls at document level — nothing above us is viewport-bounded, so `flex-1`
-     alone would let the docks grow the page instead of the canvas yielding space. Bound the shell to
-     the viewport minus the classic layout's chrome (64px header + 56px footer); the canvas then
-     shrinks for the bottom dock instead of pushing the page taller. -->
-<div class="flex min-h-0 min-w-0 flex-auto flex-col overflow-hidden" style="height: calc(100dvh - 120px)">
-    <app-pipeline-editor [readOnly]="mode() === 'combined'">
-        <span toolbarEnd class="flex shrink-0 items-center gap-2">
-            <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
-            <mat-button-toggle-group
-                [value]="mode()"
-                (change)="setMode($event.value)"
-                aria-label="Pipelines view mode"
-                hideSingleSelectionIndicator
-            >
-                <mat-button-toggle value="combined">View</mat-button-toggle>
-                <mat-button-toggle value="editor">Edit</mat-button-toggle>
-            </mat-button-toggle-group>
-        </span>
-    </app-pipeline-editor>
-</div>
+        <!-- Main -->
+        <div class="flex flex-auto flex-col p-6 sm:p-10">
+            @if (combinedUnavailable()) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:share"
+                    message="Could not load the pipeline topology from the control API."
+                ></inspecto-empty-state>
+            } @else if (combined(); as c) {
+                <!-- Top bar: search + multiselect of pipelines (left) · palette popup (right) -->
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="relative">
+                            <mat-icon class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+                            <input
+                                type="text"
+                                class="bg-card w-44 rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
+                                placeholder="Search pipelines…"
+                                aria-label="Search pipelines"
+                                (input)="onCombinedSearch($event)"
+                            />
+                        </div>
+                        <mat-form-field subscriptSizing="dynamic" class="w-72">
+                            <mat-label>Pipelines</mat-label>
+                            <mat-select multiple [value]="combinedSelected()"
+                                        (selectionChange)="setCombinedSelected($event.value)">
+                                @for (n of combinedFlowOptions(); track n) {
+                                    <mat-option [value]="n">{{ n }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
+                        <span class="text-secondary text-xs">
+                            {{ combinedSelected().length || c.flows.length }} of {{ c.flows.length }} shown
+                            @if (c.links.length) { · {{ c.links.length }} store link{{ c.links.length === 1 ? '' : 's' }} }
+                        </span>
+                    </div>
+
+                    <!-- Color legend doubles as the palette trigger (click to reveal node types) -->
+                    @if (nodeTypeGroups().length) {
+                        <button mat-stroked-button [matMenuTriggerFor]="paletteMenu"
+                                matTooltip="Show the processor palette" aria-label="Show the processor palette">
+                            <span class="flex items-center gap-1.5">
+                                @for (cat of legendCategories; track cat) {
+                                    <span class="inline-block h-2.5 w-2.5 rounded-full"
+                                          [style.backgroundColor]="categoryColor(cat)" aria-hidden="true"></span>
+                                }
+                                <span class="ml-1 text-xs">Palette</span>
+                            </span>
+                        </button>
+                        <mat-menu #paletteMenu="matMenu">
+                            <div class="max-w-xs p-3" (click)="$event.stopPropagation()">
+                                @for (g of nodeTypeGroups(); track g.category) {
+                                    <div class="mb-3 last:mb-0">
+                                        <div class="mb-1 flex items-center gap-2">
+                                            <span class="inline-block h-2.5 w-2.5 rounded-full"
+                                                  [style.backgroundColor]="categoryColor(g.category)" aria-hidden="true"></span>
+                                            <span class="text-xs font-semibold tracking-wide">{{ g.category }}</span>
+                                        </div>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @for (t of g.types; track t.type) {
+                                                <span class="rounded-md border px-2 py-0.5 text-xs"
+                                                      style="border-color: var(--gamma-border)"
+                                                      [matTooltip]="t.description">{{ t.label }}</span>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </mat-menu>
+                    }
+                </div>
+
+                <section class="bg-card rounded-2xl p-5 shadow" aria-label="Pipeline topology">
+                    <inspecto-graph-view [data]="combinedG6()" (nodeClick)="onNodeClick($event)"></inspecto-graph-view>
+                </section>
+
+                @if (selectedNode(); as n) {
+                    <div class="mt-6">
+                        <ng-container *ngTemplateOutlet="nodeInspector; context: { $implicit: n }"></ng-container>
+                    </div>
+                } @else {
+                    <div class="text-secondary mt-3 px-1 text-sm">Select a node to inspect it. A store node is where a pipeline and a job meet.</div>
+                }
+            } @else {
+                <inspecto-empty-state
+                    icon="heroicons_outline:share"
+                    [message]="combinedLoading() ? 'Loading topology…' : 'No pipelines to show yet.'"
+                ></inspecto-empty-state>
+            }
+        </div>
+    </div>
+} @else {
+    <!-- The admin shell scrolls at document level — nothing above us is viewport-bounded, so `flex-1`
+         alone would let the docks grow the page instead of the canvas yielding space. Bound the shell to
+         the viewport minus the classic layout's chrome (64px header + 56px footer); the canvas then
+         shrinks for the bottom dock instead of pushing the page taller. -->
+    <div class="flex min-h-0 min-w-0 flex-auto flex-col overflow-hidden" style="height: calc(100dvh - 120px)">
+        <app-pipeline-editor [readOnly]="mode() === 'view'">
+            <span toolbarEnd class="flex shrink-0 items-center gap-2">
+                <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+                <ng-container *ngTemplateOutlet="modeToggle"></ng-container>
+            </span>
+        </app-pipeline-editor>
+    </div>
+}
+
+<!-- One toggle definition for both chromes, so the three modes can never drift apart. -->
+<ng-template #modeToggle>
+    <mat-button-toggle-group
+        [value]="mode()"
+        (change)="setMode($event.value)"
+        aria-label="Pipelines view mode"
+        hideSingleSelectionIndicator
+    >
+        <mat-button-toggle value="view">View</mat-button-toggle>
+        <mat-button-toggle value="editor">Edit</mat-button-toggle>
+        <mat-button-toggle value="topology" matTooltip="All chosen pipelines on one canvas, joined at their shared stores">
+            Topology
+        </mat-button-toggle>
+    </mat-button-toggle-group>
+</ng-template>
+
+<!-- Shared node inspector -->
+<ng-template #nodeInspector let-n>
+    <section class="bg-card rounded-2xl p-5 shadow" aria-label="Node details">
+        <div class="mb-3 text-lg font-semibold">{{ nodeDisplayLabel(n) }}</div>
+        <dl class="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
+            <div><dt class="text-secondary text-xs">Id</dt><dd class="font-mono text-sm">{{ n.id }}</dd></div>
+            <div><dt class="text-secondary text-xs">Type</dt><dd class="font-mono text-sm">{{ n.type }}</dd></div>
+            <div><dt class="text-secondary text-xs">Category</dt><dd class="text-sm">{{ n.category }}</dd></div>
+            @if (n.flow) {
+                <div><dt class="text-secondary text-xs">Pipeline</dt><dd class="font-mono text-sm">{{ n.flow }}</dd></div>
+            }
+            @if (n.use) {
+                <div><dt class="text-secondary text-xs">Uses</dt><dd class="font-mono text-sm">{{ n.use }}</dd></div>
+            }
+            @if (n.store) {
+                <div><dt class="text-secondary text-xs">{{ n.category === 'STORE' ? 'Store' : 'Produces store' }}</dt><dd class="font-mono text-sm">{{ n.store }}</dd></div>
+            }
+            @if (n.sourceStore) {
+                <div><dt class="text-secondary text-xs">Consumes store</dt><dd class="font-mono text-sm">{{ n.sourceStore }}</dd></div>
+            }
+            @if (n.sinkKind) {
+                <div>
+                    <dt class="text-secondary text-xs">Sink kind</dt>
+                    <dd class="text-sm">{{ n.sinkKind }}{{ n.restsOnDisk === false ? ' (non-persistent)' : '' }}</dd>
+                </div>
+            }
+        </dl>
+        @if (n.description) {
+            <p class="text-secondary mt-3 text-sm">{{ n.description }}</p>
+        }
+    </section>
+</ng-template>
