@@ -47,6 +47,47 @@ Tests: `DatasetRelationTest.physicalRefWithDatabaseSubtreeReadsMappedOutputOnly`
 `sinkNestedInsideAnotherStoreFailsClosed`, `slashedSinkStoreNameFailsClosed`,
 `externalDataDirStaysAllowed`).
 
+## Multi-destination `sinks:` (shipped 2026-08-02 — `0cdc9dff` + `79dcb3e6`)
+
+A `*_pipeline.toon` may declare a top-level plural **`sinks:`** list — one `{database, format,
+compression, ducklake}` tuple per destination. The single `output:` + `dirs.database` pair is the
+one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises the shorthand).
+
+* **Model / parse / validate** — `PipelineConfig.Sink` (`@PublicApi 4.8.0`) + `resolveSinks(...)`
+  (synthesises the shorthand, never throws); `PipelineConfigParser` parses the `sinks:` list (each entry
+  needs a non-blank `database`); `ConfigSafetyValidator.checkSink` path-jails every `database` /
+  `ducklake.data_path` and allow-lists format/compression.
+* **Ingest fan-out** — `BatchIngestStrategy.writeAndTrace` (the shared choke point) fans the main
+  partitioned write to every `cfg.sinks()` destination, each under its own `database` root (the `dbDir`
+  suffix beyond `dirs.database` is preserved) and its own format/compression. **Predicate =
+  `cfg.sinks().size() > 1`** — *not* the whole-graph `BatchGraphRunner.engages`, which miscounts a
+  multi-schema batch. A single destination is byte-for-byte the legacy write. **Direct fan-out, not
+  `BatchGraphRunner`** — the ingest commit model is already "write everything, finalise once," and
+  `finalizeSource` (backup / markers-LAST / ledger) is per-source-file, so it runs exactly once
+  regardless of destination count. `BatchGraphRunner` stays the flow-job executor, unused by ingest.
+* **Bypass guards** — paths that skip `writeAndTrace` (native single-member `streamingIngest`/
+  `chunkedIngest`; plugin `GenerationModeIngester`) materialise via the union path when `sinks>1`
+  (`CsvBatchStrategy`, `StreamingPluginBatchStrategy`).
+* **Editor round-trip** — `PipelineEditable.lower` no longer refuses `MULTI_SINK`; a graph with >1
+  distinct sink database lowers to a `sinks:` list (the shorthand stays consistent with the first
+  destination). Safe because a `transform.route`/`derive` node is not `LOWERABLE` (fails
+  `UNSUPPORTED_NODE` first), so every sink reaching here is a replicate-per-destination fan-out. The
+  `MULTI_SINK` constant is kept but never emitted; the Angular mock mirrors it.
+* **Refusals (deliberate, at load/runtime).** A **versioned reference store** (`reference.load:
+  upsert|scd2`) + `sinks>1` is refused at `PipelineConfig.prepare()` (single version history is
+  ill-defined across destinations). **Decision-rule *routing* + `sinks>1`** is refused at runtime in
+  `writeAndTrace` (routed outputs are single-destination). Multi-sink commit is **not** cross-branch
+  transactional (B9 stands) — a clone may have some destinations committed and others retrying.
+
+⚠ **Toon authoring:** in the indexed-tuple form `sinks[N]{database,format}:`, a `database` path
+(contains `:` and `/`) **must be quoted** — `"/data/hot",PARQUET` — or the tabular decoder reads 0 rows.
+
+Tests: `PipelineConfigSinksTest`, `ConfigSafetyValidatorTest` (per-sink jail/allow-list),
+`PipelineLiftTest.liftsSinksListToADataFedFanOut`,
+`BatchProcessorSinksTest.fanOutWritesEachDestinationAndFinalisesOnce`,
+`PipelineEditableTest.twoDistinctDatabasesLowerToASinksList`,
+`ControlApiFlowCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline`.
+
 ## Quarantine outcomes
 
 * `QUARANTINED_UNREADABLE` — the ingester threw (file unreadable/undecodable).

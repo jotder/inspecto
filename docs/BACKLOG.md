@@ -475,6 +475,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
       can overshoot the mark. A per-cycle acquisition intake cap (the acquisition-side mirror of T15's
       `-Dingest.maxFilesPerCycle`, oldest-first) would bound a single fetch. Build only if overshoot is a
       real problem — the across-tick gate already bounds steady-state.
+    - **Deferred from `sinks:` (shipped 2026-08-02) — three documented follow-ups.** The plural `sinks:`
+      config-format shipped all 4 slices (as-built: `okf/backend/engine/output-sinks.md`). Refused/deferred,
+      build only if a real need appears: (a) **per-sink `ducklake` block in the flat `.toon`** — the
+      indexed-tuple row can't carry a nested map, so multi-sink + ducklake needs a nested representation or
+      the editor; (b) **decision-rule *routing* + `sinks>1`** — routed outputs are single-destination, refused
+      at runtime in `writeAndTrace`; (c) **versioned reference store + `sinks>1`** — refused at
+      `PipelineConfig.prepare()` (one version history is ill-defined across destinations). Also open: a
+      `ConfigSpecs`/`ConfigJsonSchema` structural spec for `sinks:` — authoring-UX only (`ConfigLoader.validate`
+      ignores unknown keys, so round-trip needs none), pairs naturally with (a).
   - **Duplicate pipeline id at construction — DECIDED 2026-08-01: fail fast.** `CollectorService`'s
     constructor accepted two config files declaring the same in-file `name:`, while
     `registerPipeline` rejected exactly that at runtime. The two surfaces now agree: a new
