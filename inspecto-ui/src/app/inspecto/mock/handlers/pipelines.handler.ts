@@ -40,7 +40,17 @@ import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.h
  * file/database/stream split — **which connector a source uses is carried by its Connection profile
  * (`collector.connection`), not by the node type** — and `alert` is CONTROL, not a transform.
  */
-export const NODE_TYPES: PipelineNodeType[] = [
+/**
+ * Mirrors `PipelineEditable.LOWERABLE` on the server — the 9 of 20 types a save can lower back to the
+ * flat config. ⚠ A mock more permissive than the server is the failure mode this whole flag exists to
+ * kill: keep these two lists in lockstep.
+ */
+const LOWERABLE = new Set([
+    'acquisition', 'parser', 'gap', 'transform.dedup.marker', 'transform.dedup.fingerprint',
+    'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
+]);
+
+export const NODE_TYPES: PipelineNodeType[] = ([
     // entry / acquisition (the collector role)
     { type: 'acquisition', category: 'SOURCE', label: 'Acquisition', description: 'Collects files from a source (poll/listing); the pipeline entry.', accepts: [], emits: ['data', 'gap', 'failure'], emitsNamedRoutes: false },
     { type: 'adapter', category: 'SOURCE', label: 'Adapter', description: 'Windows a stream/push source into intermediate files (by time/count/size), then lands them.', accepts: [], emits: ['data'], emitsNamedRoutes: false },
@@ -67,7 +77,7 @@ export const NODE_TYPES: PipelineNodeType[] = [
     { type: 'alert', category: 'CONTROL', label: 'Alert', description: 'Raises an alert from rule / gap / failure outcomes.', accepts: ['data', 'gap', 'failure'], emits: [], emitsNamedRoutes: false },
     { type: 'gap', category: 'CONTROL', label: 'Gap detection', description: 'Reports sequence gaps as SEQUENCE_GAP events.', accepts: ['gap'], emits: [], emitsNamedRoutes: false },
     { type: 'event', category: 'CONTROL', label: 'Event', description: 'Emits a notification / event.', accepts: ['data', 'success', 'failure', 'gap'], emits: [], emitsNamedRoutes: false },
-];
+] as Omit<PipelineNodeType, 'lowerable'>[]).map((t) => ({ ...t, lowerable: LOWERABLE.has(t.type) }));
 
 const CATEGORY_OF = new Map(NODE_TYPES.map((t) => [t.type, t.category]));
 

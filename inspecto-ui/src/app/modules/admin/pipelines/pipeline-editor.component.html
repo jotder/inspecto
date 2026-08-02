@@ -267,6 +267,17 @@
 
             <!-- canvas — takes everything the docks give back -->
             <div class="relative min-w-0 flex-1">
+                <!--
+                    G5: this pipeline opened fine but contains node types a save cannot lower back to
+                    the flat config. Say so now, not after the user has invested a session of edits.
+                -->
+                @if (unsupportedNodes().length; as n) {
+                    <inspecto-alert class="absolute inset-x-2 top-2 z-10 block" variant="warning">
+                        This pipeline uses {{ n }} step{{ n === 1 ? '' : 's' }} the current save format has
+                        no home for (<code>{{ unsupportedTypeList() }}</code>). You can explore and edit, but
+                        <b>Save will refuse</b> until {{ n === 1 ? 'it is' : 'they are' }} removed.
+                    </inspecto-alert>
+                }
                 <app-pipeline-editor-graph
                     [data]="g6Data()"
                     [graphKey]="selectedId()"
@@ -364,6 +375,7 @@
                                     [selectedEdgeRel]="selectedEdgeRel()"
                                     [candidateRels]="candidateRels()"
                                     [readOnly]="!lens.canAuthorWorkbench()"
+                                    [canRunToHere]="scratchRunAvailable"
                                     (configure)="openNodeConfig($event)"
                                     (runToHere)="openRunToHere($event)"
                                     (previewView)="openViewPreview($event)"

@@ -36,6 +36,7 @@ import { pipelineScaffold } from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
@@ -50,6 +51,7 @@ import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-renam
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
+import { environment } from 'environments/environment';
 import {
     PipelineFinding,
     NodeStatus,
@@ -104,6 +106,7 @@ import {
         MatInputModule,
         MatMenuModule,
         MatTooltipModule,
+        InspectoAlertComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
@@ -160,6 +163,8 @@ export class PipelineEditorComponent implements OnInit {
     });
     readonly paletteGroups = signal<NodeTypeGroup[]>([]);
     private readonly typeCat = signal<Map<string, string>>(new Map());
+    /** type → whether a save can lower it, from `GET /pipelines/node-types` (see G2/G5). */
+    private readonly typeLowerable = signal<Map<string, boolean>>(new Map());
 
     readonly selectedNode = signal<AuthoredNode | null>(null);
     readonly selectedEdgeId = signal<string | null>(null);
@@ -177,6 +182,12 @@ export class PipelineEditorComponent implements OnInit {
      * findings share one dock (they are both "output of the thing on the canvas"), so opening one
      * closes the other rather than stacking two bands under the graph.
      */
+    /**
+     * `POST /pipelines/authored/{id}/run?to=` has no real route — PipelineRoutes reserves the path
+     * and never registers it, so run-to-here only works against the offline mock. Gate, don't 404.
+     */
+    readonly scratchRunAvailable = environment.mockFlows;
+
     readonly bottomTab = signal<'dryrun' | 'validation' | null>(null);
 
     // ── canvas status (Stage 2) + validation/activation (Stage 4) ──
@@ -302,6 +313,7 @@ export class PipelineEditorComponent implements OnInit {
                 this.paletteGroups.set(groupByCategory(ts));
                 this.typeCat.set(typeCategoryMap(ts));
                 this.typeEmits.set(new Map(ts.map((t) => [t.type, t.emits])));
+                this.typeLowerable.set(new Map(ts.map((t) => [t.type, t.lowerable])));
             },
             error: () => this.paletteGroups.set([]),
         });
@@ -479,13 +491,26 @@ export class PipelineEditorComponent implements OnInit {
         });
     }
 
-    /** Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_SINK / NO_*) as a toast, or false if none. */
+    /**
+     * Surface named lower-refusals (UNSUPPORTED_NODE / MULTI_SINK / NO_*) in the Validation dock, or
+     * false if the error carried none. Every refusal is listed and stays put — a first-only transient
+     * toast turned an n-problem graph into n save→fix→save cycles.
+     */
     private showRefusals(err: unknown): boolean {
         const refusals = (err as { error?: { error?: { details?: { refusals?: PipelineRefusal[] } } } })
             ?.error?.error?.details?.refusals;
         if (!refusals?.length) return false;
-        const r = refusals[0];
-        this.toast.error(`Cannot save: ${r.message}${r.nodeId ? ` (node '${r.nodeId}')` : ''}`);
+        this.findings.set(refusals.map((r) => ({
+            severity: 'error' as const,
+            nodeId: r.nodeId,
+            message: r.message,
+        })));
+        this.bottomTab.set('validation');
+        this.toast.error(
+            refusals.length === 1
+                ? 'Cannot save: 1 problem — see Validation.'
+                : `Cannot save: ${refusals.length} problems — see Validation.`,
+        );
         return true;
     }
 
@@ -829,6 +854,22 @@ export class PipelineEditorComponent implements OnInit {
         this.bottomTab.set('validation');
         return f;
     }
+
+    /**
+     * G5 one-way door: a grandfathered `*_flow.toon` always *opens* (the lift is total) but a save
+     * refuses every node the flat config has no home for. Surfaced on load, before the user invests
+     * edits — deliberately a warning, not read-only, because deleting the offending node is exactly
+     * how you make the pipeline saveable again, and read-only would block that repair.
+     */
+    readonly unsupportedNodes = computed<AuthoredNode[]>(() => {
+        const lowerable = this.typeLowerable();
+        if (!lowerable.size) return []; // catalog not in yet — don't cry wolf
+        return (this.model()?.nodes ?? []).filter((n) => lowerable.get(n.type) === false);
+    });
+
+    /** The distinct offending types, for the banner text. */
+    readonly unsupportedTypeList = computed(() =>
+        [...new Set(this.unsupportedNodes().map((n) => n.type))].join(', '));
 
     /** Click a finding to select its node on the canvas. */
     selectFinding(nodeId?: string): void {

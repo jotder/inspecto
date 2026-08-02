@@ -269,7 +269,7 @@ describe('validatePipeline', () => {
 describe('groupByCategory', () => {
     it('orders groups by the canonical category order, unknown categories last', () => {
         const t = (type: string, category: string): PipelineNodeType =>
-            ({ type, category, label: type, description: '', accepts: [], emits: [], emitsNamedRoutes: false });
+            ({ type, category, label: type, description: '', accepts: [], emits: [], emitsNamedRoutes: false, lowerable: true });
         const groups = groupByCategory([
             t('gap', 'CONTROL'), t('acquisition', 'SOURCE'), t('x', 'WEIRD'), t('sink.view', 'SINK'),
         ]);

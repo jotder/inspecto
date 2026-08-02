@@ -107,10 +107,13 @@ class ControlApiFlowsTest {
                 if ("sink.view".equals(t.get("type").asText())) {
                     hasView = true;
                     assertEquals("SINK", t.get("category").asText());
+                    // The palette needs save-ability up front; sink.view cannot be lowered.
+                    assertFalse(t.get("lowerable").asBoolean(), "sink.view is not lowerable");
                 }
                 if ("acquisition".equals(t.get("type").asText())) {
                     hasAcq = true;
                     assertEquals("SOURCE", t.get("category").asText());
+                    assertTrue(t.get("lowerable").asBoolean(), "acquisition is lowerable");
                 }
             }
             assertTrue(hasView && hasAcq, "palette carries sink.view + acquisition with their categories");

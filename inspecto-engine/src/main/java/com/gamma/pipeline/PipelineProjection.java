@@ -42,6 +42,9 @@ public final class PipelineProjection {
             m.put("accepts", List.copyOf(t.accepts()));
             m.put("emits", List.copyOf(t.emits()));
             m.put("emitsNamedRoutes", t.emitsNamedRoutes());
+            // Save-ability, not runnability: the engine executes far more than the flat config can
+            // round-trip. The palette greys these out rather than refusing at Save.
+            m.put("lowerable", PipelineEditable.isLowerable(t.type()));
             out.add(m);
         }
         return out;

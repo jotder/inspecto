@@ -67,6 +67,12 @@ export interface PipelineNodeType {
     accepts: string[];
     emits: string[];
     emitsNamedRoutes: boolean;
+    /**
+     * Whether a save can lower this type back to the flat pipeline config. `false` ⇒ the engine may
+     * well run it, but the editor cannot persist it (422 `UNSUPPORTED_NODE`), so the palette disables
+     * it. Save-ability, not runnability.
+     */
+    lowerable: boolean;
 }
 
 /** A node in the combined topology: a pipeline node (with its owning `flow`) or a synthetic `STORE` join node. */

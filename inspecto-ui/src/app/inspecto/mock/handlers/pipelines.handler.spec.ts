@@ -66,6 +66,16 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup.fingerprint']);
     });
 
+    it('marks exactly the 9 types the server can lower — a laxer mock is the whole failure mode', () => {
+        // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
+        // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
+        expect(NODE_TYPES.filter((t) => t.lowerable).map((t) => t.type).sort()).toEqual([
+            'acquisition', 'enrichment', 'gap', 'parser', 'sink.persistent',
+            'transform.dedup.fingerprint', 'transform.dedup.marker', 'transform.filter', 'transform.map',
+        ]);
+        expect(NODE_TYPES.length).toBe(20);
+    });
+
     it('only the parser and the router emit operator-named routes', () => {
         expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type))
             .toEqual(['parser', 'transform.route']);

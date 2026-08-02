@@ -28,6 +28,7 @@ import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-ed
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
 import { nodeAttributesFor } from './node-attributes';
+import { environment } from 'environments/environment';
 
 /**
  * Dialog data: the node to configure, its (already-resolved) type/category labels for the header, and the
@@ -192,6 +193,7 @@ export interface NodeConfigResult {
                 }
 
                 <!-- Run just this processor over a bounded sample (no production write) -->
+                @if (testAvailable) {
                 <div class="pt-2">
                     <button type="button" mat-stroked-button (click)="test()" [disabled]="testing">
                         @if (testing) { <mat-spinner diameter="16" class="mr-2"></mat-spinner> }
@@ -213,6 +215,7 @@ export interface NodeConfigResult {
                         </inspecto-alert>
                     }
                 </div>
+                }
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button mat-dialog-close>Cancel</button>
@@ -280,6 +283,12 @@ export class NodeConfigDialog {
 
     testing = false;
     testResult: ComponentTestResult | null = null;
+    /**
+     * `POST /components/{type}/{id}/test` exists only in the offline mock — the real ControlApi has
+     * no `/components` surface at all, so an authored node's dotted type (`transform.filter`) has
+     * nothing to hit. Hide the action rather than ship a button that 404s.
+     */
+    readonly testAvailable = environment.mockFlows;
 
     readonly form = this.fb.group({
         name: this.fb.control(''),

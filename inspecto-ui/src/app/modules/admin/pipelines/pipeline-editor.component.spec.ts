@@ -151,6 +151,51 @@ describe('PipelineEditorComponent', () => {
         expect(c.dirty()).toBe(false);
     });
 
+    it('lists every save refusal in the Validation dock, not just the first as a toast', () => {
+        const c = make();
+        c.selectedId.set('demo');
+        c.model.set(structuredClone(FLOW));
+        api.savePipelineGraph.mockReturnValue(throwError(() => ({
+            status: 422,
+            error: { error: { details: { refusals: [
+                { code: 'UNSUPPORTED_NODE', nodeId: 'a', message: "no home for a 'transform.split' node" },
+                { code: 'UNSUPPORTED_NODE', nodeId: 'b', message: "no home for a 'transform.merge' node" },
+                { code: 'NO_PARSER', message: 'the pipeline has no parser' },
+            ] } } },
+        })));
+
+        c.save();
+
+        // All three, persistent — the old behaviour was three save→fix→save cycles.
+        expect(c.findings()).toHaveLength(3);
+        expect(c.findings().every((f) => f.severity === 'error')).toBe(true);
+        expect(c.findings().map((f) => f.nodeId)).toEqual(['a', 'b', undefined]);
+        expect(c.bottomTab()).toBe('validation');
+    });
+
+    it('flags a grandfathered pipeline whose nodes cannot be lowered, without locking the fix out', () => {
+        const c = make();
+        c.model.set({
+            name: 'legacy',
+            active: false,
+            nodes: [
+                { id: 'src', type: 'acquisition', config: {} },
+                { id: 'sp', type: 'transform.split', config: {} },
+                { id: 'mg', type: 'transform.merge', config: {} },
+            ],
+            edges: [],
+        });
+
+        // Before the catalog lands there is nothing to judge against — stay quiet rather than cry wolf.
+        expect(c.unsupportedNodes()).toHaveLength(0);
+
+        c['typeLowerable'].set(new Map([
+            ['acquisition', true], ['transform.split', false], ['transform.merge', false],
+        ]));
+        expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['sp', 'mg']);
+        expect(c.unsupportedTypeList()).toBe('transform.split, transform.merge');
+    });
+
     it('a 503 on create marks the editor read-only', () => {
         config.write.mockReturnValue(throwError(() => ({ status: 503 })));
         const c = make();

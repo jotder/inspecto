@@ -69,6 +69,35 @@ palette, so it all looked correct offline: the *mock more lenient than the serve
 `pipelines.handler.spec.ts` now pins the palette to the enum. **Adding a type to the mock without adding it
 to `BuiltinNodeType` re-opens exactly this hole.**
 
+### Save-ability is a separate axis from runnability — `lowerable` (2026-08-02)
+
+`GET /pipelines/node-types` carries **`lowerable: boolean`** per type (`PipelineProjection.catalog()` →
+`PipelineEditable.isLowerable`, mirroring the `LOWERABLE` set). It answers *"can a save lower this back
+to the flat `*_pipeline.toon`?"* — **9 of the 20** types. It does **not** mean "the engine can run it":
+the engine runs far more than the flat config can round-trip (`RowShaper.shape` handles the whole
+`transform.*` family). Keep the two questions apart; conflating them is how the palette came to present
+20 equal-looking options, 11 of which failed at Save with a 422 `UNSUPPORTED_NODE`.
+
+The palette disables non-lowerable entries (dimmed, non-draggable, explanatory tooltip). Opening a
+grandfathered flow that *contains* them shows a warning banner naming the types — deliberately a
+**warning, not read-only**, because deleting the offending node is the only way to make the pipeline
+saveable again, and read-only would lock out that repair.
+
+⚠ The mock's `LOWERABLE` list must stay in lockstep with the server's; `pipelines.handler.spec.ts` pins
+it by name. This is the same *mock more lenient than the server* trap described above.
+
+Related: **save refusals all land in the Validation dock** (persistent, click-to-select-node), not a
+first-only toast — an n-problem graph used to mean n save→fix→save cycles.
+
+### Two editor test affordances are mock-only (2026-08-02)
+
+*Run to here* (inspector) and *Test processor* (node-config dialog) are gated behind
+`environment.mockFlows`. Neither backend route exists: `POST /pipelines/authored/{id}/run?to=` is
+reserved-but-unregistered (`PipelineRoutes.java:69`, deliberately — it must never fire a production
+run), and there is **no `/components/*` route in the Java backend at all**. They are kept rather than
+deleted because `run-to-here.dialog.ts` is the finished UI for the still-open "test against real data"
+work — see [`../../../BACKLOG.md`](../../../BACKLOG.md). Ungate them when that backend lands.
+
 Corollary worth keeping: **which connector a source uses is carried by its Connection profile**
 (`collector.connection`), not by the node type — hence one `acquisition`, not a file/database/stream split.
 A connector's own options (`query`, `watermark_column`, `topic`, `bootstrap_servers`) live in the

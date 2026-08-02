@@ -125,6 +125,9 @@ final class ConfigRoutes implements RouteModule {
         // Warning only: the save still succeeds (the schema file may be created afterwards), but
         // the operator learns now that Register would fail on this host.
         findings.addAll(schemaFileFindings(type, draft, Severity.WARNING));
+        // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
+        // returns written:true and the config is then silently dropped from the index forever.
+        findings.addAll(armedWithoutSchemaFindings(type, draft));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
@@ -373,6 +376,38 @@ final class ConfigRoutes implements RouteModule {
             }
         }
         return out;
+    }
+
+    /**
+     * {@code active: true} with no schema source at all — the one draft shape that {@link
+     * PipelineConfig#load} hard-throws on but spec validation accepts. Left unchecked, the write
+     * succeeds, {@code ConfigRegistry.rebuild} logs a single WARN and omits the pipeline, and the
+     * scheduler then skips it every cycle forever: no run, no failure, no operator signal.
+     *
+     * <p>Deliberately narrower than a full {@code PipelineConfig.fromMap} gate — parsing the draft
+     * here would also hard-fail an <em>unresolvable</em> schema reference, which
+     * {@link #schemaFileFindings} intentionally keeps a WARNING (the file may be created after the
+     * save, or belong to another host). Mirrors {@code PipelineConfigParser}'s three schema sources.
+     */
+    static List<Finding> armedWithoutSchemaFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type)) return List.of();
+        if (!Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false"))))
+            return List.of();
+        Object procObj = draft.get("processing");
+        Map<?, ?> proc = procObj instanceof Map<?, ?> m ? m : Map.of();
+        Object parsingObj = draft.get("parsing");
+        Map<?, ?> parsing = parsingObj instanceof Map<?, ?> m ? m : Map.of();
+        Object plugin = parsing.get("plugin") instanceof Map<?, ?> pm ? pm.get("ingester") : null;
+        boolean hasSchema =
+                (proc.get("schema_file") instanceof String s && !s.isBlank())
+                || (proc.get("schemas") instanceof List<?> l && !l.isEmpty())
+                || (proc.get("ingester") instanceof String i && !i.isBlank())
+                || (plugin instanceof String p && !p.isBlank());
+        if (hasSchema) return List.of();
+        return List.of(new Finding(Severity.ERROR, "active",
+                "active: true but no schema is configured (processing.schema_file, "
+                        + "processing.schemas[], or a plugin ingester) — keep the draft inactive "
+                        + "until its schema is attached"));
     }
 
     /**

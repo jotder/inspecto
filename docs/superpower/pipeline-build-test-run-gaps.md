@@ -1,6 +1,9 @@
 # Build → Test → Run: the ingestion authoring journey, and where it breaks
 
 **Status:** IN FLIGHT (opened 2026-08-02). Gap analysis + remediation plan.
+**Steps 0–4 SHIPPED 2026-08-02.** Step 5 (test against real data) is the remaining product gap — see §3.
+Three findings from implementation changed the plan as written; they are recorded inline below (§2.1,
+§2.4, §3 Step 4). Read those before assuming the original text still holds.
 **Trigger:** operator question — *"how would a user build and run a data pipeline? we need to give
 users a decent way to build → test → run data ingestion."* The inventory existed; the **journey** had
 never been traced end-to-end.
@@ -16,11 +19,12 @@ to *build*, *see it work*, and *turn it on* without hitting a dead end.
 | Step | Path | Verdict |
 |---|---|---|
 | **Build** | Onboarding wizard (`POST /config/write`) **or** graph editor (`PUT /pipelines/{name}/graph`) — both write the same canonical `<id>_pipeline.toon` | Works. Round-trips for ordinary topologies. |
-| **Test** | dry-run · "Run to here" · node "Test" · parser preview | **Broken — see §2.1.** |
+| **Test** | dry-run · parser preview (the two that exist against a real backend) | **Still the hole.** The 404ing affordances are gone (§2.1), so the journey is now *honest* — but a user still cannot run their pipeline over their own files before arming it. Step 5. |
 | **Run** | `active: true` → poll loop (`PipelineScheduler`), or `POST /runs/{name}/trigger` (fires even when inactive; only `template:true` is refused 409) | Works. |
 
 Build and Run are sound. **The middle step is the hole**: a user cannot run their pipeline against
-their own data before turning it on.
+their own data before turning it on. Steps 0–4 removed the *lies* around that hole (dead buttons,
+silent activation failures, save-time surprises); Step 5 fills the hole itself.
 
 ---
 
@@ -35,6 +39,18 @@ their own data before turning it on.
 | **Dry-run** — `pipeline-dry-run-panel.component.ts:27` | `POST /pipelines/authored/{id}/dry-run` (`PipelineRoutes.java:946`) | Works, but over **user-typed synthetic JSON**, not the real files in the inbox. |
 
 Shipping buttons that 404 is worse than not shipping them. **Decide per button: implement or remove.**
+
+> **CORRECTION (2026-08-02, during the fix).** The table above understated it for the node Test button.
+> There is **no `/components/*` route anywhere in the Java backend** — not the dotted-type variant, not
+> the bare `transform`/`grammar`/`sink` ones. The whole `/components` surface is mock-only. (An earlier
+> exploration pass reported `ComponentRoutes.java:42-44` as the registration site; **that file does not
+> exist**. Treat the original table's Reality column for row 2 as wrong.)
+>
+> **Resolved by gating, not deleting.** Both affordances are now hidden unless
+> `environment.mockFlows` is on — the flag whose own comment already scopes it to "dry-run,
+> per-processor test". Rationale: `run-to-here.dialog.ts` is a complete, working, mock-backed feature
+> and is *exactly* the Step 5 UI; deleting it would mean rebuilding it. So the editor no longer lies
+> against a real backend, and the offline demo is unchanged.
 
 ### 2.2 — G2 · No authoring-time signal that a node cannot be saved
 
@@ -80,10 +96,20 @@ Onboarding's `POST /config/write` enforces **only** spec + safety; `ConfigSpecs.
 ⚠ **Severity note:** G1 fails *visibly* (a 404 the user sees). G4 **succeeds visibly and then does
 nothing**, with no UI signal at all. Arguably the worse of the two.
 
-> Residual unknown (small, targeted): does the wizard call `registerPipeline` after `/config/write`?
-> If yes, the schema case at least surfaces as a synchronous error to that one caller
-> (`CollectorService.java:944-951` rethrows). If it relies on passive poll-loop pickup, it is fully
-> silent. **One UI trace decides which branch users actually hit.**
+> **Residual unknown RESOLVED (2026-08-02): the silent branch is the one users hit.** The wizard calls
+> `registerPipeline` **only on initial create** (`onboarding-create.dialog.ts:341`) — and create always
+> writes `active: false` (`:318`, hardcoded). Activation happens later in the Publish stage as
+> `saveBlock({ active: true })` (`publish-pane.component.ts:114`), which is a plain
+> `/config/write overwrite:true` with **no register call after it**. So the exact moment a user arms a
+> pipeline was the moment with no feedback path at all.
+>
+> **FIXED.** `ConfigRoutes.armedWithoutSchemaFindings` adds an ERROR finding at write time, so the
+> Publish-stage flip now 422s with the schema named. Deliberately narrower than the "call
+> `PipelineConfig.fromMap` and surface any parse failure" fix this plan originally proposed: `fromMap`
+> also hard-throws on an *unresolvable* schema reference, which `schemaFileFindings` intentionally
+> keeps a WARNING (the file may be created after the save, or belong to another host). A blanket load-
+> check would have silently converted that warning into a hard failure. Verified live: armed+no-schema
+> → 422; `active:false` draft → 200; armed with an unresolvable ref → 200 + warning.
 
 ### 2.5 — G5 · Silent one-way door on grandfathered flows
 
@@ -94,37 +120,50 @@ never be saved back. Nothing indicates this until the user has edited and clicke
 
 ## 3. Plan
 
-**Step 0 — close G4 (DONE: traced; now fix).** Confirmed a silent permanent no-op. Fix is small and
-narrow: make `POST /config/write` **load-check** what it just wrote for `type=pipeline` (call
-`PipelineConfig.fromMap` and return the parse failure as a 422 finding), so an `active:true`
-schema-less pipeline is refused at write instead of accepted and ignored.
-→ verify: writing `active:true` with no schema returns 422 naming the schema; writing `active:false`
-still succeeds (drafts must stay writable).
-→ also: one UI trace to settle whether the wizard registers after write (residual unknown, §2.4).
+**Step 0 — close G4. ✅ SHIPPED.** `ConfigRoutes.armedWithoutSchemaFindings` returns an ERROR finding
+for `active: true` with no schema source (schema_file / schemas[] / plugin ingester), reusing the
+existing findings→422 path. Narrower than the `PipelineConfig.fromMap` load-check originally proposed
+here — see §2.4 for why a blanket gate would have regressed the deliberate schema-file WARNING.
+→ verified: live probe gives 422 naming the schema for armed+no-schema, 200 for an `active:false`
+draft, and 200+warning for armed with an unresolvable ref. Three tests in `ControlApiConfigWriteTest`.
 
-**Step 1 — stop lying to the user (G1).** Per button, implement or remove:
-- *Run to here* — implement the reserved `?to={nodeId}` scratch run, or delete the inspector action.
-- *Node Test* — repoint at a real endpoint, or delete the dialog action.
-→ verify: no affordance in the editor issues a request that 404s (assert in the e2e/preview pass).
+**Step 1 — stop lying to the user (G1). ✅ SHIPPED (by gating).** Both affordances are hidden unless
+`environment.mockFlows`. Neither was deleted: run-to-here is a complete mock-backed feature and is
+literally the Step 5 UI. See the correction in §2.1 — the `/components` surface does not exist at all.
+→ verified: with the real backend, the editor renders no *Run to here* and no *Test processor*; no
+console errors.
 
-**Step 2 — early signal (G2).** Add `lowerable: boolean` to `GET /pipelines/node-types`; grey out
-those palette entries with a "flow-only" tooltip.
-→ verify: palette renders 9 enabled / 11 disabled against the live endpoint; mock matches the server
-(⚠ a mock more lenient than the server is the known failure mode — pin it in `pipelines.handler.spec.ts`).
+**Step 2 — early signal (G2). ✅ SHIPPED.** `lowerable: boolean` added to `GET /pipelines/node-types`
+(`PipelineProjection.catalog()` → new `PipelineEditable.isLowerable`). Non-lowerable palette entries
+are disabled, non-draggable, dimmed, with a tooltip saying they cannot be saved.
+→ verified against the live endpoint: **9 enabled / 11 disabled**, 20 total. The mock↔server contract
+is pinned by name in `pipelines.handler.spec.ts` (the laxer-mock failure mode), plus a backend
+assertion in `ControlApiFlowsTest`.
 
-**Step 3 — persistent refusals (G3).** Route **all** refusals into the Validation dock, click-to-select
-the offending node. Plumbing already exists.
-→ verify: a 3-unsupported-node graph lists 3 findings in one save attempt.
+**Step 3 — persistent refusals (G3). ✅ SHIPPED.** `showRefusals` now maps **every** refusal into
+`findings` and opens the Validation dock (click-to-select already existed); the toast is reduced to a
+count pointing there.
+→ verified: a 3-refusal save yields 3 persistent findings, node ids preserved, dock opened.
 
-**Step 4 — one-way door banner (G5).** On lift, if the graph contains a non-lowerable node, mark the
-editor read-only with an explanatory banner instead of failing at Save.
-→ verify: opening a grandfathered flow shows the banner and disables Save.
+**Step 4 — one-way door (G5). ✅ SHIPPED — but as a warning banner, NOT read-only.** The plan said
+"mark the editor read-only". **That was wrong:** deleting the offending node is exactly how a user
+makes a grandfathered pipeline saveable again, so read-only would have locked out the only repair
+path. The editor now shows a warning banner naming the offending types and stays fully editable.
+→ verified by unit test (`unsupportedNodes`): stays silent until the type catalog loads (no crying
+wolf), then lists the non-lowerable node ids. Not reproducible in the live preview — every pipeline
+lifted from a flat config is lowerable by construction, which is the point.
 
-**Step 5 — the real one: test against real data.** Give the user a bounded run over actual inbox files
-with no writes. Largest piece; scope after Steps 0–4 land.
-
-**Sequencing note:** Steps 2–4 are all in the editor redesigned on 2026-08-02 and are small. Step 1 is
-the one a real user hits first. Step 5 is the actual product gap.
+**Step 5 — the real one: test against real data. ⬜ REMAINING.** Give the user a bounded run over
+actual inbox files with no writes. This is now the *only* thing standing between Build and Run.
+Notably, the UI is already built and working against the mock (`run-to-here.dialog.ts`, file picker,
+per-relation counts, sample table) — Step 1 gated it rather than deleting it precisely so this step is
+a backend job, not a rebuild. What is missing on the server (per the feasibility pass):
+- reading actual inbox files and running the real ingest/parse stage — `PipelineDryRun` is strictly
+  synthetic-rows-in-memory and skips parsing entirely;
+- a stop-at-node cutoff — `PipelineExecutor.dryRun` has no partial-graph primitive;
+- registering the reserved `POST /pipelines/authored/{id}/run?to={nodeId}` (`PipelineRoutes.java:69`),
+  which must stay scratch-only and never fire a production run.
+Estimated **medium/large**. Flip `mockFlows`-gating off for run-to-here when it lands.
 
 ---
 

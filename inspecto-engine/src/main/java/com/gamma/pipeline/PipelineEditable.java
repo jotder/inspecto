@@ -47,6 +47,15 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
+    /**
+     * Whether a save can lower this node type back to the flat config. The palette reads this so a
+     * type the editor cannot persist is greyed out up front, instead of the user discovering it at
+     * Save via an {@link #UNSUPPORTED_NODE} refusal.
+     */
+    public static boolean isLowerable(String type) {
+        return LOWERABLE.contains(type);
+    }
+
     /** Collector-block keys owned by the fingerprint dedup / gap nodes, not the acquisition node. */
     private static final Set<String> NOT_ACQ_OWNED = Set.of("duplicate", "incremental", "gap_detection");
 

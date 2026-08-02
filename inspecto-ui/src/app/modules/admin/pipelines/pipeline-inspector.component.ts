@@ -76,9 +76,11 @@ import {
                         <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon> Configure
                     </button>
                 }
-                <button mat-stroked-button type="button" (click)="runToHere.emit(node)">
-                    <mat-icon svgIcon="heroicons_outline:play"></mat-icon> Run to here
-                </button>
+                @if (canRunToHere) {
+                    <button mat-stroked-button type="button" (click)="runToHere.emit(node)">
+                        <mat-icon svgIcon="heroicons_outline:play"></mat-icon> Run to here
+                    </button>
+                }
                 @if (node.type === 'sink.view') {
                     <button mat-stroked-button type="button" (click)="previewView.emit(node)">
                         <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon> Preview data
@@ -135,6 +137,12 @@ export class PipelineInspectorComponent {
     @Input() candidateRels: string[] = [];
     /** Business lens: hide every authoring action (Configure/Connect/Delete/relabel), keep Run to here. */
     @Input() readOnly = false;
+    /**
+     * Whether the scratch run-to-here backend is actually there. `POST /pipelines/authored/{id}/run`
+     * is a mock-only contract — the route is deliberately unregistered on the real ControlApi — so the
+     * host gates the button on `environment.mockFlows` rather than shipping one that 404s.
+     */
+    @Input() canRunToHere = false;
 
     @Output() configure = new EventEmitter<AuthoredNode>();
     @Output() runToHere = new EventEmitter<AuthoredNode>();

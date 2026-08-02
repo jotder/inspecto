@@ -130,6 +130,63 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /**
+     * G4: {@code active: true} with no schema source loads nowhere, so accepting the write means the
+     * pipeline is dropped from the index and skipped by the scheduler forever, silently.
+     */
+    @Test
+    void armedPipelineWithoutASchemaIs422(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String armed = """
+                    {"type":"pipeline","config":{
+                       "name":"armed_no_schema","active":true,
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            HttpResponse<String> r = post(c.port, "/config/write", armed);
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
+            assertTrue(out.get("findings").toString().contains("no schema is configured"),
+                    "the finding names the missing schema: " + out.get("findings"));
+            assertFalse(Files.exists(root.resolve("armed_no_schema_pipeline.toon")));
+        }
+    }
+
+    /** The same draft stays writable while inactive — that is the whole point of a draft. */
+    @Test
+    void inactiveDraftWithoutASchemaStillWrites(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String draft = """
+                    {"type":"pipeline","config":{
+                       "name":"draft_no_schema","active":false,
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            HttpResponse<String> r = post(c.port, "/config/write", draft);
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(Files.exists(root.resolve("draft_no_schema_pipeline.toon")));
+        }
+    }
+
+    /**
+     * An armed pipeline whose schema reference does not resolve on <em>this</em> host stays a
+     * WARNING and is written — the new gate must not swallow that deliberate distinction.
+     */
+    @Test
+    void armedPipelineWithAnUnresolvableSchemaIsStillOnlyAWarning(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String armed = """
+                    {"type":"pipeline","config":{
+                       "name":"armed_elsewhere","active":true,
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"schema_file":"nowhere/orders_schema.toon","threads":1}}}""";
+            HttpResponse<String> r = post(c.port, "/config/write", armed);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertTrue(out.get("written").asBoolean());
+            assertTrue(out.get("findings").size() > 0, "the unresolvable reference is still reported");
+        }
+    }
+
     @Test
     void pathJailRejectsEscapingSubdirAndAbsolute(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -63,10 +63,16 @@ import { categoryColor, categoryLabel, NodeTypeGroup, paletteHeroIcon } from './
                         @for (t of group.types; track t.type) {
                             <button
                                 type="button"
-                                class="flex w-full cursor-grab items-center gap-1.5 rounded py-1 pl-7 pr-2 text-left text-xs hover:bg-black/5 dark:hover:bg-white/10"
-                                draggable="true"
-                                [matTooltip]="t.description"
-                                [attr.aria-label]="'Add ' + t.label"
+                                class="flex w-full items-center gap-1.5 rounded py-1 pl-7 pr-2 text-left text-xs"
+                                [class.cursor-grab]="t.lowerable"
+                                [class.hover:bg-black/5]="t.lowerable"
+                                [class.dark:hover:bg-white/10]="t.lowerable"
+                                [class.opacity-40]="!t.lowerable"
+                                [class.cursor-not-allowed]="!t.lowerable"
+                                [draggable]="t.lowerable"
+                                [disabled]="!t.lowerable"
+                                [matTooltip]="t.lowerable ? t.description : t.description + ' — cannot be saved to this pipeline format yet.'"
+                                [attr.aria-label]="t.lowerable ? 'Add ' + t.label : t.label + ' (unavailable — cannot be saved)'"
                                 (click)="pick.emit(t.type)"
                                 (dragstart)="$event.dataTransfer?.setData('text/flow-node-type', t.type)"
                             >

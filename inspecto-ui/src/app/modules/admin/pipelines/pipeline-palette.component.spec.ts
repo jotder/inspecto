@@ -6,8 +6,8 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { NodeTypeGroup } from './pipeline-graph';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 
-const type = (t: string, category: string, label: string): PipelineNodeType =>
-    ({ type: t, category, label, description: `Add a ${label}`, accepts: [], emits: [], emitsNamedRoutes: false });
+const type = (t: string, category: string, label: string, lowerable = true): PipelineNodeType =>
+    ({ type: t, category, label, description: `Add a ${label}`, accepts: [], emits: [], emitsNamedRoutes: false, lowerable });
 
 const GROUPS: NodeTypeGroup[] = [
     { category: 'SOURCE', types: [type('acquisition', 'SOURCE', 'File')] },
@@ -85,6 +85,26 @@ describe('PipelinePaletteComponent', () => {
         fixture.componentRef.setInput('groups', GROUPS);
         fixture.detectChanges();
         expect(text(fixture)).toContain('File writer');
+    });
+
+    it('disables a non-lowerable type instead of letting Save refuse it later', () => {
+        TestBed.configureTestingModule({
+            imports: [PipelinePaletteComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(PipelinePaletteComponent);
+        fixture.componentRef.setInput('groups', [
+            { category: 'SOURCE', types: [type('acquisition', 'SOURCE', 'File')] },
+            { category: 'TRANSFORM', types: [type('transform.split', 'TRANSFORM', 'Split', false)] },
+        ] satisfies NodeTypeGroup[]);
+        fixture.detectChanges();
+
+        const btn = (label: string) =>
+            Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+                .find((b) => b.textContent?.includes(label))!;
+        expect(btn('File').disabled).toBe(false);
+        expect(btn('Split').disabled).toBe(true);
+        expect(btn('Split').getAttribute('draggable')).toBe('false');
     });
 
     it('has no a11y violations expanded or filtered', async () => {

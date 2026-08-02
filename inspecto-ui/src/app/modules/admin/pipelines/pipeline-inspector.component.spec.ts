@@ -46,7 +46,9 @@ describe('PipelineInspectorComponent', () => {
     });
 
     it('emits configure/runToHere/connect/deleteSelected from the node actions', () => {
-        const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE' });
+        const { fixture, c } = create({
+            node: NODE, status: 'configured', category: 'PARSE', canRunToHere: true,
+        });
         const configure = vi.fn();
         const runToHere = vi.fn();
         const connect = vi.fn();
@@ -64,6 +66,17 @@ describe('PipelineInspectorComponent', () => {
         expect(runToHere).toHaveBeenCalledWith(NODE);
         expect(connect).toHaveBeenCalled();
         expect(del).toHaveBeenCalled();
+    });
+
+    it('hides Run to here unless the scratch-run backend is available (it is mock-only)', () => {
+        const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE' });
+        const runBtn = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Run to here'));
+        expect(runBtn(), 'no button that would 404 against the real ControlApi').toBeUndefined();
+
+        fixture.componentRef.setInput('canRunToHere', true);
+        fixture.detectChanges();
+        expect(runBtn()).toBeDefined();
     });
 
     it('shows Preview data only for a sink.view node, and emits previewView on click', () => {
@@ -111,7 +124,9 @@ describe('PipelineInspectorComponent', () => {
 
     it('readOnly hides Configure/Connect/Delete but keeps Run to here', () => {
         // One TestBed/fixture, mutated between assertions — TestBed can only be configured once per test.
-        const { fixture, c } = create({ node: NODE, status: 'configured', category: 'PARSE', readOnly: true });
+        const { fixture, c } = create({
+            node: NODE, status: 'configured', category: 'PARSE', readOnly: true, canRunToHere: true,
+        });
         const el = fixture.nativeElement as HTMLElement;
         const buttons = Array.from(el.querySelectorAll('button'));
         expect(buttons.some((b) => b.textContent?.includes('Configure'))).toBe(false);
