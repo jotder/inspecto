@@ -242,8 +242,19 @@ Execution / Signal networks. A consequence that targets a component `invokes` it
 **Pipeline** — A named, authored **DAG of Steps** that turns raw source files into clean, partitioned Tables.
 The Pipeline's `wiring` *is* its graph. ⛔ never "Flow".
 
-**Step** — One node in a Pipeline. A Step is a Parser, Transform, Enrichment, or Sink — **or** an embedded Job —
-**or** a sub-Pipeline.
+**Step** — One node in a Pipeline, drawn from the **closed `BuiltinNodeType` vocabulary** (20 ids, served
+verbatim by `GET /pipelines/node-types`): the SOURCE pair (`acquisition` / `adapter`), `parser`, the TRANSFORM
+family (`transform.*` + `enrichment`), the three `sink.*` kinds, and the CONTROL trio (`gap` / `alert` /
+`event`). ⚠ Closed on purpose — contrast **Job types**, which are an *open* registry (`JobTypeProvider`).
+
+> ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
+> were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
+> §3.8 of [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
+> makes **in-motion (Pipeline) vs at-rest (Job)** a binding line, so an at-rest operator cannot be an
+> in-motion node. The two compose as **producer/consumer over a shared store**, never by nesting: a Job
+> fires on the Pipeline's `on_commit`, or binds by store name to a `sink.view` (the designated hand-off —
+> `BuiltinNodeType` SINK_VIEW). The reverse — a `pipeline`-type Job re-running an authored Pipeline over data
+> at rest — makes the Job the *outer* Executable, which is composition, not embedding.
 
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
 — or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
@@ -273,8 +284,11 @@ Table**.
 **Executable** — The abstraction for anything the Scheduler can start and that produces a **Run**. It is either a
 **Pipeline** or a **Job**.
 
-**Job** — An atomic, Quartz-style Executable that can do *anything*. A Job may also be embedded as a **Step**
-inside a Pipeline.
+**Job** — An atomic, cron-style Executable that can do *anything* to data **at rest**: the downstream consumer
+of what a Pipeline landed. Its kinds are an **open registry** keyed by string id (`JobTypeProvider` /
+`JobTypeRegistry`); the built-ins are `enrich` · `report` · `maintenance` · `pipeline`. ⛔ There is deliberately
+**no `ingest` job type** (removed 2026-06-17) — ingestion is the Pipeline's sole responsibility, and an
+`ingest` job is now a config error. ⚠ A Job is **not** embeddable as a **Step** (see §5).
 
 **Scheduler** — The Operations engine that owns **Triggers** and starts **Executables** (Pipelines or Jobs). It
 defines *when*, not *what*.

@@ -96,7 +96,7 @@ AI-driven autonomy without redesign.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| PIP-1 | Authored **Pipeline** DAGs (Steps: Parser/Transform/Enrichment/Sink, embedded Job, sub-Pipeline) with author-time validation, visual editor | Must | SHIPPED (live e2e verified 2026-07-07 — `examples/06-serve/pipeline-job`, manual + `on_pipeline` triggers) | All |
+| PIP-1 | Authored **Pipeline** DAGs (Steps = the closed `BuiltinNodeType` set: SOURCE/Parser/Transform/Enrichment/Sink/CONTROL) with author-time validation, visual editor | Must | SHIPPED (live e2e verified 2026-07-07 — `examples/06-serve/pipeline-job`, manual + `on_pipeline` triggers). ⚠ *Scope corrected 2026-08-02:* "embedded Job, sub-Pipeline" was never in `BuiltinNodeType` and is **not** shipped — what the e2e proves is the Pipeline→Job **trigger** coupling (`on_pipeline`), i.e. producer/consumer over a shared store, not nesting. Ruled out by design, see GLOSSARY §5 | All |
 | PIP-2 | Medallion ELT: raw → clean partitioned Tables → Derived Tables (bronze→silver→gold) | Must | SHIPPED | All |
 | PIP-3 | Incremental event-driven processing: on-pipeline commit Triggers, watermarks, cron + catch-up | Must | SHIPPED | All |
 | PIP-4 | **Scheduler** + **Jobs** (atomic Executables; Run ⊇ Batch ⊇ File status hierarchy) | Must | SHIPPED | All |

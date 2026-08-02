@@ -262,8 +262,10 @@ Pipeline editor round out the toolkit.
 that turns raw source files into clean, partitioned Tables. The list shows each Pipeline's
 active/inactive status and last-run time, with per-row actions to **run now** or open **history**.
 Opening a Pipeline gives you its detail view (files, audit, batches) and its **editor** — a
-NiFi-style visual canvas where you lay out processor nodes (parser, transform, enrichment, sink,
-job, sub-pipeline) and connect them. In the editor, click to select, double-click to configure,
+NiFi-style visual canvas where you lay out processor nodes (collection, parser, transform,
+enrichment, sink, and the control nodes) and connect them. A **Job is not a node** — Jobs run
+*after* a Pipeline, over the data it landed; you chain one by giving it an `on-pipeline` trigger, or
+by pointing it at a `sink.view` store. In the editor, click to select, double-click to configure,
 drag to move, and **Shift-drag** to draw a connection between nodes; each node has a **Test** button
 for validating just that step. Parser nodes open a dedicated configuration dialog with a typed
 property sheet and a grid preview of the parsed output; the dialog offers nine format types, but

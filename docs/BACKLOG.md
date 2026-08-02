@@ -429,12 +429,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 **Open:**
 - **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
   unification W5). W5 made the graph editor *author* the canonical `*_pipeline.toon` for the
-  single-source / single-persistent-sink subset, refusing everything else with a named code
-  (`UNSUPPORTED_NODE`/`MULTI_SINK`/…). The flat `PipelineConfig` executor still cannot *run* a
-  multi-sink, non-`gap` CONTROL, `transform.derive`/`route`, or `sink.materialized`/`view` topology —
-  those stay grandfathered `*_flow.toon`, editable-read only. Closing this = the branch-aware executor
+  single-source subset, refusing everything else with `UNSUPPORTED_NODE`. **11 of the 20
+  `BuiltinNodeType`s are still refused at lowering** and stay grandfathered `*_flow.toon`,
+  editable-read only: `adapter`, `transform.select`/`derive`/`validate`/`route`/`split`/`merge`,
+  `sink.materialized`/`view`, and the non-`gap` CONTROL pair `alert`/`event`.
+  ⚠ **Multi-sink came OFF this list 2026-08-02** — the plural `sinks:` block runs multi-destination
+  ingest through the `BatchIngestStrategy.writeAndTrace` fan-out, and `MULTI_SINK` is now a
+  declared-but-never-raised constant (`PipelineEditable.java:37`; the `>1 database` path lowers to a
+  `sinks:` block instead, `79dcb3e6`). Don't re-derive the gap from that code — it reads as live.
+  ⚠ **The gap is the config format, not engine capability.** `RowShaper.shape` already executes the
+  whole `transform.*` family (`select`/`derive`→`project`, `validate`, `route`, `split`, `merge`), and
+  it reaches production **through jobs** — `PipelineJobRunner:172-176` is the real caller of
+  `PipelineExecutor`. What's missing is a home for those nodes in the flat `*_pipeline.toon` and the
+  ingest-path wiring, not a shaper. Genuinely unimplemented anywhere: `adapter`, `alert`, `event`.
+  Closing this = the branch-aware executor
   of [`okf/backend/pipeline-graph/pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md)
-  §13 R3, which would let the editor lower (and the engine run) the full graph vocabulary. Largest
+  §13 R3, which would let the editor lower (and the ingest path run) the full graph vocabulary. Largest
   remaining pipeline-graph piece; explicitly out of scope for W5.
   - **IN FLIGHT — plan of record:**
     [`superpower/branch-aware-executor-plan.md`](superpower/branch-aware-executor-plan.md). The operator
@@ -458,13 +468,20 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     (run one materialised batch through `PipelineExecutor` on the ingest path), `BatchProcessor.finalizeSource`
     (the crash-ordered commit body re-homed so the graph path reuses it; `commit` delegates, flat path
     byte-for-byte), and the engagement predicate `BatchGraphRunner.engages` (>1 data-fed sink, excluding the
-    `unmatched`-wired quarantine). ⚠ **The predicate is `false` for every real ingest config today** — a `Batch`
-    is always single-schema and a flat `*_pipeline.toon` can't author multi-sink — so **step 3's strategy
-    wiring + step 4 (lift the editor `MULTI_SINK` refusal) are GATED on the deferred `sinks:` config-format**
-    (the true prerequisite to a multi-sink ingest pipeline). The machinery lets `sinks:` flip it on with no
-    executor rework. Stage C is unstarted (needs sign-off). Note the real multi-destination limit is **one
-    destination per pipeline** — a config-format gap
-    (`PipelineConfig.Output` is a single record), not an executor gap.
+    `unmatched`-wired quarantine).
+    **UPDATE 2026-08-02 — `sinks:` shipped (`0cdc9dff` + `79dcb3e6`), so re-read this:**
+    - **Step 4 is DONE.** The editor's `MULTI_SINK` refusal is lifted; a 2-database graph lowers to a
+      `sinks:` block. `PipelineConfig` carries `record Sink` + `List<Sink> sinks()` (never empty — it
+      synthesises the `dirs.database` + `output:` shorthand), so the old note that
+      "`PipelineConfig.Output` is a single record" **no longer holds**.
+    - **Multi-destination did NOT need Stage A.** It shipped as flat-path fan-out in
+      `BatchIngestStrategy.writeAndTrace`, not through `BatchGraphRunner`.
+    - **Step 3 is still NOT wired.** `BatchGraphRunner` remains uncalled from main code — the only
+      references are two prose comments in `BatchProcessor.java:87,95`. Its `engages` predicate wants
+      **>1 data-fed sink _node_**, which `sinks:` does not create (that's N destinations for one branch),
+      so the predicate is still `false` for every real ingest config. The remaining trigger for Stage A
+      is a genuinely branching graph, which is exactly the refused-node list above.
+    Stage C is unstarted (needs sign-off).
     - **Deferred from B3b — acquisition-side "listed remotely but not yet fetched" gauge.** With ingest now
       walking the inbox, `countPending` is the exact *landed* backlog; the remote-side pending signal ("the
       connector listed N files we have not fetched yet") is a distinct, still-unbuilt metric. Decide its
