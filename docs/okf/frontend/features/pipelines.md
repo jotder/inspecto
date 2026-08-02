@@ -22,6 +22,33 @@ mirrors the backend `CsvSettings`. Parsers persist as reusable `grammar`
 [components](components.md). Backed by `PipelinesService` / `ComponentsService`; offline via the
 `mockFlows`-gated handler of the unified [mock backend](../conventions/mock-backends.md).
 
+## Nothing loads until you open it; View is the editor with `readOnly` (2026-08-02)
+
+**One component serves both modes.** `PipelinesComponent` is a thin host that renders
+`PipelineEditorComponent` with `[readOnly]="mode() === 'combined'"`. View is not a separate page — same
+toolbar, tab strip, palette, canvas and docks — so switching to Edit never means relearning the screen.
+`canAuthor()` = authoring lens **AND** not read-only, and every canvas mutation path checks it, so the
+gate is defence-in-depth rather than hidden buttons.
+
+**The open set is explicit.** Arrival fetches only `GET /pipelines` (names + flags) and the node-type
+catalog — *not* `GET /pipelines/combined`, which used to pull the whole topology on every visit. An
+Open dialog searches the name list and ticks one or many; each becomes a canvas tab, and a tab's graph
+is lifted only when it first becomes active. The dialog returns the **full desired set**, so unticking
+closes a tab.
+
+⚠ **Per-tab state is the subtle part.** Each tab parks its graph *and* its dirty flag on switch —
+without that, switching tabs silently discards unsaved edits (a real bug caught in review: the first
+version parked only in `activateTab`, while `select` also changes tabs). Every path that changes the
+active tab goes through `parkCurrent()`. A dirty tab refuses to be closed by an untick (kept open with
+a toast) and confirms on its own close button; those are the only two ways edits can be discarded.
+The active tab's `dirty` mirrors into the per-tab set through **one effect**, so the dozen scattered
+`dirty.set(...)` call sites stay ignorant of tabs.
+
+⚠ **Removed:** the combined "one or many pipelines joined at their shared stores" rendering, with its
+synthetic STORE nodes and the store-aware node inspector. Multi-pipeline is now *tabs*, not one merged
+canvas — cross-pipeline store links are no longer visualised here. `graph-view.component.ts` itself is
+untouched and still serves Catalog, Link Analysis and Objects.
+
 ## The editor shell is full-bleed, Visio-style (2026-08-02)
 
 Edit mode is an **editor shell, not an admin page**: `pipelines.component.html` branches on `mode()` and
