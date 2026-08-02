@@ -8,7 +8,7 @@
     >
         <h1 class="mr-2 shrink-0 text-base font-semibold leading-none">Pipelines</h1>
 
-        @if (creating() && lens.canAuthorWorkbench()) {
+        @if (creating() && canAuthor()) {
             <mat-form-field subscriptSizing="dynamic" class="w-56">
                 <mat-label>New pipeline name</mat-label>
                 <input matInput [formControl]="newName" placeholder="orders_rollup" (keyup.enter)="createFlow()" />
@@ -19,28 +19,19 @@
             <button mat-flat-button color="primary" type="button" (click)="createFlow()">Create</button>
             <button mat-button type="button" (click)="creating.set(false)">Cancel</button>
         } @else {
-            <!-- The open pipeline IS the document title here, so it reads as a title + picker rather than
-                 a labelled form field — which also keeps the bar one control tall (the gamma theme
-                 reserves ~25px above every mat-form-field for its floating label). -->
+            <!-- Nothing is open on arrival, so Open is the primary affordance rather than a picker over
+                 an already-loaded set. It is also how tabs are closed (untick), which is why it stays
+                 available with tabs open. -->
             <button
-                mat-button
-                [matMenuTriggerFor]="pipelineMenu"
-                class="min-w-0"
-                matTooltip="Choose a pipeline"
-                aria-label="Choose a pipeline"
+                mat-icon-button
+                (click)="openPipelines()"
+                matTooltip="Open pipelines…"
+                aria-label="Open pipelines"
             >
-                <span class="max-w-56 truncate">{{ selectedLabel() }}</span>
-                <mat-icon iconPositionEnd svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
             </button>
-            <mat-menu #pipelineMenu="matMenu">
-                @for (f of flows(); track f.name) {
-                    <button mat-menu-item (click)="select(f.name)">
-                        {{ f.displayName || f.name }}@if (f.template) { <span class="opacity-70">(template)</span> }
-                    </button>
-                }
-            </mat-menu>
 
-            @if (lens.canAuthorWorkbench()) {
+            @if (canAuthor()) {
                 <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
                 <button mat-icon-button (click)="startNew()" matTooltip="New pipeline" aria-label="New pipeline">
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
@@ -126,7 +117,7 @@
                 }
             }
 
-            @if (lens.canAuthorWorkbench()) {
+            @if (canAuthor()) {
                 <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
                 <button
                     mat-icon-button
@@ -203,14 +194,75 @@
         </div>
     }
 
-    @if (!flows().length && !creating() && !loading()) {
+    <!-- ── tab strip — one tab per open pipeline; the active one is what every action acts on ────── -->
+    @if (tabs().length) {
+        <div
+            class="flex shrink-0 items-stretch gap-px overflow-x-auto border-b"
+            style="background: var(--gamma-bg-default); border-color: var(--gamma-border)"
+            role="tablist"
+            aria-label="Open pipelines"
+        >
+            @for (t of tabs(); track t.id) {
+                <div
+                    class="flex shrink-0 items-center gap-1 border-r pl-3 pr-1"
+                    style="border-color: var(--gamma-border)"
+                    [style.background]="t.id === selectedId() ? 'var(--gamma-bg-card)' : 'transparent'"
+                >
+                    <button
+                        type="button"
+                        class="py-1.5 text-xs"
+                        role="tab"
+                        [attr.aria-selected]="t.id === selectedId()"
+                        [class.font-semibold]="t.id === selectedId()"
+                        [class.opacity-60]="t.id !== selectedId()"
+                        (click)="activateTab(t.id)"
+                    >
+                        {{ t.label }}
+                        @if (t.template) {
+                            <span class="ml-1 opacity-60">(template)</span>
+                        }
+                        @if (t.dirty) {
+                            <span class="ml-1" style="color: var(--gamma-warn)" aria-label="unsaved changes">●</span>
+                        }
+                    </button>
+                    <button
+                        type="button"
+                        class="flex h-5 w-5 items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10"
+                        [attr.aria-label]="'Close ' + t.label"
+                        (click)="closeTab(t.id)"
+                    >
+                        <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+            }
+        </div>
+    }
+
+    @if (!tabs().length && !creating() && !loading()) {
+        <!-- Nothing is fetched until the user opens something, so the empty canvas is the normal
+             arrival state, not an error. It has to carry the Open affordance or the page looks broken. -->
         <div class="flex min-h-0 flex-1 items-center justify-center">
-            <inspecto-empty-state
-                icon="heroicons_outline:arrows-right-left"
-                title="No authored pipelines"
-                message="Create a pipeline to start composing a topology."
-            >
-            </inspecto-empty-state>
+            @if (flows().length) {
+                <inspecto-empty-state
+                    icon="heroicons_outline:folder-open"
+                    title="No pipeline open"
+                    [message]="
+                        'Open one or more of the ' +
+                        flows().length +
+                        ' available pipelines to see them on the canvas.'
+                    "
+                    actionLabel="Open a pipeline…"
+                    (action)="openPipelines()"
+                >
+                </inspecto-empty-state>
+            } @else {
+                <inspecto-empty-state
+                    icon="heroicons_outline:arrows-right-left"
+                    title="No authored pipelines"
+                    message="Create a pipeline to start composing a topology."
+                >
+                </inspecto-empty-state>
+            }
         </div>
     } @else {
         <!-- ── body: [palette dock] │ canvas │ [properties dock] ───────────────────────────────── -->
@@ -374,7 +426,7 @@
                                     [selectedEdgeId]="selectedEdgeId()"
                                     [selectedEdgeRel]="selectedEdgeRel()"
                                     [candidateRels]="candidateRels()"
-                                    [readOnly]="!lens.canAuthorWorkbench()"
+                                    [readOnly]="!canAuthor()"
                                     [canRunToHere]="scratchRunAvailable"
                                     (configure)="openNodeConfig($event)"
                                     (runToHere)="openRunToHere($event)"

@@ -1,10 +1,12 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    Input,
     OnInit,
     ViewChild,
     ViewEncapsulation,
     computed,
+    effect,
     inject,
     signal,
 } from '@angular/core';
@@ -47,6 +49,7 @@ import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { ParserConfigDialog } from './parser-config.dialog';
+import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
@@ -137,7 +140,42 @@ export class PipelineEditorComponent implements OnInit {
 
     @ViewChild(PipelineEditorGraphComponent) private canvas?: PipelineEditorGraphComponent;
 
+    /**
+     * View mode: the identical shell with every mutating affordance withheld. Distinct from the
+     * Business-lens gate (a permission) — this is the user choosing to look rather than author, so both
+     * are consulted through {@link canAuthor}, and neither alone is trusted.
+     */
+    @Input() readOnly = false;
+
     readonly flows = signal<PipelineSummary[]>([]);
+
+    // ── open set (tabs) ───────────────────────────────────────────────────────────────────────────
+    /** The open tabs, in strip order. Nothing is open until the user opens something. */
+    readonly openIds = signal<string[]>([]);
+    /**
+     * Per-tab graph + dirty state, so switching tabs never silently discards unsaved edits. The active
+     * tab's graph lives in {@link model} as before; this is where the inactive ones wait.
+     */
+    private readonly cachedModels = new Map<string, AuthoredPipeline>();
+    private readonly dirtyIds = signal<ReadonlySet<string>>(new Set());
+
+    /**
+     * Mirror the active tab's `dirty` into the per-tab set. One effect rather than touching the dozen
+     * scattered `dirty.set(...)` call sites — those all describe *what changed*, and none of them should
+     * have to know about tabs.
+     */
+    private readonly trackDirtyPerTab = effect(() => {
+        const id = this.selectedId();
+        const isDirty = this.dirty();
+        if (!id) return;
+        this.dirtyIds.update((s) => {
+            if (s.has(id) === isDirty) return s; // no-op keeps the signal from re-notifying
+            const next = new Set(s);
+            if (isDirty) next.add(id);
+            else next.delete(id);
+            return next;
+        });
+    });
     /** Configurable processor icons/colours (empty until loaded → fall back to the per-kind glyph). */
     readonly iconMap = signal<IconMap>({});
     readonly selectedId = signal<string | null>(null);
@@ -150,12 +188,6 @@ export class PipelineEditorComponent implements OnInit {
     });
     /** True when the selection is a non-runnable authoring template — it must not offer Activate. */
     readonly isTemplate = computed(() => this.selectedSummary()?.template === true);
-    /** The toolbar's document title — the open pipeline's display name, or the pick-one prompt. */
-    readonly selectedLabel = computed(() => {
-        const s = this.selectedSummary();
-        return s ? s.displayName || s.name : 'Select a pipeline';
-    });
-
     /** The selected pipeline as a transfer reference — what the export/import menu offers. */
     readonly transferItems = computed(() => {
         const id = this.selectedId();
@@ -301,7 +333,11 @@ export class PipelineEditorComponent implements OnInit {
             next: (fs) => {
                 this.flows.set(fs);
                 this.loading.set(false);
-                if (fs.length && !this.selectedId()) this.select(fs[0].name);
+                // Deliberately opens nothing. Listing is cheap; lifting a graph is not, and auto-opening
+                // one arbitrary pipeline both cost a fetch nobody asked for and made the tab strip lie
+                // about what the user had chosen. The Open dialog is the only thing that opens a tab.
+                // Re-listing (after a save/import) must not disturb tabs already open.
+                this.openIds.update((ids) => ids.filter((id) => fs.some((f) => f.name === id)));
             },
             error: () => {
                 this.flows.set([]);
@@ -346,8 +382,123 @@ export class PipelineEditorComponent implements OnInit {
         }
     }
 
-    select(id: string): void {
+    /** Whether this session may mutate: an authoring lens AND not the read-only View. */
+    canAuthor(): boolean {
+        return this.lens.canAuthorWorkbench() && !this.readOnly;
+    }
+
+    /** Tab strip rows — open ids resolved to their list entry, with per-tab dirty state. */
+    readonly tabs = computed(() =>
+        this.openIds().map((id) => {
+            const f = this.flows().find((x) => x.name === id);
+            return { id, label: f?.displayName || id, template: f?.template === true, dirty: this.dirtyIds().has(id) };
+        }),
+    );
+
+    /** Any tab with unsaved edits — drives the leave/close warnings. */
+    readonly anyDirty = computed(() => this.dirtyIds().size > 0);
+
+    /** Search-and-choose the open set. Returns the FULL desired set, so unticking closes a tab. */
+    openPipelines(): void {
+        this.dialog
+            .open(PipelineOpenDialog, {
+                width: '30rem',
+                data: { pipelines: this.flows(), open: this.openIds() },
+            })
+            .afterClosed()
+            .subscribe((next?: string[]) => {
+                if (!next) return;
+                const keep = new Set(next);
+                // Closing a dirty tab from here would discard edits invisibly — keep those open and say so.
+                const refused = this.openIds().filter((id) => !keep.has(id) && this.dirtyIds().has(id));
+                for (const id of refused) keep.add(id);
+                if (refused.length) {
+                    this.toast.warning(
+                        `Kept ${refused.length} tab(s) with unsaved changes open — save or close them individually.`,
+                    );
+                }
+                for (const id of this.openIds()) if (!keep.has(id)) this.forgetTab(id);
+                this.openIds.set(next.filter((id) => keep.has(id)).concat([...keep].filter((id) => !next.includes(id))));
+
+                const active = this.selectedId();
+                if (!active || !keep.has(active)) {
+                    const first = this.openIds()[0];
+                    if (first) this.activateTab(first);
+                    else this.clearActive();
+                }
+            });
+    }
+
+    /**
+     * Make an already-open tab the active one, parking the outgoing tab's graph and dirty flag.
+     * Named `activateTab`, not `activate` — {@link activate} already means "arm this pipeline to run".
+     */
+    activateTab(id: string): void {
+        if (this.selectedId() === id) return;
+        this.parkCurrent();
         this.clearSelection();
+        const cached = this.cachedModels.get(id);
+        if (cached) {
+            this.model.set(cached);
+            this.selectedId.set(id);
+            this.dirty.set(this.dirtyIds().has(id));
+            this.loadLastRun(id);
+            return;
+        }
+        this.select(id);
+    }
+
+    /** Close one tab. A dirty tab asks first — this is the only path that can discard edits. */
+    async closeTab(id: string): Promise<void> {
+        if (this.dirtyIds().has(id)) {
+            const ok = await this.confirm.confirmDestructive(
+                `'${id}' has edits that have not been saved. Closing the tab discards them.`,
+                { title: 'Discard unsaved changes?', confirmText: 'Discard' },
+            );
+            if (!ok) return;
+        }
+        this.forgetTab(id);
+        this.openIds.update((ids) => ids.filter((x) => x !== id));
+        if (this.selectedId() !== id) return;
+        this.clearActive();
+        const next = this.openIds()[0];
+        if (next) this.activateTab(next);
+    }
+
+    private forgetTab(id: string): void {
+        this.cachedModels.delete(id);
+        this.dirtyIds.update((s) => {
+            const next = new Set(s);
+            next.delete(id);
+            return next;
+        });
+    }
+
+    /** No active tab — the empty canvas state. */
+    private clearActive(): void {
+        this.clearSelection();
+        this.selectedId.set(null);
+        this.model.set(null);
+        this.dirty.set(false);
+        this.lastRunBatch.set(null);
+    }
+
+    /**
+     * Park the active tab's graph so switching away from it cannot lose edits. Every path that changes
+     * the active tab goes through here — {@link select} included, which is how the first version leaked.
+     */
+    private parkCurrent(): void {
+        const current = this.selectedId();
+        if (!current) return;
+        const m = this.model();
+        if (m) this.cachedModels.set(current, m);
+    }
+
+    /** Fetch and open a pipeline's graph, adding a tab for it if it is not already open. */
+    select(id: string): void {
+        if (this.selectedId() !== id) this.parkCurrent();
+        this.clearSelection();
+        if (!this.openIds().includes(id)) this.openIds.update((ids) => [...ids, id]);
         // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
         this.api.pipelineGraphRaw(id).subscribe({
             next: (flow) => {
@@ -461,7 +612,7 @@ export class PipelineEditorComponent implements OnInit {
      * human as the audited actor (decision D2). Nothing is persisted by applying.
      */
     applyPipelineDraft(draft: AiDraft): void {
-        if (!this.lens.canAuthorWorkbench()) return; // defense in depth, not just the button
+        if (!this.canAuthor()) return; // defense in depth, not just the button
         const flow = draft.config as unknown as AuthoredPipeline;
         if (!flow?.nodes || !flow?.edges) return;
         const current = this.model();
@@ -628,7 +779,7 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     openNodeConfig(node: AuthoredNode): void {
-        if (!this.lens.canAuthorWorkbench()) return; // Business lens: no-op — double-click/Configure can't mutate
+        if (!this.canAuthor()) return; // read-only (Business lens or View mode): no-op — double-click/Configure can't mutate
         const category = this.typeCategory(node.type);
         // Parsers get the rich multi-pane parser editor; every other category uses the generic config popup.
         const ref =
@@ -708,7 +859,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Drag-to-draw: G6 already drew the edge, so only record it in the model (default `data` relationship). */
     onEdgeCreated(e: { source: string; target: string }): void {
-        if (!this.lens.canAuthorWorkbench()) return; // Business lens: canvas drag-to-draw can't mutate
+        if (!this.canAuthor()) return; // read-only (Business lens or View mode): canvas drag-to-draw can't mutate
         if (e.source === e.target) return;
         this.addEdge(e.source, e.target, 'data', { skipCanvas: true });
     }
@@ -736,7 +887,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Palette drag-drop: place the new node where it was dropped. */
     onDropAdd(e: { type: string; x: number; y: number }): void {
-        if (!this.lens.canAuthorWorkbench() || !this.model()) return; // Business lens: palette drag can't mutate
+        if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette drag can't mutate
         const node = this.insertNode(e.type);
         this.canvas?.addNode(node.id, node.id, this.visualKind(e.type), e.x, e.y);
         this.selectNewNode(node);
@@ -744,7 +895,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Palette click / keyboard (Enter): add the node at the canvas centre — the no-mouse path to add. */
     addFromPalette(type: string): void {
-        if (!this.lens.canAuthorWorkbench() || !this.model()) return; // Business lens: palette click can't mutate
+        if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette click can't mutate
         const node = this.insertNode(type);
         this.canvas?.addNodeAtCenter(node.id, node.id, this.visualKind(type));
         this.selectNewNode(node);
@@ -769,7 +920,7 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     onDeleteKey(): void {
-        if (!this.lens.canAuthorWorkbench()) return; // Business lens: the canvas Delete key can't mutate
+        if (!this.canAuthor()) return; // read-only (Business lens or View mode): the canvas Delete key can't mutate
         const edgeId = this.selectedEdgeId();
         const node = this.selectedNode();
         if (edgeId) {

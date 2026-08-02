@@ -97,6 +97,93 @@ describe('PipelineEditorComponent', () => {
         return (c as unknown as { canvas: ReturnType<typeof canvasMock> }).canvas;
     }
 
+    describe('open set / tabs', () => {
+        it('opens nothing on arrival — listing is cheap, lifting a graph is not', () => {
+            api.list.mockReturnValue(of([
+                { name: 'a', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+                { name: 'b', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+            ]));
+            const c = make();
+            expect(c.flows()).toHaveLength(2);
+            expect(c.openIds()).toEqual([]);
+            expect(c.selectedId()).toBeNull();
+            expect(api.pipelineGraphRaw).not.toHaveBeenCalled();
+        });
+
+        it('select opens a tab and makes it active', () => {
+            const c = make();
+            c.select('demo');
+            expect(c.openIds()).toEqual(['demo']);
+            expect(c.selectedId()).toBe('demo');
+            expect(api.pipelineGraphRaw).toHaveBeenCalledWith('demo');
+        });
+
+        it('switching tabs keeps each tab\'s unsaved edits — the data-loss trap', () => {
+            const c = make();
+            c.select('demo');
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'extra', type: 'transform.filter', config: {} }] }));
+            c.dirty.set(true);
+            TestBed.tick(); // flush the per-tab dirty effect
+
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            expect(c.selectedId()).toBe('other');
+            expect(c.model()!.nodes).toHaveLength(0);
+            expect(c.dirty()).toBe(false);
+
+            // Back to the first tab: the edit is still there, and still flagged dirty.
+            c.activateTab('demo');
+            expect(c.selectedId()).toBe('demo');
+            expect(c.model()!.nodes.some((n) => n.id === 'extra')).toBe(true);
+            expect(c.dirty()).toBe(true);
+            // Restoring from cache must not refetch.
+            expect(api.pipelineGraphRaw).toHaveBeenCalledTimes(2);
+        });
+
+        it('closing a clean tab drops it and activates a neighbour', () => {
+            const c = make();
+            c.select('demo');
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            expect(c.openIds()).toEqual(['demo', 'other']);
+
+            void c.closeTab('other');
+            expect(c.openIds()).toEqual(['demo']);
+            expect(c.selectedId()).toBe('demo');
+        });
+
+        it('closing the last tab returns to the empty canvas', () => {
+            const c = make();
+            c.select('demo');
+            void c.closeTab('demo');
+            expect(c.openIds()).toEqual([]);
+            expect(c.selectedId()).toBeNull();
+            expect(c.model()).toBeNull();
+        });
+
+        it('re-listing after a save leaves open tabs alone but drops deleted ones', () => {
+            const c = make();
+            c.select('demo');
+            c.select('gone');
+            api.list.mockReturnValue(of([
+                { name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+            ]));
+            c.load();
+            expect(c.openIds()).toEqual(['demo']);
+        });
+    });
+
+    it('readOnly withholds authoring even when the lens would allow it', () => {
+        const c = make();
+        c.readOnly = true;
+        c.model.set(structuredClone(FLOW));
+        expect(c.canAuthor()).toBe(false);
+
+        c.onDropAdd({ type: 'transform.filter', x: 10, y: 20 });
+        expect(c.model()!.nodes).toHaveLength(2); // unchanged
+        expect(c.dirty()).toBe(false);
+    });
+
     it('dropping a palette node adds it to the model and the canvas', () => {
         const c = make();
         c.model.set(structuredClone(FLOW));
