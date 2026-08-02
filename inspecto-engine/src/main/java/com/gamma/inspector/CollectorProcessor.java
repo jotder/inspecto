@@ -83,6 +83,11 @@ public class CollectorProcessor {
 
         MarkerManager.cleanupStaleMarkers(cfg);
 
+        // B3b: acquisition (remote fetch-and-land) is its own unit now. It runs inline here for a poll cycle
+        // — a later step gives it its own driver, timer and budget — and is a no-op for a local collector.
+        // Landed files then look exactly like locally-pushed ones to the ingest walk below.
+        acquire(cfg);
+
         // The set of inbox files this cycle will ingest (matching, ready/stable, not already-processed).
         // The real run path emits readiness signals (FILE_STABLE + the waiting-stability gauge); the
         // read-only countPending scan does not.
@@ -175,109 +180,151 @@ public class CollectorProcessor {
     }
 
     /**
-     * Discover → readiness-gate → duplicate-filter. Discovery is delegated to the configured source connector
-     * (the built-in LOCAL connector reproduces the legacy poll-dir tree-walk exactly). When a
-     * {@code source.stability} block is configured, {@link StabilityGate} holds back any file that is still
-     * arriving (size/mtime not yet quiescent, or a {@code ready_marker} absent) so a half-written file is never
-     * ingested; absent that block, every discovered file is a candidate immediately — Phase-A behaviour.
-     * Duplicate-marker filtering then stays an engine concern applied on top, split out from the listing so a
-     * large inbox can run the per-file marker stat in parallel (order need not be preserved).
+     * The acquisition unit (B3b): for a REMOTE collector, run the network-facing half of a poll cycle — open
+     * the connector, honour the circuit breaker, discover, stability-gate and gap-detect over the remote
+     * listing, apply the incremental watermark, then fetch each ready file and land it atomically in the inbox
+     * (B3a). Returns how many files it landed this call. A LOCAL collector needs no acquisition — files are
+     * pushed straight to {@code dirs.poll} — so this returns {@code 0} without opening anything.
      *
-     * @param emitSignals {@code true} only on the real {@link #run} path — it then emits a
-     *                    {@link EventType#FILE_STABLE} event per file the gate just released and refreshes the
-     *                    {@code inspecto_files_waiting_stability} gauge; {@code countPending} passes
-     *                    {@code false} so a dashboard poll stays side-effect-free.
+     * <p>{@link #run} calls this inline before {@link #collect} today; a later step gives it its own driver,
+     * timer and budget. The unit boundary is drawn here (plan §5) so that move is a re-parenting, not a rewrite.
      */
-    private static List<File> collect(PipelineConfig cfg, boolean emitSignals) throws java.io.IOException {
+    @PublicApi(since = "1.0.0")
+    public static int acquire(PipelineConfig cfg) throws java.io.IOException {
+        if (!CollectorConnectors.isRemote(cfg)) return 0;   // local collector: nothing to acquire
+
         PipelineConfig.Collector src = cfg.collector();
         PipelineConfig.Stability st = src.stability();
-
-        // When stability gating is on, fold the temp/in-flight excludes (*.tmp/*.partial/…) into discovery so
-        // a file mid-write is never even listed; absent a stability block this stays empty ⇒ discovery unchanged.
-        List<String> excludes = src.excludes();
-        if (st.enabled() && st.excludeTempFiles()) {
-            excludes = new ArrayList<>(excludes);
-            excludes.addAll(st.tempPatterns());
-        }
-        DiscoveryContext ctx = new DiscoveryContext(src.includes(), excludes, src.recursiveDepth());
+        DiscoveryContext ctx = discoveryContext(src, st);
         RetryPolicy retry = RetryPolicy.from(src.retry());
 
         // The connector stays open through materialisation: a remote connector holds a session for the lifetime
-        // of the cycle, and fetchTo() needs it. (The local connector holds nothing — close is a no-op.)
+        // of the fetch, and fetchTo() needs it.
         try (CollectorConnector connector = CollectorConnectors.forConfig(cfg)) {
-            boolean remote = !"local".equalsIgnoreCase(connector.scheme());
-
             // Circuit breaker (Phase F): if this source's breaker is OPEN (repeated connectivity failures), skip
-            // the whole cycle rather than hammering a dead endpoint — it half-opens for one trial after cooldown.
+            // acquisition rather than hammering a dead endpoint — it half-opens for one trial after cooldown.
             PipelineConfig.CircuitBreaker cb = src.circuitBreaker();
-            if (remote && cb.enabled() && !CircuitBreaker.shared().allow(src.id(), cb.cooldownMillis())) {
-                if (emitSignals)
-                    log.warn("Source {} circuit OPEN — skipping this cycle (cooldown {}ms)",
-                            cfg.identity().pipelineName(), cb.cooldownMillis());
-                return List.of();
+            if (cb.enabled() && !CircuitBreaker.shared().allow(src.id(), cb.cooldownMillis())) {
+                log.warn("Source {} circuit OPEN — skipping acquisition this cycle (cooldown {}ms)",
+                        cfg.identity().pipelineName(), cb.cooldownMillis());
+                return 0;
             }
 
             // Discover, with retry/backoff (Phase F) for transient remote faults. Connectivity success/failure
-            // feeds the breaker so a flapping endpoint trips it; the local connector never throws here.
+            // feeds the breaker so a flapping endpoint trips it.
             List<RemoteFile> discovered;
             try {
                 discovered = retry.execute(() -> connector.discover(ctx));
-                if (remote && cb.enabled()) CircuitBreaker.shared().recordSuccess(src.id());
+                if (cb.enabled()) CircuitBreaker.shared().recordSuccess(src.id());
             } catch (Exception e) {
-                if (remote && cb.enabled()
-                        && CircuitBreaker.shared().recordFailure(src.id(), cb.failureThreshold()) && emitSignals)
+                if (cb.enabled() && CircuitBreaker.shared().recordFailure(src.id(), cb.failureThreshold()))
                     AcquisitionTelemetry.emitCircuitOpen(cfg, e.getMessage());
                 if (e instanceof java.io.IOException io) throw io;
                 if (e instanceof RuntimeException re) throw re;
                 throw new java.io.IOException("Discovery failed for " + cfg.identity().pipelineName(), e);
             }
 
-            StabilityGate.StabilityResult gated = (st.enabled() && !discovered.isEmpty())
-                    ? StabilityGate.shared().filter(src.id(), discovered, connector, st.windowMillis(), st.sizeChecks())
-                    : null;
-            List<RemoteFile> ready = (gated != null) ? gated.ready() : discovered;
-
-            if (emitSignals && st.enabled()) {
-                AcquisitionTelemetry.setWaitingGauge(cfg, gated != null ? gated.waiting().size() : 0);
-                if (gated != null) for (RemoteFile f : gated.newlyStable()) AcquisitionTelemetry.emitFileStable(cfg, f);
-            }
+            List<RemoteFile> ready = gateStability(cfg, src, st, connector, discovered, true);
 
             // Gap detection (Phase D): over the full discovery listing (not the dedup-filtered candidates) so a
-            // hole in the expected series is reported even when nothing new is ingestable this cycle. Run path only.
-            if (emitSignals && cfg.collector().gapDetection().active() && !discovered.isEmpty())
+            // hole in the expected series is reported even when nothing new is ingestable this cycle.
+            if (cfg.collector().gapDetection().active() && !discovered.isEmpty())
                 detectGaps(cfg, discovered);
 
-            // Incremental discovery (Phase C4): when source.incremental.watermark is set, drop candidates modified
-            // strictly before the source's high-watermark (the max last_modified the ledger has recorded). Applied
-            // BEFORE the remote/local split so a remote source spends no fetch bandwidth on old objects; gap
-            // detection above already saw the full listing, so a hole is still reported.
+            // Incremental discovery (Phase C4): when source.incremental.watermark is set, drop objects modified
+            // strictly before the source's high-watermark so a remote source spends no fetch bandwidth on them;
+            // gap detection above already saw the full listing, so a hole is still reported.
             if (cfg.collector().incremental().enabled() && !ready.isEmpty())
-                ready = watermarkFilter(cfg, ready, emitSignals);
+                ready = watermarkFilter(cfg, ready, true);
 
-            if (ready.isEmpty()) return List.of();
+            if (ready.isEmpty()) return 0;
 
-            // Remote sources (SFTP/FTP/…) — Phase E: fetch the bytes into the staging tree and land them
-            // atomically in the poll root (B3a), so the rest of the engine — dedup, markers, ledger, backup —
-            // treats them exactly like local files with no further change. Discovery for a remote source uses
-            // the connector (not a poll walk), so landed files are never re-listed. A read-only pending scan
-            // NEVER fetches — it returns a count-only approximation.
-            //
-            // B3b will lift this call out to its own driver; everything above it is that driver's unit. The
-            // boundary is drawn here deliberately (plan §5) so the move is a re-parenting, not a rewrite.
-            if (remote) {
-                if (!emitSignals) return RemoteAcquisitionHandler.pendingRemoteApprox(cfg, ready);
-                ready = RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry);
-                if (ready.isEmpty()) return List.of();
-            }
-
-            List<File> candidates = dedupLocal(cfg, ready, emitSignals);
-            // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
-            // read-only pending scan must keep reporting the true backlog — and only when an operator set
-            // -Dingest.maxFilesPerCycle, so the default path is byte-for-byte the pre-T15 behaviour. Files
-            // beyond the cap are simply not admitted this cycle: they stay in the durable inbox (uncommitted,
-            // so no marker/ledger entry hides them) and the next cycle sees them again.
-            return emitSignals ? admit(cfg, candidates) : candidates;
+            // Fetch the bytes into the staging tree and land them atomically in the poll root (B3a), so the rest
+            // of the engine — dedup, markers, ledger, backup — treats them exactly like local files.
+            return RemoteAcquisitionHandler.materializeRemote(cfg, connector, ready, retry).size();
         }
+    }
+
+    /**
+     * Ingest discovery: walk {@code dirs.poll} locally (for EVERY collector — a remote collector's files have
+     * already been fetched and landed there by {@link #acquire}) and filter to ready/stable, not-already-processed
+     * candidates. Duplicate-marker filtering stays an engine concern applied on top, split out from the listing so
+     * a large inbox can run the per-file marker stat in parallel (order need not be preserved).
+     *
+     * <p>For a LOCAL collector the readiness gate, gap detection and incremental watermark run here over the inbox
+     * walk — they protect a half-written local push. For a REMOTE collector they already ran in {@link #acquire}
+     * over the remote listing, and a landed file is atomically complete by construction, so gating it again would
+     * be both wrong and redundant.
+     *
+     * @param emitSignals {@code true} only on the real {@link #run} path — it then emits a
+     *                    {@link EventType#FILE_STABLE} event per file the gate just released, refreshes the
+     *                    {@code inspecto_files_waiting_stability} gauge, and applies the T15 admission cap;
+     *                    {@code countPending} passes {@code false} so a dashboard poll stays side-effect-free.
+     */
+    private static List<File> collect(PipelineConfig cfg, boolean emitSignals) throws java.io.IOException {
+        PipelineConfig.Collector src = cfg.collector();
+        PipelineConfig.Stability st = src.stability();
+        boolean remote = CollectorConnectors.isRemote(cfg);
+        DiscoveryContext ctx = discoveryContext(src, st);
+
+        // Always walk the inbox locally. The local connector holds nothing — close is a no-op.
+        List<RemoteFile> ready;
+        try (CollectorConnector inbox = CollectorConnectors.localForConfig(cfg)) {
+            List<RemoteFile> discovered = inbox.discover(ctx);
+            if (remote) {
+                ready = discovered;   // landed files are complete; acquire() already gated/gapped/watermarked
+            } else {
+                ready = gateStability(cfg, src, st, inbox, discovered, emitSignals);
+                if (emitSignals && cfg.collector().gapDetection().active() && !discovered.isEmpty())
+                    detectGaps(cfg, discovered);
+                if (cfg.collector().incremental().enabled() && !ready.isEmpty())
+                    ready = watermarkFilter(cfg, ready, emitSignals);
+            }
+        }
+        if (ready.isEmpty()) return List.of();
+
+        List<File> candidates = dedupLocal(cfg, ready, emitSignals);
+        // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
+        // read-only pending scan must keep reporting the true backlog — and only when an operator set
+        // -Dingest.maxFilesPerCycle, so the default path is byte-for-byte the pre-T15 behaviour. Files
+        // beyond the cap are simply not admitted this cycle: they stay in the durable inbox (uncommitted,
+        // so no marker/ledger entry hides them) and the next cycle sees them again.
+        return emitSignals ? admit(cfg, candidates) : candidates;
+    }
+
+    /**
+     * Build the discovery filter (includes/excludes/depth). When stability gating is on and configured to exclude
+     * temp files, fold the in-flight patterns ({@code *.tmp}/{@code *.partial}/…) into the excludes so a file
+     * mid-write is never even listed; absent a stability block this stays empty ⇒ discovery unchanged.
+     */
+    private static DiscoveryContext discoveryContext(PipelineConfig.Collector src, PipelineConfig.Stability st) {
+        List<String> excludes = src.excludes();
+        if (st.enabled() && st.excludeTempFiles()) {
+            excludes = new ArrayList<>(excludes);
+            excludes.addAll(st.tempPatterns());
+        }
+        return new DiscoveryContext(src.includes(), excludes, src.recursiveDepth());
+    }
+
+    /**
+     * Readiness gate (Phase B): when a {@code source.stability} block is configured, {@link StabilityGate} holds
+     * back any file that is still arriving (size/mtime not yet quiescent, or a {@code ready_marker} absent) so a
+     * half-written file is never ingested; absent that block, every discovered file is ready immediately. On the
+     * run path ({@code emitSignals}) it also refreshes the {@code inspecto_files_waiting_stability} gauge and
+     * emits a {@link EventType#FILE_STABLE} event per file the gate just released.
+     */
+    private static List<RemoteFile> gateStability(PipelineConfig cfg, PipelineConfig.Collector src,
+            PipelineConfig.Stability st, CollectorConnector connector, List<RemoteFile> discovered, boolean emitSignals)
+            throws java.io.IOException {
+        StabilityGate.StabilityResult gated = (st.enabled() && !discovered.isEmpty())
+                ? StabilityGate.shared().filter(src.id(), discovered, connector, st.windowMillis(), st.sizeChecks())
+                : null;
+        List<RemoteFile> ready = (gated != null) ? gated.ready() : discovered;
+        if (emitSignals && st.enabled()) {
+            AcquisitionTelemetry.setWaitingGauge(cfg, gated != null ? gated.waiting().size() : 0);
+            if (gated != null) for (RemoteFile f : gated.newlyStable()) AcquisitionTelemetry.emitFileStable(cfg, f);
+        }
+        return ready;
     }
 
     /**

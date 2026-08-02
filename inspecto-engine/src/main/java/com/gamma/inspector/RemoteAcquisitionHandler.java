@@ -16,7 +16,6 @@ import com.gamma.event.EventType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -325,19 +324,6 @@ final class RemoteAcquisitionHandler {
             log.warn("Post-action {} failed for {} on {}: {} — file already staged, continuing",
                     action.kind(), rf.relativePath(), cfg.identity().pipelineName(), e.getMessage());
         }
-    }
-
-    /**
-     * Count-only pending approximation for a remote source on the read-only {@code countPending} path — it must
-     * never fetch over the network. Returns the would-be staging paths of the ready files that pre-fetch dedup
-     * wouldn't immediately skip; the caller only reads {@code size()}.
-     */
-    static List<File> pendingRemoteApprox(PipelineConfig cfg, List<RemoteFile> ready) {
-        Path pollRoot = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
-        List<File> out = new ArrayList<>(ready.size());
-        for (RemoteFile rf : ready)
-            if (!isKnownDuplicate(cfg, rf, pollRoot)) out.add(pollRoot.resolve(rf.relativePath()).toFile());
-        return out;
     }
 
     /**
