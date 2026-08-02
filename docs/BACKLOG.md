@@ -427,6 +427,36 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- **Build → Test → Run authoring journey — the middle step is missing** (surfaced 2026-08-02). Plan of
+  record: [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md).
+  Build (wizard **or** graph editor → one canonical `<id>_pipeline.toon`) and Run (`active:` poll loop /
+  `POST /runs/{name}/trigger`) both work; **a user cannot test a pipeline against their own data.**
+  - **G1 ⚠ two of three test affordances call endpoints that don't exist.** *Run to here*
+    (`pipelines.service.ts:349` → `POST /pipelines/authored/{id}/run?to=`) was **reserved and never
+    built** — `PipelineRoutes.java:69` says so in a comment. *Node Test* (`node-config.dialog.ts:397`)
+    posts `node.type`+`node.id` to `/components/{type}/{id}/test`, whose routes only accept bare
+    `transform`/`grammar`/`sink` + a registered component name (`ComponentRoutes.java:42-44`) — dotted
+    type and node id both miss. Both 404. Only `dry-run` works, over **user-typed synthetic JSON**.
+    *Decide per button: implement or remove — a 404ing affordance is worse than none.*
+  - **G2 no authoring-time signal for unsupported nodes.** `LOWERABLE` is private
+    (`PipelineEditable.java:43`); `GET /pipelines/node-types` has no `lowerable` flag, so the palette
+    shows all 20 types as equal and the user learns at Save via 422. ⚠ The 2026-08-02 editor redesign
+    amplified this — the palette went from hidden popup to permanent menu.
+  - **G3 refusals are a first-only transient toast** (`pipeline-editor.component.ts:483` takes
+    `refusals[0]`) → save/fix/save whack-a-mole. The Validation dock beside it already renders
+    persistent click-to-select findings.
+  - **G4 ⚠ the wizard can write an `active:true` pipeline that silently never runs — VERIFIED
+    2026-08-02.** `POST /config/write` never calls `PipelineConfig.load` (`ConfigRoutes.java:110-171`),
+    so it returns **`written:true`** for an `active:true` schema-less config that
+    `PipelineConfigParser.parse:384-389` hard-throws on. `ConfigRegistry.rebuild:102-104` catches it,
+    logs one WARN, and **omits the pipeline from the index**; `PipelineScheduler.selectDue:227-230`
+    then skips it every cycle forever. **No metric, no run record, nothing in the Runs pane** — it
+    never enters the index, so it cannot even produce a failed run. Parser/sink are *not* reachable
+    gaps (`dirs.database` is `require()`d; parser defaults to `delimited`) — schema-when-active is the
+    one real hole. *Fix: load-check the written config in `/config/write` and 422 the parse failure.*
+    ⚠ Severity: G1 fails visibly; **G4 succeeds visibly and then does nothing.**
+  - **G5 silent one-way door** — a grandfathered `*_flow.toon` with non-lowerable nodes opens (lift
+    always succeeds) but can never be saved back; nothing says so until Save.
 - **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
   unification W5). W5 made the graph editor *author* the canonical `*_pipeline.toon` for the
   single-source subset, refusing everything else with `UNSUPPORTED_NODE`. **11 of the 20
