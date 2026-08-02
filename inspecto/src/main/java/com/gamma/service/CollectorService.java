@@ -487,9 +487,12 @@ public final class CollectorService implements AutoCloseable {
         // The loop/event-driven ingest driver (M2 step 2). Passed the SAME runGuard/registryLock/bus/
         // triggerWorkers and the shared registry/config/paused/running state — never clones — plus the two
         // callbacks for what stays here: the sync run-by-name (runPipeline, same runGuard) and the status sync.
+        // Acquisition has its own budget so network fetch never competes with DuckDB ingest for one
+        // allowance (B3b); defaults to the ingest budget, overridable with -Dacquire.maxConcurrent.
+        int maxConcurrentAcquisitions = Integer.getInteger("acquire.maxConcurrent", this.maxConcurrentRuns);
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,
                 this.running, this.runGuard, this.registryLock, this.bus, this.triggerWorkers,
-                this.maxConcurrentRuns,
+                this.maxConcurrentRuns, maxConcurrentAcquisitions,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
     }
 
@@ -837,6 +840,11 @@ public final class CollectorService implements AutoCloseable {
         // pipeline cannot delay the next tick for the others. runAllOnce (POST /trigger, tests) keeps the
         // blocking path — same runs, awaited. See PipelineScheduler's "Two cycle entry points, one body".
         scheduler.everySeconds("poll-all", 0, pollSeconds, () -> underSpace(pipelineScheduler::dispatchCycle));
+        // B3b: acquisition runs on its own timer, independent of the ingest cycle above, so a slow remote
+        // fetch never delays ingest of already-landed files. No-op for a local-only registry (nothing to
+        // acquire). -Dacquire.pollSeconds overrides the cadence; defaults to the ingest poll interval.
+        long acquireSeconds = Long.getLong("acquire.pollSeconds", pollSeconds);
+        scheduler.everySeconds("acquire-all", 0, acquireSeconds, () -> underSpace(pipelineScheduler::dispatchAcquireCycle));
         // ACQ-6 push discovery: filesystem events on local `source.discovery: watch` poll roots trigger an
         // immediate single-pipeline run (same runGuard as the loop above, which stays on as the backstop).
         watcher = CollectorWatcher.startFor(configRegistry.all(), name -> {

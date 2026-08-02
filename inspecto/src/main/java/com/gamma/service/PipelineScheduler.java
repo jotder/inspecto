@@ -3,7 +3,9 @@ package com.gamma.service;
 import com.gamma.etl.BatchEvent;
 import com.gamma.etl.BatchEventBus;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.acquire.CollectorConnectors;
 import com.gamma.acquire.IntakeGovernor;
+import com.gamma.inspector.CollectorProcessor;
 import com.gamma.inspector.MultiCollectorProcessor;
 import com.gamma.pipeline.PipelineTrigger;
 import com.gamma.pipeline.exec.TriggerCoalescer;
@@ -120,12 +122,19 @@ final class PipelineScheduler {
     private final Semaphore runPermits;
     /** Runs currently executing across <em>all</em> in-flight cycles, mirrored to {@code inspecto_active_runs}. */
     private final AtomicInteger activeRuns = new AtomicInteger();
+    /** Per-pipeline acquisition exclusion — SEPARATE from {@link #runGuard} (B3b): acquisition and ingest of
+     *  the <em>same</em> pipeline may overlap (fetch the next files while the last batch commits), while two
+     *  acquisitions of it may not (a slow fetch is skipped, not queued). */
+    private final PipelineRunGuard acquireGuard = new PipelineRunGuard();
+    /** Acquisition's own budget, held for the scheduler's lifetime — deliberately NOT {@link #runPermits}:
+     *  network fetch and DuckDB ingest must not compete for one allowance (B3b). */
+    private final Semaphore acquirePermits;
 
     PipelineScheduler(List<Path> registry, ConfigRegistry configRegistry, Set<String> paused,
                       Set<String> running, PipelineRunGuard runGuard, ReentrantLock registryLock,
                       BatchEventBus bus,
-                      ExecutorService triggerWorkers, int maxConcurrentRuns, long pollIntervalMs,
-                      Consumer<String> runPipeline, Runnable syncStatus) {
+                      ExecutorService triggerWorkers, int maxConcurrentRuns, int maxConcurrentAcquisitions,
+                      long pollIntervalMs, Consumer<String> runPipeline, Runnable syncStatus) {
         this.registry          = registry;
         this.configRegistry    = configRegistry;
         this.paused            = paused;
@@ -135,6 +144,7 @@ final class PipelineScheduler {
         this.bus               = bus;
         this.triggerWorkers    = triggerWorkers;
         this.runPermits        = new Semaphore(Math.max(1, maxConcurrentRuns));
+        this.acquirePermits    = new Semaphore(Math.max(1, maxConcurrentAcquisitions));
         this.pollIntervalMs    = pollIntervalMs;
         this.runPipeline       = runPipeline;
         this.syncStatus        = syncStatus;
@@ -156,7 +166,9 @@ final class PipelineScheduler {
      * again, because its claim is still held.
      */
     void dispatchCycle() {
-        dispatch(selectDue(System.currentTimeMillis()));
+        // Periodic driver: ingest only. A remote collector's files are fetched by the separate acquisition
+        // driver ({@link #dispatchAcquireCycle()}) on its own timer, so the poll tick must not re-fetch (B3b).
+        dispatch(selectDue(System.currentTimeMillis()), false);
     }
 
     /**
@@ -169,7 +181,9 @@ final class PipelineScheduler {
      * @return the run outcome (total / failed source counts)
      */
     MultiCollectorProcessor.RunResult runCycle() {
-        List<Future<Integer>> runs = dispatch(selectDue(System.currentTimeMillis()));
+        // Explicit "run all now" (POST /trigger, tests): a self-contained acquire-then-ingest cycle, so it
+        // fetches inline exactly as before B3b rather than waiting on the background acquisition driver.
+        List<Future<Integer>> runs = dispatch(selectDue(System.currentTimeMillis()), true);
         int failed = 0;
         for (Future<Integer> f : runs) {
             try {
@@ -233,7 +247,7 @@ final class PipelineScheduler {
      * whole audit for every config, so per-run would multiply that by the pipeline count. The last task to
      * finish fires it, which is the same point in the cycle as before — see {@link #runOne}.
      */
-    private List<Future<Integer>> dispatch(List<Due> due) {
+    private List<Future<Integer>> dispatch(List<Due> due, boolean acquireFirst) {
         if (due.isEmpty()) return List.of();
         com.gamma.metrics.MetricRegistry.global().inc("inspecto_poll_cycles_total", "Poll cycles run", Map.of());
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate this space onto each worker
@@ -241,7 +255,7 @@ final class PipelineScheduler {
         List<Future<Integer>> runs = new ArrayList<>(due.size());
         for (Due d : due) {
             try {
-                runs.add(triggerWorkers.submit(() -> runOne(d, mdc, pending)));
+                runs.add(triggerWorkers.submit(() -> runOne(d, mdc, pending, acquireFirst)));
             } catch (RejectedExecutionException e) {
                 // The service is shutting down. Release the claim we took during selection rather than
                 // leaking it, and decrement so a sibling task still fires the final status sync.
@@ -263,7 +277,7 @@ final class PipelineScheduler {
      *
      * @return {@code 1} when this pipeline's run failed, else {@code 0} — summed by {@link #runCycle()}
      */
-    private int runOne(Due due, Map<String, String> mdc, AtomicInteger pending) {
+    private int runOne(Due due, Map<String, String> mdc, AtomicInteger pending, boolean acquireFirst) {
         if (mdc != null) MDC.setContextMap(mdc);
         com.gamma.metrics.MetricRegistry reg = com.gamma.metrics.MetricRegistry.global();
         try (PipelineRunGuard.Claim claim = due.claim()) {
@@ -276,7 +290,7 @@ final class PipelineScheduler {
                     activeRuns.incrementAndGet());
             try {
                 MultiCollectorProcessor.RunResult r =
-                        MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink());
+                        MultiCollectorProcessor.runConfigs(List.of(due.cfg()), 1, bus.sink(), acquireFirst);
                 if (r.failed() > 0)
                     reg.inc("inspecto_source_run_failures_total", "Source-run failures", Map.of(), r.failed());
                 return r.failed();
@@ -413,6 +427,84 @@ final class PipelineScheduler {
     void forget(String id) {
         lastRunAtMs.remove(id);
         eventCoalescers.remove(id);
+        acquireGuard.forget(id);              // per-pipeline acquire lock (B3b) — same leak-under-churn reason
         IntakeGovernor.shared().forget(id);   // same leak-under-churn reason, one map further down
+    }
+
+    // ── Acquisition driver (B3b) ──────────────────────────────────────────────────
+    // A sibling of the ingest cycle: its own timer (registered by CollectorService), its own budget
+    // (acquirePermits) and its own per-pipeline guard (acquireGuard), so fetching a remote source runs
+    // independently of — and may overlap — ingesting it, while two fetches of the same source cannot.
+
+    /**
+     * One acquisition tick: fetch-and-land for every due REMOTE pipeline, then return without waiting —
+     * the network-facing mirror of {@link #dispatchCycle()}. Local pipelines have nothing to acquire and
+     * are skipped. Cadence is the acquisition timer's own interval, not a pipeline's {@code trigger:} — a
+     * cron-gated pipeline still wants its files staged and ready before the cron fires.
+     */
+    void dispatchAcquireCycle() {
+        dispatchAcquire(selectDueForAcquire());
+    }
+
+    /**
+     * Pick the remote pipelines to acquire this tick and claim each under {@link #acquireGuard}. Shares
+     * {@link #registryLock}/{@link #configRegistry} with ingest selection (bounded work, never held across a
+     * fetch). A pipeline still fetching from an earlier tick keeps its claim and is skipped, not queued.
+     */
+    private List<Due> selectDueForAcquire() {
+        List<Due> due = new ArrayList<>();
+        registryLock.lock();
+        try {
+            configRegistry.rebuild(registry);
+            for (Path p : registry) {
+                PipelineConfig cfg = configRegistry.configForPath(p).orElse(null);
+                if (cfg == null) continue;
+                String id = cfg.identity().pipelineName();
+                if (paused.contains(id) || !cfg.active() || cfg.template()) continue;
+                if (!CollectorConnectors.isRemote(cfg)) continue;   // local: nothing to acquire
+                PipelineRunGuard.Claim claim = acquireGuard.tryAcquire(id);
+                if (claim == null) continue;                        // still fetching from an earlier tick
+                due.add(new Due(cfg.forNewRun(), id, claim));
+            }
+        } finally {
+            registryLock.unlock();
+        }
+        return due;
+    }
+
+    /** Hand each selected pipeline's fetch to {@link #triggerWorkers}, releasing the claim on a rejected
+     *  submit (service stopping) so it cannot leak — mirrors {@link #dispatch}. */
+    private void dispatchAcquire(List<Due> due) {
+        if (due.isEmpty()) return;
+        Map<String, String> mdc = MDC.getCopyOfContextMap();
+        for (Due d : due) {
+            try {
+                triggerWorkers.submit(() -> acquireOne(d, mdc));
+            } catch (RejectedExecutionException e) {
+                d.claim().close();
+                log.debug("Acquire cycle: '{}' not dispatched (service stopping)", d.id());
+            }
+        }
+    }
+
+    /** Fetch-and-land one pipeline under its {@link #acquireGuard} claim and the {@link #acquirePermits}
+     *  budget, then release both. Runs on a {@link #triggerWorkers} virtual thread. */
+    private void acquireOne(Due due, Map<String, String> mdc) {
+        if (mdc != null) MDC.setContextMap(mdc);
+        try (PipelineRunGuard.Claim claim = due.claim()) {
+            acquirePermits.acquire();
+            try {
+                int landed = CollectorProcessor.acquire(due.cfg());
+                if (landed > 0) log.info("Acquired {} file(s) for '{}'", landed, due.id());
+            } catch (Exception e) {
+                log.error("Acquisition failed for '{}'", due.id(), e);
+            } finally {
+                acquirePermits.release();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();                 // shutting down while queued for a permit
+        } finally {
+            MDC.clear();
+        }
     }
 }

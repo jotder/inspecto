@@ -180,6 +180,19 @@ public final class MultiCollectorProcessor {
      */
     public static RunResult runConfigs(List<PipelineConfig> configs, int maxConcurrent,
                                        java.util.function.Consumer<com.gamma.etl.BatchEvent> onCommit) {
+        return runConfigs(configs, maxConcurrent, onCommit, true);
+    }
+
+    /**
+     * As {@link #runConfigs(List, int, java.util.function.Consumer)} but choosing whether each source
+     * acquires before it ingests. The service's <em>periodic</em> ingest driver passes {@code false} — a
+     * separate acquisition driver fetches remote files on its own timer and budget (B3b), so the poll tick
+     * must not re-fetch. Every other caller (CLI, {@code runAllOnce}, manual trigger) passes {@code true}
+     * for a self-contained acquire-then-ingest cycle.
+     */
+    public static RunResult runConfigs(List<PipelineConfig> configs, int maxConcurrent,
+                                       java.util.function.Consumer<com.gamma.etl.BatchEvent> onCommit,
+                                       boolean acquireFirst) {
         Semaphore permits    = new Semaphore(Math.max(1, maxConcurrent));
         AtomicInteger failed = new AtomicInteger();
         Map<String, String> mdc = MDC.getCopyOfContextMap();   // propagate the caller's space (MDC) onto each worker
@@ -192,7 +205,8 @@ public final class MultiCollectorProcessor {
                     try {
                         permits.acquire();
                         try {
-                            CollectorProcessor.run(cfg, onCommit);
+                            if (acquireFirst) CollectorProcessor.run(cfg, onCommit);
+                            else CollectorProcessor.ingest(cfg, onCommit);
                             log.info("Source '{}' completed", cfg.identity().pipelineName());
                         } catch (CollectorProcessor.BatchProcessingException e) {
                             failed.incrementAndGet();

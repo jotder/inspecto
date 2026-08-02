@@ -72,21 +72,32 @@ public class CollectorProcessor {
     }
 
     /**
-     * Run one poll cycle, emitting a {@link BatchEvent} to {@code onCommit} after each
-     * SUCCESS batch commits (the service layer passes a bus sink here so downstream
-     * stages can react). {@code onCommit} may be {@code null}.
+     * Run one full poll cycle for {@code cfg}: {@link #acquire} (remote fetch-and-land, a no-op for a local
+     * collector) followed by {@link #ingest}. This is the self-contained one-shot entry point — the CLI,
+     * {@code reprocess}, and the service's manual "run now". The always-on service instead drives acquisition
+     * and ingest on separate timers with separate budgets (B3b), calling the two halves independently.
+     * {@code onCommit} may be {@code null}.
      */
     public static void run(PipelineConfig cfg, java.util.function.Consumer<BatchEvent> onCommit)
+            throws Exception {
+        acquire(cfg);
+        ingest(cfg, onCommit);
+    }
+
+    /**
+     * Ingest one poll cycle: plan the inbox files into batches and process them in parallel, emitting a
+     * {@link BatchEvent} to {@code onCommit} after each SUCCESS batch commits (the service layer passes a bus
+     * sink here so downstream stages can react). Does <b>not</b> acquire — a remote collector's files must
+     * already have been fetched and landed in the inbox by {@link #acquire}. {@code onCommit} may be
+     * {@code null}.
+     */
+    @PublicApi(since = "1.0.0")
+    public static void ingest(PipelineConfig cfg, java.util.function.Consumer<BatchEvent> onCommit)
             throws Exception {
         Path root           = Paths.get(cfg.dirs().poll()).toAbsolutePath();
         if (!Files.exists(root)) Files.createDirectories(root);
 
         MarkerManager.cleanupStaleMarkers(cfg);
-
-        // B3b: acquisition (remote fetch-and-land) is its own unit now. It runs inline here for a poll cycle
-        // — a later step gives it its own driver, timer and budget — and is a no-op for a local collector.
-        // Landed files then look exactly like locally-pushed ones to the ingest walk below.
-        acquire(cfg);
 
         // The set of inbox files this cycle will ingest (matching, ready/stable, not already-processed).
         // The real run path emits readiness signals (FILE_STABLE + the waiting-stability gauge); the
