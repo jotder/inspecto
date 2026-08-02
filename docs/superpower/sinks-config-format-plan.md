@@ -142,10 +142,20 @@ ingest. Predicate = **`cfg.sinks().size() > 1`** (not the whole-graph `engages`,
   → ⚠ *toon-authoring gotcha:* in the indexed-tuple form, a `database` path (contains `:` and `/`) must be
   **quoted** in the row — `"/data/hot",PARQUET` — or the tabular decoder reads 0 rows.
 
-### Slice 4 — lift the editor `MULTI_SINK` refusal (GATED on slices 1–3) — *plan task #10*
-- `PipelineEditable.lower`: allow > 1 distinct `database` **when backed by a `sinks:` config**; keep every
-  other named refusal. `ConfigSpecs`/`ConfigJsonSchema` gain the `sinks:` structural spec here (its first
-  real consumer). Mock `pipeline-editable.ts` must refuse exactly what the server refuses.
+### Slice 4 — lift the editor `MULTI_SINK` refusal — *implemented (uncommitted)*
+- `PipelineEditable.lower`: >1 distinct `database` no longer refuses `MULTI_SINK` — it emits a plural
+  `sinks:` list (distinct destinations, keyed by database; the single `output:`/`dirs.database` shorthand
+  stays consistent with the first). Safe because row-routing can't reach the check: a `transform.route`/
+  `derive` node is not `LOWERABLE`, so it already fails `UNSUPPORTED_NODE` — every sink here is a data/
+  schema-dispatch fan-out that `sinks:` (replicate-per-destination) represents faithfully. The `MULTI_SINK`
+  constant/vocabulary is kept (never emitted now). Mock `pipeline-editable.ts` mirrors the change exactly.
+- **`ConfigSpecs`/`ConfigJsonSchema` spec deferred (not required):** `ConfigLoader.validate` only checks
+  *declared* fields and **ignores unknown keys**, so a lowered `sinks:` config round-trips + saves without a
+  spec. The spec is authoring-UX only (field metadata / JSON-schema) — a follow-up alongside the ducklake-in-
+  `.toon` representation.
+- → *verified:* `PipelineEditableTest.twoDistinctDatabasesLowerToASinksList` (lower emits a 2-element
+  `sinks:` list); `ControlApiFlowCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline` (a 2-database graph
+  `PUT`s 200, not 422). No UI spec pinned the old mock refusal.
 
 ## 4. Gotchas
 - ⚠ **No silent-drop.** Until slice 3, a `sinks().size() > 1` config must **fail at load**, never write only

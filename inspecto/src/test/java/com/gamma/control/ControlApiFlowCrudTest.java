@@ -133,19 +133,24 @@ class ControlApiFlowCrudTest {
             JsonNode refusal = V1Body.envelope(r.body()).get("error").get("details").get("refusals").get(0);
             assertEquals("UNSUPPORTED_NODE", refusal.get("code").asText());
             assertEquals("d1", refusal.get("nodeId").asText());
+        }
+    }
 
+    /** Two distinct-database sinks are no longer refused — they save as a multi-destination sinks: pipeline. */
+    @Test
+    void twoDistinctDatabasesSaveAsAMultiSinkPipeline(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String b = dir.toString().replace('\\', '/');
             String twoDbs = """
-                {"active":true,
-                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"in"}},
-                          {"id":"p","type":"parser","config":{"schema_file":"s.toon"}},
-                          {"id":"s1","type":"sink.persistent","config":{"database":"db_a"}},
-                          {"id":"s2","type":"sink.persistent","config":{"database":"db_b"}}],
+                {"active":false,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
+                          {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
+                          {"id":"s1","type":"sink.persistent","config":{"database":"%1$s/db_a","format":"PARQUET"}},
+                          {"id":"s2","type":"sink.persistent","config":{"database":"%1$s/db_b","format":"CSV"}}],
                  "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"s1"},
-                          {"from":"p","rel":"data","to":"s2"}]}""";
-            HttpResponse<String> r2 = send(c.port, "PUT", "/pipelines/refuse_b/graph", twoDbs);
-            assertEquals(422, r2.statusCode(), r2.body());
-            assertEquals("MULTI_SINK", V1Body.envelope(r2.body())
-                    .get("error").get("details").get("refusals").get(0).get("code").asText());
+                          {"from":"p","rel":"data","to":"s2"}]}""".formatted(b);
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/two_sink/graph", twoDbs);
+            assertEquals(200, r.statusCode(), r.body());
         }
     }
 

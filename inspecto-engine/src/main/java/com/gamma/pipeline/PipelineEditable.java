@@ -172,7 +172,9 @@ public final class PipelineEditable {
         PipelineNode acq = null, parser = null, gap = null, marker = null, fingerprint = null;
         PipelineNode primarySink = null, quarantineSink = null;
         List<PipelineNode> filters = new ArrayList<>();
-        Set<String> databases = new LinkedHashSet<>();
+        // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
+        // output:/dirs.database shorthand; more than one ⇒ a plural sinks: block (slice 4).
+        LinkedHashMap<String, PipelineNode> destByDatabase = new LinkedHashMap<>();
         for (PipelineNode n : g.nodes()) {
             String t = n.type();
             if (!LOWERABLE.contains(t)) {
@@ -190,16 +192,17 @@ public final class PipelineEditable {
                 if (isQuarantine(n)) {
                     quarantineSink = n;
                 } else {
-                    if (n.cfg("database") != null) databases.add(String.valueOf(n.cfg("database")));
+                    if (n.cfg("database") != null) destByDatabase.putIfAbsent(String.valueOf(n.cfg("database")), n);
                     if (primarySink == null || (primarySink.cfg("database") == null && n.cfg("database") != null))
                         primarySink = n;
                 }
             }
             // transform.map + enrichment: derived / companion-persisted — nothing to lower
         }
-        if (databases.size() > 1)
-            refusals.add(new PipelineCompileException.Refusal(MULTI_SINK, null,
-                    "persistent sinks name " + databases.size() + " distinct database dirs; the flat config has exactly one"));
+        // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4).
+        // Row-routing to distinct destinations can't reach here: a transform.route/derive node is not
+        // LOWERABLE, so it already fails UNSUPPORTED_NODE above; every sink here is a data/schema-dispatch
+        // fan-out, which sinks: (replicate-per-destination) represents faithfully.
 
         if (strict) {
             if (acq == null) refusals.add(new PipelineCompileException.Refusal(NO_ACQUISITION, null,
@@ -275,6 +278,23 @@ public final class PipelineEditable {
             replaceOrRemove(dirs, "backup", primarySink.cfg("backup"));
             replaceOrRemove(dirs, "temp", primarySink.cfg("temp"));
             for (String k : SINK_PROC_OWNED) replaceOrRemove(processing, k, primarySink.cfg(k));
+        }
+        // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
+        // dirs.database above stays the shorthand + parser fallback, consistent with the first destination).
+        // One destination ⇒ no sinks: block, so a single-output pipeline round-trips verbatim.
+        if (destByDatabase.size() > 1) {
+            List<Map<String, Object>> sinks = new ArrayList<>();
+            for (PipelineNode s : destByDatabase.values()) {
+                Map<String, Object> sink = new LinkedHashMap<>();
+                sink.put("database", s.cfg("database"));
+                putIfPresent(sink, "format", s.cfg("format"));
+                putIfPresent(sink, "compression", s.cfg("compression"));
+                putIfPresent(sink, "ducklake", s.cfg("ducklake"));
+                sinks.add(sink);
+            }
+            out.put("sinks", sinks);
+        } else {
+            out.remove("sinks");
         }
         // dirs.quarantine: replaced when a quarantine node exists, otherwise PRESERVED even in strict
         // mode — the lift only models a quarantine node for selector/segments pipelines, so a

@@ -111,7 +111,9 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     let marker: AuthoredNode | undefined, fingerprint: AuthoredNode | undefined;
     let primarySink: AuthoredNode | undefined, quarantine: AuthoredNode | undefined;
     const filters: AuthoredNode[] = [];
-    const databases = new Set<string>();
+    // Distinct output destinations keyed by database dir (order-preserving). One => the single
+    // output:/dirs.database shorthand; more than one => a plural sinks: block (slice 4).
+    const destByDatabase = new Map<string, AuthoredNode>();
 
     for (const n of g.nodes) {
         if (!LOWERABLE.has(n.type)) {
@@ -127,13 +129,14 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
             else {
-                if (n.config?.['database'] != null) databases.add(String(n.config['database']));
+                const db = n.config?.['database'];
+                if (db != null && !destByDatabase.has(String(db))) destByDatabase.set(String(db), n);
                 if (!primarySink || (primarySink.config?.['database'] == null && n.config?.['database'] != null)) primarySink = n;
             }
         }
     }
-    if (databases.size > 1)
-        refusals.push({ code: 'MULTI_SINK', message: `persistent sinks name ${databases.size} distinct database dirs; the flat config has exactly one` });
+    // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4).
+    // Row-routing can't reach here: a transform.route/derive node is not LOWERABLE (UNSUPPORTED_NODE above).
 
     if (strict) {
         if (!acq) refusals.push({ code: 'NO_ACQUISITION', message: 'an active pipeline needs an acquisition node' });
@@ -198,6 +201,19 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         setOrDel(dirs, 'backup', primarySink.config?.['backup']);
         setOrDel(dirs, 'temp', primarySink.config?.['temp']);
         for (const k of ['threads', 'duckdb_threads', 'batch_max_files', 'batch_max_bytes']) setOrDel(processing, k, primarySink.config?.[k]);
+    }
+    // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
+    // dirs.database above stays the shorthand). One destination => no sinks: block (verbatim round-trip).
+    if (destByDatabase.size > 1) {
+        out['sinks'] = [...destByDatabase.values()].map((s) => {
+            const sink: Cfg = { database: s.config?.['database'] };
+            if (s.config?.['format'] != null) sink['format'] = s.config['format'];
+            if (s.config?.['compression'] != null) sink['compression'] = s.config['compression'];
+            if (s.config?.['ducklake'] != null) sink['ducklake'] = s.config['ducklake'];
+            return sink;
+        });
+    } else {
+        delete out['sinks'];
     }
     if (quarantine) setOrDel(dirs, 'quarantine', quarantine.config?.['dir']);
 

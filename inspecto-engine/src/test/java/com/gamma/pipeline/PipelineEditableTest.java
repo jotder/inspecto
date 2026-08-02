@@ -67,16 +67,24 @@ class PipelineEditableTest {
         assertEquals("d1", ex.refusals().get(0).nodeId());
     }
 
+    /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */
     @Test
-    void twoDistinctDatabasesRefuseMultiSink() {
+    void twoDistinctDatabasesLowerToASinksList() {
         PipelineGraph g = new PipelineGraph("x", true, List.of(
                 node("acq", "acquisition", Map.of("poll", "in")),
                 node("parse", "parser", Map.of("schema_file", "s.toon")),
-                node("s1", "sink.persistent", Map.of("database", "db_a")),
-                node("s2", "sink.persistent", Map.of("database", "db_b"))), List.of());
-        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
-                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
-        assertTrue(ex.refusals().stream().anyMatch(r -> PipelineEditable.MULTI_SINK.equals(r.code())));
+                node("s1", "sink.persistent", Map.of("database", "db_a", "format", "PARQUET")),
+                node("s2", "sink.persistent", Map.of("database", "db_b", "format", "CSV"))), List.of());
+        Map<String, Object> lowered = PipelineEditable.lower(g, new LinkedHashMap<>(), true);
+
+        assertTrue(lowered.get("sinks") instanceof List<?>, "multi-destination lowers to a sinks: list");
+        List<?> sinks = (List<?>) lowered.get("sinks");
+        assertEquals(2, sinks.size());
+        java.util.Set<Object> dbs = new java.util.LinkedHashSet<>();
+        for (Object s : sinks) dbs.add(((Map<?, ?>) s).get("database"));
+        assertEquals(java.util.Set.of("db_a", "db_b"), dbs);
+        // the single output:/dirs.database shorthand stays consistent with the first destination
+        assertEquals("db_a", ((Map<?, ?>) lowered.get("dirs")).get("database"));
     }
 
     /** Multi-schema branch sinks share one database — that is NOT a MULTI_SINK refusal. */
