@@ -31,9 +31,12 @@ Backup is a separate, later step (`BatchProcessor.backupFile`, post-commit), not
 Three properties depend on this, all pinned by `RemoteAcquisitionStagingTest`:
 
 * **A partial download is never ingestible.** `fetchTo` resumes by appending to its destination, so if that
-  destination were the inbox a half-downloaded file would sit there under its final name. That used to be
-  safe only because acquisition and ingest ran in one synchronous call under a single run-guard claim — the
-  coupling the branch-aware-executor work removes.
+  destination were the inbox a half-downloaded file would sit there under its final name. Staging is now the
+  *only* thing that makes this safe: since B3b, acquisition and ingest run on separate timers and separate
+  guards, so a fetch in flight is no longer shielded by a shared run-guard claim. A landed file, being
+  atomically complete, is then discovered by the ordinary inbox walk exactly like a local push — it is
+  re-listable, and markers/fingerprint dedup (not the old discovery bypass) is what keeps it from being
+  ingested twice.
 * **Resume still works**, because the staging path is deterministic (`<staging>/<relativePath>`), not a
   UUID temp name: the next attempt finds the partial and continues it. `SftpConnector.fetchTo` compares the
   destination's size to the remote length to decide the offset.

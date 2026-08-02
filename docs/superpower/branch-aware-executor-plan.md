@@ -4,8 +4,11 @@
 > **throughput/decoupling (Stage B) goes first**; multi-destination sinks become a later slice
 > expressed as a plural `sinks:` section. **Shipped: B1 (per-pipeline run guard) + B2 (non-blocking
 > dispatch) — committed `2f4348f5`, full reactor 2451/0/0 · B3a (stage-then-land) — inspecto-engine
-> 791/0/0.** B3b (the acquisition driver itself) is next. Stage A (the executor bridge) is deferred
-> behind B; Stage C is unstarted.
+> 791/0/0 · B3b (the acquisition driver) — steps 1–2 `1328c0f1`, step 3 `a4edbe19`, inspecto 645/0/0,
+> full reactor 2205/0/0.** **B4 (queue-driven multiplexer) is next.** Stage A (the executor bridge) is
+> deferred behind B; Stage C is unstarted. B3b as-built facts are in §"B3b — the acquisition driver"
+> below (marked ✅) and distilled into [engine/ingestion](../okf/backend/engine/ingestion.md) +
+> [acquisition/framework](../okf/backend/acquisition/framework.md).
 
 ## 0. Decisions of record (2026-08-01)
 
@@ -286,7 +289,20 @@ pre-existing, not introduced by B3 — but the new staging resolution could not 
 > `4.x`. Recorded here so it is a decision on the record rather than an oversight; revisit if a `4.x`
 > deployment ever takes remote-collector input, since an untrusted remote listing is the reachable input.
 
-**B3b — the acquisition driver (NEXT — designed, not built).**
+**B3b — the acquisition driver (✅ SHIPPED — steps 1–2 `1328c0f1`, step 3 `a4edbe19`).**
+
+> **As-built.** All three steps landed as designed. `CollectorProcessor.acquire(cfg)` /
+> `ingest(cfg, onCommit)` are now separate public units; `run()` = `acquire`+`ingest` for the one-shot
+> CLI/`reprocess`/manual path. The always-on service drives them on two timers: `dispatchAcquireCycle()`
+> under `acquire.pollSeconds` / `acquire.maxConcurrent` with a dedicated per-pipeline `acquireGuard`; the
+> poll tick is now ingest-only. `countPending` became the exact landed backlog (the `pendingRemoteApprox`
+> hack was deleted). Verified by `AcquisitionDriverTest` (ServiceLoader `faketest` connector, no network).
+> **Deferred (→ BACKLOG §6):** the separate acquisition-side "listed remotely but not yet fetched" gauge —
+> not built; no metric was renamed since none was misleading. **Gotcha:** manual "run now" acquires inline
+> under the ingest `runGuard`, uncoordinated with the background `acquireGuard`, so it can overlap one
+> background acquisition tick — benign (atomic land + dedup). Recorded in acquisition/framework.md.
+
+The original design (kept for provenance):
 
 Now that landing is atomic, acquisition can run on its own timer with its own budget, and ingest can
 discover remote-fetched files by scanning the inbox exactly like locally-pushed ones — the unification the

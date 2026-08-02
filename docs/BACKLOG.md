@@ -442,9 +442,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     later as a plural `sinks:` section, the executor bridge (Stage A) deferred behind B.
     Shipped so far: **B1** per-pipeline run guard (`ingestLock` was one global lock across the whole
     cycle), **B2** non-blocking poll dispatch (a tick no longer waits on the runs it starts), **B3a**
-    remote fetches stage outside the inbox and land atomically. Next: **B3b** (acquisition gets its own
-    driver), then B4/B5. Note the real multi-destination limit is **one destination per pipeline** — a
-    config-format gap (`PipelineConfig.Output` is a single record), not an executor gap.
+    remote fetches stage outside the inbox and land atomically, **B3b** acquisition has its own driver —
+    `dispatchAcquireCycle()` on `acquire.pollSeconds`/`acquire.maxConcurrent` with a dedicated per-pipeline
+    `acquireGuard`; the poll tick is ingest-only; `countPending` is now the exact landed backlog.
+    Next: **B4** (queue-driven multiplexer + bounded spill), then B5. Note the real multi-destination limit
+    is **one destination per pipeline** — a config-format gap (`PipelineConfig.Output` is a single record),
+    not an executor gap.
+    - **Deferred from B3b — acquisition-side "listed remotely but not yet fetched" gauge.** With ingest now
+      walking the inbox, `countPending` is the exact *landed* backlog; the remote-side pending signal ("the
+      connector listed N files we have not fetched yet") is a distinct, still-unbuilt metric. Decide its
+      name (e.g. `inspecto_files_awaiting_fetch`) before adding it. No metric was renamed in B3b — none was
+      misleading.
   - **Duplicate pipeline id at construction — DECIDED 2026-08-01: fail fast.** `CollectorService`'s
     constructor accepted two config files declaring the same in-file `name:`, while
     `registerPipeline` rejected exactly that at runtime. The two surfaces now agree: a new

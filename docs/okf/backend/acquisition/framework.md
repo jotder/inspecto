@@ -10,8 +10,20 @@ timestamp: 2026-06-28T00:00:00Z
 # Data Acquisition Framework
 
 A full acquisition engine (not a directory poller): **Discover → Determine readiness → Guarantee collection
-semantics → Retrieve/validate → Finalize**. Driven by [`CollectorProcessor.run()`](../engine/ingestion.md) (one
-call = one poll cycle). Authoritative doc: [`data-acquisition-framework.md`](data-acquisition-framework.md).
+semantics → Retrieve/validate → Finalize**. The phases below are `CollectorProcessor.acquire(cfg)`, which
+fetches remote files and lands them atomically in the inbox; ingest then discovers them by walking the inbox
+like any local push. In the one-shot CLI/`reprocess`/manual path, `CollectorProcessor.run()` calls
+`acquire` then `ingest` in one cycle. In the **always-on service** the two run on their own timers (B3b):
+`dispatchAcquireCycle()` fetches under `acquire.pollSeconds` / `acquire.maxConcurrent`, guarded per-pipeline by
+a dedicated `acquireGuard`, so a slow fetch neither blocks nor is blocked by ingest, and two acquisitions of
+one pipeline never overlap. `acquire` is a no-op for a `local` collector. Authoritative doc:
+[`data-acquisition-framework.md`](data-acquisition-framework.md).
+
+> **Gotcha — manual run vs. background acquisition.** The manual "run now" acquires inline under the *ingest*
+> `runGuard`, which is separate from the background `acquireGuard`; a manual run can therefore overlap one
+> background acquisition tick of the same pipeline. This is benign and self-correcting — landing is atomic
+> (B3a stage-then-rename) and duplicates are caught by markers/fingerprint dedup — but it is why the two
+> guards are deliberately not one.
 
 ## Phases
 

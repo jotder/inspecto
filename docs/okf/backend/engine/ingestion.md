@@ -35,9 +35,15 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
 ## Batch coordination
 
 * `CollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) — the per-source ETL
-  entry point and one poll cycle: scan inbox → group into `Batch`es (bounded by `processing.batch.max_files`/
-  `max_bytes`) → submit to a virtual-thread executor bounded by `Semaphore(processing.threads)`. Also the
-  single-pipeline CLI `main`. Drives all the [acquisition](../acquisition/framework.md) phases.
+  entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquisition/framework.md)
+  phases (remote fetch-and-land; a no-op for a `local` collector), and **`ingest(cfg, onCommit)`** scans the
+  inbox → groups into `Batch`es (bounded by `processing.batch.max_files`/`max_bytes`) → submits to a
+  virtual-thread executor bounded by `Semaphore(processing.threads)`. `run()` = `acquire` then `ingest`, the
+  self-contained one-shot used by the single-pipeline CLI `main`, `reprocess`, and the service's manual "run
+  now". The always-on service instead drives the two halves on **separate timers with separate budgets** — see
+  [acquisition](../acquisition/framework.md). Ingest always walks the local inbox: a remote-fetched file, once
+  landed, is discovered exactly like a locally-pushed one, so `countPending` is now the exact landed backlog
+  (no remote approximation).
 * `BatchProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/BatchProcessor.java`) — a thin, stateless
   coordinator: pick a [`BatchIngestStrategy`](transforms-seams.md) (CSV or plugin), run `ingest()` → an
   `IngestOutcome`, then the path-agnostic tail `commit()` (DuckLake register → manifest → backup originals →
