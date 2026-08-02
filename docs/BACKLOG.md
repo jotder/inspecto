@@ -453,9 +453,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     producer/consumer timers with a guarded, back-pressured hand-off over the durable inbox) from the deleted
     `ingest` job type (two schedulers racing one inbox with no lock). **✅ STAGE B IS CLOSED.** ⚠ **B4 was
     rescoped** from the plan's "queue-driven multiplexer, §3.5 verbatim": the verbatim per-edge escalation
-    needs the deferred Stage A, and B2+B3b already met the skew motivation — see the plan's B4 section. Stage A
-    (the node-level flow executor / executor bridge) remains **deferred**; Stage C is unstarted (needs
-    sign-off). Note the real multi-destination limit is **one destination per pipeline** — a config-format gap
+    needs the deferred Stage A, and B2+B3b already met the skew motivation — see the plan's B4 section.
+    **Stage A steps 1–3 SHIPPED as tested-but-dormant machinery** (`318acf2a`, `6965f6f3`): `BatchGraphRunner`
+    (run one materialised batch through `PipelineExecutor` on the ingest path), `BatchProcessor.finalizeSource`
+    (the crash-ordered commit body re-homed so the graph path reuses it; `commit` delegates, flat path
+    byte-for-byte), and the engagement predicate `BatchGraphRunner.engages` (>1 data-fed sink, excluding the
+    `unmatched`-wired quarantine). ⚠ **The predicate is `false` for every real ingest config today** — a `Batch`
+    is always single-schema and a flat `*_pipeline.toon` can't author multi-sink — so **step 3's strategy
+    wiring + step 4 (lift the editor `MULTI_SINK` refusal) are GATED on the deferred `sinks:` config-format**
+    (the true prerequisite to a multi-sink ingest pipeline). The machinery lets `sinks:` flip it on with no
+    executor rework. Stage C is unstarted (needs sign-off). Note the real multi-destination limit is **one
+    destination per pipeline** — a config-format gap
     (`PipelineConfig.Output` is a single record), not an executor gap.
     - **Deferred from B3b — acquisition-side "listed remotely but not yet fetched" gauge.** With ingest now
       walking the inbox, `countPending` is the exact *landed* backlog; the remote-side pending signal ("the

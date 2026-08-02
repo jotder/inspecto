@@ -137,31 +137,53 @@ Near-identical unbuilt prior art to reuse rather than reinvent:
 The stages are ordered so that **Stage A is compatible with either future** — it does not presuppose
 the Stage B reversal. The trick is to draw the unit boundary now and change the driver later.
 
-### Stage A — make the graph vocabulary executable (DEFERRED behind Stage B per §0 decision 1)
+### Stage A — make the graph vocabulary executable (steps 1–3 SHIPPED as dormant machinery; step 4 gated)
 
-Still the right shape when it is picked up, but note §0's correction: on its own it does not deliver a
-second *destination* — that needs the `sinks:` format work (§0 decision 2) as a prerequisite.
+> **Status 2026-08-02.** Steps 1–3 are built + verified and committed (`318acf2a` seam, `6965f6f3`
+> finalize + predicate). They land as **tested-but-dormant machinery**: an investigation this shift
+> confirmed the ingest path **cannot express a multi-sink batch today** — a `Batch` is always
+> single-schema (`BatchPlanner` groups by schema before building batches, `Batch.java`), and a flat
+> `*_pipeline.toon` cannot author route/derive/multi-destination (the editor refuses them). So the
+> engagement predicate (`BatchGraphRunner.engages`) is **`false` for every real ingest config**, and the
+> flat single-output path stays byte-for-byte. **Step 3's strategy wiring and step 4 (lift the editor
+> refusal) are therefore GATED on the deferred `sinks:` config-format (§0 decision 2)** — the real
+> prerequisite to a multi-sink ingest pipeline. Landing the machinery now means the `sinks:` work later
+> flips the predicate on with no executor rework. `*_flow.toon` never touches the ingest door (it is an
+> at-rest `JobType.PIPELINE` job via `PipelineJobRunner`), so it is out of scope here by design.
+
+Still the right shape, but note §0's correction: on its own Stage A does not deliver a second
+*destination* — that needs the `sinks:` format work (§0 decision 2) as a prerequisite.
 
 Extract the "run one materialized batch through a graph and commit it" work as a **first-class unit**
 with an explicit input record, instead of inlining the executor into `writeAndTrace`. The poll loop
 calls that unit today; a queue-driven driver can call the same unit in Stage B with no rework.
 
-1. **Unit seam** — new `pipeline/exec/BatchGraphRunner`: takes (live DuckDB `Connection`, lifted
+1. ✅ **Unit seam** (`318acf2a`) — new `pipeline/exec/BatchGraphRunner`: takes (live DuckDB `Connection`, lifted
    `PipelineGraph`, seed table, `batchId`, config) → drives `PipelineExecutor.execute` with a real
    `SinkWriter` (`PartitionSinkWriter`) and a real `SourceFinalize`.
    → *verify:* unit test seeds a two-sink graph, asserts both sinks written once.
-2. **Real `SourceFinalize`** — re-home `BatchProcessor.commit`'s existing bodies (DuckLake register →
-   manifest → backup → **markers LAST** → dedup ledger, `BatchProcessor.java:82-186`) behind the
-   `SourceFinalize` callback, preserving that exact order. This is the piece `PipelineJobRunner`
-   stubs.
-   → *verify:* crash-ordering test — markers must not exist unless every branch committed.
-3. **Engagement predicate** — the flat tail stays byte-for-byte for a single-sink linear config; the
-   unit engages only when the lifted graph needs it. Decide the predicate off the graph, not a flag.
-   → *verify:* existing 618-test baseline unchanged; a flat config's write path provably untouched.
-4. **Lift the editor's refusals** for exactly what now runs (`MULTI_SINK` first), keeping
-   `PipelineEditable`'s named codes for the rest. Mock (`mock/pipeline-editable.ts`) must refuse
-   exactly what the server refuses — the pinned strictness rule.
-   → *verify:* `pipelines.handler.spec.ts` + a real-HTTP save of a two-sink pipeline.
+2. ✅ **Real `SourceFinalize`** (`6965f6f3`) — extracted `BatchProcessor.finalizeSource` from `commit`
+   (DuckLake register → manifest → backup → **markers LAST** → dedup ledger / DB-watermark; the actual
+   range was `82-195`, three lines longer than the plan's `82-186` — a DB-export-watermark-LAST step was
+   added after this plan was written). `commit` now delegates, so the flat path is byte-for-byte; the
+   branch-aware `BatchGraphRunner` drives the same body as its `SourceFinalizer`.
+   → *verified:* `BatchGraphRunnerFinalizeTest` — markers-LAST/backup/manifest land on a two-sink graph,
+   and a fresh-connection replay over the same durable `BranchCommitLog` does **not** re-finalise (the
+   marker step never runs twice). Cross-branch crash-ordering is the `BranchCommitCoordinator` invariant.
+3. ✅ **Engagement predicate** (`6965f6f3`) — `BatchGraphRunner.engages(g) = dataFedSinkCount(g) > 1`,
+   counting `SINK`-category nodes reached by a `data`/`route:*` edge and **excluding** the quarantine sink
+   wired only by `unmatched` (mirrors what `PipelineExecutor` commits as a branch). Off the graph, not a flag.
+   → *verified:* `BatchGraphRunnerTest` — a single-schema-shaped graph (one data sink + `unmatched`
+   quarantine) counts `1` / does not engage; a two-route-sink graph counts `2` / engages. Flat-path
+   `BatchProcessorTest` 5/5 unchanged.
+   → ⏳ **Not yet wired into `CsvBatchStrategy`** — gated on `sinks:` (status box): a real ingest config
+   cannot trip the predicate until a multi-sink `*_pipeline.toon` can be authored, so the engage-branch in
+   the strategy would be dead code until then. Predicate + runner + finalize are ready to connect.
+4. ⏳ **Lift the editor's refusals** (`MULTI_SINK` first) — **GATED on `sinks:` config-format.** Lifting
+   the refusal without a format that can *represent* a second destination would let the editor save a
+   `*_pipeline.toon` the engine can't round-trip. Keep `PipelineEditable`'s named codes; the mock
+   (`mock/pipeline-editable.ts`) must refuse exactly what the server refuses (pinned strictness).
+   → *verify (when unblocked):* `pipelines.handler.spec.ts` + a real-HTTP save of a two-sink pipeline.
 
 **Not in Stage A:** `sink.materialized`/`view` on the ingest path, non-`gap` CONTROL, cross-branch
 transactional commit (B9 keeps it non-transactional by design).
