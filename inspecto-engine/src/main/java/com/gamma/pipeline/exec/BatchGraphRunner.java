@@ -2,7 +2,10 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PartitionOutput;
+import com.gamma.pipeline.NodeCategory;
 import com.gamma.pipeline.PipelineGraph;
+import com.gamma.pipeline.PipelineNodeTypes;
+import com.gamma.pipeline.PipelineRel;
 
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -70,5 +73,28 @@ public final class BatchGraphRunner {
                 in.conn(), in.graph(), in.seedNodeId(), in.seedTable(), in.batchId(),
                 coordinator, writer, () -> finalizer.finalizeSource(writer.outputs()));
         return new Result(exec, writer.outputs(), writer.totalRows());
+    }
+
+    /**
+     * <b>Stage A engagement predicate.</b> Whether {@code g} needs this branch-aware runner instead of the
+     * flat single-output write path: it fans one batch across <b>more than one data-fed sink branch</b>.
+     * This is deliberately {@code false} for every legacy single-sink {@code *_pipeline.toon} — a
+     * single-schema lift produces one data sink plus a quarantine sink wired only by the {@code unmatched}
+     * control edge, and {@link #dataFedSinkCount} excludes the latter (exactly as {@link PipelineExecutor}
+     * does — a control edge carries no relation produced from a seed, so the executor never commits it as a
+     * branch). So the flat path stays byte-for-byte until a genuinely multi-sink config can be authored (the
+     * deferred {@code sinks:} config-format, BACKLOG §6).
+     */
+    public static boolean engages(PipelineGraph g) {
+        return dataFedSinkCount(g) > 1;
+    }
+
+    /** Count of {@code SINK}-category nodes reached by at least one {@code data} or {@code route:*} edge. */
+    static long dataFedSinkCount(PipelineGraph g) {
+        return g.nodes().stream()
+                .filter(n -> PipelineNodeTypes.isCategory(n.type(), NodeCategory.SINK))
+                .filter(n -> g.edgesTo(n.id()).stream()
+                        .anyMatch(e -> PipelineRel.DATA.equals(e.rel()) || PipelineRel.isRoute(e.rel())))
+                .count();
     }
 }

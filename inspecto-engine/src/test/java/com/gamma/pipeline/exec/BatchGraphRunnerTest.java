@@ -91,6 +91,48 @@ class BatchGraphRunnerTest {
         assertEquals(2L, res.totalRows(), "one row routed to each sink (id3→hi, id1→lo)");
     }
 
+    @Test
+    void engagementPredicateExcludesQuarantineSoFlatSingleSinkDoesNotEngage() {
+        String store = PipelineStores.CONFIG_STORE;
+        // the shape a single-schema *_pipeline.toon lifts to: one data sink + a quarantine sink wired
+        // ONLY by the `unmatched` control edge (PipelineLift.addQuarantine)
+        PipelineGraph flat = new PipelineGraph("FLAT_ETL", true,
+                List.of(
+                        PipelineNode.of("parse", "parser"),
+                        PipelineNode.of("sink", "sink.persistent", Map.of(store, "out")),
+                        PipelineNode.of("quarantine", "sink.persistent", Map.of(store, "q"))),
+                List.of(
+                        PipelineEdge.data("parse", "sink"),
+                        new PipelineEdge("parse", PipelineRel.UNMATCHED, "quarantine")));
+
+        assertEquals(1, BatchGraphRunner.dataFedSinkCount(flat), "quarantine (unmatched) is not a data-fed sink");
+        assertFalse(BatchGraphRunner.engages(flat), "flat single-sink config keeps the legacy write path");
+    }
+
+    @Test
+    void engagementPredicateFiresOnMultipleDataFedSinks() {
+        String store = PipelineStores.CONFIG_STORE;
+        PipelineGraph multi = new PipelineGraph("ROUTE_ETL", true,
+                List.of(
+                        PipelineNode.of("parse", "parser"),
+                        PipelineNode.of("r", "transform.route", Map.of(
+                                "mode", "case",
+                                "branches", List.of(
+                                        Map.of("key", "hi", "where", "amt >= 200"),
+                                        Map.of("key", "lo", "where", "amt < 200")))),
+                        PipelineNode.of("sink_hi", "sink.persistent", Map.of(store, "hi")),
+                        PipelineNode.of("sink_lo", "sink.persistent", Map.of(store, "lo")),
+                        PipelineNode.of("quarantine", "sink.persistent", Map.of(store, "q"))),
+                List.of(
+                        PipelineEdge.data("parse", "r"),
+                        new PipelineEdge("r", PipelineRel.route("hi"), "sink_hi"),
+                        new PipelineEdge("r", PipelineRel.route("lo"), "sink_lo"),
+                        new PipelineEdge("parse", PipelineRel.UNMATCHED, "quarantine")));
+
+        assertEquals(2, BatchGraphRunner.dataFedSinkCount(multi), "two route-fed sinks; quarantine excluded");
+        assertTrue(BatchGraphRunner.engages(multi), "multi-sink fan-out needs the branch executor");
+    }
+
     private void sql(String s) throws SQLException {
         try (Statement st = conn.createStatement()) { st.execute(s); }
     }

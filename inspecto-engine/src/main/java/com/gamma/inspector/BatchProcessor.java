@@ -82,6 +82,22 @@ public final class BatchProcessor {
     private static void commit(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage)
             throws IOException {
+        // lineage is persisted by writeAudit (from the outcome), not here. The durable side effects —
+        // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
+        // the branch-aware graph path (BatchGraphRunner's SourceFinalizer) reuses once every sink branch is
+        // committed (Stage A), so both drivers share this one crash-ordered sequence.
+        finalizeSource(batch, cfg, survivors, outputs);
+    }
+
+    /**
+     * The batch's durable source finalisation, in crash-safe order: DuckLake register → manifest → backup →
+     * <b>markers LAST</b> → fingerprint ledger / DB-export watermark. Extracted from {@link #commit} so the
+     * branch-aware {@link com.gamma.pipeline.exec.BatchGraphRunner} can drive the identical sequence as its
+     * {@code SourceFinalizer} — run once, only after every sink branch is durable (T11 commit-split). The
+     * legacy single-output path calls it through {@code commit}; both share this one ordering invariant.
+     */
+    static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+                               List<PartitionOutput> outputs) throws IOException {
 
         // ── ordering rationale ────────────────────────────────────────────────
         // Markers signal "already processed; skip on next poll." If a crash leaves
