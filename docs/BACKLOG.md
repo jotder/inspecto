@@ -447,12 +447,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     `acquireGuard`; the poll tick is ingest-only; `countPending` is now the exact landed backlog, **B4**
     acquisition back-pressure — `selectDueForAcquire` skips a pipeline whose `countPending` reached
     `-Dacquire.backpressure.highWater` (0=off), so a slow ingest cannot make acquisition fill local disk;
-    the durable inbox is the spill queue (§3.5), throttling the producer (negative feedback, unlike T15).
-    Next: **B5** (reconcile §3.8 docs) closes Stage B. ⚠ **B4 was rescoped** from the plan's "queue-driven
-    multiplexer, §3.5 verbatim": the verbatim per-edge escalation needs the deferred Stage A, and B2+B3b
-    already met the skew motivation — see the plan's B4 section. Note the real multi-destination limit is
-    **one destination per pipeline** — a config-format gap (`PipelineConfig.Output` is a single record), not
-    an executor gap.
+    the durable inbox is the spill queue (§3.5), throttling the producer (negative feedback, unlike T15),
+    **B5** reconcile §3.8 docs (docs-only) — the design doc now carries a **"Collection is a unit, not a
+    second scheduler"** block distinguishing Stage B (one loop-scheduler-side driver split into
+    producer/consumer timers with a guarded, back-pressured hand-off over the durable inbox) from the deleted
+    `ingest` job type (two schedulers racing one inbox with no lock). **✅ STAGE B IS CLOSED.** ⚠ **B4 was
+    rescoped** from the plan's "queue-driven multiplexer, §3.5 verbatim": the verbatim per-edge escalation
+    needs the deferred Stage A, and B2+B3b already met the skew motivation — see the plan's B4 section. Stage A
+    (the node-level flow executor / executor bridge) remains **deferred**; Stage C is unstarted (needs
+    sign-off). Note the real multi-destination limit is **one destination per pipeline** — a config-format gap
+    (`PipelineConfig.Output` is a single record), not an executor gap.
     - **Deferred from B3b — acquisition-side "listed remotely but not yet fetched" gauge.** With ingest now
       walking the inbox, `countPending` is the exact *landed* backlog; the remote-side pending signal ("the
       connector listed N files we have not fetched yet") is a distinct, still-unbuilt metric. Decide its

@@ -287,6 +287,20 @@ scheduling (a streaming feel) ever becomes a real requirement, the **phase-2** e
 mark that de-schedules the upstream node when full. This is deliberately **out of v1** (the locked "topology over
 the batch engine" decision); add it only when needed.
 
+> **First slice shipped on the one edge that already exists (B4, 2026-08-02).** The general per-`data`-edge
+> form above is still deferred — it presumes the node-level flow executor (the intra-flow topological walk of
+> §3.3), which is not built. But post-B3b there *is* one real hand-off edge: **acquire → ingest**, and its
+> spill-to-disk queue is not new machinery — it **is the durable inbox** (the §3.5 "queue that absorbs
+> overload is the durable source itself"). B4 gives that edge exactly the escalation's shape: acquisition
+> **de-schedules itself** when the inbox backlog (`CollectorProcessor.countPending`, exact after B3b) reaches
+> `-Dacquire.backpressure.highWater` (0 = off), so the **upstream unit (the producer, acquisition) stops
+> feeding a full downstream (ingest)** rather than filling local disk unboundedly. It throttles the *producer*
+> — **negative** feedback, and the deliberate mirror of T15, which must **not** throttle the ingest *consumer*
+> on backlog (that would be positive feedback; see §3.5 adaptive-throttling note). The gate bounds backlog
+> *across* acquire ticks, not within one — bounding a single cycle's fetch volume is the deferred
+> `acquire.maxFilesPerCycle` (BACKLOG §6). See [acquisition/framework](../acquisition/framework.md#back-pressure-b4)
+> and §3.8 below for how this fits the two-timer pipeline driver without becoming a second scheduler.
+
 ### 3.6 Node scheduling & triggers (timer / cron / event / manual)
 
 **Entry nodes are scheduled; everything downstream is data-driven.** An entry node (no inbound `data` edge —
@@ -404,7 +418,8 @@ and are run by **different schedulers**. Conflating them is the confusion this s
 **Two schedulers, one responsibility each (decided 2026-06-17):**
 - **The loop scheduler** — fixed-delay or no-delay ([`Scheduler.everySeconds`](../../../../inspecto-util/src/main/java/com/gamma/util/Scheduler.java),
   the poll-all cycle) — drives **pipeline nodes only**, over every `active` flow. **Ingest / acquisition lives here
-  exclusively.**
+  exclusively.** *(Stage B split this side into two loop-driven timers — acquire and ingest — but it is still one
+  driver on the loop-scheduler side, not the job scheduler; see "Collection is a unit, not a second scheduler" below.)*
 - **The custom-function scheduler** — cron / event / manual ([`JobService`](../../../../inspecto-engine/src/main/java/com/gamma/job/JobService.java)) —
   drives **jobs only** = bespoke plugin functions over stored data. **It never ingests.**
 
@@ -428,6 +443,26 @@ config-driven `*_job.toon`, re-armed deterministically at startup — the file *
 **premature** (single-node; distribution is a future edition), and Quartz gives no execution reporting regardless.
 Two small, **no-new-dep** extensions are tracked instead: **misfire/catch-up** ([T26](#14-things-to-do-implementation-checklist))
 and a **DuckDB-backed Jobs reporting pane** ([T27](#14-things-to-do-implementation-checklist)).
+
+**Collection is a unit, not a second scheduler (Stage B, B3b/B4 — reconciled 2026-08-02).** Stage B split a
+pipeline's loop-driven side into **two timers** — `dispatchAcquireCycle()` (fetch remote → land in the inbox)
+and the ingest poll (`dispatchCycle()`, walk the inbox → batch → commit). Superficially that resembles the very
+thing R6 deleted — an `ingest` job re-running acquisition on a *separate* scheduler over the same inbox. It is
+**not**, and the difference is exact:
+
+| | Deleted `ingest` job (R6) | Stage B acquire + ingest timers |
+|---|---|---|
+| Which schedulers | **Two** — the loop scheduler *and* the job (custom-function) scheduler, each independently acquiring | **One family** — both timers are the loop-scheduler-side pipeline driver ([`PipelineScheduler`](../../../../inspecto/src/main/java/com/gamma/service/PipelineScheduler.java)); the job scheduler is untouched and still never ingests |
+| Relationship to the inbox | Two acquirers **race the same inbox** as producers, **no shared lock** → duplicate fetch/processing | **Producer / consumer across a boundary**: acquire is the sole **writer** (fetch → atomic land, B3a stage-then-rename), ingest is the sole **reader-and-remover** (walk → drain). The inbox *is* the hand-off queue between them |
+| Coordination | None — that was the bug | **Explicit + guarded**: per-pipeline `acquireGuard` (no two acquisitions overlap) and `runGuard` (no two ingests overlap); atomic landing + **markers-LAST** keep the hand-off crash-safe. An acquire and an ingest of the *same* pipeline may overlap **by design** — they touch opposite sides of the boundary |
+| Overload behaviour | Unbounded — a second acquirer just piles more into the inbox | **Back-pressured (B4)**: acquisition de-schedules itself when the inbox reaches `-Dacquire.backpressure.highWater`, so the producer cannot outrun the consumer and fill disk. This is §3.5's escalation on the acquire→ingest edge (durable inbox = spill queue), throttling the *producer* — negative feedback, the mirror of T15 |
+
+So Stage B is **one execution model with an explicit hand-off**, not two schedulers racing one inbox. The §3.8
+rules stand unchanged: ingestion remains the pipeline's sole responsibility on the loop-scheduler side (now via
+two coordinated timers instead of one poll), and the job scheduler still never ingests. This resolves the R6
+caveat that the distinction "must be written into §3.8, not assumed" (branch-aware-executor-plan §0), and open
+decision #1's justification of record — **skew/latency, concretely "don't let a slow ingest make acquisition fill
+local disk"** — is realized by B4 rather than by any throughput SLA.
 
 **Combined visualisation — they are one graph, not two.** Pipeline and job meet at the **same store/table**: the
 pipeline's `sink(store)` node *is* the job's `source(store)` node. That is exactly the lineage-graph join (§2 — the

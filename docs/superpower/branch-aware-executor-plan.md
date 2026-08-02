@@ -1,14 +1,17 @@
 # Plan — Branch-aware executor on the ingest path (BACKLOG §6)
 
-> **Status: IN FLIGHT (opened 2026-08-01).** Operator decisions taken 2026-08-01 reordered the stages:
-> **throughput/decoupling (Stage B) goes first**; multi-destination sinks become a later slice
-> expressed as a plural `sinks:` section. **Shipped: B1 (per-pipeline run guard) + B2 (non-blocking
-> dispatch) — committed `2f4348f5`, full reactor 2451/0/0 · B3a (stage-then-land) — inspecto-engine
-> 791/0/0 · B3b (the acquisition driver) — steps 1–2 `1328c0f1`, step 3 `a4edbe19`, inspecto 645/0/0,
-> full reactor 2205/0/0 · B4 (acquisition back-pressure) — `eb69f1ee`, full reactor green.** **B5
-> (reconcile §3.8) is next**, then Stage B is closed. Stage A (the executor bridge) is deferred behind B;
-> Stage C is unstarted. B3b/B4 as-built facts are in the §"B3b/B4" sections below (marked ✅) and distilled
-> into [engine/ingestion](../okf/backend/engine/ingestion.md) +
+> **Status: STAGE B CLOSED (opened 2026-08-01, closed 2026-08-02).** Operator decisions taken 2026-08-01
+> reordered the stages: **throughput/decoupling (Stage B) goes first**; multi-destination sinks become a
+> later slice expressed as a plural `sinks:` section. **Shipped: B1 (per-pipeline run guard) + B2
+> (non-blocking dispatch) — committed `2f4348f5`, full reactor 2451/0/0 · B3a (stage-then-land) —
+> inspecto-engine 791/0/0 · B3b (the acquisition driver) — steps 1–2 `1328c0f1`, step 3 `a4edbe19`,
+> inspecto 645/0/0, full reactor 2205/0/0 · B4 (acquisition back-pressure) — `eb69f1ee`, full reactor
+> green · B5 (reconcile §3.8 — docs only) — this change.** **Stage B is now closed:** its non-blocking,
+> per-pipeline, acquisition-decoupled, back-pressured ingest execution model is shipped and its as-built is
+> reconciled into §3.8 (["Collection is a unit, not a second scheduler"](../okf/backend/pipeline-graph/pipeline-graph-design.md#38-pipelines-vs-jobs--two-drivers-over-one-shared-store-formalised-2026-06-17))
+> and §3.5. Stage A (the node-level flow executor / executor bridge) remains **deferred** behind B; Stage C
+> is unstarted (needs sign-off, §5). B3b/B4 as-built facts are in the §"B3b/B4" sections below (marked ✅)
+> and distilled into [engine/ingestion](../okf/backend/engine/ingestion.md) +
 > [acquisition/framework](../okf/backend/acquisition/framework.md).
 
 ## 0. Decisions of record (2026-08-01)
@@ -373,8 +376,14 @@ The original design (kept for provenance):
 The multiplexer unit gets a queue-driven driver + bounded spill-to-disk hand-off with a high-water mark
 (the §3.5 escalation, verbatim).
 
-**B5 —** reconcile §3.8: state precisely how "collection is a unit" differs from the deleted `ingest`
-job type (one execution model with explicit hand-off, not a second scheduler racing the same inbox).
+**B5 — reconcile §3.8 (✅ SHIPPED — docs only, closes Stage B).** Done in the design doc's §3.8 as the
+**"Collection is a unit, not a second scheduler"** block (a side-by-side table: deleted `ingest` job = two
+schedulers racing one inbox with no lock; Stage B = one loop-scheduler-side driver split into producer/consumer
+timers with an explicit, `acquireGuard`/`runGuard`-coordinated, B4-back-pressured hand-off over the durable
+inbox). §3.5's escalation clause gained the matching "first slice shipped on acquire→ingest" note. This also
+writes open decision #1's justification of record (skew/latency → "don't let a slow ingest make acquisition fill
+local disk") into §3.5/§3.8 as required. `live-execution.md` needed no change — it describes at-rest authored
+pipelines (`JobType.PIPELINE`), which never touch the acquire/ingest inbox that Stage B reconciles.
 ### Stage C — per-file stage housekeeping (NEEDS SIGN-OFF; reverses B10 ordering)
 
 Today every durable store records a **terminal fact**, not a progression: ledger keyed
