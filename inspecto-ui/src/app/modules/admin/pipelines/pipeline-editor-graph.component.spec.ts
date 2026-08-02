@@ -48,4 +48,25 @@ describe('PipelineEditorGraphComponent', () => {
         expect(host?.getAttribute('aria-label')).toContain('Pipeline editor canvas');
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    it('observes the canvas box so the side docks resize the graph, and disconnects on destroy', () => {
+        // jsdom has no ResizeObserver; stub one so the AfterViewInit wiring runs (the component guards
+        // on `typeof ResizeObserver !== 'undefined'`).
+        const observe = vi.fn();
+        const disconnect = vi.fn();
+        vi.stubGlobal(
+            'ResizeObserver',
+            class {
+                observe = observe;
+                disconnect = disconnect;
+                unobserve = vi.fn();
+            },
+        );
+
+        const fixture = create();
+        expect(observe).toHaveBeenCalledTimes(1);
+        fixture.destroy();
+        expect(disconnect).toHaveBeenCalledTimes(1);
+        vi.unstubAllGlobals();
+    });
 });

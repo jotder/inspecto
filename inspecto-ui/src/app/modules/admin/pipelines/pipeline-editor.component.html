@@ -1,40 +1,67 @@
-<div class="flex h-full flex-col gap-3">
-    <!-- toolbar -->
-    <div class="flex flex-wrap items-center gap-2">
+<!-- Visio-style editor shell: one compact toolbar, docked resizable palette / properties, a full-bleed
+     canvas, and a collapsible output dock. The canvas is the hero — every other region collapses away. -->
+<div class="flex min-h-0 flex-1 flex-col" style="background: var(--gamma-bg-default)">
+    <!-- ── toolbar ─────────────────────────────────────────────────────────────────────────────── -->
+    <div
+        class="flex shrink-0 flex-wrap items-center gap-1 border-b px-3 py-1.5"
+        style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+    >
+        <h1 class="mr-2 shrink-0 text-base font-semibold leading-none">Pipelines</h1>
+
         @if (creating() && lens.canAuthorWorkbench()) {
-            <div class="flex items-center gap-2">
-                <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <mat-label>New pipeline name</mat-label>
-                    <input matInput [formControl]="newName" placeholder="orders_rollup"
-                           (keyup.enter)="createFlow()" />
-                    @if (newName.touched && newName.invalid) {
-                        <mat-error>A name is required</mat-error>
-                    }
-                </mat-form-field>
-                <button mat-flat-button color="primary" type="button" (click)="createFlow()">Create</button>
-                <button mat-button type="button" (click)="creating.set(false)">Cancel</button>
-            </div>
-        } @else {
             <mat-form-field subscriptSizing="dynamic" class="w-56">
-                <mat-label>Pipeline</mat-label>
-                <mat-select [value]="selectedId()" (selectionChange)="select($event.value)">
-                    @for (f of flows(); track f.name) {
-                        <mat-option [value]="f.name">
-                            {{ f.displayName || f.name }}@if (f.template) { <span class="opacity-70">(template)</span> }
-                        </mat-option>
-                    }
-                </mat-select>
+                <mat-label>New pipeline name</mat-label>
+                <input matInput [formControl]="newName" placeholder="orders_rollup" (keyup.enter)="createFlow()" />
+                @if (newName.touched && newName.invalid) {
+                    <mat-error>A name is required</mat-error>
+                }
             </mat-form-field>
+            <button mat-flat-button color="primary" type="button" (click)="createFlow()">Create</button>
+            <button mat-button type="button" (click)="creating.set(false)">Cancel</button>
+        } @else {
+            <!-- The open pipeline IS the document title here, so it reads as a title + picker rather than
+                 a labelled form field — which also keeps the bar one control tall (the gamma theme
+                 reserves ~25px above every mat-form-field for its floating label). -->
+            <button
+                mat-button
+                [matMenuTriggerFor]="pipelineMenu"
+                class="min-w-0"
+                matTooltip="Choose a pipeline"
+                aria-label="Choose a pipeline"
+            >
+                <span class="max-w-56 truncate">{{ selectedLabel() }}</span>
+                <mat-icon iconPositionEnd svgIcon="heroicons_outline:chevron-down"></mat-icon>
+            </button>
+            <mat-menu #pipelineMenu="matMenu">
+                @for (f of flows(); track f.name) {
+                    <button mat-menu-item (click)="select(f.name)">
+                        {{ f.displayName || f.name }}@if (f.template) { <span class="opacity-70">(template)</span> }
+                    </button>
+                }
+            </mat-menu>
+
             @if (lens.canAuthorWorkbench()) {
+                <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
                 <button mat-icon-button (click)="startNew()" matTooltip="New pipeline" aria-label="New pipeline">
                     <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                 </button>
-                <button mat-icon-button color="primary" [disabled]="!dirty() || saving()" (click)="save()"
-                        matTooltip="Save" aria-label="Save pipeline">
+                <button
+                    mat-icon-button
+                    color="primary"
+                    [disabled]="!dirty() || saving()"
+                    (click)="save()"
+                    matTooltip="Save"
+                    aria-label="Save pipeline"
+                >
                     <mat-icon svgIcon="heroicons_outline:check"></mat-icon>
                 </button>
-                <button mat-icon-button [matMenuTriggerFor]="flowMenu" [disabled]="!selectedId()"
-                        matTooltip="More pipeline actions" aria-label="More pipeline actions">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="flowMenu"
+                    [disabled]="!selectedId()"
+                    matTooltip="More pipeline actions"
+                    aria-label="More pipeline actions"
+                >
                     <mat-icon svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
                 </button>
                 <mat-menu #flowMenu="matMenu">
@@ -52,139 +79,194 @@
                     </button>
                 </mat-menu>
             }
-            <button mat-icon-button [disabled]="!selectedId()" (click)="toggleDryRun()"
-                    matTooltip="Dry-run" aria-label="Dry-run">
+
+            <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+            <button
+                mat-icon-button
+                [disabled]="!selectedId()"
+                (click)="toggleDryRun()"
+                matTooltip="Dry-run"
+                aria-label="Dry-run"
+            >
                 <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
             </button>
-            <button mat-icon-button [disabled]="!selectedId()" (click)="toggleValidate()"
-                    matTooltip="Validate" aria-label="Validate">
+            <button
+                mat-icon-button
+                [disabled]="!selectedId()"
+                (click)="toggleValidate()"
+                matTooltip="Validate"
+                aria-label="Validate"
+            >
                 <mat-icon svgIcon="heroicons_outline:shield-check"></mat-icon>
             </button>
-            <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['authored-pipeline']" (changed)="load()" label="Import / export pipeline" />
             <!-- A template is refused by every run path server-side, so Activate is not offered at all:
                  an affordance that can only fail is worse than none. Clearing `template: true` promotes it. -->
             @if (!isTemplate()) {
                 @if (isActive()) {
-                    <button mat-icon-button [disabled]="activating()" (click)="deactivate()"
-                            matTooltip="Deactivate" aria-label="Deactivate">
+                    <button
+                        mat-icon-button
+                        [disabled]="activating()"
+                        (click)="deactivate()"
+                        matTooltip="Deactivate"
+                        aria-label="Deactivate"
+                    >
                         <mat-icon svgIcon="heroicons_outline:pause"></mat-icon>
                     </button>
                 } @else {
-                    <button mat-icon-button color="primary" [disabled]="!selectedId() || activating()" (click)="activate()"
-                            matTooltip="Activate" aria-label="Activate">
+                    <button
+                        mat-icon-button
+                        color="primary"
+                        [disabled]="!selectedId() || activating()"
+                        (click)="activate()"
+                        matTooltip="Activate"
+                        aria-label="Activate"
+                    >
                         <mat-icon svgIcon="heroicons_outline:bolt"></mat-icon>
                     </button>
                 }
             }
+
             @if (lens.canAuthorWorkbench()) {
-                <button mat-icon-button [disabled]="!hasSelection()" (click)="onDeleteKey()"
-                        matTooltip="Delete selected" aria-label="Delete the selected node or edge">
+                <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+                <button
+                    mat-icon-button
+                    [disabled]="!hasSelection()"
+                    (click)="onDeleteKey()"
+                    matTooltip="Delete selected"
+                    aria-label="Delete the selected node or edge"
+                >
                     <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                 </button>
             }
-            <button mat-icon-button (click)="toggleInspector()"
-                    [matTooltip]="inspectorOpen() ? 'Hide properties' : 'Show properties'"
-                    [attr.aria-label]="inspectorOpen() ? 'Hide properties' : 'Show properties'">
-                <mat-icon [svgIcon]="inspectorOpen() ? 'heroicons_outline:chevron-double-right' : 'heroicons_outline:chevron-double-left'"></mat-icon>
+
+            <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+            <!-- AGT-6a A2/A5.3 moved off the canvas: the assist surfaces live in the right dock, so they
+                 cost no vertical space until asked for. -->
+            <button
+                mat-icon-button
+                [disabled]="!model()"
+                (click)="showRightTab('assist')"
+                matTooltip="AI assist"
+                aria-label="AI assist"
+            >
+                <mat-icon svgIcon="heroicons_outline:sparkles"></mat-icon>
             </button>
-            @if (isTemplate()) {
-                <span class="inline-flex items-center gap-1 text-sm" role="status"
-                      matTooltip="A starting point for a similar pipeline. It collects and writes nowhere near the pipeline it was copied from, and cannot run until the template flag is cleared."
-                      style="color: var(--gamma-warn)">
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:document-duplicate"></mat-icon>
-                    template — not runnable
-                </span>
-            } @else if (isActive()) {
-                <span class="inline-flex items-center gap-1 text-sm" style="color: var(--gamma-primary)">
-                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:bolt"></mat-icon> active
-                </span>
-            }
-            @if (lastRunBatch(); as b) {
-                <span class="text-xs opacity-70" matTooltip="Last recorded run of this flow">
-                    last run: {{ b.totalRows.toLocaleString() }} row(s) · {{ b.runTs }}
-                </span>
-            }
-            @if (dirty()) {
-                <span class="text-sm" style="color: var(--gamma-warn)">unsaved changes</span>
-            }
-            @if (connectFrom()) {
-                <span class="text-sm" role="status" style="color: var(--gamma-primary)">
-                    connecting from '{{ connectFrom() }}' — click a target node
-                </span>
-            }
+            <inspecto-transfer-menu
+                [items]="transferItems()"
+                [allowedKinds]="['authored-pipeline']"
+                (changed)="load()"
+                label="Import / export pipeline"
+            />
+
+            <!-- right-aligned: live status, then the host's own actions (view mode, explain) -->
+            <span class="ml-auto flex flex-wrap items-center gap-2">
+                @if (connectFrom()) {
+                    <span class="text-xs" role="status" style="color: var(--gamma-primary)">
+                        connecting from '{{ connectFrom() }}' — click a target node
+                    </span>
+                }
+                @if (dirty()) {
+                    <span class="text-xs" style="color: var(--gamma-warn)">unsaved changes</span>
+                }
+                @if (lastRunBatch(); as b) {
+                    <span class="text-xs opacity-70" matTooltip="Last recorded run of this flow">
+                        last run: {{ b.totalRows.toLocaleString() }} row(s) · {{ b.runTs }}
+                    </span>
+                }
+                @if (isTemplate()) {
+                    <span
+                        class="inline-flex items-center gap-1 text-xs"
+                        role="status"
+                        matTooltip="A starting point for a similar pipeline. It collects and writes nowhere near the pipeline it was copied from, and cannot run until the template flag is cleared."
+                        style="color: var(--gamma-warn)"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:document-duplicate"></mat-icon>
+                        template — not runnable
+                    </span>
+                } @else if (isActive()) {
+                    <span class="inline-flex items-center gap-1 text-xs" style="color: var(--gamma-primary)">
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:bolt"></mat-icon> active
+                    </span>
+                }
+                <ng-content select="[toolbarEnd]"></ng-content>
+            </span>
         }
     </div>
 
     @if (unavailable()) {
-        <div role="alert" class="rounded p-2 text-sm"
-             style="background: var(--gamma-bg-card); color: var(--gamma-warn)">
+        <div
+            role="alert"
+            class="shrink-0 border-b px-3 py-1.5 text-sm"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border); color: var(--gamma-warn)"
+        >
             Editing is read-only — the server was started without <code>-Dassist.write.root</code>.
         </div>
     }
 
-    <!-- AGT-6a A2: parse + dry-run-simulate the authored graph, then review the result as a diff before
-         it replaces the working model. Only meaningful once a pipeline is open. -->
-    @if (model(); as m) {
-        <inspecto-ai-assist
-            tool="pipeline_author"
-            [args]="aiFlowArgs()"
-            [current]="aiCurrentPipeline()"
-            label="Check this topology"
-            [disabled]="!m.nodes.length"
-            disabledReason="Add at least one processor first"
-            (applyDraft)="applyPipelineDraft($event)"
-        ></inspecto-ai-assist>
-
-        <!-- AGT-6a A5.3: the same tool from one sentence. A separate instance, not a mode switch on the
-             one above: describing a topology and checking the one on screen are different acts, and the
-             check must stay available on a backend with no model. -->
-        <inspecto-ai-assist
-            tool="pipeline_author"
-            prompting
-            [args]="aiPromptArgs()"
-            [current]="aiCurrentPipeline()"
-            label="Draft a topology"
-            promptHint="e.g. collect orders, drop rows under 100, write the rest to the big store"
-            (applyDraft)="applyPipelineDraft($event)"
-        ></inspecto-ai-assist>
-    }
-
     @if (!flows().length && !creating() && !loading()) {
-        <inspecto-empty-state icon="heroicons_outline:arrows-right-left" title="No authored pipelines"
-            message="Create a pipeline to start composing a topology.">
-        </inspecto-empty-state>
+        <div class="flex min-h-0 flex-1 items-center justify-center">
+            <inspecto-empty-state
+                icon="heroicons_outline:arrows-right-left"
+                title="No authored pipelines"
+                message="Create a pipeline to start composing a topology."
+            >
+            </inspecto-empty-state>
+        </div>
     } @else {
-        <!-- editor body: canvas + floating palette + right-side property drawer -->
-        <div class="relative min-h-0 flex-1">
+        <!-- ── body: [palette dock] │ canvas │ [properties dock] ───────────────────────────────── -->
+        <div class="flex min-h-0 flex-1 overflow-hidden">
+            <!-- left dock — the step palette; collapses to an icon rail -->
+            <aside
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-r"
+                [class.w-10]="!paletteOpen()"
+                [style.width.px]="paletteOpen() ? paletteSplit.width() : null"
+                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                aria-label="Step palette"
+            >
+                @if (paletteOpen()) {
+                    <div
+                        class="flex shrink-0 items-center gap-1 border-b py-1 pl-2 pr-1"
+                        style="border-color: var(--gamma-border)"
+                    >
+                        <h2 class="text-xs font-semibold uppercase tracking-wide opacity-60">Steps</h2>
+                        <button
+                            class="ml-auto"
+                            mat-icon-button
+                            (click)="togglePalette()"
+                            matTooltip="Hide the step palette"
+                            aria-label="Hide the step palette"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:chevron-double-left"></mat-icon>
+                        </button>
+                    </div>
+                    <app-pipeline-palette
+                        [groups]="paletteGroups()"
+                        (pick)="addFromPalette($event)"
+                    ></app-pipeline-palette>
+                } @else {
+                    <button
+                        mat-icon-button
+                        (click)="togglePalette()"
+                        matTooltip="Show the step palette"
+                        aria-label="Show the step palette"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
+                    </button>
+                }
+            </aside>
+            <!-- Kept mounted (hidden, not @if'd) while collapsed so #paletteSplit stays resolvable. -->
+            <div
+                inspectoSplit="pipelines.palette"
+                #paletteSplit="inspectoSplit"
+                [min]="170"
+                [max]="380"
+                [defaultWidth]="215"
+                [class.hidden]="!paletteOpen()"
+                aria-label="Resize the step palette (arrow keys or drag)"
+            ></div>
 
-            <!-- floating processor palette (self-toggling; see PipelinePaletteComponent) -->
-            <app-pipeline-palette [groups]="paletteGroups()" (pick)="addFromPalette($event)"></app-pipeline-palette>
-
-        <mat-drawer-container class="h-full overflow-hidden rounded" [hasBackdrop]="false"
-                              style="background: var(--gamma-bg-card)">
-            <!-- inspector drawer (collapsible property panel; toggled from the toolbar) -->
-            <mat-drawer #inspectorDrawer position="end" mode="over" [opened]="inspectorOpen()"
-                        [disableClose]="true" class="w-72 p-3"
-                        style="background: var(--gamma-bg-card); border-left: 1px solid var(--gamma-border)">
-                <app-pipeline-inspector
-                    [node]="selectedNode()"
-                    [status]="selectedNode() ? statusOf(selectedNode()!) : null"
-                    [category]="selectedNode() ? typeCategory(selectedNode()!.type) : ''"
-                    [lastRun]="selectedNodeLastRun()"
-                    [selectedEdgeId]="selectedEdgeId()"
-                    [selectedEdgeRel]="selectedEdgeRel()"
-                    [candidateRels]="candidateRels()"
-                    [readOnly]="!lens.canAuthorWorkbench()"
-                    (configure)="openNodeConfig($event)"
-                    (runToHere)="openRunToHere($event)"
-                    (previewView)="openViewPreview($event)"
-                    (connect)="armConnect()"
-                    (deleteSelected)="onDeleteKey()"
-                    (edgeRelChange)="setEdgeRel($event)">
-                </app-pipeline-inspector>
-            </mat-drawer>
-
-            <mat-drawer-content class="min-w-0">
+            <!-- canvas — takes everything the docks give back -->
+            <div class="relative min-w-0 flex-1">
                 <app-pipeline-editor-graph
                     [data]="g6Data()"
                     [graphKey]="selectedId()"
@@ -195,54 +277,250 @@
                     (deleteKey)="onDeleteKey()"
                     (edgeCreated)="onEdgeCreated($event)"
                     (nodeHover)="onNodeHover($event)"
-                    (nodeOpen)="onNodeOpen($event)">
+                    (nodeOpen)="onNodeOpen($event)"
+                >
                 </app-pipeline-editor-graph>
-            </mat-drawer-content>
-        </mat-drawer-container>
-        </div><!-- end relative canvas wrapper -->
+            </div>
 
-        <!-- dry-run drawer -->
-        @if (dryRunOpen()) {
-            <app-pipeline-dry-run-panel [pipelineId]="selectedId()"></app-pipeline-dry-run-panel>
-        }
+            <div
+                inspectoSplit="pipelines.inspector"
+                #inspectorSplit="inspectoSplit"
+                pane="right"
+                [min]="240"
+                [max]="560"
+                [defaultWidth]="300"
+                [class.hidden]="!inspectorOpen()"
+                aria-label="Resize the properties panel (arrow keys or drag)"
+            ></div>
 
-        <!-- validation findings (Stage 4) -->
-        @if (validateOpen()) {
-            <div class="rounded p-3" style="background: var(--gamma-bg-card)">
-                <div class="mb-2 flex items-center gap-2">
-                    <h3 class="text-sm font-semibold">Validation</h3>
-                    <span class="text-xs opacity-70">{{ findings().length }} finding(s)</span>
-                </div>
-                @if (!findings().length) {
-                    <p class="inline-flex items-center gap-1 text-sm" style="color: var(--gamma-primary)">
-                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:check-circle"></mat-icon>
-                        No issues — ready to activate.
-                    </p>
-                } @else {
-                    <ul class="flex flex-col gap-0.5">
-                        @for (f of findings(); track $index) {
-                            <li>
-                                <button type="button"
-                                        class="flex w-full items-start gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
-                                        (click)="selectFinding(f.nodeId)">
-                                    <mat-icon class="icon-size-4 mt-0.5 shrink-0" [svgIcon]="findingIcon(f.severity)"
-                                              [style.color]="findingTint(f.severity)"></mat-icon>
-                                    <span>{{ f.message }}</span>
-                                </button>
-                            </li>
+            <!-- right dock — properties / assist; collapses to an icon rail -->
+            <aside
+                class="flex min-h-0 shrink-0 flex-col overflow-hidden border-l"
+                [class.w-10]="!inspectorOpen()"
+                [style.width.px]="inspectorOpen() ? inspectorSplit.width() : null"
+                style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+                aria-label="Properties"
+            >
+                @if (inspectorOpen()) {
+                    <div
+                        class="flex shrink-0 items-center border-b pr-1"
+                        style="border-color: var(--gamma-border)"
+                    >
+                        <div role="tablist" aria-label="Properties panel" class="flex items-center">
+                            <button
+                                type="button"
+                                role="tab"
+                                id="pipe-tab-properties"
+                                aria-controls="pipe-panel-right"
+                                [attr.aria-selected]="rightTab() === 'properties'"
+                                [attr.tabindex]="rightTab() === 'properties' ? 0 : -1"
+                                class="border-b-2 px-2.5 py-1.5 text-xs font-semibold"
+                                [style.border-color]="rightTab() === 'properties' ? 'var(--gamma-primary)' : 'transparent'"
+                                [class.opacity-60]="rightTab() !== 'properties'"
+                                (click)="rightTab.set('properties')"
+                            >
+                                Properties
+                            </button>
+                            <button
+                                type="button"
+                                role="tab"
+                                id="pipe-tab-assist"
+                                aria-controls="pipe-panel-right"
+                                [attr.aria-selected]="rightTab() === 'assist'"
+                                [attr.tabindex]="rightTab() === 'assist' ? 0 : -1"
+                                class="border-b-2 px-2.5 py-1.5 text-xs font-semibold"
+                                [style.border-color]="rightTab() === 'assist' ? 'var(--gamma-primary)' : 'transparent'"
+                                [class.opacity-60]="rightTab() !== 'assist'"
+                                (click)="rightTab.set('assist')"
+                            >
+                                Assist
+                            </button>
+                        </div>
+                        <button
+                            class="ml-auto"
+                            mat-icon-button
+                            (click)="toggleInspector()"
+                            matTooltip="Hide the properties panel"
+                            aria-label="Hide the properties panel"
+                        >
+                            <mat-icon svgIcon="heroicons_outline:chevron-double-right"></mat-icon>
+                        </button>
+                    </div>
+
+                    <div
+                        id="pipe-panel-right"
+                        role="tabpanel"
+                        [attr.aria-labelledby]="rightTab() === 'properties' ? 'pipe-tab-properties' : 'pipe-tab-assist'"
+                        class="min-h-0 flex-1 overflow-y-auto p-3"
+                    >
+                        @if (rightTab() === 'properties') {
+                            <div>
+                                <app-pipeline-inspector
+                                    [node]="selectedNode()"
+                                    [status]="selectedNode() ? statusOf(selectedNode()!) : null"
+                                    [category]="selectedNode() ? typeCategory(selectedNode()!.type) : ''"
+                                    [lastRun]="selectedNodeLastRun()"
+                                    [selectedEdgeId]="selectedEdgeId()"
+                                    [selectedEdgeRel]="selectedEdgeRel()"
+                                    [candidateRels]="candidateRels()"
+                                    [readOnly]="!lens.canAuthorWorkbench()"
+                                    (configure)="openNodeConfig($event)"
+                                    (runToHere)="openRunToHere($event)"
+                                    (previewView)="openViewPreview($event)"
+                                    (connect)="armConnect()"
+                                    (deleteSelected)="onDeleteKey()"
+                                    (edgeRelChange)="setEdgeRel($event)"
+                                >
+                                </app-pipeline-inspector>
+                            </div>
+                        } @else {
+                            <div class="flex flex-col gap-3">
+                                @if (model(); as m) {
+                                    <!-- AGT-6a A2: parse + dry-run-simulate the authored graph, then review the
+                                         result as a diff before it replaces the working model. -->
+                                    <inspecto-ai-assist
+                                        tool="pipeline_author"
+                                        [args]="aiFlowArgs()"
+                                        [current]="aiCurrentPipeline()"
+                                        label="Check this topology"
+                                        [disabled]="!m.nodes.length"
+                                        disabledReason="Add at least one processor first"
+                                        (applyDraft)="applyPipelineDraft($event)"
+                                    ></inspecto-ai-assist>
+
+                                    <!-- AGT-6a A5.3: the same tool from one sentence. A separate instance, not a
+                                         mode switch on the one above: describing a topology and checking the one
+                                         on screen are different acts, and the check must stay available on a
+                                         backend with no model. -->
+                                    <inspecto-ai-assist
+                                        tool="pipeline_author"
+                                        prompting
+                                        [args]="aiPromptArgs()"
+                                        [current]="aiCurrentPipeline()"
+                                        label="Draft a topology"
+                                        promptHint="e.g. collect orders, drop rows under 100, write the rest to the big store"
+                                        (applyDraft)="applyPipelineDraft($event)"
+                                    ></inspecto-ai-assist>
+                                } @else {
+                                    <p class="text-sm opacity-70">Open a pipeline to use the assist surfaces.</p>
+                                }
+                            </div>
                         }
-                    </ul>
+                    </div>
+                } @else {
+                    <button
+                        mat-icon-button
+                        (click)="toggleInspector()"
+                        matTooltip="Show the properties panel"
+                        aria-label="Show the properties panel"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:chevron-double-left"></mat-icon>
+                    </button>
                 }
+            </aside>
+        </div>
+
+        <!-- ── bottom dock — dry-run output / validation findings ──────────────────────────────── -->
+        @if (bottomTab(); as tab) {
+            <div
+                class="flex shrink-0 flex-col border-t"
+                style="max-height: 40%; background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+            >
+                <div class="flex shrink-0 items-center border-b pr-1" style="border-color: var(--gamma-border)">
+                    <div role="tablist" aria-label="Editor output" class="flex items-center">
+                        <button
+                            type="button"
+                            role="tab"
+                            id="pipe-tab-dryrun"
+                            aria-controls="pipe-panel-output"
+                            [attr.aria-selected]="tab === 'dryrun'"
+                            [attr.tabindex]="tab === 'dryrun' ? 0 : -1"
+                            class="border-b-2 px-2.5 py-1.5 text-xs font-semibold"
+                            [style.border-color]="tab === 'dryrun' ? 'var(--gamma-primary)' : 'transparent'"
+                            [class.opacity-60]="tab !== 'dryrun'"
+                            (click)="bottomTab.set('dryrun')"
+                        >
+                            Dry run
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            id="pipe-tab-validation"
+                            aria-controls="pipe-panel-output"
+                            [attr.aria-selected]="tab === 'validation'"
+                            [attr.tabindex]="tab === 'validation' ? 0 : -1"
+                            class="inline-flex items-center gap-1.5 border-b-2 px-2.5 py-1.5 text-xs font-semibold"
+                            [style.border-color]="tab === 'validation' ? 'var(--gamma-primary)' : 'transparent'"
+                            [class.opacity-60]="tab !== 'validation'"
+                            (click)="validate()"
+                        >
+                            Validation
+                            @if (findings().length) {
+                                <span class="rounded px-1.5 text-xs" style="background: var(--gamma-bg-default)">
+                                    {{ findings().length }}
+                                </span>
+                            }
+                        </button>
+                    </div>
+                    <button
+                        class="ml-auto"
+                        mat-icon-button
+                        (click)="bottomTab.set(null)"
+                        matTooltip="Hide the output panel"
+                        aria-label="Hide the output panel"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                    </button>
+                </div>
+
+                <div
+                    id="pipe-panel-output"
+                    role="tabpanel"
+                    [attr.aria-labelledby]="tab === 'dryrun' ? 'pipe-tab-dryrun' : 'pipe-tab-validation'"
+                    class="min-h-0 flex-1 overflow-y-auto p-3"
+                >
+                    @if (tab === 'dryrun') {
+                        <app-pipeline-dry-run-panel [pipelineId]="selectedId()"></app-pipeline-dry-run-panel>
+                    } @else {
+                        @if (!findings().length) {
+                            <p class="inline-flex items-center gap-1 text-sm" style="color: var(--gamma-primary)">
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:check-circle"></mat-icon>
+                                No issues — ready to activate.
+                            </p>
+                        } @else {
+                            <ul class="flex flex-col gap-0.5">
+                                @for (f of findings(); track $index) {
+                                    <li>
+                                        <button
+                                            type="button"
+                                            class="flex w-full items-start gap-2 rounded px-1 py-0.5 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            (click)="selectFinding(f.nodeId)"
+                                        >
+                                            <mat-icon
+                                                class="icon-size-4 mt-0.5 shrink-0"
+                                                [svgIcon]="findingIcon(f.severity)"
+                                                [style.color]="findingTint(f.severity)"
+                                            ></mat-icon>
+                                            <span>{{ f.message }}</span>
+                                        </button>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    }
+                </div>
             </div>
         }
     }
 
     <!-- hover preview tooltip -->
     @if (hoverTip(); as t) {
-        <div class="pointer-events-none fixed z-50 max-w-xs rounded border p-2 text-xs shadow-lg"
-             style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
-             [style.left.px]="t.x + 14"
-             [style.top.px]="t.y + 14">
+        <div
+            class="pointer-events-none fixed z-50 max-w-xs rounded border p-2 text-xs shadow-lg"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+            [style.left.px]="t.x + 14"
+            [style.top.px]="t.y + 14"
+        >
             <div class="font-semibold">{{ t.name }}</div>
             <div class="opacity-70">{{ t.type }}@if (t.category) { · {{ t.category }} }</div>
             @if (t.config.length) {

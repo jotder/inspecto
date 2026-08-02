@@ -1,13 +1,37 @@
+<!-- Edit mode is a full-bleed editor shell (no page header, no page padding — the canvas is the point);
+     View mode keeps the standard admin page chrome. The mode switch rides in the editor's own toolbar. -->
+@if (mode() === 'editor') {
+    <!-- The admin shell scrolls at document level — nothing above us is viewport-bounded, so `flex-1`
+         alone would let the docks grow the page instead of the canvas yielding space. Bound the shell to
+         the viewport minus the classic layout's chrome (64px header + 56px footer); the canvas then
+         shrinks for the bottom dock instead of pushing the page taller. -->
+    <div
+        class="flex min-h-0 min-w-0 flex-auto flex-col overflow-hidden"
+        style="height: calc(100dvh - 120px)"
+    >
+        <app-pipeline-editor>
+            <span toolbarEnd class="flex shrink-0 items-center gap-2">
+                <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
+                <mat-button-toggle-group
+                    [value]="mode()"
+                    (change)="setMode($event.value)"
+                    aria-label="Pipelines view mode"
+                    hideSingleSelectionIndicator
+                >
+                    <mat-button-toggle value="combined">View</mat-button-toggle>
+                    <mat-button-toggle value="editor">Edit</mat-button-toggle>
+                </mat-button-toggle-group>
+            </span>
+        </app-pipeline-editor>
+    </div>
+} @else {
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
     <div class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent">
         <div>
             <h1 class="text-3xl font-extrabold leading-none tracking-tight">Pipelines</h1>
             <div class="text-secondary mt-1.5">
-                @switch (mode()) {
-                    @case ('editor') { Author and edit a pipeline topology on an interactive canvas }
-                    @default { One or many pipelines as a node graph, joined at their shared stores — read-only }
-                }
+                One or many pipelines as a node graph, joined at their shared stores — read-only
             </div>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
@@ -21,21 +45,15 @@
                 <mat-button-toggle value="combined">View</mat-button-toggle>
                 <mat-button-toggle value="editor">Edit</mat-button-toggle>
             </mat-button-toggle-group>
-            @if (mode() === 'combined') {
-                <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['authored-pipeline']" (changed)="load()" label="Import / export pipelines" />
-                <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh pipelines">
-                    <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
-                </button>
-            }
+            <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['authored-pipeline']" (changed)="load()" label="Import / export pipelines" />
+            <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh pipelines">
+                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+            </button>
         </div>
     </div>
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (mode() === 'editor') {
-            <!-- Edit (T32): author/edit a pipeline on an interactive canvas -->
-            <app-pipeline-editor></app-pipeline-editor>
-        } @else {
             <!-- View: the chosen pipelines (one or many), joined at their shared stores -->
             @if (combinedUnavailable()) {
                 <inspecto-empty-state
@@ -123,9 +141,9 @@
                     [message]="combinedLoading() ? 'Loading topology…' : 'No pipelines to show yet.'"
                 ></inspecto-empty-state>
             }
-        }
     </div>
 </div>
+}
 
 <!-- Shared node inspector -->
 <ng-template #nodeInspector let-n>

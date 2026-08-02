@@ -283,6 +283,19 @@ src/app/
   defaultWidth, `pane="right"` when the controlled pane sits right of the handle) and bind the pane's
   `[style.width.px]="h.width()"`. Persists per device at `inspecto.split.<key>`; `role="separator"` +
   arrow-key a11y built in; hosts add `aria-label` + responsive classes. Never re-roll pointer resize.
+  ⚠ **Keep the handle MOUNTED while its pane is collapsed** (`[class.hidden]`, never `@if`) or the
+  `#h="inspectoSplit"` ref the pane's width binds to stops resolving. Collapse-to-rail idiom (Pipelines
+  editor, 2026-08-02): `[class.w-10]="!open()"` + `[style.width.px]="open() ? h.width() : null"` — the
+  null drops the inline width so the rail class applies.
+- **Full-bleed editor shells (Pipelines edit mode, 2026-08-02).** ⚠ **The admin shell scrolls at document
+  level — `body` is `min-height:100%` and every ancestor is `min-height:auto`, so NOTHING above a routed
+  pane is viewport-bounded.** A pane that wants IDE chrome (docks that give space back to a canvas) must
+  bound *itself* — `style="height: calc(100dvh - 120px)"` (classic layout = 64px header + 56px footer) —
+  or `flex-1` children size to content and an opening bottom dock grows the page instead of shrinking the
+  canvas. This looks fine until the second dock opens, which is why it survives a casual preview check.
+  Link Analysis dodges it with a `62vh` band; a true full-bleed editor cannot.
+  ⚠ A G6/Chart/Map host inside such a shell needs its **own `ResizeObserver`** — side docks resize it and
+  the libraries only track the window (`pipeline-editor-graph.component.ts` learned this the same day).
 - **Detail-over-list panes (R5):** when a routed detail should NOT destroy its list (runs, jobs), use ONE
   matcher-based route config covering both `''` and `':name'` (same config ⇒ router reuses the list
   component ⇒ scroll/filters survive), read `paramMap` into a `detailName` signal, and mount the detail

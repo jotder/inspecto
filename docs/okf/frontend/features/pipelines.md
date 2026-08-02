@@ -22,6 +22,33 @@ mirrors the backend `CsvSettings`. Parsers persist as reusable `grammar`
 [components](components.md). Backed by `PipelinesService` / `ComponentsService`; offline via the
 `mockFlows`-gated handler of the unified [mock backend](../conventions/mock-backends.md).
 
+## The editor shell is full-bleed, Visio-style (2026-08-02)
+
+Edit mode is an **editor shell, not an admin page**: `pipelines.component.html` branches on `mode()` and
+gives the editor the whole route — no page header, no `p-6 sm:p-10`. View mode keeps the standard chrome,
+and the mode toggle + `<inspecto-ai-explain>` project into the editor's own toolbar via `[toolbarEnd]`, so
+there is exactly one bar and one `<h1>`.
+
+Regions, all collapsing toward the canvas:
+
+- **Toolbar** — one compact row, divider-grouped (document · file · run · edit · assist). The open
+  pipeline is a **mat-menu title button**, not a `mat-form-field`: the gamma theme parks every field's
+  floating label ~25px above the control (`angular-material.scss`), which alone made the bar 87px; the
+  menu takes it to 53px. Don't "restore the select" without re-measuring.
+- **Left dock** — the step palette (`app-pipeline-palette`), search + collapsible category sections. It is
+  a **docked panel now, not the old floating popup**; a search overrides the fold state.
+- **Right dock** — `Properties` / `Assist` tabs. The two `<inspecto-ai-assist>` surfaces moved here off the
+  canvas band they used to occupy; `showRightTab('assist')` is the toolbar's sparkle button.
+- **Bottom dock** — one `bottomTab` signal (`'dryrun' | 'validation' | null`) replacing the old
+  `dryRunOpen`/`validateOpen` pair; dry-run output and findings are one dock, not two stacked bands.
+
+Both side docks are `[inspectoSplit]` (persisted at `inspecto.split.pipelines.{palette,inspector}`) and
+collapse to a 40px icon rail. **Gotchas that cost a cycle each, recorded in the `angular-ui` skill:** the
+shell must bound itself to the viewport (`calc(100dvh - 120px)`) because nothing above a routed pane is
+height-bounded; the split handle must stay mounted while collapsed; the G6 host needs its own
+`ResizeObserver`; and the palette's `groups` must be a **signal input** — as a plain `@Input` its
+`filtered()` computed cached the empty first pass and the catalog never appeared.
+
 ## The node-type vocabulary is the engine's, and only the engine's (2026-07-31)
 
 The palette is a **faithful port of the backend enum `BuiltinNodeType`** — what

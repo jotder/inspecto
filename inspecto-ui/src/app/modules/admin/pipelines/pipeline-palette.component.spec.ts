@@ -20,45 +20,77 @@ function create() {
         providers: [provideNoopAnimations()],
     });
     const fixture = TestBed.createComponent(PipelinePaletteComponent);
-    fixture.componentInstance.groups = GROUPS;
+    fixture.componentRef.setInput('groups', GROUPS);
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance };
 }
 
-describe('PipelinePaletteComponent', () => {
-    it('starts closed, showing only the trigger', () => {
-        const { fixture } = create();
-        const el = fixture.nativeElement as HTMLElement;
-        expect(el.querySelector('[aria-expanded="false"]')).toBeTruthy();
-        expect(el.textContent).not.toContain('File writer');
-    });
+const text = (fixture: { nativeElement: HTMLElement }): string => fixture.nativeElement.textContent ?? '';
 
-    it('opens the panel and lists every group + type', () => {
-        const { fixture, c } = create();
-        c.open.set(true);
-        fixture.detectChanges();
-        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-        expect(text).toContain('File');
-        expect(text).toContain('File writer');
+describe('PipelinePaletteComponent', () => {
+    it('is docked and expanded by default — every group and type is listed', () => {
+        const { fixture } = create();
+        expect(text(fixture)).toContain('File');
+        expect(text(fixture)).toContain('File writer');
     });
 
     it('emits pick with the type id on click-to-add', () => {
         const { fixture, c } = create();
-        c.open.set(true);
-        fixture.detectChanges();
         const pick = vi.fn();
         c.pick.subscribe(pick);
-        const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
-            b.getAttribute('aria-label') === 'Add File',
+        const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+            (b) => b.getAttribute('aria-label') === 'Add File',
         );
         btn?.click();
         expect(pick).toHaveBeenCalledWith('acquisition');
     });
 
-    it('has no a11y violations closed or open', async () => {
+    it('filters the catalog by the search query, dropping groups with no hit', () => {
+        const { fixture, c } = create();
+        c.query.set('writer');
+        fixture.detectChanges();
+        expect(text(fixture)).toContain('File writer');
+        expect(c.filtered().map((g) => g.category)).toEqual(['SINK']);
+    });
+
+    it('folds a category away on its header click, and reports the empty search case', () => {
+        const { fixture, c } = create();
+        c.toggleGroup('SINK');
+        fixture.detectChanges();
+        expect(c.isOpen('SINK')).toBe(false);
+        expect(text(fixture)).not.toContain('File writer');
+
+        // A search overrides the fold — a user searching wants to see the hits.
+        c.query.set('writer');
+        fixture.detectChanges();
+        expect(c.isOpen('SINK')).toBe(true);
+
+        c.query.set('nothing-matches-this');
+        fixture.detectChanges();
+        expect(text(fixture)).toContain('No step type matches');
+    });
+
+    it('renders the catalog when it arrives AFTER the first render (it loads async)', () => {
+        // Regression: `filtered()` is a computed, so `groups` must be a signal input — with a plain
+        // @Input it cached the empty first pass and the docked palette stayed empty forever.
+        TestBed.configureTestingModule({
+            imports: [PipelinePaletteComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(PipelinePaletteComponent);
+        fixture.componentRef.setInput('groups', []);
+        fixture.detectChanges();
+        expect(text(fixture)).toContain('No step type matches');
+
+        fixture.componentRef.setInput('groups', GROUPS);
+        fixture.detectChanges();
+        expect(text(fixture)).toContain('File writer');
+    });
+
+    it('has no a11y violations expanded or filtered', async () => {
         const { fixture, c } = create();
         await expectNoA11yViolations(fixture.nativeElement);
-        c.open.set(true);
+        c.query.set('writer');
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });

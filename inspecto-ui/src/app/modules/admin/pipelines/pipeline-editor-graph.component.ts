@@ -72,6 +72,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     private graph: Graph | null = null;
     private dark = false;
     private ready = false;
+    private resizeObserver: ResizeObserver | null = null;
     private destroyRef = inject(DestroyRef);
 
     constructor() {
@@ -92,6 +93,13 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     ngAfterViewInit(): void {
         this.ready = true;
         this.rebuild();
+        // The editor's side docks resize and collapse over this canvas, and G6 only tracks the window.
+        // Observe the host box so the drawing surface follows the dock (same idiom as GraphViewComponent).
+        // Absent in jsdom.
+        if (typeof ResizeObserver !== 'undefined') {
+            this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
+            this.resizeObserver.observe(this.hostEl.nativeElement);
+        }
     }
 
     ngOnChanges(changes: SimpleChanges): void {
@@ -100,6 +108,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     }
 
     ngOnDestroy(): void {
+        this.resizeObserver?.disconnect();
         this.graph?.destroy();
     }
 

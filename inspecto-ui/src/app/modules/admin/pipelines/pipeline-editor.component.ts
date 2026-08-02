@@ -15,8 +15,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
-import { MatSelectModule } from '@angular/material/select';
-import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -39,6 +37,7 @@ import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
@@ -104,18 +103,20 @@ import {
         MatIconModule,
         MatInputModule,
         MatMenuModule,
-        MatSelectModule,
-        MatSidenavModule,
         MatTooltipModule,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
         PipelinePaletteComponent,
         InspectoEmptyStateComponent,
+        InspectoSplitDirective,
         TransferMenuComponent,
         AiAssistComponent,
     ],
     templateUrl: './pipeline-editor.component.html',
+    // The editor is a full-bleed shell: it fills whatever the route gives it, and the canvas takes
+    // whatever the docks don't. `min-h-0` is what lets the inner scroll regions actually scroll.
+    host: { class: 'flex min-h-0 flex-1 flex-col' },
     changeDetection: ChangeDetectionStrategy.OnPush,
     encapsulation: ViewEncapsulation.None,
 })
@@ -146,6 +147,11 @@ export class PipelineEditorComponent implements OnInit {
     });
     /** True when the selection is a non-runnable authoring template — it must not offer Activate. */
     readonly isTemplate = computed(() => this.selectedSummary()?.template === true);
+    /** The toolbar's document title — the open pipeline's display name, or the pick-one prompt. */
+    readonly selectedLabel = computed(() => {
+        const s = this.selectedSummary();
+        return s ? s.displayName || s.name : 'Select a pipeline';
+    });
 
     /** The selected pipeline as a transfer reference — what the export/import menu offers. */
     readonly transferItems = computed(() => {
@@ -166,7 +172,12 @@ export class PipelineEditorComponent implements OnInit {
     /** Set when a write returns 503 (no `-Dassist.write.root`) — the editor is read-only. */
     readonly unavailable = signal(false);
 
-    readonly dryRunOpen = signal(false);
+    /**
+     * The bottom dock's active tab, or `null` when it is collapsed. Dry-run output and validation
+     * findings share one dock (they are both "output of the thing on the canvas"), so opening one
+     * closes the other rather than stacking two bands under the graph.
+     */
+    readonly bottomTab = signal<'dryrun' | 'validation' | null>(null);
 
     // ── canvas status (Stage 2) + validation/activation (Stage 4) ──
     /** Known registry refs (`grammar/x`, `transform/y`, …) — drives dangling detection once loaded. */
@@ -181,7 +192,6 @@ export class PipelineEditorComponent implements OnInit {
     private readonly lastRunCounts = signal<Map<string, number>>(new Map());
     /** node-type → emitted relationships, for the edge relationship picker. */
     private readonly typeEmits = signal<Map<string, string[]>>(new Map());
-    readonly validateOpen = signal(false);
     readonly findings = signal<PipelineFinding[]>([]);
     readonly activating = signal(false);
     readonly statusLabel = statusLabel;
@@ -191,8 +201,12 @@ export class PipelineEditorComponent implements OnInit {
     readonly creating = signal(false);
     readonly newName = this.fb.control('', { nonNullable: true, validators: [Validators.required] });
 
-    /** The property panel is collapsible (the editor body is just canvas + an optional inspector drawer). */
+    /** The right dock (properties / assist) is collapsible to a rail — the canvas takes the space back. */
     readonly inspectorOpen = signal(true);
+    /** The left dock (the step palette) is collapsible to a rail, independently of the right one. */
+    readonly paletteOpen = signal(true);
+    /** Which surface the right dock shows: the selection's properties, or the AI authoring surfaces. */
+    readonly rightTab = signal<'properties' | 'assist'>('properties');
     /** Hover preview: the node under the cursor + its viewport position (null when not hovering). */
     readonly hoverTip = signal<{
         name: string;
@@ -207,6 +221,20 @@ export class PipelineEditorComponent implements OnInit {
 
     toggleInspector(): void {
         this.inspectorOpen.update((o) => !o);
+    }
+
+    togglePalette(): void {
+        this.paletteOpen.update((o) => !o);
+    }
+
+    /** Reveal the right dock on the given tab (an already-showing tab collapses the dock again). */
+    showRightTab(tab: 'properties' | 'assist'): void {
+        if (this.inspectorOpen() && this.rightTab() === tab) {
+            this.inspectorOpen.set(false);
+            return;
+        }
+        this.rightTab.set(tab);
+        this.inspectorOpen.set(true);
     }
 
     /** The selected flow's editable model mapped to G6 data — fed to the host only on a flow switch. */
@@ -760,7 +788,7 @@ export class PipelineEditorComponent implements OnInit {
     // ── dry-run ──
 
     toggleDryRun(): void {
-        this.dryRunOpen.update((o) => !o);
+        this.bottomTab.update((t) => (t === 'dryrun' ? null : 'dryrun'));
     }
 
     // ── edge relationship (Stage 2) ──
@@ -789,8 +817,8 @@ export class PipelineEditorComponent implements OnInit {
     }
 
     toggleValidate(): void {
-        if (!this.validateOpen()) this.validate();
-        else this.validateOpen.set(false);
+        if (this.bottomTab() === 'validation') this.bottomTab.set(null);
+        else this.validate();
     }
 
     /** Walk the flow for activation-blocking issues; opens the findings panel. */
@@ -798,7 +826,7 @@ export class PipelineEditorComponent implements OnInit {
         const m = this.model();
         const f = m ? validatePipeline(m, this.typeCat(), this.validRefs(), this.testedStatus()) : [];
         this.findings.set(f);
-        this.validateOpen.set(true);
+        this.bottomTab.set('validation');
         return f;
     }
 
