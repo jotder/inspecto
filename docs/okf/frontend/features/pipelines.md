@@ -22,13 +22,26 @@ mirrors the backend `CsvSettings`. Parsers persist as reusable `grammar`
 [components](components.md). Backed by `PipelinesService` / `ComponentsService`; offline via the
 `mockFlows`-gated handler of the unified [mock backend](../conventions/mock-backends.md).
 
-## Nothing loads until you open it; View is the editor with `readOnly` (2026-08-02)
+## Three lenses, and nothing loads until you ask for it (2026-08-02)
 
-**One component serves both modes.** `PipelinesComponent` is a thin host that renders
-`PipelineEditorComponent` with `[readOnly]="mode() === 'combined'"`. View is not a separate page — same
-toolbar, tab strip, palette, canvas and docks — so switching to Edit never means relearning the screen.
-`canAuthor()` = authoring lens **AND** not read-only, and every canvas mutation path checks it, so the
-gate is defence-in-depth rather than hidden buttons.
+`PipelinesComponent` hosts **`view` · `editor` · `topology`**:
+
+- **View and Edit are one component** — `PipelineEditorComponent` with `[readOnly]="mode() === 'view'"`.
+  Same toolbar, tab strip, palette, canvas and docks, so switching never means relearning the screen.
+  `canAuthor()` = authoring lens **AND** not read-only, and every canvas mutation path checks it, so
+  the gate is defence-in-depth rather than hidden buttons.
+- **Topology** is the store-joined overview: every chosen pipeline on one canvas, wired through the
+  synthetic STORE nodes they share, with the multiselect and the store-aware node inspector. It is a
+  separate mode because it answers a different question — tabs say *what is in this pipeline*, topology
+  says *how do these fit together* — and the tabbed editor cannot express the second.
+
+⚠ The mode ids are `view`/`editor`/`topology`. They were briefly `combined`/`editor` where `combined`
+meant the **read-only editor**; that name is now taken by the thing it never referred to, so don't
+resurrect it.
+
+**Laziness is the rule, per mode.** Arrival fetches only the pipeline name list and the node-type
+catalog. `GET /pipelines/combined` — the expensive whole-topology call that used to run on every visit
+— fires the first time Topology is entered, guarded so re-entry reuses it (Refresh forces a refetch).
 
 **The open set is explicit.** Arrival fetches only `GET /pipelines` (names + flags) and the node-type
 catalog — *not* `GET /pipelines/combined`, which used to pull the whole topology on every visit. An
@@ -44,10 +57,9 @@ a toast) and confirms on its own close button; those are the only two ways edits
 The active tab's `dirty` mirrors into the per-tab set through **one effect**, so the dozen scattered
 `dirty.set(...)` call sites stay ignorant of tabs.
 
-⚠ **Removed:** the combined "one or many pipelines joined at their shared stores" rendering, with its
-synthetic STORE nodes and the store-aware node inspector. Multi-pipeline is now *tabs*, not one merged
-canvas — cross-pipeline store links are no longer visualised here. `graph-view.component.ts` itself is
-untouched and still serves Catalog, Link Analysis and Objects.
+**Multi-pipeline has two answers, deliberately.** Tabs (editor) for working on several pipelines one at
+a time; Topology for seeing them merged. The tabbed editor never renders more than one graph at once —
+that is what keeps "which pipeline does this edit belong to" answerable.
 
 ## The editor shell is full-bleed, Visio-style (2026-08-02)
 
