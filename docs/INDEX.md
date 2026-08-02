@@ -73,6 +73,15 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/sinks-config-format-plan.md`](superpower/sinks-config-format-plan.md) — **the plural `sinks:`
+  config-format, IN FLIGHT 2026-08-02** — the true prerequisite that unblocks Stage A of the branch-aware
+  executor (`branch-aware-executor-plan.md` §0.2 / §5 steps 3–4). Today a `*_pipeline.toon` names exactly
+  **one** destination (split across `Dirs.database` + `Output`); this adds a top-level plural `sinks:` list of
+  `{database, format, compression, ducklake}` tuples, with the single `output:`/`dirs.database` kept as the
+  one-element shorthand. Flat-ingest semantics = **fan-out/replicate** (every sink fed by a `data` edge), which
+  is exactly what the already-shipped-but-dormant predicate `BatchGraphRunner.engages` engages on — so it flips
+  on with no executor rework. Slices: **1** model+parse+safety-validate (dormant, N>1 rejected at load), **2**
+  per-sink lift, **3** wire the predicate + remove the gate, **4** lift the editor `MULTI_SINK` refusal.
 - ~~`superpower/onboarding-pipeline-unification.md`~~ — **SHIPPED end-to-end 2026-08-01 (W0–W5), plan
   archived** to
   [`archived-documents/plans-archive/onboarding-pipeline-unification.md`](archived-documents/plans-archive/onboarding-pipeline-unification.md).

@@ -109,6 +109,56 @@ public final class ConfigSafetyValidator {
 
         checkOutput(raw, "output.format", "output.compression", p, out);
         checkDuckLake(raw, out);
+
+        // ── sinks (plural destinations) ──
+        // Each entry is a {database, format, compression, ducklake} tuple; validate the same path-jail /
+        // allow-list surface the single output: has. (Multi-destination ingest is executable; the one
+        // unsupported combination — a versioned reference store with >1 destination — is refused at load,
+        // PipelineConfig.prepare().)
+        if (raw.get("sinks") instanceof List<?> sinks) {
+            for (int i = 0; i < sinks.size(); i++) {
+                if (sinks.get(i) instanceof Map<?, ?> sink) {
+                    checkSink(i, sink, p, out);
+                } else {
+                    out.add(Finding.error("sinks[" + i + "]", "each sinks[] entry must be a map"));
+                }
+            }
+        }
+    }
+
+    /** Path-jail + format/compression/ducklake allow-list for one {@code sinks[i]} destination entry. */
+    private static void checkSink(int i, Map<?, ?> sink, SafetyPolicy p, List<Finding> out) {
+        String prefix = "sinks[" + i + "]";
+        Object db = sink.get("database");
+        if (db != null && !db.toString().isBlank()) checkPathValue(prefix + ".database", db.toString(), p, out);
+
+        Object fmt = sink.get("format");
+        if (fmt != null && !fmt.toString().isBlank()
+                && !p.allowedFormats().contains(fmt.toString().trim().toUpperCase())) {
+            out.add(Finding.error(prefix + ".format", "output format '" + fmt
+                    + "' is not in the allow-list " + p.allowedFormats()));
+        }
+        Object comp = sink.get("compression");
+        if (comp != null && !comp.toString().isBlank()
+                && !p.allowedCompression().contains(comp.toString().trim().toLowerCase())) {
+            out.add(Finding.error(prefix + ".compression", "compression '" + comp
+                    + "' is not in the allow-list " + p.allowedCompression()));
+        }
+        if (sink.get("ducklake") instanceof Map<?, ?> dl) {
+            Object dp = dl.get("data_path");
+            if (dp != null && !dp.toString().isBlank()) {
+                checkPathValue(prefix + ".ducklake.data_path", dp.toString(), p, out);
+            }
+            if (Boolean.TRUE.equals(dl.get("enabled"))) {
+                for (String k : new String[]{"catalog_url", "data_path", "table"}) {
+                    Object v = dl.get(k);
+                    if (v == null || v.toString().isBlank()) {
+                        out.add(Finding.error(prefix + ".ducklake." + k,
+                                prefix + ".ducklake." + k + " is required when ducklake is enabled"));
+                    }
+                }
+            }
+        }
     }
 
     // ── enrichment ───────────────────────────────────────────────────────────────────

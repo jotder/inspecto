@@ -135,6 +135,35 @@ class ConfigSafetyValidatorTest {
     }
 
     @Test
+    void sinkDatabaseOutsideRootIsRejected(@TempDir Path root) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        raw.put("sinks", List.of(
+                Map.of("database", Path.of("/etc/exfil-sink").toAbsolutePath().toString(), "format", "PARQUET")));
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "sinks[0].database"), "a sink database escaping the root must be rejected: " + f);
+    }
+
+    @Test
+    void sinkFormatAndCompressionAllowListEnforced(@TempDir Path root) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        raw.put("sinks", List.of(new LinkedHashMap<>(Map.of(
+                "database", root.resolve("sink").toString(), "format", "EXE", "compression", "rar"))));
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "sinks[0].format"));
+        assertTrue(hasError(f, "sinks[0].compression"));
+    }
+
+    @Test
+    void multipleValidSinksUnderRootPassCleanly(@TempDir Path root) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        raw.put("sinks", List.of(
+                Map.of("database", root.resolve("hot").toString(), "format", "PARQUET"),
+                Map.of("database", root.resolve("cold").toString(), "format", "CSV")));
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
+        assertTrue(f.isEmpty(), "two valid under-root destinations are safe (multi-destination is executable): " + f);
+    }
+
+    @Test
     void enrichmentOutsideRootIsRejected(@TempDir Path root) {
         Map<String, Object> raw = new LinkedHashMap<>();
         raw.put("name", "ENR");

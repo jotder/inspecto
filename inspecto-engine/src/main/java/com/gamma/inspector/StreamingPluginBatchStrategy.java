@@ -42,6 +42,12 @@ final class StreamingPluginBatchStrategy implements BatchIngestStrategy {
         long maxMemberBytes = batch.members().stream().mapToLong(Batch.Member::bytes).max().orElse(0L);
         boolean generationMode = forcedFlushRows > 0 || (threshold > 0 && maxMemberBytes >= threshold);
 
+        // Multi-destination fan-out (sinks:>1) writes through writeAndTrace, which UnionModeIngester uses but
+        // GenerationModeIngester bypasses (it streams generations straight to one dir). Force the union path
+        // so the fan-out reaches every destination. (A very large plugin input thus materialises rather than
+        // streaming; a chunking-sized input combined with multiple destinations is rare.)
+        if (cfg.sinks().size() > 1) generationMode = false;
+
         if (generationMode) {
             long flush = forcedFlushRows > 0 ? forcedFlushRows
                     : (cfg.processing().flushRecords() > 0 ? cfg.processing().flushRecords() : DEFAULT_FLUSH_ROWS);

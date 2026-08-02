@@ -75,7 +75,13 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                 //     instead of the read_csv → raw_f<id> → raw_input → transformed triple-copy.
                 // The Java parse engine keeps the per-member materialise→raw_input path below.
                 if (DuckDbCsvIngester.decideNative(batch, cfg)) {
-                    if (batch.members().size() == 1) {
+                    // Multi-destination fan-out (sinks:>1) writes through the shared writeAndTrace, which the
+                    // single-member streaming/chunked paths bypass (they stream read_csv → COPY straight to
+                    // one dir). So a fan-out batch materialises the `transformed` table via the union path —
+                    // which writeAndTrace then fans out to every destination. (A huge single file thus
+                    // materialises instead of chunking; multi-destination + a chunking-sized file is rare.)
+                    boolean fanOut = cfg.sinks().size() > 1;
+                    if (batch.members().size() == 1 && !fanOut) {
                         Batch.Member only = batch.members().get(0);
                         return cfg.chunking().appliesTo(only.file().length())
                                 ? NativeCsvStreamingEngine.chunkedIngest(batch, only, cfg, conn, batchStart)

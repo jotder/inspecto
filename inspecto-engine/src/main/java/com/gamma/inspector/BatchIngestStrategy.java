@@ -80,19 +80,36 @@ interface BatchIngestStrategy {
      * ({@link DecisionRuleApplier} — exact no-op when none are authored), then write it
      * Hive-partitioned under {@code dbDir} and collect the input→output lineage matrix over the same
      * partitions. Routed rows contribute their own outputs + lineage.
+     *
+     * <p><b>Multi-destination fan-out ({@code sinks:}).</b> When the pipeline declares more than one
+     * {@link PipelineConfig#sinks() destination}, the main partitioned write is repeated to each — under
+     * that destination's own {@code database} root (the {@code dbDir} suffix beyond {@code dirs.database},
+     * e.g. the {@code table} subdir, is preserved) and its own {@code format}/{@code compression}. A single
+     * destination (the {@code output:} shorthand) is byte-for-byte the legacy single write. The Decision
+     * Rules run <em>once</em> (they have side effects — routed writes + quarantine — that must not repeat),
+     * so decision-rule routing combined with multiple destinations is refused here; a versioned reference
+     * store combined with multiple destinations is refused earlier, at {@link PipelineConfig#prepare()}.
+     * The batch's source finalisation (backup/markers/ledger) runs once over the union of every
+     * destination's outputs — those side effects are per-source-file, not per-destination.
      */
     static Written writeAndTrace(Connection conn, String table, List<String> partCols,
                                  PipelineConfig cfg, String dbDir, String baseName,
                                  String batchId, Map<Integer, String> srcIdToFile) throws Exception {
+        List<PipelineConfig.Sink> sinks = cfg.sinks();
+        boolean fanOut = sinks.size() > 1;
+
         DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(
                 conn, table, cfg, dbDir, baseName, partCols, batchId, srcIdToFile);
+        if (fanOut && !applied.outputs().isEmpty())
+            throw new IllegalStateException("decision-rule routing writes to a single destination; combining "
+                    + "it with a multi-destination sinks: pipeline is not yet supported");
 
         // Reference Phase-2 P1/P2: a `produces: reference` pipeline with `load: upsert|scd2` writes an
         // append-only versioned store — each batch stamps system columns (__key_hash/__row_hash/
         // __valid_from/__op/__batch_id), folds out within-batch key duplicates, skips rows identical to
         // the store's current version, and reveals under a batch-unique file stem so prior versions
         // survive (latest-version-wins / as-of are derived at read time by the enrichment views).
-        // `load: replace` (the default) is untouched — plain overwrite.
+        // `load: replace` (the default) is untouched — plain overwrite. (Refused with sinks:>1 at prepare().)
         String writeTable = table;
         String writeBase  = baseName;
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
@@ -101,16 +118,21 @@ interface BatchIngestStrategy {
                     existingStoreReader(dbDir, cfg.output().format()));
             writeBase = baseName + "__v_" + batchId;   // batch-unique ⇒ append, never overwrite
         }
-        List<PartitionOutput> mainOut = PartitionWriter.write(conn, writeTable, dbDir,
-                cfg.output().format(), cfg.output().compression(), writeBase, partCols);
-        List<LineageRow> mainLineage = LineageCollector.collect(
-                conn, writeTable, batchId, srcIdToFile, mainOut, partCols);
-        if (applied.outputs().isEmpty() && applied.lineage().isEmpty())
-            return new Written(mainOut, mainLineage);
+
+        // Fan the main partitioned write out to every destination (one for the single-output shorthand,
+        // byte-for-byte). `rel` is dbDir's suffix beyond dirs.database (e.g. the table subdir), re-rooted
+        // under each destination's own database.
+        java.nio.file.Path rel = fanOut
+                ? Paths.get(cfg.dirs().database()).relativize(Paths.get(dbDir)) : null;
         List<PartitionOutput> outputs = new java.util.ArrayList<>(applied.outputs());
-        outputs.addAll(mainOut);
         List<LineageRow> lineage = new java.util.ArrayList<>(applied.lineage());
-        lineage.addAll(mainLineage);
+        for (PipelineConfig.Sink dest : sinks) {
+            String destDir = fanOut ? Paths.get(dest.database()).resolve(rel).toString() : dbDir;
+            List<PartitionOutput> outs = PartitionWriter.write(conn, writeTable, destDir,
+                    dest.format(), dest.compression(), writeBase, partCols);
+            outputs.addAll(outs);
+            lineage.addAll(LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols));
+        }
         return new Written(outputs, lineage);
     }
 

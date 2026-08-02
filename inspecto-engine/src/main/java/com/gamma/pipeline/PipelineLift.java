@@ -79,25 +79,24 @@ public final class PipelineLift {
 
         // 4. branch on schema resolution (exactly one of the three is set)
         PipelineConfig.Schemas s = cfg.schemas();
-        Map<String, Object> sinkBase = sinkBaseConfig(cfg);
         boolean rowFilters = cfg.csv().hasRowFilters();
 
         if (s.selector() != null && s.selector().hasSchemas()) {
             int i = 0;
             for (SchemaSelector.Selection sel : s.selector().entries()) {
                 String key = routeKey(sel.table(), i++);
-                branch(nodes, edges, PipelineRel.route(key), key, sel.schema(), sel.table(), sinkBase, cfg, rowFilters);
+                branch(nodes, edges, PipelineRel.route(key), key, sel.schema(), sel.table(), cfg, rowFilters);
             }
             addQuarantine(nodes, edges, cfg);
         } else if (s.segments() != null && !s.segments().isEmpty()) {
             for (Map.Entry<String, Map<String, Object>> e : s.segments().entrySet()) {
                 String key = routeKey(e.getKey(), 0);
-                branch(nodes, edges, PipelineRel.route(key), key, e.getValue(), e.getKey(), sinkBase, cfg, rowFilters);
+                branch(nodes, edges, PipelineRel.route(key), key, e.getValue(), e.getKey(), cfg, rowFilters);
             }
             addQuarantine(nodes, edges, cfg);
         } else {
             // single schema: one linear chain off the parser's data edge
-            branch(nodes, edges, PipelineRel.DATA, null, s.single(), null, sinkBase, cfg, rowFilters);
+            branch(nodes, edges, PipelineRel.DATA, null, s.single(), null, cfg, rowFilters);
         }
 
         return new PipelineGraph(cfg.identity().pipelineName(), cfg.active(), nodes, edges);
@@ -167,10 +166,13 @@ public final class PipelineLift {
         return new PipelineNode(PARSE, BuiltinNodeType.PARSER.type(), "Parser", null, c, use);
     }
 
-    /** Build one {@code [filter →] map → sink} chain off {@code parse} via {@code rel}; {@code key} is null for single-schema. */
+    /** Build one {@code [filter →] map → sink(s)} chain off {@code parse} via {@code rel}; {@code key} is null for
+     *  single-schema. The {@code map} fans out to one {@code sink.persistent} node per
+     *  {@link PipelineConfig#sinks() destination} — one for the single-{@code output:} shorthand (byte-for-byte
+     *  as before), several when a {@code sinks:} list names multiple destinations. */
     private static void branch(List<PipelineNode> nodes, List<PipelineEdge> edges, String rel, String key,
                                Map<String, Object> schema, String table,
-                               Map<String, Object> sinkBase, PipelineConfig cfg, boolean rowFilters) {
+                               PipelineConfig cfg, boolean rowFilters) {
         String suffix = (key == null) ? "" : "_" + key;
         String mapUpstream = PARSE;
         String mapUpstreamRel = rel;
@@ -190,20 +192,25 @@ public final class PipelineLift {
         nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_MAP.type(), mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));
 
-        String sinkId = "sink" + suffix;
-        Map<String, Object> sinkCfg = new LinkedHashMap<>(sinkBase);
         // The declared data-store this sink produces — the join key a downstream job/enrichment matches
         // its source store against, so the topology superimposes from config/metadata (see PipelineStores).
         // Legacy pipelines only ever write a resting store, so the lift always emits sink.persistent;
         // sink.materialized / sink.view are authored-only (new capability, doc §3.1).
         String store = (table != null && !table.isBlank())
                 ? table : canonicalName(schema, cfg.identity().pipelineName());
-        put(sinkCfg, PipelineStores.CONFIG_STORE, store);
-        put(sinkCfg, "table", table);
-        if (schema != null) sinkCfg.put("schema", schema);   // partitions derived from it at compile-back
-        // The sink's display name is the store it produces — typically a business object/concept (§3.1).
-        nodes.add(new PipelineNode(sinkId, BuiltinNodeType.SINK_PERSISTENT.type(), store, "Persistent store", sinkCfg, null));
-        edges.add(PipelineEdge.data(mapId, sinkId));
+        // Fan out: one persistent sink per destination, each fed by a data edge off the map. A single
+        // destination (the common case) keeps the id `sink<suffix>` so the graph is byte-for-byte unchanged.
+        List<PipelineConfig.Sink> sinks = cfg.sinks();
+        for (int d = 0; d < sinks.size(); d++) {
+            String sinkId = "sink" + suffix + (sinks.size() == 1 ? "" : "__d" + d);
+            Map<String, Object> sinkCfg = sinkConfig(sinks.get(d), cfg);
+            put(sinkCfg, PipelineStores.CONFIG_STORE, store);
+            put(sinkCfg, "table", table);
+            if (schema != null) sinkCfg.put("schema", schema);   // partitions derived from it at compile-back
+            // The sink's display name is the store it produces — typically a business object/concept (§3.1).
+            nodes.add(new PipelineNode(sinkId, BuiltinNodeType.SINK_PERSISTENT.type(), store, "Persistent store", sinkCfg, null));
+            edges.add(PipelineEdge.data(mapId, sinkId));
+        }
     }
 
     private static void addQuarantine(List<PipelineNode> nodes, List<PipelineEdge> edges, PipelineConfig cfg) {
@@ -213,12 +220,15 @@ public final class PipelineLift {
         edges.add(new PipelineEdge(PARSE, PipelineRel.UNMATCHED, QUARANTINE));
     }
 
-    private static Map<String, Object> sinkBaseConfig(PipelineConfig cfg) {
+    /** Per-destination sink config: the {@link PipelineConfig.Sink}'s format/compression/ducklake/database plus
+     *  the pipeline-wide backup/temp/batch/thread settings shared by every destination. For the single-{@code
+     *  output:} shorthand ({@code sinks().get(0)}) this reproduces the former {@code sinkBaseConfig} exactly. */
+    private static Map<String, Object> sinkConfig(PipelineConfig.Sink dest, PipelineConfig cfg) {
         Map<String, Object> c = new LinkedHashMap<>();
-        put(c, "format", cfg.output().format());
-        put(c, "compression", cfg.output().compression());
-        if (cfg.output().duckLake() != null) c.put("ducklake", cfg.output().duckLake());
-        put(c, "database", cfg.dirs().database());
+        put(c, "format", dest.format());
+        put(c, "compression", dest.compression());
+        if (dest.duckLake() != null) c.put("ducklake", dest.duckLake());
+        put(c, "database", dest.database());
         put(c, "backup", cfg.dirs().backup());
         put(c, "temp", cfg.dirs().temp());
         c.put("batch_max_files", cfg.processing().batchMaxFiles());

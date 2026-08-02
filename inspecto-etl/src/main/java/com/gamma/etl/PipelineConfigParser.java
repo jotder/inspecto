@@ -272,6 +272,29 @@ final class PipelineConfigParser {
             b.duckLakeCfg  = (Map<String, Object>) out.get("ducklake");
         }
 
+        // ── sinks (plural destinations) ─────────────────────────────────────────
+        // A top-level `sinks:` list, each entry a {database, format, compression, ducklake} destination.
+        // Absent ⇒ PipelineConfig synthesises the single-`output:` one-element shorthand. More than one
+        // destination is parsed + liftable but REFUSED when loaded for execution (PipelineConfig.prepare)
+        // until the branch-aware executor is wired — see docs/superpower/sinks-config-format-plan.md.
+        if (raw.get("sinks") instanceof List<?> sinkList) {
+            for (Object entry : sinkList) {
+                if (!(entry instanceof Map<?, ?> sm)) {
+                    throw new IllegalArgumentException("each sinks[] entry must be a map with a 'database' key");
+                }
+                Map<String, Object> sink = (Map<String, Object>) sm;
+                Object db = sink.get("database");
+                if (db == null || db.toString().isBlank()) {
+                    throw new IllegalArgumentException("each sinks[] entry requires a non-blank 'database' dir");
+                }
+                b.sinks.add(new PipelineConfig.Sink(
+                        db.toString(),
+                        String.valueOf(sink.getOrDefault("format", "CSV")).toUpperCase(),
+                        (String) sink.get("compression"),
+                        (Map<String, Object>) sink.get("ducklake")));
+            }
+        }
+
         // ── plugin ingester + segments ────────────────────────────────────────
         // `parsing.plugin` (frontend: plugin) is the unified alias for the legacy
         // `processing.ingester`/`segments`/`ingester_config` triple; when present its keys win.

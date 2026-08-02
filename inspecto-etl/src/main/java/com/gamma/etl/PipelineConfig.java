@@ -109,6 +109,23 @@ public final class PipelineConfig {
     public record Output(String format, String compression, Map<String, Object> duckLake) {}
 
     /**
+     * One output <b>destination</b>: the write-root {@code database} dir plus the {@code format}/
+     * {@code compression}/{@code duckLake} tuple that {@link Output} carries — i.e. everything a single
+     * write site consumes ({@code cfg.dirs().database()} for <em>where</em>, {@code cfg.output()} for
+     * <em>how</em>). A pipeline may declare several via a top-level {@code sinks:} list; when {@code sinks:}
+     * is absent, {@link #sinks()} synthesises a one-element list from {@code dirs.database} + {@code output:}
+     * (the single-destination shorthand), so the accessor is never empty. {@code duckLake} is {@code null}
+     * when the destination has no DuckLake block.
+     *
+     * <p><b>Multi-destination is not yet executable</b> — a config whose {@code sinks:} names more than one
+     * destination is constructible and liftable (so the editor can author it and {@code PipelineLift} can
+     * fan it out), but is refused when loaded for execution ({@link #prepare()}) until the branch-aware
+     * executor is wired (Stage A step 3, see {@code docs/superpower/sinks-config-format-plan.md}).
+     */
+    @PublicApi(since = "4.8.0")
+    public record Sink(String database, String format, String compression, Map<String, Object> duckLake) {}
+
+    /**
      * Schema resolution — at most one of {@code selector} (multi-schema {@code schemas[]}),
      * {@code single} (legacy {@code schema_file}), or {@code segments} (plugin path) is
      * non-null; all three are {@code null} for a schema-less <em>draft</em> (v5.1.0 — allowed
@@ -595,6 +612,7 @@ public final class PipelineConfig {
     private final Processing processing;
     private final CsvSettings csv;
     private final Output     output;
+    private final List<Sink> sinks;
     private final Schemas    schemas;
     private final DuckDbSettings duckdb;
     private final Chunking       chunking;
@@ -675,6 +693,11 @@ public final class PipelineConfig {
     public Processing processing() { return processing; }
     public CsvSettings csv()       { return csv; }
     public Output     output()     { return output; }
+    /**
+     * Output destinations; never empty. A one-element list is the single-{@code output:} shorthand
+     * ({@code dirs.database} + {@code output:}); a longer list comes from an explicit {@code sinks:} block.
+     */
+    public List<Sink> sinks()      { return sinks; }
     public Schemas    schemas()    { return schemas; }
     /** Optional DuckDB resource controls; never null (fields may be null ⇒ DuckDB defaults). */
     public DuckDbSettings duckdb()   { return duckdb; }
@@ -727,6 +750,7 @@ public final class PipelineConfig {
                 Collections.unmodifiableList(b.excludeRegex),
                 b.filterTargetColumn);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg);
+        this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.schemas = new Schemas(b.schemaSelector, b.singleSchema, b.segmentSchemas,
                 b.ingesterClass,
                 b.ingesterConfig != null
@@ -779,6 +803,7 @@ public final class PipelineConfig {
         this.processing = src.processing;
         this.csv = src.csv;
         this.output = src.output;
+        this.sinks = src.sinks;   // already resolved + validated on the original build
         this.schemas = src.schemas;
         this.duckdb = src.duckdb;
         this.chunking = src.chunking;
@@ -806,6 +831,19 @@ public final class PipelineConfig {
     public PipelineConfig forNewRun() {
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         return new PipelineConfig(this, ts);
+    }
+
+    /**
+     * Resolve the output destinations: an explicit {@code sinks:} list when present, otherwise the
+     * one-element single-{@code output:} shorthand ({@code dirs.database} + {@code output:}). The result is
+     * never empty. A multi-destination config is <em>constructible and liftable</em> here (the graph editor
+     * and {@link com.gamma.pipeline.PipelineLift} must be able to represent it); it is refused only when
+     * loaded for <em>execution</em> — see {@link #prepare()}.
+     */
+    private static List<Sink> resolveSinks(List<Sink> declared, Output output, String database) {
+        return (declared == null || declared.isEmpty())
+                ? List.of(new Sink(database, output.format(), output.compression(), output.duckLake()))
+                : List.copyOf(declared);
     }
 
     // ── static factory ────────────────────────────────────────────────────────
@@ -854,8 +892,23 @@ public final class PipelineConfig {
      * Create the run's status directory — the single filesystem side-effect formerly performed
      * inline during {@code load}. A no-op when status is disabled or a literal {@code status_file}
      * was configured. Idempotent and safe to call more than once.
+     *
+     * <p>This is the <b>execution gate</b>: every runnable config reaches the engine through
+     * {@link #load(String)} → {@code prepare()} ({@code ConfigRegistry}, {@code CollectorService},
+     * {@code CollectorProcessor}), whereas the editor / lift / draft-validation paths use the pure
+     * {@link #fromMap(Map)}. So refusing an unsupported config here catches a hand-edited {@code .toon} too,
+     * while still letting the graph editor and {@link com.gamma.pipeline.PipelineLift} represent it.
+     * Multi-destination {@code sinks:} ingest is wired; the one combination not yet supported is a
+     * <b>versioned reference store</b> ({@code reference.load: upsert|scd2}) with more than one destination —
+     * its single version history is ill-defined across destinations — so that is refused here.
      */
     public void prepare() throws IOException {
+        if (sinks.size() > 1 && produces == Produces.REFERENCE && reference.load().versionedStore()) {
+            throw new IllegalStateException(
+                    "a versioned reference store (reference.load upsert/scd2) writes a single version history; "
+                            + "combining it with multiple sinks: destinations is not supported "
+                            + "(see docs/superpower/sinks-config-format-plan.md)");
+        }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));
         }
@@ -946,6 +999,8 @@ public final class PipelineConfig {
         String outputFormat  = "CSV";
         String compression;
         Map<String, Object> duckLakeCfg;
+        /** Explicit {@code sinks:} destinations; empty ⇒ synthesise the single-{@code output:} shorthand. */
+        List<Sink> sinks = new ArrayList<>();
         SchemaSelector      schemaSelector;
         Map<String, Object> singleSchema;
         String ingesterClass;

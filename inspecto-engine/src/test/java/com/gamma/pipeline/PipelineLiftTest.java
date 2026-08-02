@@ -2,6 +2,7 @@ package com.gamma.pipeline;
 
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.pipeline.exec.BatchGraphRunner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -65,6 +66,39 @@ class PipelineLiftTest {
         assertEquals("mini", g.node("sink").orElseThrow().name());
         // a legacy sink rests on disk (persistent), so the deletion fence treats it as a real store
         assertTrue(PipelineStores.producedStores(g).get(0).restsOnDisk());
+    }
+
+    @Test
+    void liftsSinksListToADataFedFanOut() throws Exception {
+        // A plural sinks: config (constructed via fromMap — a 2-destination config is liftable but not
+        // yet runnable, so it never reaches load()/prepare()). The map must fan out to one persistent sink
+        // per destination, each keeping its own database — exactly what the dormant engagement predicate fires on.
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("name", "FANOUT_ETL");
+        m.put("dirs", Map.of("poll", "in", "database", "out"));
+        m.put("processing", Map.of("threads", 1));
+        m.put("sinks", List.of(
+                Map.of("database", "out_hot", "format", "parquet"),
+                Map.of("database", "out_cold", "format", "csv")));
+        PipelineConfig cfg = PipelineConfig.fromMap(m);
+        assertEquals(2, cfg.sinks().size());
+
+        PipelineGraph g = PipelineLift.lift(cfg);
+
+        // the map fans out to two persistent sinks, each fed by a data edge
+        List<String> sinkIds = ids2(g.dataEdgesFrom("map"));
+        assertEquals(2, sinkIds.size(), "map fans out to one sink per destination: " + sinkIds);
+        for (String id : sinkIds) assertType(g, id, "sink.persistent");
+
+        // each sink carries its own destination database (the per-sink lift, not one shared sinkBase)
+        Set<String> dbs = Set.of(
+                String.valueOf(g.node(sinkIds.get(0)).orElseThrow().cfg("database")),
+                String.valueOf(g.node(sinkIds.get(1)).orElseThrow().cfg("database")));
+        assertEquals(Set.of("out_hot", "out_cold"), dbs, "each sink keeps its own destination database");
+
+        // this is precisely what the shipped-but-dormant engagement predicate engages on (two data-fed
+        // sinks off the map, quarantine excluded — proven above by the two data edges)
+        assertTrue(BatchGraphRunner.engages(g), "a multi-destination graph needs the branch executor");
     }
 
     @Test
