@@ -74,12 +74,13 @@ former root reference docs** (each index lists them):
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
 - [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) —
-  **IN FLIGHT (opened 2026-08-02).** The ingestion authoring journey traced end-to-end: Build and Run
-  work, **Test is a hole** — two of the three test affordances 404 (`?to={nodeId}` was reserved and
-  never built; node Test posts a dotted type at the Component Library routes), and the third runs on
-  hand-typed synthetic JSON. Plus four authoring-time gaps (no `lowerable` signal on the palette,
-  first-only toast refusals, asymmetric wizard/editor completeness gates, silent one-way door on
-  grandfathered flows). Gaps filed in [`BACKLOG.md`](BACKLOG.md) §Pipelines as G1–G5.
+  **IN FLIGHT (opened 2026-08-02). Steps 0–4 SHIPPED same day** (`4fe388a1`): the armed-pipeline silent
+  failure closed (G4), the two 404ing test affordances gated off rather than deleted (G1), a
+  `lowerable` signal added to the palette (G2), refusals routed to the Validation dock (G3), a
+  grandfathered-flow warning banner (G5, not read-only as first drafted — see the plan's inline
+  correction). **Step 5 — a bounded test run over real inbox files — is the one gap left**, and is a
+  backend job (`PipelineDryRun` is synthetic-only; no stop-at-node primitive; the run-to-here route is
+  reserved but unregistered). Gaps tracked in [`BACKLOG.md`](BACKLOG.md) §Pipelines.
 
 - ~~`superpower/sinks-config-format-plan.md`~~ — **SHIPPED end-to-end 2026-08-02 (all 4 slices, `0cdc9dff`
   + `79dcb3e6`), plan archived** to
