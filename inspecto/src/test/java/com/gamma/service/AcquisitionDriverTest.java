@@ -154,6 +154,46 @@ class AcquisitionDriverTest {
     }
 
     @Test
+    void acquisitionPausesWhenInboxBacklogReachesTheHighWaterMark(@TempDir Path dir) throws Exception {
+        Path remote = Files.createDirectories(dir.resolve("remote"));
+        Files.writeString(remote.resolve("a.csv"), CSV);
+        Files.writeString(remote.resolve("b.csv"), CSV);
+        FakeRemoteConnectorFactory.reset(remote);
+
+        // Pre-fill the inbox with 3 unprocessed files so the backlog is already over a high-water mark of 2.
+        Path inbox = Files.createDirectories(dir.resolve("inbox"));
+        for (int i = 0; i < 3; i++) Files.writeString(inbox.resolve("pending" + i + ".csv"), CSV);
+
+        Path cfg = remotePipeline(dir, "REMOTE_ETL");
+        // The knob is read in the CollectorService constructor — set it only around construction, then clear
+        // it immediately so it never leaks to another test in this JVM.
+        System.setProperty("acquire.backpressure.highWater", "2");
+        CollectorService svc = null;
+        try {
+            svc = new CollectorService(List.of(cfg), 3600, 1);
+            System.clearProperty("acquire.backpressure.highWater");
+
+            scheduler(svc).dispatchAcquireCycle();                 // inbox backlog (3) >= high-water (2)
+            Thread.sleep(300);                                     // a wrongly-admitted fetch would run here
+            assertEquals(0, FakeRemoteConnectorFactory.FETCHES.get(),
+                    "inbox at/over the high-water mark: acquisition is de-scheduled, nothing fetched");
+
+            // Drain the inbox below the mark; the next tick is admitted and fetches both remote files.
+            try (var s = Files.walk(inbox)) {
+                s.filter(Files::isRegularFile).forEach(p -> {
+                    try { Files.delete(p); } catch (Exception ignore) { /* best effort */ }
+                });
+            }
+            scheduler(svc).dispatchAcquireCycle();
+            assertTrue(awaitTrue(() -> FakeRemoteConnectorFactory.FETCHES.get() == 2),
+                    "inbox drained below the mark: acquisition resumes and fetches both remote files");
+        } finally {
+            System.clearProperty("acquire.backpressure.highWater");
+            if (svc != null) svc.close();
+        }
+    }
+
+    @Test
     void aSecondAcquisitionIsSkippedWhileTheFirstIsStillFetching(@TempDir Path dir) throws Exception {
         Path remote = Files.createDirectories(dir.resolve("remote"));
         Files.writeString(remote.resolve("a.csv"), CSV);

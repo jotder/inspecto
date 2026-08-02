@@ -490,9 +490,13 @@ public final class CollectorService implements AutoCloseable {
         // Acquisition has its own budget so network fetch never competes with DuckDB ingest for one
         // allowance (B3b); defaults to the ingest budget, overridable with -Dacquire.maxConcurrent.
         int maxConcurrentAcquisitions = Integer.getInteger("acquire.maxConcurrent", this.maxConcurrentRuns);
+        // B4: acquisition back-pressure — pause fetching for a pipeline whose inbox backlog (countPending)
+        // has reached this high-water mark, so a slow ingest cannot make acquisition fill local disk
+        // unboundedly. The durable inbox is the spill queue (§3.5). 0 = off (default), like -Dingest.maxFilesPerCycle.
+        int acquireHighWater = Integer.getInteger("acquire.backpressure.highWater", 0);
         this.pipelineScheduler = new PipelineScheduler(this.registry, this.configRegistry, this.paused,
                 this.running, this.runGuard, this.registryLock, this.bus, this.triggerWorkers,
-                this.maxConcurrentRuns, maxConcurrentAcquisitions,
+                this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
     }
 

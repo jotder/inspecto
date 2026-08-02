@@ -129,11 +129,16 @@ final class PipelineScheduler {
     /** Acquisition's own budget, held for the scheduler's lifetime — deliberately NOT {@link #runPermits}:
      *  network fetch and DuckDB ingest must not compete for one allowance (B3b). */
     private final Semaphore acquirePermits;
+    /** B4 acquisition back-pressure: skip acquiring a pipeline whose inbox backlog ({@code countPending}) has
+     *  reached this high-water mark, so a slow ingest cannot make acquisition fill local disk unboundedly. The
+     *  durable inbox is the spill queue (§3.5); this de-schedules the upstream (acquisition). {@code 0} = off. */
+    private final int acquireHighWater;
 
     PipelineScheduler(List<Path> registry, ConfigRegistry configRegistry, Set<String> paused,
                       Set<String> running, PipelineRunGuard runGuard, ReentrantLock registryLock,
                       BatchEventBus bus,
                       ExecutorService triggerWorkers, int maxConcurrentRuns, int maxConcurrentAcquisitions,
+                      int acquireHighWater,
                       long pollIntervalMs, Consumer<String> runPipeline, Runnable syncStatus) {
         this.registry          = registry;
         this.configRegistry    = configRegistry;
@@ -145,6 +150,7 @@ final class PipelineScheduler {
         this.triggerWorkers    = triggerWorkers;
         this.runPermits        = new Semaphore(Math.max(1, maxConcurrentRuns));
         this.acquirePermits    = new Semaphore(Math.max(1, maxConcurrentAcquisitions));
+        this.acquireHighWater  = acquireHighWater;
         this.pollIntervalMs    = pollIntervalMs;
         this.runPipeline       = runPipeline;
         this.syncStatus        = syncStatus;
@@ -462,6 +468,16 @@ final class PipelineScheduler {
                 String id = cfg.identity().pipelineName();
                 if (paused.contains(id) || !cfg.active() || cfg.template()) continue;
                 if (!CollectorConnectors.isRemote(cfg)) continue;   // local: nothing to acquire
+                // B4 back-pressure: if the inbox backlog has reached the high-water mark, de-schedule
+                // acquisition for this pipeline this tick — its already-landed files wait in the durable inbox
+                // (the spill queue, §3.5) until ingest drains them below the mark. countPending is the exact
+                // backlog (B3b); a failed scan returns -1, which naturally does not trip the gate (fail-open).
+                if (acquireHighWater > 0 && CollectorProcessor.countPending(cfg) >= acquireHighWater) {
+                    com.gamma.metrics.MetricRegistry.global().inc("inspecto_acquire_backpressure_skips_total",
+                            "Acquisition ticks skipped because the inbox reached the back-pressure high-water mark",
+                            Map.of("pipeline", id));
+                    continue;
+                }
                 PipelineRunGuard.Claim claim = acquireGuard.tryAcquire(id);
                 if (claim == null) continue;                        // still fetching from an earlier tick
                 due.add(new Due(cfg.forNewRun(), id, claim));
