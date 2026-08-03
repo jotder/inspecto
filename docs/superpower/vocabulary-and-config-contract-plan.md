@@ -1,10 +1,14 @@
 # Config-key contract + vocabulary enforcement
 
 **Status:** IN FLIGHT — opened 2026-08-03. **D1 · D2 · D4 · D5 shipped** (`9a4ff7c7`, pushed 2026-08-03).
+**D7 SHIPPED** 2026-08-03 (`8e6e605d`) — re-scoped first (the flat filter node round-tripped fine and was
+merely *undeclared*; option 1 ruled out as a regression), then options 2+3 built together per operator
+decision: `csv_settings.where` post-parse predicate + an `AttributeType: 'list'` and the full 6-attribute
+`transform.filter` spec, with the mock's lift brought to parity.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D7** (⚠ **re-scoped 2026-08-03** — the flat filter node round-trips fine and is merely
-*undeclared*; option 1 ruled out as a regression) and **D8** (both awaiting operator decision), the
-§3.2/§3.3 guards, and both renames (§4, §5). Do not archive this plan until those close.
+needing design), **D8** (awaiting operator decision), the §3.2/§3.3 guards, and both renames (§4, §5). Do
+not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -121,6 +125,11 @@ every lift, so dropping it in `lower` is lossless — not the same situation as 
 "companion-persisted" half refers to `enrichment`; the `_enrich*` files are audit ledgers, not a node-config
 companion.)
 
+**Both of the two live options below SHIPPED together** (`8e6e605d`, 2026-08-03) — the operator chose "both"
+rather than the minimum. As-built notes are distilled into
+[`../okf/frontend/features/pipelines.md`](../okf/frontend/features/pipelines.md); what follows is the
+decision record.
+
 The two live options, no longer mutually exclusive:
 
 2. **Give the flat path a real SQL row predicate** — a new `csv_settings.where` honoured post-parse. Cost
@@ -135,9 +144,9 @@ The two live options, no longer mutually exclusive:
 3. **Declare the pre-parse vocabulary the flat path already honours.** No longer "not recommended" — the
    original objection assumed this meant reusing a name for different semantics, but these keys *are* this
    representation's real, already-round-tripping contract, and leaving them undeclared is what hides a
-   working feature. Blocker stands and is UI-side: **`AttributeSpec` has no list type**, needed for the
-   four `include_*`/`exclude_*` lists. Distinct labels/help must make the pre- vs post-parse difference
-   explicit if both ship.
+   working feature. The blocker (**`AttributeSpec` had no list type**) was resolved by adding
+   `AttributeType: 'list'` (`string[]` as removable chips) plus the mandated `FindingsSpec.TYPES` mirror.
+   Labels state which moment each key belongs to.
 
 **Minimum honest fix is 3** (surface what already works). **2 is additive** and only needed if a SQL
 predicate over parsed columns is actually wanted.

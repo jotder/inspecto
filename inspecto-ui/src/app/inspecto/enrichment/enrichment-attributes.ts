@@ -7,9 +7,11 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  * never renders it. Keys and defaults mirror `EnrichmentConfig.fromMap` exactly (engine-real:
  * `input.format`/`output.format` default PARQUET there).
  *
- * <p>⚠ `input.partitions` / `output.partitions` are deliberately NOT specced: they are TOON lists,
- * and `AttributeSpec` has no list type — a comma-string knob here would author a config
- * `strList` rejects at load. Hosts must carry existing partition lists through a save verbatim.
+ * <p>⚠ `input.partitions` / `output.partitions` are still NOT specced, but the original reason is gone:
+ * `AttributeSpec` gained a `list` type (string[]) with D7, 2026-08-03, and these are exactly string
+ * lists. Speccing them is now a small, unblocked follow-up rather than a capability gap — it was left
+ * out of D7 to keep that change scoped. Until then, hosts must carry existing partition lists through a
+ * save verbatim, and a comma-string knob is still wrong here (`strList` rejects it at load).
  */
 export const ENRICHMENT_WIRING_ATTRIBUTES: AttributeSpec[] = [
     {

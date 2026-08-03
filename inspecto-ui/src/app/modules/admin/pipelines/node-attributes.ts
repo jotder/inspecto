@@ -82,8 +82,9 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
         { key: 'exclude_prefixes', label: 'Exclude by prefix (before parsing)', type: 'list', tier: 'optional', help: 'Drop rows whose target column starts with any of these.' },
         { key: 'filter_target_column', label: 'Target column index', type: 'number', tier: 'advanced', min: 0, help: 'Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate.' },
     ],
-    // `branches` — the list of `{key, where}` that actually does the routing — has no spec: `AttributeSpec`
-    // has no list type, and the named routes are authored on the canvas edges. `mode` is the only scalar.
+    // `branches` — the list of `{key, where}` that actually does the routing — has no spec: the `list`
+    // type added with D7 is `string[]`, and these are MAPS, so it does not apply here. The named routes
+    // are authored on the canvas edges anyway. `mode` is the only scalar.
     'transform.route': [
         { key: 'mode', label: 'Route mode', type: 'select', tier: 'required', default: 'case', options: [{ value: 'case', label: 'case (exclusive)' }, { value: 'clone', label: 'clone (fan-out)' }], help: 'Named routes and their predicates are edited on the canvas edges.' },
     ],

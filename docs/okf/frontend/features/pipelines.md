@@ -183,21 +183,42 @@ partitioning is schema-level `partitions[]{column, source, type}` / legacy `part
 `where` — is reachable only from an authored `*_flow.toon` graph via `PipelineJobRunner`, and
 `POST`/`PUT /pipelines/authored` are **405 since W5**. This editor can only write the flat
 `*_pipeline.toon`, whose lower merges a `transform.filter` node's cfg **wholesale** into
-`processing.csv_settings` (`PipelineEditable.java:277`, mirrored in `mock/pipeline-editable.ts`), and that
-map's reader knows only `include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`/
-`filter_target_column` (`PipelineConfigParser.java:255-259`). So a filter authored here persists a correctly
-named `where` that **no reachable runtime reads**. Verified by saving through the real UI and reading the
-persisted config back — not inferable from either side alone.
-
-⛔ **Do not "fix" that by re-speccing the node to `include_regex`.** Those are `regexp_matches()` patterns
-applied to **one raw physical column before parsing** (`DuckDbCsvIngester.filterWhere`); a SQL predicate over
-parsed columns (`amount > 0`) is inexpressible as one. Same-sounding name, different capability — that
-substitution is the exact drift this contract exists to stop. Tracked as **D7** in
-[`../../../superpower/vocabulary-and-config-contract-plan.md`](../../../superpower/vocabulary-and-config-contract-plan.md).
+`processing.csv_settings` (`PipelineEditable.java:277`, mirrored in `mock/pipeline-editable.ts`).
 
 **Corollary for any future key check:** "read somewhere in `PipelineLift`/`PipelineCompiler`/`RowShaper`" is
-too weak a right-hand side — it would call the above green. Bind a node type to the runtime that executes
-**the file this editor actually saves**.
+too weak a right-hand side — it would have called the pre-fix `where` green. Bind a node type to the runtime
+that executes **the file this editor actually saves**.
+
+### `transform.filter` has two filtering moments — never collapse them (D7, closed 2026-08-03)
+
+The above trap was originally written up as "a filter authored here reaches no runtime". Verifying the fix
+options overturned that framing, and the corrected version is the durable lesson:
+
+| Moment | Keys | Runtime |
+|---|---|---|
+| **pre-parse** | `include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`, anchored on `filter_target_column` | `DuckDbCsvIngester.filterWhere:713-730`, inlined into the `read_csv` SELECT — matches **one raw physical column** before any field is named or typed |
+| **post-parse** | `where` | `DataTransformer.materialize` — SQL over the **mapped, typed target columns** |
+
+The pre-parse group **always worked** on this path and round-tripped through `PipelineLift.filterConfig`;
+it was simply never declared as `AttributeSpec`s, so the dialog couldn't reach it — a working feature
+hidden, not a broken one. The post-parse `where` was the genuinely missing runtime and was added 2026-08-03.
+
+⛔ **Never substitute one for the other.** `amount > 0` is inexpressible as a `regexp_matches()` pattern over
+an unparsed column, and a regex over raw text is inexpressible as a predicate over typed columns. Same-
+sounding names, different capabilities — that substitution is the exact drift this contract exists to stop.
+
+Two non-obvious consequences worth keeping:
+
+- ⚠ **Refusing a node type in `lower` is not a safe "smallest fix"** — `PipelineLift` *emits*
+  `transform.filter` for any pipeline with row filters, so an `UNSUPPORTED_NODE` refusal would break
+  open-then-save on exactly those pipelines. Check whether lift emits a type before proposing to refuse it.
+- ⚠ **`transform.map` being dropped by `lower` is NOT the same bug.** Its lifted config is only
+  `{schema: …}` (`PipelineLift.java:189-192`), derived from the pipeline schema and regenerated on every
+  lift, so dropping it is lossless. (The `PipelineEditable.java:209` comment's "companion-persisted" half
+  refers to `enrichment`; the `_enrich*` files are audit ledgers, not a node-config companion.)
+- ⚠ **`filter_target_column` lifts only alongside a pre-parse list.** It is the index those lists anchor on,
+  so emitting it for a predicate-only pipeline made `lower` write a key the file never had — which is how a
+  "verbatim" round-trip test catches an otherwise invisible asymmetry.
 
 ### The dialog bridges flat ↔ nested in both directions
 
