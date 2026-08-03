@@ -10,9 +10,13 @@ decision: `csv_settings.where` post-parse predicate + an `AttributeType: 'list'`
 attribute through the editor's real save path and asserts it lands on the engine field. It found **D9**
 (`duplicate__*` unreachable from the acquisition node) on its first run.
 
+**§3.2 TOON config-key guard SHIPPED** 2026-08-04 — a second pass in `tools/check-vocabulary.mjs` over the
+committed corpus. Its allowlist is the Flow→Pipeline **Tier-3 debt register**, and a `stale-allowlist` rule
+makes that debt self-retiring.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the §3.2 guard, and both
-renames (§4, §5). Do not archive this plan until those close.
+needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the remaining §3.2 surfaces
+(OKF+superpower docs; Java+TS source), and both renames (§4, §5). Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -246,13 +250,44 @@ each new surface needs an allowlist for deliberate keeps, or CI goes red on inte
 
 | Surface | Approach | Allowlist needed for |
 |---|---|---|
-| **TOON config keys** | scan `spaces/**/config/*.toon`, `examples/**/*.toon` for banned **keys** (not prose) | none — config keys should be pristine. **Do this one first**: cheapest, highest value, catches a bad key before data exists |
+| **TOON config keys** | ✅ **SHIPPED 2026-08-04** — a second pass in the same script over the **committed** corpus (`git ls-files '*.toon'`, 142 files) | ⚠ **"none" was WRONG** — see below. Four entries, all Flow→Pipeline Tier-3 debt |
 | **OKF + superpower docs** | add trees, exclude `docs/archived-documents/**` | design docs legitimately name internal types — allowlist `FlowGraph`-style IR names |
 | **Java + TS source** | identifier scan | large allowlist; land **last** |
 | **UI↔config↔engine contract** | separate check, not a vocabulary rule — see §3.3 |
 
 `docs/archived-documents/**` is excluded permanently: CLAUDE.md defines it as *"kept for provenance, never
 maintained"*. Rewriting history there is wrong, and it is most of the 1,791 raw `flow` hits.
+
+#### As-built for the TOON pass (2026-08-04) — and the premise it corrected
+
+⚠ **"None — config keys should be pristine" was wrong**, and the exception is the useful part. Two live
+`flow:` keys exist (`inspecto/examples/06-serve/pipeline-job/rollup_job.toon:4`,
+`spaces/demo/config/jobs/orders_rollup_job.toon:4`) plus two grandfathered `*_flow.toon` files — all
+**deliberate Tier-3 keeps** (§4), not oversights. A guard shipped without an allowlist would have gone red
+on correct-for-today configs on its first CI run, which is how a guard gets disabled.
+
+So `CONFIG_ALLOW` is framed as **the Tier-3 debt register, made executable** — and a `stale-allowlist`
+rule fails when an entry stops suppressing anything. That inverts the usual rot: when Tier 3 lands, the
+guard *tells you* the exemption is now unused, so the rename becomes self-announcing rather than leaving
+a stale exemption that would silently forgive a future regression at that path.
+
+Three scoping decisions worth keeping:
+
+- **It scans `git ls-files`, not the working tree.** Local therefore matches CI, `.gitignore` is honoured
+  for free, and — the load-bearing reason — `spaces/**` runtime state is **never read**, which per
+  DATA-GOV-1 can be real operator data that is none of a linter's business. (A working-tree scan would
+  have fired today on an untracked scratch `spaces/default/config/flows/sddD.toon` that CI cannot see.)
+- **`_flow.toon` (underscore) is banned; `circular-flow.toon` (hyphen) is not.** The latter is a
+  link-analysis **motif** name — the sanctioned lowercase "flow of value" sense. Banning the word outright
+  would flag three pattern packs, i.e. exactly the false-positive noise this section warns about.
+- **Deliberately NOT banned:** `source`/`sources`/`source_store` (the documented *"Collector rename
+  residual"* keep — BACKLOG), plain `store:` (the physical-backend sense GLOSSARY explicitly permits),
+  `metric` (ambiguous — the observability sense is canonical), and `batch` (Consignment is decided but
+  **not rolled out**, so the code and configs still legitimately say Batch). Each would be noise today.
+
+**Verified by proving it can go red**, not just green: each of the four rules was fired against probe
+files (exit 1), the `vocab-allow` per-line hatch was shown to suppress one, a bogus allow entry was shown
+to trip `stale-allowlist`, and the clean tree exits 0 over 9 docs + 142 configs.
 
 ### 3.3 The name-contract check — ✅ SHIPPED 2026-08-04
 
@@ -366,7 +401,8 @@ existing header warns about.
    (`mock/seeds/seeded-node-config.spec.ts`) so the phantoms cannot re-spread. Turned up **D8** (open).
 4. **§3.3** name-contract check, bidirectional — ✅ **done 2026-08-04** (`NodeConfigNameContractTest`, 4
    tests). Locks in 1–3 behaviourally, pins the D3/D9 gaps, and turned up **D9** (open).
-5. **§3.2** guard on TOON config keys.
+5. **§3.2** guard on TOON config keys — ✅ **done 2026-08-04**. Corrected the "no allowlist needed"
+   premise; the four entries are now the Tier-3 debt register, and a `stale-allowlist` rule retires them.
 6. **Flow Tier 1.**
 7. **§3.2** guard on OKF + superpower docs; reconcile
    [`consignment-elt-architecture.md`](consignment-elt-architecture.md) against GLOSSARY (§7 below).

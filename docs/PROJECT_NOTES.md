@@ -153,7 +153,10 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   and put the module `target/classes` **ahead** of the `.m2` jars so fresh code shadows the stale installed
   `file-processor-*` artifacts (that ordering also silences the duplicate-`logback.xml` warning).
 - **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push:
-  `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs) and `tools/check-secrets.mjs` (a
+  `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs, **plus banned KEYS in the committed
+  TOON config corpus** since 2026-08-04 — it reads `git ls-files`, not the working tree, so local matches
+  CI and `spaces/**` runtime state is never scanned; its `CONFIG_ALLOW` doubles as the Flow→Pipeline Tier-3
+  debt register and fails when an entry goes stale) and `tools/check-secrets.mjs` (a
   secret-ish key assigned a ≥16-char literal — SEC-INCIDENT-1). Both take a per-line `vocab-allow` /
   `secret-allow` comment as the escape hatch. ⚠ **`check-secrets.mjs` is deliberately master-only** — `4.x`
   still carries the live OAuth secrets, so merging it forward pins `4.x` CI red (BACKLOG §5). A third guard,

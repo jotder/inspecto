@@ -22,10 +22,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Canonical-vocabulary guard: user-facing docs must not use ⛔ banned synonyms (Flow, Data
-      # Store, Collector-as-noun) or the Measure/Metric confusion (docs/GLOSSARY.md). Pure Node
-      # (preinstalled on the runner), fast — fails early before the heavier steps.
-      - name: Guard — canonical vocabulary in user-facing docs
+      # Canonical-vocabulary guard, two passes (docs/GLOSSARY.md). (1) User-facing docs must not use ⛔
+      # banned synonyms (Flow, Data Store, Collector-as-noun) or the Measure/Metric confusion. (2) The
+      # committed TOON config corpus must not grow a banned KEY — cheapest surface to police, since a bad
+      # key costs nothing here but costs a migration once operators have authored data against it. Pure
+      # Node (preinstalled on the runner), fast — fails early before the heavier steps.
+      - name: Guard — canonical vocabulary in user-facing docs + TOON config keys
         run: node tools/check-vocabulary.mjs
 
       # Committed-secret guard (SEC-INCIDENT-1, docs/BACKLOG.md §5): a secret-ish key assigned a long
