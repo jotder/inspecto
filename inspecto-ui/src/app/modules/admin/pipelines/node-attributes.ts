@@ -13,6 +13,13 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
  * those nodes while `PipelineValidator` only warned. Corrected 2026-07-31 (W2/U-D); the palette port
  * lives in `mock/handlers/pipelines.handler.ts`.
  *
+ * <p>⚠ **This table has a Java mirror — change both.** `NodeConfigNameContractTest` (inspecto-engine)
+ * drives each key below through the editor's real save path (`PipelineEditable.toMap` → `lower` →
+ * `ConfigCodec.toToon` → `PipelineConfig.load`) and asserts the value lands on the engine field that reads
+ * it, so a key that reaches nothing fails there rather than silently no-opping in production. Adding or
+ * renaming a key here without updating its `contracts()` entry leaves the new key unguarded — nothing
+ * fails, which is precisely the drift the check exists to stop.
+ *
  * <p>⚠ **A key here IS the config key** — `AttributeSpec.key` is written verbatim into `node.config`
  * (`node-config.dialog`, no case-conversion layer anywhere in the app), so it must equal the string the
  * engine reads. `transform.filter` shipped as `predicate` while `RowShaper.filter` reads

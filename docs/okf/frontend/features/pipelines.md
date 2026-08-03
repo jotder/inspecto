@@ -253,3 +253,44 @@ Two rules are pinned in its docblock, both learned by breaking something:
 - **Deadness is per node type.** `mode` and `table` must never go in a global dead-key list — `mode` is real
   for `transform.route` (`RowShaper.java:104`, `ConservationCheck.java:78`) and `table` is round-tripped for
   `sink.persistent` (`PipelineEditable.java:149`).
+
+### The name contract is checked by *driving the save*, not by comparing strings (2026-08-04)
+
+`NodeConfigNameContractTest` (inspecto-engine) is the guard for all of the above. It does not compare two key
+lists — a string check would have called D1 green while filters still no-opped. Each declared attribute is
+given a sentinel value and pushed through the editor's own path, then read back off the parsed config:
+
+```
+PipelineEditable.toMap → PipelineCodec.fromMap → [set key] → PipelineEditable.lower
+      → ConfigCodec.toToon → PipelineConfig.load → assert the engine field == sentinel
+```
+
+**A key that does not survive that trip is read by nothing, however it is spelled.** Three things this pinned
+that are easy to get wrong again:
+
+- ⚠ **`PipelineLift.lift` is the wrong left-hand side.** It is the legacy/authored lift and emits a
+  *different vocabulary* than the editable lift the editor uses — `includes`/`excludes` plural
+  (`PipelineLift.java:114-115`) vs `include`/`exclude` verbatim from the file
+  (`PipelineEditable.editableConfig:122-123`). A check built on it fails correct keys and passes unreachable
+  ones. **Use `PipelineEditable`** for anything about what the editor saves.
+- ⚠ **`filterConfig` omits a key whose list is empty**, so a reverse ("everything the runtime carries is
+  declared") assertion needs a fixture exercising *every* capability. An under-populated fixture reports a
+  phantom missing spec — it did exactly that on the first run.
+- **Equality is only valid where the node's cfg *is* the vocabulary** (`transform.filter`). For `acquisition`
+  and `sink.persistent` the node carries the whole raw `collector:`/`output:` block and the shared tables are
+  a curated subset by design — asserting equality there would be a permanently red, therefore disabled, guard.
+
+### A shared attribute table is correct per *block*, not per *node* (2026-08-04)
+
+`COLLECTOR_ATTRIBUTES` is deliberately shared with Onboarding so one table serves both features — but the two
+adopters reach the `collector:` block differently, and a key can be real for one and unreachable for the other:
+
+| Key | Onboarding (authors `collector:` directly) | Acquisition **node** (flat lower) |
+|---|---|---|
+| `connection` | real | ⛔ stripped — rides on `use: connection/<name>` (**D3**) |
+| `duplicate__mode`, `duplicate__on_change` | real | ⛔ discarded — the `duplicate:` block belongs to the fingerprint-dedup node (`NOT_ACQ_OWNED`, overlaid at `PipelineEditable.java:255`) (**D9**) |
+
+⛔ **Neither is a dead key, and pruning the shared table is the wrong fix** — that would break the adopter for
+which the key is real. This is the third time this shape has appeared (D3, D9, and the near-miss on `key_columns`),
+so treat "declared but unreachable" as a *per-adopter* question from the start. Both gaps are pinned by tests
+asserting the current, defective behaviour, which fail — by design — the moment someone closes them.

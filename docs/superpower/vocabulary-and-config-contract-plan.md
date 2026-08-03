@@ -6,9 +6,13 @@ merely *undeclared*; option 1 ruled out as a regression), then options 2+3 built
 decision: `csv_settings.where` post-parse predicate + an `AttributeType: 'list'` and the full 6-attribute
 `transform.filter` spec, with the mock's lift brought to parity.
 
+**§3.3 name-contract check SHIPPED** 2026-08-04 — `NodeConfigNameContractTest` drives each declared
+attribute through the editor's real save path and asserts it lands on the engine field. It found **D9**
+(`duplicate__*` unreachable from the acquisition node) on its first run.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D8** (awaiting operator decision), the §3.2/§3.3 guards, and both renames (§4, §5). Do
-not archive this plan until those close.
+needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the §3.2 guard, and both
+renames (§4, §5). Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -66,6 +70,7 @@ placeholder?}` — note **`key` is the config key**, `label` is display-only, an
 | **D7** | `transform.filter` on the flat path has a **real, round-tripping vocabulary that the UI does not declare** — the spec declares the *authored-graph* one instead (⚠ re-scoped 2026-08-03, see below; the original "unrunnable" framing was wrong) | `PipelineLift.java:180-186,242-251` **emits** a `transform.filter` node carrying `filter_target_column`/`include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`; `PipelineEditable.java:277` lowers it back into `processing.csv_settings`; `PipelineConfigParser.java:255-259` reads exactly those keys. The spec's `where` belongs to `RowShaper.java:79`, reachable only from an authored `*_flow.toon` via `PipelineJobRunner.java:126-135` (writes 405 since W5) | a dialog-authored `where` no-ops, **and** the filtering that *does* work here is unreachable from the UI |
 
 | **D8** | `sink.materialized` upsert config is **misnamed**, not phantom | seeds `pipeline-case-studies.seed.ts:51,93` carry `mode: 'upsert'` + `key_columns` (0 Java readers), but the real capability is pipeline-level `reference: {load: upsert, key: [...]}` (`PipelineConfigParser.java:406-412`, `Load.from`, `strList`) | the demo narrative is implementable but unspelled; a naive "delete the dead key" sweep would destroy it |
+| **D9** | `duplicate__mode` / `duplicate__on_change` are declared on the **acquisition** node but the flat lower routes `duplicate:` to the **fingerprint-dedup** node | `PipelineEditable.NOT_ACQ_OWNED = {duplicate, incremental, gap_detection}` (`:60`) excludes it from the acquisition node's editable cfg, and `lower` overlays the block from the fingerprint node (`:255`) — so a value set on the acquisition node is discarded even though `PipelineConfigParser` reads the key. Proven by `NodeConfigNameContractTest.collectorAttributesTheAcquisitionNodeCannotSaveStayPinned` | dedup settings authored on an acquisition node are silently lost — **found 2026-08-04 by the §3.3 check on its first run** |
 
 **D8 — found 2026-08-03 by the new seed guard, and it is the counter-example to D2/D5.** The guard flagged
 `key_columns`, I deleted it, and `pipeline-case-studies.spec.ts` failed on *"upserts candidates by key"* — a
@@ -77,6 +82,16 @@ docblock: before deleting a zero-reader key, check for a **differently-named equ
 key-hygiene sweep silently removes a capability someone documented. Fixing D8 means renaming the seed to the
 engine's shape (and deciding whether upsert belongs on the node at all, since `sink.materialized` is not in
 `LOWERABLE` and cannot round-trip a flat config) — a modeling decision, left open.
+
+**D9 — found 2026-08-04 by the §3.3 check, and it is D3's shape, not D2/D5's.** ⛔ **Do not "fix" it by
+deleting the two attributes from `COLLECTOR_ATTRIBUTES`.** That table is *shared with Onboarding*, which
+authors the `collector:` block directly and for which `duplicate.mode`/`duplicate.on_change` are real,
+read keys (`PipelineConfigParser.java:449-460`). The key is not dead — it is **unreachable from one
+adopter**, exactly like D3's `connection`. Two candidate fixes, both a modeling decision rather than a key
+rename: surface the keys on the **fingerprint-dedup node** (where the flat lower already routes them), or
+make `lower` accept them from the acquisition node. Until then the gap is pinned by a test that will fail
+the moment it is closed. This is the second time a shared table has produced a per-adopter gap — the
+pattern is now worth naming: **a shared attribute table is correct per-block, not per-node.**
 
 Also confirmed while verifying D2/D5, so a future sweep does not get it wrong: `mode` is engine-real for
 `transform.route` (`RowShaper.java:104`, `ConservationCheck.java:78`) and `table` is round-tripped for
@@ -239,21 +254,50 @@ each new surface needs an allowlist for deliberate keeps, or CI goes red on inte
 `docs/archived-documents/**` is excluded permanently: CLAUDE.md defines it as *"kept for provenance, never
 maintained"*. Rewriting history there is wrong, and it is most of the 1,791 raw `flow` hits.
 
-### 3.3 The name-contract check (new, separate from the docs guard)
+### 3.3 The name-contract check — ✅ SHIPPED 2026-08-04
 
-Assert per node type that **UI spec key == TOON cfg key == the key the engine reads**. This is the check
-that would have caught all of D1–D5 at authoring time. It belongs with `ConfigSpecs`/`PipelineNodeType`,
-not with the prose guard — different failure mode, different owner, different allowlist.
+`inspecto-engine/src/test/java/com/gamma/pipeline/NodeConfigNameContractTest.java` (4 tests).
 
-Cheapest first version: a test that walks the served node-type attribute specs and asserts every key is
-read somewhere in `PipelineLift`/`PipelineCompiler`/`RowShaper`, and that every key those read is declared.
-Bidirectional — D2 and D5 are "declared but never read", D1 is "read but declared under another name".
+**Built behaviourally, not as a key-name comparison.** A string-equality check between two curated lists
+would have called D1 green. Instead each declared attribute is driven through the editor's *actual* save
+path with a sentinel value, and the engine field is read back:
 
-⚠ **Per representation, not per key name** (learned from D7). "Read somewhere in
-`PipelineLift`/`PipelineCompiler`/`RowShaper`" is too weak a right-hand side: `where` satisfies it via
-`RowShaper` while being unreachable from the flat `*_pipeline.toon` the editor writes. The assertion must
-bind a node type to **the runtime that executes the file the editor saves** — otherwise the check greenlights
-a correctly-spelled key that nothing on the reachable path reads, which is precisely how D1 looked fixed.
+```
+PipelineEditable.toMap → PipelineCodec.fromMap → [set key] → PipelineEditable.lower
+      → ConfigCodec.toToon → PipelineConfig.load → assert the engine field == sentinel
+```
+
+A key that does not survive that trip is read by nothing, however it is spelled — which is the whole point
+of "per representation, not per key name".
+
+⚠ **`PipelineLift.lift` is the WRONG left-hand side and this is the trap to remember.** It is the
+legacy/authored lift and emits a *different vocabulary* than the editable lift the editor uses:
+`includes`/`excludes` (plural, `PipelineLift.java:114-115`) vs `include`/`exclude` (singular, verbatim from
+the file — `PipelineEditable.editableConfig:122-123`). A check built on `PipelineLift` would fail correct
+keys and pass unreachable ones. Use `PipelineEditable`.
+
+The four tests, and why each exists:
+
+| Test | Direction | Guards |
+|---|---|---|
+| `everyDeclaredAttributeReachesTheEngine` | declared → engine | D2/D5 ("declared but read by nothing"). 16 contracts across `acquisition`, `transform.filter`, `sink.persistent`. |
+| `everyKeyTheFilterNodeCarriesIsDeclared` | engine → declared | **D7** — a capability the runtime carries but no spec declares, i.e. a working feature invisible in the dialog. Equality is valid here only because the filter node's cfg *is* the filter vocabulary. |
+| `collectorAttributesTheAcquisitionNodeCannotSaveStayPinned` | pins known gaps | D3 (`connection`) and **D9** (`duplicate__*`) — asserts the *defective* behaviour, so closing either gap fails the test and says "move it into `contracts()`". |
+| `declaredTypesTheFlatEditorCannotSaveAreKnown` | pins reachability | `transform.route` / `sink.materialized` / `sink.view` have specs but are **not in `LOWERABLE`** — unreachable from the flat editor by design (the palette greys them out), not by defect. |
+
+**Deliberately NOT asserted:** "every key the acquisition/sink node carries is declared." Those nodes carry
+the whole raw `collector:`/`output:` block and their shared tables are a *curated subset* by design, with the
+dialog's free-form editor as the escape hatch. Equality there would be a permanently red, therefore
+disabled, guard — the same failure mode §3.2's header warns about.
+
+⚠ **Gotcha for whoever extends it:** `PipelineLift.filterConfig` omits a key whose list is empty, so the
+reverse test's fixture must exercise **every** filter capability. An under-populated fixture reports a
+phantom "missing spec" — it did exactly that on the first run.
+
+**Residual weakness (honest).** The declared side is a Java mirror of `node-attributes.ts`, hand-kept in
+step with `node-attributes.spec.ts` on the TS side. Nothing yet fails if the two curated lists drift from
+each other — only §3.1 (serve the specs from the server) closes that seam for real. This check is
+nonetheless strictly stronger than name-matching, because its right-hand side is real runtime behaviour.
 
 ## 4. Flow → Pipeline, all three tiers
 
@@ -320,7 +364,8 @@ existing header warns about.
    the `connection` attribute. See the ⚠ above §2's detail table.
 3. **D2**, **D5** — ✅ done 2026-08-03, with a new seed-level guard
    (`mock/seeds/seeded-node-config.spec.ts`) so the phantoms cannot re-spread. Turned up **D8** (open).
-4. **§3.3** name-contract check, bidirectional. Locks in 1–3.
+4. **§3.3** name-contract check, bidirectional — ✅ **done 2026-08-04** (`NodeConfigNameContractTest`, 4
+   tests). Locks in 1–3 behaviourally, pins the D3/D9 gaps, and turned up **D9** (open).
 5. **§3.2** guard on TOON config keys.
 6. **Flow Tier 1.**
 7. **§3.2** guard on OKF + superpower docs; reconcile
