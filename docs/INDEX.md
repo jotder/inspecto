@@ -73,6 +73,52 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/vocabulary-and-config-contract-plan.md`](superpower/vocabulary-and-config-contract-plan.md)
+  — **IN FLIGHT (opened 2026-08-03). D1/D2/D4/D5 SHIPPED same day; D3/D6/D7/D8 open; both renames unstarted.**
+  The UI↔config↔engine key contract, plus the agreed Flow→Pipeline (all three tiers, **reversing** the §13
+  "kept `flows/` dir + JSON keys" decision) and Cube→Matrix sweeps. Root cause in §1: per-node cfg specs live
+  only in `node-attributes.ts`, `GET /pipelines/node-types` carries no attribute specs, and there is **no
+  case-conversion layer anywhere**, so every UI `AttributeSpec.key` must already be the exact backend key with
+  nothing checking it.
+  **The three lessons in §2 are the reason to read this doc even if the defects mean nothing to you:**
+  (1) *verify a key against the representation the surface actually saves to* — `transform.filter` was renamed
+  `predicate`→`where` to match `RowShaper`, which the flat-pipeline editor **cannot reach**, so filters still
+  no-op (**D7**), and D3 turned out to be **mostly wrong** for the same reason and collapsed into D4;
+  (2) *a zero-reader key may be misnamed rather than phantom* — deleting `key_columns` broke a documented
+  case-study invariant because upsert-by-key is real under `reference.load`/`reference.key` (**D8**, reverted);
+  (3) *deadness is per node type* — `mode` and `table` are dead on a sink but engine-real elsewhere.
+  §3 scopes the common checking point over all four surfaces (TOON keys first, Java/TS last — the existing
+  guard's header warns *"a noisy guard gets disabled"*), and §3.3 must bind a node type to the runtime that
+  executes the file the editor saves, or it will bless correctly-spelled unreachable keys. §6 sequences the
+  work **defects → guard → renames**; §7 tracks the ELT doc's four remaining GLOSSARY divergences (its
+  Batch→**Consignment** call was **accepted** 2026-08-03 — see below); §8 catalogues the snake_case/camelCase
+  splits for the allowlists.
+
+- [`superpower/consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) —
+  **DESIGN (opened 2026-08-03). Nothing implemented.** Captures the design conversation behind a
+  Consignment-based ELT model that replaces a Kafka record-at-a-time ETL. Core claim: the two apparent
+  execution systems (`BatchProcessor` file/batch path · `PipelineExecutor` graph path) are one model built
+  from both ends, joined by making the **Consignment manifest a first-class DuckDB relation** flowing on
+  graph edges. ⚠ **Its vocabulary is now BINDING, not just this doc's:** *Consignment* was accepted
+  2026-08-03 as the canonical name for the unit-of-work entity — GLOSSARY §2 redefines it, §6-A is now
+  **`Run ⊇ Consignment ⊇ File`**, and §13 carries the Batch→Consignment row, which **supersedes
+  Flow→Pipeline as the largest blast radius** (517 Java files, 39 `@PublicApi` ⇒ breaking, needs a version
+  bump; `batch` survives for the generic grouping sense). Identity is `(consignment_id, run_id)` — Run is
+  already canonical for "one execution". Settled here too: ⛔ *Instance* (collides with GLOSSARY Type/Instance);
+  append-only, no catalog; the invariant *no file holds two Consignments*; manifest-driven reprocessing;
+  compaction past a 7/14/30/`none` horizon with the `lateness ≤ seal ≤ compaction ≤ raw-retention` chain;
+  mandatory `count` + additive-only measures; `OPEN → SEALED → REOPENED` partitions with a
+  `PartitionSealed` event replacing end-of-day cron; statistical completeness via a new **`baseline`
+  Expectation kind** (KNN deferred to `inspecto-intelligence`, §9.4); event-time captured at load not
+  report time, field per schema + timezone per **Stream** with `Local` resolved to a concrete IANA zone
+  (§10). Two rules worth reading even out of context: **partition-affecting config must be pinned in the
+  manifest** or a config edit silently breaks replace-by-batch (§5.6), and **garbage timestamps route to
+  `invalid` rather than creating a phantom partition** (§10.3). §11 grounds the persistence model against
+  the existing `BatchAuditWriter` CSVs / `EventType` / `Signal` / `ObjectType` — most of the event surface
+  already exists; the real gap is **no durable output-file registry** (`PartitionOutput` is in-memory only),
+  which §5.3 reprocessing, §5.5 and §6.3 compaction all need. **Open: `ProcessorContext` (§14)** — start
+  there. New model surface listed in §13; unverified items and open decisions in §15.
+
 - [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) —
   **IN FLIGHT (opened 2026-08-02). Steps 0–4 SHIPPED same day** (`4fe388a1`): the armed-pipeline silent
   failure closed (G4), the two 404ing test affordances gated off rather than deleted (G1), a

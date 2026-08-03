@@ -159,7 +159,11 @@ Catalog ▸ *Onboard Stream / Onboard Reference* opens a stage rail (Collection 
 `active: false` pipeline. One "onboard" verb product-wide. ⛔ never "wizard" in UI copy. *(Shipped 2026-07-16;
 seams: `docs/okf/backend/control-plane/onboarding-authoring.md`.)*
 
-**Batch** — A set of one or more files ingested and processed together as one unit of work.
+**Consignment** — A set of one or more files ingested and processed together as one unit of work. ⛔ *Batch*
+in this entity sense (renamed 2026-08-03, §13 — **not yet rolled out; code and API still say `Batch`**).
+✅ *batch* survives as the ordinary verb/adjective for "group operations together" — JDBC batching,
+`batch_max_files`, `BatchedOperations` telemetry — which is a different concept and stays. One word → one
+concept: if it has a status and an id, it is a **Consignment**; if it is just a grouping knob, it is a batch.
 
 **File** — A single collected file. Carries a **File status** (see *Run* for the status hierarchy).
 
@@ -295,8 +299,11 @@ defines *when*, not *what*.
 
 **Run** — One execution of an Executable. Runs nest:
 
-> **Run ⊇ Batch ⊇ File** — a Run contains one or more Batches; a Batch processes one or more Files. Each level
-> has its own status: **Run status**, **Batch status**, **File status**.
+> **Run ⊇ Consignment ⊇ File** — a Run contains one or more Consignments; a Consignment processes one or more
+> Files. Each level has its own status: **Run status**, **Consignment status**, **File status**.
+
+*(Was `Run ⊇ Batch ⊇ File` until 2026-08-03; see the Consignment entry in §2 and the §13 row. Identity is
+`(consignment_id, run_id)` — the run is the attempt, so a reprocess is a new Run over the same Consignment.)*
 
 ---
 
@@ -532,7 +539,7 @@ plane's words for another.
 |---|---|---|---|
 | **P1 — Artifact graph** | authored **Components** | Component / Part — `part-of`, `uses` | Registry (derived) |
 | **P2 — Lineage graph** | **data assets** (Source→Table→View→KPI) | Asset — `EMITS·DECLARES·DESCRIBES·MATERIALIZES·FEEDS·JOINS_INTO·COMPUTED_FROM·CONSUMES` | `MetadataGraphService` |
-| **P2′ — Provenance** | a **Batch**'s records through **Steps** | Step — `flowed-through` (+ row counts) | `DbProvenanceStore` + Provenance rows |
+| **P2′ — Provenance** | a **Consignment**'s records through **Steps** | Step — `flowed-through` (+ row counts) | `DbProvenanceStore` + Provenance rows |
 | **P3 — Entity / Link graph** | **records as business entities** | **Entity** / **Link** (+ attributes) | Entity Projection over a Dataset (mock-first — see below) |
 
 **Lineage vs Provenance** — **Lineage** = the *derived asset graph* (which asset feeds which); design-time,
@@ -627,7 +634,10 @@ touchpoint before renaming; the backend hits below are *known examples*, not an 
 | `USES` *(lineage edge)* | **`CONSUMES`** | ✅ **DONE** (breaking → 5.0): `EdgeKind.CONSUMES`, `MetadataGraphBuilder` report→kpi edge; FE `models.ts` `EdgeKind` already `CONSUMES`. ⚠️ `/catalog/graph` emits the new value (no alias). |
 | `EVENT_TABLE` / `TRANSFORMED_TABLE` / `REFERENCE_TABLE` | **`TABLE`** / **`DERIVED_TABLE`** / **`REFERENCE_DATASET`** | ✅ **DONE** (breaking → 5.0): `NodeKind` enum + all usages (`IdScheme`, `CatalogOverlay`, `MetadataGraphService`, `KpiToSqlSkill`, `SuggestConfigSkill`) + 5 test files; FE `models.ts` union + `node-detail.dialog.ts` `isStore()` + `catalog-graph.ts` shape/glyph. Id tokens (`event`/`xform`/`ref`) unchanged. ⚠️ `/catalog/graph` emits the new enum values (no alias). |
 | `LineageRow` *(file→partition rows)* | **Provenance** *(concept)* | `inspecto/etl/LineageRow.java`, `BatchAuditWriter`; the asset graph keeps the name *Lineage* |
+| Batch *(the unit-of-work entity)* | **Consignment** | **NOT STARTED — now the largest blast radius in this table; supersedes Flow→Pipeline as the "save for last" row.** Decided 2026-08-03 for the greenfield ELT design (`docs/superpower/consignment-elt-architecture.md`), which authors the concept under this name. Scale: **517 Java files** mention `Batch`, **39 of them `@PublicApi`** — so this is a **breaking API rename needing a version bump** (unlike Flow→Pipeline, contracts here *have* shipped). Core touchpoints: `BatchEvent` + `BatchEventBus` (the event seam every consumer subscribes to), `BatchManifest`, `BatchAuditWriter`/`BatchAuditReport`, `BatchProcessor`, `BatchIngestStrategy`/`BatchStrategy`, `BatchPlanner`, `BatchGraphRunner`, `BatchSink`, `BatchSignal`, `BatchRow`; plus `batch_id` wherever persisted, and the UI's Runs/Processing-Status surfaces. ⚠ **Scope this rename by concept, not by string.** Only the entity with an id and a status renames. The generic grouping sense stays `batch`: `batch_max_files`/`batch_max_bytes` config keys, `BatchedOperations`/`BatchedOperationMs` telemetry, JDBC/DuckDB batching. Same discipline as the Metric row keeping ops `MetricRegistry`. ⚠ Persisted `Batch*` event rows and audit tables need a **read-alias**, not a hard cutover. |
 
 **Migration underway** (the *2b* coordinated breaking change, toward **5.0** — one term per verified PR). ✅ = the
 rename has landed (see the touchpoint cell for the commit); unmarked rows are the agreed target, not yet started.
-**Save Flow→Pipeline for last** (largest blast radius). When a rename lands, mark its row ✅ and record the commit.
+**Save Batch→Consignment for last** (largest blast radius, and the only row here that is a *breaking API*
+rename — 39 `@PublicApi` types — so it needs a version bump; Flow→Pipeline was the previous holder of that
+slot and has since landed). When a rename lands, mark its row ✅ and record the commit.
