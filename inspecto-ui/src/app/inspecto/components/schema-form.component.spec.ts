@@ -16,6 +16,11 @@ const SPECS: AttributeSpec[] = [
     { key: 'threads', label: 'Threads', type: 'number', tier: 'advanced', default: 4, min: 1, max: 64 },
 ];
 
+/** `type: 'list'` in the always-visible tier so the chips render without expanding a group. */
+const LIST_SPECS: AttributeSpec[] = [
+    { key: 'patterns', label: 'Patterns', type: 'list', tier: 'required', required: false, placeholder: '^CALL' },
+];
+
 describe('InspectoSchemaFormComponent', () => {
     function create(specs: AttributeSpec[] = SPECS, initial?: Record<string, unknown>) {
         TestBed.configureTestingModule({
@@ -134,5 +139,67 @@ describe('InspectoSchemaFormComponent', () => {
         fixture.componentInstance.form.get('type')?.setValue('report');
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    /**
+     * `type: 'list'` (D7): the text box is a DRAFT and the control holds the committed `string[]`.
+     * Clearing every entry must write `null`, not `[]`, so `required` and the hosts' delete-on-clear
+     * both see it as blank.
+     */
+    it('commits list entries as an array, dedupes, and clears to null', () => {
+        const fixture = create(LIST_SPECS);
+        const c = fixture.componentInstance;
+        const spec = LIST_SPECS[0];
+
+        expect(c.listValue('patterns')).toEqual([]);
+
+        c.setListDraft('patterns', '^CALL');
+        c.addListItem(spec);
+        c.setListDraft('patterns', '^SMS');
+        c.addListItem(spec);
+        expect(c.form.get('patterns')?.value).toEqual(['^CALL', '^SMS']);
+        expect(c.listDraft('patterns')).toBe(''); // draft cleared after commit
+        expect(c.isDirty()).toBe(true);
+
+        c.setListDraft('patterns', '^CALL'); // duplicate ignored
+        c.addListItem(spec);
+        c.setListDraft('patterns', '   '); // blank ignored
+        c.addListItem(spec);
+        expect(c.form.get('patterns')?.value).toEqual(['^CALL', '^SMS']);
+
+        c.removeListItem(spec, 0);
+        expect(c.form.get('patterns')?.value).toEqual(['^SMS']);
+        c.removeListItem(spec, 0);
+        expect(c.form.get('patterns')?.value).toBeNull(); // emptied ⇒ null, not []
+    });
+
+    it('renders committed list entries as removable chips and loads initial arrays', async () => {
+        const fixture = create(LIST_SPECS, { patterns: ['^CALL', '^SMS'] });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+
+        expect(el.textContent).toContain('^CALL');
+        expect(el.textContent).toContain('^SMS');
+        const removes = Array.from(el.querySelectorAll('button[aria-label^="Remove "]'));
+        expect(removes.length).toBe(2);
+
+        (removes[0] as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.form.get('patterns')?.value).toEqual(['^SMS']);
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('Enter in a list field adds an entry instead of submitting the form', () => {
+        const fixture = create(LIST_SPECS);
+        let submits = 0;
+        fixture.componentInstance.submitted.subscribe(() => submits++);
+
+        fixture.componentInstance.setListDraft('patterns', '^CALL');
+        const event = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+        fixture.componentInstance.addListItem(LIST_SPECS[0], event);
+
+        expect(event.defaultPrevented).toBe(true); // otherwise the sr-only submit button fires
+        expect(submits).toBe(0);
+        expect(fixture.componentInstance.form.get('patterns')?.value).toEqual(['^CALL']);
     });
 });

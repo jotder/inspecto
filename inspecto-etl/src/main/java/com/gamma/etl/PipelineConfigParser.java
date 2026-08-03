@@ -257,6 +257,10 @@ final class PipelineConfigParser {
             b.excludePrefixes  = strList(csv.get("exclude_prefixes"));
             b.excludeRegex     = strList(csv.get("exclude_regex"));
             b.filterTargetColumn = toInt(csv.getOrDefault("filter_target_column", 0));
+            // post-parse SQL row predicate over the MAPPED columns (DataTransformer.materialize) —
+            // a different moment from the include_*/exclude_* lists above, which match one raw
+            // physical column inside read_csv. See PipelineConfig.CsvSettings.
+            b.rowWhere         = blankToNull(csv.get("where"));
             // 4.1 additive: fixed-width frontend (null unless frontend: fixedwidth)
             b.fixedWidth       = parseFixedWidth(csv);
             // 4.8 additive: json / text_regex frontends (null unless selected)

@@ -11,6 +11,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AttributeOption, AttributeSpec, byTier, defaultsFor, dependsOnMatches, isRequired } from '../component-model';
+import { ChipComponent } from './chip.component';
 
 /**
  * Supplies the suggestion list for a `type: 'autocomplete'` attribute. Receives the current raw form
@@ -35,6 +36,7 @@ export type AttributeOptionLoader = (
     imports: [
         NgTemplateOutlet,
         ReactiveFormsModule,
+        ChipComponent,
         MatAutocompleteModule,
         MatButtonModule,
         MatFormFieldModule,
@@ -140,6 +142,51 @@ export type AttributeOptionLoader = (
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
                         }
+                        @case ('list') {
+                            <!-- string[] as removable chips. The text box is a DRAFT, not the control:
+                                 the control's value is the array, committed on Enter / + / blur. -->
+                            <div class="flex flex-col gap-1">
+                                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                                    <mat-label>{{ spec.label }}</mat-label>
+                                    <input
+                                        matInput
+                                        type="text"
+                                        [value]="listDraft(spec.key)"
+                                        [placeholder]="spec.placeholder ?? ''"
+                                        [attr.cdkFocusInitial]="first ? '' : null"
+                                        (input)="setListDraft(spec.key, $any($event.target).value)"
+                                        (keydown.enter)="addListItem(spec, $event)"
+                                        (blur)="addListItem(spec)"
+                                    />
+                                    <button
+                                        mat-icon-button
+                                        matSuffix
+                                        type="button"
+                                        [attr.aria-label]="'Add entry to ' + spec.label"
+                                        [disabled]="!listDraft(spec.key).trim()"
+                                        (click)="addListItem(spec)"
+                                    >
+                                        <mat-icon svgIcon="heroicons_outline:plus" />
+                                    </button>
+                                    @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                    <mat-error>{{ errorFor(spec) }}</mat-error>
+                                </mat-form-field>
+                                @if (listValue(spec.key).length) {
+                                    <div class="flex flex-wrap gap-1 pb-1">
+                                        @for (item of listValue(spec.key); track $index) {
+                                            <inspecto-chip
+                                                variant="soft"
+                                                [removable]="true"
+                                                [removeLabel]="'Remove ' + item + ' from ' + spec.label"
+                                                (removed)="removeListItem(spec, $index)"
+                                            >
+                                                <span class="font-mono">{{ item }}</span>
+                                            </inspecto-chip>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
                         @case ('number') {
                             <!-- Static type="number" so Angular's NumberValueAccessor attaches (a [type]
                                  binding would leave the default accessor → string values). -->
@@ -224,6 +271,52 @@ export class InspectoSchemaFormComponent {
             (opts) => this.loadedOptions.update((m) => ({ ...m, [spec.key]: opts })),
             () => undefined,
         );
+    }
+
+    /** In-progress text per `type: 'list'` field — the control itself holds the committed array. */
+    private readonly listDrafts = signal<Record<string, string>>({});
+
+    listDraft(key: string): string {
+        return this.listDrafts()[key] ?? '';
+    }
+
+    setListDraft(key: string, text: string): void {
+        this.listDrafts.update((m) => ({ ...m, [key]: text }));
+    }
+
+    /** The committed entries of a `list` control (null/non-array ⇒ empty). */
+    listValue(key: string): string[] {
+        const v = this.form.get(key)?.value;
+        return Array.isArray(v) ? (v as string[]) : [];
+    }
+
+    /**
+     * Commit the draft as a new entry. Called from Enter, the + button and blur — blur included so a
+     * typed-but-uncommitted value isn't silently lost when the user goes straight for Save.
+     * Duplicates and blanks are ignored; `event.preventDefault()` stops Enter from submitting the form
+     * (the sr-only submit button above would otherwise fire).
+     */
+    addListItem(spec: AttributeSpec, event?: Event): void {
+        event?.preventDefault();
+        const text = this.listDraft(spec.key).trim();
+        if (!text) return;
+        const current = this.listValue(spec.key);
+        if (!current.includes(text)) this.writeList(spec.key, [...current, text]);
+        this.setListDraft(spec.key, '');
+    }
+
+    removeListItem(spec: AttributeSpec, index: number): void {
+        const next = this.listValue(spec.key).filter((_, i) => i !== index);
+        this.writeList(spec.key, next);
+    }
+
+    /** Empty ⇒ null, so a cleared list reads as blank to `required` and to the host's delete-on-clear. */
+    private writeList(key: string, items: string[]): void {
+        const control = this.form.get(key);
+        if (!control) return;
+        control.setValue(items.length ? items : null);
+        control.markAsDirty();
+        control.markAsTouched();
     }
 
     /** Suggestions narrowed by the field's current text (matches value or label, case-insensitive). */

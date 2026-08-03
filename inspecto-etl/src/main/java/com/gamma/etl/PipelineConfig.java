@@ -86,6 +86,17 @@ public final class PipelineConfig {
      * {@code excludeRegex} (anchored on {@code filterTargetColumn}, a 0-based selector index) compile
      * to a row-filter {@code WHERE} clause on the native path and an in-loop filter on the Java path.
      * {@code strictMode} is {@code null} when unset (⇒ DuckDB default).
+     *
+     * <p><b>Two distinct filtering moments</b> — do not conflate them. The {@code includePrefixes}/
+     * {@code includeRegex}/{@code excludePrefixes}/{@code excludeRegex} lists are <em>pre-parse</em>:
+     * they match one raw physical column ({@code c<filterTargetColumn>}) inside the {@code read_csv}
+     * SELECT, before any field is named or typed ({@link DuckDbCsvIngester#filterWhere}). {@code where}
+     * is <em>post-parse</em>: a SQL predicate over the mapped, typed target columns, applied by
+     * {@link DataTransformer#materialize}. A predicate like {@code amount > 0} is only expressible as
+     * the latter; a regex over an unparsed column is only expressible as the former. Hence
+     * {@link #hasRowFilters()} and {@link #hasRowPredicate()} are separate — {@code where} is valid on
+     * frontends that have no {@code c<N>} columns at all (json / text_regex), where the pre-parse lists
+     * are rejected outright ({@code ConfigValidator}).
      */
     @PublicApi(since = "2.0.0")
     public record CsvSettings(String delimiter, int skipHeaderLines, int skipJunkLines,
@@ -95,12 +106,17 @@ public final class PipelineConfig {
                               List<String> nullStrings,
                               List<String> includePrefixes, List<String> includeRegex,
                               List<String> excludePrefixes, List<String> excludeRegex,
-                              int filterTargetColumn) {
+                              int filterTargetColumn, String where) {
 
-        /** Whether any of the row-filter lists is non-empty. */
+        /** Whether any of the <em>pre-parse</em> row-filter lists is non-empty. */
         public boolean hasRowFilters() {
             return !includePrefixes.isEmpty() || !includeRegex.isEmpty()
                 || !excludePrefixes.isEmpty() || !excludeRegex.isEmpty();
+        }
+
+        /** Whether a <em>post-parse</em> SQL row predicate ({@code where}) is declared. */
+        public boolean hasRowPredicate() {
+            return where != null && !where.isBlank();
         }
     }
 
@@ -748,7 +764,7 @@ public final class PipelineConfig {
                 Collections.unmodifiableList(b.includeRegex),
                 Collections.unmodifiableList(b.excludePrefixes),
                 Collections.unmodifiableList(b.excludeRegex),
-                b.filterTargetColumn);
+                b.filterTargetColumn, b.rowWhere);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.schemas = new Schemas(b.schemaSelector, b.singleSchema, b.segmentSchemas,
@@ -977,6 +993,7 @@ public final class PipelineConfig {
         List<String> excludePrefixes = new ArrayList<>();
         List<String> excludeRegex    = new ArrayList<>();
         int          filterTargetColumn = 0;
+        String       rowWhere;          // post-parse SQL predicate (csv_settings.where); null ⇒ no filter
         FixedWidth   fixedWidth;          // null ⇒ delimited frontend (the default)
         Json         json;                // null unless frontend: json
         TextRegex    textRegex;           // null unless frontend: text_regex

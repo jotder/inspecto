@@ -2,8 +2,9 @@
 
 **Status:** IN FLIGHT — opened 2026-08-03. **D1 · D2 · D4 · D5 shipped** (`9a4ff7c7`, pushed 2026-08-03).
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D7** and **D8** (open by operator decision), the §3.2/§3.3 guards, and both renames (§4,
-§5). Do not archive this plan until those close.
+needing design), **D7** (⚠ **re-scoped 2026-08-03** — the flat filter node round-trips fine and is merely
+*undeclared*; option 1 ruled out as a regression) and **D8** (both awaiting operator decision), the
+§3.2/§3.3 guards, and both renames (§4, §5). Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -58,7 +59,7 @@ placeholder?}` — note **`key` is the config key**, `label` is display-only, an
 | **D4** | generic node dialog never bridged flat spec keys ↔ nested config — **in BOTH directions** | `node-config.dialog.ts:439-449` (save) **and** the constructor's split (load); enrichment path *does* (`:496`), onboarding panes do (`collection-pane:265`, `publish-pane:93`, `parsing-pane:298`) | ✅ **FIXED 2026-08-03.** Save wrote `__` keys literally (`duplicate__mode`, read by nothing); load compared *raw* top-level keys to *flat* spec keys, so a real `duplicate: {mode}` block matched no spec, fell into free-form as a JSON **string**, and — free-form being applied last — **overwrote the schema form's own value on save**. The load half was found only because the save-half regression test failed on it |
 | **D5** | `partition_by` is a phantom key | mock seeds `pipeline-case-studies.seed.ts:50`, `telecom-ra.seed.ts:44`, `default-space.seed.ts:325` | matches no backend key; real partitioning is schema-level `partitionKey`/`partitions[]` — ✅ **FIXED 2026-08-03**: it had spread to **five** seed files (also `financial-audit`, `link-analysis`, and a 2nd case study), all stripped; already correctly absent from the UI specs. New guard `mock/seeds/seeded-node-config.spec.ts` stops it coming back |
 | **D6** | no timezone surface in the UI while the backend specs `meta.domain.timezone` | zero `timezone\|timeZone\|zoneId` hits in `inspecto-ui/src` | unmodeled config surface (not a rename) |
-| **D7** | `transform.filter` is **unrunnable** on the only path the editor can save to — a name fix cannot reach it | `PipelineEditable.java:277` merges filter cfg into `processing.csv_settings`; `PipelineConfigParser.java:255-259` reads only `include_*`/`exclude_*`/`filter_target_column` there; `RowShaper` is reachable only from an authored `*_flow.toon` via `PipelineJobRunner.java:126-135`, and `POST`/`PUT /pipelines/authored` are 405 since W5 | **filters authored in the dialog still no-op, under any key** |
+| **D7** | `transform.filter` on the flat path has a **real, round-tripping vocabulary that the UI does not declare** — the spec declares the *authored-graph* one instead (⚠ re-scoped 2026-08-03, see below; the original "unrunnable" framing was wrong) | `PipelineLift.java:180-186,242-251` **emits** a `transform.filter` node carrying `filter_target_column`/`include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`; `PipelineEditable.java:277` lowers it back into `processing.csv_settings`; `PipelineConfigParser.java:255-259` reads exactly those keys. The spec's `where` belongs to `RowShaper.java:79`, reachable only from an authored `*_flow.toon` via `PipelineJobRunner.java:126-135` (writes 405 since W5) | a dialog-authored `where` no-ops, **and** the filtering that *does* work here is unreachable from the UI |
 
 | **D8** | `sink.materialized` upsert config is **misnamed**, not phantom | seeds `pipeline-case-studies.seed.ts:51,93` carry `mode: 'upsert'` + `key_columns` (0 Java readers), but the real capability is pipeline-level `reference: {load: upsert, key: [...]}` (`PipelineConfigParser.java:406-412`, `Load.from`, `strList`) | the demo narrative is implementable but unspelled; a naive "delete the dead key" sweep would destroy it |
 
@@ -91,18 +92,55 @@ processing.csv_settings:
 The palette offers `Filter` for a flat pipeline, `lower` accepts the node without a refusal, and the value
 lands in a map whose reader has no `where` key. **`include_regex` is not the same capability** — those are
 regexes matched with `regexp_matches()` against ONE raw physical column *before* parsing
-(`DuckDbCsvIngester.filterWhere`), so `amount > 0` is inexpressible as one. Three candidate fixes, needing
-a decision (all of them backend, none a UI edit):
+(`DuckDbCsvIngester.filterWhere:713-730`, inlined into the `read_csv` SELECT at `:140-141`), so `amount > 0`
+is inexpressible as one.
 
-1. **Refuse it** — `UNSUPPORTED_NODE` in `PipelineEditable.lower` for `transform.filter`, the mechanism
-   already used for non-lowerable types and already surfaced by the editor's `showRefusals`. Smallest and
-   honest, but withdraws a palette affordance. ⚠ `transform.map` is silently lossy in exactly the same
-   place ("lower ignores map") — so this decision covers both, or it is arbitrary.
-2. **Give the flat path a real SQL row predicate** — a new `csv_settings.where` the CSV reader honours
-   post-parse. Makes the affordance work as labelled; new engine capability.
-3. **Re-spec the node to the flat path's actual keys** — `include_regex`/`exclude_regex` as lists. ⛔ Not
-   recommended: different semantics under the same name is the exact drift this plan exists to stop, and
-   `AttributeSpec` has no list type.
+### ⚠ D7 re-scoped 2026-08-03 — the flat filter node is NOT broken, it is UNDECLARED
+
+Verifying the option set overturned its premise. **`transform.filter` already round-trips correctly on the
+flat path** with its own vocabulary: `PipelineLift.java:180-186` synthesises a `"Row filter"` node whenever
+`cfg.csv().hasRowFilters()`, populating it from `filterConfig` (`:242-251`) with `filter_target_column` +
+`include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex` — precisely the keys
+`PipelineEditable.java:277` lowers back into `csv_settings` and `PipelineConfigParser.java:255-259` reads.
+
+So the flat path has **two distinct filtering moments**, and the UI declares neither correctly:
+
+| Moment | Vocabulary | Status |
+|---|---|---|
+| **pre-parse**, regex over one raw physical column | `filter_target_column`, `include_*`/`exclude_*` | **works and round-trips today** — but no `AttributeSpec` declares it, so it is unreachable from the dialog and invisible on a lifted node |
+| **post-parse**, SQL predicate over parsed columns | `where` | **does not exist** in the flat runtime; only `RowShaper` (authored graph, writes 405) honours it |
+
+D7 is therefore the **same category as D8** — a mis-declared vocabulary, not a missing capability — except
+the two vocabularies are genuinely different capabilities, so it is not a pure rename.
+
+**⛔ Option 1 (refuse) is now ruled out — it would cause a regression.** Lift *emits* `transform.filter`
+for every pipeline that has row filters configured, so an `UNSUPPORTED_NODE` refusal in `lower` would break
+open→save on exactly those pipelines. The `transform.map` objection also dissolves: map's lifted config is
+only `{schema: …}` (`PipelineLift.java:189-192`), **derived** from the pipeline schema and regenerated on
+every lift, so dropping it in `lower` is lossless — not the same situation as filter. (The `:209` comment's
+"companion-persisted" half refers to `enrichment`; the `_enrich*` files are audit ledgers, not a node-config
+companion.)
+
+The two live options, no longer mutually exclusive:
+
+2. **Give the flat path a real SQL row predicate** — a new `csv_settings.where` honoured post-parse. Cost
+   is now measured and small: `PipelineConfigParser.java:255-259` (+1 line) → `PipelineConfig.Builder`
+   (`PipelineConfig.java:919`, **package-private**, free to change) → `PipelineConfig.CsvSettings`
+   (`:90`, `@PublicApi(since="2.0.0")` record — an added component changes canonical-constructor arity;
+   in-repo precedent at `:83-88` treats additive optional components as non-breaking) →
+   `DataTransformer.materialize` (`DataTransformer.java:53-99`), the existing post-parse seam that builds
+   `CREATE TABLE "<dest>" AS SELECT …`. **~10 lines, no new pipeline stage.** Wrap the built select as a
+   derived table (`… AS SELECT * FROM (<select>) t WHERE <pred>`) — target-column aliases cannot be
+   referenced from the same SELECT's `WHERE`.
+3. **Declare the pre-parse vocabulary the flat path already honours.** No longer "not recommended" — the
+   original objection assumed this meant reusing a name for different semantics, but these keys *are* this
+   representation's real, already-round-tripping contract, and leaving them undeclared is what hides a
+   working feature. Blocker stands and is UI-side: **`AttributeSpec` has no list type**, needed for the
+   four `include_*`/`exclude_*` lists. Distinct labels/help must make the pre- vs post-parse difference
+   explicit if both ship.
+
+**Minimum honest fix is 3** (surface what already works). **2 is additive** and only needed if a SQL
+predicate over parsed columns is actually wanted.
 
 The generalisable lesson, and why §3.3 must be built as specified: a key-name check alone would have
 called D1 green. The bidirectional assertion has to be **per representation** — "declared for a node type

@@ -20,16 +20,27 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
  * `docs/superpower/vocabulary-and-config-contract-plan.md`) so the key matches the engine's reader.
  * `transform.validate` reads `rule`, not `where` — it stays unspecced.
  *
- * <p>⚠ **`where` is still inert on the path this dialog saves to — D1 was only half the bug.** The only
- * host is `pipeline-editor.component`, which round-trips the flat `*_pipeline.toon`; its lower merges
- * every `transform.filter` node's cfg wholesale into `processing.csv_settings`
- * (`PipelineEditable.java:277`, mirrored at `mock/pipeline-editable.ts:189-192`), and that map's reader
- * knows only `include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`/`filter_target_column`
- * (`PipelineConfigParser.java:255-259`). `RowShaper` is reached only from an authored `*_flow.toon` graph
- * via `PipelineJobRunner` — a representation this editor cannot write (`POST`/`PUT /pipelines/authored`
- * are 405 since W5). So do NOT "fix" this by swapping in `include_regex`: those are regexes matched
- * against ONE raw physical column pre-parse (`DuckDbCsvIngester.filterWhere`), not a SQL predicate over
- * parsed columns — a genuinely different capability, not a synonym. Tracked as D7.
+ * <p>⚠ **`transform.filter` has TWO filtering moments, and they are not synonyms** (D7, resolved
+ * 2026-08-03). The only host is `pipeline-editor.component`, which round-trips the flat
+ * `*_pipeline.toon`; its lower merges every `transform.filter` node's cfg wholesale into
+ * `processing.csv_settings` (`PipelineEditable.java:277`, mirrored at `mock/pipeline-editable.ts`).
+ * That map has two readers:
+ *
+ * <ul>
+ *   <li>**pre-parse** — `include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex` anchored on
+ *       `filter_target_column`, matched with `regexp_matches()`/`LIKE` against ONE raw physical column
+ *       inside the `read_csv` SELECT, before any field is named or typed
+ *       (`DuckDbCsvIngester.filterWhere`). Round-trips through `PipelineLift.filterConfig` — it has
+ *       always worked here; it was simply never declared, so the dialog couldn't reach it.</li>
+ *   <li>**post-parse** — `where`, a SQL predicate over the mapped, typed target columns, applied by
+ *       `DataTransformer.materialize` (added 2026-08-03; `PipelineConfig.CsvSettings.hasRowPredicate`).</li>
+ * </ul>
+ *
+ * A predicate like `amount > 0` is inexpressible as a pre-parse regex, and a regex over an unparsed
+ * column is inexpressible as a predicate — so do NOT collapse the two, and do not "simplify" the spec by
+ * dropping either group. `RowShaper` (the authored `*_flow.toon` runtime, reachable only via
+ * `PipelineJobRunner`) reads the same `where` key, but this editor cannot write that representation
+ * (`POST`/`PUT /pipelines/authored` are 405 since W5).
  *
  * <p>**`acquisition` reuses the shared `COLLECTOR_ATTRIBUTES`** (`inspecto/component-model`, moved there
  * from `catalog/onboarding/` in the same change) — this is U-D's "one table per concern": both features
@@ -60,8 +71,16 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     'sink.persistent': OUTPUT_ATTRIBUTES,
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,
+    // Two DIFFERENT filtering moments, both real on the flat path — see the D7 note in the file header.
+    // Neither is individually mandatory (a node may use either), so both are visible with
+    // `required: false` rather than one being `tier: 'required'` and forcing the wrong choice.
     'transform.filter': [
-        { key: 'where', label: 'Keep-when predicate', type: 'string', tier: 'required', placeholder: 'amount > 0', help: 'Rows matching are kept; the rest go to the dropped branch.' },
+        { key: 'where', label: 'Row predicate (after parsing)', type: 'string', tier: 'required', required: false, placeholder: 'amount > 0', help: 'SQL over the mapped, typed columns. Rows matching are kept; NULL results are dropped.' },
+        { key: 'include_regex', label: 'Include matching (before parsing)', type: 'list', tier: 'optional', placeholder: '^CALL', help: 'Keep rows whose target column matches any of these regexes, checked on the raw text before parsing.' },
+        { key: 'exclude_regex', label: 'Exclude matching (before parsing)', type: 'list', tier: 'optional', placeholder: '^TEST', help: 'Drop rows whose target column matches any of these regexes.' },
+        { key: 'include_prefixes', label: 'Include by prefix (before parsing)', type: 'list', tier: 'optional', help: 'Keep rows whose target column starts with any of these.' },
+        { key: 'exclude_prefixes', label: 'Exclude by prefix (before parsing)', type: 'list', tier: 'optional', help: 'Drop rows whose target column starts with any of these.' },
+        { key: 'filter_target_column', label: 'Target column index', type: 'number', tier: 'advanced', min: 0, help: 'Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate.' },
     ],
     // `branches` — the list of `{key, where}` that actually does the routing — has no spec: `AttributeSpec`
     // has no list type, and the named routes are authored on the canvas edges. `mode` is the only scalar.

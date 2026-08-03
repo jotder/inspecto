@@ -368,7 +368,10 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         collector: { connector: 'sftp', connection: 'cdr_sftp_prod', include: ['glob:**/*.csv.gz'] },
         processing: {
             threads: 1,
-            csv_settings: { delimiter: ',', has_header: true, include_regex: ["msisdn NOT LIKE '0000%'"] },
+            // A SQL predicate belongs in `where` (post-parse, over the mapped columns), NOT in
+            // `include_regex` — those are regexp_matches() patterns over ONE raw pre-parse column, so
+            // this expression matched nothing there. Corrected with D7, 2026-08-03.
+            csv_settings: { delimiter: ',', has_header: true, where: "msisdn NOT LIKE '0000%'" },
             schema_file: 'cdr_ingest_schema.toon',
         },
     };

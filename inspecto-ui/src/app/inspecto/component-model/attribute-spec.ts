@@ -22,7 +22,11 @@ export type AttributeType =
     | 'select'
     | 'autocomplete' // free text + suggestions (suggestions assist, they never constrain the value);
     //                  the renderer host supplies the suggestion source via its `optionLoaders` input
-    | 'multiline';
+    | 'multiline'
+    | 'list'; // string[] edited as removable chips — for config keys the engine reads as a list
+    //           (e.g. csv_settings.include_regex). An empty list counts as blank, so a `required`
+    //           list must have at least one entry. ⚠ Adding a member here also needs
+    //           `FindingsSpec.TYPES` (backend) widened, or the server 422s a spec this can draw.
 
 export interface AttributeOption {
     value: string;
@@ -92,7 +96,11 @@ export function byTier(specs: AttributeSpec[]): Record<AttributeTier, AttributeS
     return out;
 }
 
-const isBlank = (v: unknown): boolean => v === undefined || v === null || v === '';
+// An empty list is blank, so `required` on a `list` means "at least one entry" (matching Angular's
+// own Validators.required, which treats [] as empty — the two must agree or the form and the
+// framework-free validator disagree on the same value).
+const isBlank = (v: unknown): boolean =>
+    v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
 
 /** Validate `value` against the visible specs — the spec-driven half of a kind's `config.validate`. */
 export function validateAttributes(specs: AttributeSpec[], value: Record<string, unknown>): ConfigFinding[] {
@@ -128,6 +136,11 @@ export function validateAttributes(specs: AttributeSpec[], value: Record<string,
             case 'select':
                 if (!(s.options ?? []).some((o) => o.value === v)) {
                     findings.push({ severity: 'error', path: s.key, message: `${s.label} must be one of the listed options` });
+                }
+                break;
+            case 'list':
+                if (!Array.isArray(v) || v.some((e) => typeof e !== 'string')) {
+                    findings.push({ severity: 'error', path: s.key, message: `${s.label} must be a list of text values` });
                 }
                 break;
             case 'identifier':

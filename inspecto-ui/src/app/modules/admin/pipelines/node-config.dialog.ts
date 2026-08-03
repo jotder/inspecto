@@ -461,6 +461,9 @@ export class NodeConfigDialog {
             for (const s of this.specs()) {
                 let val = values[s.key];
                 if (s.type === 'number') val = val === '' || val == null ? null : Number(val);
+                // A cleared list is blank, not `[]` — otherwise clearing every chip writes an empty
+                // array the engine would read as "a list is configured" instead of dropping the key.
+                if (s.type === 'list' && Array.isArray(val) && val.length === 0) val = null;
                 if (val !== '' && val != null) flat[s.key] = val;
             }
             // Deep-merge each nested root over what the node already had, so sub-keys the schema does not

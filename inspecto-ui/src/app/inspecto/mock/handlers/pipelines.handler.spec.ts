@@ -157,6 +157,37 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
         expect((put?.body as { written: boolean }).written).toBe(true);
     });
 
+    /**
+     * D7 mock parity (2026-08-03). The row-filter keys live inside `processing.csv_settings` in the file,
+     * but the backend's `PipelineLift.filterConfig` lifts them onto their own `transform.filter` node.
+     * The mock used to leave them on the PARSER node's verbatim `csv_settings`, so the offline editor drew
+     * a different graph than the server for the same file — and the Filter node's new attribute schema
+     * had nothing to bind to. This pins the split, and that the value still round-trips back into
+     * `csv_settings` on save (`lower` merges every filter node's cfg into that map).
+     */
+    it('lifts a csv_settings row filter onto a Filter node, and lowers it back into csv_settings', () => {
+        const store = seededStore();
+        const raw = handler(req('GET', '/api/pipelines/cdr_ingest/graph/raw'), store)?.body as {
+            nodes: { id: string; type: string; config?: Record<string, unknown> }[];
+        };
+
+        const filter = raw.nodes.find((n) => n.type === 'transform.filter');
+        expect(filter, 'the seed carries csv_settings.where, so a Filter node must be lifted').toBeDefined();
+        expect(filter?.config?.['where']).toBe("msisdn NOT LIKE '0000%'");
+        // ...and it must NOT also be left on the parser node (that is the split-brain the split fixes)
+        const parser = raw.nodes.find((n) => n.type === 'parser');
+        expect((parser?.config?.['csv_settings'] as Record<string, unknown>)?.['where']).toBeUndefined();
+        // `filter_target_column` travels only with the pre-parse lists, which this seed has none of
+        expect(filter?.config?.['filter_target_column']).toBeUndefined();
+
+        const put = handler(req('PUT', '/api/pipelines/cdr_ingest/graph', raw), store);
+        expect((put?.body as { written: boolean }).written).toBe(true);
+        const saved = store.get<{ config: { processing: { csv_settings: Record<string, unknown> } } }>(
+            'default', PIPELINE_CONFIGS_COLL, 'cdr_ingest',
+        )!;
+        expect(saved.config.processing.csv_settings['where']).toBe("msisdn NOT LIKE '0000%'");
+    });
+
     it('refuses an unrepresentable topology with a named code (never silently truncates)', () => {
         const store = seededStore();
         const bad = {

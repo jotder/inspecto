@@ -79,7 +79,8 @@ public final class PipelineLift {
 
         // 4. branch on schema resolution (exactly one of the three is set)
         PipelineConfig.Schemas s = cfg.schemas();
-        boolean rowFilters = cfg.csv().hasRowFilters();
+        // either filtering moment surfaces as one Filter node (pre-parse lists and/or post-parse `where`)
+        boolean rowFilters = cfg.csv().hasRowFilters() || cfg.csv().hasRowPredicate();
 
         if (s.selector() != null && s.selector().hasSchemas()) {
             int i = 0;
@@ -242,11 +243,17 @@ public final class PipelineLift {
     private static Map<String, Object> filterConfig(PipelineConfig cfg) {
         var csv = cfg.csv();
         Map<String, Object> c = new LinkedHashMap<>();
-        c.put("filter_target_column", csv.filterTargetColumn());
+        // only meaningful as the index the pre-parse lists anchor on — emitting it for a
+        // predicate-only pipeline would have lower write a key the original file never had.
+        if (csv.hasRowFilters()) c.put("filter_target_column", csv.filterTargetColumn());
         if (!csv.includePrefixes().isEmpty()) c.put("include_prefixes", csv.includePrefixes());
         if (!csv.includeRegex().isEmpty())    c.put("include_regex", csv.includeRegex());
         if (!csv.excludePrefixes().isEmpty()) c.put("exclude_prefixes", csv.excludePrefixes());
         if (!csv.excludeRegex().isEmpty())    c.put("exclude_regex", csv.excludeRegex());
+        // post-parse predicate: surfaced on the same node so the editor can read AND re-save it
+        // (lower copies this node's cfg wholesale back into csv_settings). Omitting it here would
+        // silently drop an authored `where` the first time a pipeline is opened and saved.
+        if (csv.hasRowPredicate())            c.put("where", csv.where());
         return c;
     }
 

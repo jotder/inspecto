@@ -15,6 +15,12 @@ import java.util.*;
  * Writing the partitioned output is the responsibility of {@link PartitionWriter};
  * computing lineage is {@link LineageCollector}.
  *
+ * <p>When {@code processing.csv_settings.where} is set, this is also the <b>post-parse row filter</b>
+ * site: the predicate runs against the mapped, typed target columns produced here — the only place a
+ * predicate like {@code amount > 0} can be evaluated. It is not the same feature as the pre-parse
+ * {@code include_*}/{@code exclude_*} regex lists, which match one raw physical column inside
+ * {@code read_csv} ({@link DuckDbCsvIngester#filterWhere}).
+ *
  * <h3>Partition column SQL generation</h3>
  * <ul>
  *   <li>{@code VARCHAR / DOUBLE / INTEGER} — direct reference or TRY_CAST.</li>
@@ -93,8 +99,18 @@ public final class DataTransformer {
         select.append(", \"").append(sourceTable).append("\".\"__src_id\" AS __src_id");
         select.append(" FROM \"").append(sourceTable).append('"');
 
+        // ── post-parse row predicate (csv_settings.where) ─────────────────────
+        // Wrapped as a derived table rather than appended as a WHERE on the SELECT above: the
+        // predicate is written against the *target* column names, and SQL cannot reference a
+        // SELECT's own output aliases from its own WHERE. The pre-parse include_*/exclude_*
+        // filters are a different moment entirely (DuckDbCsvIngester.filterWhere, inside read_csv).
+        String sql = "CREATE TABLE \"" + destTable + "\" AS " + select;
+        if (cfg.csv().hasRowPredicate())
+            sql = "CREATE TABLE \"" + destTable + "\" AS SELECT * FROM (" + select + ") AS __shaped "
+                    + "WHERE COALESCE((" + cfg.csv().where() + "), FALSE)";
+
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("CREATE TABLE \"" + destTable + "\" AS " + select);
+            stmt.execute(sql);
         }
     }
 }

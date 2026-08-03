@@ -143,6 +143,34 @@ class PipelineEditableTest {
         assertFalse(lowered.toString().contains("premium_enrich"), "no mirror of the companion in the file");
     }
 
+    /**
+     * D7: the post-parse predicate {@code processing.csv_settings.where} must survive lift → lower on
+     * the flat representation, because this is the only representation the pipeline editor can save.
+     * Lift has to surface it on the Filter node (otherwise opening and saving a pipeline silently drops
+     * an authored predicate) and lower has to put it back unchanged.
+     */
+    @Test
+    void postParsePredicateRoundTripsThroughTheFilterNode(@TempDir Path dir) throws Exception {
+        Path toon = writePredicatePipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        // ── lift surfaces the predicate on a filter node the editor can render ──
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+        PipelineNode filter = g.nodes().stream()
+                .filter(n -> BuiltinNodeType.TRANSFORM_FILTER.type().equals(n.type()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "a csv_settings.where must lift to a filter node, else the editor cannot see it"));
+        assertEquals("AMT > 1.0", filter.cfg("where"));
+        assertNull(filter.cfg("filter_target_column"),
+                "meaningless without the pre-parse lists — emitting it would make lower non-verbatim");
+
+        // ── lower puts it back, and the whole file round-trips verbatim ──
+        Map<String, Object> lowered = PipelineEditable.lower(g, raw, true);
+        assertEquals(raw, lowered, "strict lower reproduces the predicate pipeline verbatim");
+    }
+
     // ── fixtures ────────────────────────────────────────────────────────────────
 
     private static PipelineNode node(String id, String type, Map<String, Object> cfg) {
@@ -152,6 +180,58 @@ class PipelineEditableTest {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> decode(Path toon) throws Exception {
         return (Map<String, Object>) (Map<?, ?>) ConfigLoader.filesystem().decode(toon.toString());
+    }
+
+    /**
+     * Minimal single-schema pipeline whose only filtering is the post-parse predicate — deliberately
+     * separate from {@link #writeRichPipeline} so adding a Filter node here cannot perturb the node
+     * counts the other tests assert against that fixture.
+     *
+     * <p>⚠ No {@code dirs.markers} and no {@code duplicate_check}: {@code markers} is a <em>modeled</em>
+     * key owned by the dedup-marker node, so without that node a strict lower correctly drops it and the
+     * verbatim assertion fails on a diff that has nothing to do with the predicate. Add the two together
+     * or not at all.
+     */
+    private static Path writePredicatePipeline(Path dir) throws Exception {
+        Path sf = dir.resolve("pred_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: EVENT_DATE
+                raw:
+                  name: pred_data
+                  format: CSV
+                  fields[3]{name,selector,type}:
+                    ID, "0", VARCHAR
+                    AMT, "1", DOUBLE
+                    EVENT_DATE, "2", DATE
+                mapping:
+                  canonicalName: pred_data
+                  rawName: pred_data
+                  rules[3]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                    AMT, AMT, DIRECT
+                    EVENT_DATE, EVENT_DATE, DIRECT
+                """);
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: EDITABLE_PREDICATE
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                  backup: %1$s/backup
+                  temp: %1$s/temp
+                output:
+                  format: CSV
+                processing:
+                  threads: 2
+                  file_pattern: "*.csv"
+                  schema_file: %2$s
+                  csv_settings:
+                    where: "AMT > 1.0"
+                """.formatted(base, sf.toString().replace('\\', '/'));
+        Path p = dir.resolve("editable_predicate_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
     }
 
     /**

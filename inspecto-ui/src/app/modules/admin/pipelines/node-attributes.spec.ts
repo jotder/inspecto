@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byTier, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
+import { byTier, COLLECTOR_ATTRIBUTES, isRequired, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
 import { nodeAttributesFor } from './node-attributes';
 
 /**
@@ -60,15 +60,41 @@ describe('node-attributes', () => {
      * Every backend fixture uses `where` (`RowShaperTest`, `PipelineExecutorTest`, `PipelineDryRunTest`,
      * `ComponentPreviewTest`, `ControlApiFlowRunTest`, …), which is what makes `where` the canonical side.
      *
-     * ⚠ This pins the NAME only. It does not prove a filter runs: the sole host of this dialog saves to
-     * the flat `*_pipeline.toon`, whose lower drops the cfg into `processing.csv_settings` where no
-     * `where` key is read — see the second ⚠ in `node-attributes.ts` (D7). A round-trip test asserting
-     * a filter actually filters belongs with whichever fix closes D7, not here.
+     * ⚠ This pins the NAMES only. That a filter actually filters is proved on the engine side —
+     * `DataTransformerRowPredicateTest` (post-parse `where`) and
+     * `PipelineEditableTest.postParsePredicateRoundTripsThroughTheFilterNode` (the lift/lower contract).
      */
     it('names the filter predicate with the key the engine actually reads', () => {
         const keys = nodeAttributesFor('transform.filter')!.map((s) => s.key);
-        expect(keys).toEqual(['where']);
+        expect(keys).toContain('where');
         expect(keys).not.toContain('predicate');
+    });
+
+    /**
+     * D7 (2026-08-03). `transform.filter` has TWO filtering moments on the flat path and the spec must
+     * declare both, because they are different capabilities under one node type:
+     *
+     * - post-parse `where` — SQL over the mapped, typed columns (`DataTransformer.materialize`);
+     * - pre-parse `include_*`/`exclude_*` — regex/prefix over ONE raw column inside `read_csv`
+     *   (`DuckDbCsvIngester.filterWhere`), anchored on `filter_target_column`.
+     *
+     * The pre-parse group round-trips through `PipelineLift.filterConfig` and always worked here — it was
+     * simply undeclared, so the dialog could not reach it. Collapsing the two (e.g. re-speccing `where` to
+     * `include_regex`) is the drift the config-key contract exists to stop: `amount > 0` is not a regex.
+     */
+    it('declares both the pre-parse and post-parse filtering vocabularies', () => {
+        const specs = nodeAttributesFor('transform.filter')!;
+        const byKey = new Map(specs.map((s) => [s.key, s]));
+
+        // the pre-parse lists are real, engine-read keys and must be list-typed (not comma-strings)
+        for (const k of ['include_regex', 'exclude_regex', 'include_prefixes', 'exclude_prefixes']) {
+            expect(byKey.get(k)?.type).toBe('list');
+        }
+        expect(byKey.get('filter_target_column')?.type).toBe('number');
+        expect(byKey.get('where')?.type).toBe('string');
+
+        // Neither moment may be mandatory — a node legitimately uses only one of them.
+        for (const s of specs) expect(isRequired(s)).toBe(false);
     });
 
     /**

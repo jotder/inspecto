@@ -38,7 +38,10 @@ type StoreData = Record<string, SpaceData>; // space → collections
 // REQUIRED, not cosmetic: a persisted v20 store keeps its authored pipelines, so without it every
 // existing browser would go on serving `collector.file`/`sink.file` nodes and `rel: 'kept'` edges that
 // the backend has never had — the seeds would be corrected only for first-time visitors.
-export const MOCK_STORE_KEY = 'inspecto.mock.v21'; // v20: pattern-pack component seeds (v19: case rule + flat impact attrs)
+// v22: the cdr_ingest seed's SQL predicate moved from `include_regex` (a pre-parse regex list, which
+// could never evaluate it) to `csv_settings.where`. A persisted v21 store would keep the wrong-vocabulary
+// value — the exact confusion D7 documents — on the Filter node the lift now surfaces it on.
+export const MOCK_STORE_KEY = 'inspecto.mock.v22'; // v20: pattern-pack component seeds (v19: case rule + flat impact attrs)
 
 export class MockStore {
     private data: StoreData = {};

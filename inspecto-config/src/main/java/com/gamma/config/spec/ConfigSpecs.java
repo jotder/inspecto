@@ -135,6 +135,10 @@ public final class ConfigSpecs {
                         "Row deny-list (regexp_matches): drop rows whose filter_target_column matches any."),
                 FieldSpec.withDefault("processing.csv_settings.filter_target_column", "Filter target column",
                         FieldType.INT, 0, "0-based selector index the include/exclude filters apply to."),
+                FieldSpec.of("processing.csv_settings.where", "Row predicate (post-parse)", FieldType.STRING,
+                        "SQL predicate over the MAPPED, typed target columns, e.g. amount > 0 — applied "
+                                + "after parsing. Different moment from include_*/exclude_*, which are "
+                                + "regexes over one raw column before parsing. NULL rows are dropped."),
                 FieldSpec.withDefault("processing.batch.max_files", "Batch max files", FieldType.INT, 1,
                         "Files packed into one batch; raise above 1 for intra-batch parallelism."),
                 FieldSpec.of("processing.duckdb.temp_directory", "DuckDB scratch dir", FieldType.FILEPATH,

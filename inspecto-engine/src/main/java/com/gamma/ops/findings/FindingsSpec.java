@@ -48,7 +48,8 @@ public record FindingsSpec(String objectType, List<Section> sections) {
 
     /** Renderer-supported control types — the {@code AttributeType} union in {@code attribute-spec.ts}. */
     public static final Set<String> TYPES =
-            Set.of("string", "identifier", "number", "boolean", "select", "autocomplete", "multiline");
+            Set.of("string", "identifier", "number", "boolean", "select", "autocomplete", "multiline",
+                    "list");
 
     /** Disclosure tiers — {@code AttributeTier}: always visible / collapsed / behind the gear. */
     public static final Set<String> TIERS = Set.of("required", "optional", "advanced");

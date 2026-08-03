@@ -72,6 +72,28 @@ describe('attribute-spec', () => {
         expect(validateAttributes(specs, { kind: 'non_null' }).map((f) => f.path)).toEqual(['column']);
     });
 
+    /**
+     * `type: 'list'` (D7). An EMPTY list is blank, not "a value" — it has to agree with Angular's own
+     * `Validators.required`, which treats `[]` as empty; otherwise the framework-free validator and the
+     * reactive form disagree about the same value and one of them silently wins.
+     */
+    it('treats an empty list as blank and validates list entries as text', () => {
+        const specs: AttributeSpec[] = [
+            { key: 'tags', label: 'Tags', type: 'list', tier: 'required' },
+            { key: 'opt', label: 'Opt', type: 'list', tier: 'optional' },
+        ];
+        // empty / missing ⇒ blank ⇒ only the required one complains
+        expect(validateAttributes(specs, { tags: [], opt: [] }).map((f) => f.path)).toEqual(['tags']);
+        expect(validateAttributes(specs, {}).map((f) => f.path)).toEqual(['tags']);
+        // a non-empty list satisfies required
+        expect(validateAttributes(specs, { tags: ['a'] })).toEqual([]);
+        // wrong shapes are reported, not coerced
+        expect(validateAttributes(specs, { tags: 'a,b' }).map((f) => f.message)).toEqual([
+            'Tags must be a list of text values',
+        ]);
+        expect(validateAttributes(specs, { tags: [1, 2] }).map((f) => f.path)).toEqual(['tags']);
+    });
+
     it('accepts a fully valid config and wraps as a kind validator', () => {
         const validate = attributeValidator(SPECS);
         expect(validate({ name: 'daily_kpi', type: 'report', cron: '0 2 * * *', threads: 8, enabled: false })).toEqual([]);

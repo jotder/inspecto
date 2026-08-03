@@ -22,6 +22,48 @@ type Cfg = Record<string, unknown>;
 const asMap = (v: unknown): Cfg => (v && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Cfg) } : {});
 const isQuarantine = (n: AuthoredNode): boolean => !!n.config?.['dir'] && n.config?.['database'] == null;
 
+/** The four PRE-parse row-filter lists — regexes/prefixes over one raw column, anchored on
+ *  `filter_target_column`. Distinct from the POST-parse `where` predicate; see node-attributes.ts. */
+const PRE_PARSE_FILTER_KEYS = ['include_prefixes', 'include_regex', 'exclude_prefixes', 'exclude_regex'];
+
+/**
+ * Move the row-filter keys out of a lifted `csv_settings` and return them as a Filter node's config —
+ * the TS mirror of `PipelineLift.filterConfig`. Mutates `parserCfg`'s csv_settings clone.
+ *
+ * Two gating rules copied from the Java, both load-bearing for the verbatim round-trip:
+ * `filter_target_column` travels ONLY when a pre-parse list does (it is the index those lists anchor
+ * on, so emitting it alone would have lower write a key the file never had), and a blank `where` is
+ * not a predicate.
+ */
+function extractRowFilters(parserCfg: Cfg): Cfg {
+    if (parserCfg['csv_settings'] == null) return {};
+    const csv = asMap(parserCfg['csv_settings']);
+    const out: Cfg = {};
+    const hasLists = PRE_PARSE_FILTER_KEYS.some(
+        (k) => Array.isArray(csv[k]) && (csv[k] as unknown[]).length > 0,
+    );
+    for (const k of PRE_PARSE_FILTER_KEYS) {
+        if (csv[k] != null) {
+            out[k] = csv[k];
+            delete csv[k];
+        }
+    }
+    if (csv['filter_target_column'] != null) {
+        if (hasLists) out['filter_target_column'] = csv['filter_target_column'];
+        delete csv['filter_target_column'];
+    }
+    if (csv['where'] != null && String(csv['where']).trim()) {
+        out['where'] = csv['where'];
+        delete csv['where'];
+    }
+    if (!Object.keys(out).length) return {};
+    // csv_settings was cloned by asMap, so write the pruned copy back (dropping it entirely when the
+    // filter keys were all it held — lower re-creates it from the Filter node).
+    if (Object.keys(csv).length) parserCfg['csv_settings'] = csv;
+    else delete parserCfg['csv_settings'];
+    return out;
+}
+
 /** Lift a canonical pipeline config map into the editable graph (topology + verbatim sections). */
 export function liftConfig(config: Cfg): AuthoredPipeline {
     const collector = asMap(config['collector'] ?? config['source']);
@@ -78,8 +120,19 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     for (const k of ['csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config']) {
         if (processing[k] != null) parserCfg[k] = processing[k];
     }
+    // The row-filter keys inside csv_settings are NOT parser config — they lift to their own Filter
+    // node, mirroring `PipelineLift.filterConfig`. Without this split the offline editor showed a
+    // `where`/`include_regex` buried in the parser's free-form csv_settings while the real backend put
+    // it on a Filter node: the same surface reporting two different graphs for one file.
+    const filterCfg = extractRowFilters(parserCfg);
     nodes.push({ id: 'parse', type: 'parser', name: 'Parser', config: parserCfg });
     edges.push({ from: upstream, rel: 'data', to: 'parse' });
+    let sinkUpstream = 'parse';
+    if (Object.keys(filterCfg).length) {
+        nodes.push({ id: 'filter', type: 'transform.filter', name: 'Row filter', config: filterCfg });
+        edges.push({ from: 'parse', rel: 'data', to: 'filter' });
+        sinkUpstream = 'filter';
+    }
 
     // single persistent sink (the flat config's one primary output)
     const sinkCfg: Cfg = {};
@@ -95,7 +148,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     const store = String(config['name'] ?? 'out');
     sinkCfg['store'] = store;
     nodes.push({ id: 'sink', type: 'sink.persistent', name: store, description: 'Persistent store', config: sinkCfg });
-    edges.push({ from: 'parse', rel: 'data', to: 'sink' });
+    edges.push({ from: sinkUpstream, rel: 'data', to: 'sink' });
 
     return { name: String(config['name'] ?? ''), active: config['active'] === true, nodes, edges };
 }
