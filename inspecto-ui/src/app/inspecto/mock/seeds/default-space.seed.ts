@@ -322,7 +322,7 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
             { id: 'collect', type: 'acquisition', name: 'Collect CDR drops', use: 'connections/cdr_sftp_prod', config: { include: 'glob:**/*.csv.gz' } },
             { id: 'parse', type: 'parser', name: 'Parse CSV', config: { delimiter: ',', header: true } },
             { id: 'filter', type: 'transform.filter', name: 'Drop test rows', config: { predicate: "msisdn NOT LIKE '0000%'" } },
-            { id: 'write', type: 'sink.persistent', name: 'CDR parquet', config: { format: 'PARQUET', partition_by: 'event_date' } },
+            { id: 'write', type: 'sink.persistent', name: 'CDR parquet', config: { format: 'PARQUET' } },
         ],
         edges: [
             { from: 'collect', rel: 'data', to: 'parse' },

@@ -38,7 +38,7 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
             { id: 'extract', type: 'acquisition', name: 'Extract xDR pairs', use: 'connections/xdr_warehouse' },
             { id: 'aggregate', type: 'transform.derive', name: 'Roll up to entities + links' },
             { id: 'prune', type: 'transform.filter', name: 'Prune weak links', config: { predicate: 'weight >= 1' } },
-            { id: 'store', type: 'sink.persistent', name: 'Graph store', config: { format: 'PARQUET', partition_by: 'link_type' } },
+            { id: 'store', type: 'sink.persistent', name: 'Graph store', config: { format: 'PARQUET' } },
         ],
         edges: [
             { from: 'extract', rel: 'data', to: 'aggregate' },

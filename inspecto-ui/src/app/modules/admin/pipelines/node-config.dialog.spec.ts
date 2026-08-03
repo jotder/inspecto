@@ -134,6 +134,53 @@ describe('NodeConfigDialog', () => {
         expect(closed?.node.config).toMatchObject({ format: 'CSV', extra: '1' });
     });
 
+    /**
+     * D4 regression (2026-08-03). Spec keys are flat (`__` = nesting), but the flat pipeline's
+     * `collector:` block reads `duplicate`/`stability`/`post_action` as nested MAPS
+     * (`PipelineConfigParser.java:450,459,518`), so the generic save must run `nestKeys` — it did not, and
+     * a literal `duplicate__mode` key was read by nothing. `include`/`exclude` are LIST_KEYS, so they also
+     * split to the list shape the seeds use. The enrichment branch and the onboarding panes always nested;
+     * only this path was missing it.
+     */
+    it('nests flat `__` spec keys before they reach node.config', async () => {
+        let closed: { node: AuthoredNode } | undefined;
+        const fixture = await create({
+            node: {
+                id: 'acq', type: 'acquisition',
+                config: {
+                    duplicate: { mode: 'checksum', algorithm: 'SHA256' },
+                    stability: { window: '30s', size_checks: 3 },
+                    include: ['glob:**/*.csv'],
+                },
+            },
+            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+        });
+        const c = fixture.componentInstance;
+        (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
+        fixture.detectChanges();
+        c.save();
+        const cfg = closed?.node.config as Record<string, unknown>;
+        expect(cfg['stability']).toMatchObject({ window: '30s' });
+        expect(cfg['include']).toEqual(['glob:**/*.csv']);
+        // The flat forms must be gone — they are form-transport spellings, never config keys.
+        expect(Object.keys(cfg).filter((k) => k.includes('__'))).toEqual([]);
+        // Sub-keys with no AttributeSpec are engine-read and must survive a guided save
+        // (`duplicate.algorithm`, `stability.size_checks` — PipelineConfigParser.java:449-470).
+        expect(cfg['duplicate']).toEqual({ mode: 'checksum', algorithm: 'SHA256' });
+        expect((cfg['stability'] as Record<string, unknown>)['size_checks']).toBe(3);
+    });
+
+    /** The nested block must reach the schema form, not the free-form escape hatch (D4, load half). */
+    it('seeds the schema form from a nested block instead of stringifying it into free-form', async () => {
+        const c = (await create({
+            node: { id: 'acq', type: 'acquisition', config: { duplicate: { mode: 'etag' }, mystery: { a: 1 } } },
+            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+        })).componentInstance;
+        expect(c.schemaInitial['duplicate__mode']).toBe('etag');
+        // Only the genuinely unknown root is free-form — and it stays literal there.
+        expect(c.configRows.value).toEqual([{ key: 'mystery', value: '{"a":1}' }]);
+    });
+
     // ── enrichment nodes (W4b): the dialog authors the REAL companion through the shared editor ──
 
     it('renders the shared enrichment editor + wiring form for an enrichment node', async () => {

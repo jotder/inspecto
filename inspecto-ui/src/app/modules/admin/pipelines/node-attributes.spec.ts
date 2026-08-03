@@ -52,6 +52,38 @@ describe('node-attributes', () => {
         expect(keys).not.toContain('min_age_seconds');
     });
 
+    /**
+     * D1 regression (2026-08-03). The key is written verbatim into `node.config`, so it must be the
+     * string the engine reads: `RowShaper.filter` → `str(node, "where")`
+     * (`inspecto-engine/.../pipeline/exec/RowShaper.java:79`, and the fused path at :261). This shipped
+     * as `predicate` — a word that appears in `RowShaper` only as the `requireExpr` error label (:89).
+     * Every backend fixture uses `where` (`RowShaperTest`, `PipelineExecutorTest`, `PipelineDryRunTest`,
+     * `ComponentPreviewTest`, `ControlApiFlowRunTest`, …), which is what makes `where` the canonical side.
+     *
+     * ⚠ This pins the NAME only. It does not prove a filter runs: the sole host of this dialog saves to
+     * the flat `*_pipeline.toon`, whose lower drops the cfg into `processing.csv_settings` where no
+     * `where` key is read — see the second ⚠ in `node-attributes.ts` (D7). A round-trip test asserting
+     * a filter actually filters belongs with whichever fix closes D7, not here.
+     */
+    it('names the filter predicate with the key the engine actually reads', () => {
+        const keys = nodeAttributesFor('transform.filter')!.map((s) => s.key);
+        expect(keys).toEqual(['where']);
+        expect(keys).not.toContain('predicate');
+    });
+
+    /**
+     * D2 regression (2026-08-03). `route_column` was read by **nothing** — `RowShaper.route` routes on
+     * `branches[]{key, where}` (per-branch SQL predicates), plus `mode` and `default`
+     * (`RowShaper.java:99-145`); a repo-wide grep found zero Java readers of `route_column`. `mode` is
+     * engine-real and stays. `branches` and `default` are deliberately unspecced — `AttributeSpec` has no
+     * list type and the named routes are authored on the canvas edges.
+     */
+    it('offers only the engine-real scalar for a route node', () => {
+        const keys = nodeAttributesFor('transform.route')!.map((s) => s.key);
+        expect(keys).toEqual(['mode']);
+        expect(keys).not.toContain('route_column');
+    });
+
     /** All three sink kinds write the same `output:` block — the kind is behaviour, not a config shape. */
     it('gives every sink kind the same output-block schema', () => {
         const persistent = nodeAttributesFor('sink.persistent');

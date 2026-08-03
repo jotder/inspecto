@@ -41,7 +41,7 @@ export function seedTelecomRa(store: MockStore, space: string): void {
             { id: 'collect', type: 'acquisition', name: 'Collect switch CDRs', use: 'connections/switch_sftp', config: { include: 'glob:**/*.csv.gz' } },
             { id: 'parse', type: 'parser', name: 'Parse CDR CSV', config: { delimiter: ',', header: true } },
             { id: 'filter', type: 'transform.filter', name: 'Drop zero-duration', config: { predicate: 'duration_s > 0' } },
-            { id: 'write', type: 'sink.persistent', name: 'Switch CDR parquet', config: { format: 'PARQUET', partition_by: 'event_date' } },
+            { id: 'write', type: 'sink.persistent', name: 'Switch CDR parquet', config: { format: 'PARQUET' } },
         ],
         edges: [
             { from: 'collect', rel: 'data', to: 'parse' },

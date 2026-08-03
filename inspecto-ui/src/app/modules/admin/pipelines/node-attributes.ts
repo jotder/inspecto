@@ -13,6 +13,24 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
  * those nodes while `PipelineValidator` only warned. Corrected 2026-07-31 (W2/U-D); the palette port
  * lives in `mock/handlers/pipelines.handler.ts`.
  *
+ * <p>⚠ **A key here IS the config key** — `AttributeSpec.key` is written verbatim into `node.config`
+ * (`node-config.dialog`, no case-conversion layer anywhere in the app), so it must equal the string the
+ * engine reads. `transform.filter` shipped as `predicate` while `RowShaper.filter` reads
+ * `str(node, "where")`; renamed to `where` 2026-08-03 (D1 of
+ * `docs/superpower/vocabulary-and-config-contract-plan.md`) so the key matches the engine's reader.
+ * `transform.validate` reads `rule`, not `where` — it stays unspecced.
+ *
+ * <p>⚠ **`where` is still inert on the path this dialog saves to — D1 was only half the bug.** The only
+ * host is `pipeline-editor.component`, which round-trips the flat `*_pipeline.toon`; its lower merges
+ * every `transform.filter` node's cfg wholesale into `processing.csv_settings`
+ * (`PipelineEditable.java:277`, mirrored at `mock/pipeline-editable.ts:189-192`), and that map's reader
+ * knows only `include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`/`filter_target_column`
+ * (`PipelineConfigParser.java:255-259`). `RowShaper` is reached only from an authored `*_flow.toon` graph
+ * via `PipelineJobRunner` — a representation this editor cannot write (`POST`/`PUT /pipelines/authored`
+ * are 405 since W5). So do NOT "fix" this by swapping in `include_regex`: those are regexes matched
+ * against ONE raw physical column pre-parse (`DuckDbCsvIngester.filterWhere`), not a SQL predicate over
+ * parsed columns — a genuinely different capability, not a synonym. Tracked as D7.
+ *
  * <p>**`acquisition` reuses the shared `COLLECTOR_ATTRIBUTES`** (`inspecto/component-model`, moved there
  * from `catalog/onboarding/` in the same change) — this is U-D's "one table per concern": both features
  * author the same `collector:` block, so a second hand-written table is exactly the drift that produced
@@ -43,11 +61,12 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,
     'transform.filter': [
-        { key: 'predicate', label: 'Keep-when predicate', type: 'string', tier: 'required', placeholder: 'amount > 0', help: 'Rows matching are kept; the rest go to the dropped branch.' },
+        { key: 'where', label: 'Keep-when predicate', type: 'string', tier: 'required', placeholder: 'amount > 0', help: 'Rows matching are kept; the rest go to the dropped branch.' },
     ],
+    // `branches` — the list of `{key, where}` that actually does the routing — has no spec: `AttributeSpec`
+    // has no list type, and the named routes are authored on the canvas edges. `mode` is the only scalar.
     'transform.route': [
-        { key: 'mode', label: 'Route mode', type: 'select', tier: 'required', default: 'case', options: [{ value: 'case', label: 'case (exclusive)' }, { value: 'clone', label: 'clone (fan-out)' }] },
-        { key: 'route_column', label: 'Route by column', type: 'string', tier: 'optional', help: 'Named routes are edited on the canvas edges.' },
+        { key: 'mode', label: 'Route mode', type: 'select', tier: 'required', default: 'case', options: [{ value: 'case', label: 'case (exclusive)' }, { value: 'clone', label: 'clone (fan-out)' }], help: 'Named routes and their predicates are edited on the canvas edges.' },
     ],
 };
 

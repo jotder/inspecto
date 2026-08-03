@@ -20,7 +20,7 @@ import {
     LensService,
     PipelinesService,
 } from 'app/inspecto/api';
-import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
+import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
@@ -305,15 +305,25 @@ export class NodeConfigDialog {
             use: n.use ?? '',
         });
         // Split the stored config: schema-known keys seed the schema-form; the rest become free-form rows.
+        //
+        // ⚠ Spec keys are FLAT (`__` = nesting) while the stored config is NESTED, so the split has to
+        // compare FLATTENED keys. Comparing raw top-level keys meant a real `duplicate: {mode: …}` block
+        // matched no spec, fell into the free-form editor as a JSON *string*, and then — free-form being
+        // applied last in `save()` — overwrote the schema form's own nested value. D4, load half.
         const schemaKeys = new Set(this.specs().map((s) => s.key));
+        for (const [key, value] of Object.entries(flattenBlock(n.config))) {
+            if (schemaKeys.has(key)) this.schemaInitial[key] = value;
+        }
+        // A top-level key is schema-owned when a spec names it or names a leaf beneath it (`duplicate` is
+        // owned by `duplicate__mode`). Owned roots are seeded above and must NOT also appear as free-form
+        // rows; sub-keys the schema does not model survive via the merge in `save()`.
+        const ownsRoot = (root: string): boolean =>
+            schemaKeys.has(root) || this.specs().some((s) => s.key.startsWith(root + KEY_SEP));
         let extraKeys = 0;
         for (const [key, value] of Object.entries(n.config ?? {})) {
-            if (schemaKeys.has(key)) {
-                this.schemaInitial[key] = value;
-            } else {
-                this.configRows.push(this.configRow(key, typeof value === 'string' ? value : JSON.stringify(value)));
-                extraKeys++;
-            }
+            if (ownsRoot(key)) continue;
+            this.configRows.push(this.configRow(key, typeof value === 'string' ? value : JSON.stringify(value)));
+            extraKeys++;
         }
         // Show the free-form editor up front only when it's the primary surface or already carries
         // keys. For an enrichment node the primary surface is the shared editor (W4b), so free-form
@@ -436,14 +446,38 @@ export class NodeConfigDialog {
         const v = this.form.getRawValue();
         const config: Record<string, unknown> = {};
         // Schema-driven values first (numbers coerced per spec), then free-form rows for keys outside it.
+        //
+        // ⚠ Spec keys are FLAT — `__` means nesting (`AttributeSpec.key` convention, `flat-keys.ts`) — so
+        // they MUST go through `nestKeys` before they reach `node.config`. The flat pipeline's `collector:`
+        // block reads `duplicate`, `stability` and `post_action` as nested MAPS
+        // (`PipelineConfigParser.java:450,459,518`), so a literal `duplicate__mode` key is read by nothing.
+        // This is D4 of `docs/superpower/vocabulary-and-config-contract-plan.md`; the enrichment branch
+        // below (`:496`) and every onboarding pane already did this — only the generic save was missing it.
+        // `nestKeys` also splits the LIST_KEYS (`include`/`exclude`) comma-string into a list, which is the
+        // shape the seeds use and which `PipelineConfigParser.strList` prefers (it accepts either).
         if (this.schemaForm) {
             const values = this.schemaForm.value();
+            const flat: Record<string, unknown> = {};
             for (const s of this.specs()) {
                 let val = values[s.key];
                 if (s.type === 'number') val = val === '' || val == null ? null : Number(val);
-                if (val !== '' && val != null) config[s.key] = val;
+                if (val !== '' && val != null) flat[s.key] = val;
+            }
+            // Deep-merge each nested root over what the node already had, so sub-keys the schema does not
+            // model survive a guided save — `duplicate.algorithm`, `stability.size_checks`/`ready_marker`/
+            // `exclude_temp_patterns`, `post_action.tags`/`on_unsupported` are all real, engine-read keys
+            // with no AttributeSpec (`PipelineConfigParser.java:449-470,516-527`). Same guarantee the
+            // enrichment branch gives. A root the form cleared entirely is absent from `nestKeys` output and
+            // so is dropped, which keeps delete-on-clear working at root granularity.
+            const plain = (x: unknown): x is Record<string, unknown> =>
+                x !== null && typeof x === 'object' && !Array.isArray(x);
+            const prior = this.data.node.config ?? {};
+            for (const [root, val] of Object.entries(nestKeys(flat))) {
+                config[root] = plain(val) && plain(prior[root]) ? mergeBlock(prior[root], val) : val;
             }
         }
+        // Free-form rows stay LITERAL — a hand-typed key means exactly what was typed (this is the escape
+        // hatch for keys outside the schema), and it keeps overriding the schema as it did before.
         for (const row of v.config as { key: string; value: string }[]) {
             if (row.key && row.key.trim()) config[row.key.trim()] = row.value;
         }

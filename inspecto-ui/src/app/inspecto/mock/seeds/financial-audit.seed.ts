@@ -38,7 +38,7 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
         nodes: [
             { id: 'extract', type: 'acquisition', name: 'Extract GL postings', use: 'connections/erp_db' },
             { id: 'clean', type: 'transform.filter', name: 'Drop reversals', config: { predicate: "entry_type != 'reversal'" } },
-            { id: 'store', type: 'sink.persistent', name: 'Audit parquet', config: { format: 'PARQUET', partition_by: 'posting_date' } },
+            { id: 'store', type: 'sink.persistent', name: 'Audit parquet', config: { format: 'PARQUET' } },
         ],
         edges: [
             { from: 'extract', rel: 'data', to: 'clean' },
