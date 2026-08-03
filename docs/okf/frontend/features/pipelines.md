@@ -162,3 +162,73 @@ backend reads (`format`, `compression`); the remaining `transform.*` types are *
 rather than guessed. Types without a schema fall back to the free-form key/value editor ("Additional
 config", collapsed when a schema exists) — the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
 (product-confirmed 2026-07-02: configs stay explicit/self-documenting).
+
+## A spec `key` *is* the engine's config key — there is no mapping layer (2026-08-03)
+
+`AttributeSpec.key` is written **verbatim** into `node.config` (`node-config.dialog.ts`), and the app has
+**no case-conversion or key-mapping layer at all** — zero `toSnake`/`camelize` helpers, no interceptor doing
+it. The only transform is `component-model/flat-keys.ts`. So a spec key that isn't already the exact backend
+key produces a control that persists a value nothing reads, and nothing rejects it: `PipelineValidator`
+never inspects config keys and `PipelineCodec` stores `config` as an unchecked map.
+
+Keys corrected under this rule: `transform.filter` is **`where`** (`RowShaper.java:79` reads
+`str(node, "where")`; `"predicate"` appears there only as the `requireExpr` error label at `:89`), and
+`transform.route` offers **only `mode`** — routing is `branches[]{key, where}`, authored on the canvas
+**edges**, and `route_column` was read by nothing. `partition_by` was likewise phantom on sinks: real
+partitioning is schema-level `partitions[]{column, source, type}` / legacy `partitionKey`.
+
+### ⚠ The two representations share node-type names but not runtimes
+
+**This is the trap that makes a key-name fix look like a feature fix.** `RowShaper` — which does read
+`where` — is reachable only from an authored `*_flow.toon` graph via `PipelineJobRunner`, and
+`POST`/`PUT /pipelines/authored` are **405 since W5**. This editor can only write the flat
+`*_pipeline.toon`, whose lower merges a `transform.filter` node's cfg **wholesale** into
+`processing.csv_settings` (`PipelineEditable.java:277`, mirrored in `mock/pipeline-editable.ts`), and that
+map's reader knows only `include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`/
+`filter_target_column` (`PipelineConfigParser.java:255-259`). So a filter authored here persists a correctly
+named `where` that **no reachable runtime reads**. Verified by saving through the real UI and reading the
+persisted config back — not inferable from either side alone.
+
+⛔ **Do not "fix" that by re-speccing the node to `include_regex`.** Those are `regexp_matches()` patterns
+applied to **one raw physical column before parsing** (`DuckDbCsvIngester.filterWhere`); a SQL predicate over
+parsed columns (`amount > 0`) is inexpressible as one. Same-sounding name, different capability — that
+substitution is the exact drift this contract exists to stop. Tracked as **D7** in
+[`../../../superpower/vocabulary-and-config-contract-plan.md`](../../../superpower/vocabulary-and-config-contract-plan.md).
+
+**Corollary for any future key check:** "read somewhere in `PipelineLift`/`PipelineCompiler`/`RowShaper`" is
+too weak a right-hand side — it would call the above green. Bind a node type to the runtime that executes
+**the file this editor actually saves**.
+
+### The dialog bridges flat ↔ nested in both directions
+
+Nested `collector:` blocks are authored with `__` spec keys (`duplicate__mode`, `stability__window`), so the
+dialog runs `nestKeys` on **save** and `flattenBlock` on **load**. Both halves matter: without the load half,
+a real `duplicate: {mode}` block matches no flat spec key, falls into the free-form editor as a JSON
+**string**, and — free-form being applied last in `save()` — **overwrites the schema form's own value**.
+
+Save **deep-merges** each nested root over the node's prior config (`mergeBlock`) rather than rebuilding it,
+because several engine-read sub-keys have no `AttributeSpec`: `duplicate.algorithm`,
+`stability.size_checks`/`ready_marker`/`exclude_temp_files`/`exclude_temp_patterns`, `post_action.tags`/
+`on_unsupported` (`PipelineConfigParser.java:449-470,516-527`). Without the merge, a guided save silently
+destroys hand-authored TOON.
+
+⚠ `connection` is stripped by both lift and lower (*"carried on `use:` … never mirrored in config"*,
+`PipelineEditable.java:124-125,247-249`), so it is discarded on every save — but **don't just delete the
+attribute**: `bindKindFor('SOURCE')` is `null`, so acquisition renders no Connection picker and this is the
+only discoverable way to set one. The fix is a real binding first, then a per-adopter exclusion (it must stay
+in the shared table for Onboarding, which authors `collector:` directly).
+
+### A key with zero readers may be MISNAMED, not phantom
+
+`mock/seeds/seeded-node-config.spec.ts` runs all six seeders into a fresh `MockStore` and fails on phantom
+keys, so a dead key cannot re-spread through the seeds (`partition_by` had reached **five** files that way).
+Two rules are pinned in its docblock, both learned by breaking something:
+
+- **Check for a differently-named equivalent before deleting a zero-reader key.** `key_columns` + `mode:
+  'upsert'` on the case-study `sink.materialized` seeds have no Java reader, but upsert-by-key is real at
+  pipeline level as `reference: {load: upsert, key: [...]}` (`PipelineConfigParser.java:406-412`). Deleting
+  them broke a documented case-study invariant; the fix is to rename to the engine's shape (**D8**), not to
+  drop the capability.
+- **Deadness is per node type.** `mode` and `table` must never go in a global dead-key list — `mode` is real
+  for `transform.route` (`RowShaper.java:104`, `ConservationCheck.java:78`) and `table` is round-tripped for
+  `sink.persistent` (`PipelineEditable.java:149`).

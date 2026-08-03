@@ -1,6 +1,9 @@
 # Config-key contract + vocabulary enforcement
 
-**Status:** PLAN — opened 2026-08-03. Nothing implemented.
+**Status:** IN FLIGHT — opened 2026-08-03. **D1 · D2 · D4 · D5 shipped** (`9a4ff7c7`, pushed 2026-08-03).
+**Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
+needing design), **D7** and **D8** (open by operator decision), the §3.2/§3.3 guards, and both renames (§4,
+§5). Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
