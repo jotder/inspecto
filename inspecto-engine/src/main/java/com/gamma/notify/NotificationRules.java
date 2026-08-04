@@ -79,7 +79,7 @@ public final class NotificationRules {
                 // A provenance conservation breach already opens an ALERT object (both kinds); surface it
                 // to the operator's feed too. minLevel WARN catches AMPLIFICATION (WARN) as well as LOSS
                 // (ERROR) — matching that the ALERT bridge fires for both.
-                new NotificationRule("builtin-conservation-imbalance", EventType.FLOW_CONSERVATION_IMBALANCE,
+                new NotificationRule("builtin-conservation-imbalance", EventType.PIPELINE_CONSERVATION_IMBALANCE,
                         EventLevel.WARN, "ops",
                         "Conservation {{attributes.kind}} in {{pipeline}}",
                         "{{attributes.node}}: {{attributes.recordsIn}} in vs {{attributes.recordsOut}} out",

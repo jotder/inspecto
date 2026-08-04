@@ -224,21 +224,21 @@ public final class PipelineJobRunner implements Job {
 
     /**
      * T22 — evaluate the §11.4 conservation invariant over this run's per-edge counts and emit a
-     * {@link EventType#FLOW_CONSERVATION_IMBALANCE} event for each non-amplifying node where records were lost
-     * or unexpectedly amplified. The {@link com.gamma.ops.EventObjectBridge} promotes it to a managed ALERT.
+     * {@link EventType#PIPELINE_CONSERVATION_IMBALANCE} event for each non-amplifying node where records were
+     * lost or unexpectedly amplified. The {@link com.gamma.ops.EventObjectBridge} promotes it to a managed ALERT.
      * Never throws — observability must not break the run that just succeeded.
      *
      * <p>Package-visible (not private) so a test can drive the emit bridge with crafted imbalanced counts:
      * a healthy real run conserves by construction (every conserving node records both its kept and its
-     * diverted relations), so a positive {@code FLOW_CONSERVATION_IMBALANCE} is only reachable from an
-     * injected count mismatch, not a clean flow.
+     * diverted relations), so a positive {@code PIPELINE_CONSERVATION_IMBALANCE} is only reachable from an
+     * injected count mismatch, not a clean run.
      */
     static void reportConservation(PipelineGraph g, String pipelineId, String batchId, List<ProvenanceRow> rows) {
         try {
             Map<String, Long> counts = new LinkedHashMap<>();
             for (ProvenanceRow r : rows) counts.put(r.nodeId() + "|" + r.rel(), r.rowCount());
             for (ConservationCheck.Imbalance im : ConservationCheck.imbalances(g, counts)) {
-                EventLog.current().emit(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE)
+                EventLog.current().emit(Event.builder(EventType.PIPELINE_CONSERVATION_IMBALANCE)
                         .level("LOSS".equals(im.kind()) ? EventLevel.ERROR : EventLevel.WARN)
                         .source(PipelineJobRunner.class.getName())
                         .pipeline(pipelineId)

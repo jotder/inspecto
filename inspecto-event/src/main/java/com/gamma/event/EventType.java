@@ -86,11 +86,14 @@ public final class EventType {
      *  cross-driver hazard the deletion fence guards (§3.8 rule 4, T25). The {@code store},
      *  {@code activeProducers} and {@code activeConsumers} attributes name the racing flows. */
     public static final String STORE_DELETE_CONFLICT = "STORE_DELETE_CONFLICT";
-    /** A flow run's data-plane provenance failed the conservation invariant at a non-amplifying node — records
-     *  entered that did not leave (silent data loss) or were unexpectedly amplified (§11.4, T22). The
+    /** A pipeline run's data-plane provenance failed the conservation invariant at a non-amplifying node —
+     *  records entered that did not leave (silent data loss) or were unexpectedly amplified (§11.4, T22). The
      *  {@code node}, {@code recordsIn}, {@code recordsOut} and {@code kind} (LOSS/AMPLIFICATION) attributes
      *  describe the imbalance; {@code correlationId} is the run's {@code batchId}. */
-    public static final String FLOW_CONSERVATION_IMBALANCE = "FLOW_CONSERVATION_IMBALANCE";
+    public static final String PIPELINE_CONSERVATION_IMBALANCE = "PIPELINE_CONSERVATION_IMBALANCE";
+    /** Read-alias for {@link #PIPELINE_CONSERVATION_IMBALANCE}'s pre-rename value, persisted in existing
+     *  event-ledger rows — matched on read only; nothing is ever written under this value again. */
+    public static final String FLOW_CONSERVATION_IMBALANCE_LEGACY = "FLOW_CONSERVATION_IMBALANCE";
 
     // ── cross-space sharing (the Exchange — Share Grants) ───────────────────────────
     /** An owner Space listed a Dataset/Widget as shareable in the Exchange. {@code owner}/{@code kind}/

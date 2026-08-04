@@ -10,7 +10,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Phase-D2: SEQUENCE_GAP and FLOW_CONSERVATION_IMBALANCE domain events are each promoted to a managed
+ * Phase-D2: SEQUENCE_GAP and PIPELINE_CONSERVATION_IMBALANCE domain events are each promoted to a managed
  * ALERT object (with de-duplication).
  */
 class EventObjectBridgeTest {
@@ -26,7 +26,7 @@ class EventObjectBridgeTest {
     }
 
     private static Event imbalance(String pipeline, String node, String kind, long in, long out) {
-        return Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE)
+        return Event.builder(EventType.PIPELINE_CONSERVATION_IMBALANCE)
                 .pipeline(pipeline)
                 .message("flow '" + pipeline + "' node '" + node + "': " + in + " in, " + out + " out (" + kind + ")")
                 .attr("node", node)
@@ -85,6 +85,27 @@ class EventObjectBridgeTest {
     }
 
     @Test
+    void anImbalanceUnderTheLegacyPreRenameTypeStillPromotes() {
+        // FLOW_CONSERVATION_IMBALANCE is persisted in existing event-ledger rows (Tier 2 rename); the
+        // bridge must keep resolving it on read even though nothing is emitted under it anymore.
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        EventObjectBridge bridge = new EventObjectBridge(objects);
+
+        bridge.onEvent(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY)
+                .pipeline("evt_rollup")
+                .message("flow 'evt_rollup' node 'flt': 3 in, 2 out (LOSS)")
+                .attr("node", "flt")
+                .attr("kind", "LOSS")
+                .attr("recordsIn", 3L)
+                .attr("recordsOut", 2L)
+                .build());
+
+        List<OperationalObject> alerts = objects.active(ObjectType.ALERT, "evt_rollup");
+        assertEquals(1, alerts.size());
+        assertEquals(EventObjectBridge.IMBALANCE_RULE, alerts.get(0).attributes().get("rule"));
+    }
+
+    @Test
     void anActiveImbalanceForTheSameNodeIsNotDuplicated() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         EventObjectBridge bridge = new EventObjectBridge(objects);
@@ -102,7 +123,7 @@ class EventObjectBridgeTest {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         EventObjectBridge bridge = new EventObjectBridge(objects);
 
-        bridge.onEvent(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE).pipeline("p").message("no node attr").build());
+        bridge.onEvent(Event.builder(EventType.PIPELINE_CONSERVATION_IMBALANCE).pipeline("p").message("no node attr").build());
         assertTrue(objects.active(ObjectType.ALERT, "p").isEmpty());
     }
 

@@ -102,7 +102,7 @@ class NotificationServiceTest {
         NotificationService svc = new NotificationService(store, NotificationRules.defaults(),
                 new NotificationPreferences());
 
-        svc.onEvent(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE).level(EventLevel.ERROR)
+        svc.onEvent(Event.builder(EventType.PIPELINE_CONSERVATION_IMBALANCE).level(EventLevel.ERROR)
                 .pipeline("orders").correlationId("b1")
                 .attr("node", "dedupe").attr("recordsIn", "1000").attr("recordsOut", "980")
                 .attr("kind", "LOSS").build());
@@ -122,7 +122,7 @@ class NotificationServiceTest {
                 new NotificationPreferences());
 
         // AMPLIFICATION carries EventLevel.WARN — the rule's minLevel WARN must still match it.
-        svc.onEvent(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE).level(EventLevel.WARN)
+        svc.onEvent(Event.builder(EventType.PIPELINE_CONSERVATION_IMBALANCE).level(EventLevel.WARN)
                 .pipeline("orders").correlationId("b2")
                 .attr("node", "fanout").attr("recordsIn", "1000").attr("recordsOut", "1200")
                 .attr("kind", "AMPLIFICATION").build());

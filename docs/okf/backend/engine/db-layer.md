@@ -165,17 +165,17 @@ CREATE TABLE IF NOT EXISTS inspecto_job_runs (
 );
 ```
 
-### 3.6 `inspecto_flow_provenance` — per-edge row counts  · **A**
+### 3.6 `inspecto_pipeline_provenance` — per-edge row counts  · **A**
 File: `provenance.duckdb`
 
 ```sql
-CREATE TABLE IF NOT EXISTS inspecto_flow_provenance (
-  flow_id   VARCHAR,
-  batch_id  VARCHAR,
-  node_id   VARCHAR,
-  rel       VARCHAR,
-  row_count BIGINT,
-  run_ts    VARCHAR
+CREATE TABLE IF NOT EXISTS inspecto_pipeline_provenance (
+  pipeline_id VARCHAR,
+  batch_id    VARCHAR,
+  node_id     VARCHAR,
+  rel         VARCHAR,
+  row_count   BIGINT,
+  run_ts      VARCHAR
 );
 ```
 

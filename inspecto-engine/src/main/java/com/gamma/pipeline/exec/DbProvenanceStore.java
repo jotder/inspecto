@@ -30,7 +30,7 @@ import java.util.Map;
 public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.BrowsableStore {
 
     private static final Logger log = LoggerFactory.getLogger(DbProvenanceStore.class);
-    private static final String T = "inspecto_flow_provenance";
+    private static final String T = "inspecto_pipeline_provenance";
 
     private final Connection conn;
 
@@ -54,7 +54,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
     private void initSchema() {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE TABLE IF NOT EXISTS " + T + " ("
-                    + "flow_id VARCHAR, batch_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
+                    + "pipeline_id VARCHAR, batch_id VARCHAR, node_id VARCHAR, rel VARCHAR, "
                     + "row_count BIGINT, run_ts VARCHAR)");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise provenance DB schema", e);
@@ -78,9 +78,9 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
     public synchronized void record(List<ProvenanceRow> rows) {
         if (rows == null || rows.isEmpty()) return;
         try (PreparedStatement ps = conn.prepareStatement("INSERT INTO " + T
-                + " (flow_id, batch_id, node_id, rel, row_count, run_ts) VALUES (?,?,?,?,?,?)")) {
+                + " (pipeline_id, batch_id, node_id, rel, row_count, run_ts) VALUES (?,?,?,?,?,?)")) {
             for (ProvenanceRow r : rows) {
-                ps.setString(1, r.flowId());
+                ps.setString(1, r.pipelineId());
                 ps.setString(2, r.batchId());
                 ps.setString(3, r.nodeId());
                 ps.setString(4, r.rel());
@@ -91,7 +91,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
             ps.executeBatch();
         } catch (SQLException e) {
             log.warn("Could not project provenance for pipeline {} batch {}: {}",
-                    rows.get(0).flowId(), rows.get(0).batchId(), e.getMessage());
+                    rows.get(0).pipelineId(), rows.get(0).batchId(), e.getMessage());
         }
     }
 
@@ -102,7 +102,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
      */
     public synchronized List<Map<String, Object>> query(String pipelineId, String batchId) {
         String sql = "SELECT node_id AS \"nodeId\", rel, row_count AS \"rowCount\""
-                + " FROM " + T + " WHERE flow_id = ? AND batch_id = ? ORDER BY node_id, rel";
+                + " FROM " + T + " WHERE pipeline_id = ? AND batch_id = ? ORDER BY node_id, rel";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, pipelineId);
             ps.setString(2, batchId);
@@ -116,7 +116,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
     /** The most recent runs of a pipeline (distinct {@code batchId}, newest first) — for picking a run to inspect. */
     public synchronized List<Map<String, Object>> batches(String pipelineId, int limit) {
         String sql = "SELECT batch_id AS \"batchId\", max(run_ts) AS \"runTs\", sum(row_count) AS \"totalRows\""
-                + " FROM " + T + " WHERE flow_id = ? GROUP BY batch_id ORDER BY \"runTs\" DESC LIMIT ?";
+                + " FROM " + T + " WHERE pipeline_id = ? GROUP BY batch_id ORDER BY \"runTs\" DESC LIMIT ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, pipelineId);
             ps.setInt(2, Math.max(1, limit));

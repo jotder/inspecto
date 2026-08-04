@@ -49,15 +49,17 @@ public final class EventObjectBridge {
         if (e == null) return;
         try {
             if (EventType.SEQUENCE_GAP.equals(e.type())) promoteGap(e);
-            else if (EventType.FLOW_CONSERVATION_IMBALANCE.equals(e.type())) promoteImbalance(e);
+            else if (EventType.PIPELINE_CONSERVATION_IMBALANCE.equals(e.type())
+                    || EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY.equals(e.type())) promoteImbalance(e);
         } catch (RuntimeException ex) {
             log.warn("could not promote {} to an ALERT object: {}", e.type(), ex.getMessage());
         }
     }
 
     /**
-     * Promote a {@link EventType#FLOW_CONSERVATION_IMBALANCE} (data lost or unexpectedly amplified at a
-     * non-amplifying node, §11.4) to a managed ALERT. De-duplicated per {@code (flow pipeline, node)} so a
+     * Promote a {@link EventType#PIPELINE_CONSERVATION_IMBALANCE} (or its {@link
+     * EventType#FLOW_CONSERVATION_IMBALANCE_LEGACY pre-rename} value) — data lost or unexpectedly amplified
+     * at a non-amplifying node, §11.4 — to a managed ALERT. De-duplicated per {@code (pipeline, node)} so a
      * recurring imbalance on the same node doesn't clone an open alert.
      */
     private void promoteImbalance(Event e) {

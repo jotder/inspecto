@@ -359,7 +359,7 @@ class PipelineJobRunnerTest {
 
         List<Event> captured = new CopyOnWriteArrayList<>();
         Consumer<Event> sub = e -> {
-            if (EventType.FLOW_CONSERVATION_IMBALANCE.equals(e.type()) && "loss_flow".equals(e.pipeline()))
+            if (EventType.PIPELINE_CONSERVATION_IMBALANCE.equals(e.type()) && "loss_flow".equals(e.pipeline()))
                 captured.add(e);
         };
         EventLog.global().addSubscriber(sub);   // reportConservation emits via EventLog.current() → global() (no space MDC)

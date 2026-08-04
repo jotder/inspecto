@@ -31,9 +31,14 @@ renamed to `collectors.md`), plus 2 prose-rule bugs (`Source-of-truth` false pos
 
 **Cube → Matrix SHIPPED** 2026-08-04 (`15c8d430`) — see §5 below.
 
+**Flow→Pipeline Tier 2 SHIPPED** 2026-08-04 — see §4 above: `inspecto_flow_provenance`→
+`inspecto_pipeline_provenance` + `ProvenanceRow.flowId`→`pipelineId` + `FLOW_CONSERVATION_IMBALANCE`→
+`PIPELINE_CONSERVATION_IMBALANCE` with a legacy read-alias.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
 needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the §3.2 guard on Java+TS
-source, and Flow→Pipeline Tiers 2/3 (§4). Do not archive this plan until those close.
+source, and Flow→Pipeline Tier 3 (§4, needs a version bump via `release-workflow`). Do not archive this
+plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -373,14 +378,20 @@ gate. It now renames with the `inspecto_flow_provenance` table it keys, which is
 The record carries a comment saying so, so the next sweep does not "fix" it. **Lesson: `@PublicApi` is a
 tier boundary in its own right, independent of persistence and JSON.**
 
-**Tier 2 — breaking, internal.**
+**Tier 2 — breaking, internal. ✅ SHIPPED 2026-08-04.**
 
 - `inspecto_flow_provenance` → `inspecto_pipeline_provenance` (opt-in projection, `-Dprovenance.backend=duckdb`),
   **together with `ProvenanceRow.flowId` → `pipelineId`** (moved down from Tier 1 — see above) and the
-  `DbProvenanceStore` SQL literals that name the column.
-- `FLOW_CONSERVATION_IMBALANCE` → `PIPELINE_CONSERVATION_IMBALANCE`. ⚠ **This value is persisted in
-  existing event-ledger rows.** Renaming the constant without a read-alias orphans historical Incidents and
-  any saved query filtering on it. Alias on read, do not rewrite history.
+  `DbProvenanceStore` SQL literals that name the column (`flow_id`→`pipeline_id`, table DDL/INSERT/SELECT).
+  No migration written: the store is opt-in and default-off, and `initSchema()` is `CREATE TABLE IF NOT
+  EXISTS`, so a deployment that turns the flag on gets the new name fresh. `docs/okf/backend/engine/db-layer.md`
+  §3.6 updated to match.
+- `FLOW_CONSERVATION_IMBALANCE` → `PIPELINE_CONSERVATION_IMBALANCE` (`EventType`, `PipelineJobRunner`,
+  `EventObjectBridge`, `NotificationRules`). ⚠ **This value is persisted in existing event-ledger rows** —
+  landed with `EventType.FLOW_CONSERVATION_IMBALANCE_LEGACY` kept as a read-only alias;
+  `EventObjectBridge.onEvent` matches both the new constant and the legacy value so historical Incidents
+  still promote, proven by `anImbalanceUnderTheLegacyPreRenameTypeStillPromotes` in
+  `EventObjectBridgeTest`. Nothing is ever written under the legacy value again.
 
 **Tier 3 — breaking, external contract.**
 
@@ -448,7 +459,7 @@ this file's subject IS the rename — same shape as the existing `bare-flow` ent
    [`consignment-elt-architecture.md`](consignment-elt-architecture.md) against GLOSSARY (§7 below). — ✅
    **done 2026-08-04.**
 8. **Cube → Matrix** additive labels; mark §13 ✅. — ✅ **done 2026-08-04.**
-9. **Flow Tier 2** with read-alias.
+9. **Flow Tier 2** with read-alias. — ✅ **done 2026-08-04.**
 10. **Flow Tier 3** with migration — via `release-workflow`, version bump.
 11. **§3.2** guard on Java + TS source, with allowlist. Last, largest allowlist.
 12. **§3.1** serve cfg vocabulary from the server — the structural fix. Can start any time after 4;
