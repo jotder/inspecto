@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { GammaConfigService } from '@gamma/services/config';
@@ -26,6 +26,8 @@ async function create() {
 }
 
 describe('DesignSystemComponent', () => {
+    afterEach(() => document.querySelector('.cdk-overlay-container')?.remove());
+
     it('renders the gallery: heading plus one section per shared pattern', async () => {
         const fixture = await create();
         const el = fixture.nativeElement as HTMLElement;
@@ -34,6 +36,17 @@ describe('DesignSystemComponent', () => {
         expect(sections).toContain('Status badge');
         expect(sections).toContain('Data grid');
         expect(sections).toContain('Data table');
+        expect(sections).toContain('Resizable dialog');
+    });
+
+    it('the resizable-dialog demo opens with the shared chrome (grip + maximize button)', async () => {
+        const fixture = await create();
+        fixture.componentInstance.openResizeDemo();
+        TestBed.tick(); // the dialog renders in the overlay, outside the fixture's tree
+        const pane = document.querySelector('.cdk-overlay-pane') as HTMLElement;
+        expect(pane.classList.contains('inspecto-dialog-resizable')).toBe(true);
+        expect(pane.querySelector('.inspecto-dialog-resize-grip')).toBeTruthy();
+        expect(pane.querySelector('button[aria-label="Full screen"]')).toBeTruthy();
     });
 
     it('has no a11y violations', async () => {

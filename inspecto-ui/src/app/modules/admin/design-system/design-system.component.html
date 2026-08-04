@@ -246,6 +246,35 @@
             <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.schemaForm }}</code></pre>
         </section>
 
+        <!-- ── Resizable dialog ([inspectoDialogResize]) ─────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Resizable dialog</h2>
+                <button mat-stroked-button (click)="copy(snippets.dialogResize)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>[inspectoDialogResize]</code>
+                (<code>inspecto/components/dialog-resize.directive.ts</code>) — the shared
+                resizable / maximizable dialog chrome, extracted from the grammar dialog so every dialog
+                resizes the same way. Put the attribute on the dialog title: it appends a drag grip to the
+                bottom-right corner (pointer drag, or arrow keys when focused), and big dialogs add a
+                maximize button calling <code>chrome.toggleMaximize()</code> — which reuses the existing
+                <code>.dialog-fullscreen</code> panel class. Once sized, the content flexes into the chosen
+                size instead of scrolling. Adopters: the Grammar editor and the Pipelines node-config
+                dialog. Never re-roll a per-dialog fullscreen toggle.
+            </p>
+            <div class="bg-card rounded-2xl p-6 shadow">
+                <button mat-flat-button color="primary" (click)="openResizeDemo()">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-pointing-out"></mat-icon>
+                    <span class="ml-1">Open sample dialog</span>
+                </button>
+            </div>
+            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.dialogResize }}</code></pre>
+        </section>
+
         <!-- ── Inline AI assist (AGT-6a A1) ──────────────────────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">

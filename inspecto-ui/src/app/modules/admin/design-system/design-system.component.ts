@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -34,6 +35,7 @@ import { QuerySource } from 'app/inspecto/query';
 import { DataTableComponent, DataTableTier } from 'app/inspecto/data-table';
 import { TreeTableComponent, TreeNode, varianceCell } from 'app/inspecto/tree-table';
 import { GeoData, MapViewComponent } from 'app/inspecto/geo';
+import { ResizeDemoDialog } from './resize-demo.dialog';
 
 interface DemoRow {
     pipeline: string;
@@ -77,6 +79,7 @@ interface DemoRow {
 export class DesignSystemComponent {
     private fb = inject(FormBuilder);
     private toast = inject(ToastrService);
+    private dialog = inject(MatDialog);
     readonly themeSvc = inject(InspectoGridThemeService);
 
     // ── Status badges ────────────────────────────────────────────────────────────────────────
@@ -235,6 +238,11 @@ export class DesignSystemComponent {
         });
     }
 
+    // ── Resizable dialog (shared [inspectoDialogResize] chrome) ─────────────────────────────
+    openResizeDemo(): void {
+        this.dialog.open(ResizeDemoDialog, { width: '32rem' });
+    }
+
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {
         badge: `<inspecto-status-badge [value]="event.level" />\n// in an ag-Grid cellRenderer:\ncellRenderer: (p) => statusBadgeHtml(p.value)`,
@@ -249,6 +257,7 @@ export class DesignSystemComponent {
         aiExplain: `<!-- the read-only half — one icon button for a pane header (AGT-6a A4) -->\n<!-- the PANE declares the terms; nothing is typed, nothing is inferred -->\n<inspecto-ai-explain\n  screen="Pipelines"                       // reads as "About Pipelines" in the title + aria-label\n  [terms]="['Pipeline', 'Step', 'Trigger']" />  // canonical GLOSSARY.md spellings, never synonyms\n// No draft, no diff, no Apply — there is no write path at all, so this is NOT\n// gated on canAuthorWorkbench: a Business-lens user is who needs it most.\n// glossary_lookup, falling back to docs_search; a 503 explains itself.`,
         dataTable: `<!-- one component, four tiers; logic lives in inspecto/data-table/{core,sql} + inspecto/query -->\n<!-- standard: icon toolbar (columns · search · export) -->\n<!-- pro: + a CodeMirror SQL editor (runs offline via AlaSQL) + filter builder -->\n<!-- proMax: + "save as rule" (parameterized :fieldValue template) -->\n<inspecto-data-table\n  [tier]="'pro'"                 // 'mini' | 'standard' | 'pro' | 'proMax'\n  [rows]="rows"\n  [columns]="columnDefs"         // optional; omitted ⇒ one column per row key\n  [rowActions]="actions"\n  sourceName="cdr"\n  (rowClick)="open($event)"\n  (ruleSaved)="onRuleSaved($event)" />  // pro max`,
         mapView: `<!-- offline MapLibre host (bundled Natural Earth basemap, no network) -->\n<inspecto-map-view\n  [data]="geoData"          // GeoData { points, routes }; null ⇒ unmounted (show an empty state)\n  [fill]="true"             // grow into a flex column (default: 62vh page band)\n  (pointClick)="open($event)" />\n// colours live in theme/map-tokens.ts (the map's chart-tokens analog)`,
+        dialogResize: `<!-- shared resizable/maximizable dialog chrome (inspecto/components/dialog-resize.directive.ts) -->\n<!-- the attribute goes on the dialog title; the drag grip is appended automatically -->\n<h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">\n  <span class="min-w-0 truncate">Edit Grammar · {{ node.id }}</span>\n  <span class="flex-1"></span>\n  <!-- big dialogs add a maximize button; it reuses the .dialog-fullscreen panel class -->\n  <button mat-icon-button type="button" (click)="chrome.toggleMaximize()"\n          [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'">\n    <mat-icon [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in'\n                                            : 'heroicons_outline:arrows-pointing-out'" />\n  </button>\n</h2>\n// panel styles live in styles.scss (.inspecto-dialog-resizable); outside a dialog the directive is inert`,
         menuFavorites: `// personal, client-local overlay — never PUT to the server (inspecto/menu/menu-favorites.ts)\n// storage key: inspecto.menuFavorites.v1, keyed by space id\nfavIds = signal<Set<string>>(loadForSpace());\ntoggleFavorite(id): void { /* mutate the set, persist to localStorage */ }\n\n<!-- a star toggle on each leaf row (aria-pressed, mirrors the sql-editor favorites idiom) -->\n<button [attr.aria-pressed]="isFav(id)" (click)="toggleFavorite(id)"\n        [attr.aria-label]="isFav(id) ? 'Unfavorite' : 'Favorite'">\n  <mat-icon [svgIcon]="isFav(id) ? 'heroicons_solid:star' : 'heroicons_outline:star'" />\n</button>\n\n// a virtual top-of-sidebar "Favorites" group (favoritesNavGroup in menu-nav.ts), prepended in\n// NavigationService: resolves ids against the current tree, drops stale/deleted, re-ids fav-<id>.`,
     };
     copy(text: string): void {
