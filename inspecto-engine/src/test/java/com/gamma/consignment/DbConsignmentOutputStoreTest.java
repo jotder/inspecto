@@ -144,4 +144,104 @@ class DbConsignmentOutputStoreTest {
             assertTrue(db.outputs("c1").isEmpty());
         }
     }
+
+    // ── state transitions (§6.3 / §5.3) ──────────────────────────────────────────
+
+    @Test
+    void supersedeMovesOnlyThisConsignmentsLiveRows() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    out("c1", "/w/a.parquet", 1, State.LIVE),
+                    out("c1", "/w/b.parquet", 2, State.LIVE),
+                    out("c2", "/w/c.parquet", 3, State.LIVE)));
+
+            assertEquals(2, db.supersede("c1"));
+            assertEquals(List.of(State.SUPERSEDED, State.SUPERSEDED),
+                    db.outputs("c1").stream().map(ConsignmentOutput::state).toList());
+            assertEquals(State.LIVE, db.outputs("c2").get(0).state(), "another Consignment is untouched");
+        }
+    }
+
+    /**
+     * The transition that must NOT happen. A {@code COMPACTED_AWAY} row is the evidence that this file's rows
+     * now live inside a merged file; overwriting it with {@code SUPERSEDED} would lose the one fact that tells
+     * a reprocess to rewrite the partition (§6.2) instead of unlinking a path that is already gone.
+     */
+    @Test
+    void supersedeLeavesCompactedAwayRowsAlone() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    out("c1", "/w/live.parquet", 1, State.LIVE),
+                    out("c1", "/w/gone.parquet", 2, State.COMPACTED_AWAY)));
+
+            assertEquals(1, db.supersede("c1"), "only the LIVE row moves");
+            assertEquals(State.COMPACTED_AWAY, db.outputs("c1").stream()
+                    .filter(o -> o.path().endsWith("gone.parquet")).findFirst().orElseThrow().state());
+        }
+    }
+
+    @Test
+    void markCompactedAwayFlipsExactlyTheGivenPaths() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    out("c1", "/w/dt=1/a.parquet", 1, State.LIVE),
+                    out("c2", "/w/dt=1/b.parquet", 2, State.LIVE),
+                    out("c3", "/w/dt=2/c.parquet", 3, State.LIVE)));
+
+            // A merged file spans Consignments — which is why this is keyed by path, not by consignment_id.
+            assertEquals(2, db.markCompactedAway(List.of("/w/dt=1/a.parquet", "/w/dt=1/b.parquet")));
+            assertEquals(State.COMPACTED_AWAY, db.outputs("c1").get(0).state());
+            assertEquals(State.COMPACTED_AWAY, db.outputs("c2").get(0).state());
+            assertEquals(State.LIVE, db.outputs("c3").get(0).state(), "a different partition is untouched");
+        }
+    }
+
+    /** Compaction legitimately merges files older than the registry, so an unmatched path is not an error. */
+    @Test
+    void markCompactedAwayIgnoresPathsItDoesNotKnow() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(out("c1", "/w/a.parquet", 1, State.LIVE)));
+            assertEquals(0, db.markCompactedAway(List.of("/w/never-registered.parquet")));
+            assertEquals(State.LIVE, db.outputs("c1").get(0).state());
+        }
+    }
+
+    /**
+     * The silent-failure guard: a relative spelling on the write side and an absolute one on the compaction side
+     * (or the reverse) must still match, or a state flip would report success having changed nothing.
+     */
+    @Test
+    void markCompactedAwayMatchesAcrossRelativeAndAbsoluteSpellings() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(out("c1", "work/cdr/dt=1/a.parquet", 1, State.LIVE)));
+
+            String absolute = Path.of("work/cdr/dt=1/a.parquet").toAbsolutePath().normalize().toString();
+            assertEquals(1, db.markCompactedAway(List.of(absolute)),
+                    "an absolute probe must find a row stored relative");
+            assertEquals(State.COMPACTED_AWAY, db.outputs("c1").get(0).state());
+            assertEquals("work/cdr/dt=1/a.parquet", db.outputs("c1").get(0).path(),
+                    "and the stored spelling is left alone — normalising it would make the row cwd-dependent");
+        }
+    }
+
+    /** Idempotent: re-running compaction over the same directory must not report phantom changes. */
+    @Test
+    void markCompactedAwayIsIdempotent() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(out("c1", "/w/a.parquet", 1, State.LIVE)));
+            assertEquals(1, db.markCompactedAway(List.of("/w/a.parquet")));
+            assertEquals(0, db.markCompactedAway(List.of("/w/a.parquet")), "already gone — nothing to change");
+        }
+    }
+
+    /** Same fail-open contract as record(): a failed state flip is logged, never thrown. */
+    @Test
+    void stateTransitionsAreBestEffortAndNeverThrow() throws Exception {
+        DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:");
+        db.close();
+        assertEquals(0, db.supersede("c1"));
+        assertEquals(0, db.markCompactedAway(List.of("/w/a.parquet")));
+        assertEquals(0, db.markCompactedAway(List.of()));
+        assertEquals(0, db.markCompactedAway(null));
+    }
 }

@@ -1,5 +1,8 @@
 package com.gamma.inspector;
 
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.etl.BatchManifest;
 import com.gamma.etl.ManifestStore;
 import com.gamma.etl.PipelineConfig;
@@ -7,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.*;
+import java.util.List;
 
 /**
  * Implements {@code ura reprocess <pipeline.toon> <batch_id>}: deletes the
@@ -30,9 +34,16 @@ public final class ReprocessCommand {
         log.info("[REPROCESS] {} — {} member(s), {} output(s)",
                 batchId, m.members.size(), m.outputs.size());
 
+        guardAgainstCompactedOutputs(batchId, m);
+
         // 1. delete outputs
         for (BatchManifest.OutputEntry o : m.outputs) {
-            Files.deleteIfExists(Paths.get(o.outputFile()));
+            if (!Files.deleteIfExists(Paths.get(o.outputFile())))
+                log.warn("[REPROCESS] {} — output already absent, nothing to delete: {}. If it was merged by "
+                                + "the compact job rather than removed by hand, re-ingest will DUPLICATE its "
+                                + "rows; enable the consignment-outputs registry "
+                                + "(-Dconsignment.outputs.backend) so this can be detected instead of guessed.",
+                        batchId, o.outputFile());
         }
         // 2. delete markers
         for (String marker : m.markers) {
@@ -52,11 +63,44 @@ public final class ReprocessCommand {
             Files.createDirectories(dst.getParent());
             Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
         }
-        // 4. supersede the manifest
+        // 4. supersede the manifest, and the registry rows beside it (a no-op when the registry is off)
         ManifestStore.supersede(cfg.dirs().manifestsDir(), batchId);
+        DbConsignmentOutputStore registry = ConsignmentOutputStores.shared();
+        if (registry != null) registry.supersede(batchId);
 
         // 5. re-run a normal poll on the restored set (fresh batch id)
         CollectorProcessor.run(cfg);
         log.info("[REPROCESS] {} complete.", batchId);
+    }
+
+    /**
+     * Refuse to reprocess a Consignment whose output files a compaction has merged away (§11.3(a), §6.3).
+     *
+     * <p>This is the one case where the old behaviour was <b>silently wrong</b> rather than merely awkward:
+     * step 1's {@code deleteIfExists} no-ops on a path compaction already unlinked, the members are restored,
+     * and the fresh poll re-ingests rows that are still present inside the merged file — <b>duplicating them</b>,
+     * with nothing in the log to say so. {@code PartitionCompactor}'s javadoc has documented that trade-off and
+     * offered only "set {@code min_age_days} beyond the reprocess horizon" as mitigation.
+     *
+     * <p>The §11.3 registry makes it decidable, so a refusal replaces the duplication. Removing the rows safely
+     * means rewriting the whole partition (§6.2), which this command does not do — so it stops rather than
+     * pretending. When the registry is off (the default) nothing is decidable and nothing is blocked; the
+     * per-file warning in step 1 is all that can honestly be said.
+     */
+    private static void guardAgainstCompactedOutputs(String batchId, BatchManifest m) {
+        DbConsignmentOutputStore registry = ConsignmentOutputStores.shared();
+        if (registry == null) return;
+
+        List<String> compacted = registry.outputs(batchId).stream()
+                .filter(o -> o.state() == ConsignmentOutput.State.COMPACTED_AWAY)
+                .map(ConsignmentOutput::path)
+                .toList();
+        if (compacted.isEmpty()) return;
+
+        throw new IllegalStateException("Refusing to reprocess " + batchId + ": " + compacted.size()
+                + " of its " + m.outputs.size() + " output file(s) were merged away by compaction, so deleting"
+                + " them is impossible and re-ingesting would duplicate rows that still exist in the merged"
+                + " file(s). Affected: " + compacted
+                + ". Rewrite the affected partition(s) instead, or restore from backup.");
     }
 }

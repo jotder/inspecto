@@ -5,15 +5,16 @@ This began as the record of a design conversation, so the bulk below is still de
 
 | Piece | State as of 2026-08-04 |
 |---|---|
-| §11.3 `consignment_outputs` | **SLICES 1 + 2 BUILT + VERIFIED** — `DbConsignmentOutputStore` (default-off) has production callers on **all three** write paths, with real per-file `row_count`. §7.2 reconciliation is asserted on each |
+| §11.3 `consignment_outputs` | **SLICES 1 + 2 + STATE MUTATORS BUILT + VERIFIED** — `DbConsignmentOutputStore` (default-off) has production callers on **all three** write paths with real per-file `row_count` (§7.2 reconciliation asserted on each), plus `supersede`/`markCompactedAway` wired to `ReprocessCommand` and `PartitionCompactor`. **Slice 3 (the `batch_id` rename) is NOT done** — see §11.3's *Slice 3 — SCOPE GROUNDED* |
 | §14 `ProcessorContext` | **BUILT + VERIFIED (all of §14.4)** — `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` `JobTypeProvider` adapter, `ConsignmentReader`, and `SummaryEmitter`'s §7.2 guardrails. As-built in [`okf/backend/control-plane/jobs.md`](../okf/backend/control-plane/jobs.md) |
 | Everything else (§2, §4–§10, §11.4, §12, §13) | design only, nothing implemented |
 
-**Next:** the two remaining §11.3 items — **slice 3**, the `batch_id` → `consignment_id` rename in persisted
-artifacts (scope + the six name-keyed read sites are in *Decided 2026-08-04* item 2), and the state-transition
-mutators (`supersede`/`compactedAway`) that §6.3 compaction needs: the registry records writes today, and
-nothing yet flips a row's state, so the `PartitionCompactor` duplicate-rows bug §11.3(a) documents is still
-live. After that, the design-only sections — §7.3's summary storage is the one `SummaryEmitter` is waiting on.
+**Next:** **slice 3** — the `batch_id` → `consignment_id` rename in persisted artifacts — is the only §11.3 item
+left, and it is **blocked on an operator call**: grounding found three categories of `batch_id` that *Decided
+2026-08-04* item 2 did not consider, one of which cannot use accept-both-on-read at all. See §11.3's *Slice 3 —
+SCOPE GROUNDED* before starting it. The state-transition mutators it was paired with are **done**, so the
+`PartitionCompactor` duplicate-rows bug §11.3(a) documents is no longer silent. After that, the design-only
+sections — §7.3's summary storage is the one `SummaryEmitter` is waiting on.
 
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time
@@ -758,6 +759,73 @@ key's `year`/`month`/`day` segments, and is `null` for any other partition schem
 cut with the *pinned* timezone at load; the two agree only when partitioning is on event-time date in that zone
 and **diverge silently on late-arriving data**. §10.1's work must therefore **replace** this derivation, not fall
 back to it. `run_id` is left `null` everywhere: no path today has a Run identity distinct from its unit of work.
+
+#### State mutators — AS BUILT 2026-08-04. The §11.3(a) bug is now refused, not documented
+
+`supersede(consignmentId)` and `markCompactedAway(paths)` landed **with** their call sites, not ahead of them.
+Both are `UPDATE`-only — a row is created solely by `record()` at the moment a file is revealed — so no state
+flip can resurrect a file the registry never saw.
+
+- **`PartitionCompactor`** flips the merged-away paths **after** the swap is irreversible (step 6, after the
+  reveal and the hidden-original cleanup). A crash before it leaves the index *stale* (still `LIVE` for a merged
+  path) rather than *wrong* (marked gone while still readable); `heal()` cannot un-merge, so the conservative
+  direction is the one a later run corrects instead of compounding. Same rule as slice 2's "register after the
+  manifest write".
+- **`ReprocessCommand`** now **refuses** when any of the Consignment's rows are `COMPACTED_AWAY`. This is the
+  §11.3(a) bug: `deleteIfExists` silently no-ops on a path compaction already unlinked, the members are restored,
+  and the fresh poll re-ingests rows that still exist inside the merged file — **duplicating them, with nothing
+  in the log**. Safe removal means rewriting the whole partition (§6.2), which this command does not do, so it
+  stops rather than pretending. It also `supersede`s the registry rows beside `ManifestStore.supersede`.
+  ⚠ Only where the registry is enabled; **default-off deployments still need `min_age_days` beyond the reprocess
+  horizon**, and get a per-file warning naming the duplication risk instead of a refusal.
+
+**No replacement row is inserted for a merged file, deliberately.** It holds rows from many Consignments, so no
+single `consignment_id` owns it and per-Consignment counts inside it are unknowable without re-reading it. The
+pair `(state = COMPACTED_AWAY, partition_key)` is already sufficient for the only consumer that cares — §6.2
+rewrites the whole partition — so **the schema needs no `replaced_by` column**, and §6.3's "generation" is not
+yet exercised by compaction.
+
+**(i) Path spelling is a real silent-failure surface, and the obvious fix does not work.** `PartitionWriter`
+derives its path from the configured output dir and `PartitionCompactor` from its own `dir` parameter; either may
+be relative, and two spellings of one file make a state flip match zero rows *and report success*. Binding both
+spellings into one `WHERE` clause **fails** — an already-absolute probe normalises to itself, so a row stored
+relative still never matches (caught by a test written to assert the match, which went red). The store therefore
+normalises **both sides in Java** before comparing. `record()` deliberately does **not** normalise: absolutising
+at write time would make the stored value depend on the writing process's working directory.
+
+**(j) Two identity collisions surfaced, both pre-existing and neither caused by this work.** Batch ids are
+`yyyyMMdd_HHmmss` (`PipelineConfig.java:848`) — **second granularity** — so `ReprocessCommand`'s "re-run a normal
+poll on the restored set (fresh batch id)" holds *only across a second boundary*; a fast reprocess re-ingests
+under the **same** id. Output file names are deterministic (`<baseName>_out.<ext>`), so that re-run also lands on
+the **same path**. The registry consequently holds one `SUPERSEDED` and one fresh `LIVE` row sharing a path —
+correct as history, but it means **`(consignment_id, path)` is not unique and must never be treated as a key**.
+
+#### Slice 3 — SCOPE GROUNDED 2026-08-04, **not started**
+
+The authoritative site-by-site grounding for this slice already lives in `SESSION_STATUS.local.md`'s gotchas
+(written a shift earlier) and should be read from there — it is more specific than *Decided 2026-08-04* item 2,
+which says "six name-keyed read sites". Its key findings, not repeated in full here: `BatchManifest`'s Gson field
+has **no `@SerializedName`**, so the on-disk key is camelCase `"batchId"` and renaming the Java field silently
+yields `null` for every existing manifest; `CommitLog` and `BranchCommitLog` parse **positionally**, so their
+header text is cosmetic and they need no reader change; the **UI** reads raw `b['batch_id']`
+(`batch-detail.dialog.ts:81-82`), which fails silently; and `__batch_id` is a data-plane system column, declared
+**out of scope**.
+
+Two things to add to that list, and one reason to hold:
+
+1. **Two further name-keyed read sites**: `InspectoTools:427` (intelligence pack) and `DbStatusStore:181`, which
+   passes `"batch_id"` as the *key-column argument* to `insertRows` rather than naming it in SQL — so a rename
+   there is a behaviour change, not a text substitution. `OperationalTables:36/42/45` deserves emphasis: it
+   *declares* the CSV column lists to the agent's SQL skill, so a mismatch breaks **generated** SQL, where a
+   wrong column name surfaces as a failed agent answer rather than a compile error.
+2. **`batch_id` is also a `.toon` config key** (`PipelineJobRunner:77/136`). Renaming it breaks operators'
+   existing pipeline configs, which makes it a config-key-contract decision, not a persisted-artifact one.
+
+**Recommendation: split it, and confirm the split first.** The audit CSVs + `BatchManifest` + their read sites are
+one coherent accept-both-on-read change. The DuckDB columns (`DbProvenanceStore`, `DbStatusStore`) need real
+`ALTER TABLE … RENAME COLUMN` migrations against existing files — note `DbStatusStore`'s `payload` blob embeds the
+literal `"batch_id"` too — and the config key is a different contract again. Splitting changes what "slice 3"
+means, so it wants an operator call rather than an assumption. **Nothing here is blocked on code.**
 
 ### 11.4 Partition state — nothing exists
 

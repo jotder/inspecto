@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,10 +35,14 @@ import java.util.stream.Stream;
  *       restores the hidden originals (it was not), so a killed run never loses or duplicates rows.</li>
  * </ul>
  *
- * <p><b>Known trade-off</b>: {@code reprocess} of a batch whose output file was compacted away degrades to a
- * no-op delete + re-ingest (its manifest's {@code outputFile} no longer exists), which would duplicate its
- * rows — set {@code min_age_days} beyond the operational reprocess horizon. Recorded in
- * {@code docs/REQUIREMENTS.md} (PIP-7) and the job-library example.
+ * <p><b>Known trade-off, now detectable</b>: {@code reprocess} of a batch whose output file was compacted away
+ * degrades to a no-op delete + re-ingest (its manifest's {@code outputFile} no longer exists), which would
+ * duplicate its rows. Step 6 below flips those paths to {@code COMPACTED_AWAY} in the §11.3
+ * {@code consignment_outputs} registry, which lets {@link com.gamma.inspector.ReprocessCommand} <em>refuse</em>
+ * rather than duplicate. That only applies where the registry is enabled
+ * ({@code -Dconsignment.outputs.backend}); it is default-off, so {@code min_age_days} beyond the operational
+ * reprocess horizon remains the mitigation everywhere else. Recorded in {@code docs/REQUIREMENTS.md} (PIP-7)
+ * and the job-library example.
  */
 final class PartitionCompactor {
 
@@ -122,6 +127,11 @@ final class PartitionCompactor {
             // 5. … then the hidden originals and the journal can go.
             for (Path p : candidates) Files.deleteIfExists(sibling(p, HIDDEN_SUFFIX));
             Files.deleteIfExists(journal);
+            // 6. Flip the §11.3 registry last, after the swap is irreversible. A crash before this leaves the
+            //    index stale (rows still LIVE for a merged-away path) rather than wrong (a file marked gone
+            //    that is still readable) — and heal() plus the next run's reveal cannot un-merge, so the
+            //    conservative direction is the one that a later run corrects rather than compounds.
+            ConsignmentOutputStores.markCompactedAway(candidates.stream().map(Path::toString).toList());
             return candidates.size();
         } catch (Exception e) {
             heal(dir);   // undo/finish from the journal so the directory is never left half-swapped

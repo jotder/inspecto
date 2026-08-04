@@ -16,7 +16,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p><b>Pure registry — no backend resolution here.</b> Unlike {@code AcquisitionLedgers}, this class never builds
  * a store: {@code ServiceStores.openConsignmentOutputStore} remains the single place that reads
- * {@code -Dconsignment.outputs.backend} and the URL properties, and {@code SpaceBootstrap} registers the result.
+ * {@code -Dconsignment.outputs.backend} and the URL properties, and the {@code CollectorService} constructor
+ * registers the result.
  * Two resolvers for one toggle is how a default-off store silently becomes on.
  *
  * <p><b>Absent by default, and that is not degraded correctness.</b> With no store registered — every existing
@@ -74,5 +75,16 @@ public final class ConsignmentOutputStores {
         if (outputs == null || outputs.isEmpty()) return;
         DbConsignmentOutputStore store = shared();
         if (store != null) store.record(outputs);
+    }
+
+    /**
+     * Flip {@code paths} to {@code COMPACTED_AWAY} in the calling space's registry, or do nothing when none is
+     * registered — the compaction-side twin of {@link #record}, so {@code PartitionCompactor} stays static and
+     * unaware of whether a registry exists.
+     */
+    public static void markCompactedAway(List<String> paths) {
+        if (paths == null || paths.isEmpty()) return;
+        DbConsignmentOutputStore store = shared();
+        if (store != null) store.markCompactedAway(paths);
     }
 }

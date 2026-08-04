@@ -220,7 +220,7 @@ message, attributes (JSON), payload (JSON), level  -- + partition cols year, mon
 `level` ∈ [`EventLevel`](../../../../inspecto-event/src/main/java/com/gamma/event/EventLevel.java). There is **no
 JDBC/Postgres event table** — events are Parquet-only.
 
-### 3.9 `consignment_outputs` — per-output-file registry  · **A** *(becomes **M** when state transitions land)*
+### 3.9 `consignment_outputs` — per-output-file registry  · **M**
 File: `inspecto-consignment-outputs.db`
 
 ```sql
@@ -267,13 +267,30 @@ partition key's `year`/`month`/`day` segments and is `null` for any other scheme
 that plan §10.1's pinned-timezone event-time-at-load must replace, not fall back to. `run_id` is `null`
 everywhere: no path yet has a Run identity distinct from its unit of work.
 
-`row_count` is not a copy of anything: `PartitionOutput` carries only `(partition, outputFile, bytes)`, and a
-multi-file partitioned `COPY` reports no per-file count, so the value has to be summed from
-`LineageCollector`'s per-`(srcId, partition)` counts. Reads return **all** states, not just `LIVE` — hiding
-`COMPACTED_AWAY` would conceal exactly the case the registry exists to expose (see
-[`PartitionCompactor`](../../../../inspecto-engine/src/main/java/com/gamma/job/PartitionCompactor.java)'s own
-javadoc: reprocessing a Consignment whose output was compacted away currently degrades to a no-op delete plus
-re-ingest, which duplicates rows).
+Reads return **all** states, not just `LIVE` — hiding `COMPACTED_AWAY` would conceal exactly the case the
+registry exists to expose.
+
+**Who changes state (2026-08-04).** Both mutators are `UPDATE`-only; only `record()` ever creates a row, so a
+state flip cannot resurrect a file the registry never saw. Both are best-effort (logged, never thrown), the same
+fail-open contract as `record()`.
+
+| Mutator | Caller | Contract |
+|---|---|---|
+| `markCompactedAway(paths)` | [`PartitionCompactor`](../../../../inspecto-engine/src/main/java/com/gamma/job/PartitionCompactor.java), **after** the reveal + cleanup | Path-keyed, because one merged file absorbs many Consignments. **Inserts no replacement row** — no single `consignment_id` owns the merged file, and `(state, partition_key)` is all §6.2's partition rewrite needs |
+| `supersede(consignmentId)` | [`ReprocessCommand`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java), beside `ManifestStore.supersede` | Moves **only `LIVE`** rows; a `COMPACTED_AWAY` row keeps that state, since it is the evidence that tells a reprocess to rewrite the partition rather than unlink a path that is gone |
+
+This closes a **silent data-duplication bug**: `ReprocessCommand` used to `deleteIfExists` a path compaction had
+already unlinked (a no-op), restore the members, and re-ingest rows still present inside the merged file. It now
+**refuses** when any row is `COMPACTED_AWAY`. ⚠ Only when the registry is enabled — default-off deployments still
+need `min_age_days` beyond the reprocess horizon, and get a warning naming the risk instead.
+
+**Two gotchas when querying this table.** (1) **`(consignment_id, path)` is not unique.** Batch ids are
+`yyyyMMdd_HHmmss` (second granularity) and output file names are deterministic, so a reprocess finishing inside
+the same second produces one `SUPERSEDED` and one fresh `LIVE` row sharing a path. (2) **`path` is stored with
+the caller's own spelling, relative or absolute** — `record()` deliberately does not normalise, because
+absolutising at write time would make the row depend on the writing process's working directory. Matching
+therefore normalises *both sides in Java*; a two-spelling SQL `WHERE` cannot do it, since an already-absolute
+probe normalises to itself.
 
 ---
 

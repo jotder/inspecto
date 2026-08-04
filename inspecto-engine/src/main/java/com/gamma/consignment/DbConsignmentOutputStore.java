@@ -28,10 +28,11 @@ import java.util.List;
  * table is authoritative for <em>state</em>: a store that can legitimately be absent must never be the only
  * record that a file exists.
  *
- * <p><b>Deliberately not here yet.</b> No {@code supersede}/{@code compactedAway} mutator: the compaction and
- * reprocess call sites land in a later slice, and a state-transition method with no caller is speculative
- * surface on a table whose shape is still being proved. {@link #record} and {@link #outputs} are the minimum
- * useful pair — they are what {@code ProcessorContext.outputs()} (§14.3) and {@code ReprocessCommand} need.
+ * <p><b>State transitions.</b> {@link #supersede} and {@link #markCompactedAway} arrived with their call sites
+ * ({@code ReprocessCommand}, {@code PartitionCompactor}) rather than ahead of them. Both are <b>path- or
+ * id-keyed {@code UPDATE}s that never insert</b>: a row is only ever created by {@link #record} at the moment a
+ * file is revealed, so a state flip cannot resurrect a file the registry never saw. Neither transition is
+ * reversible, and neither is a substitute for the JSON manifest — see the existence/state split above.
  */
 @PublicApi(since = "5.0.0")
 public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.util.BrowsableStore {
@@ -139,6 +140,103 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             log.warn("consignment-outputs query failed for {}: {}", consignmentId, e.getMessage());
         }
         return out;
+    }
+
+    /**
+     * Mark every still-{@code LIVE} file of one Consignment {@code SUPERSEDED} — the state flip that belongs
+     * beside {@code ManifestStore.supersede}, for when a Consignment's output is replaced by a reprocess.
+     *
+     * <p>Only {@code LIVE} rows move. A {@code COMPACTED_AWAY} row must keep that state: it is the evidence
+     * that the file's rows now live inside a merged file, which is precisely what a reprocess needs to know to
+     * take the §6.2 partition-rewrite path instead of a no-op unlink.
+     *
+     * @return how many rows changed state; {@code 0} is normal when the registry is default-off or the
+     *         Consignment predates it, and is never an error.
+     */
+    public synchronized int supersede(String consignmentId) {
+        return update("UPDATE " + T + " SET state = 'SUPERSEDED' WHERE consignment_id = ? AND state = 'LIVE'",
+                consignmentId, "supersede consignment " + consignmentId);
+    }
+
+    /**
+     * Mark the given output paths {@code COMPACTED_AWAY} — the files a compaction merged and unlinked.
+     *
+     * <p><b>No replacement row is inserted, deliberately.</b> A merged file holds rows from many Consignments,
+     * so no single {@code consignment_id} owns it and any row claiming one would be a fiction; per-Consignment
+     * {@code row_count}s inside it are unknowable without re-reading the file. The pair
+     * {@code (state=COMPACTED_AWAY, partition_key)} is already sufficient for the only consumer that cares —
+     * §6.2 rewrites the whole partition — so the schema needs no {@code replaced_by} column for this.
+     *
+     * @param paths the exact revealed paths as recorded by {@link #record}; unmatched paths are silently
+     *              ignored, since compaction legitimately merges files older than the registry itself.
+     * @return how many rows changed state.
+     */
+    public synchronized int markCompactedAway(List<String> paths) {
+        if (paths == null || paths.isEmpty()) return 0;
+        java.util.Set<String> wanted = new java.util.HashSet<>();
+        for (String p : paths) wanted.add(norm(p));
+
+        int changed = 0;
+        try {
+            // Resolve stored spellings to the same normalised form before comparing — see norm(). Matching in
+            // SQL cannot work in both directions, because the column would have to be normalised too.
+            List<String> matches = new ArrayList<>();
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery(
+                         "SELECT DISTINCT path FROM " + T + " WHERE state <> 'COMPACTED_AWAY'")) {
+                while (rs.next()) {
+                    String stored = rs.getString("path");
+                    if (stored != null && wanted.contains(norm(stored))) matches.add(stored);
+                }
+            }
+            try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T
+                    + " SET state = 'COMPACTED_AWAY' WHERE path = ? AND state <> 'COMPACTED_AWAY'")) {
+                for (String stored : matches) {
+                    ps.setString(1, stored);
+                    changed += ps.executeUpdate();
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("Could not mark {} path(s) compacted away: {}", paths.size(), e.getMessage());
+        }
+        return changed;
+    }
+
+    /**
+     * A path's absolute, normalised form — used <b>only to widen a match</b>, never to rewrite what is stored.
+     *
+     * <p>The two sides cannot be relied on to agree on spelling: {@code PartitionWriter.reveal} derives its path
+     * from the configured output directory while {@code PartitionCompactor} derives its from its own {@code dir}
+     * parameter, and either may be relative. Two spellings of one file would make a state flip match zero rows
+     * and still report success — exactly the silent failure this table exists to prevent, so
+     * {@link #markCompactedAway} compares <em>normalised forms on both sides</em>. Binding two spellings into
+     * one {@code WHERE} clause does not achieve that: an already-absolute probe normalises to itself, so a row
+     * stored relative would still never match.
+     *
+     * <p><b>Why {@link #record} does not normalise.</b> Absolutising at write time would make the stored value
+     * depend on the writing process's working directory, so a registry read after a restart under a different
+     * cwd would resolve to a different file. Storing the caller's own spelling keeps the row durable; widening
+     * happens at compare time, where being wrong costs a missed match rather than a bad path.
+     */
+    private static String norm(String path) {
+        if (path == null) return null;
+        try {
+            return java.nio.file.Path.of(path).toAbsolutePath().normalize().toString();
+        } catch (RuntimeException invalid) {
+            return path;
+        }
+    }
+
+    /** Best-effort single-parameter {@code UPDATE}: a failed state flip is logged, never thrown — same
+     *  fail-open contract as {@link #record}, since this table is an index and not the record of existence. */
+    private int update(String sql, String param, String what) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, param);
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            log.warn("Could not {}: {}", what, e.getMessage());
+            return 0;
+        }
     }
 
     private static ConsignmentOutput map(ResultSet rs) throws SQLException {
