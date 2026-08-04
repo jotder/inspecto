@@ -906,9 +906,9 @@ public final class CollectorService implements AutoCloseable {
                 log.warn("Deletion fence: could not list authored flows ({}): {}",
                         e.getClass().getSimpleName(), e.getMessage());
             }
-            if (jobs != null && !jobs.runningFlows().isEmpty()) {
+            if (jobs != null && !jobs.runningPipelines().isEmpty()) {
                 active = new java.util.LinkedHashSet<>(running);
-                active.addAll(jobs.runningFlows());
+                active.addAll(jobs.runningPipelines());
             }
         }
         List<DeletionFence.Conflict> conflicts = DeletionFence.check(targetStores, flows, active);

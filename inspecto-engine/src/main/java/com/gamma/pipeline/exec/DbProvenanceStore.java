@@ -16,7 +16,7 @@ import java.util.Map;
 
 /**
  * <b>T21 — durable, queryable projection of the data-plane provenance matrix.</b> Persists the per-(node,
- * relationship) record counts a flow run emits ({@link ProvenanceRow}) into a DuckDB table so a
+ * relationship) record counts a pipeline run emits ({@link ProvenanceRow}) into a DuckDB table so a
  * {@code GET /provenance} query (T22) can paint counts onto the {@link com.gamma.pipeline.PipelineGraph} edges of a
  * past run. Mirrors {@link com.gamma.job.DbJobRunStore}: plain JDBC over the bundled DuckDB engine (no new
  * dependency), a single shared {@link Connection} (low-volume, JDBC connections aren't thread-safe), schema
@@ -36,7 +36,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
 
     // ── raw table browser seam (BrowsableStore) — read-only, synchronized(this) ──
     @Override public String browseId() { return "provenance"; }
-    @Override public String browseLabel() { return "Flow Provenance"; }
+    @Override public String browseLabel() { return "Pipeline Provenance"; }
     @Override public java.util.List<String> browseTables() { return java.util.List.of(T); }
     @Override public Connection browseConnection() { return conn; }
 
@@ -74,7 +74,7 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         }
     }
 
-    /** Append all rows of one flow run. Best-effort: a write failure is logged, never thrown. */
+    /** Append all rows of one pipeline run. Best-effort: a write failure is logged, never thrown. */
     public synchronized void record(List<ProvenanceRow> rows) {
         if (rows == null || rows.isEmpty()) return;
         try (PreparedStatement ps = conn.prepareStatement("INSERT INTO " + T
@@ -90,21 +90,21 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
             }
             ps.executeBatch();
         } catch (SQLException e) {
-            log.warn("Could not project provenance for flow {} batch {}: {}",
+            log.warn("Could not project provenance for pipeline {} batch {}: {}",
                     rows.get(0).flowId(), rows.get(0).batchId(), e.getMessage());
         }
     }
 
     /**
-     * The per-(node, relationship) counts of one run, keyed by {@code (flowId, batchId)}. Column labels are
+     * The per-(node, relationship) counts of one run, keyed by {@code (pipelineId, batchId)}. Column labels are
      * camelCase to match the rest of the JSON API (the frontend consumes them verbatim, mapping each
      * {@code (nodeId, rel)} onto its outgoing {@code PipelineGraph} edge as the Sankey weight).
      */
-    public synchronized List<Map<String, Object>> query(String flowId, String batchId) {
+    public synchronized List<Map<String, Object>> query(String pipelineId, String batchId) {
         String sql = "SELECT node_id AS \"nodeId\", rel, row_count AS \"rowCount\""
                 + " FROM " + T + " WHERE flow_id = ? AND batch_id = ? ORDER BY node_id, rel";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, flowId);
+            ps.setString(1, pipelineId);
             ps.setString(2, batchId);
             return JdbcRows.query(ps);
         } catch (SQLException e) {
@@ -113,12 +113,12 @@ public final class DbProvenanceStore implements AutoCloseable, com.gamma.util.Br
         }
     }
 
-    /** The most recent runs of a flow (distinct {@code batchId}, newest first) — for picking a run to inspect. */
-    public synchronized List<Map<String, Object>> batches(String flowId, int limit) {
+    /** The most recent runs of a pipeline (distinct {@code batchId}, newest first) — for picking a run to inspect. */
+    public synchronized List<Map<String, Object>> batches(String pipelineId, int limit) {
         String sql = "SELECT batch_id AS \"batchId\", max(run_ts) AS \"runTs\", sum(row_count) AS \"totalRows\""
                 + " FROM " + T + " WHERE flow_id = ? GROUP BY batch_id ORDER BY \"runTs\" DESC LIMIT ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, flowId);
+            ps.setString(1, pipelineId);
             ps.setInt(2, Math.max(1, limit));
             return JdbcRows.query(ps);
         } catch (SQLException e) {

@@ -153,7 +153,7 @@ public final class JobService implements AutoCloseable {
     private volatile java.util.function.Consumer<Event> signalSubscriber;
     /** Flow ids (authored-flow graph names) of {@link JobType#PIPELINE} jobs currently in flight — fed to the
      *  deletion fence (T32) so a delete that races an active flow-job reader/writer surfaces a conflict. */
-    private final Set<String> runningFlows = ConcurrentHashMap.newKeySet();
+    private final Set<String> runningPipelines = ConcurrentHashMap.newKeySet();
 
     /** Live + recently-finished runs by {@code runId}, so {@code GET /jobs/runs/{runId}} can poll a manual
      *  fire (W5). A run is registered {@code RUNNING} at submit and replaced with its terminal
@@ -608,7 +608,7 @@ public final class JobService implements AutoCloseable {
      * Run an authored flow once, ad-hoc, without a registered job (T32 — the config-less
      * {@code POST /pipelines/authored/{id}/trigger} route). A synthetic {@code type: pipeline} config is
      * built on the fly and executed through the exact registered-job run lifecycle — deletion-fence
-     * tracking ({@link #runningFlows()}), per-name non-overlap (keyed by the flow id, so a re-fire while
+     * tracking ({@link #runningPipelines()}), per-name non-overlap (keyed by the flow id, so a re-fire while
      * the flow is still running records {@code SKIPPED}), the durable run ledger and {@link #runById}
      * polling — but it is never added to the registry, so {@link #jobs()} stays config-only. The run
      * (and its {@code GET /jobs/{name}/runs} history) is recorded under the flow id. Attribution matches
@@ -617,11 +617,11 @@ public final class JobService implements AutoCloseable {
      * @return the {@code runId} to poll
      * @throws IllegalStateException when no authored-flow store is configured (no write root)
      */
-    public String triggerFlowRun(String flowId, String actor) {
-        JobConfig cfg = new JobConfig(flowId, "pipeline", null, null, true, false,
-                Map.of("flow", flowId), null, null);
+    public String triggerPipelineRun(String pipelineId, String actor) {
+        JobConfig cfg = new JobConfig(pipelineId, "pipeline", null, null, true, false,
+                Map.of("flow", pipelineId), null, null);
         Job job = buildFlowJob(cfg);   // fails closed without an authored-flow store
-        String runId = newRunId(flowId);
+        String runId = newRunId(pipelineId);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
         submitAdhocRun(job, cfg, runId, trigger);
         return runId;
@@ -708,7 +708,7 @@ public final class JobService implements AutoCloseable {
     }
 
     /** As {@link #submitRun(String, String, String, String, int, Firing)} but for an ad-hoc run
-     *  ({@link #triggerFlowRun}): the job/config are carried, not resolved from the registry — an
+     *  ({@link #triggerPipelineRun}): the job/config are carried, not resolved from the registry — an
      *  unregistered run can't be disarmed by a concurrent {@link #removeJob}; it was already admitted. */
     private void submitAdhocRun(Job job, JobConfig cfg, String runId, String trigger) {
         String start = LocalDateTime.now().format(TS);
@@ -737,13 +737,13 @@ public final class JobService implements AutoCloseable {
 
     /** The run lifecycle with the {@link Job} + config carried explicitly — shared by the registered path
      *  above (which re-resolves both from the registry on the worker thread, so a removed job stays an
-     *  inert no-op) and the ad-hoc flow path ({@link #triggerFlowRun}), whose synthetic config is never
+     *  inert no-op) and the ad-hoc flow path ({@link #triggerPipelineRun}), whose synthetic config is never
      *  registered and so cannot be resolved by name. */
     private void runJob(Job job, JobConfig cfg, String runId, String name, String trigger, String start,
                         String correlationId, int chainDepth, Firing firing) {
         runner.runExclusiveOrSkip(name, () -> {
             fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
-            String flowId = trackFlowStart(job, cfg, name);   // T32: mark a flow job's stores active for the fence
+            String pipelineId = trackFlowStart(job, cfg, name);   // T32: mark a flow job's stores active for the fence
             Map<String, String> params = cfg != null ? cfg.params() : Map.of();
             RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, chainDepth,
                     params, runLogStore, runLogMax, runArtifactStore);
@@ -752,7 +752,7 @@ public final class JobService implements AutoCloseable {
                 ctx.log().error("run rejected: " + reason, null);
                 ctx.signals().emit("job.run.rejected", Severity.WARN,
                         Map.of("job", name, "run", runId, "reason", reason));
-                if (flowId != null) runningFlows.remove(flowId);
+                if (pipelineId != null) runningPipelines.remove(pipelineId);
                 record(new JobRun(runId, name, job.type(), trigger, start,
                         LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
                 return;
@@ -778,7 +778,7 @@ public final class JobService implements AutoCloseable {
                 ctx.signals().emit("job.run.rejected", Severity.WARN,
                         Map.of("job", name, "run", runId, "missing", pr.missingRequired(),
                                 "invalidType", pr.invalidType()));
-                if (flowId != null) runningFlows.remove(flowId);
+                if (pipelineId != null) runningPipelines.remove(pipelineId);
                 record(new JobRun(runId, name, job.type(), trigger, start,
                         LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
                 return;
@@ -806,7 +806,7 @@ public final class JobService implements AutoCloseable {
                         0L);
             } finally {
                 packs.releaseRun(packOwner);
-                if (flowId != null) runningFlows.remove(flowId);
+                if (pipelineId != null) runningPipelines.remove(pipelineId);
             }
             ctx.log().info("run completed", "status", res.status(), "durationMs", res.durationMs());
             // One terminal lifecycle signal: job.run.failed on a thrown exception, else job.run.completed.
@@ -898,9 +898,9 @@ public final class JobService implements AutoCloseable {
      */
     private String trackFlowStart(Job job, JobConfig cfg, String name) {
         if (!"pipeline".equals(job.type())) return null;
-        String flowId = cfg != null ? cfg.opt("flow", name) : name;
-        runningFlows.add(flowId);
-        return flowId;
+        String pipelineId = cfg != null ? cfg.opt("flow", name) : name;
+        runningPipelines.add(pipelineId);
+        return pipelineId;
     }
 
     /** The configured job by name (the run path keys by name; configs is the source of truth for params). */
@@ -918,8 +918,8 @@ public final class JobService implements AutoCloseable {
      * into the deletion fence's running-set (T32) so deleting a store an active flow job reads/writes is
      * flagged as a {@code STORE_DELETE_CONFLICT}, just as for a running pipeline.
      */
-    public Set<String> runningFlows() {
-        return Set.copyOf(runningFlows);
+    public Set<String> runningPipelines() {
+        return Set.copyOf(runningPipelines);
     }
 
     // ── Control API surface ──────────────────────────────────────────────────────

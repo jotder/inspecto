@@ -125,9 +125,9 @@ public final class PipelineJobRunner implements Job {
 
     @Override
     public JobResult run() throws Exception {
-        String flowId = cfg.require("flow");
-        PipelineGraph g = flowStore.get(flowId).orElseThrow(() -> new IllegalArgumentException(
-                "flow job '" + cfg.name() + "' references unknown flow '" + flowId + "'"));
+        String pipelineId = cfg.require("flow");
+        PipelineGraph g = flowStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
+                "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
         String dir = cfg.opt("data_dir", dataDir);
         requireTopLevelSinks(g, dir);
         String batchId = cfg.opt("batch_id", cfg.name().toLowerCase().replace(' ', '_')
@@ -151,7 +151,7 @@ public final class PipelineJobRunner implements Job {
             for (Seed seed : seeds) {                              // one view per source_store (multi-source, Phase C)
                 String view = SEED_VIEW_PREFIX + "_" + safe(seed.node());
                 String predicate = incremental
-                        ? watermarks.get(flowId, seed.store())
+                        ? watermarks.get(pipelineId, seed.store())
                             .map(wm -> "\"" + incCol + "\" > '" + wm.replace("'", "''") + "'").orElse(null)
                         : null;
                 SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
@@ -163,7 +163,7 @@ public final class PipelineJobRunner implements Job {
             String sinkBase = cfg.name().toLowerCase().replace(' ', '_') + (incremental ? "_" + safe(batchId) : "");
             PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase);
             BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(
-                    Path.of(auditDir).resolve(safe(flowId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
+                    Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
 
             // T20/T21 — collect per-(node, relationship) record counts during the walk (counts must be taken
             // while the scratch relations are live) and persist them as this run's data-plane provenance.
@@ -171,24 +171,24 @@ public final class PipelineJobRunner implements Job {
             List<ProvenanceRow> provRows = new ArrayList<>();
             PipelineExecutor.ProvenanceCollector collector = provenance == null
                     ? PipelineExecutor.ProvenanceCollector.NONE
-                    : (nodeId, rel, rowCount) -> provRows.add(new ProvenanceRow(flowId, batchId, nodeId, rel, rowCount, runTs));
+                    : (nodeId, rel, rowCount) -> provRows.add(new ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs));
 
             PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, collector);
 
             if (provenance != null) {
                 provenance.record(provRows);
-                reportConservation(g, flowId, batchId, provRows);   // T22 — §11.4 invariant → event/alert
+                reportConservation(g, pipelineId, batchId, provRows);   // T22 — §11.4 invariant → event/alert
             }
 
-            if (incremental) advanceWatermarks(conn, watermarks, flowId, seeds, seedViews, incCol);
+            if (incremental) advanceWatermarks(conn, watermarks, pipelineId, seeds, seedViews, incCol);
 
             long ms = (System.nanoTime() - t0) / 1_000_000L;
             List<String> parts = writer.outputs().stream().map(PartitionOutput::partition).distinct().toList();
             List<String> srcStores = seeds.stream().map(Seed::store).toList();
-            registerViews(g, flowId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
+            registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
             bus.publish(new BatchEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
             log.info("[FLOWJOB] {} ran flow '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
-                    cfg.name(), flowId, srcStores, writer.outputs().size(), writer.totalRows(),
+                    cfg.name(), pipelineId, srcStores, writer.outputs().size(), writer.totalRows(),
                     PipelineStores.produced(g));
             return JobResult.ok(writer.outputs().size() + " file(s), " + writer.totalRows()
                     + " row(s) → store(s) " + PipelineStores.produced(g), ms);
@@ -233,7 +233,7 @@ public final class PipelineJobRunner implements Job {
      * diverted relations), so a positive {@code FLOW_CONSERVATION_IMBALANCE} is only reachable from an
      * injected count mismatch, not a clean flow.
      */
-    static void reportConservation(PipelineGraph g, String flowId, String batchId, List<ProvenanceRow> rows) {
+    static void reportConservation(PipelineGraph g, String pipelineId, String batchId, List<ProvenanceRow> rows) {
         try {
             Map<String, Long> counts = new LinkedHashMap<>();
             for (ProvenanceRow r : rows) counts.put(r.nodeId() + "|" + r.rel(), r.rowCount());
@@ -241,9 +241,9 @@ public final class PipelineJobRunner implements Job {
                 EventLog.current().emit(Event.builder(EventType.FLOW_CONSERVATION_IMBALANCE)
                         .level("LOSS".equals(im.kind()) ? EventLevel.ERROR : EventLevel.WARN)
                         .source(PipelineJobRunner.class.getName())
-                        .pipeline(flowId)
+                        .pipeline(pipelineId)
                         .correlationId(batchId)
-                        .message("flow '" + flowId + "' node '" + im.node() + "': "
+                        .message("flow '" + pipelineId + "' node '" + im.node() + "': "
                                 + im.recordsIn() + " in, " + im.recordsOut() + " out (" + im.kind() + ")")
                         .attr("node", im.node())
                         .attr("recordsIn", im.recordsIn())
@@ -251,10 +251,10 @@ public final class PipelineJobRunner implements Job {
                         .attr("kind", im.kind())
                         .build());
                 log.warn("[FLOWJOB] conservation imbalance in flow '{}' at node '{}': {} in, {} out ({})",
-                        flowId, im.node(), im.recordsIn(), im.recordsOut(), im.kind());
+                        pipelineId, im.node(), im.recordsIn(), im.recordsOut(), im.kind());
             }
         } catch (RuntimeException e) {
-            log.warn("[FLOWJOB] conservation check failed for flow '{}': {}", flowId, e.getMessage());
+            log.warn("[FLOWJOB] conservation check failed for flow '{}': {}", pipelineId, e.getMessage());
         }
     }
 
@@ -286,16 +286,16 @@ public final class PipelineJobRunner implements Job {
      * have already committed, so a registration failure is logged, not raised. Views land under
      * {@code <write-root>/views/} (sibling of the authored-flow store) for a KPI/report/alert API to bind to.
      */
-    private void registerViews(PipelineGraph g, String flowId, List<String> srcStores, String dir) {
+    private void registerViews(PipelineGraph g, String pipelineId, List<String> srcStores, String dir) {
         ViewStore views = new ViewStore(flowStore.root().resolveSibling("views"));
         String now = Instant.now().toString();
         for (PipelineStores.Produced p : PipelineStores.producedStores(g)) {
             if (p.restsOnDisk()) continue;     // persistent/materialized already wrote bytes
             String derivedSql = deriveViewSql(g, p.node(), dir).orElse(null);   // single SELECT when expressible
             try {
-                views.write(new ViewDefinition(p.store(), flowId, srcStores, derivedSql, now));
+                views.write(new ViewDefinition(p.store(), pipelineId, srcStores, derivedSql, now));
                 log.info("[FLOWJOB] registered logical view '{}' (flow '{}', source_store(s) {}){}",
-                        p.store(), flowId, srcStores, derivedSql == null ? "" : " with derived_sql");
+                        p.store(), pipelineId, srcStores, derivedSql == null ? "" : " with derived_sql");
             } catch (Exception e) {
                 log.warn("[FLOWJOB] could not register view '{}': {}", p.store(), e.getMessage());
             }
@@ -350,12 +350,12 @@ public final class PipelineJobRunner implements Job {
      * Called only after the branch commit (crash-before-advance re-reads the increment, which the sink write
      * makes idempotent).
      */
-    private static void advanceWatermarks(Connection conn, PipelineWatermarkStore store, String flowId,
+    private static void advanceWatermarks(Connection conn, PipelineWatermarkStore store, String pipelineId,
                                           List<Seed> seeds, Map<String, String> seedViews, String incCol)
             throws Exception {
         for (Seed seed : seeds) {
             String newMax = queryMaxAsText(conn, seedViews.get(seed.node()), incCol);
-            if (newMax != null) store.put(flowId, seed.store(), newMax);
+            if (newMax != null) store.put(pipelineId, seed.store(), newMax);
         }
     }
 

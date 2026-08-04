@@ -14,6 +14,10 @@ attribute through the editor's real save path and asserts it lands on the engine
 committed corpus. Its allowlist is the Flow→Pipeline **Tier-3 debt register**, and a `stale-allowlist` rule
 makes that debt self-retiring.
 
+**Flow→Pipeline Tier 1 SHIPPED** 2026-08-04 (§4) — pure rename, no migration. `ProvenanceRow.flowId` was
+reclassified **down to Tier 2** because it is `@PublicApi`: a tier boundary independent of persistence and
+JSON, and the one thing the original Tier-1 list got wrong.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
 needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the remaining §3.2 surfaces
 (OKF+superpower docs; Java+TS source), and both renames (§4, §5). Do not archive this plan until those close.
@@ -340,13 +344,27 @@ GLOSSARY §13 records Flow→Pipeline as ✅ DONE with *"Kept: authored-flow sto
 response keys."* This plan **reverses those keeps** per the operator's Tier-3 decision. The §13 row must be
 updated to say so, or the next shift will read the keeps as still-current.
 
-**Tier 1 — non-breaking, pure refactor.** `flowId` params/locals, `runningFlows()`, `triggerFlowRun()`,
-`ProvenanceRow.flowId`, and test classes `ControlApiFlowsTest` / `ControlApiFlowRunTest` /
-`ControlApiFlowCrudTest`. Compile-checked, no migration.
+**Tier 1 — non-breaking, pure refactor. ✅ SHIPPED 2026-08-04.** `flowId` → `pipelineId` params/locals
+(59 occurrences over 5 files: `PipelineJobRunner`, `JobService`, `CollectorService`, `PipelineRoutes`,
+`JobServiceTest`), `runningFlows()` → `runningPipelines()`, `triggerFlowRun()` → `triggerPipelineRun()`,
+the three test classes → `ControlApiPipelinesTest` / `ControlApiPipelineRunTest` /
+`ControlApiPipelineCrudTest`, and the UI's `RunToHereData.flowId` → `pipelineId` (dialog-data field, never
+on the wire). No migration; compile- and test-checked.
+
+⚠ **`ProvenanceRow.flowId` was listed here and is NOT Tier 1 — it was moved to Tier 2.** The record is
+`@PublicApi(since = "4.3.0")`, so renaming the accessor `.flowId()` breaks external embedders, which by
+Tier 1's own "non-breaking" definition disqualifies it. It is *not* blocked by the things one would
+expect — the DuckDB column is a separate literal (`flow_id`) and the field is never Jackson-serialized
+(`query()`/`batches()` alias only `nodeId`/`rowCount`/`batchId`) — the `@PublicApi` marker alone is the
+gate. It now renames with the `inspecto_flow_provenance` table it keys, which is the coherent unit anyway.
+The record carries a comment saying so, so the next sweep does not "fix" it. **Lesson: `@PublicApi` is a
+tier boundary in its own right, independent of persistence and JSON.**
 
 **Tier 2 — breaking, internal.**
 
-- `inspecto_flow_provenance` → `inspecto_pipeline_provenance` (opt-in projection, `-Dprovenance.backend=duckdb`).
+- `inspecto_flow_provenance` → `inspecto_pipeline_provenance` (opt-in projection, `-Dprovenance.backend=duckdb`),
+  **together with `ProvenanceRow.flowId` → `pipelineId`** (moved down from Tier 1 — see above) and the
+  `DbProvenanceStore` SQL literals that name the column.
 - `FLOW_CONSERVATION_IMBALANCE` → `PIPELINE_CONSERVATION_IMBALANCE`. ⚠ **This value is persisted in
   existing event-ledger rows.** Renaming the constant without a read-alias orphans historical Incidents and
   any saved query filtering on it. Alias on read, do not rewrite history.
@@ -403,7 +421,8 @@ existing header warns about.
    tests). Locks in 1–3 behaviourally, pins the D3/D9 gaps, and turned up **D9** (open).
 5. **§3.2** guard on TOON config keys — ✅ **done 2026-08-04**. Corrected the "no allowlist needed"
    premise; the four entries are now the Tier-3 debt register, and a `stale-allowlist` rule retires them.
-6. **Flow Tier 1.**
+6. **Flow Tier 1** — ✅ **done 2026-08-04**. `ProvenanceRow.flowId` was reclassified **down to Tier 2**
+   mid-flight (`@PublicApi`); everything else renamed as planned.
 7. **§3.2** guard on OKF + superpower docs; reconcile
    [`consignment-elt-architecture.md`](consignment-elt-architecture.md) against GLOSSARY (§7 below).
 8. **Cube → Matrix** additive labels; mark §13 ✅.

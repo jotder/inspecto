@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * old {@code *_flow.toon} authoring writes are GONE — grandfathered flows stay readable / runnable /
  * deletable, never newly written.
  */
-class ControlApiFlowCrudTest {
+class ControlApiPipelineCrudTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();

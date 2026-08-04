@@ -17,9 +17,9 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { ConnectionTreeComponent } from 'app/modules/admin/connections/connection-tree.component';
 
-/** Dialog data: which authored flow + which node to run up to, plus the source's bound connection (if any). */
+/** Dialog data: which authored pipeline + which node to run up to, plus the source's bound connection (if any). */
 export interface RunToHereData {
-    flowId: string;
+    pipelineId: string;
     node: AuthoredNode;
     /** The seed source's connection id (`connections/<id>` → `<id>`), or null when none is bound. */
     connectionId: string | null;
@@ -248,7 +248,7 @@ export class RunToHereDialog implements OnInit {
         this.running.set(true);
         this.error.set(null);
         this.result.set(null);
-        this.api.runToNode(this.data.flowId, this.data.node.id, this.selectedFiles()).subscribe({
+        this.api.runToNode(this.data.pipelineId, this.data.node.id, this.selectedFiles()).subscribe({
             next: (r) => {
                 this.running.set(false);
                 this.result.set(r);

@@ -118,7 +118,7 @@ Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enu
 
 Node types from `PipelineNodeTypes.catalog()`. (The `demo` space now ships a real authored-flow example —
 `spaces/demo/config/flows/orders_rollup_flow.toon` — and the shape also appears in test Java strings
-(`ControlApiFlowCrudTest`, `PipelineJobRunnerTest`). `PipelineCodec` round-trips
+(`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`). `PipelineCodec` round-trips
 `nodes[id,type,name?,description?,use?,config?]` + `edges[from,rel,to]` + `name` + `active`.)
 
 | Node | Fragment | Doc |
@@ -286,7 +286,7 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
   **Stale, corrected 2026-07-22**: the `demo` sample catalog now ships both — a flow
   (`spaces/demo/config/flows/orders_rollup_flow.toon`) and an RCA template
   (`spaces/demo/config/ops/orders_rca.toon`), each also mirrored under `spaces/uat/config/`. The TOON
-  shapes are additionally exercised in tests (`ControlApiFlowCrudTest`, `PipelineJobRunnerTest`).
+  shapes are additionally exercised in tests (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`).
 - ~~`json` / `text_regex` frontends are `[LIVE]` — runnable examples can now be added to the suite.~~
   **SHIPPED 2026-07-20**: `examples/02-parsing/json-frontend` and `examples/02-parsing/text-regex-frontend`
   added (NDJSON + named-capture-group regex, each with `samples/` and a README catalog row).

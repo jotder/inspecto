@@ -86,7 +86,7 @@ Tests: `PipelineConfigSinksTest`, `ConfigSafetyValidatorTest` (per-sink jail/all
 `PipelineLiftTest.liftsSinksListToADataFedFanOut`,
 `BatchProcessorSinksTest.fanOutWritesEachDestinationAndFinalisesOnce`,
 `PipelineEditableTest.twoDistinctDatabasesLowerToASinksList`,
-`ControlApiFlowCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline`.
+`ControlApiPipelineCrudTest.twoDistinctDatabasesSaveAsAMultiSinkPipeline`.
 
 ## Quarantine outcomes
 

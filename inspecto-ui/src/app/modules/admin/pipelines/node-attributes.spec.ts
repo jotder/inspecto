@@ -58,7 +58,7 @@ describe('node-attributes', () => {
      * (`inspecto-engine/.../pipeline/exec/RowShaper.java:79`, and the fused path at :261). This shipped
      * as `predicate` — a word that appears in `RowShaper` only as the `requireExpr` error label (:89).
      * Every backend fixture uses `where` (`RowShaperTest`, `PipelineExecutorTest`, `PipelineDryRunTest`,
-     * `ComponentPreviewTest`, `ControlApiFlowRunTest`, …), which is what makes `where` the canonical side.
+     * `ComponentPreviewTest`, `ControlApiPipelineRunTest`, …), which is what makes `where` the canonical side.
      *
      * ⚠ This pins the NAMES only. That a filter actually filters is proved on the engine side —
      * `DataTransformerRowPredicateTest` (post-parse `where`) and

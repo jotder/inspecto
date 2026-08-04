@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 202 + runId polled to SUCCESS via {@code GET /jobs/runs/{runId}}, the sink store written, and no job
  * registered ({@code GET /jobs} stays empty — the run is ad-hoc, not a {@code *_job.toon}).
  */
-class ControlApiFlowRunTest {
+class ControlApiPipelineRunTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();

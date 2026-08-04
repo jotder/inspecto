@@ -520,8 +520,8 @@ class JobServiceTest {
              JobService js = new JobService(List.of(fj), bus, s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
             // the bus is synchronous on the publishing (job) thread, so this fires while run() is still in
-            // flight → the flow id must already be in runningFlows() at that instant (before the finally removes it)
-            bus.subscribe(ev -> { if ("nightly".equals(ev.pipeline())) midRun.set(js.runningFlows()); });
+            // flight → the flow id must already be in runningPipelines() at that instant (before the finally removes it)
+            bus.subscribe(ev -> { if ("nightly".equals(ev.pipeline())) midRun.set(js.runningPipelines()); });
             js.start();
             assertTrue(js.trigger("nightly"), "the flow job is built and triggerable");
             JobRun run = await(() -> js.lastRunOf("nightly").orElse(null));
@@ -530,7 +530,7 @@ class JobServiceTest {
             assertEquals("pipeline", run.type());
             assertNotNull(midRun.get(), "the flow's chain event fired");
             assertTrue(midRun.get().contains("evt_rollup"), "flow tracked as running mid-run: " + midRun.get());
-            assertTrue(js.runningFlows().isEmpty(), "the running-flow set is cleaned up after the run");
+            assertTrue(js.runningPipelines().isEmpty(), "the running-flow set is cleaned up after the run");
         }
     }
 
@@ -549,9 +549,9 @@ class JobServiceTest {
              JobService js = new JobService(List.of(), bus, s, null,
                      dir.resolve("audit").toString(), null, store, dataDir)) {
             // the ad-hoc run publishes its chain event under the flow id (there is no job name)
-            bus.subscribe(ev -> { if ("evt_rollup".equals(ev.pipeline())) midRun.set(js.runningFlows()); });
+            bus.subscribe(ev -> { if ("evt_rollup".equals(ev.pipeline())) midRun.set(js.runningPipelines()); });
             js.start();
-            String runId = js.triggerFlowRun("evt_rollup", "rahul");
+            String runId = js.triggerPipelineRun("evt_rollup", "rahul");
             JobRun run = await(() -> js.runById(runId).filter(r -> !"RUNNING".equals(r.status())).orElse(null));
 
             assertEquals("SUCCESS", run.status(), run.message());
@@ -560,7 +560,7 @@ class JobServiceTest {
             assertEquals("evt_rollup", run.job(), "the run is recorded under the flow id");
             assertNotNull(midRun.get(), "the flow's chain event fired");
             assertTrue(midRun.get().contains("evt_rollup"), "ad-hoc run tracked for the deletion fence mid-run");
-            assertTrue(js.runningFlows().isEmpty(), "the running-flow set is cleaned up after the run");
+            assertTrue(js.runningPipelines().isEmpty(), "the running-flow set is cleaned up after the run");
             assertTrue(js.jobs().isEmpty(), "an ad-hoc run never registers a job");
             assertEquals(1, js.runsFor("evt_rollup").size(), "history is browsable under the flow id");
         }
@@ -572,7 +572,7 @@ class JobServiceTest {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new BatchEventBus(), s, null, dir.resolve("audit").toString())) {
             js.start();
-            assertThrows(IllegalStateException.class, () -> js.triggerFlowRun("ghost", null));
+            assertThrows(IllegalStateException.class, () -> js.triggerPipelineRun("ghost", null));
         }
     }
 

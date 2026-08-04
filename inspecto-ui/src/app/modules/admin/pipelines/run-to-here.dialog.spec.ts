@@ -25,7 +25,7 @@ function create(data: Partial<RunToHereData> = {}) {
         providers: [
             provideNoopAnimations(),
             { provide: MatDialogRef, useValue: { close: () => {} } },
-            { provide: MAT_DIALOG_DATA, useValue: { flowId: 'cdr_ingest', node: { id: 'parse', type: 'parser.dsv' }, connectionId: null, ...data } },
+            { provide: MAT_DIALOG_DATA, useValue: { pipelineId: 'cdr_ingest', node: { id: 'parse', type: 'parser.dsv' }, connectionId: null, ...data } },
             { provide: PipelinesService, useValue: { runToNode: () => of(RUN_RESULT) } },
             { provide: ConnectionProbeService, useValue: { explore: () => of([]) } },
         ],

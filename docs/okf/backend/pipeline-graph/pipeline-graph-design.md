@@ -1006,7 +1006,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   /components/schema/{id}/test {sampleRows}`. **Sink preview:** `ComponentPreview.sink` scratch-validates
   store/format/partition-columns against the sample (row count + bounded sample, no write); `POST
   /components/sink/{id}/test {sampleRows}`. Shared scratch helper `ScratchTables` (seed/count/read/columnNames).
-  Tests: `ComponentPreviewTest`(8) · `PipelineDryRunTest`(2) · `ControlApiComponentsTest`(7)/`ControlApiFlowCrudTest`.
+  Tests: `ComponentPreviewTest`(8) · `PipelineDryRunTest`(2) · `ControlApiComponentsTest`(7)/`ControlApiPipelineCrudTest`.
 - [x] **T19 (done — CRUD backend 2026-06-18; component UI 2026-06-18; flow-topology editor closed 2026-07-19, see below).** Component + flow CRUD, generalising the
   connection write pattern (write-root gated, id-sanitised, path-jailed, atomic temp+move). **Component CRUD:**
   `com.gamma.pipeline.ComponentStore` (create/replace/delete/list/get over `<write-root>/registry/<typeDir>/<id>.toon` for
@@ -1018,7 +1018,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   + `/{id}/nodes`,`/{id}/edges` (incremental edits) — every write gated by `PipelineValidator` (422 on errors); a distinct
   namespace from the read-only lifted-pipeline projection. Tests: `ComponentStoreTest`(5, incl. a schema tabular
   round-trip confirming `ConfigCodec.toToon` handles schemas) · `ControlApiComponentsTest`(3) · `PipelineCodecTest`(3) ·
-  `PipelineStoreTest`(3) · `ControlApiFlowCrudTest`(3). **Component authoring UI done 2026-06-18 (T19a):**
+  `PipelineStoreTest`(3) · `ControlApiPipelineCrudTest`(3). **Component authoring UI done 2026-06-18 (T19a):**
   `inspecto-ui` `modules/admin/components` — a `/components` pane listing grammar/schema/transform/sink with
   create/edit/delete (mirrors the connections-CRUD pane), a per-kind `ComponentFormDialog` (structured fields;
   transform operator+JSON config) with an inline **Test** panel driving the T18 dry-run endpoints
@@ -1082,7 +1082,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   history. Response mirrors the jobs trigger: `202 {runId, pipeline, status}` + `Location`. Gates: 503 no
   write root · 404 missing/unsafe flow id · `canOperateRuns`. **Deliberately NOT `…/run`:** that path is the
   editor's scratch-only run-to-here contract (`POST …/run?to={nodeId}`, `pipelines.service.ts`, mock-only
-  today) and must never fire a production run. Tests: `ControlApiFlowRunTest` (real HTTP, every gate) +
+  today) and must never fire a production run. Tests: `ControlApiPipelineRunTest` (real HTTP, every gate) +
   2 `JobServiceTest` (lifecycle-without-registration; fail-closed without a flow store).
   **UI consumer for views done (2026-07-18):** `ViewsService` (`inspecto/api/views.service.ts`) wraps
   the three `/views*` endpoints; the pipeline inspector shows a **Preview data** action on `sink.view`
@@ -1124,7 +1124,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   (`<flow>/<node>`) + a synthetic **store node** (`store:<name>`, category `STORE`) per produced/consumed store,
   wired `producer-sink → store → consumer`, drawing the cross-flow `on_commit` through the table. The derived
   `PipelineStores.superimpose` links are exposed for reference. `GET /pipelines/combined` endpoint. The join is config-derived
-  (sink `store` ↔ consumer `source_store`), no `on_pipeline` coupling. `PipelineProjectionTest`/`ControlApiFlowsTest`.
+  (sink `store` ↔ consumer `source_store`), no `on_pipeline` coupling. `PipelineProjectionTest`/`ControlApiPipelinesTest`.
   **UI (Pass B):** a "Combined" toggle in the **Flows** pane reuses the shared G6 `graph-view`, styling the synthetic
   store as a `TABLE`-kind join node (`toCombinedG6Data`); verified live (2 flows, store legend, no console errors).
 - [x] **T25 (backend done 2026-06-17).** **Deletion fence on the shared store** (§3.8 rule 4): `DeletionFence.check`
@@ -1236,7 +1236,7 @@ executor (§13 R3), still future work — W5 makes the editor *author* the canon
 widen what executes.
 
 *Verified: `PipelineEditableTest` (8 — verbatim round-trip + every refusal), the rewritten
-`ControlApiFlowCrudTest` (7 — the canonical round-trip, grandfathered reads, retired writes), full
+`ControlApiPipelineCrudTest` (7 — the canonical round-trip, grandfathered reads, retired writes), full
 `inspecto-engine,inspecto` reactor 618/0/0; UI gate 1945/0 + prod build; a live offline walk (create →
 canonical `*_pipeline.toon` written with the full space-convention dir set + `registered:true` → lifted
 to the graph). The mock's TS lift/lower (`inspecto-ui/.../mock/pipeline-editable.ts`) pins the same

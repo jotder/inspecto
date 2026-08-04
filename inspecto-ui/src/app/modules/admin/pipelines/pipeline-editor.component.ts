@@ -816,15 +816,15 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Open the run-to-here loop for a node: pick inbox files → run the subgraph up to it → see Parquet. */
     openRunToHere(node: AuthoredNode): void {
-        const flowId = this.selectedId();
+        const pipelineId = this.selectedId();
         const m = this.model();
-        if (!flowId || !m) return;
+        if (!pipelineId || !m) return;
         const src = m.nodes.find((n) => this.typeCategory(n.type) === 'SOURCE' && n.use?.startsWith('connections/'));
         const connectionId = src?.use ? src.use.slice('connections/'.length) : null;
         const ref = this.dialog.open(RunToHereDialog, {
             width: '760px',
             autoFocus: false,
-            data: { flowId, node, connectionId },
+            data: { pipelineId, node, connectionId },
         });
         ref.afterClosed().subscribe((r?: PipelineRunResult) => {
             if (r) this.applyRunOutcomes(r);

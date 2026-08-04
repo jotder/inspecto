@@ -966,7 +966,7 @@ final class PipelineRoutes implements RouteModule {
     /**
      * {@code POST /pipelines/authored/{id}/trigger} — run an authored flow for real, once, config-less (T32
      * follow-up): no {@code type: pipeline} {@code *_job.toon} needed. The fire goes through
-     * {@link com.gamma.job.JobService#triggerFlowRun} so it gets the full registered-run lifecycle
+     * {@link com.gamma.job.JobService#triggerPipelineRun} so it gets the full registered-run lifecycle
      * (deletion-fence tracking, non-overlap, durable run ledger) without registering a job. Async:
      * {@code 202} + {@code {runId,...}} + a {@code Location} to poll ({@code GET /jobs/runs/{runId}});
      * optional {@code ?actor=} attributes the fire. 503 without a write root, 404 if the flow is absent.
@@ -976,7 +976,7 @@ final class PipelineRoutes implements RouteModule {
         if (!new PipelineStore(root).exists(id)) throw new ApiException(404, "no authored flow '" + id + "'");
         String runId;
         try {
-            runId = api.service().jobServiceOrCreate().triggerFlowRun(id, ApiContext.query(e, "actor"));
+            runId = api.service().jobServiceOrCreate().triggerPipelineRun(id, ApiContext.query(e, "actor"));
         } catch (IllegalStateException ex) {
             // the service booted without a write root, so its flow store never opened — same gate as above
             throw new ApiException(503, ex.getMessage());

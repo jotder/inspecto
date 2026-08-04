@@ -149,7 +149,7 @@ console errors.
 are disabled, non-draggable, dimmed, with a tooltip saying they cannot be saved.
 → verified against the live endpoint: **9 enabled / 11 disabled**, 20 total. The mock↔server contract
 is pinned by name in `pipelines.handler.spec.ts` (the laxer-mock failure mode), plus a backend
-assertion in `ControlApiFlowsTest`.
+assertion in `ControlApiPipelinesTest`.
 
 **Step 3 — persistent refusals (G3). ✅ SHIPPED.** `showRefusals` now maps **every** refusal into
 `findings` and opens the Validation dock (click-to-select already existed); the toast is reduced to a

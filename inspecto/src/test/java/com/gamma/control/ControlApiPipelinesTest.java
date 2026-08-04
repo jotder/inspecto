@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code GET /pipelines} list, the {@code GET /pipelines/node-types} editor palette, and
  * {@code GET /pipelines/{id}/graph} (a registered pipeline lifted to a {@code PipelineGraph} and projected).
  */
-class ControlApiFlowsTest {
+class ControlApiPipelinesTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
