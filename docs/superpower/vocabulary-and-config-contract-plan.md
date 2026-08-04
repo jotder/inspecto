@@ -62,8 +62,12 @@ turned out to be "the filed fix would have made things worse":
 correct per BLOCK, not per NODE.* Onboarding authors `collector:` whole; the graph splits the same block
 across nodes. The fix for a per-adopter gap is a documented derivation, never a prune and never a fork.
 
-**Open:** the §3.2 guard on Java+TS source (item 11) and §3.1 serve-cfg-vocabulary-from-server (item 12).
-Do not archive this plan until those close.
+**§3.2 guard on Java+TS source SHIPPED 2026-08-04** (item 11) — pass 4, 1,359 files, green. The section's own
+"large allowlist" prediction was wrong (8 entries, not ~223) because the rule bans only *compound*
+identifiers; 20 residual identifiers were renamed rather than allowlisted. Proving it red exposed a bug in
+the rule that had been silently passing 9 real hits. See §3.2's as-built note.
+
+**Open:** §3.1 serve-cfg-vocabulary-from-server (item 12) is the last item. Do not archive until it closes.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -342,7 +346,7 @@ each new surface needs an allowlist for deliberate keeps, or CI goes red on inte
 |---|---|---|
 | **TOON config keys** | ✅ **SHIPPED 2026-08-04** — a second pass in the same script over the **committed** corpus (`git ls-files '*.toon'`, 142 files) | ⚠ **"none" was WRONG** — see below. Four entries, all Flow→Pipeline Tier-3 debt |
 | **OKF + superpower docs** | add trees, exclude `docs/archived-documents/**` | design docs legitimately name internal types — allowlist `FlowGraph`-style IR names |
-| **Java + TS source** | identifier scan | large allowlist; land **last** |
+| **Java + TS source** | ✅ **SHIPPED 2026-08-04** — pass 4, an identifier scan over `*/src/main/java/**` + `inspecto-ui/src/app/**` (1,359 files) | ⚠ **"large allowlist" was WRONG** — 8 entries, because the rule bans only *compound* identifiers. See below |
 | **UI↔config↔engine contract** | separate check, not a vocabulary rule — see §3.3 |
 
 `docs/archived-documents/**` is excluded permanently: CLAUDE.md defines it as *"kept for provenance, never
@@ -378,6 +382,48 @@ Three scoping decisions worth keeping:
 **Verified by proving it can go red**, not just green: each of the four rules was fired against probe
 files (exit 1), the `vocab-allow` per-line hatch was shown to suppress one, a bogus allow entry was shown
 to trip `stale-allowlist`, and the clean tree exits 0 over 9 docs + 142 configs.
+
+#### As-built for the Java+TS pass (2026-08-04) — and why it needed no large allowlist
+
+This section predicted a "large allowlist" and told itself to land this surface last. Landing it last was
+right; the allowlist prediction was wrong, and the reason is the one transferable lesson here.
+
+**Measure before designing the rule.** A bare `/flow/i` matches ~223 committed source files — which, had it
+shipped, would have meant a 223-entry allowlist, i.e. precisely the *"a noisy guard gets disabled"* failure
+this file's header warns about. But almost none of those 223 are the Pipeline entity. They are:
+
+1. **`flow` as a substring of an unrelated canonical word** — `Workflow` (the Incident/Case state machine,
+   canonical) and `overflow`. A naive rule flags every one.
+2. **the sanctioned lowercase "flow of value" sense** — link analysis genuinely computes **max-flow**
+   (`maxFlow`, `flowFrom`/`flowTo`, the `circular-flow` motif), and `FLOW_KEYWORDS` is the SQL
+   *control-flow* keyword set. These are the only correct names for what they are.
+3. **citations of the retired `*_flow.toon` format**, grandfathered on purpose since W5.
+
+So the rule bans `flow` **only when welded to another word** (`flowStore`, `openFlowStore`,
+`FLOW_CONSERVATION_IMBALANCE`) and never the bare word: nobody writes `flowStore` meaning fluid dynamics.
+That single distinction took the allowlist from ~223 entries to **8**, all of them reasoned — 3 deliberate
+keeps (the Tier-2 event read-alias and its reader), 4 sanctioned-sense (max-flow, SQL control-flow), and 3
+Tier-3 debt entries for the agent-tool argument named `flow`. Bare `flow` as a standalone local, parameter
+or javadoc word is deliberately deferred: it needs per-occurrence judgement, not a regex.
+
+**Scoped to `src/main/**` + the UI app, excluding `*.spec.ts` and Java test sources.** A test *method name*
+is a sentence (`aFlowJobSuccessChainsADownstreamJob`) — it reads as prose and carries no contract, so
+renaming them would have tripled the change for no reader benefit.
+
+**The residual was fixed, not allowlisted** — 20 identifiers renamed across Java and TS (`flowStore`→
+`pipelineStore`, `flowsRoot`→`pipelinesRoot`, `openFlowStore`→`openPipelineStore`, `trackFlowStart`→
+`trackPipelineStart`, `mockFlows`→`mockPipelines`, `createFlow`→`createPipeline`, `deleteFlow`→
+`deletePipeline`, …), so the guard ships **green over 1,359 files** rather than green over a baseline.
+
+⚠ **Proving it red found a bug in the rule itself, and this is why the red-first discipline is not
+ceremony.** The first regex was `[a-z]+Flows?\b`, which cannot match `openFlowStore` — `\b` will not sit
+between `Flow` and `Store`. A probe file with one `openFlowStore()` in it exposed that; the corrected
+`[a-z]+Flow[A-Za-z]*` then surfaced **9 further real hits** the buggy version had silently passed
+(`authoredFlowList`, `aiFlowArgs`, `combinedFlowOptions`, …). A guard verified only green would have
+shipped, reported success, and enforced roughly half of what it claimed.
+
+Also confirmed: the pass scans `git ls-files`, so an **untracked** probe is invisible to it — the same
+local==CI property the TOON pass relies on. `git add -N` was needed to make the probe fire at all.
 
 ### 3.3 The name-contract check — ✅ SHIPPED 2026-08-04
 
@@ -547,7 +593,9 @@ this file's subject IS the rename — same shape as the existing `bare-flow` ent
 9. **Flow Tier 2** with read-alias. — ✅ **done 2026-08-04.**
 10. **Flow Tier 3** with migration — via `release-workflow`, version bump. — ✅ **done 2026-08-04** (no
     version bump needed — see §4: dual-read/dual-emit everywhere, nothing to break).
-11. **§3.2** guard on Java + TS source, with allowlist. Last, largest allowlist.
+11. ~~**§3.2** guard on Java + TS source, with allowlist. Last, largest allowlist.~~ ✅ **DONE 2026-08-04** —
+    landing it last was right; "largest allowlist" was wrong (8 entries, because only *compound* identifiers
+    are banned). 20 residual identifiers renamed, green over 1,359 files.
 12. **§3.1** serve cfg vocabulary from the server — the structural fix. Can start any time after 4;
     sequenced last because it is the largest and 4 already prevents regression.
 

@@ -24,7 +24,7 @@ function seededStore(): MockStore {
 }
 
 describe('componentsHandler', () => {
-    const handler = componentsHandler({ mockStudio: true, mockFlows: true });
+    const handler = componentsHandler({ mockStudio: true, mockPipelines: true });
 
     it('lists, creates, gets and deletes a component kind', () => {
         const store = seededStore();
@@ -120,7 +120,7 @@ describe('componentsHandler', () => {
 
     it('respects the per-kind flag gating (studio kinds vs registry kinds)', () => {
         const store = seededStore();
-        const studioOnly = componentsHandler({ mockStudio: true, mockFlows: false });
+        const studioOnly = componentsHandler({ mockStudio: true, mockPipelines: false });
         expect(studioOnly(req('GET', '/api/components/dataset'), store)).toBeDefined();
         expect(studioOnly(req('GET', '/api/components/grammar'), store)).toBeUndefined(); // falls through
     });

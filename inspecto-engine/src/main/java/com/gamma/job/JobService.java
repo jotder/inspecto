@@ -96,7 +96,7 @@ public final class JobService implements AutoCloseable {
      *  time by the {@code receipt_prune} maintenance task. */
     private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
     /** Authored-flow store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
-    private final PipelineStore flowStore;
+    private final PipelineStore pipelineStore;
     /** Data root under which each store is a sub-directory — a flow job reads/writes {@code <dataDir>/<store>} (T32). */
     private final String dataDir;
     /** Optional deletion fence (T25): consulted before a {@code maintenance} job that declares a {@code store:}
@@ -184,19 +184,19 @@ public final class JobService implements AutoCloseable {
     /** As the full constructor, with no data-plane provenance store (T21). */
     public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
-                      PipelineStore flowStore, String dataDir) {
-        this(configs, bus, scheduler, reports, auditDir, jobRunStore, flowStore, dataDir, null);
+                      PipelineStore pipelineStore, String dataDir) {
+        this(configs, bus, scheduler, reports, auditDir, jobRunStore, pipelineStore, dataDir, null);
     }
 
     /**
      * Full constructor. Adds the authored-flow store and data root that {@link JobType#PIPELINE} jobs need (T32):
-     * a flow job loads its flow from {@code flowStore} and reads/writes stores under {@code dataDir}; plus an
+     * a flow job loads its flow from {@code pipelineStore} and reads/writes stores under {@code dataDir}; plus an
      * optional {@code provenanceStore} (T21) it records per-edge record counts to. All may be left at
      * {@code null}/default when no flow jobs / no provenance backend are configured.
      */
     public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
-                      PipelineStore flowStore, String dataDir,
+                      PipelineStore pipelineStore, String dataDir,
                       com.gamma.pipeline.exec.DbProvenanceStore provenanceStore) {
         this.configs   = new CopyOnWriteArrayList<>(configs);
         this.bus       = bus;
@@ -205,7 +205,7 @@ public final class JobService implements AutoCloseable {
         this.zone      = ZoneId.systemDefault();
         this.auditDir  = auditDir;
         this.ledger    = new JobRunLedger(auditDir, jobRunStore);
-        this.flowStore = flowStore;
+        this.pipelineStore = pipelineStore;
         this.dataDir   = dataDir;
         this.provenanceStore = provenanceStore;
         this.runLogStore = new RunLogStore(auditDir);
@@ -276,7 +276,7 @@ public final class JobService implements AutoCloseable {
                 List.of(ParameterDecl.required("pipeline", ParamType.STRING, "Authored Pipeline id to run"),
                         ParameterDecl.optional("incremental_column", ParamType.STRING, null, "Watermark column for incremental runs")),
                 List.of("pipeline.commit"), List.of()),
-                this::buildFlowJob));
+                this::buildPipelineJob));
         // sql.template (P3b, §15.1): the first Run Artifact producer. Config-aware parameters — the
         // authored SQL's $name tokens are its contract (SqlParamScanner). Injected with the space dataDir.
         registry.register(new SqlTemplateJobType(dataDir));
@@ -464,11 +464,11 @@ public final class JobService implements AutoCloseable {
     }
 
     /** A {@link JobType#PIPELINE} job (T32) — requires an authored-flow store (set {@code -Dassist.write.root}). */
-    private Job buildFlowJob(JobConfig c) {
-        if (flowStore == null)
+    private Job buildPipelineJob(JobConfig c) {
+        if (pipelineStore == null)
             throw new IllegalStateException("flow job '" + c.name()
                     + "' needs an authored-flow store; set -Dassist.write.root so authored flows can be loaded");
-        return new PipelineJobRunner(c, bus, flowStore, dataDir, auditDir, provenanceStore);
+        return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore);
     }
 
     private void onBatchEvent(BatchEvent event) {
@@ -620,7 +620,7 @@ public final class JobService implements AutoCloseable {
     public String triggerPipelineRun(String pipelineId, String actor) {
         JobConfig cfg = new JobConfig(pipelineId, "pipeline", null, null, true, false,
                 Map.of("pipeline", pipelineId), null, null);
-        Job job = buildFlowJob(cfg);   // fails closed without an authored-flow store
+        Job job = buildPipelineJob(cfg);   // fails closed without an authored-flow store
         String runId = newRunId(pipelineId);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
         submitAdhocRun(job, cfg, runId, trigger);
@@ -743,7 +743,7 @@ public final class JobService implements AutoCloseable {
                         String correlationId, int chainDepth, Firing firing) {
         runner.runExclusiveOrSkip(name, () -> {
             fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
-            String pipelineId = trackFlowStart(job, cfg, name);   // T32: mark a flow job's stores active for the fence
+            String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a flow job's stores active for the fence
             Map<String, String> params = cfg != null ? cfg.params() : Map.of();
             RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, chainDepth,
                     params, runLogStore, runLogMax, runArtifactStore);
@@ -896,7 +896,7 @@ public final class JobService implements AutoCloseable {
      * so it matches the flow names {@link DeletionFence#check} derives from the authored flows the live
      * {@code CollectorService} feeds it — a delete racing this flow's store then surfaces as a conflict.
      */
-    private String trackFlowStart(Job job, JobConfig cfg, String name) {
+    private String trackPipelineStart(Job job, JobConfig cfg, String name) {
         if (!"pipeline".equals(job.type())) return null;
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key.
         String pipelineId = cfg != null ? cfg.opt("pipeline", cfg.opt("flow", name)) : name;

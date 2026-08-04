@@ -35,21 +35,21 @@ public final class PipelineStore {
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
-    private final Path flowsRoot;
+    private final Path pipelinesRoot;
 
-    public PipelineStore(Path flowsRoot) {
-        this.flowsRoot = Objects.requireNonNull(flowsRoot, "flowsRoot").normalize();
+    public PipelineStore(Path pipelinesRoot) {
+        this.pipelinesRoot = Objects.requireNonNull(pipelinesRoot, "pipelinesRoot").normalize();
     }
 
     public Path root() {
-        return flowsRoot;
+        return pipelinesRoot;
     }
 
     /** Every authored flow on disk (re-scans), in filename order; an unparseable file is warned and skipped. */
     public List<PipelineGraph> list() {
         List<PipelineGraph> out = new ArrayList<>();
-        if (!Files.isDirectory(flowsRoot)) return out;
-        try (Stream<Path> files = Files.list(flowsRoot)) {
+        if (!Files.isDirectory(pipelinesRoot)) return out;
+        try (Stream<Path> files = Files.list(pipelinesRoot)) {
             files.filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(TOON))
                     .sorted()
@@ -61,7 +61,7 @@ public final class PipelineStore {
                         }
                     });
         } catch (IOException e) {
-            log.warn("Cannot scan flows dir {}: {}", flowsRoot, e.getMessage());
+            log.warn("Cannot scan flows dir {}: {}", pipelinesRoot, e.getMessage());
         }
         return out;
     }
@@ -112,8 +112,8 @@ public final class PipelineStore {
         if (s.contains("..") || !SAFE_ID.matcher(s).matches())
             throw new IllegalArgumentException(
                     "unsafe flow id '" + id + "' (allowed: letters, digits, '.', '_', '-')");
-        Path target = flowsRoot.resolve(s + TOON).normalize();
-        if (!target.startsWith(flowsRoot))
+        Path target = pipelinesRoot.resolve(s + TOON).normalize();
+        if (!target.startsWith(pipelinesRoot))
             throw new IllegalArgumentException("resolved path escapes the flows root");
         return target;
     }

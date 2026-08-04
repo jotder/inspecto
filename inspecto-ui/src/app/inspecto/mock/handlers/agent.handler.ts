@@ -70,7 +70,7 @@ function readSchemaFields(prompt: string): Record<string, unknown>[] {
  * break, so a wrong one here would look like a working draft — the same trap the schema half hit with
  * `number`. Same contract as the others: an unreadable sentence yields nothing, hence a retryable 422.
  */
-function readFlow(prompt: string): Record<string, unknown> | null {
+function readPipeline(prompt: string): Record<string, unknown> | null {
     const stages: { id: string; type: string; config?: Record<string, unknown> }[] = [];
     if (/\bcollect|acquire|ingest|read\b/i.test(prompt)) stages.push({ id: 'acq', type: 'acquisition' });
     const cond = readCondition(prompt);
@@ -325,7 +325,7 @@ export function agentHandler(flags: MockFlags): MockHandler {
             // Schema-keyed, pane-wins: the same merge order the backend does.
             let derivedArgs: Record<string, unknown>;
             if (tool === 'pipeline_author') {
-                const graph = readFlow(prompt);
+                const graph = readPipeline(prompt);
                 if (!graph)
                     return error(422, `the model did not produce arguments for '${tool}'`
                         + ' — rephrase the request, or fill the form directly');

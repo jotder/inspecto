@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Canonical-vocabulary guard. THREE independent passes, deliberately kept in one script so CI runs one step:
+// Canonical-vocabulary guard. FOUR independent passes, deliberately kept in one script so CI runs one step:
 //
 //   1. USER-FACING DOCS — prose must not use a ⛔ banned synonym (below). Curated set, no allowlist.
 //   2. TOON CONFIG KEYS — the committed config corpus must not grow a banned *key* (§3.2 of
@@ -8,6 +8,9 @@
 //      migration.
 //   3. KNOWLEDGE TREES — `docs/okf/**` + `docs/superpower/**`, same rules as pass 1 but allowlisted per
 //      `<path>::<ruleId>` (DOC_ALLOW). Added 2026-08-04; `docs/archived-documents/**` stays excluded.
+//   4. JAVA + TS SOURCE IDENTIFIERS — the surface §3.2 said to land LAST, added 2026-08-04. Bans `flow`
+//      only where it is WELDED to another word (`flowStore`, `FLOW_CONSERVATION`), never the bare word.
+//      See SOURCE_RULES for why that restraint is what makes the pass possible at all.
 //
 // Makes the glossary enforceable instead of aspirational: fails the build when a user-facing doc uses a
 // ⛔ banned synonym or commits a known concept-confusion. Born from the 2026-07-07 USER_GUIDE audit, whose
@@ -203,6 +206,72 @@ const CONFIG_ALLOW = {
         'Tier-3 debt: as above, the demo-space twin.',
 };
 
+// ── pass 4: Java + TS source identifiers (plan §3.2, the surface it said to land LAST) ────────────
+//
+// ⚠ This pass bans `flow` ONLY where it is glued to another word in an identifier (`flowStore`,
+// `openFlowStore`, `FLOW_CONSERVATION_IMBALANCE`). It deliberately does NOT ban the bare word, and that
+// restraint is the whole reason it can exist: a measurement before writing it found ~223 files matching
+// bare `flow`, of which the overwhelming majority are one of three legitimate things —
+//
+//   1. `Workflow` / `overflow` — `flow` as a SUBSTRING of an unrelated canonical word. `Workflow` is the
+//      Incident/Case state machine and is canonical; a naive /flow/i would have flagged all of it.
+//   2. the sanctioned lowercase "flow of value" sense — link analysis genuinely computes **max-flow**
+//      (`flowFrom`/`flowTo`, the `circular-flow` motif), and prose says "control flow", "back-pressure".
+//   3. citations of the retired `*_flow.toon` format, which is grandfathered on purpose (W5).
+//
+// A compound identifier has none of that ambiguity: nobody writes `flowStore` meaning fluid dynamics. So
+// this rule is precise where a word-level rule would be noise — and per this file's own header, a noisy
+// guard gets disabled. Bare `flow` as a standalone local, parameter or javadoc word is left to a later
+// sweep; it needs per-occurrence judgement, not a regex.
+//
+// Scope is `src/main/**` + the UI app, NOT test sources: test METHOD NAMES are a sentence
+// (`aFlowJobSuccessChainsADownstreamJob`), so they read as prose and carry no contract. Renaming them is
+// cosmetic and would have tripled this change for no reader benefit.
+const SOURCE_GLOBS = ['*/src/main/java/*.java', 'inspecto-ui/src/app/*.ts', 'inspecto-ui/src/app/*.html'];
+/** `*.spec.ts` is the TS half of the "test names are prose" exclusion above — `src/main/**` does it for Java. */
+const SOURCE_SKIP = /\.spec\.ts$/;
+
+const SOURCE_RULES = [
+    {
+        id: 'flow-identifier',
+        // `flow` welded to another word: flowStore | FlowStore | openFlowStore | FLOW_CONSERVATION |
+        // liftedFlows. The middle alternative needs the trailing `[A-Za-z]*` — an earlier `[a-z]+Flows?\b`
+        // silently MISSED `openFlowStore`, because `\b` cannot sit between `Flow` and `Store`. A probe
+        // caught it; without proving the rule red on a word-Flow-word name it would have shipped blind.
+        // `[a-z]+Flow` requires the capital F, so `workflow`/`overflow` can never match, and the
+        // `flow[A-Z_]` lookahead means bare `flow`/`flows`/`flowing` do not match either.
+        re: /\b(?:[Ff]low(?=[A-Z_])[A-Za-z_]*|[a-z]+Flow[A-Za-z]*|FLOW_[A-Z_]+)\b/g,
+        msg: 'The authored DAG is a **Pipeline**, never a "Flow" (GLOSSARY §5). Rename the identifier. If this is the sanctioned lowercase "flow of value" sense (link-analysis max-flow) or a citation of the retired `*_flow.toon` format, put `vocab-allow` on the line or allowlist the file.',
+    },
+];
+
+// Same `<path>::<ruleId>` keying and the same self-retirement as CONFIG_ALLOW: an entry that stops
+// suppressing anything is debt that has been PAID and must be deleted.
+const SOURCE_ALLOW = {
+    'inspecto-event/src/main/java/com/gamma/event/EventType.java::flow-identifier':
+        'Deliberate Tier-2 read-alias: FLOW_CONSERVATION_IMBALANCE_LEGACY must keep the pre-rename spelling — it exists to match events already persisted under the old type. Renaming it would defeat its purpose.',
+    'inspecto-engine/src/main/java/com/gamma/ops/EventObjectBridge.java::flow-identifier':
+        'Reads the Tier-2 legacy alias above so pre-rename events still promote — the whole point of the alias.',
+
+    // ── the sanctioned lowercase "flow of value" sense: NOT the Pipeline entity ────────────────────
+    'inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java::flow-identifier':
+        'FLOW_KEYWORDS is the SQL **control-flow** keyword set (CASE/WHEN/…) — English sense, nothing to do with a Pipeline.',
+    'inspecto-ui/src/app/modules/admin/studio/datasets/calculated-column-guard.ts::flow-identifier':
+        'The TS twin of ExpressionGuard.FLOW_KEYWORDS — same SQL control-flow sense.',
+    'inspecto-ui/src/app/inspecto/graph/graph-analysis.ts::flow-identifier':
+        'maxFlow is the **max-flow/min-cut** graph algorithm — the mathematical sense, and the only correct name for it.',
+    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
+        'The template half of the max-flow toolbox below (flowFrom/flowTo/runFlow) — same algorithmic sense.',
+    'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java::flow-identifier':
+        'Tier-3 debt, NOT an internal rename: `flowSchemaJson` builds the schema for an agent tool ARGUMENT named `flow`, which is an external contract the model is prompted against. Renaming it needs dual-accept on the tool arg (BACKLOG), so the helper keeps the argument\'s name until then.',
+    'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/ArgumentDeriver.java::flow-identifier':
+        'Tier-3 debt: `constrainedFlow` constrains that same `flow` tool argument — see InspectoTools above.',
+    'inspecto-intelligence/src/main/java/com/gamma/intelligence/InspectoIntelligenceAgent.java::flow-identifier':
+        'Tier-3 debt: calls `constrainedFlow` — see ArgumentDeriver above.',
+    'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-identifier':
+        'NOT a Pipeline: this is graph **max-flow** analysis (`flowFrom`/`flowTo`/`runFlow`), the sanctioned lowercase "flow of value" sense GLOSSARY permits — the same sense as the `circular-flow` motif pattern packs.',
+};
+
 /** Committed paths matching a pathspec (repo-relative, forward slashes), or null outside a git checkout. */
 function trackedFiles(pattern) {
     try {
@@ -325,9 +394,51 @@ if (treeDocs.length) {
     }
 }
 
-const all = [...violations, ...treeViolations, ...configViolations];
+// Pass 4: Java + TS source identifiers. Committed files only, same local==CI reason as pass 2.
+const sourceViolations = [];
+const usedSourceAllow = new Set();
+const sourceFiles = SOURCE_GLOBS.every((g) => trackedFiles(g) !== null)
+    ? [...new Set(SOURCE_GLOBS.flatMap((g) => trackedFiles(g)))].filter((p) => !SOURCE_SKIP.test(p))
+    : null;
+for (const rel of sourceFiles ?? []) {
+    let text;
+    try {
+        text = readFileSync(join(repoRoot, rel), 'utf8');
+    } catch {
+        continue; // listed by git but absent from the worktree (sparse checkout)
+    }
+    text.split(/\r?\n/).forEach((raw, i) => {
+        if (raw.includes('vocab-allow')) return;
+        for (const rule of SOURCE_RULES) {
+            for (const m of raw.match(rule.re) ?? []) {
+                const allow = `${rel}::${rule.id}`;
+                if (SOURCE_ALLOW[allow]) { usedSourceAllow.add(allow); continue; }
+                sourceViolations.push({ rel, line: i + 1, rule: rule.id, msg: rule.msg, hit: m, src: raw.trim() });
+            }
+        }
+    });
+}
+
+// Self-retiring, exactly as CONFIG_ALLOW/DOC_ALLOW: most SOURCE_ALLOW entries are Tier-3 debt, so when
+// that debt is paid the guard says so instead of carrying an exemption that would forgive a regression.
+if (sourceFiles !== null) {
+    for (const allow of Object.keys(SOURCE_ALLOW)) {
+        if (usedSourceAllow.has(allow)) continue;
+        const [path, ruleId] = allow.split('::');
+        sourceViolations.push({
+            rel: path,
+            line: 0,
+            rule: 'stale-allowlist',
+            hit: ruleId,
+            src: '(SOURCE_ALLOW entry)',
+            msg: `This allowlist entry no longer suppresses anything — the ${ruleId} exemption at this path is unused. DELETE the entry from SOURCE_ALLOW.`,
+        });
+    }
+}
+
+const all = [...violations, ...treeViolations, ...configViolations, ...sourceViolations];
 if (all.length) {
-    console.error(`\n✖ Vocabulary guard: ${violations.length} violation(s) in user-facing docs, ${treeViolations.length} in docs/{okf,superpower}, ${configViolations.length} in TOON config\n`);
+    console.error(`\n✖ Vocabulary guard: ${violations.length} violation(s) in user-facing docs, ${treeViolations.length} in docs/{okf,superpower}, ${configViolations.length} in TOON config, ${sourceViolations.length} in Java/TS source\n`);
     for (const v of all) {
         console.error(`  ${v.rel}:${v.line}  [${v.rule}] ${v.hit}`);
         console.error(`      ${v.src}`);
@@ -335,11 +446,15 @@ if (all.length) {
     }
     console.error('Fix by using the canonical term (docs/GLOSSARY.md), or append `vocab-allow` on the line for a justified exception.');
     console.error('A config key needs a deliberate keep? Add `<path>::<ruleId>` to CONFIG_ALLOW WITH a reason — it is tracked debt, not an excuse.');
-    console.error('A doc in docs/{okf,superpower} whose SUBJECT is the banned term, or which uses a sanctioned other sense? Add `<path>::<ruleId>` to DOC_ALLOW WITH a reason. A merely STALE doc must be fixed, not allowlisted.\n');
+    console.error('A doc in docs/{okf,superpower} whose SUBJECT is the banned term, or which uses a sanctioned other sense? Add `<path>::<ruleId>` to DOC_ALLOW WITH a reason. A merely STALE doc must be fixed, not allowlisted.');
+    console.error('A source identifier using the sanctioned lowercase sense (link-analysis max-flow), or blocked on an external contract? Add `<path>::<ruleId>` to SOURCE_ALLOW WITH a reason, or `vocab-allow` on the line for a one-off citation.\n');
     process.exit(1);
 }
 
 const configScope = toonFiles === null
     ? 'TOON pass skipped (not a git checkout)'
     : `${toonFiles.length} committed TOON config(s) clean`;
-console.log(`✓ Vocabulary guard: ${USER_FACING.length} user-facing doc(s) + ${treeDocs.length} docs/{okf,superpower} doc(s) + ${configScope} — no banned synonyms or concept-confusion.`);
+const sourceScope = sourceFiles === null
+    ? 'source pass skipped (not a git checkout)'
+    : `${sourceFiles.length} Java/TS source file(s) clean`;
+console.log(`✓ Vocabulary guard: ${USER_FACING.length} user-facing doc(s) + ${treeDocs.length} docs/{okf,superpower} doc(s) + ${configScope} + ${sourceScope} — no banned synonyms or concept-confusion.`);

@@ -97,7 +97,7 @@ describe('expectationsHandler', () => {
     // ── MET-5: unified storage — expectations live in component:expectation, so the generic
     //    version-history routes (componentsHandler) serve them offline ─────────────────────────
 
-    const components = componentsHandler({ mockFlows: true });
+    const components = componentsHandler({ mockPipelines: true });
 
     it('a config edit archives a version; run-check stamps do not (MET-5)', () => {
         const store = seededStore();

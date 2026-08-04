@@ -165,7 +165,7 @@ public final class CollectorService implements AutoCloseable {
     private final EventLog eventLog;
     /** Authored-pipeline store ({@link SpaceRoot#pipelinesDir()}); lets the deletion fence (T32) see
      *  pipeline jobs as store producers/consumers. {@code null} when no write root is configured. */
-    private final PipelineStore flowStore;
+    private final PipelineStore pipelineStore;
     /** Per-pipeline ingest exclusion: an operator-triggered run (Control API {@code /trigger},
      *  {@code /runs/{name}/trigger}) can never overlap a poll-cycle run — or another trigger — <em>of the
      *  same pipeline</em>, while different pipelines proceed concurrently. A waiting caller re-evaluates the
@@ -361,7 +361,7 @@ public final class CollectorService implements AutoCloseable {
         // the capture appender's global fallback still hits it); a hosted space gets its own instance.
         this.eventLog          = "default".equals(spaceId) ? EventLog.global() : EventLog.create();
         EventLog.register(spaceId, eventLog);
-        this.flowStore         = ServiceStores.openFlowStore(root);
+        this.pipelineStore         = ServiceStores.openPipelineStore(root);
         this.registry          = new CopyOnWriteArrayList<>(registry);
         this.pollSeconds       = Math.max(1, pollSeconds);
         this.maxConcurrentRuns = Math.max(1, maxConcurrentRuns);
@@ -374,7 +374,7 @@ public final class CollectorService implements AutoCloseable {
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
                         System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                        flowStore, System.getProperty("data.dir", root.dataDir()), ServiceStores.openProvenanceStore(root));
+                        pipelineStore, System.getProperty("data.dir", root.dataDir()), ServiceStores.openProvenanceStore(root));
         if (this.jobs != null) {
             this.jobs.deletionGuard(this::checkDeletion);   // T25: fence delete jobs
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
@@ -899,9 +899,9 @@ public final class CollectorService implements AutoCloseable {
         // in-flight runs into the active set, so a delete that races an active flow-job reader/writer is
         // flagged as a conflict — not just one racing a running pipeline.
         Set<String> active = running;
-        if (flowStore != null) {
+        if (pipelineStore != null) {
             try {
-                flows.addAll(flowStore.list());
+                flows.addAll(pipelineStore.list());
             } catch (RuntimeException e) {
                 log.warn("Deletion fence: could not list authored flows ({}): {}",
                         e.getClass().getSimpleName(), e.getMessage());
@@ -1141,7 +1141,7 @@ public final class CollectorService implements AutoCloseable {
         if (jobs == null) {
             JobService created = new JobService(List.of(), bus, scheduler, reports,
                     System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                    flowStore, System.getProperty("data.dir", root.dataDir()), null);
+                    pipelineStore, System.getProperty("data.dir", root.dataDir()), null);
             created.deletionGuard(this::checkDeletion);
             created.spaceId(spaceId);
             created.eventLog(eventLog);

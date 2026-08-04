@@ -55,21 +55,21 @@ final class PipelineRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/pipelines", (e, m) -> flowSummaries(api));
+        api.get("/pipelines", (e, m) -> pipelineSummaries(api));
         api.get("/pipelines/node-types", (e, m) -> PipelineProjection.catalog());
-        api.get("/pipelines/combined", (e, m) -> combinedFlows(api));
+        api.get("/pipelines/combined", (e, m) -> combinedPipelines(api));
         // *_flow.toon is GRANDFATHERED (W5, plan U-A): existing files stay readable / runnable /
         // deletable, but are never newly written — the authoring write routes are gone; the graph
         // editor now writes the canonical *_pipeline.toon via PUT /pipelines/{name}/graph below.
-        api.get("/pipelines/authored", (e, m) -> authoredFlowList(api));
-        api.get("/pipelines/authored/([^/]+)", (e, m) -> authoredFlow(api, ApiContext.name(m)));
-        api.get("/pipelines/authored/([^/]+)/raw", (e, m) -> authoredFlowRaw(api, ApiContext.name(m)));
-        api.delete("/pipelines/authored/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteFlow(api, ApiContext.name(m))));
+        api.get("/pipelines/authored", (e, m) -> authoredPipelineList(api));
+        api.get("/pipelines/authored/([^/]+)", (e, m) -> authoredPipeline(api, ApiContext.name(m)));
+        api.get("/pipelines/authored/([^/]+)/raw", (e, m) -> authoredPipelineRaw(api, ApiContext.name(m)));
+        api.delete("/pipelines/authored/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deletePipeline(api, ApiContext.name(m))));
         api.post("/pipelines/authored/([^/]+)/dry-run", (e, m) -> dryRunFlow(api, ApiContext.name(m), api.body(e)));
         // A real run is an operational verb (canOperateRuns) and mirrors POST /jobs/{name}/trigger — deliberately
         // NOT ".../run": that path is the editor's scratch-only run-to-here contract (POST …/run?to={nodeId},
         // pipelines.service.ts, mock-only today) and must never fire a production run.
-        api.post("/pipelines/authored/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> runFlow(api, e, ApiContext.name(m))));
+        api.post("/pipelines/authored/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> runPipeline(api, e, ApiContext.name(m))));
         api.get("/pipelines/([^/]+)/graph", (e, m) -> graphForPipeline(api, ApiContext.name(m)));
         // W5 (plan U-A): the editable round-trip over the canonical *_pipeline.toon.
         api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, ApiContext.name(m)));
@@ -86,7 +86,7 @@ final class PipelineRoutes implements RouteModule {
     }
 
     /** Lift every registered pipeline to a {@link PipelineGraph} and project a compact summary (GET /pipelines). */
-    private Object flowSummaries(ApiContext api) {
+    private Object pipelineSummaries(ApiContext api) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (CollectorService.PipelineView pv : api.service().pipelines()) {
             api.service().configFor(pv.name()).ifPresent(c -> {
@@ -107,12 +107,12 @@ final class PipelineRoutes implements RouteModule {
     }
 
     /** Lift every registered pipeline and project the combined pipeline+job topology (GET /pipelines/combined, T24). */
-    private Object combinedFlows(ApiContext api) {
-        return PipelineProjection.combined(liftedFlows(api.service()));
+    private Object combinedPipelines(ApiContext api) {
+        return PipelineProjection.combined(liftedPipelines(api.service()));
     }
 
     /** Every registered pipeline lifted to a {@link PipelineGraph} (shared with the component safe-delete check). */
-    static List<PipelineGraph> liftedFlows(CollectorService service) {
+    static List<PipelineGraph> liftedPipelines(CollectorService service) {
         List<PipelineGraph> graphs = new ArrayList<>();
         for (CollectorService.PipelineView pv : service.pipelines()) {
             service.configFor(pv.name()).ifPresent(c -> graphs.add(PipelineLift.lift(c)));
@@ -127,24 +127,24 @@ final class PipelineRoutes implements RouteModule {
         return PipelineProjection.graph(PipelineLift.lift(c));
     }
 
-    private Path flowsRootOrNull(ApiContext api) {
+    private Path pipelinesRootOrNull(ApiContext api) {
         return api.writeRoot() == null ? null : SpaceRoot.pipelinesSubdir(api.writeRoot());
     }
 
-    private PipelineStore flowStore(ApiContext api) {
+    private PipelineStore pipelineStore(ApiContext api) {
         return new PipelineStore(SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline write")));
     }
 
     /** {@code GET /pipelines/authored} — summaries of every authored flow (empty when no write root). */
-    private Object authoredFlowList(ApiContext api) {
-        Path root = flowsRootOrNull(api);
+    private Object authoredPipelineList(ApiContext api) {
+        Path root = pipelinesRootOrNull(api);
         if (root == null) return List.of();
         return new PipelineStore(root).list().stream().map(PipelineProjection::summary).toList();
     }
 
     /** {@code GET /pipelines/authored/{id}} — one authored flow's graph projection; 404 if absent. */
-    private Object authoredFlow(ApiContext api, String id) {
-        Path root = flowsRootOrNull(api);
+    private Object authoredPipeline(ApiContext api, String id) {
+        Path root = pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
         if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         return PipelineProjection.graph(g);
@@ -153,10 +153,10 @@ final class PipelineRoutes implements RouteModule {
     /**
      * {@code GET /pipelines/authored/{id}/raw} — the <b>lossless</b> authored definition ({@link PipelineCodec#toMap},
      * nodes with their config) so the editor can round-trip a flow without dropping node config; the
-     * {@link #authoredFlow} projection is structural-only. 404 if absent.
+     * {@link #authoredPipeline} projection is structural-only. 404 if absent.
      */
-    private Object authoredFlowRaw(ApiContext api, String id) {
-        Path root = flowsRootOrNull(api);
+    private Object authoredPipelineRaw(ApiContext api, String id) {
+        Path root = pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
         if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         return PipelineCodec.toMap(g);
@@ -900,9 +900,9 @@ final class PipelineRoutes implements RouteModule {
     }
 
     /** {@code DELETE /pipelines/authored/{id}} — remove an authored flow; 404 if absent. */
-    private Object deleteFlow(ApiContext api, String id) throws IOException {
-        PipelineStore store = flowStore(api);
-        if (!flowExists(store, id)) throw new ApiException(404, "no authored flow '" + id + "'");
+    private Object deletePipeline(ApiContext api, String id) throws IOException {
+        PipelineStore store = pipelineStore(api);
+        if (!pipelineExists(store, id)) throw new ApiException(404, "no authored flow '" + id + "'");
         boolean removed;
         try {
             removed = store.delete(id);
@@ -920,18 +920,18 @@ final class PipelineRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         }
-        validateFlow(g);
+        validatePipeline(g);
         return g;
     }
 
-    private void validateFlow(PipelineGraph g) {
+    private void validatePipeline(PipelineGraph g) {
         PipelineValidator.Result r = PipelineValidator.validate(g);
         if (!r.ok())
             throw new ApiException(422, "flow validation failed: " + r.errors().stream()
                     .map(i -> i.code() + " — " + i.message()).toList());
     }
 
-    private static boolean flowExists(PipelineStore store, String id) {
+    private static boolean pipelineExists(PipelineStore store, String id) {
         try {
             return store.exists(id);
         } catch (IllegalArgumentException e) {
@@ -945,7 +945,7 @@ final class PipelineRoutes implements RouteModule {
      * flow is absent, 400 on a bad sample, 422 on a validation/SQL error. Never touches production output.
      */
     private Object dryRunFlow(ApiContext api, String id, Map<String, Object> body) {
-        Path root = flowsRootOrNull(api);
+        Path root = pipelinesRootOrNull(api);
         PipelineGraph g;
         try {
             g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
@@ -972,7 +972,7 @@ final class PipelineRoutes implements RouteModule {
      * {@code 202} + {@code {runId,...}} + a {@code Location} to poll ({@code GET /jobs/runs/{runId}});
      * optional {@code ?actor=} attributes the fire. 503 without a write root, 404 if the flow is absent.
      */
-    private Object runFlow(ApiContext api, HttpExchange e, String id) throws IOException {
+    private Object runPipeline(ApiContext api, HttpExchange e, String id) throws IOException {
         Path root = SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline run"));
         if (!new PipelineStore(root).exists(id)) throw new ApiException(404, "no authored flow '" + id + "'");
         String runId;

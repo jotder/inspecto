@@ -38,7 +38,7 @@ final class ServiceStores {
      * configured. Lets the deletion fence (T32) see pipeline jobs as store producers/consumers; without a
      * write root a configured pipeline job fails closed at build time with a clear message.
      */
-    static PipelineStore openFlowStore(SpaceRoot root) {
+    static PipelineStore openPipelineStore(SpaceRoot root) {
         Path pipelines = root.pipelinesDir();
         return pipelines == null ? null : new PipelineStore(pipelines);
     }

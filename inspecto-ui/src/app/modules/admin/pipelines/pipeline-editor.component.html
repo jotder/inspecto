@@ -11,12 +11,12 @@
         @if (creating() && canAuthor()) {
             <mat-form-field subscriptSizing="dynamic" class="w-56">
                 <mat-label>New pipeline name</mat-label>
-                <input matInput [formControl]="newName" placeholder="orders_rollup" (keyup.enter)="createFlow()" />
+                <input matInput [formControl]="newName" placeholder="orders_rollup" (keyup.enter)="createPipeline()" />
                 @if (newName.touched && newName.invalid) {
                     <mat-error>A name is required</mat-error>
                 }
             </mat-form-field>
-            <button mat-flat-button color="primary" type="button" (click)="createFlow()">Create</button>
+            <button mat-flat-button color="primary" type="button" (click)="createPipeline()">Create</button>
             <button mat-button type="button" (click)="creating.set(false)">Cancel</button>
         } @else {
             <!-- Nothing is open on arrival, so Open is the primary affordance rather than a picker over
@@ -48,14 +48,14 @@
                 </button>
                 <button
                     mat-icon-button
-                    [matMenuTriggerFor]="flowMenu"
+                    [matMenuTriggerFor]="pipelineMenu"
                     [disabled]="!selectedId()"
                     matTooltip="More pipeline actions"
                     aria-label="More pipeline actions"
                 >
                     <mat-icon svgIcon="heroicons_outline:ellipsis-vertical"></mat-icon>
                 </button>
-                <mat-menu #flowMenu="matMenu">
+                <mat-menu #pipelineMenu="matMenu">
                     <button mat-menu-item (click)="renamePipeline()">
                         <mat-icon svgIcon="heroicons_outline:pencil"></mat-icon>
                         <span>Rename&hellip;</span>
@@ -64,7 +64,7 @@
                         <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
                         <span>Save as template&hellip;</span>
                     </button>
-                    <button mat-menu-item (click)="deleteFlow()">
+                    <button mat-menu-item (click)="deletePipeline()">
                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                         <span>Delete pipeline</span>
                     </button>
@@ -444,7 +444,7 @@
                                          result as a diff before it replaces the working model. -->
                                     <inspecto-ai-assist
                                         tool="pipeline_author"
-                                        [args]="aiFlowArgs()"
+                                        [args]="aiPipelineArgs()"
                                         [current]="aiCurrentPipeline()"
                                         label="Check this topology"
                                         [disabled]="!m.nodes.length"

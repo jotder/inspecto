@@ -140,7 +140,7 @@ export class PipelineInspectorComponent {
     /**
      * Whether the scratch run-to-here backend is actually there. `POST /pipelines/authored/{id}/run`
      * is a mock-only contract — the route is deliberately unregistered on the real ControlApi — so the
-     * host gates the button on `environment.mockFlows` rather than shipping one that 404s.
+     * host gates the button on `environment.mockPipelines` rather than shipping one that 404s.
      */
     @Input() canRunToHere = false;
 

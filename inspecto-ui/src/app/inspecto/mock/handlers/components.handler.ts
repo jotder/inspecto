@@ -34,13 +34,13 @@ const COMPONENTS = /\/components\/([^/]+)$/;
 
 export function componentsHandler(flags: MockFlags): MockHandler {
     const enabledFor = (kind: string): boolean =>
-        STUDIO_KINDS.has(kind) ? !!flags.mockStudio : !!flags.mockFlows;
+        STUDIO_KINDS.has(kind) ? !!flags.mockStudio : !!flags.mockPipelines;
 
     return (req: MockRequest, store: MockStore) => {
         const { method, url, space } = req;
         let m: string[] | null;
 
-        if (flags.mockFlows) {
+        if (flags.mockPipelines) {
             // The parser-editor's grammar preview + the ASN.1 module library moved to the served
             // parser framework (`/parsers` — see parsers.handler); this domain keeps only the
             // component registry + per-component test.

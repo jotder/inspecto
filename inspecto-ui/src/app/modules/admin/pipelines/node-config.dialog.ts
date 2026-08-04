@@ -309,7 +309,7 @@ export class NodeConfigDialog {
      * no `/components` surface at all, so an authored node's dotted type (`transform.filter`) has
      * nothing to hit. Hide the action rather than ship a button that 404s.
      */
-    readonly testAvailable = environment.mockFlows;
+    readonly testAvailable = environment.mockPipelines;
 
     readonly form = this.fb.group({
         name: this.fb.control(''),

@@ -93,7 +93,7 @@ const DRY_RUN = /\/pipelines\/authored\/([^/]+)\/dry-run$/;
 const RUN_TO = /\/pipelines\/authored\/([^/]+)\/run$/;
 const AUTHORED_ID = /\/pipelines\/authored\/([^/]+)$/;
 const GRAPH_RAW = /\/pipelines\/([^/]+)\/graph\/raw$/;
-const FLOW_GRAPH = /\/pipelines\/([^/]+)\/graph$/;
+const PIPELINE_GRAPH = /\/pipelines\/([^/]+)\/graph$/;
 const SAVE_AS_TEMPLATE = /\/pipelines\/([^/]+)\/save-as-template$/;
 const LABEL = /\/pipelines\/([^/]+)\/label$/;
 const PROV_BATCHES = /\/provenance\/batches$/;
@@ -105,7 +105,7 @@ const VIEW_NAME = /\/views\/([^/]+)$/;
 
 export function pipelinesHandler(flags: MockFlags): MockHandler {
     return (req: MockRequest, store: MockStore) => {
-        if (!flags.mockFlows) return undefined;
+        if (!flags.mockPipelines) return undefined;
         const { method, url, space } = req;
         // Grandfathered *_flow.toon store (read-only now). The CANONICAL pipelines the editor edits
         // live in PIPELINE_CONFIGS_COLL (shared with onboarding — W5/U-A: one model).
@@ -147,10 +147,10 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
         if (method === 'POST' && (m = match(url, LABEL))) {
             return relabel(store, space, m[1], req.body as { name?: string });
         }
-        if (method === 'PUT' && (m = match(url, FLOW_GRAPH))) {
+        if (method === 'PUT' && (m = match(url, PIPELINE_GRAPH))) {
             return saveGraph(store, space, m[1], req.body as AuthoredPipeline);
         }
-        if (method === 'GET' && (m = match(url, FLOW_GRAPH))) {
+        if (method === 'GET' && (m = match(url, PIPELINE_GRAPH))) {
             return json(graphOf(graphOfName(m[1])));
         }
         // POST/PUT /pipelines/authored* retired with W5 — 405 where the path still serves reads.
@@ -243,7 +243,7 @@ function viewData(flows: AuthoredPipeline[], name: string, limit: number): MockR
 
 /**
  * The `GET /pipelines` row for a stored config. `template`/`displayName` come from the CONFIG, not the
- * lifted graph — matching `PipelineRoutes.flowSummaries`, which reads them off `PipelineConfig` and emits
+ * lifted graph — matching `PipelineRoutes.pipelineSummaries`, which reads them off `PipelineConfig` and emits
  * each only when set (so an ordinary pipeline's row is byte-identical to before).
  */
 function configSummary(r: StoredPipelineConfig): PipelineSummary {

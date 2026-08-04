@@ -10,7 +10,7 @@ import com.gamma.api.PublicApi;
  * the topology; these rows are the quantities painted onto it. Keyed by {@code (pipelineId, batchId)} — the same
  * {@code batchId} the run publishes as its {@code BatchEvent} correlation id.
  *
- * <p>⚠ {@code flowId} → {@code pipelineId} is a Tier 2 (breaking, internal) rename — this record is
+ * <p>⚠ {@code flowId} → {@code pipelineId} is a Tier 2 (breaking, internal) rename — this record is  vocab-allow: cites the pre-rename name
  * {@code @PublicApi}, which is why it did NOT move in the Tier 1 sweep despite being an obvious Flow→Pipeline
  * hit. It renames together with the {@code inspecto_pipeline_provenance} table it keys (vocabulary plan §4),
  * since both are the same coherent unit.

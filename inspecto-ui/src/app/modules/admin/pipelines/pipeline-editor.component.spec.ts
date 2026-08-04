@@ -288,7 +288,7 @@ describe('PipelineEditorComponent', () => {
         const c = make();
         c.startNew();
         c.newName.setValue('x');
-        c.createFlow();
+        c.createPipeline();
         expect(c.unavailable()).toBe(true);
     });
 
@@ -417,7 +417,7 @@ describe('PipelineEditorComponent', () => {
         const c = make();
         c.model.set(structuredClone(FLOW));
 
-        const args = c.aiFlowArgs() as { flow: AuthoredPipeline };
+        const args = c.aiPipelineArgs() as { flow: AuthoredPipeline };
         expect(Object.keys(args)).toEqual(['flow']);
         expect(args.flow.nodes).toHaveLength(2);
         expect(args.flow.name).toBe('demo');

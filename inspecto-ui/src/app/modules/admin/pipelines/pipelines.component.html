@@ -46,7 +46,7 @@
                             <mat-label>Pipelines</mat-label>
                             <mat-select multiple [value]="combinedSelected()"
                                         (selectionChange)="setCombinedSelected($event.value)">
-                                @for (n of combinedFlowOptions(); track n) {
+                                @for (n of combinedPipelineOptions(); track n) {
                                     <mat-option [value]="n">{{ n }}</mat-option>
                                 }
                             </mat-select>

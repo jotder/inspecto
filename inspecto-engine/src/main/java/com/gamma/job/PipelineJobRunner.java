@@ -87,34 +87,34 @@ import java.util.Set;
 public final class PipelineJobRunner implements Job {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineJobRunner.class);
-    private static final String SEED_VIEW_PREFIX = "flow_src";
+    private static final String SEED_VIEW_PREFIX = "pipeline_src";
 
     private final JobConfig cfg;
     private final BatchEventBus bus;
-    private final PipelineStore flowStore;
+    private final PipelineStore pipelineStore;
     private final String dataDir;
     private final String auditDir;
     private final DbProvenanceStore provenance;   // T21 — nullable; default-off unless -Dprovenance.backend set
 
     /** As {@link #PipelineJobRunner(JobConfig, BatchEventBus, PipelineStore, String, String, DbProvenanceStore)} with no provenance store. */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore flowStore,
+    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir) {
-        this(cfg, bus, flowStore, dataDir, auditDir, null);
+        this(cfg, bus, pipelineStore, dataDir, auditDir, null);
     }
 
     /**
      * @param cfg        the job config ({@code flow} param = authored flow id)
      * @param bus        the batch-event bus for chain events
-     * @param flowStore  the authored-flow store ({@code <write-root>/flows}) to load the flow from
+     * @param pipelineStore  the authored-flow store ({@code <write-root>/flows}) to load the flow from
      * @param dataDir    the data root under which each store is a sub-directory (per-job {@code data_dir} overrides)
      * @param auditDir   the directory for the branch-commit log
      * @param provenance the data-plane provenance store (T21), or {@code null} to not record per-edge counts
      */
-    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore flowStore,
+    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance) {
         this.cfg = cfg;
         this.bus = bus;
-        this.flowStore = flowStore;
+        this.pipelineStore = pipelineStore;
         this.dataDir = dataDir;
         this.auditDir = auditDir;
         this.provenance = provenance;
@@ -129,7 +129,7 @@ public final class PipelineJobRunner implements Job {
         // read only, kept for existing *_job.toon files that were never resaved.
         String pipelineIdOpt = cfg.opt("pipeline", null);
         final String pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
-        PipelineGraph g = flowStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
+        PipelineGraph g = pipelineStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
                 "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
         String dir = cfg.opt("data_dir", dataDir);
         requireTopLevelSinks(g, dir);
@@ -290,7 +290,7 @@ public final class PipelineJobRunner implements Job {
      * {@code <write-root>/views/} (sibling of the authored-flow store) for a KPI/report/alert API to bind to.
      */
     private void registerViews(PipelineGraph g, String pipelineId, List<String> srcStores, String dir) {
-        ViewStore views = new ViewStore(flowStore.root().resolveSibling("views"));
+        ViewStore views = new ViewStore(pipelineStore.root().resolveSibling("views"));
         String now = Instant.now().toString();
         for (PipelineStores.Produced p : PipelineStores.producedStores(g)) {
             if (p.restsOnDisk()) continue;     // persistent/materialized already wrote bytes

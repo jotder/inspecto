@@ -83,7 +83,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
 });
 
 describe('pipelinesHandler — authored DELETE referential integrity (R2)', () => {
-    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
 
     it('409s deleting a pipeline a job triggers on, listing the referencing job', () => {
         const store = seededStore();
@@ -103,7 +103,7 @@ describe('pipelinesHandler — authored DELETE referential integrity (R2)', () =
 });
 
 describe('pipelinesHandler — /views (sink.view UI-consumer, T32 follow-up)', () => {
-    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
 
     function withView(store: MockStore): void {
         // Views come from sink.view nodes on grandfathered flows — seed one directly (authoring
@@ -140,7 +140,7 @@ describe('pipelinesHandler — /views (sink.view UI-consumer, T32 follow-up)', (
 });
 
 describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower over the config)', () => {
-    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
 
     it('lists the registered CANONICAL pipelines (config store), not the grandfathered flows', () => {
         const store = seededStore();
@@ -221,7 +221,7 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
  * preview greenlight precisely the collision this exists to prevent.
  */
 describe('pipelinesHandler — save-as-template mirrors the server gates and neutralising', () => {
-    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
     const post = (url: string, body: unknown, store: MockStore) => handler(req('POST', url, body), store);
 
     it('refuses an unknown source (404), a missing id (400), a bad id (422) and a taken id (409)', () => {
@@ -275,7 +275,7 @@ describe('pipelinesHandler — save-as-template mirrors the server gates and neu
 });
 
 describe('pipelinesHandler — label relabels without moving the identity', () => {
-    const handler = pipelinesHandler({ mockFlows: true, mockStudio: true });
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
 
     it('stamps the derived id, keeps the record key, and reports stampedId once', () => {
         const store = seededStore();

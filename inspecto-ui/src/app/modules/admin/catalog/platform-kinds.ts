@@ -4,9 +4,9 @@ import { ComponentKind, Part, Ref, Wiring, getKind, hasEditorRoute, pipelineRefs
 /**
  * P2 of the component-model adoption plan: register the platform's **existing** kinds on the unified registry
  * as thin, register-only adapters (no UI / behavior change). Atomic kinds (grammar / schema / transform /
- * sink / rule) are leaves; `pipeline` is the one composite — its `graph` wiring **is** the authored flow DAG
- * (the north-star "FlowGraph is literally a pipeline's wiring"). Studio's widget / dataset / dashboard register
- * separately (their own `*.kind.ts`).
+ * sink / rule) are leaves; `pipeline` is the one composite — its `graph` wiring **is** the authored
+ * Pipeline's DAG (the north-star: "FlowGraph is literally a pipeline's wiring"). vocab-allow: cites the phrase verbatim
+ * Studio's widget / dataset / dashboard register separately (their own `*.kind.ts`).
  *
  * Validators are intentionally tiny / no-op (no JSON-schema engine — adoption-plan STOP): they exist so the
  * registry can surface a kind's identity + part rules to the reuse-graph (P3), not to re-validate what the

@@ -11,7 +11,7 @@ export const environment = {
     // ── every mock domain ON (the only difference from environment.ts) ──
     mockConnectionProbe: true, // connection workbench: connect · explore · test · sample · CRUD
     mockSpaces: true, // /spaces meta/list/create/delete + Space-Templates gallery
-    mockFlows: true, // Pipelines graph editor (palette, authored-flow CRUD, dry-run)
+    mockPipelines: true, // Pipelines graph editor (palette, authored-flow CRUD, dry-run)
     mockOps: true, // operational-intelligence surfaces (events / alerts / objects / enrichment)
     mockStudio: true, // Studio component kinds + settings + BI template/share/public-dashboard/inv
     mockJobs: true, // Scheduler write actions + per-run logs/events

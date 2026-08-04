@@ -218,7 +218,7 @@ export class PipelineEditorComponent implements OnInit {
      * `POST /pipelines/authored/{id}/run?to=` has no real route — PipelineRoutes reserves the path
      * and never registers it, so run-to-here only works against the offline mock. Gate, don't 404.
      */
-    readonly scratchRunAvailable = environment.mockFlows;
+    readonly scratchRunAvailable = environment.mockPipelines;
 
     readonly bottomTab = signal<'dryrun' | 'validation' | null>(null);
 
@@ -542,7 +542,7 @@ export class PipelineEditorComponent implements OnInit {
         this.newName.reset('');
     }
 
-    createFlow(): void {
+    createPipeline(): void {
         if (this.newName.invalid) {
             this.newName.markAsTouched();
             return;
@@ -577,7 +577,7 @@ export class PipelineEditorComponent implements OnInit {
      * `{name, nodes, edges}` flat, as this pane did before A5.3, made the real backend answer
      * "flow is required and must be an object" on every call; only the offline mock accepted it.
      */
-    aiFlowArgs(): Record<string, unknown> {
+    aiPipelineArgs(): Record<string, unknown> {
         const m = this.model();
         // `active` travels too: the tool echoes the parsed graph, which always carries it, so omitting it
         // here makes the diff claim the check wants to deactivate a live pipeline. (Applying never could —
@@ -733,7 +733,7 @@ export class PipelineEditorComponent implements OnInit {
             });
     }
 
-    async deleteFlow(): Promise<void> {
+    async deletePipeline(): Promise<void> {
         const id = this.selectedId();
         if (!id) return;
         const ok = await this.confirm.confirmDestructive(

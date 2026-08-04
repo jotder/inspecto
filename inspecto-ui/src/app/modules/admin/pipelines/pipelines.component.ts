@@ -95,7 +95,7 @@ export class PipelinesComponent {
     });
 
     /** Pipeline names offered in the multiselect, filtered by its search box. */
-    readonly combinedFlowOptions = computed<string[]>(() =>
+    readonly combinedPipelineOptions = computed<string[]>(() =>
         this.filterNames(this.combinedSearch(), (this.combined()?.flows ?? []).map((f) => f.name)),
     );
 

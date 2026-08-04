@@ -23,7 +23,7 @@ export const environment = {
     // Prototype-only: serve the Pipelines graph editor fully offline (node-type palette, authored-flow
     // CRUD, dry-run, per-processor test) from an in-memory store. Flip false / remove the interceptor
     // once the real flow backend is wired.
-    mockFlows: false,
+    mockPipelines: false,
     // Prototype-only: serve the operational-intelligence surfaces (events / alerts / objects / enrichment)
     // fully offline from in-memory datasets, so the reusable query panel can be exercised with no backend.
     // Gates the ops handler in the unified mock store; flip false once wired to the real backend.
