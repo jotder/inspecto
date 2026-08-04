@@ -229,7 +229,14 @@ final class PipelineConfigParser {
         if (grammarRef == null) grammarRef = blankToNull(proc.get("grammar"));
         Path grammarFile = grammarRef == null ? null : resolveGrammarRef(grammarRef, configDir);
         if (grammarFile != null) b.referencedFiles.add(grammarFile);
-        Map<String, Object> csv = resolveGrammar(proc, grammarFile);
+
+        // A referenced Grammar is either the legacy FLAT csv_settings map or — since a Grammar
+        // component is just an EXTRACTED `parsing:` block — the block itself. Extraction must be a
+        // move, not a transform, so both shapes resolve here and the inline `parsing:` still wins.
+        Map<String, Object> grammarBlock = readGrammar(grammarFile);
+        boolean blockShaped = isParsingBlock(grammarBlock);
+        Map<String, Object> csv = resolveGrammar(proc, blockShaped ? null : grammarBlock);
+        if (blockShaped) csv = mergeParsing(csv, grammarBlock);
 
         if (parsing != null) csv = mergeParsing(csv, parsing);
 
@@ -308,9 +315,13 @@ final class PipelineConfigParser {
         // ── plugin ingester + segments ────────────────────────────────────────
         // `parsing.plugin` (frontend: plugin) is the unified alias for the legacy
         // `processing.ingester`/`segments`/`ingester_config` triple; when present its keys win.
+        // Inline first, then the referenced Grammar's own plugin root (an extracted `parsing:` block
+        // carries it too), then the legacy processing.* triple.
         Map<String, Object> pluginBlock =
                 (parsing != null && parsing.get("plugin") instanceof Map<?, ?> pm)
-                        ? (Map<String, Object>) pm : null;
+                        ? (Map<String, Object>) pm
+                        : (blockShaped && grammarBlock.get("plugin") instanceof Map<?, ?> gm)
+                                ? (Map<String, Object>) gm : null;
         b.ingesterClass = pluginBlock != null && pluginBlock.get("ingester") != null
                 ? (String) pluginBlock.get("ingester") : (String) proc.get("ingester");
         Object icfg = pluginBlock != null && pluginBlock.get("ingester_config") != null
@@ -981,25 +992,35 @@ final class PipelineConfigParser {
     }
 
     /**
-     * Resolve the effective delimited-parse settings map from {@code processing}: load the external
-     * grammar file at {@code processing.grammar} (if any), then overlay the inline
-     * {@code processing.csv_settings} (so inline keys win for local overrides). Returns {@code null}
-     * when neither is present (defaults then apply, preserving pre-4.1 behaviour).
-     *
-     * @throws FileNotFoundException if {@code processing.grammar} names a file that does not exist
+     * Resolve the effective delimited-parse settings map: the already-decoded legacy flat grammar
+     * (may be {@code null}) overlaid by the inline {@code processing.csv_settings} (so inline keys
+     * win for local overrides). Returns {@code null} when neither is present (defaults then apply,
+     * preserving pre-4.1 behaviour).
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> resolveGrammar(Map<String, Object> proc, Path grammarFile)
-            throws IOException {
+    private static Map<String, Object> readGrammar(Path grammarFile) throws IOException {
+        if (grammarFile == null) return null;
+        if (!Files.exists(grammarFile))
+            throw new FileNotFoundException("Grammar file not found: " + grammarFile);
+        log.info("[CONFIG] Grammar: {}", grammarFile);
+        return (Map<String, Object>) JToon.decode(Files.readString(grammarFile, StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Is this decoded Grammar an extracted {@code parsing:} block rather than a legacy flat
+     * {@code csv_settings} map? Told apart by a NESTED {@code delimited}/{@code plugin} root: a flat
+     * grammar carries the delimited keys at top level and never nests them, while
+     * {@code fixedwidth}/{@code json}/{@code text_regex} are maps in <em>both</em> shapes and so
+     * cannot discriminate.
+     */
+    private static boolean isParsingBlock(Map<String, Object> grammar) {
+        return grammar != null
+                && (grammar.get("delimited") instanceof Map<?, ?> || grammar.get("plugin") instanceof Map<?, ?>);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> resolveGrammar(Map<String, Object> proc, Map<String, Object> grammar) {
         Map<String, Object> inline = (Map<String, Object>) proc.get("csv_settings");
-        Map<String, Object> grammar = null;
-        if (grammarFile != null) {
-            if (!Files.exists(grammarFile))
-                throw new FileNotFoundException("Grammar file not found: " + grammarFile);
-            grammar = (Map<String, Object>)
-                    JToon.decode(Files.readString(grammarFile, StandardCharsets.UTF_8));
-            log.info("[CONFIG] Delimited grammar: {}", grammarFile);
-        }
         if (grammar == null && inline == null) return null;
         Map<String, Object> merged = new LinkedHashMap<>();
         if (grammar != null) merged.putAll(grammar);

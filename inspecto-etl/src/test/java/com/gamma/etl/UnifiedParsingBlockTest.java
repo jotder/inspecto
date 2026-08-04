@@ -221,6 +221,50 @@ class UnifiedParsingBlockTest {
         assertEquals("|", cfg.csv().delimiter());
     }
 
+    /**
+     * A Grammar component is an EXTRACTED `parsing:` block, so the block shape resolves too —
+     * extraction is a move, not a transform. (The flat shape above is the legacy spelling and both
+     * must keep working.)
+     */
+    @Test
+    void aParsingShapedGrammarComponentResolves(@TempDir Path dir) throws Exception {
+        writeGrammarComponent(dir, "block_form", """
+                frontend: delimited
+                delimited:
+                  delimiter: "|"
+                  skip_header_lines: 3
+                """);
+
+        PipelineConfig cfg = load(dir, "gblock", "", """
+                parsing:
+                  grammar: grammar/block_form
+                """);
+
+        assertEquals("|", cfg.csv().delimiter());
+        assertEquals(3, cfg.csv().skipHeaderLines());
+    }
+
+    /** Inline still wins over a block-shaped component, exactly as over the flat one. */
+    @Test
+    void inlineKeysOverrideAParsingShapedGrammarComponent(@TempDir Path dir) throws Exception {
+        writeGrammarComponent(dir, "block_form", """
+                frontend: delimited
+                delimited:
+                  delimiter: "|"
+                  skip_header_lines: 3
+                """);
+
+        PipelineConfig cfg = load(dir, "gblockovr", "", """
+                parsing:
+                  grammar: grammar/block_form
+                  delimited:
+                    delimiter: ";"
+                """);
+
+        assertEquals(";", cfg.csv().delimiter(), "the inline override wins");
+        assertEquals(3, cfg.csv().skipHeaderLines(), "…and the component supplies the rest");
+    }
+
     /** A ref naming no component fails loudly at load — never a silent default-delimiter parse. */
     @Test
     void unknownGrammarRefFailsLoudly(@TempDir Path dir) {

@@ -4,7 +4,7 @@ import { ParserTreeNode } from 'app/inspecto/api';
 
 /**
  * Recursive collapsible tree for a hierarchical parse preview (ASN.1 / JSON / XML) — the tree-shaped
- * counterpart to the flat ag-Grid output in {@link ParserConfigDialog}. Presentational only: takes a
+ * counterpart to the flat ag-Grid output in {@link GrammarEditorDialog}. Presentational only: takes a
  * {@link ParserTreeNode} forest and renders nested `treeitem`s, each showing its label, an optional type
  * chip, and a leaf value. Container nodes start expanded and toggle on click; nodes default-expand so the
  * record structure reads at a glance. A standalone component may reference its own selector recursively

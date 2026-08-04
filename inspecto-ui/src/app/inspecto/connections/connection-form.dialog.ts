@@ -29,7 +29,7 @@ export interface ConnectionFormResult {
 }
 
 /**
- * Create/edit a connection profile — a schema-driven, typed form (mirrors the parser-config dialog). A
+ * Create/edit a connection profile — a schema-driven, typed form (mirrors the Grammar editor dialog). A
  * connection-type dropdown (Database / FTP / FTPS / Local / SFTP) drives the per-type attribute sheet.
  * Progressive disclosure ("ask only what's necessary"):
  *

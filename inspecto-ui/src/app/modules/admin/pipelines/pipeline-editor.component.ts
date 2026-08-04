@@ -48,7 +48,7 @@ import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component'
 import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
-import { ParserConfigDialog } from './parser-config.dialog';
+import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
@@ -791,10 +791,10 @@ export class PipelineEditorComponent implements OnInit {
     openNodeConfig(node: AuthoredNode): void {
         if (!this.canAuthor()) return; // read-only (Business lens or View mode): no-op — double-click/Configure can't mutate
         const category = this.typeCategory(node.type);
-        // Parsers get the rich multi-pane parser editor; every other category uses the generic config popup.
+        // Parse nodes get THE shared Grammar editor; every other category uses the generic config popup.
         const ref =
             category === 'PARSE'
-                ? this.dialog.open(ParserConfigDialog, {
+                ? this.dialog.open(GrammarEditorDialog, {
                       width: '1100px',
                       maxWidth: '95vw',
                       autoFocus: false,
