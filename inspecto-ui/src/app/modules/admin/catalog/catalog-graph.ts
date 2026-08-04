@@ -36,6 +36,20 @@ export function nodeColor(kind: NodeKind): string {
 }
 
 /**
+ * User-facing display name per node kind. Additive-label only (GLOSSARY §13 "Cube → Matrix"): the model
+ * type stays `NodeKind.DERIVED_TABLE` — only what the UI PRINTS changes. Unmapped kinds fall back to the
+ * raw enum token (the historical behaviour every call site had before this map existed).
+ */
+const NODE_KIND_LABELS: Partial<Record<NodeKind, string>> = {
+    DERIVED_TABLE: 'Matrix',
+};
+
+/** Display label for a node kind — see {@link NODE_KIND_LABELS}. */
+export function nodeKindLabel(kind: NodeKind): string {
+    return NODE_KIND_LABELS[kind] ?? kind;
+}
+
+/**
  * Curated library of monochrome line glyphs (24×24 viewBox, path data only) offered in the configurable-icon
  * picker. Keyed by a stable name persisted in the icon map. Extends the original per-kind set with common
  * processor shapes (file/db/stream/filter/route/merge/aggregate/alert/write/…).
@@ -100,14 +114,14 @@ export function toG6Data(nodes: MetadataNode[], edges: MetadataEdge[]): G6GraphD
     };
 }
 
-/** Distinct node kinds present in the graph, paired with their legend colour (stable order). */
-export function legendFor(nodes: MetadataNode[]): { kind: NodeKind; fill: string }[] {
+/** Distinct node kinds present in the graph, paired with their legend colour + display label (stable order). */
+export function legendFor(nodes: MetadataNode[]): { kind: NodeKind; fill: string; label: string }[] {
     const seen = new Set<NodeKind>();
-    const out: { kind: NodeKind; fill: string }[] = [];
+    const out: { kind: NodeKind; fill: string; label: string }[] = [];
     for (const n of nodes) {
         if (!seen.has(n.kind)) {
             seen.add(n.kind);
-            out.push({ kind: n.kind, fill: nodeColor(n.kind) });
+            out.push({ kind: n.kind, fill: nodeColor(n.kind), label: nodeKindLabel(n.kind) });
         }
     }
     return out;

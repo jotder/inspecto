@@ -14,7 +14,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { GammaConfigService } from '@gamma/services/config';
 import { EdgeData, EdgeEvent, ElementDatum, Graph, GraphData, LayoutOptions, NodeData, NodeEvent } from '@antv/g6';
-import { G6GraphData, nodeColor, nodeShape } from './catalog-graph';
+import { G6GraphData, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
 import { toSvg } from 'app/inspecto/graph';
 import { NodeKind } from 'app/inspecto/api';
 import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
@@ -235,7 +235,7 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
             return `<b>${esc(data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}`;
         }
         const degree = this.data?.edges.filter((e) => e.source === d.id || e.target === d.id).length ?? 0;
-        return `<b>${esc(data.label)}</b><br/>${esc(data.kind)} · ${degree} link${degree === 1 ? '' : 's'}`;
+        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}`;
     }
 
     private rebuild(): void {

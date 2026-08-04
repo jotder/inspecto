@@ -119,7 +119,7 @@ describe('CatalogComponent', () => {
         const c = create().componentInstance;
         c.runGraph();
         expect(c.graph?.nodes).toEqual([TABLE]);
-        expect(c.legend).toEqual([{ kind: 'TABLE', fill: expect.any(String) }]);
+        expect(c.legend).toEqual([{ kind: 'TABLE', fill: expect.any(String), label: 'TABLE' }]);
     });
 
     it('deep-links to the Lineage tab and runs the traversal from ?tab=graph&from=', () => {

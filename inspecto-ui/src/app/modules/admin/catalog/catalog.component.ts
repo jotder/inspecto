@@ -112,7 +112,7 @@ export class CatalogComponent implements OnInit {
 
     // graph view (derived from `graph` on each successful traversal)
     g6Data: G6GraphData | null = null;
-    legend: { kind: NodeKind; fill: string }[] = [];
+    legend: { kind: NodeKind; fill: string; label: string }[] = [];
 
     readonly nodeColumns: ColDef[] = [
         { field: 'kind', headerName: 'Kind', width: 130 },

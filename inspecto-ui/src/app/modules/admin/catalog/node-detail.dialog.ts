@@ -7,6 +7,7 @@ import { CatalogService, MetadataNode, NodeDetail } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { AssistPanelComponent } from 'app/inspecto/components/assist-panel.component';
 import { StoreLineageComponent } from './store-lineage.component';
+import { nodeKindLabel } from './catalog-graph';
 
 /**
  * Catalog node inspector: node facts + attrs, neighbour grid (click to walk the graph
@@ -27,7 +28,7 @@ import { StoreLineageComponent } from './store-lineage.component';
             @if (detail && !loading) {
                 <table class="text-sm">
                     <tr><th scope="row" class="pr-4 text-left align-top">Id</th><td>{{ detail.node.id }}</td></tr>
-                    <tr><th scope="row" class="pr-4 text-left align-top">Kind</th><td>{{ detail.node.kind }}</td></tr>
+                    <tr><th scope="row" class="pr-4 text-left align-top">Kind</th><td>{{ nodeKindLabel(detail.node.kind) }}</td></tr>
                     @if (detail.node.description) {
                         <tr><th scope="row" class="pr-4 text-left align-top">Description</th><td>{{ detail.node.description?.text }}</td></tr>
                     }
@@ -81,8 +82,11 @@ export class NodeDetailDialog {
     loading = false;
     detail: NodeDetail | null = null;
 
+    /** Exposed for the template — see {@link nodeKindLabel}. */
+    readonly nodeKindLabel = nodeKindLabel;
+
     readonly neighbourColumns: ColDef[] = [
-        { field: 'kind', headerName: 'Kind', width: 120 },
+        { field: 'kind', headerName: 'Kind', width: 120, valueFormatter: (p) => nodeKindLabel(p.value) },
         { field: 'label', headerName: 'Label', flex: 1 },
         { field: 'id', headerName: 'Id', flex: 1 },
     ];

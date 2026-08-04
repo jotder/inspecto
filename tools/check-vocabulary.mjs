@@ -69,6 +69,8 @@ const DOC_ALLOW = {
         'Sanctioned sense: "Business-data stores" read via a DuckDB sandbox is the physical backend, not a Dataset.',
     'docs/superpower/vocabulary-and-config-contract-plan.md::bare-flow':
         'This plan IS the Flow→Pipeline rename: "Flow Tier 1/2/3" are the names of its own work items. Retire with the plan when Tier 3 lands.',
+    'docs/superpower/vocabulary-and-config-contract-plan.md::cube-noun':
+        'This plan IS the Cube→Matrix rename (§5): every hit is the plan discussing its own renamed term ("## 5. Cube → Matrix", the operator trigger quote, the audit\'s "no noun-sense Cube was found" finding). Retire alongside the bare-flow entry above.',
     'docs/okf/frontend/features/link-analysis.md::source-acquisition-entity':
         'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
     'docs/okf/backend/integrations.md::source-acquisition-entity':
@@ -103,6 +105,16 @@ const RULES = [
         // are allowed; only a standalone capitalized "Flow" noun is flagged.
         test: (line) => { const m = line.replace(/workflow/gi, '').match(/\bFlow(s)?\b/); return m ? m[0] : null; },
         msg: 'The authored DAG is a **Pipeline**, never a "Flow" (GLOSSARY §5).',
+    },
+    {
+        id: 'cube-noun',
+        // Cube→Matrix (GLOSSARY §13, plan §5, additive UI label — the model stays NodeKind.DERIVED_TABLE).
+        // Case-sensitive on purpose: the sanctioned VERB sense is always lowercase in existing prose
+        // ("aggregates (cubes)...", "a Transform or cube/rollup") and must keep passing; only a
+        // capitalized "Cube" noun is the asset-name confusion this rule catches. The `heroicons_outline:cube`
+        // icon id is backticked and already stripped by stripInlineCode above.
+        test: (line) => { const m = line.match(/\bCube\b/); return m ? m[0] : null; },
+        msg: 'The summary Derived Table\'s user-facing name is **Matrix** (GLOSSARY §13) — "Cube" stays a lowercase **verb** (the Transform action), never the asset\'s noun.',
     },
     {
         id: 'source-acquisition-entity',
