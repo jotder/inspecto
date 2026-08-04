@@ -67,6 +67,50 @@ class PipelineEditableTest {
         assertEquals("d1", ex.refusals().get(0).nodeId());
     }
 
+    /**
+     * A pipeline authored by the Onboarding Parsing stage carries its parse options in the top-level
+     * {@code parsing:} block — the design-of-record spelling, which {@code PipelineConfigParser}
+     * overlays <em>over</em> {@code processing.csv_settings}. The editor must therefore SEE that block
+     * on the parser node; otherwise it edits the losing key and the operator's change is masked.
+     */
+    @Test
+    void parsingBlockIsCarriedOnTheParserNode(@TempDir Path dir) throws Exception {
+        Path toon = writeParsingBlockPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        Map<?, ?> parser = nodeOfType(editable, "parser");
+        Map<?, ?> config = (Map<?, ?>) parser.get("config");
+        assertNotNull(config, "the parser node has config");
+
+        Map<?, ?> parsing = (Map<?, ?>) config.get("parsing");
+        assertNotNull(parsing, "the parser node carries the parsing: block it owns");
+        assertEquals("|", ((Map<?, ?>) parsing.get("delimited")).get("delimiter"));
+    }
+
+    /** …and an edit to it lowers back into {@code parsing:}, not the losing legacy key. */
+    @Test
+    void editedParsingBlockLowersBackIntoParsing(@TempDir Path dir) throws Exception {
+        Path toon = writeParsingBlockPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        // the operator changes the delimiter in the editor
+        Map<?, ?> parser = nodeOfType(editable, "parser");
+        Map<?, ?> parsing = (Map<?, ?>) ((Map<?, ?>) parser.get("config")).get("parsing");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> delimited = (Map<String, Object>) parsing.get("delimited");
+        delimited.put("delimiter", ";");
+
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+        Map<?, ?> loweredParsing = (Map<?, ?>) lowered.get("parsing");
+        assertEquals(";", ((Map<?, ?>) loweredParsing.get("delimited")).get("delimiter"),
+                "the edit lands in parsing:, the block that wins the overlay");
+    }
+
     /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */
     @Test
     void twoDistinctDatabasesLowerToASinksList() {
@@ -175,6 +219,62 @@ class PipelineEditableTest {
 
     private static PipelineNode node(String id, String type, Map<String, Object> cfg) {
         return new PipelineNode(id, type, null, null, cfg, null);
+    }
+
+    /** The single node of {@code type} in an editable map — fails loudly if there isn't exactly one. */
+    private static Map<?, ?> nodeOfType(Map<String, Object> editable, String type) {
+        List<?> nodes = (List<?>) editable.get("nodes");
+        List<Map<?, ?>> hits = new java.util.ArrayList<>();
+        for (Object n : nodes) if (type.equals(((Map<?, ?>) n).get("type"))) hits.add((Map<?, ?>) n);
+        assertEquals(1, hits.size(), "exactly one '" + type + "' node");
+        return hits.get(0);
+    }
+
+    /**
+     * A pipeline in the Onboarding spelling: parse options in the top-level {@code parsing:} block,
+     * with only the schema reference left in {@code processing:}. Deliberately has NO
+     * {@code processing.csv_settings} — that is the point: the options live where the parser gives
+     * them precedence.
+     */
+    private static Path writeParsingBlockPipeline(Path dir) throws Exception {
+        Path sf = dir.resolve("pb_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: EVENT_DATE
+                raw:
+                  name: pb_data
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    ID, "0", VARCHAR
+                    EVENT_DATE, "1", DATE
+                mapping:
+                  canonicalName: pb_data
+                  rawName: pb_data
+                  rules[2]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                    EVENT_DATE, EVENT_DATE, DIRECT
+                """);
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: PARSING_BLOCK
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                collector:
+                  connector: local
+                parsing:
+                  frontend: delimited
+                  delimited:
+                    delimiter: "|"
+                    has_header: false
+                processing:
+                  schema_file: %2$s
+                """.formatted(base, sf.toString().replace('\\', '/'));
+        Path p = dir.resolve("parsing_block_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
     }
 
     @SuppressWarnings("unchecked")

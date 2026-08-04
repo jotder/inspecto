@@ -63,7 +63,11 @@ public final class PipelineEditable {
      */
     private static final Set<String> NOT_ACQ_OWNED = Set.of("gap_detection");
 
-    /** Parser-owned processing keys (schema resolution + the parse frontend). */
+    /**
+     * Parser-owned <b>processing</b> keys (schema resolution + the parse frontend). The parser also
+     * owns the top-level {@code parsing:} block, which is NOT listed here because it is not a
+     * {@code processing:} key — it is carried verbatim under its own node-config key.
+     */
     private static final Set<String> PARSER_OWNED = Set.of(
             "csv_settings", "schema_file", "schemas", "segments", "ingester", "ingester_config");
 
@@ -132,6 +136,12 @@ public final class PipelineEditable {
             putIfPresent(c, "file_pattern", processing.get("file_pattern"));
         } else if (BuiltinNodeType.PARSER.type().equals(t)) {
             for (String k : PARSER_OWNED) putIfPresent(c, k, processing.get(k));
+            // The unified top-level parsing: block is parser-owned too, carried VERBATIM under its own
+            // key rather than flattened into the legacy ones. It is not a second spelling the editor may
+            // ignore: PipelineConfigParser overlays parsing: OVER processing.csv_settings, so a parser
+            // node that could not see it would edit the losing key and the operator's change would be
+            // silently masked by the block Onboarding wrote.
+            putIfPresent(c, "parsing", raw.get("parsing"));
         } else if (BuiltinNodeType.GAP.type().equals(t)) {
             if (collector.get("gap_detection") instanceof Map<?, ?> gd)
                 for (Map.Entry<?, ?> e : gd.entrySet())
@@ -222,9 +232,10 @@ public final class PipelineEditable {
                 refusals.add(new PipelineCompileException.Refusal(NO_PERSISTENT_SINK, null,
                         "an active pipeline needs a persistent sink with a database dir"));
             final PipelineNode p = parser;
-            if (p != null && PARSER_OWNED.stream().noneMatch(k -> p.cfg(k) != null))
+            if (p != null && p.cfg("parsing") == null
+                    && PARSER_OWNED.stream().noneMatch(k -> p.cfg(k) != null))
                 refusals.add(new PipelineCompileException.Refusal(PARSER_NO_SCHEMA, p.id(),
-                        "the parser names no schema_file / schemas / segments"));
+                        "the parser names no parsing: block / schema_file / schemas / segments"));
         }
         if (!refusals.isEmpty()) throw new PipelineCompileException(refusals);
 
@@ -268,6 +279,10 @@ public final class PipelineEditable {
         if (parser != null) {
             processing.keySet().removeAll(PARSER_OWNED);
             for (String k : PARSER_OWNED) putIfPresent(processing, k, parser.cfg(k));
+            // …and the top-level parsing: block it owns (see editableConfig). Absent from the node ⇒
+            // absent from the file, but only in strict mode: a partial merge must not drop a block it
+            // was never given.
+            overlayOwned(out, "parsing", parser.cfg("parsing"), strict);
             if (!filters.isEmpty()) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> csv = (Map<String, Object>)

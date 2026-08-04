@@ -119,6 +119,10 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     // `where`/`include_regex` buried in the parser's free-form csv_settings while the real backend put
     // it on a Filter node: the same surface reporting two different graphs for one file.
     const filterCfg = extractRowFilters(parserCfg);
+    // The top-level `parsing:` block is parser-owned too, carried verbatim (mirrors
+    // `PipelineEditable.editableConfig`). It OVERLAYS processing.csv_settings in the engine, so a
+    // parser node that could not see it would edit the losing key.
+    if (config['parsing'] != null) parserCfg['parsing'] = config['parsing'];
     nodes.push({ id: 'parse', type: 'parser', name: 'Parser', config: parserCfg });
     edges.push({ from: upstream, rel: 'data', to: 'parse' });
     let sinkUpstream = 'parse';
@@ -189,9 +193,9 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         if (!parser) refusals.push({ code: 'NO_PARSER', message: 'an active pipeline needs a parser node' });
         if (!primarySink || primarySink.config?.['database'] == null)
             refusals.push({ code: 'NO_PERSISTENT_SINK', message: 'an active pipeline needs a persistent sink with a database dir' });
-        const schemaKeys = ['csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config'];
+        const schemaKeys = ['parsing', 'csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config'];
         if (parser && !schemaKeys.some((k) => parser!.config?.[k] != null))
-            refusals.push({ code: 'PARSER_NO_SCHEMA', nodeId: parser.id, message: 'the parser names no schema_file / schemas / segments' });
+            refusals.push({ code: 'PARSER_NO_SCHEMA', nodeId: parser.id, message: 'the parser names no parsing: block / schema_file / schemas / segments' });
     }
     if (refusals.length) return { refusals };
 
@@ -234,6 +238,10 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
             const csv = asMap(processing['csv_settings']); processing['csv_settings'] = csv;
             for (const f of filters) Object.assign(csv, f.config ?? {});
         }
+        // …and the top-level parsing: block it owns. Removed only in strict mode: a partial merge
+        // must not drop a block it was never given (mirrors `overlayOwned`).
+        if (parser.config?.['parsing'] != null) out['parsing'] = parser.config['parsing'];
+        else if (strict) delete out['parsing'];
     }
 
     if (primarySink) {

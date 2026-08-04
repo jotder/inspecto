@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+
+import { liftConfig, lowerGraph } from './pipeline-editable';
+
+/**
+ * Parity guard for the mock's lift/lower against the backend `PipelineEditable`. The mock must never
+ * be MORE LENIENT than the server: a topology it accepts offline that the real route 422s turns a
+ * hard failure into a passing rehearsal.
+ *
+ * These cases pin the top-level `parsing:` block, which is parser-owned and OVERLAYS
+ * `processing.csv_settings` in the engine — so a parser node that cannot see it would edit the losing
+ * key and the operator's change would be silently masked.
+ */
+describe('mock pipeline-editable — the parsing: block is parser-owned', () => {
+    /** A pipeline in the Onboarding spelling: parse options in `parsing:`, schema ref in `processing:`. */
+    const parsingBlockConfig = () => ({
+        name: 'PB',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        parsing: { frontend: 'delimited', delimited: { delimiter: '|', has_header: false } },
+        processing: { schema_file: 'pb_schema.toon' },
+    });
+
+    it('carries the parsing: block onto the parser node', () => {
+        const g = liftConfig(parsingBlockConfig());
+
+        const parser = g.nodes.find((n) => n.type === 'parser');
+        expect(parser).toBeDefined();
+        expect(parser!.config?.['parsing']).toEqual({
+            frontend: 'delimited',
+            delimited: { delimiter: '|', has_header: false },
+        });
+    });
+
+    it('lowers an edited parsing: block back into parsing:, not the legacy key', () => {
+        const existing = parsingBlockConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser')!;
+        (parser.config!['parsing'] as Record<string, Record<string, unknown>>)['delimited']['delimiter'] = ';';
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('config' in res).toBe(true);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect(config['parsing']).toEqual({
+            frontend: 'delimited',
+            delimited: { delimiter: ';', has_header: false },
+        });
+        // the losing legacy key must not be resurrected behind the operator's back
+        expect((config['processing'] as Record<string, unknown>)['csv_settings']).toBeUndefined();
+    });
+
+    it('accepts a parsing: block as satisfying PARSER_NO_SCHEMA', () => {
+        const existing = parsingBlockConfig();
+        // the parser names ONLY the parsing: block — no schema_file / schemas / segments
+        delete (existing.processing as Record<string, unknown>)['schema_file'];
+        const g = liftConfig(existing);
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(false);
+    });
+
+    it('still refuses a parser naming nothing at all', () => {
+        const existing = parsingBlockConfig();
+        delete (existing as Record<string, unknown>)['parsing'];
+        delete (existing.processing as Record<string, unknown>)['schema_file'];
+        const g = liftConfig(existing);
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        expect((res as { refusals: { code: string }[] }).refusals.map((r) => r.code)).toContain(
+            'PARSER_NO_SCHEMA',
+        );
+    });
+
+    it('does not drop a parsing: block it was never given (non-strict merge)', () => {
+        const existing = parsingBlockConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser')!;
+        delete parser.config!['parsing'];
+
+        const res = lowerGraph(g, existing, false);
+
+        expect((res as { config: Record<string, unknown> }).config['parsing']).toBeDefined();
+    });
+});
