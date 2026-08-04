@@ -692,7 +692,7 @@ DuckDB holds a single-writer lock. The engine is chosen per store by process-glo
 | Object links | `-Dobjects.backend=db` | `-Dobjects.links.db.url` | correlation graph (append-only) |
 | Object notes | `-Dobjects.backend=db` | `-Dobjects.notes.db.url` | evidence / comments (append-only) |
 | Job runs | `-Djobs.backend=postgres` (or `duckdb`) | `-Djobs.db.url` | job-execution reporting (success rate, p50/p95) |
-| Flow provenance | `-Dprovenance.backend=postgres` (or `duckdb`) | `-Dprovenance.db.url` | per-edge record counts (T21) |
+| Pipeline provenance | `-Dprovenance.backend=postgres` (or `duckdb`) | `-Dprovenance.db.url` | per-edge record counts (T21) |
 
 To use Postgres, give the URL property a `jdbc:postgresql://host:port/db` value and set the store's
 backend flag. `objects/links/notes/status` accept any `jdbc:` URL directly on their URL property; `jobs`

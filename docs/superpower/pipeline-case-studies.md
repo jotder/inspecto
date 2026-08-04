@@ -2,14 +2,14 @@
 
 Five boundary-pushing, self-contained authored pipelines for the Pipelines editor (`/pipelines`),
 seeded per space by `inspecto-ui/src/app/inspecto/mock/seeds/pipeline-case-studies.seed.ts` (wired
-into `default-space.seed.ts`, store key `inspecto.mock.v10`). Each ships with its **data source**
-(an acquisition Source entry on the Sources page, bound to a seeded Connection) and, where parsing
+into `default-space.seed.ts`, store key `inspecto.mock.v10`). Each ships with its **collector**
+(an acquisition Collector entry on the Collectors page, bound to a seeded Connection) and, where parsing
 is involved, **reusable grammars** covering every exotic parser format. Invariants are pinned by
 `modules/admin/pipelines/pipeline-case-studies.spec.ts`, so future edits can't silently defuse what
 a case study exists to exercise. Mirrors the Geo Map pack
 ([`geo-map-case-studies.md`](geo-map-case-studies.md)).
 
-| # | Pipeline | Source → Connection | The boundary it pushes |
+| # | Pipeline | Collector → Connection | The boundary it pushes |
 |---|---|---|---|
 | CS1 | `mediation_backbone` (active) | `sftp_cdr_asn1` → `cdr_sftp_prod` (+ stream + warehouse) | **Canvas scale**: 19+ nodes, 3 collectors, 4 named `route:` branches fanning back into one aggregate, 3 sinks |
 | CS2 | `fraud_velocity_stream` (active) | `kafka_sim_swaps` → kafka topic | **Clone-mode route** (same rows teed to real-time triage AND archive), CRITICAL alert, upsert sink with key columns |

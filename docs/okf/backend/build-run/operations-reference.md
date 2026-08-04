@@ -251,7 +251,7 @@ java -cp file-processor.jar com.gamma.inspector.MultiCollectorProcessor \
 java -cp file-processor.jar com.gamma.inspector.MultiCollectorProcessor spaces/ucc/config
 ```
 
-Sources run on a virtual-thread executor bounded by `-Dsources.max` (default: all resolved sources in parallel). Each source is isolated — one source failing (bad config or batch failures) is logged and counted but never aborts the others; the process exits non-zero if any source failed. A failed source does not stop the rest.
+Collectors run on a virtual-thread executor bounded by `-Dsources.max` (default: all resolved collectors in parallel). Each collector is isolated — one collector failing (bad config or batch failures) is logged and counted but never aborts the others; the process exits non-zero if any collector failed. A failed collector does not stop the rest.
 
 **Three multiplying caps.** Total worker pressure ≈ `sources.max × processing.threads × processing.duckdb_threads`. The auto-derive for `duckdb_threads=0` only divides cores among one source's `threads` — it does **not** know about `sources.max`. When running many sources in one JVM, set `duckdb_threads` explicitly (or lower `sources.max`/`threads`) so the three-way product ≈ cores — e.g. on 16 cores: `sources.max=4`, `threads=2`, `duckdb_threads=2`. When `-Dsources.max > 1` is set, the config validator surfaces this at startup: it factors `sources.max` into the explicit-oversubscription check, and for the auto default (`duckdb_threads=0`) it warns that the auto cap ignores `sources.max` and suggests a concrete value (`cores ÷ (sources.max × threads)`).
 
@@ -922,7 +922,7 @@ java --enable-native-access=ALL-UNNAMED \
 
 ### Performance reference (single-node, HDD, 4 threads)
 
-| Source | Files | Rows/file (avg) | Time/file | Total (30 days) |
+| Collector | Files | Rows/file (avg) | Time/file | Total (30 days) |
 |---|---|---|---|---|
 | <data_source> | 30 × `.csv.gz` | ~2.3 M | ~19 min | ~2.5 hr |
 | <data_source> | varies | ~420 K | ~3.4 min | — |
@@ -937,7 +937,7 @@ Note: the 20200117 <data_source> file is ~4.3 GB uncompressed (~2.97 M rows) due
 
 ---
 
-## Onboarding a New Source
+## Onboarding a New Collector
 
 1. **Write a generation config** — copy `config/<data_source>/adj_gen.toon` and adapt:
    - Set the correct `delimiter`, skip counts, and date formats

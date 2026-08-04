@@ -51,14 +51,14 @@ timestamp: 2026-07-16T00:00:00Z
 * **Pipeline seed must be ≥ 1 `source_store`** — `PipelineJobRunner.seedsOf` throws on zero; multi-source merge is the
   `transform.merge` path (the Phase-A "exactly one" rule was relaxed in Phase C). See
   [Pipeline live execution](../pipeline-graph/live-execution.md).
-* **Source→Collector rename (2026-07-14) residuals — three tokens that deliberately did NOT move.**
+* **Source→Collector rename (2026-07-14) residuals — three tokens that deliberately did NOT move.** <!-- vocab-allow: names the rename itself -->
   The acquisition entity is **Collector** (`CollectorConnector` SPI, `CollectorService`, routes
   `/collectors`) and the Catalog origin node is **Stream** (`NodeKind.STREAM`, id `stream:<pipeline>`,
   ex `source:`), but: the pipeline **TOON config key `source:`** block is kept (renaming breaks
   authored TOON — a separate migration if ever wanted); the `'SOURCE'` pipeline **stage category** is
   unchanged; `collector.*` pipeline node types were already correct. Don't "fix" these to match the
   glossary.
-* **KPI is deliberately NOT renamed to Measure** (Flow→Pipeline backend rename, 2026-06-30). The
+* **KPI is deliberately NOT renamed to Measure** (Flow→Pipeline backend rename, 2026-06-30). <!-- vocab-allow: names the rename itself --> The
   backend has no BI "Metric" concept — its semantic construct is **KPI** (`kpis:` in `*_meta.toon`,
   `KpiMeta`, `NodeKind.KPI`), a *distinct* canonical term ("a single-number Measure with a
   target/threshold"). The only `Metric*` types are ops ones (`MetricRegistry`, `MetricsService`,

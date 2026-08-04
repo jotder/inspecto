@@ -59,7 +59,7 @@ seed), and per-capability overrides `searchable`/`exportable`/`queryable`/`savab
 ## Tier assignments across hosts
 
 * **pro**: [events](../features/events.md), [alerts](../features/alerts.md), [objects](../features/objects.md), [enrichment](../features/enrichment.md) detail.
-* **standard**: [diagnoses](../features/diagnoses.md), [runs](../features/runs.md), [sources](../features/sources.md), [jobs](../features/jobs.md), [catalog](../features/catalog.md), [run-detail](../features/run-detail.md).
+* **standard**: [diagnoses](../features/diagnoses.md), [runs](../features/runs.md), [collectors](../features/collectors.md), [jobs](../features/jobs.md), [catalog](../features/catalog.md), [run-detail](../features/run-detail.md).
 * **mini / single-select**: enrichment-jobs grid, batch-detail & node-detail dialogs.
 
 # Examples

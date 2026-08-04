@@ -153,7 +153,7 @@ a rule/decision engine produces) · **Query** (first-class executable knowledge,
 **Parameter** (`$`-namespace runtime binding) · **Result Set** (semantic query output with shape
 metadata) · **Decision Engine** (anything that turns signals into consequences: rules today, AI
 next). Existing canonical terms stay binding: *Expectation / Alert Rule / Decision Rule* (never
-bare "Rule"), *Pipeline* (never Flow), *Incident*, *Measure*, *Source*.
+bare "Rule"), *Pipeline* (never Flow), *Incident*, *Measure*, *Collector*. <!-- vocab-allow: cites "Flow" in order to ban it -->
 
 ## 7. Guiding principles → enforcement
 

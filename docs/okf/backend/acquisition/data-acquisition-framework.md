@@ -39,7 +39,7 @@
 > notify is harmless — the cycle's dedup/stability decide what ingests) and **`source.discovery: watch`**
 > (JDK `WatchService` on a local/mounted poll root; debounced ~1s via `-Dservice.watch.quiet.millis`;
 > the interval poll loop stays on as the backstop — watch narrows latency, it never carries correctness).
-> **Also shipped 2026-07-08 (ACQ-5):** the **`kafka` connector** — a Kafka topic consumed as a Source. Each
+> **Also shipped 2026-07-08 (ACQ-5):** the **`kafka` connector** — a Kafka topic consumed by a Collector. Each
 > scan cycle drains a partition's unconsumed backlog into a **virtual slice file**
 > (`<topic>-p<partition>-<from>-<to>.<ext>`) that flows through the normal batch path — the DB-export
 > virtual-file idiom applied to a stream, so **no core-engine change**. Offsets are **not** a broker consumer
@@ -71,10 +71,10 @@
 * **There would be other source connectors (`Kafka` streaming + `DataBase Tables` export shipped; more to come) to create a Data Lake House System**
 
 
-## 1. Data Source (File) Connectivity
+## 1. Collector (File) Connectivity
 The system shall support collecting files from multiple source types through a pluggable connector architecture.
 
-**Supported Sources**
+**Supported Protocols**
 * **Local File System**
   * `inbox/<data_source>`
 * **Remote File Systems**
@@ -104,7 +104,7 @@ The system shall support collecting files from multiple source types through a p
 > point the source's `dirs.poll` (or `base_path`) at the mounted path. The built-in `local` connector then
 > handles discovery/stability/dedup identically to a local inbox — credentials, reconnection, and caching
 > stay the OS's job, where they are audited and battle-tested.
-* **Grouping Data Source**
+* **Grouping Collector**
   * Has different collection point and file types
   * Tagging
   

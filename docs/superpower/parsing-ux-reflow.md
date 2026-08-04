@@ -32,7 +32,7 @@ ASN.1 codec (`asn-parser/`) is a separate Maven project the inspecto reactor doe
 stays honest-prototype); flatten DSL is designed + backlogged as the immediate next engine task,
 not built this round. This change is **UI + docs only** — no backend edits, no reactor impact.
 
-⚠ Vocabulary: the new Collection toggle must NOT be labelled "Source" (banned term, GLOSSARY §2) —
+⚠ Vocabulary: the new Collection toggle must NOT be labelled "Source" (banned term, GLOSSARY §2) — <!-- vocab-allow: cites the banned term in order to ban it -->
 use "Collect from: Local inbox | Connection".
 
 ## Part A — Collection stage: Connection-first

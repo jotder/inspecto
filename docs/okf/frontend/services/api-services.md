@@ -17,7 +17,7 @@ re-exported from the `inspecto/api` barrel. See [API & data conventions](../conv
 | Service | Backs feature(s) |
 |---|---|
 | `RunsService` | [runs](../features/runs.md), [run-detail](../features/run-detail.md) |
-| `SourcesService` | [sources](../features/sources.md) |
+| `CollectorsService` | [collectors](../features/collectors.md) |
 | `ConnectionsService` · `ConnectionProbeService` | [connections](../features/connections.md) |
 | `PipelinesService` · `ComponentsService` | [pipelines](../features/pipelines.md), [components](../features/components.md) |
 | `CatalogService` | [catalog](../features/catalog.md) |

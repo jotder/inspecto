@@ -23,7 +23,7 @@ documented as concepts.
 # Platform — Workbench
 
 * [Connections](connections.md) - schema-driven connection workbench (Database/FTP/FTPS/Local/SFTP) + SSH tunnel/proxy.
-* [Sources](sources.md) - configured collection tasks.
+* [Collectors](collectors.md) - configured collection tasks.
 * [Pipelines](pipelines.md) - the authored-Pipeline (DAG) editor + parser config.
 * Expectations · Decision rules *(not yet documented)*.
 

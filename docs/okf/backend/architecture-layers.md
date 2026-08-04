@@ -59,7 +59,7 @@ Direct files / lines, role, and outbound `com.gamma` dependencies (import counts
 | L1 | `config.safety` | 2/304 | `ConfigSafetyValidator`, `SafetyPolicy` guardrails | config.spec:2 |
 | L1 | `sql` | 5/655 | Sandboxed SQL: `SqlSandbox` (ephemeral DuckDB), `SqlGuard`, `SqlOracle` | util:2, config.spec:2 |
 | L2 | `etl` | 32/4956 | Stage-1 config model/parser + CSV/DuckDB ingest engine | util:5, api:4 |
-| L2 | `inspector` | 17/2938 | Source poll cycle, batch strategies, streaming engines | acquire:28, etl:~30, util:6, event:5, metrics:2 |
+| L2 | `inspector` | 17/2938 | Collector poll cycle, batch strategies, streaming engines | acquire:28, etl:~30, util:6, event:5, metrics:2 |
 | L2 | `acquire` (+`retry`) | 29/2537 | Data Acquisition SPI: connectors, ledger, stability, retry, circuit breaker | event:2, etl:3, util:1, config.io:1 |
 | L2 | `enrich` | 5/641 | Stage-2 enrichment engine | etl:6, util:4, sql:1 |
 | L2 | `pipeline` | 23/2646 | Authored Pipeline graph model, compiler, component registry | api:22, util:6, etl:4, config.io:4 |
