@@ -67,7 +67,22 @@ across nodes. The fix for a per-adopter gap is a documented derivation, never a 
 identifiers; 20 residual identifiers were renamed rather than allowlisted. Proving it red exposed a bug in
 the rule that had been silently passing 9 real hits. See §3.2's as-built note.
 
-**Open:** §3.1 serve-cfg-vocabulary-from-server (item 12) is the last item. Do not archive until it closes.
+**§3.1 serve-cfg-vocabulary-from-server SHIPPED 2026-08-04** (item 12, the last one) — `GET
+/pipelines/node-types` publishes `attributes[]`, the node dialog prefers them, `node-attributes.ts` is now
+the documented fallback, and a committed contract JSON is byte-compared from BOTH sides so neither table can
+drift. See §3.1.
+
+**Open: nothing.** Every defect (D1–D9) and every sequence item (1–12) is closed or reclassified. **This plan
+is ready to archive** per the CLAUDE.md doc-lifecycle rule: distil the durable as-built facts into the
+matching OKF concepts (largely done inline in `okf/frontend/features/pipelines.md`), confirm the deferrals
+below live in `docs/BACKLOG.md`, then `git mv` it to `docs/archived-documents/plans-archive/` and run
+`graphify update .`.
+
+Deliberate deferrals already registered in `docs/BACKLOG.md`: **D6** (make a configured timezone actually
+govern cron firing + `$today`), **D8** (surface the pipeline-level `reference:` block so upsert-by-key is
+authorable at all), the agent-tool argument still named `flow` (a Tier-3 external contract needing
+dual-accept), and bare-word `flow` locals/parameters/javadoc, which the §3.2 source guard deliberately does
+not cover.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -319,7 +334,48 @@ lift/compile, assert the engine reads the value. Fixing the key without the test
 
 ## 3. The common checking point (all four surfaces)
 
-### 3.1 Serve the cfg vocabulary from the server — the structural fix
+### 3.1 Serve the cfg vocabulary from the server — ✅ SHIPPED 2026-08-04
+
+**As built.** `GET /pipelines/node-types` now carries `attributes[]` per node type
+(`NodeAttribute` + `NodeAttributes` in `inspecto-engine/.../pipeline/`, embedded by
+`PipelineProjection.catalog()`), the node dialog prefers the served specs, and `node-attributes.ts`
+is now explicitly the **fallback** for before-the-catalog-resolves and the offline build.
+
+The recommendation below (extend `PipelineNodeType`, not `ConfigSpecs`) was followed. Four decisions
+worth keeping:
+
+- **The control vocabulary is single-sourced, not re-declared.** `NodeAttribute.TYPES`/`TIERS` *delegate to*
+  `FindingsSpec`, the other server-authored spec surface, whose `Section` record turned out to be a
+  field-for-field mirror of the UI's `AttributeSpec` already. Two independently-declared unions is how the
+  renderer ends up asked to draw a control it does not have; a test pins the identity.
+- **`FieldSpec` (inspecto-config) was deliberately NOT reused**, for the reason `FindingsSpec`'s own javadoc
+  gives: its vocabulary is different (`path` not `key`, no `tier`/`min`/`max`, options as bare strings), so
+  mapping would be lossy for no reuse benefit.
+- **A served empty array ≠ absent.** Empty means "the server says this type has no schema"; absent means
+  "we never heard from the server". The dialog uses `??`, so an empty list is honoured instead of silently
+  re-enabling the client table — otherwise a type the server deliberately unspecced would keep drawing a
+  stale form.
+- **The mock serves the same contract file**, so the offline preview cannot drive its node forms from a
+  different table than production — the "a mock must never be more lenient than the server" rule.
+
+**The drift check is a committed artifact, compared from both sides.** `NodeAttributesContractTest` (Java)
+and `node-attributes.spec.ts` (TS) both compare to
+`inspecto-ui/src/app/inspecto/mock/node-attributes.contract.json`, so neither table can move without one of
+the two suites failing. Build-time generation was rejected on purpose: a generated artifact silently absorbs
+a change from whichever side ran the generator, which is precisely the drift it should catch. Regeneration is
+explicit and deliberate (`-Dnode.attributes.write=true`). **Verified by making it fail**: renaming one key in
+the JSON turned both suites red, then restoring turned both green.
+
+⚠ **Byte-comparing a serialized table surfaced two real nondeterminism bugs** that a shape-only assertion
+would have missed, and both were mine: `Map.copyOf` (for the type→attributes map) and `Map.of` (for each
+`{value,label}` option) are **unordered**, so the emitted JSON's key order changed between JVM runs. Left in,
+the contract test would have failed at random and been written off as flaky. Both are now `LinkedHashMap`
+with a comment saying why.
+
+Also note `resolveJsonModule` was added to `inspecto-ui/tsconfig.json`: the bundler resolved the contract
+import without it, but a plain `tsc` type-check would not have.
+
+<details><summary>The original design note (kept — its recommendation is what shipped)</summary>
 
 The durable fix for §1 is to **publish attribute specs from the server** so one definition feeds the UI
 form, the validator, and the engine. Two candidate homes, both existing:
@@ -332,6 +388,8 @@ form, the validator, and the engine. Two candidate homes, both existing:
 Recommendation: extend `PipelineNodeType`, because node cfg is per-node-type and `ConfigSpecs` is
 per-config-file. Then `node-attributes.ts` becomes a *fallback* for offline/mock only, and a CI check
 asserts the client table matches the served one.
+
+</details>
 
 ### 3.2 Extend `tools/check-vocabulary.mjs`
 
@@ -596,7 +654,7 @@ this file's subject IS the rename — same shape as the existing `bare-flow` ent
 11. ~~**§3.2** guard on Java + TS source, with allowlist. Last, largest allowlist.~~ ✅ **DONE 2026-08-04** —
     landing it last was right; "largest allowlist" was wrong (8 entries, because only *compound* identifiers
     are banned). 20 residual identifiers renamed, green over 1,359 files.
-12. **§3.1** serve cfg vocabulary from the server — the structural fix. Can start any time after 4;
+12. ✅ **DONE 2026-08-04.** **§3.1** serve cfg vocabulary from the server — the structural fix. Can start any time after 4;
     sequenced last because it is the largest and 4 already prevents regression.
 
 ## 7. Owed: reconcile the ELT design doc against GLOSSARY — ✅ DONE 2026-08-04

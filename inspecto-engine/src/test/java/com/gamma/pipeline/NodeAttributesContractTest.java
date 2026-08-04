@@ -1,0 +1,114 @@
+package com.gamma.pipeline;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * The §3.1 cross-language contract: the node cfg vocabulary this server publishes must equal the table the
+ * Angular client falls back to offline.
+ *
+ * <p><b>Why a committed file rather than build-time generation.</b> Both sides compare to ONE checked-in
+ * artifact — this test compares the Java table to it, and {@code node-attributes.spec.ts} compares the TS
+ * table to the same file. A generated artifact would silently absorb whichever side ran the generator,
+ * which is the drift it is supposed to catch. Because it is committed, a real divergence shows up as a
+ * reviewable diff on the contract file itself.
+ *
+ * <p>Regenerate deliberately (never as a reflex) with {@code -Dnode.attributes.write=true}: that rewrites
+ * the file from the Java table and the TS suite then tells you whether the client agrees. If it does not,
+ * ONE of the two tables is wrong — decide which before committing, because the JSON is the contract, not a
+ * scratch pad.
+ */
+class NodeAttributesContractTest {
+
+    /** Shared with the TS side + the mock's `/pipelines/node-types`, so the offline preview cannot drift either. */
+    private static final String CONTRACT = "inspecto-ui/src/app/inspecto/mock/node-attributes.contract.json";
+
+    private static final ObjectMapper JSON = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
+
+    /** Walk up from the module's CWD to the repo root, so the path works under surefire and an IDE alike. */
+    private static Path contractPath() {
+        Path dir = Path.of("").toAbsolutePath();
+        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent()) {
+            Path candidate = dir.resolve(CONTRACT);
+            if (Files.exists(candidate)) return candidate;
+        }
+        throw new AssertionError("cannot locate " + CONTRACT + " from " + Path.of("").toAbsolutePath());
+    }
+
+    @Test
+    void theServedVocabularyMatchesTheCommittedContract() throws IOException {
+        Path path = contractPath();
+        String actual = JSON.writeValueAsString(NodeAttributes.wireMap()).replace("\r\n", "\n").trim();
+
+        if (Boolean.getBoolean("node.attributes.write")) {
+            Files.writeString(path, actual + "\n");
+            return;
+        }
+
+        String expected = Files.readString(path).replace("\r\n", "\n").trim();
+        assertEquals(expected, actual,
+                "the published node attributes and " + CONTRACT + " disagree. If the Java table is right, "
+                        + "regenerate with -Dnode.attributes.write=true and check node-attributes.spec.ts "
+                        + "still passes; if the CLIENT is right, fix NodeAttributes.java instead.");
+    }
+
+    /**
+     * D9's split, asserted on the published side too: the acquisition node must not advertise keys the
+     * flat lower routes to the fingerprint-dedup node, or the server would be telling the UI to draw a
+     * control whose value is discarded on save.
+     */
+    @Test
+    void acquisitionDoesNotPublishTheKeysTheDedupNodeOwns() {
+        List<String> acq = NodeAttributes.ACQUISITION.stream().map(NodeAttribute::key).toList();
+        assertFalse(acq.contains("duplicate__mode"));
+        assertFalse(acq.contains("duplicate__on_change"));
+
+        List<String> dedup = NodeAttributes.DEDUP_FINGERPRINT.stream().map(NodeAttribute::key).toList();
+        assertEquals(List.of("duplicate__mode", "duplicate__on_change"), dedup);
+
+        // A derivation, not a fork: nothing is lost to the split.
+        assertEquals(NodeAttributes.COLLECTOR.size(),
+                NodeAttributes.ACQUISITION.size() + NodeAttributes.DEDUP_FINGERPRINT.size());
+    }
+
+    /** The catalog every client reads must actually carry the specs — the whole point of §3.1. */
+    @Test
+    void theNodeTypeCatalogPublishesAttributes() {
+        Map<String, Object> byType = new java.util.LinkedHashMap<>();
+        for (Map<String, Object> t : PipelineProjection.catalog()) byType.put((String) t.get("type"), t.get("attributes"));
+
+        assertTrue(byType.containsKey("acquisition"), "catalog lost the acquisition type");
+        for (String type : NodeAttributes.speccedTypes()) {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> attrs = (List<Map<String, Object>>) byType.get(type);
+            assertNotNull(attrs, type + " is specced but the catalog published no attributes for it");
+            assertFalse(attrs.isEmpty(), type + " published an empty attribute list");
+            assertEquals(NodeAttributes.forType(type).size(), attrs.size(), type + " lost attributes in the catalog");
+        }
+        // An unspecced type must publish an empty list, not be absent — the client tells them apart.
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> mapAttrs = (List<Map<String, Object>>) byType.get("transform.map");
+        assertNotNull(mapAttrs);
+        assertTrue(mapAttrs.isEmpty(), "transform.map is deliberately unspecced (free-form fallback)");
+    }
+
+    /**
+     * The control vocabulary must stay single-sourced. {@link NodeAttribute} delegates to
+     * {@link com.gamma.ops.findings.FindingsSpec}, so widening one widens both — this pins that, because
+     * two independently-declared unions is how the renderer ends up asked to draw a type it cannot.
+     */
+    @Test
+    void theControlVocabularyIsSharedWithTheOtherSpecSurface() {
+        assertSame(com.gamma.ops.findings.FindingsSpec.TYPES, NodeAttribute.TYPES);
+        assertSame(com.gamma.ops.findings.FindingsSpec.TIERS, NodeAttribute.TIERS);
+    }
+}

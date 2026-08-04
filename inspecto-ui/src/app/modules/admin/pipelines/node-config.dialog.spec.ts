@@ -16,6 +16,7 @@ import {
     MetadataNode,
     PipelinesService,
 } from 'app/inspecto/api';
+import type { AttributeSpec } from 'app/inspecto/component-model';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -210,6 +211,44 @@ describe('NodeConfigDialog', () => {
         expect(c.schemaInitial['stability__window']).toBe('30s');
         // Only the genuinely unknown root is free-form — and it stays literal there.
         expect(c.configRows.value).toEqual([{ key: 'mystery', value: '{"a":1}' }]);
+    });
+
+    // ── §3.1: the SERVED vocabulary drives the form; the local table is only a fallback ──
+
+    it('prefers the server-published attributes over the local table', async () => {
+        const served: AttributeSpec[] = [
+            { key: 'served_only', label: 'Served only', type: 'string', tier: 'required' },
+        ];
+        const c = (await create({
+            node: { id: 'w', type: 'sink.persistent' },
+            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
+            attributes: served,
+        })).componentInstance;
+        expect(c.specs()).toBe(served);
+        expect(c.specs().map((s) => s.key)).not.toContain('format'); // the local table's key
+    });
+
+    /** Before the catalog resolves (and in the offline build) the client table must still drive the form. */
+    it('falls back to the local table when the server said nothing', async () => {
+        const c = (await create({
+            node: { id: 'w', type: 'sink.persistent' },
+            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
+        })).componentInstance;
+        expect(c.specs().map((s) => s.key)).toEqual(['format', 'compression']);
+    });
+
+    /**
+     * A served EMPTY list is the server stating "this type has no schema" — it must NOT silently re-enable
+     * the client table, or a type the server deliberately unspecced would keep drawing a stale form.
+     */
+    it('honours a served empty list instead of falling back', async () => {
+        const c = (await create({
+            node: { id: 'w', type: 'sink.persistent' },
+            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
+            attributes: [],
+        })).componentInstance;
+        expect(c.specs()).toEqual([]);
+        expect(c.freeFormOpen()).toBe(true); // free-form becomes the only surface
     });
 
     // ── acquisition's Connection is a BINDING, not config (D3-remainder, 2026-08-04) ──

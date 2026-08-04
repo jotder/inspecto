@@ -40,6 +40,16 @@ export interface NodeConfigData {
     typeLabel: string;
     categoryLabel: string;
     bindKind?: ComponentType | null;
+    /**
+     * The node type's config vocabulary as **published by the server** (§3.1) — the host reads it off the
+     * `GET /pipelines/node-types` catalog it already loads for the palette.
+     *
+     * `undefined` ⇒ the catalog has not resolved (or this host does not supply it), so the dialog falls
+     * back to the local `node-attributes.ts` table. An empty array is NOT the same thing: it is the server
+     * stating this type has no schema, and it must not silently re-enable the fallback — otherwise a type
+     * the server deliberately unspecced would keep drawing a stale client form.
+     */
+    attributes?: AttributeSpec[];
 }
 
 /** Dialog close payload: the edited node (absent ⇒ the user cancelled). */
@@ -295,8 +305,16 @@ export class NodeConfigDialog {
     private static readonly CONNECTION_REF = 'connection/';
     readonly configLoaders = this.isAcquisition ? { connection: connectionOptionLoader() } : {};
 
-    /** The node type's declared attribute schema (empty ⇒ free-form editor only). */
-    readonly specs = computed<AttributeSpec[]>(() => nodeAttributesFor(this.data.node.type) ?? []);
+    /**
+     * The node type's declared attribute schema (empty ⇒ free-form editor only).
+     *
+     * <p>§3.1: the SERVED vocabulary wins. The local table is the fallback for before the catalog resolves
+     * and for the offline build. `?? ` — not `||` or a length check — so a served empty array is honoured
+     * as "the server says this type has no schema" rather than falling through to the client copy.
+     */
+    readonly specs = computed<AttributeSpec[]>(
+        () => this.data.attributes ?? nodeAttributesFor(this.data.node.type) ?? [],
+    );
     /** Schema-form seed: the node's config entries whose key the schema knows. */
     readonly schemaInitial: Record<string, unknown> = {};
     /** Free-form editor open state — open by default when there's no schema, or when extra keys exist. */

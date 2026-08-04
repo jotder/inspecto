@@ -34,7 +34,7 @@ import {
     LensService,
     apiErrorMessage,
 } from 'app/inspecto/api';
-import { pipelineScaffold } from 'app/inspecto/component-model';
+import { type AttributeSpec, pipelineScaffold } from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -197,6 +197,12 @@ export class PipelineEditorComponent implements OnInit {
     private readonly typeCat = signal<Map<string, string>>(new Map());
     /** type → whether a save can lower it, from `GET /pipelines/node-types` (see G2/G5). */
     private readonly typeLowerable = signal<Map<string, boolean>>(new Map());
+    /**
+     * type → the config vocabulary the SERVER publishes (§3.1). Handed to the node dialog so the form is
+     * driven by one definition; empty until the catalog resolves, at which point the dialog falls back to
+     * the local `node-attributes.ts` table.
+     */
+    private readonly typeAttributes = signal<Map<string, AttributeSpec[]>>(new Map());
 
     readonly selectedNode = signal<AuthoredNode | null>(null);
     readonly selectedEdgeId = signal<string | null>(null);
@@ -350,6 +356,10 @@ export class PipelineEditorComponent implements OnInit {
                 this.typeCat.set(typeCategoryMap(ts));
                 this.typeEmits.set(new Map(ts.map((t) => [t.type, t.emits])));
                 this.typeLowerable.set(new Map(ts.map((t) => [t.type, t.lowerable])));
+                // Only types the server actually specced — a type whose `attributes` the payload omits
+                // entirely (an older server) must stay absent so the dialog uses its fallback table.
+                this.typeAttributes.set(new Map(
+                    ts.filter((t) => t.attributes !== undefined).map((t) => [t.type, t.attributes!])));
             },
             error: () => this.paletteGroups.set([]),
         });
@@ -798,6 +808,7 @@ export class PipelineEditorComponent implements OnInit {
                           typeLabel: node.type,
                           categoryLabel: categoryLabel(category),
                           bindKind: bindKindFor(category),
+                          attributes: this.typeAttributes().get(node.type),
                       },
                   });
         ref.afterClosed().subscribe((res?: NodeConfigResult) => {

@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
+import type { AttributeSpec } from 'app/inspecto/component-model/attribute-spec';
 
 /** A node-type family (palette grouping + role checks); mirrors the backend `NodeCategory`. */
 export type PipelineNodeCategory = 'SOURCE' | 'PARSE' | 'TRANSFORM' | 'SINK' | 'CONTROL' | string;
@@ -73,6 +74,15 @@ export interface PipelineNodeType {
      * it. Save-ability, not runnability.
      */
     lowerable: boolean;
+    /**
+     * The node's config vocabulary, published by the server (§3.1 of
+     * `docs/superpower/vocabulary-and-config-contract-plan.md`). This is the SOURCE for the node dialog's
+     * form; `node-attributes.ts` is the offline/mock fallback for when the catalog has not loaded.
+     *
+     * An empty array is meaningful and different from `undefined`: it means the server says this type has
+     * **no** schema (free-form editor only), whereas `undefined` means we never heard from the server.
+     */
+    attributes?: AttributeSpec[];
 }
 
 /** A node in the combined topology: a pipeline node (with its owning `flow`) or a synthetic `STORE` join node. */

@@ -128,7 +128,22 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     ],
 };
 
-/** The declared attribute schema for a node type, or `undefined` when it has none (free-form only). */
+/**
+ * The declared attribute schema for a node type, or `undefined` when it has none (free-form only).
+ *
+ * <p>⚠ **Since §3.1 this table is the FALLBACK, not the source.** The server publishes the same vocabulary
+ * on `GET /pipelines/node-types` (`attributes[]`, built by `NodeAttributes.java`), and the node dialog
+ * prefers that. This copy is what the editor uses before the catalog resolves and what the offline/mock
+ * build runs on — so it must stay identical to the served one, which
+ * `node-attributes.spec.ts` enforces against the committed
+ * `inspecto/mock/node-attributes.contract.json` that the Java `NodeAttributesContractTest` also checks.
+ * Neither side can drift without one of the two suites failing.
+ */
 export function nodeAttributesFor(type: string | undefined): AttributeSpec[] | undefined {
     return type ? NODE_ATTRIBUTES[type] : undefined;
+}
+
+/** Every node type this fallback table speccs — the drift check's iteration source. */
+export function speccedNodeTypes(): string[] {
+    return Object.keys(NODE_ATTRIBUTES);
 }

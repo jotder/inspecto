@@ -280,6 +280,37 @@ that are easy to get wrong again:
   and `sink.persistent` the node carries the whole raw `collector:`/`output:` block and the shared tables are
   a curated subset by design — asserting equality there would be a permanently red, therefore disabled, guard.
 
+### Node config specs are SERVED, and the client table is a fallback (2026-08-04)
+
+`GET /pipelines/node-types` carries `attributes[]` per node type — authored in
+`inspecto-engine/.../pipeline/NodeAttributes.java`, embedded by `PipelineProjection.catalog()`. The node
+dialog prefers them; `pipelines/node-attributes.ts` is now the **fallback** for before the catalog resolves
+and for the offline build. Before this, per-node cfg keys existed *only* client-side while the server's
+catalog carried no attribute vocabulary at all, which — with no case-conversion layer anywhere — is the root
+cause every config-key defect (D1–D9) traced back to.
+
+Four things to know before touching it:
+
+- **A served empty array is not the same as an absent one.** Empty means the server says the type has no
+  schema; absent means the catalog has not answered. The dialog uses `?? `, so an empty list is honoured
+  rather than silently re-enabling the client table — otherwise a type the server deliberately unspecced
+  would keep drawing a stale form.
+- **The control vocabulary is single-sourced.** `NodeAttribute.TYPES`/`TIERS` delegate to `FindingsSpec`
+  (the other server-authored spec surface, whose `Section` was already a field-for-field mirror of
+  `AttributeSpec`), so widening an `AttributeType` stays a one-place change. `FieldSpec` in inspecto-config
+  is a *different* vocabulary and is deliberately not reused.
+- **Both tables are byte-compared to one committed artifact**,
+  `inspecto/mock/node-attributes.contract.json` — by `NodeAttributesContractTest` on the Java side and
+  `node-attributes.spec.ts` on the TS side. Regenerate only deliberately
+  (`mvn … -Dnode.attributes.write=true`), and when it fails decide *which* side is wrong first: regenerating
+  makes the test pass by moving the goalposts.
+- **The mock serves that same file**, so the offline preview cannot drive node forms from a different table
+  than production.
+
+⚠ Two nondeterminism traps if you extend the serialization: `Map.copyOf` and `Map.of` are **unordered**, so
+using either makes the emitted JSON's key order vary between JVM runs and the contract test fail at random
+(and get written off as flaky). Use `LinkedHashMap`.
+
 ### A shared attribute table is correct per *block*, not per *node* (2026-08-04)
 
 `COLLECTOR_ATTRIBUTES` is deliberately shared with Onboarding so one table serves both features — but the two

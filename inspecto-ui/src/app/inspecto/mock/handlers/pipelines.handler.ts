@@ -11,6 +11,8 @@ import type {
 } from '../../api/pipelines.service';
 import type { PipelineViewData, PipelineViewSummary } from '../../api/views.service';
 import type { IconMap } from '../../api/icon-map.service';
+import type { AttributeSpec } from '../../component-model/attribute-spec';
+import NODE_ATTRIBUTE_CONTRACT from '../node-attributes.contract.json';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -77,7 +79,16 @@ export const NODE_TYPES: PipelineNodeType[] = ([
     { type: 'alert', category: 'CONTROL', label: 'Alert', description: 'Raises an alert from rule / gap / failure outcomes.', accepts: ['data', 'gap', 'failure'], emits: [], emitsNamedRoutes: false },
     { type: 'gap', category: 'CONTROL', label: 'Gap detection', description: 'Reports sequence gaps as SEQUENCE_GAP events.', accepts: ['gap'], emits: [], emitsNamedRoutes: false },
     { type: 'event', category: 'CONTROL', label: 'Event', description: 'Emits a notification / event.', accepts: ['data', 'success', 'failure', 'gap'], emits: [], emitsNamedRoutes: false },
-] as Omit<PipelineNodeType, 'lowerable'>[]).map((t) => ({ ...t, lowerable: LOWERABLE.has(t.type) }));
+] as Omit<PipelineNodeType, 'lowerable'>[]).map((t) => ({
+    ...t,
+    lowerable: LOWERABLE.has(t.type),
+    // §3.1: the mock must publish the SAME attribute vocabulary the server does, straight from the
+    // committed contract the Java side is byte-compared against — otherwise the offline preview would
+    // drive its node forms from a different table than production, which is exactly the "a mock must
+    // never be more lenient than the server" failure. `?? []` matches the server: a type with no schema
+    // publishes an empty list, not an absent key.
+    attributes: (NODE_ATTRIBUTE_CONTRACT as Record<string, AttributeSpec[]>)[t.type] ?? [],
+}));
 
 const CATEGORY_OF = new Map(NODE_TYPES.map((t) => [t.type, t.category]));
 

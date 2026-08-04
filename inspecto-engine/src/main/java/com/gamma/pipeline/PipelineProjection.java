@@ -45,6 +45,13 @@ public final class PipelineProjection {
             // Save-ability, not runnability: the engine executes far more than the flat config can
             // round-trip. The palette greys these out rather than refusing at Save.
             m.put("lowerable", PipelineEditable.isLowerable(t.type()));
+            // §3.1: the node's config vocabulary, published so it has ONE definition. Before this the
+            // catalog carried no attribute specs at all and the keys lived only in the client table —
+            // the root cause §1 traced every config-key defect (D1–D9) back to. Absent/empty ⇒ the type
+            // has no schema and the dialog falls back to its free-form key/value editor.
+            List<Map<String, Object>> attributes = new ArrayList<>();
+            for (NodeAttribute a : NodeAttributes.forType(t.type())) attributes.add(a.toMap());
+            m.put("attributes", attributes);
             out.add(m);
         }
         return out;

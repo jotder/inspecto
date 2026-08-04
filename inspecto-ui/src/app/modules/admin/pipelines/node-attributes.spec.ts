@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { byTier, COLLECTOR_ATTRIBUTES, isRequired, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
-import { nodeAttributesFor } from './node-attributes';
+import NODE_ATTRIBUTE_CONTRACT from 'app/inspecto/mock/node-attributes.contract.json';
+import { nodeAttributesFor, speccedNodeTypes } from './node-attributes';
 
 /**
  * W2/U-D reshaped this: the map is now keyed by the engine's own `BuiltinNodeType` strings, and a type
@@ -9,6 +10,30 @@ import { nodeAttributesFor } from './node-attributes';
  * reads, so it passed while the editor authored nodes `PipelineCompiler` silently dropped.
  */
 describe('node-attributes', () => {
+    /**
+     * §3.1, the cross-language half of the contract. The server publishes this vocabulary on
+     * `GET /pipelines/node-types` (`NodeAttributes.java`), and since then THIS table is the fallback, not
+     * the source. Both sides compare to one committed artifact: `NodeAttributesContractTest` checks the
+     * Java table against `node-attributes.contract.json`, and this checks the TS table against the same
+     * file — so neither can drift without one of the two suites failing.
+     *
+     * ⚠ If this fails, decide WHICH side is wrong before touching anything. Regenerating the JSON from
+     * Java (`-Dnode.attributes.write=true`) makes this test go green by moving the goalposts; that is
+     * correct only when the Java table is the one that changed on purpose.
+     *
+     * Compared as parsed data rather than text: the JSON omits unset optional keys (matching the wire),
+     * so `toEqual` against the spec objects would trip over `undefined`-vs-absent. Serializing the TS side
+     * through `JSON.parse(JSON.stringify(...))` drops `undefined` exactly as the server omits it.
+     */
+    it('matches the vocabulary the server publishes', () => {
+        const contract = NODE_ATTRIBUTE_CONTRACT as Record<string, unknown[]>;
+        expect(speccedNodeTypes().sort()).toEqual(Object.keys(contract).sort());
+        for (const type of Object.keys(contract)) {
+            const local = JSON.parse(JSON.stringify(nodeAttributesFor(type)));
+            expect(local, `${type} disagrees with the served contract`).toEqual(contract[type]);
+        }
+    });
+
     it('returns a tiered schema for a known node type', () => {
         const specs = nodeAttributesFor('sink.persistent');
         expect(specs).toBeDefined();

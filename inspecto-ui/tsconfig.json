@@ -9,6 +9,10 @@
         "declaration": false,
         "experimentalDecorators": true,
         "moduleResolution": "bundler",
+        // §3.1 imports the committed node-attributes contract JSON directly (mock handler + drift spec).
+        // The bundler resolves it either way; this makes the dependency explicit so a plain `tsc`
+        // type-check does not fail on an import the build accepts.
+        "resolveJsonModule": true,
         "importHelpers": true,
         "target": "ES2022",
         "module": "ES2022",
