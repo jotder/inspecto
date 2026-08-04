@@ -495,7 +495,7 @@ export class NodeConfigDialog {
         // they MUST go through `nestKeys` before they reach `node.config`. The flat pipeline's `collector:`
         // block reads `duplicate`, `stability` and `post_action` as nested MAPS
         // (`PipelineConfigParser.java:450,459,518`), so a literal `duplicate__mode` key is read by nothing.
-        // This is D4 of `docs/superpower/vocabulary-and-config-contract-plan.md`; the enrichment branch
+        // See `docs/okf/frontend/features/pipelines.md` (recorded as D4 in the archived plan); the enrichment branch
         // below (`:496`) and every onboarding pane already did this — only the generic save was missing it.
         // `nestKeys` also splits the LIST_KEYS (`include`/`exclude`) comma-string into a list, which is the
         // shape the seeds use and which `PipelineConfigParser.strList` prefers (it accepts either).

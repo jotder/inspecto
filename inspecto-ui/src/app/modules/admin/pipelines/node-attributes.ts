@@ -23,8 +23,9 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
  * <p>⚠ **A key here IS the config key** — `AttributeSpec.key` is written verbatim into `node.config`
  * (`node-config.dialog`, no case-conversion layer anywhere in the app), so it must equal the string the
  * engine reads. `transform.filter` shipped as `predicate` while `RowShaper.filter` reads
- * `str(node, "where")`; renamed to `where` 2026-08-03 (D1 of
- * `docs/superpower/vocabulary-and-config-contract-plan.md`) so the key matches the engine's reader.
+ * `str(node, "where")`; renamed to `where` 2026-08-03 (recorded as D1 in the archived
+ * `docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md`) so the key matches
+ * the engine's reader.
  * `transform.validate` reads `rule`, not `where` — it stays unspecced.
  *
  * <p>⚠ **`transform.filter` has TWO filtering moments, and they are not synonyms** (D7, resolved

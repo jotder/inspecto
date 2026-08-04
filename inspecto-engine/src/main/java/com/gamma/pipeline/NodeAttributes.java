@@ -6,10 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The per-node-type config attribute tables, published on {@code GET /pipelines/node-types} (§3.1 of
- * {@code docs/superpower/vocabulary-and-config-contract-plan.md}). This is the SERVER half of the same
- * vocabulary {@code inspecto-ui/.../pipelines/node-attributes.ts} declares, and since §3.1 the served
- * copy is the source while the client table is its offline/mock fallback.
+ * The per-node-type config attribute tables, published on {@code GET /pipelines/node-types}. This is the
+ * SERVER half of the same vocabulary {@code inspecto-ui/.../pipelines/node-attributes.ts} declares, and the
+ * served copy is the source while the client table is its offline/mock fallback. Current knowledge:
+ * {@code docs/okf/frontend/features/pipelines.md}; decision record: §3.1 of the archived
+ * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}.
  *
  * <p>⚠ <b>These two tables must stay identical, and a test enforces it rather than a comment.</b>
  * {@code NodeAttributesContractTest} compares this table against the committed

@@ -36,7 +36,7 @@ import { seedTelecomRa } from './telecom-ra.seed';
  * "no differently-named equivalent" before adding a key below.
  *
  * ⚠ This checks the seeds only. The bidirectional UI-spec ↔ engine-reader contract is a separate, larger
- * check — plan §3.3 in `docs/superpower/vocabulary-and-config-contract-plan.md`, which must bind a node type
+ * check — see `docs/okf/frontend/features/pipelines.md` (§3.3 of the archived plan), which must bind a node type
  * to the runtime that executes the file the editor actually saves.
  */
 const PHANTOM = ['partition_by', 'route_column', 'min_age_seconds'] as const;

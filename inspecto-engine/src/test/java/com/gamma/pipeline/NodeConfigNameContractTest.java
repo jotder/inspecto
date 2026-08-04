@@ -18,7 +18,8 @@ import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The §3.3 name-contract check of {@code docs/superpower/vocabulary-and-config-contract-plan.md}:
+ * The name-contract check described in {@code docs/okf/frontend/features/pipelines.md} (§3.3 of the
+ * archived {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}):
  * per node type, a key the UI declares must be the key the engine reads.
  *
  * <p>⚠ <b>Bound to ONE representation.</b> "Read somewhere in {@code PipelineLift} /

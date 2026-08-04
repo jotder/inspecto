@@ -73,26 +73,16 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/vocabulary-and-config-contract-plan.md`](superpower/vocabulary-and-config-contract-plan.md)
-  — **IN FLIGHT (opened 2026-08-03). D1/D2/D4/D5 SHIPPED same day; D3/D6/D7/D8 open; both renames unstarted.**
-  The UI↔config↔engine key contract, plus the agreed Flow→Pipeline (all three tiers, **reversing** the §13
-  "kept `flows/` dir + JSON keys" decision) and Cube→Matrix sweeps. Root cause in §1: per-node cfg specs live
-  only in `node-attributes.ts`, `GET /pipelines/node-types` carries no attribute specs, and there is **no
-  case-conversion layer anywhere**, so every UI `AttributeSpec.key` must already be the exact backend key with
-  nothing checking it.
-  **The three lessons in §2 are the reason to read this doc even if the defects mean nothing to you:**
-  (1) *verify a key against the representation the surface actually saves to* — `transform.filter` was renamed
-  `predicate`→`where` to match `RowShaper`, which the flat-pipeline editor **cannot reach**, so filters still
-  no-op (**D7**), and D3 turned out to be **mostly wrong** for the same reason and collapsed into D4;
-  (2) *a zero-reader key may be misnamed rather than phantom* — deleting `key_columns` broke a documented
-  case-study invariant because upsert-by-key is real under `reference.load`/`reference.key` (**D8**, reverted);
-  (3) *deadness is per node type* — `mode` and `table` are dead on a sink but engine-real elsewhere.
-  §3 scopes the common checking point over all four surfaces (TOON keys first, Java/TS last — the existing
-  guard's header warns *"a noisy guard gets disabled"*), and §3.3 must bind a node type to the runtime that
-  executes the file the editor saves, or it will bless correctly-spelled unreachable keys. §6 sequences the
-  work **defects → guard → renames**; §7 tracks the ELT doc's four remaining GLOSSARY divergences (its
-  Batch→**Consignment** call was **accepted** 2026-08-03 — see below); §8 catalogues the snake_case/camelCase
-  splits for the allowlists.
+- ~~`superpower/vocabulary-and-config-contract-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
+  ([archive copy](archived-documents/plans-archive/vocabulary-and-config-contract-plan.md), provenance only).
+  All nine defects (D1–D9) and all twelve sequence items closed or reclassified. As-built knowledge lives in
+  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md); the deliberate deferrals (D6
+  timezone-governs-scheduling, D8 authorable `reference:` block, the agent-tool `flow` argument, bare-word
+  `flow` identifiers) are in [`BACKLOG.md`](BACKLOG.md). What it left behind, all still live:
+  the four-pass vocabulary guard (`tools/check-vocabulary.mjs` — docs, TOON keys, knowledge trees, Java/TS
+  identifiers), `NodeConfigNameContractTest` (a declared key must reach its engine field), and
+  `NodeAttributesContractTest` + the committed `node-attributes.contract.json` (the server publishes the node
+  cfg vocabulary; client and server are byte-compared).
 
 - [`superpower/consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) —
   **DESIGN (opened 2026-08-03). Nothing implemented.** Captures the design conversation behind a

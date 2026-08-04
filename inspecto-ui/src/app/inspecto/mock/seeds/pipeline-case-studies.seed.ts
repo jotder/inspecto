@@ -17,7 +17,7 @@ import { putComponent } from './seed-utils';
  * and `adapter` have no flat home at all). Do not "fix" them against `node-attributes.ts`.
  *
  * ⛔ **`sink.materialized`'s `mode: 'upsert'` + `key_columns` have zero Java readers — and must NOT be
- * deleted for it** (D8 of `docs/superpower/vocabulary-and-config-contract-plan.md`). Zero readers meant
+ * deleted for it** (see `docs/okf/frontend/features/pipelines.md`; recorded as D8 in the archived `docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md`). Zero readers meant
  * *misnamed*, not fictional: upsert-by-key is real, but **pipeline-level**, as
  * `reference: {load: upsert|scd2, key: [...]}` on a pipeline that also declares `produces: reference`
  * (`PipelineConfigParser.java:413-429`, executed by `BatchIngestStrategy.java:107-119`). There is no

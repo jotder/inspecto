@@ -11,9 +11,11 @@ import com.gamma.ops.findings.FindingsSpec;
  * One config attribute of a pipeline node type — the server-side half of the UI's {@code AttributeSpec}
  * ({@code inspecto-ui/src/app/inspecto/component-model/attribute-spec.ts}), published on
  * {@code GET /pipelines/node-types} so the node cfg vocabulary has ONE definition instead of living only
- * client-side (§3.1 of {@code docs/superpower/vocabulary-and-config-contract-plan.md}).
+ * client-side. Current knowledge: {@code docs/okf/frontend/features/pipelines.md}; the decision record is
+ * §3.1 of the archived
+ * {@code docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md}.
  *
- * <p>Why this exists: §1 of that plan traced every config-key defect (D1–D9) to the same root cause —
+ * <p>Why this exists: that plan traced every config-key defect (D1–D9) to the same root cause —
  * per-node cfg keys were declared ONLY in the client table, the server's node-type catalog carried no
  * attribute vocabulary at all, and there is no case-conversion layer anywhere, so a client key that did
  * not exactly equal the engine's key silently no-opped. Publishing the specs closes that by construction:

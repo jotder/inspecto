@@ -2,8 +2,8 @@
 // Canonical-vocabulary guard. FOUR independent passes, deliberately kept in one script so CI runs one step:
 //
 //   1. USER-FACING DOCS — prose must not use a ⛔ banned synonym (below). Curated set, no allowlist.
-//   2. TOON CONFIG KEYS — the committed config corpus must not grow a banned *key* (§3.2 of
-//      docs/superpower/vocabulary-and-config-contract-plan.md). Cheapest, highest-value surface: a bad
+//   2. TOON CONFIG KEYS — the committed config corpus must not grow a banned *key* (§3.2 of the archived
+//      docs/archived-documents/plans-archive/vocabulary-and-config-contract-plan.md). Cheapest, highest-value surface: a bad
 //      key caught here costs nothing, while the same key caught after operators author data costs a
 //      migration.
 //   3. KNOWLEDGE TREES — `docs/okf/**` + `docs/superpower/**`, same rules as pass 1 but allowlisted per
@@ -70,10 +70,10 @@ const DOC_ALLOW = {
         'Sanctioned sense: "the two share the data store" is the physical backend, not a Dataset (GLOSSARY §6-B).',
     'docs/okf/backend/engine/db-layer.md::data-store':
         'Sanctioned sense: "Business-data stores" read via a DuckDB sandbox is the physical backend, not a Dataset.',
-    'docs/superpower/vocabulary-and-config-contract-plan.md::bare-flow':
-        'This plan IS the Flow→Pipeline rename: "Flow Tier 1/2/3" are the names of its own work items. Retire with the plan when Tier 3 lands.',
-    'docs/superpower/vocabulary-and-config-contract-plan.md::cube-noun':
-        'This plan IS the Cube→Matrix rename (§5): every hit is the plan discussing its own renamed term ("## 5. Cube → Matrix", the operator trigger quote, the audit\'s "no noun-sense Cube was found" finding). Retire alongside the bare-flow entry above.',
+    // The vocabulary-and-config-contract plan's two entries were RETIRED 2026-08-04 when the plan shipped
+    // and moved to docs/archived-documents/plans-archive/ (a permanently unscanned tier). The
+    // stale-allowlist rule named both the moment the file left this scope — the self-retirement working as
+    // designed, rather than two exemptions quietly outliving the debt they described.
     'docs/okf/frontend/features/link-analysis.md::source-acquisition-entity':
         'Different concept: link-analysis "Sources" are `GraphSource` renderer feeds, not acquisition entities.',
     'docs/okf/backend/integrations.md::source-acquisition-entity':
