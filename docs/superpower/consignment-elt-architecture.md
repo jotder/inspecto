@@ -632,6 +632,69 @@ consignment_outputs:
 **The single biggest addition** — it is the catalog substitute the no-catalog decision implies, and it is
 also what §10.1 reads for authoritative record-day membership.
 
+#### Grounded 2026-08-04 — three findings that change this section
+
+**(a) It is not a future-only asset. There is a real consumer today, and a real bug.**
+`ReprocessCommand` ([`ReprocessCommand.java:24-61`](../../inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java))
+already does replace-by-batch, and it already does it **manifest-driven, not by directory scan** — exactly as
+§5.3 requires. Its lookup is a hand-rolled per-batch Gson JSON
+(`BatchManifest`/`ManifestStore`, one `<batchId>.json` per batch, written by `BatchProcessor.commit`), whose
+`OutputEntry` carries **`(partition, outputFile)` only — no rows, no bytes**.
+
+The bug this leaves is documented in the compactor's own javadoc
+([`PartitionCompactor.java:37-40`](../../inspecto-engine/src/main/java/com/gamma/job/PartitionCompactor.java)):
+**compaction rewrites files the JSON manifest still points at, so reprocessing a Consignment whose output was
+compacted away degrades to a no-op delete followed by re-ingest — which duplicates its rows.** That is §6.3's
+silent-correctness-bug shape, live in the code today, and it is the sharpest argument for the registry: a
+durable table lets compaction *supersede* a row (or repoint it) instead of stranding a path nothing can
+resolve. `PartitionCompactor` and `ReferenceCompactor` both find their candidates by `Files.list(dir)` glob
+and replace via journal→hide→reveal→cleanup, so neither can currently maintain such a pointer.
+
+**(b) `rows` is NOT available where outputs are produced.** `PartitionWriter.reveal()` constructs
+`PartitionOutput(partition, outputFile, Files.size(dstFinal))` after the atomic rename
+([`PartitionWriter.java:157`](../../inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java)) — bytes
+come from the filesystem, and a multi-file partitioned `COPY` reports no per-file row count back. The count
+exists only in `LineageCollector.collect`'s `GROUP BY` query
+([`LineageCollector.java:52-73`](../../inspecto-etl/src/main/java/com/gamma/etl/LineageCollector.java)), per
+`(srcId, partition)`. **A registry row's `rows` must therefore be summed across every `LineageRow` sharing that
+output file — no existing code does that summation.** Populating `rows` is real work, not a field copy.
+
+**(c) The hook point, and it is not one place.** The natural write site is
+[`BatchIngestStrategy.writeAndTrace:131-134`](../../inspecto-engine/src/main/java/com/gamma/inspector/BatchIngestStrategy.java),
+where `conn`, the written table, `batchId` and the fresh `outputs` are all in scope alongside the
+`LineageCollector` call. But `PartitionWriter.write` → ephemeral `List<PartitionOutput>` → consumed once →
+discarded is a pattern repeated in **four** paths: that one, `PartitionSinkWriter.outputs()`,
+`EnrichmentEngine.run:153`, and `DecisionRuleApplier:138/165`. A registry that covers only the ingest path
+gives reprocessing a partial picture, which is worse than none — it would make `ReprocessCommand` look
+authoritative while missing enrichment and routed-rule outputs. **Cover all four or state the exclusion.**
+
+**Unverified, worth one check before building:** `BatchProcessor.commit:115` calls
+`DuckLakeRegistrar.register(...)`. If DuckLake's catalog already tracks file→row-count metadata, part of this
+table may be redundant. Check before writing the DDL.
+
+#### Decided 2026-08-04 (operator calls, all three hard to reverse once data exists)
+
+1. **The JSON manifest STAYS; the table is the queryable index.** `ManifestStore` keeps writing
+   `<batchId>.json` as the crash-recovery artifact of record and `ReprocessCommand` keeps working unchanged;
+   `consignment_outputs` is the per-file, lifecycle-bearing index beside it. Rationale: §5.4 says the existing
+   commit discipline is what stands in for the missing catalog — *"carry it forward; do not reinvent it"* — and
+   a plain JSON file survives a corrupt DuckDB, whereas `ServiceStores` deliberately degrades a failed store
+   open to `null`. Under the alternative, a store-open failure would break reprocessing outright.
+   **Consequence to respect: the JSON is authoritative for *existence*, the table for *state*.** Never let the
+   table's absence imply a file does not exist.
+2. **One column name: `consignment_id`, and legacy persisted artifacts migrate now.** Scope is **persisted
+   spellings only** — the three `BatchAuditWriter` CSV headers, `CommitLog`'s header, the `BatchManifest` JSON
+   field, plus any SQL/DDL naming the column. **Explicitly NOT in scope:** the `Batch*` Java classes and
+   `batchId()` accessors, which §3 keeps as legacy internals and §15 tracks separately — that is the 517-file
+   `@PublicApi` sweep and a column rename does not imply it. ⚠ **This makes existing on-disk artifacts
+   unreadable unless reads accept both spellings**: `CommitLog.committedBatchIds()` is a crash-recovery
+   read-back, and `ManifestStore.read` is what `ReprocessCommand` depends on. **Accept-both-on-read,
+   write-new-only** is therefore mandatory, not optional polish.
+3. **All four write paths are covered**, not just ingest: `BatchIngestStrategy.writeAndTrace`,
+   `PartitionSinkWriter.outputs()`, `EnrichmentEngine.run:153`, `DecisionRuleApplier:138/165`. Rationale: a
+   registry covering only ingest makes `ReprocessCommand` look authoritative while silently missing enrichment
+   and routed-rule outputs — worse than having none.
+
 ### 11.4 Partition state — nothing exists
 
 §8.2 needs a new table outright:
@@ -875,7 +938,16 @@ processor in step 3 will answer. `Manifest` as a Java type is specified by §2/�
 - **The designer/UI surface** for typed ports, grain, SLA authoring, event-time field selection, and the
   palette.
 - **Whether the new durable tables (§11.3, §11.4) replace the three legacy `BatchAuditWriter` CSVs or the
-  CSVs become a projection of them.** Open decision.
+  CSVs become a projection of them.** Open decision — but ⚠ **the framing is wrong, grounded 2026-08-04.**
+  The registry does not compete with the CSVs at all: they sit at different grains. `status` is per-member,
+  `batches` is per-batch aggregate (`output_file_count`, `total_output_bytes` — sums, not per-file rows),
+  `lineage` is an input→output count matrix, and the durable `CommitLog`
+  ([`CommitLog.java:36`](../../inspecto-etl/src/main/java/com/gamma/etl/CommitLog.java)) is a single fsync'd
+  append-only CSV of **batch-level aggregates** with no output-file identity whatsoever. Nothing there is
+  per-output-file. **What `consignment_outputs` actually overlaps is the per-batch Gson JSON manifest**
+  (`BatchManifest.OutputEntry`) that `ReprocessCommand` reads — so the live decision is *"does the table
+  replace the JSON manifest, or does the JSON stay as the crash-recovery artifact with the table as the
+  queryable index?"* The CSV question is a non-question.
 - **Whether `batch_id` stays the column name in extended legacy artifacts** while `consignment_id` is used
   in new ones. Open decision.
 - **Verification items** flagged inline: DuckDB mergeable sketch state (§7.5); whether a durable

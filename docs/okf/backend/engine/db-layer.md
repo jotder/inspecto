@@ -64,6 +64,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
 | Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
 | Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
+| Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | `none` |
 | Ops escalation queues | `ops/queue/QueueStore` | **none** — in-memory only | — | — |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
@@ -219,6 +220,45 @@ message, attributes (JSON), payload (JSON), level  -- + partition cols year, mon
 `level` ∈ [`EventLevel`](../../../../inspecto-event/src/main/java/com/gamma/event/EventLevel.java). There is **no
 JDBC/Postgres event table** — events are Parquet-only.
 
+### 3.9 `consignment_outputs` — per-output-file registry  · **A** *(becomes **M** when state transitions land)*
+File: `inspecto-consignment-outputs.db`
+
+```sql
+CREATE TABLE IF NOT EXISTS consignment_outputs (
+  consignment_id VARCHAR,
+  run_id         VARCHAR,
+  table_name     VARCHAR,
+  partition_key  VARCHAR,
+  record_day     VARCHAR,
+  path           VARCHAR,
+  row_count      BIGINT,   -- (the plan sketch calls this `rows`; `ROWS` is a SQL keyword)
+  bytes          BIGINT,
+  written_at     VARCHAR,
+  generation     INTEGER,
+  state          VARCHAR   -- LIVE | SUPERSEDED | COMPACTED_AWAY
+);
+```
+
+The durable output registry from the
+[consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §11.3 — the catalog substitute
+its no-catalog decision implies, answering *"every file this Consignment wrote, across all partitions"* with
+lifecycle state attached.
+
+**Two things to know before using it.** (1) `consignment_id` is deliberately **not** `batch_id`: GLOSSARY §13
+bans *Batch* for this concept, and a table born after that decision starts correct instead of needing the
+migration the legacy CSV/manifest artifacts do. (2) **The per-Consignment JSON manifest stays authoritative
+for a file's *existence*; this table is authoritative for its *state*.** The store is default-off and
+`ServiceStores` degrades a failed open to `null`, so a store that can legitimately be absent must never be
+the only record that a file exists — never read a missing row as proof of a missing file.
+
+`row_count` is not a copy of anything: `PartitionOutput` carries only `(partition, outputFile, bytes)`, and a
+multi-file partitioned `COPY` reports no per-file count, so the value has to be summed from
+`LineageCollector`'s per-`(srcId, partition)` counts. Reads return **all** states, not just `LIVE` — hiding
+`COMPACTED_AWAY` would conceal exactly the case the registry exists to expose (see
+[`PartitionCompactor`](../../../../inspecto-engine/src/main/java/com/gamma/job/PartitionCompactor.java)'s own
+javadoc: reprocessing a Consignment whose output was compacted away currently degrades to a no-op delete plus
+re-ingest, which duplicates rows).
+
 ---
 
 ## 4. File topology (per space)
@@ -230,7 +270,7 @@ single-writer-locked (documented in `ServiceStores`). Locations come from
 | Layout | Capability file locations |
 |---|---|
 | **`DirSpaceRoot`** (per-space dir) | `<spaceBase>/duckdb/<file>` — e.g. `spaces/demo/duckdb/inspecto-ops.db` |
-| **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db` |
+| **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db`, `./inspecto-consignment-outputs.db` |
 
 So across N spaces you get N separate sets of these files. Events live under `<dataDir>/events/`
 (`DirSpaceRoot`) or `./inspecto-events/` (legacy). Every `-D<capability>.db.url` flag overrides the
@@ -249,7 +289,8 @@ The layer was **designed** for this: stores are JDBC-pluggable by URL scheme, th
 portable (`VARCHAR`/`BIGINT`, composite PKs, no auto-increment, no upserts — explicit DELETE-then-INSERT),
 and there is a **real embedded-Postgres round-trip test**
 ([`PostgresStateStoreTest`](../../../../inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java))
-covering 6 of the 7 DB-backed stores.
+covering 6 of the 8 DB-backed stores — **`consignment_outputs` is one of the two it does not cover.** Its DDL
+is portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that is reasoned, not proved.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
@@ -260,6 +301,7 @@ covering 6 of the 7 DB-backed stores.
 | Jobs | `-Djobs.backend=postgres` | `-Djobs.db.url` | (in URL) |
 | Provenance | `-Dprovenance.backend=postgres` | `-Dprovenance.db.url` | (in URL) |
 | Acquisition ledger | `-Dacquire.ledger.backend=db` | (property in [`AcquisitionLedgers`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)) | — |
+| Consignment outputs | `-Dconsignment.outputs.backend=postgres` | `-Dconsignment.outputs.db.url` | (in URL) |
 | Events | `-Devents.backend=parquet` | — | **No Postgres path** |
 
 Point each URL at `jdbc:postgresql://…`; the three ops URLs may share one database/schema (table names

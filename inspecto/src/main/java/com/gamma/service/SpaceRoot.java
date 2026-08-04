@@ -74,6 +74,9 @@ public interface SpaceRoot {
     /** Default JDBC URL for the acquisition (dedup) ledger, when {@code -Dacquire.ledger.backend=db}. */
     String acquisitionLedgerDbUrl();
 
+    /** Default JDBC URL for the Consignment output-file registry, when {@code -Dconsignment.outputs.backend} is set. */
+    String consignmentOutputsDbUrl();
+
     /** The pre-spaces flat layout: historical file names in the working directory. */
     static SpaceRoot legacy() {
         return new LegacySpaceRoot();
@@ -134,6 +137,8 @@ final class LegacySpaceRoot implements SpaceRoot {
     }
 
     public String acquisitionLedgerDbUrl() { return "jdbc:duckdb:inspecto-acquisition.db"; }
+
+    public String consignmentOutputsDbUrl() { return "jdbc:duckdb:inspecto-consignment-outputs.db"; }
 }
 
 /** A self-contained per-space directory: {@code base/{config,data,audit,duckdb}}. */
@@ -188,4 +193,6 @@ final class DirSpaceRoot implements SpaceRoot {
     public String statusDbUrl() { return duckdb("inspecto-status.db"); }
 
     public String acquisitionLedgerDbUrl() { return duckdb("inspecto-acquisition.db"); }
+
+    public String consignmentOutputsDbUrl() { return duckdb("inspecto-consignment-outputs.db"); }
 }

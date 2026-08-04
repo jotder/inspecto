@@ -88,6 +88,33 @@ final class ServiceStores {
     }
 
     /**
+     * Consignment output-file registry (consignment-elt plan §11.3), gated by
+     * {@code -Dconsignment.outputs.backend}: {@code duckdb} (the bundled default engine),
+     * {@code postgres}/{@code postgresql} (resolves {@code -Dconsignment.outputs.db.url}, which must be a
+     * {@code jdbc:postgresql://…} URL with the PG driver on the classpath), or a raw {@code jdbc:} URL. Any
+     * other value ⇒ {@code null} ⇒ no per-output-file registry is kept. Mirrors {@link #openProvenanceStore(SpaceRoot)}.
+     *
+     * <p><b>Absence is not degraded correctness.</b> Output files are still revealed and still recorded in the
+     * per-Consignment JSON manifest, which stays the artifact of record for <em>existence</em>; this registry
+     * adds the queryable per-file index with lifecycle <em>state</em>. That split is what makes fail-open safe
+     * here — see {@link com.gamma.consignment.DbConsignmentOutputStore}.
+     */
+    static com.gamma.consignment.DbConsignmentOutputStore openConsignmentOutputStore(SpaceRoot root) {
+        String backend = System.getProperty("consignment.outputs.backend", "none").trim().toLowerCase();
+        boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        String url = backend.startsWith("jdbc:")
+                ? backend
+                : System.getProperty("consignment.outputs.db.url", root.consignmentOutputsDbUrl());
+        try {
+            return com.gamma.consignment.DbConsignmentOutputStore.open(url);
+        } catch (Exception e) {
+            log.warn("Could not open consignment-outputs DB ({}) — output registry disabled: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Select the Phase-1 event-store backend (v4.2.0): {@code -Devents.backend=memory} (default — a
      * bounded in-memory ring; the lean fat-JAR keeps no extra files and tests stay light) or
      * {@code -Devents.backend=parquet} (durable rolling Hive-partitioned Parquet under
