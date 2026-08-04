@@ -4,9 +4,10 @@
 > surfaces were *already* one feature. **This one is the opposite: they share almost nothing, and the
 > gap between them contains two live defects.** Read §1 before scoping.
 
-Status: **IN FLIGHT** 2026-08-04 · slices 1–5 SHIPPED (5 commits on `master`, unpushed) ·
-**slice 6 + close-out remain**. §1 is the original grounding, kept as written — where implementation
-refuted it, the slice below says so.
+Status: **SHIPPED** 2026-08-04 · all 6 slices landed on `master` (unpushed with the rest of the day's
+work — see BRANCHING policy before pushing). §1 is the original grounding, kept as written — where
+implementation refuted it, the slice below says so. Close-out: see
+[`docs/okf/frontend/features/grammar-config.md`](../okf/frontend/features/grammar-config.md).
 
 ## 0. Decisions (user, 2026-08-04)
 
@@ -207,18 +208,53 @@ trap, proven in the browser), saved, and read the store back:
 with `collector`/`processing`/`output`/`dirs` untouched. A fresh tab shows a clean console (the stale
 `chunk-*.js` 404 in the older tab was a pre-rebuild dev-server artifact, not a defect).
 
-### Slice 6 — the node dialog adopts it; rename to Grammar
-`GrammarEditorDialog` renders the shared component; keeps choose-or-create + the 2-step save, now
-writing **inline node config by default** and only creating a Grammar component when the operator
-names one ("Save as reusable Grammar"). Rename per decision 3, incl. the node label and
-`pipeline-editor.component.ts:796`.
-- Verify: GAUNTLET + preview smoke (inline edit → save → `parsing:` in the file; extract → save →
-  `use: grammar/<id>` survives a reload).
+### Slice 6 — the node dialog adopts it; rename to Grammar — **SHIPPED**
+`ParserConfigDialog` → `GrammarEditorDialog` (`git mv`'d), per decision 3: the node label becomes
+"Edit Grammar", `pipeline-editor.component.ts` opens `GrammarEditorDialog`. It renders
+`<inspecto-grammar-editor>` and keeps only its own chrome: dialog shell, fullscreen, the
+`guardDirtyClose` dirty-close guard (new — the old dialog had none), the Grammar dropdown (now
+`Inline — this node only` alongside existing components, not a bare "＋ New"), and the two-step
+extract-and-name save.
 
-### Close-out
-Distill into `docs/okf/frontend/features/` (new `grammar-config.md`, cross-linked from `onboarding.md`
-+ `pipelines.md`), archive this plan, update `docs/INDEX.md` + `docs/GLOSSARY.md` §13 touchpoints,
-`graphify update .`.
+**Implements decision 1's second half.** Default is now **inline**: `save()` writes the authored
+`parsing:` block straight onto `node.config.parsing` and drops any stale `use:` — no component is
+created unless the operator clicks *Save as reusable Grammar…*, which asks for a name and persists a
+`grammar` component exactly as before. Switching the dropdown back to `Inline` on a bound node clears
+`use:` on save; extracting or rebinding always leaves exactly one of `config.parsing` / `use:`
+populated, never both.
+
+**Design change found while wiring it, not in the original plan:** a Grammar component can now be
+authored as an extracted `parsing:` block, not only the legacy flat `csv_settings` shape the dialog
+used to write (`{parser_type, ...flat keys}`). Extraction must be a **move**, not a transform — the
+inline and extracted shapes have to be the same bytes, or promoting a Grammar silently changes it.
+`PipelineConfigParser` (`resolveGrammar`/`readGrammar`/`isParsingBlock`) now resolves either shape:
+told apart by a **nested** `delimited`/`plugin` root (the one structural difference — a flat grammar
+carries `delimited.*` keys at top level, the block form nests them), the plugin fallback also checks
+the referenced Grammar's own `plugin` root. A **legacy** component (written before this slice) still
+carries `parser_type`; the dialog's `grammarBlock()` maps it to `frontend` on read only, so an
+existing Grammar still opens on the right file format without a data migration. Pinned by
+`inspecto-etl`'s `UnifiedParsingBlockTest#aParsingShapedGrammarComponentResolves` +
+`#inlineKeysOverrideAParsingShapedGrammarComponent` (inline still wins either way).
+
+**Plugin Grammars stay preview-only in this dialog**, unlike the flat rewrite that shipped before:
+a plugin parser also needs per-segment schema files that only the Onboarding Parsing stage can
+author, so saving one here is refused with an inline pointer to that stage rather than writing a
+`parser_type` key no engine code has ever read (which is what the pre-unification dialog did).
+
+Verified: full reactor **BUILD SUCCESS** (23 modules; `inspecto-etl` 216 tests incl. both new ones
+confirmed in the surefire XML); UI **2047 passed / 310 files**, `lint:tokens` + `ng build` clean.
+⚠ **Not verified live** — the Browser pane denied navigation to the offline preview this shift. The
+new dialog spec (`grammar-editor.dialog.spec.ts`, 10 cases) exercises every seam a live smoke would
+have: inline-default save, extract-then-persist, bound-edit round-trip, unbind-back-to-inline, the
+legacy `parser_type` read, and the plugin-save refusal — but a real browser round-trip through
+`ng serve` is still outstanding. Log to BACKLOG if the next shift can reach the preview.
+
+### Close-out — **DONE**
+Distilled into [`docs/okf/frontend/features/grammar-config.md`](../okf/frontend/features/grammar-config.md),
+cross-linked from `onboarding.md` + `pipelines.md`; this plan archived to
+`docs/archived-documents/plans-archive/`; `docs/INDEX.md` and `docs/GLOSSARY.md` §13 updated;
+`graphify update .` run. The deferred unknown-`use:`-prefix refusal (§2.3) and the un-run slice-6 live
+smoke are logged to `docs/BACKLOG.md`.
 
 ## 3. Risks
 - **Slice 4 is large** — it merges two mature UIs, one of which (onboarding) owns three bespoke

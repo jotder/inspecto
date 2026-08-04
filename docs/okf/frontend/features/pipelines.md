@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: Pipelines (Authoring)
-description: The NiFi-style Pipeline graph editor (AntV G6) with node config, a rich parser-config dialog, and per-processor test.
+description: The NiFi-style Pipeline graph editor (AntV G6) with node config, a Grammar editor dialog, and per-processor test.
 resource: inspecto-ui/src/app/modules/admin/pipelines/pipelines.routes.ts
 tags: [feature, pipelines, authoring, g6, graph, parser, workbench]
 timestamp: 2026-07-07T00:00:00Z
@@ -16,11 +16,13 @@ double-click=configure, plain drag=move, **Shift+drag=draw edge** (two-click Con
 editor keeps a persistent `Graph` and mutates in place (see the G6 patterns in the
 [architecture](../architecture.md)).
 
-A rich **parser-config dialog** configures PARSE nodes across 9 formats (ASN.1 · DSV · HTML · JSON · Other ·
-Parquet · TXT · XLSX · XML) with a typed property sheet and ag-Grid/tree test output; the DSV property set
-mirrors the backend `CsvSettings`. Parsers persist as reusable `grammar`
-[components](components.md). Backed by `PipelinesService` / `ComponentsService`; offline via the
-`mockFlows`-gated handler of the unified [mock backend](../conventions/mock-backends.md).
+**`GrammarEditorDialog`** (`grammar-editor.dialog.ts`, renamed from `ParserConfigDialog` 2026-08-04)
+configures PARSE nodes: a thin host over the shared `<inspecto-grammar-editor>` — see
+[Grammar configuration](grammar-config.md) for the full account, shared with Onboarding's Parsing
+stage. A Grammar lives **inline** on the node's own `parsing:` config by default; "Save as reusable
+Grammar" extracts it to a `grammar` [component](components.md) bound via `use: grammar/<id>`. Backed
+by `PipelinesService` / `ComponentsService`; offline via the `mockFlows`-gated handler of the unified
+[mock backend](../conventions/mock-backends.md).
 
 ## Three lenses, and nothing loads until you ask for it (2026-08-02)
 

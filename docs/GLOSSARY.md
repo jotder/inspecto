@@ -269,7 +269,11 @@ built-ins and custom Java decoders deployed as plugins. Fully transparent — a 
 delimited, record element for XML, schema module for ASN.1, …). Each Parser declares its grammar's schema
 (`grammarSchema`, the served `FieldSpec` vocabulary) so the options form renders generically; a Grammar
 persists as the reusable `grammar` component kind and is referenced by parser Steps via `use`.
-⛔ not "parser config" / "parse options" in UI copy — one concept, one word.
+⛔ not "parser config" / "parse options" in UI copy — one concept, one word. ✅ **UI DONE** (2026-08-04):
+the shared `<inspecto-grammar-editor>` (`inspecto/grammar/`) is the one authoring surface for both the
+Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserConfigDialog` →
+`GrammarEditorDialog`; the node label "Configure parser" → "Edit Grammar". See
+`okf/frontend/features/grammar-config.md`.
 
 **Transform** — Reshapes/derives/aggregates (cubes) data. When it materializes output it produces a **Derived
 Table**.

@@ -127,6 +127,10 @@ pipeline-level `csv_settings`, and a per-field column would imply rigor the engi
 
 ## Parsing stage flow (choose file → view → type → options → test → table/tree)
 
+The stage is a thin host over the shared `<inspecto-grammar-editor>` (2026-08-04) — see
+[Grammar configuration](grammar-config.md) for the store contract and what is shared with the
+Pipelines `parse` node dialog.
+
 The pane reads top-to-bottom, starting with its own sample strip: file-type toggle (with a **sniffed
 suggestion chip** — `sniffFrontend` recognises NDJSON / JSON-array / consistent delimiters and is
 applied only by click, never automatically, prefilling the sniffed delimiter) → per-frontend

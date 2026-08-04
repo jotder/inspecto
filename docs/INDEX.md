@@ -73,15 +73,17 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/grammar-config-unification.md`](superpower/grammar-config-unification.md) —
-  **IN FLIGHT (opened 2026-08-04). Slices 1–5 SHIPPED the same day; slice 6 + close-out remain.**
-  One `<inspecto-grammar-editor>` for the Onboarding Parsing stage and the Pipelines `parse` node.
-  The sequel to `collector-config-unification` and its **opposite**: those two surfaces were already
-  one feature, these shared only the renderer layer and the gap between them held two live defects —
-  a `use: grammar/<id>` binding that never reached disk (the save was *refused*, not merely lossy),
-  and two competing config keys where the editor wrote the losing one. Both closed. Still open:
-  the parse node dialog has not yet adopted the editor, and the unknown-`use:`-prefix refusal is
-  deferred (see the plan's slice 3).
+- ~~`superpower/grammar-config-unification.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
+  ([archive copy](archived-documents/plans-archive/grammar-config-unification.md), provenance only).
+  One `<inspecto-grammar-editor>` for the Onboarding Parsing stage and the Pipelines `parse` node
+  dialog (renamed `ParserConfigDialog` → `GrammarEditorDialog`). The sequel to
+  `collector-config-unification` and its **opposite**: those two surfaces were already one feature,
+  these shared only the renderer layer and the gap between them held two live defects — a
+  `use: grammar/<id>` binding that never reached disk (the save was *refused*, not merely lossy), and
+  two competing config keys where the editor wrote the losing one. Both closed before the UI
+  unified. As-built knowledge: [`okf/frontend/features/grammar-config.md`](okf/frontend/features/grammar-config.md).
+  Deferred to [`BACKLOG.md`](BACKLOG.md): the unknown-`use:`-prefix refusal, and the slice-6 live
+  browser smoke (the preview pane was unreachable this shift).
 
 - ~~`superpower/collector-config-unification.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
   ([archive copy](archived-documents/plans-archive/collector-config-unification.md), provenance only).
