@@ -127,8 +127,8 @@ src/app/
 - **Asking where files come from → `<inspecto-collector-config>`** (`inspecto/collector/`, 2026-08-04).
   ONE shared surface for the `collector:` block: the local-inbox/Connection toggle, the schema form over
   the shared `COLLECTOR_ATTRIBUTES`, Test connection, create-a-Connection in place, and the derived
-  connector. Adopter: Onboarding's Collection stage (the Pipelines `acquisition` node dialog adopts it
-  next). Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
+  connector. Adopters: Onboarding's Collection stage and the Pipelines `acquisition` node dialog —
+  never fork it. Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
   and save through their own route, because the two persisted shapes genuinely differ (a `collector:`
   block vs. a node's raw config plus a `use: connection/<id>` binding). ⚠ **Never ask for `connector`** —
   it is derived (local ⇒ `local`, else the picked Connection's own type) because
@@ -136,7 +136,9 @@ src/app/
   profile named by `collector.connection`, without checking the two agree. ⚠ A host that swaps the spec
   list at runtime must carry the live values across the swap: reassigning `<inspecto-schema-form>`'s
   `specs` rebuilds every control from its declared default (the mode toggle silently wiped the form
-  until this component started re-seeding).
+  until this component started re-seeding). ⚠ On the node dialog the way to UN-bind a Connection is the
+  **mode toggle**, not blanking the text — an empty picker while still in Connection mode is a refusal,
+  because a non-local collector with no Connection is the state that used to fail at run time.
 - **Editing a pipeline graph → the canonical `*_pipeline.toon` round-trip** (`modules/admin/pipelines/`,
   W5 2026-08-01). The Pipelines editor is an editor **over** the canonical config, not a second model.
   Load with `PipelinesService.pipelineGraphRaw(name)` (`GET /pipelines/{name}/graph/raw` — the lifted,

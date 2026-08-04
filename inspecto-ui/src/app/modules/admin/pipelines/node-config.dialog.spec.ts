@@ -16,6 +16,7 @@ import {
     MetadataNode,
     PipelinesService,
 } from 'app/inspecto/api';
+import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import type { AttributeSpec } from 'app/inspecto/component-model';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
@@ -64,8 +65,15 @@ async function create(data: Partial<NodeConfigData> = {}, api: Partial<ConfigSer
                 },
             },
             { provide: CatalogService, useValue: { references: vi.fn(() => of([PRODUCED_REF])) } },
-            // An acquisition node's Connection autocomplete loads these (D3-remainder).
-            { provide: ConnectionsService, useValue: { list: () => of([{ id: 'prod_sftp' }, { id: 'lake_blob' }]) } },
+            // The shared collector component loads these — `connector` included, since it DERIVES
+            // `collector.connector` from the picked profile rather than asking for it.
+            {
+                provide: ConnectionsService,
+                useValue: {
+                    list: () => of([{ id: 'prod_sftp', connector: 'sftp' }, { id: 'lake_blob', connector: 'azure' }]),
+                    test: vi.fn(() => of({ reachable: true, detail: 'ok' })),
+                },
+            },
             { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
             { provide: ToastrService, useValue: TOASTR },
         ],
@@ -79,6 +87,21 @@ async function create(data: Partial<NodeConfigData> = {}, api: Partial<ConfigSer
 /** The dialog's config schema-form (the only one, on a non-enrichment node). */
 function form(fixture: ComponentFixture<NodeConfigDialog>): InspectoSchemaFormComponent {
     return fixture.debugElement.query(By.directive(InspectoSchemaFormComponent)).componentInstance;
+}
+
+/**
+ * The shared collector surface hosted by the dialog (acquisition nodes only). `form()` above still
+ * works on one of these — a `By.directive` query descends into child views — and resolves to the
+ * schema form INSIDE this component, which is exactly the control set those tests mean.
+ */
+function collector(fixture: ComponentFixture<NodeConfigDialog>): CollectorConfigComponent {
+    return fixture.debugElement.query(By.directive(CollectorConfigComponent)).componentInstance;
+}
+
+/** Put the collector surface in Connection mode and let its schema form rebuild for the new specs. */
+function pickConnectionMode(fixture: ComponentFixture<NodeConfigDialog>): void {
+    collector(fixture).setMode('connection');
+    fixture.detectChanges();
 }
 
 /** The shared enrichment editor hosted by the dialog (enrichment nodes only). */
@@ -267,11 +290,49 @@ describe('NodeConfigDialog', () => {
             typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
         });
         const c = fixture.componentInstance;
+        pickConnectionMode(fixture);
         form(fixture).form.patchValue({ connection: 'prod_sftp' });
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
         c.save();
         expect(closed?.node.use).toBe('connection/prod_sftp');
         expect((closed?.node.config as Record<string, unknown>)?.['connection']).toBeUndefined();
+        // The presentation half of the unification (2026-08-04): the node now also writes the DERIVED
+        // connector, instead of leaving whatever the file happened to hold to disagree with the Connection.
+        expect((closed?.node.config as Record<string, unknown>)?.['connector']).toBe('sftp');
+    });
+
+    /** Collecting from the local inbox is a real answer, and it derives `connector: local`. */
+    it('writes connector "local" when the node collects from the inbox', async () => {
+        let closed: { node: AuthoredNode } | undefined;
+        const fixture = await create({
+            node: { id: 'acq', type: 'acquisition', config: { include: ['*.csv'] } },
+            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+        });
+        const c = fixture.componentInstance;
+        expect(collector(fixture).mode()).toBe('local');
+        (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
+        c.save();
+        expect((closed?.node.config as Record<string, unknown>)['connector']).toBe('local');
+        expect(closed?.node.use).toBeUndefined();
+    });
+
+    /**
+     * A Connection id that names no saved profile is REFUSED, not written — the engine hands the
+     * connector factory a profile it looks up by this name, so a phantom id fails at runtime instead.
+     */
+    it('refuses to save an acquisition node naming an unsaved Connection', async () => {
+        let closed: { node: AuthoredNode } | undefined;
+        const fixture = await create({
+            node: { id: 'acq', type: 'acquisition' },
+            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+        });
+        const c = fixture.componentInstance;
+        pickConnectionMode(fixture);
+        form(fixture).form.patchValue({ connection: 'ghost' });
+        (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
+        c.save();
+        expect(closed).toBeUndefined();
+        expect(collector(fixture).error()).toContain('"ghost" is not a saved Connection');
     });
 
     /** Round-trip: the binding has to come BACK out of `use`, or reopening the dialog shows it blank. */
@@ -283,8 +344,32 @@ describe('NodeConfigDialog', () => {
         expect(c.schemaInitial['connection']).toBe('lake_blob');
     });
 
-    /** Clearing the picker clears the binding — not "keeps the old one". */
-    it('clears the binding when the Connection is emptied', async () => {
+    /**
+     * Switching back to the local inbox clears the binding — not "keeps the old one".
+     *
+     * <p>⚠ Since the 2026-08-04 unification the way to un-bind is the MODE TOGGLE, not blanking the
+     * text: an empty box while still in Connection mode is a refusal ("Pick a Connection — or switch
+     * to Local inbox"), exactly as on Onboarding's Collection stage. Silently writing a
+     * Connection-less non-local collector is the state that used to fail at run time.
+     */
+    it('clears the binding when the node switches back to the local inbox', async () => {
+        let closed: { node: AuthoredNode } | undefined;
+        const fixture = await create({
+            node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
+            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+        });
+        const c = fixture.componentInstance;
+        expect(collector(fixture).mode()).toBe('connection');
+        collector(fixture).setMode('local');
+        fixture.detectChanges();
+        (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
+        c.save();
+        expect(closed?.node.use).toBeUndefined();
+        expect((closed?.node.config as Record<string, unknown>)['connector']).toBe('local');
+    });
+
+    /** Blanking the picker without switching mode refuses, rather than writing a broken collector. */
+    it('refuses a Connection-mode save with the Connection blanked', async () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
@@ -294,7 +379,31 @@ describe('NodeConfigDialog', () => {
         form(fixture).form.patchValue({ connection: '' });
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
         c.save();
-        expect(closed?.node.use).toBeUndefined();
+        expect(closed).toBeUndefined();
+        expect(collector(fixture).error()).toContain('Pick a Connection');
+    });
+
+    /**
+     * The unification's structural guarantee: this dialog renders the SAME component Onboarding's
+     * Collection stage renders — asserted by presence of the component, so a forked copy of the
+     * chrome fails here even if it looks identical on screen. Every other node type keeps the
+     * generic schema form.
+     */
+    it('renders the shared collector surface for an acquisition node', async () => {
+        const fixture = await create({
+            node: { id: 'acq', type: 'acquisition' },
+            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+        });
+        expect(fixture.debugElement.query(By.directive(CollectorConfigComponent))).not.toBeNull();
+    });
+
+    it('keeps the generic schema form for every other node type', async () => {
+        const fixture = await create({
+            node: { id: 'w', type: 'sink.persistent' },
+            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
+        });
+        expect(fixture.debugElement.query(By.directive(CollectorConfigComponent))).toBeNull();
+        expect(form(fixture).form.contains('format')).toBe(true);
     });
 
     /** Two controls must never both write `use` — acquisition owns it via the attribute. */

@@ -20,10 +20,11 @@ import {
     LensService,
     PipelinesService,
 } from 'app/inspecto/api';
+import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
-import { connectionOptionLoader, pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
@@ -82,6 +83,7 @@ export interface NodeConfigResult {
         MatSelectModule,
         InspectoAlertComponent,
         InspectoSchemaFormComponent,
+        CollectorConfigComponent,
         EnrichmentEditorComponent,
     ],
     template: `
@@ -158,11 +160,21 @@ export interface NodeConfigResult {
                     }
                 }
 
-                <!-- Schema-driven config for known node types (required up front, rest behind disclosure). -->
-                @if (specs().length) {
+                <!-- Acquisition authors the collector block, so it renders the SAME shared surface
+                     Onboarding's Collection stage renders — mode toggle, Test connection, create a
+                     Connection in place, derived connector — instead of a bare schema form. -->
+                @if (isAcquisition) {
                     <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Config</div>
-                    <inspecto-schema-form [specs]="specs()" [initial]="schemaInitial"
-                                          [optionLoaders]="configLoaders"></inspecto-schema-form>
+                    <inspecto-collector-config
+                        [specs]="specs()"
+                        [initial]="schemaInitial"
+                        [storedConnector]="storedConnector"
+                        (submitted)="save()"
+                    />
+                } @else if (specs().length) {
+                    <!-- Schema-driven config for known node types (required up front, rest behind disclosure). -->
+                    <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Config</div>
+                    <inspecto-schema-form [specs]="specs()" [initial]="schemaInitial"></inspecto-schema-form>
                 }
 
                 <!-- Additional / free-form config: the primary editor for unknown types, else a collapsed
@@ -253,6 +265,12 @@ export class NodeConfigDialog {
     readonly data = inject<NodeConfigData>(MAT_DIALOG_DATA);
 
     @ViewChild(InspectoSchemaFormComponent) private schemaForm?: InspectoSchemaFormComponent;
+    /**
+     * The acquisition branch's config surface. A view query does not cross a component boundary, so
+     * the schema form INSIDE this component is invisible to the query above — the two never collide,
+     * and {@link configForm} picks whichever one this node actually rendered.
+     */
+    @ViewChild(CollectorConfigComponent) private collector?: CollectorConfigComponent;
 
     // ── enrichment nodes (W4b): the dialog authors the REAL companion `*_enrich.toon` ──
     readonly isEnrichment = this.data.node.type === 'enrichment';
@@ -296,14 +314,20 @@ export class NodeConfigDialog {
      *
      * <p>⚠ It is deliberately NOT wired as a `bindKind`: the component picker calls
      * `GET /components/{kind}`, and a Connection is not a `ComponentType` — it has its own service and
-     * route. So the existing `connection` autocomplete stays the surface, and this flag makes it write
-     * `use:` instead of cfg. The attribute also stays in the shared `COLLECTOR_ATTRIBUTES` because
+     * route. So the {@link CollectorConfigComponent} picker stays the surface, and this flag makes it
+     * write `use:` instead of cfg. The attribute also stays in the shared `COLLECTOR_ATTRIBUTES` because
      * Onboarding authors the `collector:` block directly, where `connection` IS a real key.
+     *
+     * <p>Since 2026-08-04 the whole surface is that shared component, so this node gets Onboarding's
+     * mode toggle, Test connection and create-a-Connection affordances, and — the presentation half of
+     * the unification — writes the DERIVED `collector.connector` it was previously leaving to whatever
+     * the file already had.
      */
     readonly isAcquisition = this.data.node.type === 'acquisition';
     /** `use: connection/<name>` prefix — the one place the binding's shape is spelled. */
     private static readonly CONNECTION_REF = 'connection/';
-    readonly configLoaders = this.isAcquisition ? { connection: connectionOptionLoader() } : {};
+    /** The node's stored `connector`, so the shared component can grandfather a hand-authored one. */
+    readonly storedConnector = String(this.data.node.config?.['connector'] ?? '');
 
     /**
      * The node type's declared attribute schema (empty ⇒ free-form editor only).
@@ -366,6 +390,9 @@ export class NodeConfigDialog {
         let extraKeys = 0;
         for (const [key, value] of Object.entries(n.config ?? {})) {
             if (ownsRoot(key)) continue;
+            // `connector` is DERIVED, never asked (see storedConnector) — a free-form row for it would
+            // be a second control writing a field the save already computes, and free-form wins last.
+            if (this.isAcquisition && key === 'connector') continue;
             this.configRows.push(this.configRow(key, typeof value === 'string' ? value : JSON.stringify(value)));
             extraKeys++;
         }
@@ -481,12 +508,26 @@ export class NodeConfigDialog {
         return rows.slice(0, 3).map((r) => JSON.stringify(r)).join('\n');
     }
 
+    /**
+     * Whichever config surface this node actually rendered: the shared collector component for an
+     * acquisition node, else the generic schema form. Both expose the same `validate()`/`value()`
+     * pair, so the save path below stays one path.
+     */
+    private configForm(): { validate(): boolean; value(): Record<string, unknown> } | undefined {
+        return this.isAcquisition ? this.collector : this.schemaForm;
+    }
+
     save(): void {
         if (this.isEnrichment) {
             this.saveEnrichment();
             return;
         }
-        if (this.schemaForm && !this.schemaForm.validate()) return;
+        const configForm = this.configForm();
+        if (configForm && !configForm.validate()) return;
+        // Resolve the derived connector BEFORE building anything — a refusal (an unsaved Connection
+        // id, or Connection mode with nothing picked) explains itself in the component and aborts.
+        const connector = this.isAcquisition ? this.collector?.resolveConnector() ?? null : null;
+        if (this.isAcquisition && !connector) return;
         const v = this.form.getRawValue();
         const config: Record<string, unknown> = {};
         // Schema-driven values first (numbers coerced per spec), then free-form rows for keys outside it.
@@ -499,8 +540,8 @@ export class NodeConfigDialog {
         // below (`:496`) and every onboarding pane already did this — only the generic save was missing it.
         // `nestKeys` also splits the LIST_KEYS (`include`/`exclude`) comma-string into a list, which is the
         // shape the seeds use and which `PipelineConfigParser.strList` prefers (it accepts either).
-        if (this.schemaForm) {
-            const values = this.schemaForm.value();
+        if (configForm) {
+            const values = configForm.value();
             const flat: Record<string, unknown> = {};
             for (const s of this.specs()) {
                 let val = values[s.key];
@@ -536,6 +577,10 @@ export class NodeConfigDialog {
             const picked = String(config['connection'] ?? '').trim();
             delete config['connection'];
             use = picked ? NodeConfigDialog.CONNECTION_REF + picked : undefined;
+            // The derived connector is written LAST so it beats a stale value the file already had —
+            // `CollectorConnectors.forConfig` dispatches on it and never checks it agrees with the
+            // Connection it is handed, so the two must be decided in one place.
+            config['connector'] = connector;
         }
         const node: AuthoredNode = {
             id: this.data.node.id,
