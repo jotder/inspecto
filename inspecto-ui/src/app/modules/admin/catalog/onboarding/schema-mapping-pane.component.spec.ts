@@ -42,7 +42,8 @@ async function create(config: Record<string, unknown>, api: Partial<ConfigServic
             {
                 provide: ConfigService,
                 useValue: {
-                    write: vi.fn((type: string) => of(WRITE_OK(type))),
+                    write: vi.fn((type: string) => of(WRITE_OK(type))),       // companion schema file
+                    patch: vi.fn((type: string) => of(WRITE_OK(type))),       // pipeline stage save
                     read: vi.fn(() => throwError(() => ({ status: 404 }))),
                     previewSchema: vi.fn(() => of(SCHEMA_PREVIEW)),
                     ...api,
@@ -130,17 +131,21 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
     });
 
     it('save writes the schema config then links it into the pipeline draft', async () => {
+        // Two persistence paths: the companion schema FILE goes through /config/write; the
+        // pipeline draft's processing.schema_file link is a stage save → /config/patch.
         const write = vi.fn((type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK(type)));
-        const { fixture } = await create({ name: 'orders_feed', dirs: { poll: 'in' } }, { write });
+        const patch = vi.fn((type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK(type)));
+        const { fixture } = await create({ name: 'orders_feed', dirs: { poll: 'in' } }, { write, patch });
         fixture.componentInstance.save();
-        expect(write).toHaveBeenCalledTimes(2);
+        expect(write).toHaveBeenCalledTimes(1);
         const [schemaType, schemaDraft] = write.mock.calls[0] as [string, Record<string, unknown>];
         expect(schemaType).toBe('schema');
         expect((schemaDraft['raw'] as Record<string, unknown>)['name']).toBe('orders_feed_schema');
         expect((schemaDraft['mapping'] as Record<string, unknown>)['rules']).toHaveLength(2);
-        const [pipelineType, pipelineDraft] = write.mock.calls[1] as [string, Record<string, unknown>];
+        expect(patch).toHaveBeenCalledTimes(1);
+        const [pipelineType, , pipelinePatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
         expect(pipelineType).toBe('pipeline');
-        expect((pipelineDraft['processing'] as Record<string, unknown>)['schema_file']).toBe(CONVENTION_PATH);
+        expect((pipelinePatch['processing'] as Record<string, unknown>)['schema_file']).toBe(CONVENTION_PATH);
     });
 
     it('blocks save on a duplicate field name', async () => {

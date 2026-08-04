@@ -2,7 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, forkJoin, map, of, switchMap, tap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ConfigDeleteResult, ConfigService, ConfigWriteResult, Finding, ParsingPreview, SchemaPreview } from 'app/inspecto/api';
-import { mergeBlock } from 'app/inspecto/component-model';
+import { mergeBlock, nullifyDeletes } from 'app/inspecto/component-model';
 
 /** Stage ids across both kinds — a Stream uses schema/enrichment, a Reference keys. */
 export type OnboardingStageId = 'collection' | 'parsing' | 'schema' | 'enrichment' | 'keys' | 'publish';
@@ -198,12 +198,16 @@ export class OnboardingStateService {
     }
 
     /**
-     * Stage save: deep-merge `patch` over the server-held config and overwrite the file (the
-     * running service hot-reloads it by mtime). `undefined` patch values delete their key.
+     * Stage save: POST the patch to `/config/patch`, which deep-merges it over the file's CURRENT
+     * on-disk content server-side (collector-config unification, 2026-08-04 — a stale client-held
+     * copy can no longer clobber blocks this stage didn't edit, e.g. a graph save landing between
+     * this pane's load and its save). `undefined` patch values delete their key ({@link
+     * nullifyDeletes} converts them to explicit `null`s for the wire). The local `config` signal
+     * still updates optimistically with the same merge.
      */
     saveBlock(patch: Record<string, unknown>): Observable<ConfigWriteResult> {
         const next = mergeBlock(this.config() ?? {}, patch);
-        return this.configApi.write('pipeline', next, { overwrite: true }).pipe(
+        return this.configApi.patch('pipeline', this.name(), nullifyDeletes(patch)).pipe(
             tap({
                 next: (r) => {
                     this.config.set(next);

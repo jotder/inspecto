@@ -26,7 +26,8 @@ function create(
     config: Record<string, unknown>,
     opts: { api?: Partial<ConfigService>; confirm?: boolean; runsApi?: Partial<RunsService>; datasets?: ComponentDef[]; components?: Partial<ComponentsService> } = {},
 ) {
-    const write = vi.fn((_type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK));
+    // Stage saves go through POST /config/patch — the mock's third arg is the block patch itself.
+    const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK));
     const confirmFn = vi.fn(() => Promise.resolve(opts.confirm ?? true));
     const components = {
         list: vi.fn(() => of(opts.datasets ?? [])),
@@ -40,7 +41,7 @@ function create(
             provideNoopAnimations(),
             provideRouter([]),
             OnboardingStateService,
-            { provide: ConfigService, useValue: { write, ...opts.api } },
+            { provide: ConfigService, useValue: { patch, ...opts.api } },
             { provide: RunsService, useValue: { pending: vi.fn(() => of(PENDING)), ...opts.runsApi } },
             { provide: ComponentsService, useValue: components },
             { provide: InspectoConfirmService, useValue: { confirm: confirmFn, confirmDestructive: vi.fn(() => Promise.resolve(true)) } },
@@ -52,7 +53,7 @@ function create(
     state.name.set(String(config['name'] ?? '')); // the shell sets this from the route param
     const fixture = TestBed.createComponent(OnboardingPublishPaneComponent);
     fixture.detectChanges();
-    return { fixture, state, write, confirmFn, components };
+    return { fixture, state, patch, confirmFn, components };
 }
 
 describe('OnboardingPublishPaneComponent', () => {
@@ -62,20 +63,20 @@ describe('OnboardingPublishPaneComponent', () => {
     });
 
     it('save writes the output block with the schema-form defaults', () => {
-        const { fixture, write } = create({ name: 'x' });
+        const { fixture, patch } = create({ name: 'x' });
         fixture.componentInstance.save();
-        const [type, config] = write.mock.calls[0] as [string, Record<string, unknown>];
+        const [type, , blockPatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
         expect(type).toBe('pipeline');
         // W4a: the Parquet suggestion now rides `initial` (new drafts only); the shared
         // OUTPUT_ATTRIBUTES table's own default is the engine truth (CSV).
-        expect((config['output'] as Record<string, unknown>)['format']).toBe('PARQUET');
+        expect((blockPatch['output'] as Record<string, unknown>)['format']).toBe('PARQUET');
     });
 
     it('a resumed output block renders verbatim — the Parquet suggestion is for new drafts only', () => {
-        const { fixture, write } = create({ name: 'x', output: { format: 'CSV' } });
+        const { fixture, patch } = create({ name: 'x', output: { format: 'CSV' } });
         fixture.componentInstance.save();
-        const [, config] = write.mock.calls[0] as [string, Record<string, unknown>];
-        expect((config['output'] as Record<string, unknown>)['format']).toBe('CSV');
+        const [, , blockPatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
+        expect((blockPatch['output'] as Record<string, unknown>)['format']).toBe('CSV');
     });
 
     it('names the other incomplete required stages when far from ready', () => {
@@ -92,12 +93,12 @@ describe('OnboardingPublishPaneComponent', () => {
     });
 
     it('activate confirms, flips active, and refreshes the activity glance', async () => {
-        const { fixture, state, write, confirmFn } = create({ ...READY_CONFIG, output: { format: 'PARQUET' } });
+        const { fixture, state, patch, confirmFn } = create({ ...READY_CONFIG, output: { format: 'PARQUET' } });
         expect(state.lifecycle()).toBe('Ready');
         await fixture.componentInstance.activate();
         expect(confirmFn).toHaveBeenCalled();
-        const [, config] = write.mock.calls[0] as [string, Record<string, unknown>];
-        expect(config['active']).toBe(true);
+        const [, , blockPatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
+        expect(blockPatch['active']).toBe(true);
     });
 
     /** A go-live-ready config (all required stages + saved output), optionally reference-kind. */
@@ -137,17 +138,17 @@ describe('OnboardingPublishPaneComponent', () => {
     });
 
     it('a Reference go-live registers no Dataset — its store is consumed by name', async () => {
-        const { fixture, components, write } = create(readyConfig({ produces: 'reference' }));
+        const { fixture, components, patch } = create(readyConfig({ produces: 'reference' }));
         await fixture.componentInstance.activate();
-        const [, config] = write.mock.calls[0] as [string, Record<string, unknown>];
-        expect(config['active']).toBe(true); // activation DID run — the skip is kind-scoped, not vacuous
+        const [, , blockPatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
+        expect(blockPatch['active']).toBe(true); // activation DID run — the skip is kind-scoped, not vacuous
         expect(components.create).not.toHaveBeenCalled();
     });
 
     it('declining the confirm leaves the draft inactive', async () => {
-        const { fixture, write } = create({ ...READY_CONFIG, output: { format: 'PARQUET' } }, { confirm: false });
+        const { fixture, patch } = create({ ...READY_CONFIG, output: { format: 'PARQUET' } }, { confirm: false });
         await fixture.componentInstance.activate();
-        expect(write).not.toHaveBeenCalled();
+        expect(patch).not.toHaveBeenCalled();
     });
 
     it('shows the inbox activity glance once live', () => {

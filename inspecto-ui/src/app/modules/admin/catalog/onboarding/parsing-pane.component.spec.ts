@@ -37,7 +37,7 @@ async function create(
         providers: [
             provideNoopAnimations(),
             OnboardingStateService,
-            { provide: ConfigService, useValue: { write: vi.fn(() => of(WRITE_OK)), previewParsing: vi.fn(() => of(PREVIEW)), ...api } },
+            { provide: ConfigService, useValue: { patch: vi.fn(() => of(WRITE_OK)), previewParsing: vi.fn(() => of(PREVIEW)), ...api } },
             { provide: ParsersService, useValue: { list: vi.fn(() => of(CATALOG)), preview: vi.fn(), ...parsers } },
             // The data-table's grid theme chains to the app shell's GAMMA_APP_CONFIG — stub it out.
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
@@ -161,13 +161,13 @@ describe('OnboardingParsingPaneComponent', () => {
 
     /** The flat `__` key is worthless unless it lowers to the nested key the engine actually reads. */
     it('writes the records path as the nested json.records_path the parser reads', async () => {
-        const write = vi.fn((_type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK));
-        const { fixture } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'array' } } }, { write });
+        const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK));
+        const { fixture } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'array' } } }, { patch });
         const c = fixture.componentInstance;
         fixture.detectChanges();
         c.schemaForm?.form.get('json__records_path')?.setValue('payload.records');
         c.save();
-        const parsing = (write.mock.calls[0][1] as Record<string, unknown>)['parsing'] as Record<string, unknown>;
+        const parsing = (patch.mock.calls[0][2] as Record<string, unknown>)['parsing'] as Record<string, unknown>;
         expect((parsing['json'] as Record<string, unknown>)['records_path']).toBe('payload.records');
         expect(parsing['json__records_path']).toBeUndefined(); // the flat form must not leak to disk
     });
@@ -268,8 +268,8 @@ describe('OnboardingParsingPaneComponent', () => {
     });
 
     it('switching frontend marks the pane dirty and save clears other frontend blocks', async () => {
-        const write = vi.fn((_type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK));
-        const { fixture, state } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'newline' } } }, { write });
+        const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK));
+        const { fixture, state } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'newline' } } }, { patch });
         const c = fixture.componentInstance;
         c.setFrontend('text_regex');
         fixture.detectChanges(); // propagate [specs] so the schema-form rebuilds for the new frontend
@@ -278,10 +278,10 @@ describe('OnboardingParsingPaneComponent', () => {
         expect(pattern).toBeTruthy();
         pattern?.setValue('(?P<a>\\d+)');
         c.save();
-        const written = write.mock.calls[0][1] as Record<string, unknown>;
+        const written = patch.mock.calls[0][2] as Record<string, unknown>;
         const parsing = written['parsing'] as Record<string, unknown>;
         expect(parsing['frontend']).toBe('text_regex');
-        expect(parsing['json']).toBeUndefined();
+        expect(parsing['json']).toBeNull();   // explicit delete marker for the server merge
         expect((parsing['text_regex'] as Record<string, unknown>)['pattern']).toBe('(?P<a>\\d+)');
     });
 

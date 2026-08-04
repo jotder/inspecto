@@ -11,7 +11,7 @@ function create(configApi: Partial<ConfigService> = {}) {
     TestBed.configureTestingModule({
         providers: [
             OnboardingStateService,
-            { provide: ConfigService, useValue: { read: () => of({ config: {} }), write: () => of({ findings: [] }), ...configApi } },
+            { provide: ConfigService, useValue: { read: () => of({ config: {} }), patch: () => of({ findings: [] }), ...configApi } },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
@@ -61,15 +61,22 @@ describe('OnboardingStateService', () => {
         expect(s.firstOpenStage()).toBe('schema');
     });
 
-    it('saveBlock deep-merges the patch and writes with overwrite', () => {
-        const write = vi.fn(() => of({ findings: [] }));
-        const s = create({ write } as unknown as Partial<ConfigService>);
-        s.config.set({ name: 'x', dirs: { poll: 'in' }, collector: { fetch: { mode: 'seq' } } });
-        s.saveBlock({ collector: { connector: 'sftp' } }).subscribe();
-        expect(write).toHaveBeenCalledWith(
+    /**
+     * Collector-config unification (2026-08-04): the merge moved server-side — saveBlock POSTs
+     * ONLY the patch to /config/patch (delete markers as explicit nulls), never the client-held
+     * whole config, so a stale local copy can no longer clobber blocks the stage didn't edit.
+     * The local config signal still merges optimistically.
+     */
+    it('saveBlock posts the block patch to /config/patch and merges locally', () => {
+        const patch = vi.fn(() => of({ findings: [] }));
+        const s = create({ patch } as unknown as Partial<ConfigService>);
+        s.name.set('x');
+        s.config.set({ name: 'x', dirs: { poll: 'in' }, collector: { fetch: { mode: 'seq' }, connection: 'old' } });
+        s.saveBlock({ collector: { connector: 'sftp', connection: undefined } }).subscribe();
+        expect(patch).toHaveBeenCalledWith(
             'pipeline',
-            { name: 'x', dirs: { poll: 'in' }, collector: { fetch: { mode: 'seq' }, connector: 'sftp' } },
-            { overwrite: true },
+            'x',
+            { collector: { connector: 'sftp', connection: null } },   // undefined → null for the wire
         );
         expect((s.config() as Record<string, unknown>)['collector']).toEqual({ fetch: { mode: 'seq' }, connector: 'sftp' });
     });
@@ -139,8 +146,8 @@ describe('OnboardingStateService', () => {
     });
 
     it('marks a stage blocked on an ERROR finding (never Ready), and clears it on a clean save', () => {
-        const write = vi.fn(() => of({ findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }] }));
-        const s = create({ write } as unknown as Partial<ConfigService>);
+        const patch = vi.fn(() => of({ findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }] }));
+        const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({
             name: 'x', collector: { connector: 'local' }, parsing: { frontend: 'delimited' },
             processing: { schema_file: 's.toon' }, output: { format: 'CSV' },
@@ -153,7 +160,7 @@ describe('OnboardingStateService', () => {
         expect(s.blockingMessage('parsing')).toBe('bad parser');
         expect(s.lifecycle()).toBe('Draft'); // a blocked required stage is not Ready
 
-        write.mockReturnValue(of({ findings: [] }));
+        patch.mockReturnValue(of({ findings: [] }));
         s.saveBlock({ parsing: { frontend: 'delimited' } }).subscribe();
         expect(s.stageStatus().parsing).toBe('configured');
         expect(s.blockingMessage('parsing')).toBeNull();
@@ -161,12 +168,12 @@ describe('OnboardingStateService', () => {
     });
 
     it('routes findings to their stage by fieldPath prefix, not the stage that saved', () => {
-        const write = vi.fn(() => of({ findings: [
+        const patch = vi.fn(() => of({ findings: [
             { severity: 'ERROR', fieldPath: 'collector.connector', message: 'bad connector' },
             { severity: 'ERROR', fieldPath: 'output.format', message: 'bad format' },
             { severity: 'ERROR', fieldPath: '', message: 'cross-field' },
         ] }));
-        const s = create({ write } as unknown as Partial<ConfigService>);
+        const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({
             name: 'x', collector: { connector: 'local' }, parsing: { frontend: 'delimited' },
             processing: { schema_file: 's.toon' }, output: { format: 'CSV' },
@@ -181,7 +188,7 @@ describe('OnboardingStateService', () => {
         expect(s.blockingMessage('parsing')).toBe('cross-field');
 
         // A clean save clears EVERY pipeline stage's findings, not just the active one.
-        write.mockReturnValue(of({ findings: [] }));
+        patch.mockReturnValue(of({ findings: [] }));
         s.saveBlock({ parsing: { frontend: 'delimited' } }).subscribe();
         expect(s.stageStatus().collection).toBe('configured');
         expect(s.stageStatus().publish).toBe('configured');
@@ -189,10 +196,10 @@ describe('OnboardingStateService', () => {
     });
 
     it('processing findings land on keys for a Reference, schema for a Stream', () => {
-        const write = vi.fn(() => of({ findings: [
+        const patch = vi.fn(() => of({ findings: [
             { severity: 'ERROR', fieldPath: 'processing.schema_file', message: 'no schema' },
         ] }));
-        const s = create({ write } as unknown as Partial<ConfigService>);
+        const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({ name: 'r', produces: 'reference', processing: { schema_file: 's.toon' } });
         s.activeStageId.set('collection');
         s.saveBlock({ collector: { connector: 'local' } }).subscribe();
@@ -201,8 +208,8 @@ describe('OnboardingStateService', () => {
     });
 
     it('a WARNING finding toasts but does not block the stage', () => {
-        const write = vi.fn(() => of({ findings: [{ severity: 'WARNING', fieldPath: 'parsing.x', message: 'heads up' }] }));
-        const s = create({ write } as unknown as Partial<ConfigService>);
+        const patch = vi.fn(() => of({ findings: [{ severity: 'WARNING', fieldPath: 'parsing.x', message: 'heads up' }] }));
+        const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({ name: 'x', parsing: { frontend: 'delimited' } });
         s.activeStageId.set('parsing');
         s.saveBlock({ parsing: { frontend: 'delimited' } }).subscribe();

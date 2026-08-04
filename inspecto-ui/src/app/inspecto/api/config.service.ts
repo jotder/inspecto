@@ -46,6 +46,20 @@ export class ConfigService {
   ): Observable<ConfigWriteResult> {
     return this.http.post<ConfigWriteResult>(apiUrl('/config/write'), { type, config, ...opts });
   }
+  /**
+   * Block-level save: deep-merge `patch` over the file's CURRENT on-disk content, server-side
+   * (collector-config unification, 2026-08-04). Maps merge recursively, scalars/lists replace, an
+   * explicit `null` deletes its key. Same result shape as {@link write}, so findings routing is
+   * unchanged. 404s when the file doesn't exist yet — create via {@link write} first.
+   */
+  patch(
+    type: ConfigType,
+    name: string,
+    patch: Record<string, unknown>,
+    subdir?: string,
+  ): Observable<ConfigWriteResult> {
+    return this.http.post<ConfigWriteResult>(apiUrl('/config/patch'), { type, name, patch, ...(subdir ? { subdir } : {}) });
+  }
   /** Read a config back as its decoded map — the onboarding resume path. */
   read(type: ConfigType, name: string, subdir?: string): Observable<ConfigReadResult> {
     return this.http.get<ConfigReadResult>(

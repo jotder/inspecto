@@ -64,6 +64,23 @@ export function clearMissingRoots(nested: Record<string, unknown>, roots: Iterab
 }
 
 /**
+ * Convert this module's `undefined` delete markers (see {@link clearMissingRoots}) into explicit
+ * `null`s for the wire — `JSON.stringify` silently drops `undefined` values, so a patch POSTed to
+ * `/config/patch` (whose merge deletes on `null`) would otherwise lose its deletions. Recursive;
+ * returns a new object, inputs untouched.
+ */
+export function nullifyDeletes(patch: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) out[k] = null;
+        else if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+            out[k] = nullifyDeletes(v as Record<string, unknown>);
+        } else out[k] = v;
+    }
+    return out;
+}
+
+/**
  * Deep-merge `patch` over `base` (maps only — a patch list/scalar replaces). A patch key with an
  * `undefined` value deletes. Returns a new object; inputs are not mutated.
  */

@@ -131,7 +131,7 @@ describe('OnboardingShellComponent', () => {
             { name: 'x', stage: 'parsing' },
             {
                 read: () => of({ type: 'pipeline', name: 'x', path: 'p', config: { name: 'x', parsing: { frontend: 'delimited' } } }),
-                write: () => of({
+                patch: () => of({
                     type: 'pipeline', written: true, path: 'p', name: 'x', bytes: 1, overwritten: true,
                     findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }],
                 }),

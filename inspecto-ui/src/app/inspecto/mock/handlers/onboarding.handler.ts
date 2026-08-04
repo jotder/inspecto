@@ -41,6 +41,7 @@ export interface StoredEnrichmentConfig {
 }
 
 const WRITE = /\/config\/write$/;
+const PATCH = /\/config\/patch$/;
 const PREVIEW_PARSING = /\/config\/preview\/parsing$/;
 const PREVIEW_SCHEMA = /\/config\/preview\/schema$/;
 const CONFIG_FILE = /\/config\/(pipeline|schema|enrichment)\/([^/?]+)$/;
@@ -114,6 +115,35 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
             return undefined; // other types: not mocked here
         }
 
+        // Block-level save — mirrors ConfigRoutes.patchConfig with the SERVER's strictness
+        // (mock-never-more-lenient): 400 bad body, 404 unknown type/missing file (patch never
+        // creates), 409 identity change, deep merge with explicit-null deletes.
+        if (method === 'POST' && PATCH.test(url)) {
+            const body = (req.body ?? {}) as { type?: string; name?: string; patch?: Record<string, unknown> };
+            const name = String(body.name ?? '').trim();
+            if (!body.type || !name || typeof body.patch !== 'object' || body.patch === null || Array.isArray(body.patch)) {
+                return error(400, "body must include 'type', 'name' and 'patch' (a partial config map)");
+            }
+            if (!['pipeline', 'schema', 'enrichment'].includes(body.type)) {
+                return error(404, `unknown config type: ${body.type}`);
+            }
+            const coll = collFor(body.type);
+            const rec = store.get<StoredPipelineConfig>(space, coll, name);
+            if (!rec) return error(404, `no such config: ${name}.toon (create it via /config/write first)`);
+            const idField = body.type === 'schema' ? 'raw' : 'name';
+            const merged = deepMergeNullDeletes(rec.config, body.patch);
+            const before = identityOf(rec.config, body.type);
+            const after = identityOf(merged, body.type);
+            if (before && before !== after) {
+                return error(409, `patch changes the identity field '${idField}' (${before} → ${after}); rename via /config/write`);
+            }
+            store.put(space, coll, name, { ...rec, config: merged });
+            return json({
+                type: body.type, written: true, path: rec.path, name,
+                bytes: JSON.stringify(merged).length, overwritten: true, findings: [],
+            });
+        }
+
         if (method === 'POST' && PREVIEW_PARSING.test(url)) {
             const body = (req.body ?? {}) as { config?: Record<string, unknown>; sample_text?: string };
             if (!body.config || !String(body.sample_text ?? '').trim()) {
@@ -180,6 +210,36 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
 
         return undefined;
     };
+}
+
+/** The config's identity value, per type (mirrors ConfigRoutes.identityField). */
+function identityOf(config: Record<string, unknown>, type: string): string {
+    if (type === 'schema') {
+        const raw = (config['raw'] ?? {}) as Record<string, unknown>;
+        return String(raw['name'] ?? '');
+    }
+    return String(config['name'] ?? '');
+}
+
+/** Mirrors ConfigRoutes.deepMerge: maps merge recursively, scalars/lists replace, `null` deletes. */
+function deepMergeNullDeletes(
+    base: Record<string, unknown>,
+    patch: Record<string, unknown>,
+): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...base };
+    for (const [k, v] of Object.entries(patch)) {
+        if (v === null) {
+            delete out[k];
+        } else if (
+            typeof v === 'object' && !Array.isArray(v) &&
+            out[k] !== null && typeof out[k] === 'object' && !Array.isArray(out[k])
+        ) {
+            out[k] = deepMergeNullDeletes(out[k] as Record<string, unknown>, v as Record<string, unknown>);
+        } else {
+            out[k] = v;
+        }
+    }
+    return out;
 }
 
 /** Catalog projections of the registered drafts — merged into the demo streams/references lists. */
