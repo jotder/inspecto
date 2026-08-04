@@ -29,9 +29,11 @@ renamed to `collectors.md`), plus 2 prose-rule bugs (`Source-of-truth` false pos
 
 **§7 ELT-doc reconciliation SHIPPED** 2026-08-04 — see §7 below.
 
+**Cube → Matrix SHIPPED** 2026-08-04 (`15c8d430`) — see §5 below.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
 needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the §3.2 guard on Java+TS
-source, and both renames (§4, §5). Do not archive this plan until those close.
+source, and Flow→Pipeline Tiers 2/3 (§4). Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -393,7 +395,7 @@ Tier 3 requires a version bump per `docs/BRANCHING.md` and **must go through the
 skill**. Recommended sequencing: Tier 1 in its own commit; Tier 2 with the read-alias and a test proving
 old rows still resolve; Tier 3 last, with the migration and dual-read, as one coordinated change.
 
-## 5. Cube → Matrix
+## 5. Cube → Matrix — ✅ DONE 2026-08-04
 
 Smaller and mostly already correct. GLOSSARY §13 marks this row **unstarted** and describes it as an
 **"additive label, not a model rename"** — the model type stays `Derived Table` / `NodeKind.DERIVED_TABLE`,
@@ -408,10 +410,18 @@ So the sweep is narrow, and most current hits are **legitimate**:
 | `USER_GUIDE.md:50` *"Transform / cube (runs IN the lakehouse)"*, `:460` *"materialized by a Transform or cube"* | **keep** — verb sense |
 
 **No noun-sense "Cube" was found in the UI at all**, consistent with §6-B's note that Matrix is *"not yet
-surfaced in the UI as of 2026-07-20."* So the real work is **additive**: introduce the **Matrix** label in
+surfaced in the UI as of 2026-07-20."* So the real work was **additive**: introduce the **Matrix** label in
 Catalog/Studio where a summary Derived Table is displayed, then mark the §13 row ✅. A `cube-as-noun` guard
 rule is cheap but must exempt the icon ids and the verb sense — otherwise it is exactly the noisy guard the
 existing header warns about.
+
+**Landed** (`15c8d430`): `nodeKindLabel()` in `catalog-graph.ts` maps `DERIVED_TABLE`→"Matrix" (every other
+kind unchanged, raw-token fallback); wired into the Catalog legend, the graph-node hover tooltip, and the
+node-detail dialog (incl. its neighbour grid). The `cube-noun` rule was added to `tools/check-vocabulary.mjs`
+— case-sensitive on `Cube` so the always-lowercase verb sense keeps passing, backticked icon ids already
+stripped by the shared prose scanner. The plan doc's own citations of the rename (this section, the
+sequence-table row, the operator-trigger quote in the header) are the one `DOC_ALLOW` entry needed, since
+this file's subject IS the rename — same shape as the existing `bare-flow` entry above.
 
 ## 6. Sequence
 
@@ -437,7 +447,7 @@ existing header warns about.
 7. **§3.2** guard on OKF + superpower docs; reconcile
    [`consignment-elt-architecture.md`](consignment-elt-architecture.md) against GLOSSARY (§7 below). — ✅
    **done 2026-08-04.**
-8. **Cube → Matrix** additive labels; mark §13 ✅.
+8. **Cube → Matrix** additive labels; mark §13 ✅. — ✅ **done 2026-08-04.**
 9. **Flow Tier 2** with read-alias.
 10. **Flow Tier 3** with migration — via `release-workflow`, version bump.
 11. **§3.2** guard on Java + TS source, with allowlist. Last, largest allowlist.
