@@ -18,9 +18,20 @@ makes that debt self-retiring.
 reclassified **down to Tier 2** because it is `@PublicApi`: a tier boundary independent of persistence and
 JSON, and the one thing the original Tier-1 list got wrong.
 
+**§3.2 guard on OKF + superpower docs SHIPPED** 2026-08-04 — third pass in `tools/check-vocabulary.mjs`
+over `docs/okf/**` + `docs/superpower/**` (`docs/archived-documents/**` excluded permanently, per
+CLAUDE.md). Found and fixed 7 stale docs from the already-shipped Source→Collector rename <!-- vocab-allow: cites the rename itself --> (most notably
+`docs/okf/frontend/features/sources.md`, whose route/service/nav-group claims all predated the rename;
+renamed to `collectors.md`), plus 2 prose-rule bugs (`Source-of-truth` false positive; citation lines like
+"Flow→Pipeline" needed `vocab-allow`, not a heuristic). 7 `DOC_ALLOW` entries carry the deliberate keeps
+(historical narrative, sanctioned other senses), guarded by the same `stale-allowlist` self-retirement as
+`CONFIG_ALLOW` — proven RED before green via a throwaway probe file.
+
+**§7 ELT-doc reconciliation SHIPPED** 2026-08-04 — see §7 below.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the remaining §3.2 surfaces
-(OKF+superpower docs; Java+TS source), and both renames (§4, §5). Do not archive this plan until those close.
+needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the §3.2 guard on Java+TS
+source, and both renames (§4, §5). Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -424,7 +435,8 @@ existing header warns about.
 6. **Flow Tier 1** — ✅ **done 2026-08-04**. `ProvenanceRow.flowId` was reclassified **down to Tier 2**
    mid-flight (`@PublicApi`); everything else renamed as planned.
 7. **§3.2** guard on OKF + superpower docs; reconcile
-   [`consignment-elt-architecture.md`](consignment-elt-architecture.md) against GLOSSARY (§7 below).
+   [`consignment-elt-architecture.md`](consignment-elt-architecture.md) against GLOSSARY (§7 below). — ✅
+   **done 2026-08-04.**
 8. **Cube → Matrix** additive labels; mark §13 ✅.
 9. **Flow Tier 2** with read-alias.
 10. **Flow Tier 3** with migration — via `release-workflow`, version bump.
@@ -432,10 +444,14 @@ existing header warns about.
 12. **§3.1** serve cfg vocabulary from the server — the structural fix. Can start any time after 4;
     sequenced last because it is the largest and 4 already prevents regression.
 
-## 7. Owed: reconcile the ELT design doc against GLOSSARY
+## 7. Owed: reconcile the ELT design doc against GLOSSARY — ✅ DONE 2026-08-04
 
 [`consignment-elt-architecture.md`](consignment-elt-architecture.md) was written before this audit and
-diverges from canon in five ways. **Four still to apply** — the Batch row below is now resolved the other way.
+diverged from canon in five ways. The Batch row was resolved the other way (Consignment is canonical); the
+remaining four rows below are now applied in the doc: §4 names Steps and maps ingress onto the closed
+`BuiltinNodeType` set; §4 tier 7 reclassifies custom summary/reconciliation processors as Jobs on
+`on_commit`, not Steps; §7 binds "summary table" to Derived Table (model) / Matrix (label); §10.2 binds
+event-time field selection to the existing `partitions[].source` + `DATE_*`, not a new key.
 
 | Doc says | Canon | Note |
 |---|---|---|

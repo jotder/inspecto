@@ -70,17 +70,20 @@ the **GLOSSARY** §13 touchpoint table.
 
 ## 4. Processor blocks
 
-NiFi-processor analogy. Ingress nodes are Java-implemented and side-effecting; core nodes are
-SQL-compiled; the post-Consignment tier is where the payoff sits.
+NiFi-processor analogy for exposition; on the canvas each block below is a **Step**, drawn from the
+closed `BuiltinNodeType` vocabulary (GLOSSARY §5) — not a new node kind. Ingress nodes are
+Java-implemented and side-effecting; core nodes are SQL-compiled; the post-Consignment tier is where the
+payoff sits.
 
-**Ingress**
-1. **Collector** — polls/fetches, emits a manifest with per-file status.
+**Ingress** — maps onto the existing `acquisition` → `adapter` → `parser` Steps; no new ingress types
+needed (`BuiltinNodeType` is closed on purpose, plan §3.3):
+1. **Collector** (`acquisition`) — polls/fetches, emits a manifest with per-file status.
 2. **Consignment Former** — groups files into a transaction. Policy: wait-for-time / wait-for-size /
    wait-for-count / go-immediately, and *may or may not* respect Collector file status. **This is the
    single knob trading latency against file size**, and everything downstream is invariant to it.
-3. **Decoder / Preprocessor** — the wrapper for formats DuckDB cannot read natively (ASN.1, custom
-   text). Operates at **Consignment grain** with per-file parallelism inside, so the transaction is the
-   Consignment while throughput stays per-file. May generate temporary files.
+3. **Decoder / Preprocessor** (`adapter` → `parser`) — the wrapper for formats DuckDB cannot read
+   natively (ASN.1, custom text). Operates at **Consignment grain** with per-file parallelism inside, so
+   the transaction is the Consignment while throughput stays per-file. May generate temporary files.
 
 **Core (SQL-compiled, exists today)**
 4. **Extract/Load** — DuckDB over the decoded files, mapped to schemas; emits a row set per schema plus
@@ -89,8 +92,13 @@ SQL-compiled; the post-Consignment tier is where the payoff sits.
 6. **Sink** — partitioned Parquet. Emits **its own output manifest**, which is what feeds compaction and
    lineage.
 
-**Post-Consignment**
-7. **Custom processors** declaring `grain: BATCH` — incremental summary, reconciliation, Java extensions.
+**Post-Consignment** — this tier is **not** graph Steps. In-motion (Pipeline) vs at-rest (Job) is a
+binding line (`pipeline-graph-design.md` §3.8: *"an at-rest operator cannot be an in-motion node"*), and
+summary/reconciliation work runs after the Consignment has landed — i.e. it is at-rest. So:
+7. **Custom processors** declaring `grain: BATCH` — incremental summary, reconciliation, Java
+   extensions — are **Jobs triggered `on_commit`**, not Steps on the pipeline canvas. This is also why
+   `ON_COMMIT_SAME_GRAPH`'s refusal is correct as-is and should not be revisited: it enforces exactly
+   this line.
 8. **Compaction** — see §6.
 
 Two design rules:
@@ -245,6 +253,10 @@ protocol.
 Compaction must also be **re-runnable on an already-compacted partition** (§8, late data).
 
 ## 7. Summary semantics
+
+The summary asset this section designs is modeled as a **Derived Table** (`NodeKind.DERIVED_TABLE`);
+"summary table" below is the plain-English description of that model type, not a distinct concept. Its
+user-facing name is **Matrix** (GLOSSARY §13) — an additive label, not a separate node kind.
 
 ### 7.1 Partial aggregates are forced, not a defect
 
@@ -478,6 +490,13 @@ registry for sealing.
 **Decided:** the pipeline designer selects the event-time field; timezone is per-**Stream** configuration
 with options *specific zone · UTC · Local*, default Local, used whenever the time field carries no zone.
 
+**No new key.** A partition-deriving field already exists: `partitions[]` (`{column, source, type}`,
+`PartitionDef.java:9-25`, `type ∈ VARCHAR|DOUBLE|INTEGER|DATE_YEAR|DATE_MONTH|DATE_DAY`), authored today
+via the schema-mapping pane's "Partition key (optional)" picker
+(`schema-mapping-pane.component.ts:404`). The event-time field selection this section decides on binds to
+`partitions[].source` with a `DATE_*` type, rather than inventing a `timestamp`/`event_time`/`time_field`
+key — no such key exists anywhere in the config today, and one UI picker already does this job.
+
 Two constraints on top:
 
 **One table, one event-time meaning.** However it is authored, a given table must resolve to exactly one
@@ -485,9 +504,10 @@ event-time field — otherwise days are cut differently depending on which pipel
 partition state stops having a single meaning. The validator must reject two pipelines writing the same
 table with different event-time fields.
 
-Clean split: **the field is a schema property** (it names a column); **the timezone is a Stream property**
-(it describes the sender). Stream is the right granularity — the same standard CDR format delivered by
-network elements in different countries needs different day-cuts.
+Clean split: **the field is a schema property** — i.e. `partitions[].source`, not a new key — (it names a
+column); **the timezone is a Stream property** (it describes the sender). Stream is the right granularity
+— the same standard CDR format delivered by network elements in different countries needs different
+day-cuts.
 
 **`Local` must resolve to a concrete IANA zone at authoring time and be persisted as that.** If `Local`
 means "the JVM default", record-day assignment depends on the *host* rather than the data: dev and prod
