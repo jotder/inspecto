@@ -27,6 +27,26 @@
       "label" : "Watch (filesystem events)"
     } ]
   }, {
+    "key" : "duplicate__mode",
+    "label" : "Duplicate detection",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "path",
+    "options" : [ {
+      "value" : "path",
+      "label" : "By path"
+    }, {
+      "value" : "metadata",
+      "label" : "By metadata (size + mtime)"
+    }, {
+      "value" : "checksum",
+      "label" : "By checksum"
+    }, {
+      "value" : "etag",
+      "label" : "By remote ETag"
+    } ],
+    "help" : "File-level duplicate policy — how a re-seen file is recognised."
+  }, {
     "key" : "post_action__on_success",
     "label" : "After success",
     "type" : "select",
@@ -62,6 +82,19 @@
     "min" : 0.0,
     "help" : "Blank = unbounded."
   }, {
+    "key" : "duplicate__on_change",
+    "label" : "On changed duplicate",
+    "type" : "select",
+    "tier" : "advanced",
+    "options" : [ {
+      "value" : "reprocess",
+      "label" : "Reprocess"
+    }, {
+      "value" : "skip",
+      "label" : "Skip"
+    } ],
+    "help" : "What to do when a known file re-appears changed."
+  }, {
     "key" : "guarantee",
     "label" : "Delivery guarantee",
     "type" : "select",
@@ -89,40 +122,6 @@
     "type" : "string",
     "tier" : "advanced",
     "help" : "Target directory when \"After success\" is Move."
-  } ],
-  "transform.dedup.fingerprint" : [ {
-    "key" : "duplicate__mode",
-    "label" : "Duplicate detection",
-    "type" : "select",
-    "tier" : "optional",
-    "default" : "path",
-    "options" : [ {
-      "value" : "path",
-      "label" : "By path"
-    }, {
-      "value" : "metadata",
-      "label" : "By metadata (size + mtime)"
-    }, {
-      "value" : "checksum",
-      "label" : "By checksum"
-    }, {
-      "value" : "etag",
-      "label" : "By remote ETag"
-    } ],
-    "help" : "File-level duplicate policy — how a re-seen file is recognised."
-  }, {
-    "key" : "duplicate__on_change",
-    "label" : "On changed duplicate",
-    "type" : "select",
-    "tier" : "advanced",
-    "options" : [ {
-      "value" : "reprocess",
-      "label" : "Reprocess"
-    }, {
-      "value" : "skip",
-      "label" : "Skip"
-    } ],
-    "help" : "What to do when a known file re-appears changed."
   } ],
   "transform.filter" : [ {
     "key" : "where",

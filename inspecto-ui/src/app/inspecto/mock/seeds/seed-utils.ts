@@ -67,7 +67,6 @@ export function seedIconMap(store: MockStore, space: string): void {
         'transform.filter': { glyph: 'filter', color: C.ENRICHMENT },
         'transform.route': { glyph: 'route', color: C.ENRICHMENT },
         'transform.dedup.marker': { glyph: 'filter', color: C.ENRICHMENT },
-        'transform.dedup.fingerprint': { glyph: 'filter', color: C.ENRICHMENT },
         enrichment: { glyph: 'transform', color: C.ENRICHMENT },
         'sink.persistent': { glyph: 'cylinder', color: C.TABLE },
         'sink.materialized': { glyph: 'write', color: C.TABLE },

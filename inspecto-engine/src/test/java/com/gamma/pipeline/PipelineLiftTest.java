@@ -41,7 +41,8 @@ class PipelineLiftTest {
         assertType(g, "map", "transform.map");
         assertType(g, "sink", "sink.persistent");
 
-        // path mode (default) ⇒ no fingerprint dedup; single schema ⇒ no gap / no quarantine
+        // fingerprint dedup is never a node (2026-08-04 fold — it rides acquisition, where it runs);
+        // single schema ⇒ no gap / no quarantine
         assertTrue(g.node("dedup_fingerprint").isEmpty());
         assertTrue(g.node("gap").isEmpty());
         assertTrue(g.node("quarantine").isEmpty());

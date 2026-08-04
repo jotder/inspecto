@@ -102,24 +102,10 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
 ];
 
 /**
- * The `duplicate:` keys of the shared table — owned by the `transform.dedup.fingerprint` node
- * (`PipelineLift.dedupFingerprintNode` carries `duplicate`/`incremental`; `PipelineEditable.lower`
- * overlays `duplicate:` back from that node while `NOT_ACQ_OWNED` strips it from acquisition).
- * A **derivation, not a fork** — same spec objects, only membership differs (D9, 2026-08-04).
+ * ⚠ **There is no dedup subset any more** (collector-config unification, 2026-08-04). D9 had split
+ * `duplicate__*` onto a `transform.dedup.fingerprint` node; that node was REMOVED because file
+ * duplicate detection executes inside the `CollectorProcessor` poll cycle (`ledgerFilter` reads
+ * `collector.duplicate`) — it never had a runtime as a transform, so the split told the operator
+ * the check happens after collection, which is not where it happens. Both authoring surfaces —
+ * Onboarding's Collection stage and the Pipelines `acquisition` node — now render this table WHOLE.
  */
-export const COLLECTOR_DEDUP_ATTRIBUTES: AttributeSpec[] = COLLECTOR_ATTRIBUTES.filter((s) =>
-    s.key.startsWith('duplicate__'),
-);
-
-/**
- * The acquisition-owned subset — everything except the fingerprint-dedup node's keys. Since the
- * collector-config unification (2026-08-04) BOTH authoring surfaces use this derivation: the
- * Pipelines `acquisition` node AND Onboarding's Collection stage, so a value typed on either
- * surface is a key the engine reads from the block that surface owns. Consequence: dedup has no
- * onboarding surface — the engine default (`duplicate.mode: path`) applies until the operator
- * configures the `transform.dedup.fingerprint` node in the Pipelines editor; stored `duplicate:`
- * keys are never destroyed (`NOT_ACQ_OWNED` preserves them across graph saves).
- */
-export const COLLECTOR_ACQUISITION_ATTRIBUTES: AttributeSpec[] = COLLECTOR_ATTRIBUTES.filter(
-    (s) => !s.key.startsWith('duplicate__'),
-);

@@ -58,8 +58,7 @@ public final class PipelineCompiler {
             else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (PipelineNodeTypes.isCategory(t, NodeCategory.SINK)) sinks.add(n);   // any sink subtype
-            else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)
-                    || BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type().equals(t)) dedups.add(n);
+            else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) dedups.add(n);
         }
         return new Compiled(g.name(), g.active(),
                 Optional.ofNullable(acq), Optional.ofNullable(parser),
@@ -284,23 +283,20 @@ public final class PipelineCompiler {
             src.put("post_action", m);
         }
 
-        // ── duplicate + incremental live on the fingerprint dedup node (content-based dedup only) ──
-        c.dedups().stream()
-                .filter(d -> BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type().equals(d.type()))
-                .findFirst().ifPresent(fp -> {
-            if (fp.cfg("duplicate") instanceof PipelineConfig.Duplicate dup && dup.contentBased()) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("mode", dup.mode());
-                m.put("algorithm", dup.algorithm());
-                m.put("on_change", dup.onChange());
-                src.put("duplicate", m);
-            }
-            if (fp.cfg("incremental") instanceof PipelineConfig.Incremental in && in.enabled()) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("watermark", in.watermark());
-                src.put("incremental", m);
-            }
-        });
+        // ── duplicate + incremental live ON the acquisition node (2026-08-04 fold: fingerprint
+        //    dedup executes in the poll cycle; the separate graph node had no runtime) ──
+        if (acq.cfg("duplicate") instanceof PipelineConfig.Duplicate dup && dup.contentBased()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("mode", dup.mode());
+            m.put("algorithm", dup.algorithm());
+            m.put("on_change", dup.onChange());
+            src.put("duplicate", m);
+        }
+        if (acq.cfg("incremental") instanceof PipelineConfig.Incremental in && in.enabled()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("watermark", in.watermark());
+            src.put("incremental", m);
+        }
 
         // ── gap_detection lives on the gap node (Phase D) — absent ⇒ off ──
         c.gap().ifPresent(gapNode -> {

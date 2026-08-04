@@ -14,7 +14,7 @@ export interface Refusal {
 }
 
 const LOWERABLE = new Set([
-    'acquisition', 'parser', 'gap', 'transform.dedup.marker', 'transform.dedup.fingerprint',
+    'acquisition', 'parser', 'gap', 'transform.dedup.marker',
     'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
 ]);
 
@@ -76,7 +76,9 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     // acquisition (entry)
     const acqCfg: Cfg = {};
     for (const [k, v] of Object.entries(collector)) {
-        if (k === 'duplicate' || k === 'incremental' || k === 'gap_detection' || k === 'connection') continue;
+        // `duplicate`/`incremental` STAY on acquisition (2026-08-04 fold — they execute in the
+        // poll cycle); only gap_detection has its own node, and connection rides `use:`.
+        if (k === 'gap_detection' || k === 'connection') continue;
         acqCfg[k] = v;
     }
     if (dirs['poll'] != null) acqCfg['poll'] = dirs['poll'];
@@ -105,14 +107,6 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         nodes.push({ id: 'dedup_marker', type: 'transform.dedup.marker', name: 'Dedup (marker)', config: c });
         edges.push({ from: upstream, rel: 'data', to: 'dedup_marker' });
         upstream = 'dedup_marker';
-    }
-    if (collector['duplicate'] != null || collector['incremental'] != null) {
-        const c: Cfg = {};
-        if (collector['duplicate'] != null) c['duplicate'] = collector['duplicate'];
-        if (collector['incremental'] != null) c['incremental'] = collector['incremental'];
-        nodes.push({ id: 'dedup_fingerprint', type: 'transform.dedup.fingerprint', name: 'Dedup (fingerprint)', config: c });
-        edges.push({ from: upstream, rel: 'data', to: 'dedup_fingerprint' });
-        upstream = 'dedup_fingerprint';
     }
 
     // parser
@@ -161,7 +155,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
 export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean): { config: Cfg } | { refusals: Refusal[] } {
     const refusals: Refusal[] = [];
     let acq: AuthoredNode | undefined, parser: AuthoredNode | undefined, gap: AuthoredNode | undefined;
-    let marker: AuthoredNode | undefined, fingerprint: AuthoredNode | undefined;
+    let marker: AuthoredNode | undefined;
     let primarySink: AuthoredNode | undefined, quarantine: AuthoredNode | undefined;
     const filters: AuthoredNode[] = [];
     // Distinct output destinations keyed by database dir (order-preserving). One => the single
@@ -177,7 +171,6 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'parser') parser = n;
         else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
-        else if (n.type === 'transform.dedup.fingerprint') fingerprint = n;
         else if (n.type === 'transform.filter') filters.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
@@ -212,7 +205,7 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     const processing = asMap(out['processing']); out['processing'] = processing;
 
     if (acq) {
-        for (const k of Object.keys(collector)) if (!['duplicate', 'incremental', 'gap_detection'].includes(k)) delete collector[k];
+        for (const k of Object.keys(collector)) if (k !== 'gap_detection') delete collector[k];
         for (const [k, v] of Object.entries(acq.config ?? {})) if (!['poll', 'trigger', 'file_pattern'].includes(k)) collector[k] = v;
         delete collector['connection'];
         if (acq.use?.startsWith('connection/')) collector['connection'] = acq.use.slice('connection/'.length);
@@ -221,8 +214,6 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         setOrDel(processing, 'file_pattern', acq.config?.['file_pattern']);
     }
     overlay(collector, 'gap_detection', gap ? { enabled: true, ...(gap.config ?? {}) } : undefined, strict);
-    overlay(collector, 'duplicate', fingerprint?.config?.['duplicate'], strict);
-    overlay(collector, 'incremental', fingerprint?.config?.['incremental'], strict);
 
     if (marker) {
         const dc: Cfg = { enabled: true };

@@ -180,18 +180,19 @@ describe('NodeConfigDialog', () => {
     });
 
     /**
-     * D9 (2026-08-04): `duplicate:` is declared on `transform.dedup.fingerprint`, the node
-     * `PipelineEditable.lower:255` overlays it from — so the nesting + unmodeled-sub-key guarantees have
-     * to hold *there*. `algorithm` is engine-read (`PipelineConfigParser.java:456`) with no spec.
+     * `duplicate:` is declared on the ACQUISITION node since the 2026-08-04 fold (D9 had split it
+     * onto a `transform.dedup.fingerprint` node, removed because file dedup executes in the poll
+     * cycle) — so the nesting + unmodeled-sub-key guarantees have to hold there. `algorithm` is
+     * engine-read (`PipelineConfigParser.java:456`) with no spec.
      */
-    it('nests and preserves the duplicate block on the fingerprint-dedup node', async () => {
+    it('nests and preserves the duplicate block on the acquisition node', async () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: {
-                id: 'dedup_fp', type: 'transform.dedup.fingerprint',
+                id: 'acq', type: 'acquisition',
                 config: { duplicate: { mode: 'checksum', algorithm: 'SHA256' } },
             },
-            typeLabel: 'transform.dedup.fingerprint', categoryLabel: 'Transform', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Acquisition', bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(c.schemaInitial['duplicate__mode']).toBe('checksum');

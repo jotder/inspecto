@@ -72,23 +72,6 @@ public final class NodeAttributes {
                     .help("Target directory when \"After success\" is Move."));
 
     /**
-     * The {@code duplicate:} keys — declared on the fingerprint-dedup node, NOT on acquisition (D9).
-     * {@code PipelineEditable.lower} overlays {@code duplicate:} from THIS node ({@code :255}) while
-     * {@code NOT_ACQ_OWNED} ({@code :60}) strips it from the acquisition node, so a value typed on
-     * acquisition was silently discarded on save.
-     *
-     * <p>⛔ Do not "fix" that by pruning {@link #COLLECTOR} — Onboarding authors the {@code collector:}
-     * block whole and the keys are real there. The rule: <b>a shared attribute table is correct per
-     * BLOCK, not per NODE.</b>
-     */
-    public static final List<NodeAttribute> DEDUP_FINGERPRINT =
-            COLLECTOR.stream().filter(a -> a.key().startsWith("duplicate__")).toList();
-
-    /** {@link #COLLECTOR} minus the keys the fingerprint-dedup node owns — a derivation, not a fork. */
-    public static final List<NodeAttribute> ACQUISITION =
-            COLLECTOR.stream().filter(a -> !DEDUP_FINGERPRINT.contains(a)).toList();
-
-    /**
      * The {@code output:} block, shared by all three sink kinds and Onboarding's Dataset & Go-live stage —
      * the kind is the materialisation behaviour, not a different config shape. The {@code format} default
      * is the ENGINE's absent-key behaviour (CSV, the {@code PartitionWriter} default), not a UX suggestion:
@@ -149,8 +132,9 @@ public final class NodeAttributes {
         for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, TRANSFORM_FILTER, TRANSFORM_ROUTE))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
-        m.put(BuiltinNodeType.ACQUISITION.type(), ACQUISITION);
-        m.put(BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type(), DEDUP_FINGERPRINT);
+        // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
+        // dedup executes in the poll cycle, and its former graph node was removed 2026-08-04.
+        m.put(BuiltinNodeType.ACQUISITION.type(), COLLECTOR);
         m.put(BuiltinNodeType.TRANSFORM_FILTER.type(), TRANSFORM_FILTER);
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), OUTPUT);

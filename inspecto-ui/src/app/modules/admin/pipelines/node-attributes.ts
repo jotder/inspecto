@@ -1,9 +1,4 @@
-import {
-    type AttributeSpec,
-    COLLECTOR_ACQUISITION_ATTRIBUTES,
-    COLLECTOR_DEDUP_ATTRIBUTES,
-    OUTPUT_ATTRIBUTES,
-} from 'app/inspecto/component-model';
+import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
 
 /**
  * Per-node-type config attribute schemas for the generic {@link NodeConfigDialog} — the non-parser
@@ -59,9 +54,10 @@ import {
  * from `catalog/onboarding/` in the same change) — this is U-D's "one table per concern": both features
  * author the same `collector:` block, so a second hand-written table is exactly the drift that produced
  * fictional keys (`recursive`, `min_age_seconds`) here while Onboarding had the real ones
- * (`recursive_depth`, `stability__window`). One table, one truth. Since D9 (2026-08-04) it reuses a
- * **derivation** of that table rather than the whole of it — the `duplicate__*` keys moved to
- * `transform.dedup.fingerprint`, the node the engine actually reads them from.
+ * (`recursive_depth`, `stability__window`). One table, one truth — the WHOLE table, `duplicate__*`
+ * included: D9's split onto a `transform.dedup.fingerprint` node was undone 2026-08-04 when that node
+ * was removed (file dedup executes in the `CollectorProcessor` poll cycle, so it is collector-block
+ * policy, never a transform).
  *
  * <p>⚠ **A connector's OWN options are not node config.** `query`, `watermark_column`, `topic`,
  * `bootstrap_servers` live in the ConnectionProfile's `options:` map, read by each connector
@@ -81,17 +77,8 @@ import {
 // authors, so it is the shared `OUTPUT_ATTRIBUTES` (component-model) — W4a collapsed the local
 // `SINK_ATTRIBUTES` fork exactly as U-D collapsed the collector one. All three sink kinds write
 // the same block — the kind is the materialisation behaviour, not a different config shape.
-// The `duplicate:` keys were split off the shared table in D9 (2026-08-04): on the graph the
-// `collector:` block is split across nodes — `PipelineLift.dedupFingerprintNode` synthesises
-// `transform.dedup.fingerprint` carrying `duplicate`/`incremental`, and `PipelineEditable.lower`
-// overlays `duplicate:` back from THAT node while `NOT_ACQ_OWNED` strips it from acquisition, so a
-// value typed on the acquisition node was silently discarded (found by `NodeConfigNameContractTest`).
-// The derivations now live in shared `component-model/collector-attributes.ts` because the
-// collector-config unification (2026-08-04) made Onboarding's Collection stage adopt the SAME
-// acquisition subset — dedup is authored only on the fingerprint node, on both surfaces.
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
-    acquisition: COLLECTOR_ACQUISITION_ATTRIBUTES,
-    'transform.dedup.fingerprint': COLLECTOR_DEDUP_ATTRIBUTES,
+    acquisition: COLLECTOR_ATTRIBUTES,
     'sink.persistent': OUTPUT_ATTRIBUTES,
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,

@@ -35,7 +35,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         'acquisition', 'adapter',
         'parser',
         'transform.map', 'transform.filter', 'transform.select', 'transform.derive', 'transform.validate',
-        'transform.dedup.marker', 'transform.dedup.fingerprint', 'transform.route', 'transform.split',
+        'transform.dedup.marker', 'transform.route', 'transform.split',
         'transform.merge', 'enrichment',
         'sink.persistent', 'sink.materialized', 'sink.view',
         'alert', 'gap', 'event',
@@ -61,19 +61,25 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         for (const t of NODE_TYPES.filter((n) => n.category === 'CONTROL')) expect(t.emits).toEqual([]);
     });
 
-    it('keeps the two dedup subsystems distinct rather than one flattened dedup', () => {
+    /**
+     * Only the MARKER subsystem is a dedup node. `transform.dedup.fingerprint` was removed
+     * 2026-08-04: content-fingerprint dedup executes inside the `CollectorProcessor` poll cycle
+     * (`ledgerFilter` reads `collector.duplicate`), so it is collector-block policy authored on the
+     * acquisition node — never a transform with a runtime of its own.
+     */
+    it('serves only the marker dedup subsystem — fingerprint dedup is not a node', () => {
         const dedups = NODE_TYPES.filter((t) => t.type.startsWith('transform.dedup')).map((t) => t.type);
-        expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup.fingerprint']);
+        expect(dedups).toEqual(['transform.dedup.marker']);
     });
 
-    it('marks exactly the 9 types the server can lower — a laxer mock is the whole failure mode', () => {
+    it('marks exactly the 8 types the server can lower — a laxer mock is the whole failure mode', () => {
         // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
         // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
         expect(NODE_TYPES.filter((t) => t.lowerable).map((t) => t.type).sort()).toEqual([
             'acquisition', 'enrichment', 'gap', 'parser', 'sink.persistent',
-            'transform.dedup.fingerprint', 'transform.dedup.marker', 'transform.filter', 'transform.map',
+            'transform.dedup.marker', 'transform.filter', 'transform.map',
         ]);
-        expect(NODE_TYPES.length).toBe(20);
+        expect(NODE_TYPES.length).toBe(19);
     });
 
     it('only the parser and the router emit operator-named routes', () => {

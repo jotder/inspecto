@@ -43,7 +43,7 @@ public final class PipelineEditable {
     /** Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE. */
     private static final Set<String> LOWERABLE = Set.of(
             BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(), BuiltinNodeType.GAP.type(),
-            BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(), BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type(),
+            BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
@@ -56,8 +56,12 @@ public final class PipelineEditable {
         return LOWERABLE.contains(type);
     }
 
-    /** Collector-block keys owned by the fingerprint dedup / gap nodes, not the acquisition node. */
-    private static final Set<String> NOT_ACQ_OWNED = Set.of("duplicate", "incremental", "gap_detection");
+    /**
+     * Collector-block keys owned by the gap node, not the acquisition node. {@code duplicate} and
+     * {@code incremental} left this set 2026-08-04 when the fingerprint-dedup node was folded into
+     * acquisition — they execute in the poll cycle, so acquisition is where they are authored.
+     */
+    private static final Set<String> NOT_ACQ_OWNED = Set.of("gap_detection");
 
     /** Parser-owned processing keys (schema resolution + the parse frontend). */
     private static final Set<String> PARSER_OWNED = Set.of(
@@ -132,9 +136,6 @@ public final class PipelineEditable {
             if (collector.get("gap_detection") instanceof Map<?, ?> gd)
                 for (Map.Entry<?, ?> e : gd.entrySet())
                     if (!"enabled".equals(e.getKey())) c.put(String.valueOf(e.getKey()), e.getValue());
-        } else if (BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type().equals(t)) {
-            putIfPresent(c, "duplicate", collector.get("duplicate"));
-            putIfPresent(c, "incremental", collector.get("incremental"));
         } else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) {
             if (processing.get("duplicate_check") instanceof Map<?, ?> dc) {
                 putIfPresent(c, "marker_extension", dc.get("marker_extension"));
@@ -178,7 +179,7 @@ public final class PipelineEditable {
     public static Map<String, Object> lower(PipelineGraph g, Map<String, Object> existing, boolean strict) {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
-        PipelineNode acq = null, parser = null, gap = null, marker = null, fingerprint = null;
+        PipelineNode acq = null, parser = null, gap = null, marker = null;
         PipelineNode primarySink = null, quarantineSink = null;
         List<PipelineNode> filters = new ArrayList<>();
         // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
@@ -195,7 +196,6 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
-            else if (BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type().equals(t)) fingerprint = n;
             else if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(t)) filters.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
@@ -252,8 +252,6 @@ public final class PipelineEditable {
             replaceOrRemove(processing, "file_pattern", acq.cfg("file_pattern"));
         }
         overlayOwned(collector, "gap_detection", gap == null ? null : gapSection(gap), strict);
-        overlayOwned(collector, "duplicate", fingerprint == null ? null : fingerprint.cfg("duplicate"), strict);
-        overlayOwned(collector, "incremental", fingerprint == null ? null : fingerprint.cfg("incremental"), strict);
 
         if (marker != null) {
             Map<String, Object> dc = new LinkedHashMap<>();

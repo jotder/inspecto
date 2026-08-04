@@ -182,7 +182,6 @@ class PipelineCompilerTest {
         PipelineGraph g = new PipelineGraph("X", true,
                 List.of(PipelineNode.of("acq", "acquisition"),
                         PipelineNode.of("dm", "transform.dedup.marker"),
-                        PipelineNode.of("df", "transform.dedup.fingerprint"),
                         PipelineNode.of("parse", "parser"),
                         PipelineNode.of("gap", "gap"),
                         PipelineNode.of("s1", "sink.persistent", Map.of(PipelineStores.CONFIG_STORE, "a")),
@@ -193,7 +192,8 @@ class PipelineCompilerTest {
         assertEquals("acq", c.acquisition().orElseThrow().id());
         assertEquals("parse", c.parser().orElseThrow().id());
         assertEquals("gap", c.gap().orElseThrow().id());
-        assertEquals(List.of("dm", "df"), c.dedups().stream().map(PipelineNode::id).toList());
+        // Only the marker subsystem is a dedup node — fingerprint dedup rides acquisition (2026-08-04).
+        assertEquals(List.of("dm"), c.dedups().stream().map(PipelineNode::id).toList());
         assertEquals(List.of("s1", "s2"), c.sinks().stream().map(PipelineNode::id).toList());
     }
 }

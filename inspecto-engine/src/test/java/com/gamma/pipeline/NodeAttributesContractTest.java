@@ -62,22 +62,21 @@ class NodeAttributesContractTest {
     }
 
     /**
-     * D9's split, asserted on the published side too: the acquisition node must not advertise keys the
-     * flat lower routes to the fingerprint-dedup node, or the server would be telling the UI to draw a
-     * control whose value is discarded on save.
+     * The 2026-08-04 fold, asserted on the published side: the acquisition node advertises the WHOLE
+     * collector block, {@code duplicate__*} included. D9 had split those keys onto a
+     * {@code transform.dedup.fingerprint} node; that node was removed because file dedup executes in
+     * the {@code CollectorProcessor} poll cycle ({@code ledgerFilter}) — it never was a transform, so
+     * the split told the operator the check happens somewhere it does not.
      */
     @Test
-    void acquisitionDoesNotPublishTheKeysTheDedupNodeOwns() {
-        List<String> acq = NodeAttributes.ACQUISITION.stream().map(NodeAttribute::key).toList();
-        assertFalse(acq.contains("duplicate__mode"));
-        assertFalse(acq.contains("duplicate__on_change"));
+    void acquisitionPublishesTheWholeCollectorBlockIncludingDedup() {
+        List<String> acq = NodeAttributes.forType("acquisition").stream().map(NodeAttribute::key).toList();
+        assertTrue(acq.contains("duplicate__mode"));
+        assertTrue(acq.contains("duplicate__on_change"));
+        assertEquals(NodeAttributes.COLLECTOR.stream().map(NodeAttribute::key).toList(), acq);
 
-        List<String> dedup = NodeAttributes.DEDUP_FINGERPRINT.stream().map(NodeAttribute::key).toList();
-        assertEquals(List.of("duplicate__mode", "duplicate__on_change"), dedup);
-
-        // A derivation, not a fork: nothing is lost to the split.
-        assertEquals(NodeAttributes.COLLECTOR.size(),
-                NodeAttributes.ACQUISITION.size() + NodeAttributes.DEDUP_FINGERPRINT.size());
+        // The removed node publishes nothing — a graph still carrying one is refused at save.
+        assertTrue(NodeAttributes.forType("transform.dedup.fingerprint").isEmpty());
     }
 
     /** The catalog every client reads must actually carry the specs — the whole point of §3.1. */

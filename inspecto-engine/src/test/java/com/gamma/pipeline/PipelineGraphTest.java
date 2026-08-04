@@ -88,8 +88,10 @@ class PipelineGraphTest {
         assertTrue(PipelineNodeTypes.isKnown("parser"));
         assertTrue(PipelineNodeTypes.isKnown("transform.map"));
         assertTrue(PipelineNodeTypes.isKnown("transform.filter"));        // G1
-        assertTrue(PipelineNodeTypes.isKnown("transform.dedup.marker"));  // G2
-        assertTrue(PipelineNodeTypes.isKnown("transform.dedup.fingerprint"));
+        assertTrue(PipelineNodeTypes.isKnown("transform.dedup.marker"));  // G2 (the marker subsystem)
+        // The fingerprint subtype was removed 2026-08-04 — file dedup executes in the acquisition
+        // poll cycle, so it is a collector-block policy, never a transform node.
+        assertFalse(PipelineNodeTypes.isKnown("transform.dedup.fingerprint"));
         // sink is now a family of subtypes (the bare "sink" is gone)
         assertFalse(PipelineNodeTypes.isKnown("sink"));
         assertTrue(PipelineNodeTypes.isKnown("sink.persistent"));

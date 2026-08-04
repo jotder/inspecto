@@ -56,7 +56,7 @@ describe('node-attributes', () => {
 
     it('classifies every attribute of every known type into a tier', () => {
         for (const type of ['acquisition', 'transform.filter', 'transform.route',
-            'transform.dedup.fingerprint', 'sink.persistent', 'sink.materialized', 'sink.view']) {
+            'sink.persistent', 'sink.materialized', 'sink.view']) {
             for (const s of nodeAttributesFor(type)!) {
                 expect(['required', 'optional', 'advanced']).toContain(s.tier);
             }
@@ -64,36 +64,26 @@ describe('node-attributes', () => {
     });
 
     /**
-     * U-D's whole point: one table per concern, so the acquisition node cannot drift from Onboarding.
-     * Since D9 it is a **derivation** rather than the whole table — asserted by spec *identity*, so the
-     * membership can differ but a forked copy of a spec object still fails.
+     * U-D's whole point: one table per concern, so the acquisition node cannot drift from Onboarding —
+     * asserted by table identity, so a forked copy fails even if the keys look the same.
      */
-    it('authors the collector block from the SAME shared specs Onboarding uses', () => {
-        for (const s of nodeAttributesFor('acquisition')!) expect(COLLECTOR_ATTRIBUTES).toContain(s);
+    it('authors the collector block from the SAME shared table Onboarding uses', () => {
+        expect(nodeAttributesFor('acquisition')).toBe(COLLECTOR_ATTRIBUTES);
     });
 
     /**
-     * D9 (2026-08-04): a shared attribute table is correct per BLOCK, not per NODE. On the graph the
-     * `collector:` block is split across nodes — `PipelineEditable.lower:255` overlays `duplicate:` from
-     * the fingerprint-dedup node while `NOT_ACQ_OWNED:60` strips it from acquisition — so declaring these
-     * on acquisition meant the operator's value was silently discarded on save. Since the
-     * collector-config unification (2026-08-04) Onboarding's Collection stage adopts the same
-     * acquisition subset, so dedup is authored only on the fingerprint node on both surfaces.
+     * Collector-config unification (2026-08-04). D9 had split `duplicate__*` onto a
+     * `transform.dedup.fingerprint` node; that node was REMOVED because file duplicate detection
+     * executes inside the `CollectorProcessor` poll cycle (`ledgerFilter` reads `collector.duplicate`)
+     * — it had no runtime as a transform, so the split told the operator the check happens after
+     * collection. The acquisition node now declares the policy, where it actually runs.
      */
-    it('declares the duplicate policy on the node the engine reads it from', () => {
+    it('declares the duplicate policy on acquisition, where the engine runs it', () => {
         const acq = nodeAttributesFor('acquisition')!.map((s) => s.key);
-        expect(acq).not.toContain('duplicate__mode');
-        expect(acq).not.toContain('duplicate__on_change');
-
-        const dedup = nodeAttributesFor('transform.dedup.fingerprint')!.map((s) => s.key);
-        expect(dedup).toEqual(['duplicate__mode', 'duplicate__on_change']);
-    });
-
-    /** The split is a derivation, not a fork: every key still lives in exactly one shared table. */
-    it('loses no collector key to the split', () => {
-        const split = [...nodeAttributesFor('acquisition')!,
-            ...nodeAttributesFor('transform.dedup.fingerprint')!];
-        expect(new Set(split)).toEqual(new Set(COLLECTOR_ATTRIBUTES));
+        expect(acq).toContain('duplicate__mode');
+        expect(acq).toContain('duplicate__on_change');
+        // The removed node has no schema at all — a stale graph carrying one is refused at save.
+        expect(nodeAttributesFor('transform.dedup.fingerprint')).toBeUndefined();
     });
 
     it('offers the engine-real collector keys, not the old best-guess ones', () => {

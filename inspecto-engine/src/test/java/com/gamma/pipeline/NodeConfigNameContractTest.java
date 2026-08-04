@@ -80,13 +80,13 @@ class NodeConfigNameContractTest {
                 new Contract("acquisition", "post_action__archive_path", "post_action.archive_path", "/arch",
                         c -> c.collector().postAction().archivePath(), "/arch"),
 
-                // ── transform.dedup.fingerprint — the `duplicate:` keys, split off the shared
-                // collector table by D9 because THIS is the node lower overlays them from. The node
-                // exists only when the policy is already content-based (`PipelineLift:70`), so turning
-                // dedup on means adding it from the palette — it is in `LOWERABLE`, so that works.
-                new Contract("transform.dedup.fingerprint", "duplicate__mode", "duplicate.mode", "etag",
+                // ── the `duplicate:` keys — on ACQUISITION since the 2026-08-04 fold. D9 had split
+                // them onto a `transform.dedup.fingerprint` node; that node was removed because the
+                // check executes in the CollectorProcessor poll cycle (`ledgerFilter`), so it had no
+                // runtime of its own and misrepresented where dedup happens.
+                new Contract("acquisition", "duplicate__mode", "duplicate.mode", "etag",
                         c -> c.collector().duplicate().mode(), "etag"),
-                new Contract("transform.dedup.fingerprint", "duplicate__on_change", "duplicate.on_change",
+                new Contract("acquisition", "duplicate__on_change", "duplicate.on_change",
                         "skip", c -> c.collector().duplicate().onChange(), "skip"),
 
                 // ── sink.persistent — the shared OUTPUT_ATTRIBUTES table ────────────────────────
@@ -142,29 +142,30 @@ class NodeConfigNameContractTest {
     }
 
     /**
-     * The {@code collector:} keys an acquisition <em>node</em> does not own. This is not a defect list —
-     * it is the per-block/per-node split, and these assertions exist so the split cannot silently move.
+     * What the acquisition <em>node</em> owns of the {@code collector:} block. These assertions exist so
+     * the ownership line cannot silently move.
      *
-     * <p>{@code COLLECTOR_ATTRIBUTES} describes the whole {@code collector:} block, which Onboarding
-     * authors as one thing. On the graph the same block is split across nodes, so the UI declares each key
-     * on the node the engine reads it from ({@code node-attributes.ts}) — never by pruning the shared
-     * table, which Onboarding still needs whole.
+     * <p>Since the 2026-08-04 fold the node owns the block almost whole — {@code duplicate:} included,
+     * because file duplicate detection executes inside the {@code CollectorProcessor} poll cycle
+     * ({@code ledgerFilter}), i.e. during acquisition. D9 had routed those keys through a
+     * {@code transform.dedup.fingerprint} node; that node was removed (it had no runtime of its own and
+     * placed the check after collection, which is not where it happens). {@code gap_detection} keeps its
+     * own node, and {@code connection} is not a cfg key at all.
      */
     @Test
-    void theAcquisitionNodeDoesNotOwnTheWholeCollectorBlock(@TempDir Path dir) throws Exception {
+    void theAcquisitionNodeOwnsTheCollectorBlockExceptGapAndConnection(@TempDir Path dir) throws Exception {
         // `connection` is not a cfg key at all: it rides on `use: connection/<name>`, and lower strips a
         // cfg-level one (`PipelineEditable:248`). D3-remainder closed this in the UI by making the
         // `connection` attribute write `use:` instead of cfg — the engine contract below is unchanged.
         assertNull(saveThrough(dir, "acquisition", "connection", "prod_sftp").collector().connection(),
                 "`connection` became a cfg key — the UI writes it on `use:`, so this is a contract change");
 
-        // D9 (closed 2026-08-04): `duplicate:` is overlaid from the fingerprint-dedup node, so a value
-        // set on the acquisition node loses to it. The UI no longer declares the key here, which is what
-        // makes that harmless; the fixture's own `checksum` winning over `etag` is the proof.
-        assertEquals("checksum", saveThrough(dir, "acquisition", "duplicate.mode", "etag")
+        // The fold's core guarantee: a `duplicate.mode` typed on the acquisition node now REACHES the
+        // engine instead of losing to a node overlay. (Under D9 the fixture's own `checksum` won.)
+        assertEquals("etag", saveThrough(dir, "acquisition", "duplicate.mode", "etag")
                         .collector().duplicate().mode(),
-                "the acquisition node now wins `duplicate.mode` — the D9 split moved, re-check "
-                        + "node-attributes.ts before trusting either side");
+                "the acquisition node lost `duplicate.mode` to an overlay — the 2026-08-04 fold "
+                        + "regressed; a value typed on the node is being silently discarded again");
     }
 
     /**
@@ -180,9 +181,9 @@ class NodeConfigNameContractTest {
         assertTrue(PipelineEditable.isLowerable("acquisition"));
         assertTrue(PipelineEditable.isLowerable("transform.filter"));
         assertTrue(PipelineEditable.isLowerable("sink.persistent"));
-        // D9 declared specs for it, so it must stay saveable — and it is how dedup gets turned ON,
-        // since lift only synthesises the node when the policy is already content-based.
-        assertTrue(PipelineEditable.isLowerable("transform.dedup.fingerprint"));
+        // The fingerprint-dedup node was removed 2026-08-04 (no runtime of its own — dedup executes
+        // in the poll cycle), so a stale graph still carrying one is refused rather than half-honoured.
+        assertFalse(PipelineEditable.isLowerable("transform.dedup.fingerprint"));
 
         for (String authoredOnly : List.of("transform.route", "sink.materialized", "sink.view"))
             assertFalse(PipelineEditable.isLowerable(authoredOnly),

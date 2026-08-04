@@ -10,8 +10,9 @@ import java.util.Set;
  * validator. Operator-defined {@code route:*} branches are flagged by {@link #emitsNamedRoutes()}.
  *
  * <p>Reflects the §15 capability inventory: the {@code transform.*} family includes the
- * index-anchored {@code transform.filter} (G1) and the two <em>distinct</em> dedup subtypes (G2 —
- * marker vs fingerprint are different subsystems and must not be flattened).
+ * index-anchored {@code transform.filter} (G1) and the marker dedup subtype (G2). The former
+ * fingerprint dedup subtype was folded into the acquisition node 2026-08-04 — it executes in the
+ * poll cycle and had no runtime as a transform; marker remains a genuine subsystem of its own.
  *
  * <p><b>Sink is a family</b> (doc §3.1, decided 2026-06-17): a sink is one node-type family with three
  * materialisation behaviours — {@link #SINK_PERSISTENT} (data rests as a Parquet file / DuckDB table),
@@ -55,9 +56,9 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_DEDUP_MARKER("transform.dedup.marker", NodeCategory.TRANSFORM, "Dedup (marker)",
             "File-level dedup via marker files (MarkerManager) — a distinct subsystem (G2).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false),
-    TRANSFORM_DEDUP_FINGERPRINT("transform.dedup.fingerprint", NodeCategory.TRANSFORM, "Dedup (fingerprint)",
-            "Content-fingerprint dedup via the acquisition ledger — a distinct subsystem (G2).",
-            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false),
+    // transform.dedup.fingerprint was REMOVED 2026-08-04: content-fingerprint dedup executes inside
+    // the CollectorProcessor poll cycle (ledgerFilter reads collector.duplicate), so the separate
+    // node had no runtime of its own — the policy is authored on the acquisition node now.
     TRANSFORM_ROUTE("transform.route", NodeCategory.TRANSFORM, "Route",
             "Content-based routing into operator-defined branches (case / clone).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), true),

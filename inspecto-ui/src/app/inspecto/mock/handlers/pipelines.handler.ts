@@ -48,7 +48,7 @@ import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.h
  * kill: keep these two lists in lockstep.
  */
 const LOWERABLE = new Set([
-    'acquisition', 'parser', 'gap', 'transform.dedup.marker', 'transform.dedup.fingerprint',
+    'acquisition', 'parser', 'gap', 'transform.dedup.marker',
     'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
 ]);
 
@@ -66,7 +66,6 @@ export const NODE_TYPES: PipelineNodeType[] = ([
     { type: 'transform.validate', category: 'TRANSFORM', label: 'Validate', description: 'Splits rows into valid / invalid by rule.', accepts: ['data'], emits: ['data', 'invalid'], emitsNamedRoutes: false },
     // marker vs fingerprint are DIFFERENT subsystems — never flatten them into one "dedup"
     { type: 'transform.dedup.marker', category: 'TRANSFORM', label: 'Dedup (marker)', description: 'File-level dedup via marker files.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
-    { type: 'transform.dedup.fingerprint', category: 'TRANSFORM', label: 'Dedup (fingerprint)', description: 'Content-fingerprint dedup via the acquisition ledger.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
     { type: 'transform.route', category: 'TRANSFORM', label: 'Route', description: 'Content-based routing into operator-defined branches (case / clone).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: true },
     { type: 'transform.split', category: 'TRANSFORM', label: 'Split', description: 'Explodes one row into many (UNNEST).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
     { type: 'transform.merge', category: 'TRANSFORM', label: 'Merge', description: 'Joins / unions multiple inbound data edges (fan-in).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },

@@ -48,7 +48,7 @@ const jsonValidator: ValidatorFn = (control: AbstractControl): ValidationErrors 
 
 const TRANSFORM_SUBTYPES = [
     'transform.map', 'transform.select', 'transform.derive', 'transform.filter', 'transform.validate',
-    'transform.dedup.marker', 'transform.dedup.fingerprint', 'transform.route', 'transform.split', 'transform.merge',
+    'transform.dedup.marker', 'transform.route', 'transform.split', 'transform.merge',
 ];
 const SINK_KINDS = ['sink.persistent', 'sink.materialized', 'sink.view'];
 const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];

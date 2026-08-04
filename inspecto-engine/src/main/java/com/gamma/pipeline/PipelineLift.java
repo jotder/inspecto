@@ -30,8 +30,11 @@ import java.util.Map;
  *
  * <p>Control wiring implied by existing flags: {@code gap_detection} → a {@code gap} node via a
  * {@code gap} edge (G7); {@code post_action} is carried on the {@code acquisition} node as a
- * success-side finalizer (G8), <em>not</em> a {@code failure} edge. The two dedup subsystems are kept
- * as <b>distinct</b> nodes (G2). Dead top-level keys ({@code version}/{@code search}/…) are dropped (F1).
+ * success-side finalizer (G8), <em>not</em> a {@code failure} edge. Content-fingerprint dedup
+ * ({@code collector.duplicate}/{@code incremental}) is carried ON the acquisition node — it executes
+ * inside the {@code CollectorProcessor} poll cycle, so a separate graph node misrepresented where the
+ * check runs and had no runtime of its own (folded 2026-08-04; only the marker subsystem keeps a
+ * node, G2). Dead top-level keys ({@code version}/{@code search}/…) are dropped (F1).
  */
 @PublicApi(since = "4.3.0")
 public final class PipelineLift {
@@ -41,7 +44,6 @@ public final class PipelineLift {
     // ── stable node ids ──────────────────────────────────────────────────────────
     static final String ACQ               = "acq";
     static final String DEDUP_MARKER      = "dedup_marker";
-    static final String DEDUP_FINGERPRINT = "dedup_fingerprint";
     static final String PARSE             = "parse";
     static final String QUARANTINE        = "quarantine";
     static final String GAP               = "gap";
@@ -60,17 +62,13 @@ public final class PipelineLift {
             edges.add(new PipelineEdge(ACQ, PipelineRel.GAP, GAP));
         }
 
-        // 2. dedup prefix (two distinct subsystems — G2), feeding the parser
+        // 2. dedup prefix (marker subsystem only — fingerprint dedup rides the acquisition node,
+        //    where it actually executes), feeding the parser
         String upstream = ACQ;
         if (cfg.processing().duplicateCheckEnabled()) {
             nodes.add(dedupMarkerNode(cfg));
             edges.add(PipelineEdge.data(upstream, DEDUP_MARKER));
             upstream = DEDUP_MARKER;
-        }
-        if (cfg.collector().duplicate().contentBased()) {
-            nodes.add(dedupFingerprintNode(cfg));
-            edges.add(PipelineEdge.data(upstream, DEDUP_FINGERPRINT));
-            upstream = DEDUP_FINGERPRINT;
         }
 
         // 3. parser, fed by the dedup prefix (or directly by acq)
@@ -117,6 +115,7 @@ public final class PipelineLift {
         c.put("discovery", src.discovery());   // W0: poll|watch — carried so the collector block round-trips
         // typed sub-records — never null (Source canonical ctor defaults them), carried verbatim
         c.put("stability", src.stability());
+        c.put("duplicate", src.duplicate());   // fingerprint policy — executes in the poll cycle (2026-08-04 fold)
         c.put("incremental", src.incremental());
         c.put("guarantee", src.guarantee());
         c.put("fetch", src.fetch());
@@ -136,14 +135,6 @@ public final class PipelineLift {
         put(c, "markers_dir", cfg.dirs().markers());
         return new PipelineNode(DEDUP_MARKER, BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
                 "Dedup (marker)", null, c, null);
-    }
-
-    private static PipelineNode dedupFingerprintNode(PipelineConfig cfg) {
-        Map<String, Object> c = new LinkedHashMap<>();
-        c.put("duplicate", cfg.collector().duplicate());       // the fingerprint policy (mode/algorithm/on_change)
-        c.put("incremental", cfg.collector().incremental());   // watermark is derived alongside the ledger (G4)
-        return new PipelineNode(DEDUP_FINGERPRINT, BuiltinNodeType.TRANSFORM_DEDUP_FINGERPRINT.type(),
-                "Dedup (fingerprint)", null, c, null);
     }
 
     private static PipelineNode parserNode(PipelineConfig cfg) {
