@@ -368,6 +368,10 @@ public final class SpaceManager implements AutoCloseable {
         ConnectionRegistry.forget(id.value());        // drop the space's connection profiles (process-wide static map)
         StabilityGate.forget(id.value());             // drop the space's file-stability gate + its retained sightings
         com.gamma.pipeline.DecisionRules.forget(id.value());   // drop the space's decision-rule registry root
+        // CollectorService.close() already releases this, but per the S7 note above a hung close must not leak
+        // it: the registry's DuckDB file lives under the space dir, so on Windows a retained handle would make
+        // the purge below fail outright. unregister is idempotent, so the double call is free.
+        com.gamma.consignment.ConsignmentOutputStores.unregister(id.value());
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
             if (base.startsWith(spacesRoot) && Files.isDirectory(base)) deleteRecursively(base);

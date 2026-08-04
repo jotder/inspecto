@@ -66,7 +66,8 @@ public final class BatchGraphRunner {
      * ingest path passes the re-homed {@code BatchProcessor.commit} body; a test may pass a no-op.
      */
     public static Result run(Input in, SourceFinalizer finalizer) throws Exception {
-        PartitionSinkWriter writer = new PartitionSinkWriter(in.conn(), in.dataDir(), in.baseName());
+        PartitionSinkWriter writer =
+                new PartitionSinkWriter(in.conn(), in.dataDir(), in.baseName(), in.batchId());
         BranchCommitCoordinator coordinator =
                 new BranchCommitCoordinator(new BranchCommitLog(in.branchCommitLog().toString()));
         PipelineExecutor.ExecResult exec = PipelineExecutor.execute(

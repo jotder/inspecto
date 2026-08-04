@@ -164,7 +164,7 @@ public final class PipelineJobRunner implements Job {
             // incremental runs append (a run-unique base name so each increment is its own file); a full
             // recompute keeps a stable base name so a same-batch_id replay stays idempotent.
             String sinkBase = cfg.name().toLowerCase().replace(' ', '_') + (incremental ? "_" + safe(batchId) : "");
-            PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase);
+            PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase, batchId);
             BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(
                     Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
 

@@ -1,5 +1,8 @@
 package com.gamma.enrich;
 
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.DbConsignmentOutputStore;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentStore;
@@ -328,6 +331,56 @@ class EnrichmentEngineTest {
         assertEquals(3L, res.totalRows(), "three daily groups materialised");
     }
 
+    /**
+     * §11.3 slice 2 on the enrichment path. This path has <b>no lineage matrix</b> — {@code Result} carries only a
+     * whole-run total — so each file's {@code row_count} comes from a {@code GROUP BY} over the written relation.
+     * The assertion that matters is §7.2's reconciliation holding here too, on counts derived a different way
+     * from the ingest path's.
+     */
+    @Test
+    void registersEveryOutputFileWithPerFileRowCounts(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        EnrichmentConfig cfg = load(dir, in, out, DAILY_COUNT, "");
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+
+            EnrichmentEngine.Result res =
+                    EnrichmentEngine.runResult(cfg, null, List.of(), List.of(), "enrich-run-1");
+
+            List<ConsignmentOutput> rows = store.outputs("enrich-run-1");
+            assertEquals(res.outputs().size(), rows.size(), "one registry row per written file");
+            assertEquals(res.totalRows(), rows.stream().mapToLong(ConsignmentOutput::rows).sum(),
+                    "§7.2 reconciliation: summed row_count must equal the rows written");
+            for (ConsignmentOutput o : rows) {
+                assertEquals(1L, o.rows(), "each partition holds exactly one daily group: " + o.partitionKey());
+                assertEquals("EVENTS_DAILY_KPI", o.tableName());
+                assertEquals(ConsignmentOutput.State.LIVE, o.state());
+                assertTrue(Files.exists(Path.of(o.path())), "registered path must be the revealed file");
+            }
+            assertEquals(List.of("2020-04-03", "2020-04-03", "2020-04-04"),
+                    rows.stream().map(ConsignmentOutput::recordDay).sorted().toList(),
+                    "record_day survives a leading event_type partition column");
+        }
+    }
+
+    /** runId is what identifies the unit of work here; without one there is nothing to key rows on. */
+    @Test
+    void registersNothingWhenTheRunIsUnidentified(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        EnrichmentConfig cfg = load(dir, in, out, DAILY_COUNT, "");
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+            EnrichmentEngine.Result res = EnrichmentEngine.runResult(cfg, null);   // no runId overload
+
+            assertEquals(3, res.outputs().size(), "the write itself is unaffected");
+            assertTrue(store.outputs(null).isEmpty());
+        }
+    }
+
     @Test
     void cliRunWritesAuditLineageAndCommitLog(@TempDir Path dir) throws Exception {
         Path in = dir.resolve("in"), out = dir.resolve("out");
@@ -371,6 +424,7 @@ class EnrichmentEngineTest {
     @AfterEach
     void clearDecisionRules() {
         DecisionRules.clear();
+        ConsignmentOutputStores.use(null);   // process-wide static — never leak a store into another test
     }
 
     /** Author one {@code targetType: job} decision rule and register the registry for the default space. */

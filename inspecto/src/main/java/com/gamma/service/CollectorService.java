@@ -362,6 +362,12 @@ public final class CollectorService implements AutoCloseable {
         this.eventLog          = "default".equals(spaceId) ? EventLog.global() : EventLog.create();
         EventLog.register(spaceId, eventLog);
         this.pipelineStore         = ServiceStores.openPipelineStore(root);
+        // This space's Consignment output-file registry (§11.3). Default-off: openConsignmentOutputStore
+        // returns null unless -Dconsignment.outputs.backend is set, and register() then no-ops. It is published
+        // to a static per-space registry rather than held as a field because the write paths that record into it
+        // (BatchProcessor.finalizeSource, EnrichmentEngine.runResult) are static — the AcquisitionLedgers idiom.
+        com.gamma.consignment.ConsignmentOutputStores.register(
+                spaceId, ServiceStores.openConsignmentOutputStore(root));
         this.registry          = new CopyOnWriteArrayList<>(registry);
         this.pollSeconds       = Math.max(1, pollSeconds);
         this.maxConcurrentRuns = Math.max(1, maxConcurrentRuns);
@@ -1494,6 +1500,8 @@ public final class CollectorService implements AutoCloseable {
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
         try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log
+        // Release the output-file registry this service registered (+ its DB handle); no-op when default-off.
+        com.gamma.consignment.ConsignmentOutputStores.unregister(spaceId);
         if (status instanceof AutoCloseable c) {       // close a DB-backed store's connection
             try { c.close(); } catch (Exception e) { log.warn("Error closing status store: {}", e.getMessage()); }
         }

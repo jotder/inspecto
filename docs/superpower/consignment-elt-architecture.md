@@ -6,11 +6,14 @@ This began as the record of a design conversation, so the bulk below is still de
 | Piece | State as of 2026-08-04 |
 |---|---|
 | §14 `ProcessorContext` | **DESIGNED, unbuilt** — grounded against the code; decisions + build order in §14.1–§14.4 |
-| §11.3 `consignment_outputs` | **SLICE 1 BUILT + VERIFIED** — `DbConsignmentOutputStore`, default-off, 8 tests green. **No production caller yet** |
+| §11.3 `consignment_outputs` | **SLICES 1 + 2 BUILT + VERIFIED** — `DbConsignmentOutputStore` (default-off) now has production callers on **all three** write paths, with real per-file `row_count`. §7.2 reconciliation is asserted on each |
 | Everything else (§2, §4–§10, §11.4, §12, §13) | design only, nothing implemented |
 
-**Next:** slice 2 — sum `row_count` from `LineageCollector` and hook the four `PartitionOutput` write paths
-(§11.3 grounding (b)/(c)); then §14.4 steps 2–4.
+**Next:** §14.4 steps 2–4 (read-only connection accessor → `ProcessorContext` + adapter → `SummaryEmitter`
+guardrails, the last proved RED first). Also still open in §11.3: **slice 3**, the `batch_id` →
+`consignment_id` rename in persisted artifacts (scope + the six name-keyed read sites are in *Decided
+2026-08-04* item 2), and the state-transition mutators (`supersede`/`compactedAway`) that §6.3 compaction
+needs — the registry records writes today, and nothing yet flips a row's state.
 
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time
@@ -708,6 +711,53 @@ table may be redundant. Check before writing the DDL.
    `PartitionSinkWriter.outputs()`, `EnrichmentEngine.run:153`, `DecisionRuleApplier:138/165`. Rationale: a
    registry covering only ingest makes `ReprocessCommand` look authoritative while silently missing enrichment
    and routed-rule outputs — worse than having none.
+
+#### Slice 2 — AS BUILT 2026-08-04. Three more of this section's claims were wrong
+
+Grounding before building again refuted the plan. **The corrections below are what the code does; where this
+section above disagrees, the code is deliberate.**
+
+**(d) "Four write paths" is wrong — there are three, and one of the four was never separate.**
+`DecisionRuleApplier` is *not* a distinct path on ingest: its pipeline overload already calls `LineageCollector`
+inside its own `RouteSink` (`DecisionRuleApplier.java:141`) and `writeAndTrace` seeds its accumulators from
+`applied.outputs()`/`applied.lineage()` (`BatchIngestStrategy.java:127-128`). Routed-rule outputs therefore
+arrive at the ingest hook for free. The three real paths are **ingest**, **enrichment**, and **Pipeline sinks**.
+
+**(e) `writeAndTrace` is the wrong hook.** It has four callers (`CsvBatchStrategy:157`,
+`NativeCsvStreamingEngine:135` and `:264`, `UnionModeIngester:142`) and union mode calls it **per segment**, so
+hooking it would register partial sets repeatedly. The correct hook is **`BatchProcessor.finalizeSource`**: once
+per Consignment, holding the union of `outputs`, already shared with the branch-aware graph path via
+`BatchGraphRunner`'s `SourceFinalizer`. `commit` now passes `lineage` through to it (it previously dropped it).
+**Registration goes after the manifest write, never before** — the manifest is authoritative for existence, this
+table only for state, so a crash between them must lose the index and never the record that the files exist.
+
+**(f) Decision 3's rationale does not hold, though its conclusion was kept anyway.** It feared a partial registry
+would make `ReprocessCommand` look authoritative. But `ReprocessCommand` is purely manifest-driven on a `batchId`
+(`ReprocessCommand.java:29`) and structurally *cannot* reprocess enrichment or sink outputs, so an ingest-scoped
+registry would have been exactly coextensive with its only named consumer. Full coverage was an explicit operator
+call, not a consequence of this argument.
+
+**How `row_count` is obtained — two strategies, one invariant.** The count exists nowhere to copy, and the paths
+differ in whether a `COUNT(*)` has already run: ingest sums `LineageCollector`'s matrix per output file (free);
+enrichment and Pipeline sinks have only a whole-run total, so they call
+`ConsignmentOutputs.countByPartition` — a `GROUP BY` over the written relation, needing **no `__src_id`**, which
+is why it works on paths that have no lineage at all. On the sink path this *replaced* a separate whole-table
+`COUNT(*)`, so it costs nothing net. §7.2 reconciliation (summed `row_count` == rows written) is asserted on all
+three paths.
+
+**Wiring.** `ConsignmentOutputStores` is a per-space ambient registry following the documented
+`AcquisitionLedgers` global-registry idiom, because the write paths are `static` and cannot take a constructor
+dependency. It holds **no backend resolution** — `ServiceStores.openConsignmentOutputStore` stays the single
+reader of `-Dconsignment.outputs.backend` — and `record()` no-ops when absent, so no call site branches on
+default-off. Registration happens in the `CollectorService` constructor (not `SpaceBootstrap`, which misses
+single-space hosting) and is released in `close()` plus `SpaceManager.delete`, since a retained DuckDB handle
+would make a space purge fail on Windows.
+
+⚠ **`record_day` is a write-time approximation (operator call, against advice).** It is derived from the partition
+key's `year`/`month`/`day` segments, and is `null` for any other partition scheme. §10.1 defines it as event time
+cut with the *pinned* timezone at load; the two agree only when partitioning is on event-time date in that zone
+and **diverge silently on late-arriving data**. §10.1's work must therefore **replace** this derivation, not fall
+back to it. `run_id` is left `null` everywhere: no path today has a Run identity distinct from its unit of work.
 
 ### 11.4 Partition state — nothing exists
 

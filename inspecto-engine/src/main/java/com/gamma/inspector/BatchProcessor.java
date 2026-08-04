@@ -3,6 +3,8 @@ package com.gamma.inspector;
 import com.gamma.acquire.AcquisitionLedger;
 import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.acquire.LedgerEntry;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.etl.*;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -82,11 +84,12 @@ public final class BatchProcessor {
     private static void commit(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage)
             throws IOException {
-        // lineage is persisted by writeAudit (from the outcome), not here. The durable side effects —
+        // lineage is persisted by writeAudit (from the outcome); it is passed on here too because it is the
+        // only place a per-output-file row count exists (§11.3). The durable side effects —
         // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
         // the branch-aware graph path (BatchGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
-        finalizeSource(batch, cfg, survivors, outputs);
+        finalizeSource(batch, cfg, survivors, outputs, lineage);
     }
 
     /**
@@ -95,9 +98,14 @@ public final class BatchProcessor {
      * branch-aware {@link com.gamma.pipeline.exec.BatchGraphRunner} can drive the identical sequence as its
      * {@code SourceFinalizer} — run once, only after every sink branch is durable (T11 commit-split). The
      * legacy single-output path calls it through {@code commit}; both share this one ordering invariant.
+     *
+     * @param lineage {@code LineageCollector}'s count matrix for {@code outputs}, used only to give the §11.3
+     *                output registry a per-file row count. <b>Empty means "these outputs are not mine to
+     *                register"</b> — not "zero rows": the Pipeline-sink path counts per partition instead and
+     *                registers its own files, so registering here as well would double-count them.
      */
     static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
-                               List<PartitionOutput> outputs) throws IOException {
+                               List<PartitionOutput> outputs, List<LineageRow> lineage) throws IOException {
 
         // ── ordering rationale ────────────────────────────────────────────────
         // Markers signal "already processed; skip on next poll." If a crash leaves
@@ -180,6 +188,14 @@ public final class BatchProcessor {
             manifest.markers     = markerPaths;
             ManifestStore.write(cfg.dirs().manifestsDir(), manifest);
         }
+
+        // §11.3 — index the output files, AFTER the manifest and never before it. The manifest is authoritative
+        // for a file's existence, this registry only for its state, so a crash between the two must lose the
+        // index and never the record that the files exist. Best-effort and default-off: with no registry
+        // registered for this space, record() is a no-op and nothing about this sequence changes.
+        if (lineage != null && !lineage.isEmpty())
+            ConsignmentOutputStores.record(ConsignmentOutputs.fromLineage(
+                    batch.batchId(), null, batch.table(), outputs, lineage));
 
         // Backup BEFORE markers — see ordering rationale at top of method.
         if (backup != null)

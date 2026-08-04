@@ -71,7 +71,9 @@ class BatchGraphRunnerFinalizeTest {
         int[] finalised = {0};
         BatchGraphRunner.SourceFinalizer finalizer = sinkOutputs -> {
             finalised[0]++;
-            BatchProcessor.finalizeSource(batch, cfg, survivors, sinkOutputs);
+            // Empty lineage: the sink writer owns registering its own files (it counts per partition), so
+            // finalizeSource must not also register them — see its @param lineage contract.
+            BatchProcessor.finalizeSource(batch, cfg, survivors, sinkOutputs, List.of());
         };
 
         // run 1 — a poll cycle over a fresh per-batch connection: both sinks written, source finalised once

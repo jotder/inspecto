@@ -1,6 +1,8 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.pipeline.PipelineNode;
@@ -12,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,18 +44,24 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
     private final Connection conn;
     private final String dataDir;
     private final String baseName;
+    private final String consignmentId;
     private final List<PartitionOutput> outputs = new ArrayList<>();
     private long totalRows = 0L;
 
     /**
-     * @param conn     the DuckDB connection holding each sink branch's input relation
-     * @param dataDir  the data root under which each store is written as a sub-directory
-     * @param baseName the output file stem ({@code <baseName>_out.<ext>}); typically the flow/job id
+     * @param conn          the DuckDB connection holding each sink branch's input relation
+     * @param dataDir       the data root under which each store is written as a sub-directory
+     * @param baseName      the output file stem ({@code <baseName>_out.<ext>}); typically the pipeline/job id
+     * @param consignmentId the unit of work these files belong to, recorded in the §11.3 output registry. This
+     *                      writer registers its own files (it has the per-partition counts and the target store
+     *                      name in scope); {@code BatchProcessor.finalizeSource} deliberately does not, so the
+     *                      graph path does not double-count. May be {@code null} — nothing is registered then.
      */
-    public PartitionSinkWriter(Connection conn, String dataDir, String baseName) {
+    public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId) {
         this.conn = conn;
         this.dataDir = dataDir;
         this.baseName = baseName;
+        this.consignmentId = consignmentId;
     }
 
     @Override
@@ -78,7 +85,13 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
                 ? writeUnpartitioned(inputTable, dir, format, compression)
                 : PartitionWriter.write(conn, inputTable, dir, format, compression, baseName, partCols, List.of());
         outputs.addAll(outs);
-        totalRows += count(inputTable);
+        // Per-partition counts serve both purposes: they give every registry row a real row_count (§11.3 slice 2)
+        // and they sum to the branch total this used to get from a separate COUNT(*) over the whole relation.
+        Map<String, Long> rowsByPartition = ConsignmentOutputs.countByPartition(conn, inputTable, partCols);
+        totalRows += rowsByPartition.values().stream().mapToLong(Long::longValue).sum();
+        if (consignmentId != null)
+            ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
+                    consignmentId, null, store, outs, rowsByPartition));
         log.info("[FLOWJOB] sink '{}' → store '{}': {} file(s){}",
                 sink.id(), store, outs.size(), partCols.isEmpty() ? " (unpartitioned)" : " partitioned by " + partCols);
     }
@@ -124,13 +137,6 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
             }
         }
         return cols;
-    }
-
-    private long count(String table) throws Exception {
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM \"" + table + "\"")) {
-            return rs.next() ? rs.getLong(1) : 0L;
-        }
     }
 
     private static String str(Object o) { return o == null ? null : o.toString(); }

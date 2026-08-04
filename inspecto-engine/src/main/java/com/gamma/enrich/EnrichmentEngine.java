@@ -1,5 +1,7 @@
 package com.gamma.enrich;
 
+import com.gamma.consignment.ConsignmentOutputStores;
+import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
@@ -142,18 +144,35 @@ public final class EnrichmentEngine {
             DecisionRuleApplier.Result applied = DecisionRuleApplier.apply(conn, "__enriched",
                     DecisionRuleApplier.Subject.enrichment(cfg.name(), ruleTargets, runId),
                     cfg.output().database() + "_quarantine", baseName,
-                    (c, routedTable, dest) -> new DecisionRuleApplier.Result(
-                            PartitionWriter.write(c, routedTable,
-                                    Paths.get(cfg.output().database(), dest).toString(),
-                                    cfg.output().format(), cfg.output().compression(),
-                                    baseName, cfg.output().partitions(), List.of()),
-                            List.of()));
+                    (c, routedTable, dest) -> {
+                        List<PartitionOutput> routed = PartitionWriter.write(c, routedTable,
+                                Paths.get(cfg.output().database(), dest).toString(),
+                                cfg.output().format(), cfg.output().compression(),
+                                baseName, cfg.output().partitions(), List.of());
+                        // §11.3 — routed rows live in their own relation, so their counts are NOT in
+                        // __enriched's GROUP BY; count routedTable here, while it is still live.
+                        if (runId != null)
+                            ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
+                                    runId, null, dest, routed,
+                                    ConsignmentOutputs.countByPartition(c, routedTable,
+                                            cfg.output().partitions())));
+                        return new DecisionRuleApplier.Result(routed, List.of());
+                    });
 
             // 4. idempotent partitioned write (no __src_id to exclude)
             List<PartitionOutput> outputs = PartitionWriter.write(
                     conn, "__enriched",
                     cfg.output().database(), cfg.output().format(), cfg.output().compression(),
                     baseName, cfg.output().partitions(), List.of());
+            // §11.3 slice 2 — register the main write's files before the routed ones are merged in below (those
+            // registered themselves, from their own relation). There is no lineage matrix on this path, so the
+            // per-file count comes from a GROUP BY over the relation just written. `runId` is the unit of work
+            // for a recompute; the run_id column stays null until §13's Run model gives it a distinct identity.
+            if (runId != null)
+                ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
+                        runId, null, cfg.name(), outputs,
+                        ConsignmentOutputs.countByPartition(conn, "__enriched", cfg.output().partitions())));
+
             if (!applied.outputs().isEmpty()) {
                 List<PartitionOutput> all = new ArrayList<>(applied.outputs());
                 all.addAll(outputs);

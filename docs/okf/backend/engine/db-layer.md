@@ -251,6 +251,22 @@ for a file's *existence*; this table is authoritative for its *state*.** The sto
 `ServiceStores` degrades a failed open to `null`, so a store that can legitimately be absent must never be
 the only record that a file exists — never read a missing row as proof of a missing file.
 
+**Who writes it (slice 2, 2026-08-04).** Three paths, reached through `ConsignmentOutputStores` — a per-space
+ambient registry (the `AcquisitionLedgers` idiom, needed because the write paths are `static`), whose `record()`
+no-ops when the store is absent so no call site branches on default-off:
+
+| Path | Hook | Where `row_count` comes from |
+|---|---|---|
+| Ingest (+ routed rules, multi-destination fan-out) | `BatchProcessor.finalizeSource`, **after** the manifest write | `LineageCollector`'s matrix, summed per output file |
+| Enrichment | `EnrichmentEngine.runResult` (routed files register from their own relation) | `ConsignmentOutputs.countByPartition` |
+| Pipeline sinks | `PartitionSinkWriter.write` | `ConsignmentOutputs.countByPartition` (replaced its old whole-table `COUNT(*)`) |
+
+`row_count` is never a field copy — `PartitionWriter.reveal()` supplies only `(partition, outputFile, bytes)`,
+because a partitioned `COPY` reports no per-file count back. **`record_day` is currently derived from the
+partition key's `year`/`month`/`day` segments and is `null` for any other scheme** — a write-time approximation
+that plan §10.1's pinned-timezone event-time-at-load must replace, not fall back to. `run_id` is `null`
+everywhere: no path yet has a Run identity distinct from its unit of work.
+
 `row_count` is not a copy of anything: `PartitionOutput` carries only `(partition, outputFile, bytes)`, and a
 multi-file partitioned `COPY` reports no per-file count, so the value has to be summed from
 `LineageCollector`'s per-`(srcId, partition)` counts. Reads return **all** states, not just `LIVE` — hiding
