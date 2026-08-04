@@ -16,11 +16,11 @@ import java.util.regex.Pattern;
 /**
  * The {@link SummaryEmitter} that enforces §7.2 and collects what survived.
  *
- * <p><b>Durable summary storage is deliberately NOT here.</b> §7.3's partition-summary tier and §7.4's rollup
- * cache are still design, so inventing a storage format now would pin the shape §7.3 is supposed to decide.
- * What this class does is the part §14.3 actually asked for — refuse a non-composable summary at the seam — and
- * hold the validated rows so the adapter can report them. When §7.3 lands it gains a sink; the guardrail and its
- * tests do not change.
+ * <p><b>Storage lives in {@link SummaryWriter}, not here.</b> This class validates and holds; §7.3's writer turns
+ * {@link #emitted()} into one Parquet file per (Consignment × record-day) and the adapter registers them. Keeping
+ * the two apart is what let the guardrail ship and be proved red before any storage format existed — and the
+ * guardrail's tests did not change when the sink arrived. §7.4's rollup cache is still design, deliberately: it
+ * is a cache that may be deleted entirely without data loss, so nothing depends on it existing.
  */
 @PublicApi(since = "5.0.0")
 public final class GuardedSummaryEmitter implements SummaryEmitter {

@@ -134,9 +134,13 @@ class ConsignmentProcessJobTypeTest {
     }
 
     private static Job job(ConsignmentProcessor processor) {
+        return job(processor, null);
+    }
+
+    private static Job job(ConsignmentProcessor processor, String dataDir) {
         AtomicReference<ConsignmentProcessor> ref = new AtomicReference<>(processor);
         return new ConsignmentProcessJobType(
-                id -> (processor != null && id.equals(processor.id())) ? ref.get() : null)
+                id -> (processor != null && id.equals(processor.id())) ? ref.get() : null, dataDir)
                 .create(new JobConfig("count_job", ConsignmentProcessJobType.TYPE_ID, null, null,
                         true, false, Map.of(), null, null));
     }
@@ -256,6 +260,74 @@ class ConsignmentProcessJobTypeTest {
         assertEquals(List.of(), processor.seen.read().relations(), "nothing readable without the registry");
         assertTrue(ctx.warnings.stream().anyMatch(w -> w.contains("registry is disabled")),
                 "expected a disabled-registry warning, got " + ctx.warnings);
+    }
+
+    // ── §7.3: the emitted summaries actually land ────────────────────────────────
+
+    /** A processor that summarises at a record-day grain, so the §7.3 partitioned path is exercised. */
+    private static final class DailyCounter implements ConsignmentProcessor {
+        @Override public String id() { return "daily-counter"; }
+
+        @Override
+        public ProcessorResult process(ProcessorContext ctx) {
+            ctx.summaries().emit(new SummaryRow("cdr", Map.of(SummaryWriter.RECORD_DAY, "2026-07-01"),
+                    List.of(Measure.additive(SummaryEmitter.COUNT, 3))));
+            return ProcessorResult.ok("summarised");
+        }
+    }
+
+    @Test
+    void persistsEmittedSummariesAndRegistersThem(@TempDir Path dir) throws Exception {
+        Path f = writeParquet(dir.resolve("detail"), 3);
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(List.of(out(f, 3)));
+            ConsignmentOutputStores.use(store);
+
+            JobResult result = job(new DailyCounter(), data.toString())
+                    .run(new FakeJobContext(params("c1", "daily-counter"), false));
+            assertTrue(result.success(), result.message());
+
+            Path expected = data.resolve("_summaries").resolve("cdr").resolve("record_day=2026-07-01")
+                    .resolve("c1_summary_out.parquet");
+            assertTrue(Files.exists(expected), "expected a summary file at " + expected);
+
+            List<ConsignmentOutput> summaries = store.outputs("c1").stream()
+                    .filter(o -> "cdr__summary".equals(o.tableName())).toList();
+            assertEquals(1, summaries.size(), "the summary file is registered (§11.3)");
+            assertEquals(1L, summaries.get(0).rows(), "one summary row was written");
+            assertEquals("2026-07-01", summaries.get(0).recordDay());
+        }
+    }
+
+    /** Dry run must validate and report but never write — a dry run that leaves files is not a dry run. */
+    @Test
+    void writesNoSummaryFilesOnADryRun(@TempDir Path dir) throws Exception {
+        Path data = dir.resolve("data");
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+
+            job(new DailyCounter(), data.toString())
+                    .run(new FakeJobContext(params("c1", "daily-counter"), true));
+
+            assertFalse(Files.exists(data.resolve("_summaries")), "nothing may be written on a dry run");
+            assertTrue(store.outputs("c1").isEmpty(), "and nothing registered");
+        }
+    }
+
+    /** No data root ⇒ §7.3 storage is off. The guardrail still ran, so say so rather than failing silently. */
+    @Test
+    void warnsWhenSummariesWereGuardedButCannotBeStored() throws Exception {
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+
+            FakeJobContext ctx = new FakeJobContext(params("c1", "daily-counter"), false);
+            JobResult result = job(new DailyCounter(), null).run(ctx);
+
+            assertTrue(result.success(), result.message());
+            assertTrue(ctx.warnings.stream().anyMatch(w -> w.contains("not stored")),
+                    "expected a not-stored warning, got " + ctx.warnings);
+        }
     }
 
     /** The legacy no-arg entry point cannot carry parameters, so it must refuse rather than half-run. */

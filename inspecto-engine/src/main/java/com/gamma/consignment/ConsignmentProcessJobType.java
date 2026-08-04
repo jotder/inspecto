@@ -44,15 +44,34 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
     static final String P_PROCESSOR = "processor";
 
     private final Function<String, ConsignmentProcessor> lookup;
+    private final String dataDir;
 
-    /** Production: processors are discovered by {@link ServiceLoader}. */
+    /** Production: processors are discovered by {@link ServiceLoader}; summaries land under {@code dataDir}. */
+    public ConsignmentProcessJobType(String dataDir) {
+        this(ConsignmentProcessJobType::fromServiceLoader, dataDir);
+    }
+
+    /**
+     * No data root ⇒ §7.3 summary persistence is off, and the §7.2 guardrail still runs. Kept so an embedder
+     * that only wants the guarded-emit behaviour need not invent a directory.
+     */
     public ConsignmentProcessJobType() {
-        this(ConsignmentProcessJobType::fromServiceLoader);
+        this(ConsignmentProcessJobType::fromServiceLoader, null);
     }
 
     /** Test/embedder seam: resolve a processor id without going through {@code META-INF/services}. */
     ConsignmentProcessJobType(Function<String, ConsignmentProcessor> lookup) {
+        this(lookup, null);
+    }
+
+    ConsignmentProcessJobType(Function<String, ConsignmentProcessor> lookup, String dataDir) {
         this.lookup = lookup;
+        this.dataDir = dataDir;
+    }
+
+    /** The §7.3 summary tree: its own root, so {@code compact} can give it its own {@code min_age_days}. */
+    static String summariesRoot(String dataDir) {
+        return java.nio.file.Path.of(dataDir, "_summaries").toString();
     }
 
     @Override
@@ -71,7 +90,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
 
     @Override
     public Job create(JobConfig config) {
-        return new ProcessJob(config.name(), lookup);
+        return new ProcessJob(config.name(), lookup, dataDir);
     }
 
     /** The first registered processor whose {@link ConsignmentProcessor#id()} matches, or {@code null}. */
@@ -88,10 +107,12 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
 
         private final String name;
         private final Function<String, ConsignmentProcessor> lookup;
+        private final String dataDir;
 
-        ProcessJob(String name, Function<String, ConsignmentProcessor> lookup) {
+        ProcessJob(String name, Function<String, ConsignmentProcessor> lookup, String dataDir) {
             this.name = name;
             this.lookup = lookup;
+            this.dataDir = dataDir;
         }
 
         @Override public String name() { return name; }
@@ -138,7 +159,41 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
 
                 if (result == null)
                     return JobResult.failed("processor '" + processorId + "' returned no result", ms(t0));
+
+                persistSummaries(ctx, consignmentId, summaries.emitted());
                 return new JobResult(result.status(), result.message(), ms(t0));
+            }
+        }
+
+        /**
+         * §7.3: write the validated summary rows, then register the files.
+         *
+         * <p><b>Ordering matches §11.3's rule</b> — the registry row is written only after the Parquet file is
+         * revealed, so a crash between them loses an index entry and never a claim that data exists.
+         *
+         * <p><b>A summary-write failure fails the Run</b>, unlike the best-effort registry write: the processor's
+         * numbers are its output, so losing them silently would make a green Run a lie. It is deliberately the
+         * opposite trade-off from {@code record()}, where the data had already landed.
+         */
+        private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows)
+                throws Exception {
+            if (rows.isEmpty()) return;
+            if (dataDir == null) {
+                ctx.log().warn("§7.3 summary persistence is off (no data root) — " + rows.size()
+                        + " validated summary row(s) were guarded but not stored", "consignment_id", consignmentId);
+                return;
+            }
+            if (ctx.dryRun()) {
+                ctx.log().info("dry run — " + rows.size() + " summary row(s) validated, nothing written",
+                        "consignment_id", consignmentId);
+                return;
+            }
+            try (java.sql.Connection scratch = com.gamma.util.JdbcDrivers.connect("jdbc:duckdb:")) {
+                List<ConsignmentOutput> written =
+                        SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, rows);
+                ConsignmentOutputStores.record(written);
+                ctx.log().info("wrote " + written.size() + " summary file(s) from " + rows.size() + " row(s)",
+                        "consignment_id", consignmentId);
             }
         }
 

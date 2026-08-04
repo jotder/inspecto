@@ -7,13 +7,16 @@ This began as the record of a design conversation, so the bulk below is still de
 |---|---|
 | §11.3 `consignment_outputs` | **COMPLETE — slices 1, 2, 3 + state mutators, all BUILT + VERIFIED.** Default-off store with production callers on all three write paths and real per-file `row_count`; `supersede`/`markCompactedAway` wired to `ReprocessCommand` + `PartitionCompactor`; the `batch_id` → `consignment_id` rename done for the ledgers + manifest (DDL columns, `__batch_id` and the `.toon` config key deliberately deferred) |
 | §14 `ProcessorContext` | **BUILT + VERIFIED (all of §14.4)** — `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` `JobTypeProvider` adapter, `ConsignmentReader`, and `SummaryEmitter`'s §7.2 guardrails. As-built in [`okf/backend/control-plane/jobs.md`](../okf/backend/control-plane/jobs.md) |
-| Everything else (§2, §4–§10, §11.4, §12, §13) | design only, nothing implemented |
+| §7.2 + §7.3 summary tier | **BUILT + VERIFIED** — `GuardedSummaryEmitter` guards composability, `SummaryWriter` persists one Parquet file per (Consignment × record-day) with a `_measures.csv` composability sidecar, registered in the §11.3 registry under `<target>__summary`. **§7.4's rollup cache deliberately not built** |
+| Everything else (§2, §4–§6, §8–§10, §11.4, §12, §13) | design only, nothing implemented |
 
-**Next: §11.3 and §14 are both closed, so what remains is all design.** §7.3's summary storage is the one item with
-code already waiting on it — `SummaryEmitter` guards `SummaryRow`s today but has nowhere to put them. Three
-`batch_id` renames were deliberately deferred out of slice 3 and belong on the backlog, not in this section: the
-`DbProvenanceStore`/`DbStatusStore` **DDL columns** (needing `ALTER TABLE` migrations), `__batch_id` (a data-plane
-column, where accept-both-on-read is impossible), and `batch_id` as a **`.toon` config key**.
+**Next: §11.3, §14 and the §7.2/§7.3 summary tier are all closed — nothing in the plan has code waiting on it any
+more.** What remains is design, and the next piece needs a decision rather than an implementation: §8's
+end-of-period pass (which §7.5 defers non-additive measures to) is the only remaining dependency of anything
+built. Open items deliberately carried to `docs/BACKLOG.md` §4 rather than tracked here: §7.4's rollup cache, the
+three deferred `batch_id` renames (the `DbProvenanceStore`/`DbStatusStore` **DDL columns**, `__batch_id` where
+accept-both-on-read is impossible, and the **`.toon` config key**), and §7.5's histogram-vs-sketch question —
+whose "DuckDB `approx_quantile` exposes no mergeable state" premise is still **unverified**.
 
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time
@@ -335,6 +338,49 @@ horizon. Fan-out stays low in practice — most Consignments touch today plus a 
 
 Note this **supersedes an earlier suggestion in the conversation** to keep summaries flat with
 `partition_key` as a column; the multi-day span makes day-partitioning strictly better.
+
+#### AS BUILT 2026-08-04 — `SummaryWriter`
+
+`GuardedSummaryEmitter` validated and held rows; `SummaryWriter` now turns them into
+`<dataDir>/_summaries/<target>/record_day=<d>/<consignmentId>_summary_out.parquet`, and
+`ConsignmentProcessJobType` registers the files in the §11.3 registry after they are revealed (same ordering rule
+as slice 2: the index never precedes the data). A separate root is what gives §7.3's "its own compaction horizon"
+somewhere to point — `compact` can target `_summaries` with a different `min_age_days`.
+
+**It reuses `PartitionWriter` rather than issuing `COPY … PARTITION_BY` directly.** DuckDB names partition files
+`data_0.parquet`, which would **collide between Consignments** and turn §5.1's append-only guarantee into an
+overwrite; `PartitionWriter` stages and reveals each file under a per-Consignment name. Asserted directly — two
+Consignments writing the same day leave two files.
+
+**(m) §7.2's composability had to become a persisted artifact, not just a runtime check.** The guardrail refuses a
+mislabelled measure at emit time, but nothing stopped a *reader* summing a stored `duration_avg` column. Each
+target therefore carries a `_measures.csv` sidecar (`measure,composability`), **merged** across Consignments
+because it describes the target rather than one run — a read-modify-write that is legitimate here precisely
+because §5.2 governs the append-only *data* path and this is derived metadata, rebuildable from the Parquet
+schemas. Chosen over a name convention (bakes policy into identifiers) and over a registry table (the store is
+default-off, which would make summaries unreadable-by-contract in the default deployment).
+
+**(n) The registry `table_name` needs a `__summary` suffix, and it is load-bearing.**
+`GuardedSummaryEmitter.reconcile` sums the registry's detail `row_count` **by table name**, so registering a
+summary under the target's own name would inflate the detail total and silently break §7.2's reconciliation — the
+very check these rows support. The test asserts the consequence (a reconcile that still balances), not just the
+string.
+
+**(o) Target and measure names are untrusted input that becomes a directory name**, since they arrive from
+third-party processor code. They are validated against `[A-Za-z_][A-Za-z0-9_]{0,127}` and **refused** rather than
+escaped — the path-jail rule applied at the seam where such names enter. `../escape`, `a/b` and a quote-injection
+measure name are all asserted refused.
+
+⚠ **Unpartitioned fallback (operator call, against advice).** When a target's rows carry no `record_day`, its
+summary is written as a **single flat file** instead of being refused. This section explicitly *supersedes* the
+flat layout — "flat summary directories mean 'give me day D' globs everything" — so the fallback reintroduces the
+read pattern §7.3 exists to fix, silently, for any target whose author omits the key. A target with a *mixed* set
+is written **wholly flat** (with a warning) rather than split across two layouts, since neither layout's reader
+would then find all of it. Prefer emitting `record_day` on every row.
+
+**Deliberately still absent: §7.4's rollup cache.** It is a cache that can be deleted entirely without data loss,
+so nothing depends on it existing, and read-time aggregation over partials has not yet been shown to be too slow.
+Building it now would add the one mutable-looking thing in the system ahead of evidence it is needed.
 
 ### 7.4 Optional rollup tier, treated as a cache
 

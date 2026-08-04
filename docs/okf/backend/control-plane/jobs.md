@@ -269,7 +269,8 @@ before author code executes, because the parameter is `required`.
 
 ### `ProcessorContext` — what an author gets
 
-`consignmentId()` · `outputs()` (the §11.3 registry) · `read()` · `summaries()` · `log()` · `signals()` ·
+`consignmentId()` · `outputs()` (the §11.3 registry) · `read()` · `summaries()` (guarded **and** persisted, see
+below) · `log()` · `signals()` ·
 `dryRun()`. `log`/`signals`/`dryRun` are **delegated member-by-member rather than exposing `JobContext`**: a
 `job()` accessor would be one method instead of three, but it would leak the whole Job surface into a contract
 every third-party processor binds to. `ArtifactRecorder` is deliberately *not* delegated — beside
@@ -297,7 +298,7 @@ needs the actual rows, and copying a whole Consignment into scratch is the cost 
 relations stay lazy views and `SqlGuard` keeps the blocked surface out. **This is invariant protection, not a
 defence against hostile in-process code.**
 
-### Summaries are guarded, not written
+### Summaries are guarded, then written
 
 [`SummaryEmitter`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/SummaryEmitter.java) enforces
 §7.2 at the seam, because non-composable measures produce *quietly* wrong numbers: `count` is mandatory on every
@@ -307,6 +308,29 @@ undeclared is refused, never assumed. A measure whose name says it is not additi
 refusal costs one repair round. `reconcile(outputs)` gives §7.2's conservation check for free — summed `count`
 against the registry's detail rows — **reported, never thrown**, since summarising a filtered subset is legal.
 
-⚠ **Durable summary storage is NOT here.** §7.3's partition-summary tier and §7.4's rollup cache are still
-design; inventing a format now would pin the shape §7.3 must decide. The emitter validates and holds the rows.
-When §7.3 lands it gains a sink and neither the guardrail nor its tests change.
+**Storage is §7.3's `SummaryWriter`** (shipped 2026-08-04), kept separate from the guardrail — which is why the
+guardrail could ship and be proved red before any format existed, and why its tests did not change when the sink
+arrived. Validated rows become
+`<dataDir>/_summaries/<target>/record_day=<d>/<consignmentId>_summary_out.parquet`, registered in the §11.3
+registry **after** the file is revealed, under `table_name = "<target>__summary"`.
+
+Four things to know before writing a processor that emits summaries:
+
+- **Emit `record_day` on every row.** Without it the target is written as one **flat** file, which is the
+  glob-everything read §7.3 exists to eliminate. A *mixed* target is written wholly flat (with a warning) rather
+  than split across two layouts. This fallback is a deliberate operator call, taken against advice.
+- **A `_measures.csv` sidecar beside each target carries composability to read time**, merged across
+  Consignments, so a reader can tell it must not sum a `COMPUTED_FROM_DETAIL` column. Guarding emit alone never
+  stopped a reader summing an average.
+- **Target and measure names must match `[A-Za-z_][A-Za-z0-9_]{0,127}`** — they become SQL identifiers *and a
+  directory name*, so anything else is refused rather than escaped, and a name cannot be both a grain key and a
+  measure.
+- **A summary-write failure fails the Run**, unlike the best-effort registry write: the numbers are the
+  processor's output, so losing them silently would make a green Run a lie. Dry runs validate and write nothing.
+
+⚠ **§7.4's rollup cache is still deliberately absent** — it is a cache deletable without data loss, so nothing
+depends on it, and read-time aggregation has not been shown too slow. Building it would add the one
+mutable-looking thing in the system ahead of evidence.
+
+⚠ **No data root ⇒ summary persistence is off** (the no-arg `ConsignmentProcessJobType`); the guardrail still runs
+and the Run warns that validated rows were not stored.

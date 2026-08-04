@@ -267,6 +267,12 @@ no-ops when the store is absent so no call site branches on default-off:
 | Ingest (+ routed rules, multi-destination fan-out) | `BatchProcessor.finalizeSource`, **after** the manifest write | `LineageCollector`'s matrix, summed per output file |
 | Enrichment | `EnrichmentEngine.runResult` (routed files register from their own relation) | `ConsignmentOutputs.countByPartition` |
 | Pipeline sinks | `PartitionSinkWriter.write` | `ConsignmentOutputs.countByPartition` (replaced its old whole-table `COUNT(*)`) |
+| §7.3 summaries | `ConsignmentProcessJobType` after `SummaryWriter` reveals the files | the number of summary rows in that partition |
+
+⚠ **Summary rows use `table_name = "<target>__summary"`, and the suffix is load-bearing.**
+`GuardedSummaryEmitter.reconcile` sums detail `row_count` **by table name**, so registering a summary under the
+target's own name would inflate the detail total and silently break §7.2's reconciliation. Filter on the suffix to
+separate the derived summary tier (`<dataDir>/_summaries/<target>/record_day=…`) from detail outputs.
 
 `row_count` is never a field copy — `PartitionWriter.reveal()` supplies only `(partition, outputFile, bytes)`,
 because a partitioned `COPY` reports no per-file count back. **`record_day` is currently derived from the
