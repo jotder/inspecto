@@ -154,7 +154,10 @@ src/app/
   catalog — and `configuredIngester` is a SETTER because inputs are not bound when the constructor runs.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
   `.toon` written per segment before the block that references them, which is a write path this
-  component deliberately does not have.
+  component deliberately does not have. ⚠ **A host must never read a shared component through
+  `@ViewChild` in its TEMPLATE** — the query is unresolved on first render, and content projected INTO
+  that component evaluates in the host's context, so it reads too early. Take an `@Output` and mirror
+  it into a host signal (`(pluginChange)`/`(previewed)` exist for exactly this).
 - **Editing a pipeline graph → the canonical `*_pipeline.toon` round-trip** (`modules/admin/pipelines/`,
   W5 2026-08-01). The Pipelines editor is an editor **over** the canonical config, not a second model.
   Load with `PipelinesService.pipelineGraphRaw(name)` (`GET /pipelines/{name}/graph/raw` — the lifted,

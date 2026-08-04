@@ -4,7 +4,9 @@
 > surfaces were *already* one feature. **This one is the opposite: they share almost nothing, and the
 > gap between them contains two live defects.** Read §1 before scoping.
 
-Status: PLANNED 2026-08-04 · not started.
+Status: **IN FLIGHT** 2026-08-04 · slices 1–5 SHIPPED (5 commits on `master`, unpushed) ·
+**slice 6 + close-out remain**. §1 is the original grounding, kept as written — where implementation
+refuted it, the slice below says so.
 
 ## 0. Decisions (user, 2026-08-04)
 
@@ -175,26 +177,6 @@ normalizes to) — now a setter that re-attempts the rehydrate; and the hidden f
 (axe critical).
 
 Verified: `ng build` clean, UI **2055 passed / 310 files**, `lint:tokens` clean.
-
-### Slice 4 (original plan text, for reference)
-`inspecto/grammar/grammar-editor.component.ts`, standalone/OnPush/signals, **no write path** (hosts
-persist — the rule that made `<inspecto-collector-config>` and `<inspecto-enrichment-editor>` safe).
-
-Absorbs, per decision 2: type catalog (built-ins ∪ served, **with onboarding's degrade-on-error**,
-not the dialog's empty dropdown) · schema-form property sheet · sample + sniff suggestion ·
-Test/preview (**both** routes — `/config/preview/parsing` for built-ins, `/parsers/{id}/preview` for
-plugins) · table/tree result renderer · the **fixed-width field-spec editor** · the **segments editor**
-· the unserved-plugin honesty banner.
-
-Hosts keep: onboarding's `<app-onboarding-sample-panel>` state coupling, stage-nav dirty registry and
-`canAuthorWorkbench()` gate; the dialog's shell, fullscreen/maximize chrome, choose-or-create dropdown,
-two-step name save and `ref.close` node binding.
-
-API mirrors the collector precedent: inputs `specs`/`initial`/`sample`; output `submitted`; methods
-`validate()/isDirty()/value()/markPristine()`. Spec incl. axe.
-⚠ Reassigning `specs` rebuilds every control from its default — carry values across a type switch
-(the exact bug found in collector slice 4); pin it with a regression test.
-- Verify: UI `test:ci`, `lint:tokens`, build.
 
 ### Slice 5 — the Parsing stage adopts it — **SHIPPED**
 Pane is now a thin host: **727 → 339 lines** (ts+html). It keeps only what is genuinely Onboarding's —
