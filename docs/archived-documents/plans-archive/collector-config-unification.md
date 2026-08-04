@@ -1,6 +1,21 @@
 # Unify collector configuration: onboarding Collection stage ↔ pipeline acquisition node
 
-> After approval, persist this plan to `docs/superpower/collector-config-unification.md` (repo rule: plans live in-repo) before slice 1.
+> **SHIPPED and ARCHIVED 2026-08-04 — provenance only, not current.** All slices landed
+> (`5951a06b` · `438f8c09` · `9eba0e9a` · `61dc8280` · `9ff462e6` · `60193cd4`).
+> As-built knowledge: [`docs/okf/frontend/features/collector-config.md`](../okf/frontend/features/collector-config.md).
+> Open items moved to [`docs/BACKLOG.md`](../BACKLOG.md) §4 ("Collector config").
+>
+> Two departures from the plan as written, both deliberate:
+> - **Slice 1's dedup split was superseded by slice 1b** (operator decision, grounded mid-flight):
+>   `transform.dedup.fingerprint` had no runtime, so it was removed rather than fed, and both
+>   surfaces render the whole table. The shared-table move stands; only the subset derivations went.
+> - **No `/design` gallery entry.** The gallery holds design-system primitives; this is a domain
+>   composite that injects `ConnectionsService`, exactly like `<inspecto-enrichment-editor>`, which
+>   is likewise absent. Recorded in BACKLOG so it is a decision, not an oversight.
+>
+> One bug was found in the extraction and fixed with the shared component: reassigning
+> `<inspecto-schema-form>`'s `specs` rebuilds every control from its declared default, so the mode
+> toggle silently discarded everything typed so far.
 
 ## Context
 

@@ -153,9 +153,12 @@ A connector's own options (`query`, `watermark_column`, `topic`, `bootstrap_serv
 ConnectionProfile's `options:` map, read by each connector — they are **not** pipeline `collector:` keys.
 
 The generic **node-config dialog** (non-parser nodes) is schema-form-driven from the per-type tiered
-`node-attributes.ts`, keyed by those engine types. `acquisition` **reuses the shared
-`COLLECTOR_ATTRIBUTES`** (`inspecto/component-model/`) — the same table Onboarding's Collection stage
-uses, because two hand-written tables for one `collector:` block is precisely how this feature drifted into
+`node-attributes.ts`, keyed by those engine types. `acquisition` is the exception: since 2026-08-04 it
+renders the shared **`<inspecto-collector-config>`** — the same component, over the same shared
+`COLLECTOR_ATTRIBUTES` (`inspecto/component-model/`), that Onboarding's Collection stage renders, so it
+gains the mode toggle, Test connection and create-a-Connection affordances and writes the DERIVED
+`collector.connector` ([Collector configuration](collector-config.md)). Two hand-written tables for one
+`collector:` block is precisely how this feature drifted into
 keys the engine never read (`recursive` as a boolean, `min_age_seconds`; the real ones are
 `recursive_depth` and a nested `stability.window`). Sinks are specced only for the `output:` keys the
 backend reads (`format`, `compression`); the remaining `transform.*` types are **deliberately unspecced**
@@ -319,19 +322,23 @@ adopters reach the `collector:` block differently, and a key can be real for one
 | Key | Onboarding (authors `collector:` directly) | Acquisition **node** (flat lower) | Resolution (2026-08-04) |
 |---|---|---|---|
 | `connection` | real | not a cfg key — rides on `use: connection/<name>` (**D3**) | the attribute **writes the binding**: seeded from `use` on load, written back to `use` on save |
-| `duplicate__mode`, `duplicate__on_change` | real | the `duplicate:` block belongs to the fingerprint-dedup node (`NOT_ACQ_OWNED`, overlaid at `PipelineEditable.java:255`) (**D9**) | declared on `transform.dedup.fingerprint`; acquisition takes a **derivation** of the shared table without them |
+| `duplicate__mode`, `duplicate__on_change` | real | ~~belongs to the fingerprint-dedup node~~ (**D9**) | **superseded 2026-08-04**: the node was removed and these are real on acquisition too — see below |
 
 ⛔ **Neither was a dead key, and pruning the shared table would have been the wrong fix** — it would break the
 adopter for which the key is real. This shape has now appeared three times (D3, D9, and the near-miss on
 `key_columns`), so treat "declared but unreachable" as a *per-adopter* question from the start. The fix is always
 one of: **derive** the adopter's table (never fork it), or move the key to the node the engine reads it from.
 
-Two traps worth carrying forward from closing these:
+⚠ **D9's resolution was the wrong one of the two, and got reversed** (2026-08-04). The derivation was
+built before anyone checked where dedup *executes*: `ledgerFilter` reads `collector.duplicate` inside the
+`CollectorProcessor` poll cycle, so `transform.dedup.fingerprint` had no runtime — the second fix (move the
+key to the node the engine reads it from) was the right one, and the node was removed rather than fed. Both
+surfaces now render the whole shared table. Full account: [Collector configuration](collector-config.md).
+The lesson is the cheaper one: **ask where the engine reads the key before choosing between derive and move.**
 
-- **A Connection is not a `ComponentType`.** The obvious fix for D3 — `bindKindFor('SOURCE') → 'connection'` —
+One trap worth carrying forward from closing D3:
+
+- **A Connection is not a `ComponentType`.** The obvious fix — `bindKindFor('SOURCE') → 'connection'` —
   produces a picker that calls `GET /components/connection`, a route that does not exist; connections have their
-  own service. `bindKind` is only for the component registry (`grammar`/`transform`/`sink`).
-- **`transform.dedup.fingerprint` is synthesised only when the policy is already content-based**
-  (`PipelineLift.java:70`). So configuring the node covers editing and turning dedup *off*, while turning it *on*
-  means **adding** the node from the palette — which works because the type is in `LOWERABLE`, and which reads
-  more honestly anyway: dedup is a step in the graph, not a checkbox on the collector.
+  own service. `bindKind` is only for the component registry (`grammar`/`transform`/`sink`). The picker lives in
+  the shared `<inspecto-collector-config>` instead.

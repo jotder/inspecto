@@ -232,7 +232,10 @@ save time (`local`, or the picked Connection's own `ConnectionProfile.connector`
 next to the picker). This is not cosmetic: `CollectorConnectors.forConfig` dispatches on
 `collector.connector` and hands the profile named by `collector.connection` to *that* factory
 **without checking the two agree** — `connector: sftp` plus an Azure Connection silently gives the
-SFTP factory an Azure profile. Rules encoded in `collection-pane.component.ts`:
+SFTP factory an Azure profile. Since 2026-08-04 the whole surface is the shared
+`<inspecto-collector-config>` — the pane is a thin host that only persists — so the Pipelines
+`acquisition` node dialog behaves identically; see [Collector configuration](collector-config.md).
+Rules encoded there:
 - Connection mode requires a **saved** profile (unknown ids are refused at save — the whole point
   is that the id resolves to a connector); ＋New connection opens the shared `ConnectionFormDialog`.
 - A hand-authored TOON with a non-local connector and no Connection is **grandfathered**: the pane
@@ -243,7 +246,11 @@ control drops out of the schema form's value and the key would vanish from the w
 
 ## Seams & gotchas
 
-Backend seams: [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md). The
+Backend seams: [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md). Every
+stage saves its block through **`POST /config/patch`** (2026-08-04), which deep-merges server-side
+instead of replacing the file after a client-side merge — that replace was a stale-read clobber, and
+one route fixed it for every stage. ⚠ A cleared key must travel as `null`, not `undefined`
+(`nullifyDeletes`), or JSON drops it and the merge keeps the old value. The
 create dialog silently derives the full dir convention (`status_dir` et al — without it the Runs
 history stays empty) and `processing.duplicate_check` (the collector-level `duplicate:` block is a
 no-op on the legacy local poll path — without markers the same file re-ingests every cycle).

@@ -24,6 +24,7 @@ documented as concepts.
 
 * [Connections](connections.md) - schema-driven connection workbench (Database/FTP/FTPS/Local/SFTP) + SSH tunnel/proxy.
 * [Collectors](collectors.md) - configured collection tasks.
+* [Collector configuration](collector-config.md) - the ONE surface + store behind both collector-authoring screens.
 * [Pipelines](pipelines.md) - the authored-Pipeline (DAG) editor + parser config.
 * Expectations · Decision rules *(not yet documented)*.
 

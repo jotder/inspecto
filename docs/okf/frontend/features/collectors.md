@@ -9,6 +9,10 @@ timestamp: 2026-08-04T00:00:00Z
 
 # Collectors
 
+> Configuring what a collector *does* is a different concept: see
+> [Collector configuration](collector-config.md) for the one shared surface, spec table and write
+> route behind the Onboarding Collection stage and the Pipelines `acquisition` node.
+
 Route `/collectors` (Workbench nav group). Lists configured collection tasks in a **standard**
 [data-table](../design-system/data-table.md) (`autoHeight`). Backed by `CollectorsService`.
 
