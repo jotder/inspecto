@@ -1,14 +1,7 @@
 <div class="flex flex-col gap-4">
-    @if (unservedPlugin(); as fqcn) {
-        <inspecto-alert class="max-w-3xl" variant="warning" icon="heroicons_outline:puzzle-piece" title="Plugin parser not available here">
-            This pipeline parses through <code>{{ fqcn }}</code>, which no parser on this server
-            provides — its plugin jar is not deployed. The options below are for the built-in parser
-            shown, so saving would replace this pipeline's plugin parsing. Deploy the plugin, or edit
-            the pipeline TOON directly.
-        </inspecto-alert>
-    }
-
-    <!-- Choose a file and view it FIRST — the sample this stage configures against. -->
+    <!-- Choose a file and view it FIRST — the sample this stage configures against. The strip is
+         cross-stage session state, so the shared editor runs in `sampleMode="host"` and never draws
+         its own sample box here. -->
     <app-onboarding-sample-panel />
 
     <div class="flex max-w-3xl flex-col gap-4">
@@ -18,196 +11,51 @@
             engine uses.
         </p>
 
-        <div class="flex flex-wrap items-center gap-3">
-            <mat-button-toggle-group
-                [value]="activeType()"
-                (change)="setType($event.value)"
-                aria-label="File type"
-            >
-                @for (f of frontends; track f.id) {
-                    <mat-button-toggle [value]="f.id" [matTooltip]="f.hint">{{ f.label }}</mat-button-toggle>
-                }
-                <!-- Served plugin parsers (XML today; ASN.1 / vendor formats appear when deployed) -->
-                @for (p of pluginTypes(); track p.id) {
-                    <mat-button-toggle [value]="p.id" [matTooltip]="typeHint(p.label)">
-                        {{ typeName(p.label) }}
-                    </mat-button-toggle>
-                }
-            </mat-button-toggle-group>
-            @if (suggestion(); as sg) {
-                <button
-                    type="button"
-                    (click)="applySuggestion()"
-                    matTooltip="Apply the suggested file type"
-                >
-                    <inspecto-chip variant="soft" tone="primary">
-                        Looks like {{ sg.reason }} — use {{ frontendLabel(sg.frontend) }}?
-                    </inspecto-chip>
-                </button>
-            }
-        </div>
-
-        <inspecto-schema-form #sf [specs]="specs()" [initial]="initial" (submitted)="save()" />
-
-        @if (activeType() === 'fixedwidth') {
-            <div class="text-secondary text-xs font-semibold uppercase tracking-wider">Fields (name · start · length)</div>
-            <form [formGroup]="fwForm">
-                <div formArrayName="fields" class="flex flex-col gap-2">
-                    @for (g of fwFields.controls; track $index; let i = $index) {
-                        <div [formGroupName]="i" class="flex items-center gap-2">
-                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                                <mat-label>Name</mat-label>
-                                <input matInput formControlName="name" />
-                                @if (g.get('name')?.hasError('required') && g.get('name')?.touched) {
-                                    <mat-error>A field name is required.</mat-error>
-                                }
-                            </mat-form-field>
-                            <mat-form-field class="w-28" subscriptSizing="dynamic">
-                                <mat-label>Start</mat-label>
-                                <input matInput type="number" min="0" formControlName="start" />
-                            </mat-form-field>
-                            <mat-form-field class="w-28" subscriptSizing="dynamic">
-                                <mat-label>Length</mat-label>
-                                <input matInput type="number" min="1" formControlName="length" />
-                            </mat-form-field>
-                            <button
-                                mat-icon-button
-                                type="button"
-                                (click)="removeField(i)"
-                                matTooltip="Remove field"
-                                aria-label="Remove field"
-                            >
-                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:x-mark"></mat-icon>
-                            </button>
+        <inspecto-grammar-editor
+            sampleMode="host"
+            [initial]="parsingBlock"
+            [sample]="sampleText()"
+            [configuredIngester]="configuredIngester"
+            [previewFn]="previewFn"
+            (pluginChange)="plugin.set($event)"
+            (previewed)="onPreviewed($event)"
+            (submitted)="save()">
+            <!-- Segments need one schema .toon written per segment BEFORE the block referencing them —
+                 a host write path, which is why this stays projected rather than absorbed. -->
+            <div grammarExtras>
+                @if (pluginIngestable()) {
+                    @if (segmentsLoading()) {
+                        <div class="text-secondary flex items-center gap-2 text-sm">
+                            <mat-progress-spinner diameter="16" mode="indeterminate" />
+                            <span>Loading the saved segment columns…</span>
                         </div>
                     }
-                    <button mat-stroked-button type="button" class="self-start" (click)="addField()">
-                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                        <span class="ml-1">Add field</span>
-                    </button>
-                </div>
-            </form>
-        }
-
-        <div class="flex flex-wrap items-center gap-3">
-            <button
-                mat-stroked-button
-                type="button"
-                [disabled]="testing() || !state.sample()"
-                (click)="testParse()"
-                [matTooltip]="state.sample() ? 'Parse the captured sample with these settings' : 'Capture a sample first (panel above)'"
-            >
-                @if (testing()) {
-                    <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
+                    <app-onboarding-segments-editor
+                        [tree]="pluginTree()"
+                        [editable]="lens.canAuthorWorkbench()"
+                        [initial]="initialSegments()" />
                 }
-                Test parse
-            </button>
+            </div>
+        </inspecto-grammar-editor>
+
+        <!-- Shown-but-disabled without the workbench lens, matching the Collection stage: a missing
+             button reads as "this stage has no save", a disabled one as "not yours to do". -->
+        <div class="flex items-center gap-2">
             <button
                 mat-flat-button
                 color="primary"
-                [disabled]="saving() || (!!pluginDef() && !pluginIngestable()) || !lens.canAuthorWorkbench()"
-                (click)="save()"
-            >
+                type="button"
+                [disabled]="saving() || (!!plugin() && !pluginIngestable()) || !lens.canAuthorWorkbench()"
+                (click)="save()">
+                @if (saving()) { <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" /> }
                 Save parsing
             </button>
-            @if (!state.sample()) {
-                <span class="text-secondary text-sm">No sample captured yet — use the sample panel above.</span>
+            @if (plugin() && !pluginIngestable()) {
+                <span class="text-secondary text-xs">
+                    This parser previews only — loading its records to Tables needs the flatten
+                    configuration, so there is nothing to save yet.
+                </span>
             }
         </div>
-        @if (pluginDef(); as plugin) {
-            <p class="text-secondary m-0 text-sm">
-                @if (pluginIngestable()) {
-                    This parser loads into Tables via {{ plugin.ingesterClass }} — map its records
-                    onto segments below, and Save writes one schema per segment.
-                } @else {
-                    This format previews today — loading it into Tables arrives with the flatten
-                    configuration, so the draft cannot save this type yet.
-                }
-            </p>
-        }
-
-        @if (state.parseError(); as err) {
-            <inspecto-alert variant="error" title="Sample does not parse">{{ err }}</inspecto-alert>
-        }
-        @if (pluginError(); as err) {
-            <inspecto-alert variant="error" title="Sample does not parse">{{ err }}</inspecto-alert>
-        }
     </div>
-
-    <!-- Plugin parse result — full width, the served preview (table, or a record tree) -->
-    @if (pluginDef() && pluginPreview(); as p) {
-        <div class="flex flex-wrap items-center gap-3 text-sm">
-            <span class="font-semibold">Parsed sample</span>
-            @if (p.kind === 'table') {
-                <span class="text-secondary">{{ activeType() }} · {{ p.columns.length }} columns · {{ p.rowCount }} rows</span>
-                @if (p.rejectedRows > 0) {
-                    <span class="text-secondary">· {{ p.rejectedRows }} rejected</span>
-                }
-            } @else {
-                <span class="text-secondary">{{ activeType() }} · {{ p.recordCount }} records</span>
-            }
-        </div>
-        @if (p.kind === 'tree') {
-            <div class="max-h-96 overflow-auto rounded border p-2">
-                <app-parser-tree [nodes]="p.nodes" />
-            </div>
-            @if (!pluginIngestable()) {
-                <p class="text-secondary m-0 text-xs">
-                    The decoded record tree. Loading tree-shaped data into Tables needs the flatten
-                    configuration (on the backlog) — until then this preview is the authoring aid.
-                </p>
-            }
-        } @else {
-            <inspecto-data-table tier="pro" [rows]="pluginRows()" sourceName="parsed" [autoHeight]="true" exportName="parsed-sample" />
-        }
-    }
-
-    <!-- Segments — only for a plugin that can actually load (names an ingester) -->
-    @if (pluginIngestable()) {
-        @if (segmentsLoading()) {
-            <div class="flex items-center gap-2 text-sm text-secondary">
-                <mat-progress-spinner diameter="16" mode="indeterminate" />
-                <span>Loading the saved segment columns…</span>
-            </div>
-        }
-        <app-onboarding-segments-editor
-            [tree]="pluginTreeNodes()"
-            [editable]="lens.canAuthorWorkbench()"
-            [initial]="initialSegments()"
-        />
-    }
-
-    <!-- Parsed result — full width, table or (for JSON samples) a record tree -->
-    @if (!pluginDef() && state.parsePreview(); as p) {
-        <div class="flex flex-wrap items-center gap-3 text-sm">
-            <span class="font-semibold">Parsed sample</span>
-            <span class="text-secondary">{{ p.frontend }} · {{ p.columns.length }} columns · {{ p.rowCount }} rows</span>
-            @if (p.rejectedRows > 0) {
-                <span class="text-secondary">· {{ p.rejectedRows }} rejected</span>
-            }
-            @if (treeNodes()) {
-                <span class="flex-1"></span>
-                <mat-button-toggle-group
-                    [value]="resultView()"
-                    (change)="resultView.set($event.value)"
-                    aria-label="Result view"
-                >
-                    <mat-button-toggle value="table">Table</mat-button-toggle>
-                    <mat-button-toggle value="tree">Tree</mat-button-toggle>
-                </mat-button-toggle-group>
-            }
-        </div>
-        @if (resultView() === 'tree' && treeNodes(); as nodes) {
-            <div class="max-h-96 overflow-auto rounded border p-2">
-                <app-parser-tree [nodes]="nodes" />
-            </div>
-            <p class="text-secondary m-0 text-xs">
-                Your sample's record tree. The engine reads <span class="font-semibold">top-level keys</span>
-                as columns — a nested value lands as JSON text in one column (a flatten configuration
-                is on the backlog).
-            </p>
-        } @else {
-            <inspecto-data-table tier="pro" [rows]="parsedRows()" sourceName="parsed" [autoHeight]="true" exportName="parsed-sample" />
-        }
-    }
 </div>

@@ -196,9 +196,34 @@ API mirrors the collector precedent: inputs `specs`/`initial`/`sample`; output `
 (the exact bug found in collector slice 4); pin it with a regression test.
 - Verify: UI `test:ci`, `lint:tokens`, build.
 
-### Slice 5 — the Parsing stage adopts it
-Pane becomes a thin host over `state.saveBlock({parsing})`. Verify: `test:ci` + preview smoke
-(round-trip, segments still written as `_schema.toon`).
+### Slice 5 — the Parsing stage adopts it — **SHIPPED**
+Pane is now a thin host: **727 → 339 lines** (ts+html). It keeps only what is genuinely Onboarding's —
+the sample strip, the stage-nav dirty registry, the lens gate, and the two write paths.
+
+Both seams held up against a live pane, which is what this slice was for:
+- `sampleMode="host"` — the editor draws no second sample box beside the stage strip (asserted).
+- `previewFn` — a BUILT-IN test parse goes through `/config/preview/parsing` and keeps feeding
+  `state.parsePreview`/`parseError` (the Sample panel renders them and the Schema stage's `hasSource`
+  gate depends on them); a PLUGIN preview stays on the stateless route and never touches that state.
+- `[grammarExtras]` — segments still write one `_schema.toon` **before** the block referencing them
+  (pinned by asserting the call ORDER, not just the calls).
+
+⚠ A host must NOT read the editor through a `@ViewChild` **in its template** — the query is unresolved
+on first render, and here the segments editor is projected INTO the editor. Added `(pluginChange)` so
+the host mirrors what it needs into its own signals.
+
+**Regression caught by the rewritten spec:** selecting a preview-only plugin marked the stage dirty,
+raising an unsaved-changes guard the operator could never satisfy (Save is disabled for such a
+plugin). Now only an *ingestable* plugin counts as an edit. Also restored Save to
+shown-but-disabled without the workbench lens — I had hidden it, which reads as "this stage has no
+save" rather than "not yours to do", and diverges from the Collection stage.
+
+Verified: UI **2050 passed / 310 files**, `lint:tokens` + `ng build` clean, and a live smoke on the
+offline preview: typed `|`, switched Delimited→JSON→Delimited (**the value survived** — the spec-swap
+trap, proven in the browser), saved, and read the store back:
+`parsing: {delimited: {delimiter: '|', has_header: true}, frontend: 'delimited', <other frontends>: null}`
+with `collector`/`processing`/`output`/`dirs` untouched. A fresh tab shows a clean console (the stale
+`chunk-*.js` 404 in the older tab was a pre-rebuild dev-server artifact, not a defect).
 
 ### Slice 6 — the node dialog adopts it; rename to Grammar
 `GrammarEditorDialog` renders the shared component; keeps choose-or-create + the 2-step save, now

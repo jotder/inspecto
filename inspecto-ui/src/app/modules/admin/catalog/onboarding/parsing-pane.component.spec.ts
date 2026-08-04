@@ -4,7 +4,6 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, ParserDef, ParsersService, ParsingPreview } from 'app/inspecto/api';
-import { dependsOnMatches } from 'app/inspecto/component-model';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingParsingPaneComponent } from './parsing-pane.component';
@@ -14,7 +13,7 @@ const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn
 const PREVIEW: ParsingPreview = { frontend: 'delimited', columns: ['a'], rowCount: 1, rows: [{ a: '1' }], rejectedRows: 0 };
 const WRITE_OK = { type: 'pipeline', written: true, path: 'x.toon', name: 'x', bytes: 1, overwritten: false, findings: [] };
 
-/** A served catalog: the four built-ins (schemas irrelevant here) + the preview-only XML plugin. */
+/** A served catalog: a built-in (schema irrelevant here) + the preview-only XML plugin. */
 const XML_DEF: ParserDef = {
     id: 'xml', label: 'XML — XML file format', hierarchical: true, ingestable: false,
     grammarSchema: [
@@ -26,31 +25,6 @@ const CATALOG: ParserDef[] = [
     { id: 'delimited', label: 'Delimited — …', hierarchical: false, ingestable: true, grammarSchema: [] },
     XML_DEF,
 ];
-
-async function create(
-    config: Record<string, unknown>,
-    api: Partial<ConfigService> = {},
-    parsers: Partial<ParsersService> = {},
-) {
-    TestBed.configureTestingModule({
-        imports: [OnboardingParsingPaneComponent],
-        providers: [
-            provideNoopAnimations(),
-            OnboardingStateService,
-            { provide: ConfigService, useValue: { patch: vi.fn(() => of(WRITE_OK)), previewParsing: vi.fn(() => of(PREVIEW)), ...api } },
-            { provide: ParsersService, useValue: { list: vi.fn(() => of(CATALOG)), preview: vi.fn(), ...parsers } },
-            // The data-table's grid theme chains to the app shell's GAMMA_APP_CONFIG — stub it out.
-            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
-            { provide: ToastrService, useValue: TOASTR },
-        ],
-    });
-    await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
-    const state = TestBed.inject(OnboardingStateService);
-    state.config.set(config);
-    const fixture = TestBed.createComponent(OnboardingParsingPaneComponent);
-    fixture.detectChanges();
-    return { fixture, state, api: TestBed.inject(ConfigService), parsers: TestBed.inject(ParsersService) };
-}
 
 /** An ingestable plugin: `ingestable && ingesterClass` is what unlocks the segments editor. */
 const ASN1_DEF: ParserDef = {
@@ -77,6 +51,31 @@ const SAVED_SCHEMA = {
         },
     },
 };
+
+async function create(
+    config: Record<string, unknown>,
+    api: Partial<ConfigService> = {},
+    parsers: Partial<ParsersService> = {},
+) {
+    TestBed.configureTestingModule({
+        imports: [OnboardingParsingPaneComponent],
+        providers: [
+            provideNoopAnimations(),
+            OnboardingStateService,
+            { provide: ConfigService, useValue: { patch: vi.fn(() => of(WRITE_OK)), previewParsing: vi.fn(() => of(PREVIEW)), ...api } },
+            { provide: ParsersService, useValue: { list: vi.fn(() => of(CATALOG)), preview: vi.fn(), ...parsers } },
+            // The data-table's grid theme chains to the app shell's GAMMA_APP_CONFIG — stub it out.
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+            { provide: ToastrService, useValue: TOASTR },
+        ],
+    });
+    await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
+    const state = TestBed.inject(OnboardingStateService);
+    state.config.set(config);
+    const fixture = TestBed.createComponent(OnboardingParsingPaneComponent);
+    fixture.detectChanges();
+    return { fixture, state, api: TestBed.inject(ConfigService), parsers: TestBed.inject(ParsersService) };
+}
 
 describe('OnboardingParsingPaneComponent — saved segments re-hydrate', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
@@ -124,275 +123,200 @@ describe('OnboardingParsingPaneComponent — saved segments re-hydrate', () => {
     });
 });
 
+/**
+ * The pane is a thin HOST over the shared `<inspecto-grammar-editor>` (2026-08-04). The format
+ * catalog, options form, sniffing and result rendering are covered by that component's own spec —
+ * what is tested here is the WIRING and the parts Onboarding still owns: which preview route a
+ * built-in vs a plugin takes, the cross-stage state it must keep feeding, the two write paths, the
+ * dirty registry and the lens gate.
+ */
 describe('OnboardingParsingPaneComponent', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
 
-    it('initialises from the existing parsing block and normalises the frontend', async () => {
-        const { fixture } = await create({ name: 'x', parsing: { frontend: 'fixed_width', fixedwidth: { fields: [{ name: 'id', start: 0, length: 3 }] } } });
-        const c = fixture.componentInstance;
-        expect(c.frontend()).toBe('fixedwidth');
-        expect(c.fwFields.length).toBe(1);
-    });
+    it('seeds the shared editor from the existing parsing block, clean until touched', async () => {
+        const { fixture, state } = await create({
+            name: 'x',
+            parsing: { frontend: 'fixed_width', fixedwidth: { fields: [{ name: 'id', start: 0, length: 3 }] } },
+        });
+        const editor = fixture.componentInstance.grammar!;
 
-    it('adopts a saved json frontend on (re-)entering the stage, clean until touched', async () => {
-        // Re-entering the stage rebuilds the pane from the server-held draft: the saved frontend must
-        // win, and merely rendering must NOT mark the stage dirty — a spuriously dirty pane raises the
-        // rail's unsaved-changes guard and silently blocks stage navigation.
-        const { fixture, state } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'newline' } } });
-        expect(fixture.componentInstance.frontend()).toBe('json');
-        expect(fixture.componentInstance.specs().some((s) => s.key === 'json__format')).toBe(true);
+        expect(editor.frontend()).toBe('fixedwidth'); // the engine's legacy spelling normalized
+        expect(editor.fwFields.length).toBe(1);
+        // Merely rendering must NOT mark the stage dirty — that would raise the rail's unsaved-changes
+        // guard and silently block stage navigation for a config nobody touched.
         expect(state.isDirty()).toBe(false);
     });
 
-    /**
-     * W2/U-D. `json.records_path` is engine-real but was unauthorable here. It is gated on the
-     * document shape because `PipelineConfigParser.parseJson` HARD-FAILS a nested path under
-     * `format: newline` — offering it for NDJSON would author a config that cannot load.
-     */
-    it('offers the records path only for a document shape that has an enclosing document', async () => {
-        const { fixture } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'array' } } });
-        const spec = fixture.componentInstance.specs().find((s) => s.key === 'json__records_path');
-        expect(spec).toBeDefined();
-        expect(spec!.default).toBe('$');
-        // The gate itself, not just its presence: NDJSON is the one shape the engine rejects.
-        expect(dependsOnMatches(spec!.dependsOn!, { json__format: 'array' })).toBe(true);
-        expect(dependsOnMatches(spec!.dependsOn!, { json__format: 'newline' })).toBe(false);
+    it('hosts the sample capture panel itself, above the editor', async () => {
+        const { fixture } = await create({ name: 'x' });
+        const panel = fixture.nativeElement.querySelector('app-onboarding-sample-panel');
+        const editor = fixture.nativeElement.querySelector('inspecto-grammar-editor');
+
+        expect(panel).toBeTruthy();
+        // DOCUMENT_POSITION_FOLLOWING (4) ⇒ the editor comes after the sample panel.
+        expect(panel.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // …and the editor must not draw a SECOND sample box beside the stage's own strip.
+        expect(editor.querySelector('textarea')).toBeNull();
     });
 
-    /** The flat `__` key is worthless unless it lowers to the nested key the engine actually reads. */
-    it('writes the records path as the nested json.records_path the parser reads', async () => {
+    it('routes a BUILT-IN test parse through the draft preview and feeds the sample thread', async () => {
+        const { fixture, state, api } = await create({ name: 'x', dirs: { poll: 'in' } });
+        state.captureSample('s.csv', 'a|b\n1|2\n');
+        fixture.detectChanges();
+
+        fixture.componentInstance.grammar!.test();
+
+        const [draft, text] = (api.previewParsing as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect((draft as Record<string, unknown>)['dirs']).toEqual({ poll: 'in' }); // merged over the draft
+        expect((draft as Record<string, unknown>)['parsing']).toBeTruthy();
+        expect(text).toBe('a|b\n1|2\n');
+        // The Sample panel renders this and the Schema stage's `hasSource` gate depends on it.
+        expect(state.parsePreview()).toEqual(PREVIEW);
+    });
+
+    it('invalidates a stale schema cast-check when the sample is re-parsed', async () => {
+        const { fixture, state } = await create({ name: 'x' });
+        state.captureSample('s.csv', 'a\n1\n');
+        state.schemaPreview.set({ columns: [], okCount: 1, rejectedCount: 0 } as never);
+        fixture.detectChanges();
+
+        fixture.componentInstance.grammar!.test();
+
+        expect(state.schemaPreview()).toBeNull();
+    });
+
+    it('surfaces a built-in parse failure on the session, not just in the editor', async () => {
+        const previewParsing = vi.fn(() => throwError(() => ({ status: 422, error: { message: 'bad delimiter' } })));
+        const { fixture, state } = await create({ name: 'x' }, { previewParsing });
+        state.captureSample('s.csv', 'zzz');
+        fixture.detectChanges();
+
+        fixture.componentInstance.grammar!.test();
+
+        expect(state.parseError()).toBeTruthy();
+        expect(state.parsePreview()).toBeNull();
+    });
+
+    it('a PLUGIN test parse uses the stateless route and never feeds the sample thread', async () => {
+        const preview = vi.fn(() => of({
+            kind: 'tree' as const, recordCount: 2,
+            nodes: [{ label: 'order', type: 'element', children: [{ label: '@id', type: 'attr', value: '1' }] }],
+        }));
+        const { fixture, state, api, parsers } = await create({ name: 'x' }, {}, { preview });
+        state.captureSample('s.xml', '<orders><order id="1"/></orders>');
+        fixture.detectChanges();
+        const editor = fixture.componentInstance.grammar!;
+        editor.setType('xml');
+        fixture.detectChanges();
+
+        editor.schemaForm?.form.get('xml__record_element')?.setValue('order');
+        editor.test();
+
+        // The nested grammar carries the touched field AND the schema's declared defaults.
+        expect(parsers.preview).toHaveBeenCalledWith(
+            'xml',
+            { xml: { record_element: 'order', namespace_aware: false } },
+            '<orders><order id="1"/></orders>',
+        );
+        expect(api.previewParsing).not.toHaveBeenCalled();
+        // The parsed hop is fed only by the built-ins a draft can actually go live with.
+        expect(state.parsePreview()).toBeNull();
+    });
+
+    it('writes the nested keys the parser reads, never the flat form keys', async () => {
         const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK));
         const { fixture } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'array' } } }, { patch });
-        const c = fixture.componentInstance;
+        const pane = fixture.componentInstance;
         fixture.detectChanges();
-        c.schemaForm?.form.get('json__records_path')?.setValue('payload.records');
-        c.save();
+
+        pane.grammar!.schemaForm?.form.get('json__records_path')?.setValue('payload.records');
+        pane.save();
+
         const parsing = (patch.mock.calls[0][2] as Record<string, unknown>)['parsing'] as Record<string, unknown>;
         expect((parsing['json'] as Record<string, unknown>)['records_path']).toBe('payload.records');
         expect(parsing['json__records_path']).toBeUndefined(); // the flat form must not leak to disk
     });
 
-    it('an unknown frontend falls back to delimited (xml/asn1 are not engine-real)', async () => {
-        const { fixture } = await create({ name: 'x', parsing: { frontend: 'xml' } });
-        expect(fixture.componentInstance.frontend()).toBe('delimited');
-    });
-
-    /**
-     * W2/U-E. The pane used to render ONLY a "author that in the pipeline TOON" notice for these
-     * configs — which meant a plugin config saved through this pane's own segments editor could never
-     * be reopened. It must now author them, with the plugin the config names actually selected.
-     */
-    it('re-selects the served parser a saved plugin config names, and edits it', async () => {
-        const { fixture } = await create(
-            SAVED_SEGMENTS,
-            { read: vi.fn(() => of(SAVED_SCHEMA)) },
-            { list: vi.fn(() => of(ASN1_CATALOG)) },
-        );
-        const pane = fixture.componentInstance;
-
+    it('re-selects the served parser a saved plugin config names, without dirtying the stage', async () => {
         // Matched by ingesterClass: a guided Save writes the FQCN, never the parser id.
-        expect(pane.pluginDef()?.id).toBe('asn1');
-        expect(pane.activeType()).toBe('asn1');
-        expect(pane.unservedPlugin()).toBeNull();
-        // The editor is REACHABLE now — the old guard hid all of this.
-        expect(fixture.nativeElement.querySelector('app-onboarding-sample-panel')).toBeTruthy();
-    });
-
-    it('restoring the selection does not make the pane dirty', async () => {
         const { fixture, state } = await create(
             SAVED_SEGMENTS,
             { read: vi.fn(() => of(SAVED_SCHEMA)) },
             { list: vi.fn(() => of(ASN1_CATALOG)) },
         );
-        // Load-time restoration is not a user edit: a dirty pane on arrival would prompt
-        // "discard changes?" for a config nobody touched.
-        expect(fixture.componentInstance.pluginDef()?.id).toBe('asn1');
+
+        expect(fixture.componentInstance.plugin()?.id).toBe('asn1');
+        expect(fixture.componentInstance.pluginIngestable()).toBe(true);
         expect(state.isDirty()).toBe(false);
     });
 
-    /**
-     * The honest-failure case. The config names an ingester this server has no plugin for, so the pane
-     * falls back to a built-in — it must SAY so rather than silently presenting the pipeline as
-     * delimited, which is the one way lifting the guard could have been a regression.
-     */
     it('warns when the configured ingester is not served here', async () => {
+        // The honest-failure case: the pane falls back to a built-in and must SAY so, rather than
+        // silently presenting the pipeline as delimited.
         const { fixture } = await create(
             { name: 'x', processing: { ingester: 'com.example.NotDeployed' } },
             {},
             { list: vi.fn(() => of(ASN1_CATALOG)) },
         );
-        const pane = fixture.componentInstance;
 
-        expect(pane.unservedPlugin()).toBe('com.example.NotDeployed');
-        expect(pane.pluginDef()).toBeNull();
-        expect(fixture.nativeElement.textContent).toContain('not available');
+        expect(fixture.componentInstance.grammar!.unservedPlugin()).toBe('com.example.NotDeployed');
         expect(fixture.nativeElement.textContent).toContain('com.example.NotDeployed');
     });
 
-    it('says nothing about plugins when the config names no ingester', async () => {
-        const { fixture } = await create({ name: 'x' });
-        expect(fixture.componentInstance.unservedPlugin()).toBeNull();
-        expect(fixture.nativeElement.textContent).not.toContain('not available');
-    });
-
-    it('hosts the sample capture panel itself, above the file-type picker', async () => {
-        const { fixture } = await create({ name: 'x' });
-        const panel = fixture.nativeElement.querySelector('app-onboarding-sample-panel');
-        expect(panel).toBeTruthy();
-        const toggles = fixture.nativeElement.querySelector('mat-button-toggle-group');
-        // DOCUMENT_POSITION_FOLLOWING (4) ⇒ the picker comes after the sample panel.
-        expect(panel.compareDocumentPosition(toggles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    });
-
-    it('test parse sends the merged draft + sample and stores the preview on the session', async () => {
-        const { fixture, state, api } = await create({ name: 'x', dirs: { poll: 'in' } });
-        state.captureSample('s.csv', 'a|b\n1|2\n');
-        fixture.componentInstance.testParse();
-        expect(api.previewParsing).toHaveBeenCalledTimes(1);
-        const [draft, sample] = (api.previewParsing as ReturnType<typeof vi.fn>).mock.calls[0] as [Record<string, unknown>, string];
-        expect((draft['parsing'] as Record<string, unknown>)['frontend']).toBe('delimited');
-        expect(draft['dirs']).toEqual({ poll: 'in' });
-        expect(sample).toBe('a|b\n1|2\n');
-        expect(state.parsePreview()).toEqual(PREVIEW);
-    });
-
-    it('a failed test parse surfaces the error on the session thread', async () => {
-        const { fixture, state } = await create(
-            { name: 'x' },
-            { previewParsing: vi.fn(() => throwError(() => ({ status: 422, error: { message: 'no parse' } }))) },
-        );
-        state.captureSample('s.csv', 'zzz');
-        fixture.componentInstance.testParse();
-        expect(state.parsePreview()).toBeNull();
-        expect(state.parseError()).toBeTruthy();
-    });
-
-    it('switching frontend marks the pane dirty and save clears other frontend blocks', async () => {
-        const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK));
-        const { fixture, state } = await create({ name: 'x', parsing: { frontend: 'json', json: { format: 'newline' } } }, { patch });
-        const c = fixture.componentInstance;
-        c.setFrontend('text_regex');
-        fixture.detectChanges(); // propagate [specs] so the schema-form rebuilds for the new frontend
-        expect(state.isDirty()).toBe(true);
-        const pattern = c.schemaForm?.form.get('text_regex__pattern');
-        expect(pattern).toBeTruthy();
-        pattern?.setValue('(?P<a>\\d+)');
-        c.save();
-        const written = patch.mock.calls[0][2] as Record<string, unknown>;
-        const parsing = written['parsing'] as Record<string, unknown>;
-        expect(parsing['frontend']).toBe('text_regex');
-        expect(parsing['json']).toBeNull();   // explicit delete marker for the server merge
-        expect((parsing['text_regex'] as Record<string, unknown>)['pattern']).toBe('(?P<a>\\d+)');
-    });
-
-    it('suggests the sniffed frontend and applies it on click — never automatically', async () => {
+    it('offers no Save for a preview-only plugin, and selecting one is not an unsaved change', async () => {
         const { fixture, state } = await create({ name: 'x' });
-        const c = fixture.componentInstance;
-        expect(c.suggestion()).toBeNull(); // no sample yet
-        state.captureSample('s.ndjson', '{"a": 1}\n{"a": 2}\n');
+        fixture.componentInstance.grammar!.setType('xml');
         fixture.detectChanges();
-        expect(c.suggestion()?.frontend).toBe('json');
-        expect(c.frontend()).toBe('delimited'); // still the pick — suggestion only
-        expect(fixture.nativeElement.textContent).toContain('Looks like NDJSON');
-        c.applySuggestion();
-        expect(c.frontend()).toBe('json');
-        expect(c.suggestion()).toBeNull(); // matches the pick now — chip gone
-    });
 
-    it('applying a delimiter suggestion prefills the sniffed delimiter', async () => {
-        const { fixture, state } = await create({ name: 'x', parsing: { frontend: 'json' } });
-        state.captureSample('s.psv', 'a|b\n1|2\n');
-        const c = fixture.componentInstance;
-        expect(c.suggestion()?.delimiter).toBe('|');
-        c.applySuggestion();
-        fixture.detectChanges(); // rebuild the schema-form for the delimited frontend
-        await new Promise((r) => setTimeout(r)); // the prefill lands after the rebuild
-        expect(c.frontend()).toBe('delimited');
-        expect(c.schemaForm?.form.get('delimited__delimiter')?.value).toBe('|');
-    });
-
-    it('offers a Tree view of a JSON sample and falls back to the table otherwise', async () => {
-        const { fixture, state } = await create({ name: 'x', parsing: { frontend: 'json' } });
-        state.captureSample('s.ndjson', '{"id": 1, "meta": {"tag": "x"}}\n');
-        state.parsePreview.set({ frontend: 'json', columns: ['id', 'meta'], rowCount: 1, rows: [{ id: '1' }], rejectedRows: 0 });
-        const c = fixture.componentInstance;
-        expect(c.treeNodes()).toBeTruthy();
-        expect(c.resultView()).toBe('table');
-        // Render the TREE branch (the table branch is the shared data-table, covered by its own spec).
-        c.resultView.set('tree');
-        fixture.detectChanges();
-        expect(fixture.nativeElement.querySelector('app-parser-tree')).toBeTruthy();
-        expect(fixture.nativeElement.textContent).toContain('top-level keys');
-        // A non-JSON frontend has no tree offer.
-        c.setFrontend('delimited');
-        expect(c.treeNodes()).toBeNull();
-    });
-
-    it('renders the parsed table in the shared data-table, seeded FROM parsed', async () => {
-        const { fixture, state } = await create({ name: 'x' });
-        state.parsePreview.set(PREVIEW);
-        fixture.detectChanges();
-        const table = fixture.nativeElement.querySelector('inspecto-data-table');
-        expect(table).toBeTruthy();
-        // Pro tier over the sample rows: the SQL editor seeds `FROM parsed`, so the author
-        // never needs to know a real table name.
-        expect(fixture.componentInstance.parsedRows()).toEqual(PREVIEW.rows);
-    });
-
-    it('offers served plugin types beyond the built-ins, with the served grammar as the form', async () => {
-        const { fixture, state } = await create({ name: 'x' });
-        const c = fixture.componentInstance;
-        expect(c.pluginTypes().map((p) => p.id)).toEqual(['xml']); // built-ins never duplicate
-        c.setType('xml');
-        fixture.detectChanges();
-        expect(c.activeType()).toBe('xml');
-        expect(c.specs().map((s) => s.key)).toEqual(['xml__record_element', 'xml__namespace_aware']);
-        // Preview-only: Save disabled with the honest note; selection alone is not "unsaved changes".
         expect(fixture.nativeElement.textContent).toContain('flatten configuration');
         const save = Array.from(fixture.nativeElement.querySelectorAll('button'))
             .find((b) => (b as HTMLElement).textContent!.includes('Save parsing')) as HTMLButtonElement;
         expect(save.disabled).toBe(true);
         expect(state.isDirty()).toBe(false);
-        // Back to a built-in restores the engine-real specs + Save.
-        c.setType('delimited');
-        fixture.detectChanges();
-        expect(c.pluginDef()).toBeNull();
-        expect(c.specs().some((s) => s.key === 'delimited__delimiter')).toBe(true);
     });
 
-    it('plugin Test parse posts the nested grammar and renders a served TREE result', async () => {
-        const preview = vi.fn(() => of({
-            kind: 'tree' as const, recordCount: 2,
-            nodes: [{ label: 'order', type: 'element', children: [{ label: '@id', type: 'attr', value: '1' }] }],
-        }));
-        const { fixture, state, parsers } = await create({ name: 'x' }, {}, { preview });
-        state.captureSample('s.xml', '<orders><order id="1"/><order id="2"/></orders>');
-        const c = fixture.componentInstance;
-        c.setType('xml');
+    it('writes every segment schema BEFORE the block that references them', async () => {
+        const order: string[] = [];
+        const write = vi.fn(() => { order.push('write'); return of(WRITE_OK); });
+        const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => {
+            order.push('patch');
+            return of(WRITE_OK);
+        });
+        const { fixture } = await create(
+            SAVED_SEGMENTS,
+            { read: vi.fn(() => of(SAVED_SCHEMA)), write, patch },
+            { list: vi.fn(() => of(ASN1_CATALOG)) },
+        );
         fixture.detectChanges();
-        c.schemaForm?.form.get('xml__record_element')?.setValue('order');
-        c.testParse();
-        // The nested grammar carries the touched field AND the schema's declared defaults.
-        expect(parsers.preview).toHaveBeenCalledWith('xml',
-            { xml: { record_element: 'order', namespace_aware: false } },
-            '<orders><order id="1"/><order id="2"/></orders>');
-        fixture.detectChanges();
-        expect(fixture.nativeElement.querySelector('app-parser-tree')).toBeTruthy();
-        expect(fixture.nativeElement.textContent).toContain('2 records');
-        // The sample thread's parsed hop stays builtin-only — a plugin preview never feeds it.
-        expect(state.parsePreview()).toBeNull();
+
+        fixture.componentInstance.save();
+
+        // The pipeline must never name a schema file that does not exist yet.
+        expect(order).toEqual(['write', 'patch']);
+        const parsing = (patch.mock.calls[0][2] as Record<string, unknown>)['parsing'] as Record<string, unknown>;
+        const plugin = parsing['plugin'] as Record<string, unknown>;
+        expect(plugin['ingester']).toBe(ASN1_DEF.ingesterClass);
+        expect(Object.keys(plugin['segments'] as Record<string, unknown>)).toEqual(['moCallRecord']);
     });
 
-    it('a plugin preview failure surfaces the 422 reason', async () => {
-        const preview = vi.fn(() => throwError(() => ({ status: 422, error: { message: 'no elements match' } })));
-        const { fixture, state } = await create({ name: 'x' }, {}, { preview });
-        state.captureSample('s.xml', '<a/>');
-        const c = fixture.componentInstance;
-        c.setType('xml');
-        fixture.detectChanges();
-        c.testParse();
-        expect(c.pluginError()).toBeTruthy();
-        expect(c.pluginPreview()).toBeNull();
+    it('registers a dirty check with the stage nav and drops it on destroy', async () => {
+        const { fixture, state } = await create({ name: 'x' });
+        fixture.componentInstance.grammar!.setFrontend('json');
+
+        expect(state.isDirty()).toBe(true);
+
+        fixture.destroy();
+        expect(state.isDirty()).toBe(false);
+    });
+
+    it('does not save at all without the workbench lens', async () => {
+        const patch = vi.fn(() => of(WRITE_OK));
+        const { fixture } = await create({ name: 'x' }, { patch });
+        vi.spyOn(fixture.componentInstance['lens'], 'canAuthorWorkbench').mockReturnValue(false);
+
+        fixture.componentInstance.save();
+
+        expect(patch).not.toHaveBeenCalled();
     });
 
     it('has no a11y violations', async () => {

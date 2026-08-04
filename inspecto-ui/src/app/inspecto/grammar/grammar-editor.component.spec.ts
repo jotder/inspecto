@@ -173,6 +173,26 @@ describe('GrammarEditorComponent', () => {
         expect(c.frontend()).toBe('delimited');
     });
 
+    it('does not treat selecting a preview-only plugin as an unsaved change', () => {
+        // Nothing about a preview-only plugin can be saved, so nothing can be lost by navigating —
+        // and a host that saw this as dirty would raise a guard the operator cannot satisfy.
+        const fixture = create({}, [XML, ASN1]);
+        const c = fixture.componentInstance;
+
+        c.setType('xml');
+
+        expect(c.isDirty()).toBe(false);
+    });
+
+    it('treats selecting an INGESTABLE plugin as a real edit', () => {
+        const fixture = create({}, [XML, ASN1]);
+        const c = fixture.componentInstance;
+
+        c.setType('asn1');
+
+        expect(c.isDirty()).toBe(true);
+    });
+
     it('flags a plugin the server does not provide', () => {
         const fixture = create({}, [XML]);
         fixture.componentRef.setInput('configuredIngester', 'com.absent.Missing');

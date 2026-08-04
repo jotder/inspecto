@@ -121,6 +121,12 @@ export class GrammarEditorComponent {
     @Output() readonly sampleChange = new EventEmitter<string>();
     /** The active type changed (a built-in frontend id or a served parser id). */
     @Output() readonly typeChange = new EventEmitter<string>();
+    /**
+     * The selected PLUGIN parser, or null when a built-in is active. Emitted on selection AND on
+     * load-time rehydration, so a host can react without reading the editor through a `@ViewChild`
+     * in its template — which would evaluate before the query resolves.
+     */
+    @Output() readonly pluginChange = new EventEmitter<ParserDef | null>();
 
     // ── state ────────────────────────────────────────────────────────────────
 
@@ -231,7 +237,10 @@ export class GrammarEditorComponent {
         // Not `setType`: that marks the selection as a user action. This is load-time restoration, so
         // it must NOT make the editor dirty — that would prompt "discard changes?" for an untouched
         // config.
-        if (match) this.pluginDef.set(match);
+        if (match) {
+            this.pluginDef.set(match);
+            this.pluginChange.emit(match);
+        }
     }
 
     private applyPendingType(list: ParserDef[]): void {
@@ -239,8 +248,12 @@ export class GrammarEditorComponent {
         if (!want) return;
         this.pendingType.set(null);
         const plugin = list.find((p) => p.id === want && !PARSING_FRONTENDS.some((f) => f.id === p.id));
-        if (plugin) this.pluginDef.set(plugin);
-        else if (PARSING_FRONTENDS.some((f) => f.id === want)) this.frontend.set(want as ParsingFrontend);
+        if (plugin) {
+            this.pluginDef.set(plugin);
+            this.pluginChange.emit(plugin);
+        } else if (PARSING_FRONTENDS.some((f) => f.id === want)) {
+            this.frontend.set(want as ParsingFrontend);
+        }
     }
 
     private seedFixedWidthFields(fw: unknown): void {
@@ -266,6 +279,7 @@ export class GrammarEditorComponent {
         this.preview.set(null);
         this.error.set(null);
         if (f === 'fixedwidth' && this.fwFields.length === 0) this.addField();
+        this.pluginChange.emit(null);
         this.typeChange.emit(f);
     }
 
@@ -279,9 +293,14 @@ export class GrammarEditorComponent {
         if (this.pluginDef()?.id === plugin.id) return;
         this.seed.update((s) => ({ ...s, ...(this.schemaForm?.value() ?? {}) }));
         this.pluginDef.set(plugin);
-        this.typeTouched.set(true);
+        // Selecting a PREVIEW-ONLY plugin is not an unsaved change: there is nothing to save, so
+        // nothing can be lost by navigating away — and a host that treats it as dirty raises an
+        // unsaved-changes guard the operator can never satisfy. An INGESTABLE plugin can be saved,
+        // so switching to one is a real edit.
+        if (plugin.ingestable && plugin.ingesterClass) this.typeTouched.set(true);
         this.preview.set(null);
         this.error.set(null);
+        this.pluginChange.emit(plugin);
         this.typeChange.emit(plugin.id);
     }
 
