@@ -31,16 +31,16 @@ class BatchAuditWriterTest {
         w.flush(batchRow, fileRows, lineage);
 
         String status = Files.readString(Path.of(statusCsv));
-        assertTrue(status.startsWith("start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,duration_ms,error,batch_id"));
+        assertTrue(status.startsWith("start_time,end_time,filename,status,parsed_rows,error_rows,output_paths,output_sizes_bytes,duration_ms,error,consignment_id"));
         assertTrue(status.contains("a.csv"));
         assertTrue(status.contains("QUARANTINED_MISMATCH"));
 
         String batches = Files.readString(Path.of(batchesCsv));
-        assertTrue(batches.contains("batch_id,pipeline,schema_name,output_table"));
+        assertTrue(batches.contains("consignment_id,pipeline,schema_name,output_table"));
         assertTrue(batches.contains("B1"));
 
         String lin = Files.readString(Path.of(lineageCsv));
-        assertTrue(lin.startsWith("batch_id,src_id,input_file,output_file,partition,row_count"));
+        assertTrue(lin.startsWith("consignment_id,src_id,input_file,output_file,partition,row_count"));
         assertTrue(lin.contains("year=2020/month=04/day=03"));
     }
 

@@ -10,13 +10,13 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { BatchDetailDialog } from './batch-detail.dialog';
 
 const BATCHES: AuditRow[] = [
-    { batch_id: 'b-1', status: 'COMMITTED', files: '2' },
-    { batch_id: 'b-2', status: 'OPEN', files: '1' },
+    { consignment_id: 'b-1', status: 'COMMITTED', files: '2' },
+    { consignment_id: 'b-2', status: 'OPEN', files: '1' },
 ];
 const FILES: AuditRow[] = [
-    { batch_id: 'b-1', file: 'a.csv', rows: '10' },
-    { batch_id: 'b-1', file: 'b.csv', rows: '20' },
-    { batch_id: 'b-2', file: 'c.csv', rows: '5' },
+    { consignment_id: 'b-1', file: 'a.csv', rows: '10' },
+    { consignment_id: 'b-1', file: 'b.csv', rows: '20' },
+    { consignment_id: 'b-2', file: 'c.csv', rows: '5' },
 ];
 const LINEAGE: AuditRow[] = [{ input_file: 'a.csv', output: 'cdr/part-0.parquet' }];
 
@@ -48,7 +48,7 @@ describe('BatchDetailDialog', () => {
         const c = fixture.componentInstance;
         expect(stub.lineage).toHaveBeenCalledWith('cdr', 'b-1');
         expect(c.loading).toBe(false);
-        expect(c.batchRow?.['batch_id']).toBe('b-1');
+        expect(c.batchRow?.['consignment_id']).toBe('b-1');
         expect(c.batchFiles.map((f) => f['file'])).toEqual(['a.csv', 'b.csv']);
         expect(c.batchLineage).toEqual(LINEAGE);
         expect(c.batchSummary.map((kv) => kv.key)).toContain('status');

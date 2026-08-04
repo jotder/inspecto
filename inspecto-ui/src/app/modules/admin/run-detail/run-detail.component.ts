@@ -198,7 +198,7 @@ export class RunDetailComponent implements OnInit {
         const details: InspectoRowAction<AuditRow> = {
             icon: 'heroicons_outline:rectangle-group',
             hint: 'Lineage & details',
-            onClick: (r) => this.openBatchById(r['batch_id']),
+            onClick: (r) => this.openBatchById(r['consignment_id']),
         };
         if (!this.lens.canOperateRuns()) return [details];
         return [
@@ -215,7 +215,7 @@ export class RunDetailComponent implements OnInit {
         {
             icon: 'heroicons_outline:rectangle-group',
             hint: 'Open the batch this file belongs to',
-            onClick: (r) => this.openBatchById(r['batch_id']),
+            onClick: (r) => this.openBatchById(r['consignment_id']),
         },
     ];
 
@@ -265,7 +265,7 @@ export class RunDetailComponent implements OnInit {
 
     async reprocessRow(r: AuditRow): Promise<void> {
         if (!this.lens.canOperateRuns()) return; // Business lens: read-only observe
-        const id = r['batch_id'];
+        const id = r['consignment_id'];
         if (!id) {
             this.toastr.warning('No batch id on this row');
             return;

@@ -149,6 +149,13 @@ CREATE TABLE IF NOT EXISTS inspecto_status_lineage    (pipeline VARCHAR, batch_i
 CREATE TABLE IF NOT EXISTS inspecto_status_quarantine (pipeline VARCHAR, seq BIGINT, payload VARCHAR);
 ```
 
+⚠ **These two `batch_id` columns are deliberately NOT renamed** (consignment-ELT plan §11.3, slice 3 took the
+ledgers-and-manifest split only). Since 2026-08-04 the source ledgers spell the column `consignment_id` and
+`Csv.readInto` canonicalises the legacy header, so `DbStatusStore` reads the row key **`consignment_id`** while
+writing it into the column still named **`batch_id`**. The asymmetry is intentional: renaming a column in existing
+`.duckdb` files needs an `ALTER TABLE … RENAME COLUMN` migration, and the `payload` blob embeds the literal too —
+tracked in `BACKLOG.md` §4. The `payload` JSON now carries `consignment_id` for newly synced rows.
+
 ### 3.5 `inspecto_job_runs` — job-run reporting  · **A**
 File: `jobs_report.duckdb`
 

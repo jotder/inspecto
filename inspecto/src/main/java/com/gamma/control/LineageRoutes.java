@@ -19,12 +19,12 @@ import java.util.Map;
  * <ul>
  *   <li>the <b>ingest pipeline</b> records which input <i>file</i>'s rows landed in which output store+partition
  *       — the per-{@code (inputFile, partition)} count matrix ({@link com.gamma.etl.LineageRow}, written to the
- *       {@code lineage}/{@code batches} audit CSVs, joined by {@code batch_id});</li>
+ *       {@code lineage}/{@code batches} audit CSVs, joined by {@code consignment_id});</li>
  *   <li>an <b>authored flow</b> declares the {@code source_store}(s) it reads (and emits per-{@code (node, rel)}
  *       counts to {@link com.gamma.pipeline.exec.DbProvenanceStore}, painted as the {@code /provenance} Sankey).</li>
  * </ul>
  * Neither half carries the other's dimension (the flow has no file; the ingest matrix has no node), and they do
- * <b>not</b> share a {@code batch_id} — they are distinct execution engines. The bridge between them is the
+ * <b>not</b> share a {@code consignment_id} — they are distinct execution engines. The bridge between them is the
  * <b>store name</b>: ingest <i>writes</i> a store (the {@code batches.output_table}); a flow <i>reads</i> it as a
  * {@code source_store}. {@code GET /lineage?store=<store>} returns both ends so a consumer can trace
  * <i>file → store → flow → sink</i>:
@@ -56,7 +56,7 @@ final class LineageRoutes implements RouteModule {
 
     /**
      * The ingest {@code (inputFile, partition) → rowCount} rows that landed in {@code store}, unioned across every
-     * registered pipeline. Per pipeline, joins its {@code lineage} CSV to its {@code batches} CSV on {@code batch_id}
+     * registered pipeline. Per pipeline, joins its {@code lineage} CSV to its {@code batches} CSV on {@code consignment_id}
      * and keeps only batches whose {@code output_table} is this store.
      */
     private List<Map<String, Object>> upstream(ApiContext api, String store) {
@@ -82,13 +82,13 @@ final class LineageRoutes implements RouteModule {
                                                     List<Map<String, String>> batchesRows,
                                                     List<Map<String, String>> lineageRows) {
         Map<String, String> batchStore = new LinkedHashMap<>();
-        for (Map<String, String> b : batchesRows) batchStore.put(b.get("batch_id"), b.get("output_table"));
+        for (Map<String, String> b : batchesRows) batchStore.put(b.get("consignment_id"), b.get("output_table"));
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, String> r : lineageRows) {
-            if (!store.equals(batchStore.get(r.get("batch_id")))) continue;
+            if (!store.equals(batchStore.get(r.get("consignment_id")))) continue;
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("pipeline", pipeline);
-            row.put("batchId", r.get("batch_id"));
+            row.put("batchId", r.get("consignment_id"));
             row.put("inputFile", r.get("input_file"));
             row.put("partition", r.get("partition"));
             row.put("rowCount", parseLong(r.get("row_count")));

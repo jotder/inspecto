@@ -8,7 +8,8 @@ import java.util.stream.Collectors;
 
 /**
  * Appends one batch's audit to three run-scoped CSVs, structured for a future
- * bulk RDBMS load (all joined by {@code batch_id}):
+ * bulk RDBMS load (all joined by {@code consignment_id}; ledgers created before that rename carry the legacy
+ * {@code batch_id} header, which {@code Csv.readInto} canonicalises on read):
  * <ul>
  *   <li><b>status</b> (batch_file): one row per member (surviving or rejected)</li>
  *   <li><b>batches</b>: one row per batch</li>
@@ -41,15 +42,15 @@ public final class BatchAuditWriter {
                             String commitLogPath) {
         this.status = statusPath == null ? null : new CsvLedger<>(statusPath,
                 "start_time,end_time,filename,status,parsed_rows,error_rows," +
-                        "output_paths,output_sizes_bytes,duration_ms,error,batch_id",
+                        "output_paths,output_sizes_bytes,duration_ms,error,consignment_id",
                 BatchAuditWriter::statusLine);
         this.batches = batchesPath == null ? null : new CsvLedger<>(batchesPath,
-                "batch_id,pipeline,schema_name,output_table,start_time,end_time,status," +
+                "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status," +
                         "member_count,rejected_count,total_input_rows,total_output_rows," +
                         "output_file_count,total_output_bytes,duration_ms,error",
                 BatchAuditWriter::batchLine);
         this.lineage = lineagePath == null ? null : new CsvLedger<>(lineagePath,
-                "batch_id,src_id,input_file,output_file,partition,row_count",
+                "consignment_id,src_id,input_file,output_file,partition,row_count",
                 BatchAuditWriter::lineageLine);
         this.commitLog = (commitLogPath != null && !commitLogPath.isBlank())
                 ? new CommitLog(commitLogPath) : null;

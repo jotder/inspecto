@@ -26,7 +26,7 @@ import java.util.Set;
  * it is written as the final step of a committed batch.
  *
  * <p>Format (CSV, header on first creation):
- * <pre>committed_at,batch_id,pipeline,status,member_count,output_count,output_rows,output_bytes</pre>
+ * <pre>committed_at,consignment_id,pipeline,status,member_count,output_count,output_rows,output_bytes</pre>
  *
  * <p>{@link #record} is {@code synchronized}; concurrent batches in one run share
  * a single instance. Concurrent runs of the <em>same</em> pipeline (which would
@@ -36,7 +36,7 @@ import java.util.Set;
 public final class CommitLog {
 
     private static final String HEADER =
-            "committed_at,batch_id,pipeline,status,member_count,output_count,output_rows,output_bytes\n";
+            "committed_at,consignment_id,pipeline,status,member_count,output_count,output_rows,output_bytes\n";
 
     private final Path file;
 

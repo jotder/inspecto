@@ -5,16 +5,15 @@ This began as the record of a design conversation, so the bulk below is still de
 
 | Piece | State as of 2026-08-04 |
 |---|---|
-| §11.3 `consignment_outputs` | **SLICES 1 + 2 + STATE MUTATORS BUILT + VERIFIED** — `DbConsignmentOutputStore` (default-off) has production callers on **all three** write paths with real per-file `row_count` (§7.2 reconciliation asserted on each), plus `supersede`/`markCompactedAway` wired to `ReprocessCommand` and `PartitionCompactor`. **Slice 3 (the `batch_id` rename) is NOT done** — see §11.3's *Slice 3 — SCOPE GROUNDED* |
+| §11.3 `consignment_outputs` | **COMPLETE — slices 1, 2, 3 + state mutators, all BUILT + VERIFIED.** Default-off store with production callers on all three write paths and real per-file `row_count`; `supersede`/`markCompactedAway` wired to `ReprocessCommand` + `PartitionCompactor`; the `batch_id` → `consignment_id` rename done for the ledgers + manifest (DDL columns, `__batch_id` and the `.toon` config key deliberately deferred) |
 | §14 `ProcessorContext` | **BUILT + VERIFIED (all of §14.4)** — `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` `JobTypeProvider` adapter, `ConsignmentReader`, and `SummaryEmitter`'s §7.2 guardrails. As-built in [`okf/backend/control-plane/jobs.md`](../okf/backend/control-plane/jobs.md) |
 | Everything else (§2, §4–§10, §11.4, §12, §13) | design only, nothing implemented |
 
-**Next:** **slice 3** — the `batch_id` → `consignment_id` rename in persisted artifacts — is the only §11.3 item
-left, and it is **blocked on an operator call**: grounding found three categories of `batch_id` that *Decided
-2026-08-04* item 2 did not consider, one of which cannot use accept-both-on-read at all. See §11.3's *Slice 3 —
-SCOPE GROUNDED* before starting it. The state-transition mutators it was paired with are **done**, so the
-`PartitionCompactor` duplicate-rows bug §11.3(a) documents is no longer silent. After that, the design-only
-sections — §7.3's summary storage is the one `SummaryEmitter` is waiting on.
+**Next: §11.3 and §14 are both closed, so what remains is all design.** §7.3's summary storage is the one item with
+code already waiting on it — `SummaryEmitter` guards `SummaryRow`s today but has nowhere to put them. Three
+`batch_id` renames were deliberately deferred out of slice 3 and belong on the backlog, not in this section: the
+`DbProvenanceStore`/`DbStatusStore` **DDL columns** (needing `ALTER TABLE` migrations), `__batch_id` (a data-plane
+column, where accept-both-on-read is impossible), and `batch_id` as a **`.toon` config key**.
 
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time
@@ -821,11 +820,45 @@ Two things to add to that list, and one reason to hold:
 2. **`batch_id` is also a `.toon` config key** (`PipelineJobRunner:77/136`). Renaming it breaks operators'
    existing pipeline configs, which makes it a config-key-contract decision, not a persisted-artifact one.
 
-**Recommendation: split it, and confirm the split first.** The audit CSVs + `BatchManifest` + their read sites are
-one coherent accept-both-on-read change. The DuckDB columns (`DbProvenanceStore`, `DbStatusStore`) need real
-`ALTER TABLE … RENAME COLUMN` migrations against existing files — note `DbStatusStore`'s `payload` blob embeds the
-literal `"batch_id"` too — and the config key is a different contract again. Splitting changes what "slice 3"
-means, so it wants an operator call rather than an assumption. **Nothing here is blocked on code.**
+**The split was taken (operator call, 2026-08-04): ledgers + manifest only.** Explicitly deferred, each its own
+decision: the `batch_id` **DDL columns** in `DbProvenanceStore` and `DbStatusStore` (real
+`ALTER TABLE … RENAME COLUMN` against existing files — and `DbStatusStore`'s `payload` blob embeds the literal
+too), `__batch_id` (data-plane column), and the `batch_id` **`.toon` config key**.
+
+#### Slice 3 (ledgers + manifest) — AS BUILT 2026-08-04
+
+**The rename had to be absorbed in the reader, not in the consumers.** `CsvLedger` writes a header **only when the
+file does not exist**, so existing ledgers keep `batch_id` forever while new ones get `consignment_id` — and
+`FileStatusStore.readRuns` globs *many* run-timestamped ledgers into **one** row list. Both spellings therefore
+coexist **within a single result**, which rules out per-file handling. Every consumer checking two keys forever
+would also mean any consumer missed fails *silently*, because a wrong map key reads as an absent column rather
+than an error. So `Csv.readInto` — the single header-keyed reader — canonicalises `batch_id` → `consignment_id` on
+the way in, and every consumer was flipped to the one canonical name. It deliberately does **not** emit both keys:
+a row carrying both restores the ambiguity and trips `OperationalTables`' drift warning as un-queryable drift.
+
+| Artifact | What changed | Migration mechanism |
+|---|---|---|
+| The three `BatchAuditWriter` ledgers | headers → `consignment_id` | new files only; old headers canonicalised on read |
+| `CommitLog` | header → `consignment_id` | **cosmetic** — verified it skips on `committed_at,` (column 0) and reads `c[1]` **positionally**, so reads are unaffected |
+| `BatchManifest` | `@SerializedName(value = "consignmentId", alternate = {"batchId"})` | Gson's own accept-both; the **Java field stays `batchId`** (§3/§15 keep `Batch*` internals out of scope) |
+| 6 name-keyed read sites + `OperationalTables`' canonical schemas | flipped to `consignment_id` | — |
+
+**(k) This is an API contract change, and the UI had to move in lockstep.** `RunRoutes:56-57` returns
+`statusStore().batches(cfg)` / `.files(cfg)` **raw**, so the JSON key operators' browsers receive changed too.
+Five production UI sites read it (`batch-detail.dialog.ts:81-82`, `run-detail.component.ts:201/218/268`) and were
+updated with their specs and mock handlers. Had they been left, `find`/`filter` would return **nothing, with no
+error** — the same silent-failure shape as the map keys.
+
+**(l) `DbStatusStore` is deliberately asymmetric.** It now reads the canonical `consignment_id` **key** from ledger
+rows while its own **DDL column stays `batch_id`**, because renaming a column in existing `.duckdb` files needs the
+deferred migration. Documented at the method.
+
+**Verified:** full 24-module `mvn -o clean test` → **2608 tests, 0 failures, 0 errors, 6 skipped**; Angular suite
+**2009 passed / 5 skipped**. New coverage proves the migration rather than the rename: a pre-rename ledger reads
+under the new name, a pre- and a post-rename ledger read into **one** consistent key, values and `__batch_id` are
+untouched, a hand-written legacy `{"batchId":…}` manifest still binds, and fresh manifests write only
+`"consignmentId"`. `ControlApiLineageTest`'s fixtures were left on the **old** header on purpose, making the
+end-to-end stitch the accept-both case.
 
 ### 11.4 Partition state — nothing exists
 

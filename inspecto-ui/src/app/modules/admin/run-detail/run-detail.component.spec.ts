@@ -11,8 +11,8 @@ import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { RunDetailComponent } from './run-detail.component';
 
-const BATCH: AuditRow = { batch_id: 'b1', status: 'SUCCESS' };
-const QUARANTINED: AuditRow = { batch_id: 'q1', file_name: 'bad.csv', reason: 'parse_error' };
+const BATCH: AuditRow = { consignment_id: 'b1', status: 'SUCCESS' };
+const QUARANTINED: AuditRow = { consignment_id: 'q1', file_name: 'bad.csv', reason: 'parse_error' };
 
 /** `inputs` exercises the embedded side-panel mode (R5); without it the route snapshot drives the name.
  *  `confirmResult` controls what the (stubbed) confirm dialog resolves to for reprocess tests. */

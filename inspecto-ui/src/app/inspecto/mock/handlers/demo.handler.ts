@@ -188,7 +188,7 @@ export function batches(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 25 }, (_, i) => {
         const ts = NOW - i * 3_600_000;
         return {
-            batch_id: `${pipeline}-b${1000 + i}`,
+            consignment_id: `${pipeline}-b${1000 + i}`,
             status: i % 8 === 0 ? 'FAILED' : 'COMMITTED',
             input_files: String(3 + (i % 5)),
             input_rows: String(1200 + ((i * 311) % 8000)),
@@ -203,7 +203,7 @@ export function batches(pipeline: string): Record<string, string>[] {
 function files(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 20 }, (_, i) => ({
         file_name: `${pipeline}_${20260601 + i}.csv`,
-        batch_id: `${pipeline}-b${1000 + (i % 10)}`,
+        consignment_id: `${pipeline}-b${1000 + (i % 10)}`,
         status: i % 12 === 0 ? 'QUARANTINED' : 'PROCESSED',
         rows: String(400 + ((i * 71) % 3000)),
         size_bytes: String(48000 + ((i * 997) % 500000)),
@@ -213,7 +213,7 @@ function files(pipeline: string): Record<string, string>[] {
 
 function lineage(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 15 }, (_, i) => ({
-        batch_id: `${pipeline}-b${1000 + i}`,
+        consignment_id: `${pipeline}-b${1000 + i}`,
         source_file: `${pipeline}_${20260601 + i}.csv`,
         output_table: `${pipeline}_output`,
         output_partition: `day=${20260601 + i}`,
@@ -225,7 +225,7 @@ function lineage(pipeline: string): Record<string, string>[] {
 function quarantine(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 4 }, (_, i) => ({
         file_name: `${pipeline}_bad_${i}.csv`,
-        batch_id: `${pipeline}-b${990 + i}`,
+        consignment_id: `${pipeline}-b${990 + i}`,
         reason: ['parse_error', 'schema_mismatch', 'empty_file', 'encoding_error'][i % 4],
         quarantined_at: new Date(NOW - i * 86_400_000).toISOString(),
     }));

@@ -98,6 +98,9 @@ class ControlApiLineageTest {
             assertNotNull(dirs.lineageFilePath(), "status_dir should resolve a lineage CSV path");
 
             // Seed one batch that wrote to store 'events_raw', and a lineage row from subs.csv into it.
+            // These fixtures deliberately keep the PRE-rename `batch_id` header: a ledger written before
+            // §11.3's batch_id → consignment_id rename must still stitch, which makes this the end-to-end
+            // accept-both-on-read case (Csv.readInto canonicalises the header).
             Path batches = Path.of(dirs.batchesFilePath());
             Path lineage = Path.of(dirs.lineageFilePath());
             Files.createDirectories(batches.getParent());
@@ -121,11 +124,11 @@ class ControlApiLineageTest {
     @Test
     void stitchUpstreamJoinsLineageToBatchOutputTable() {
         List<Map<String, String>> batches = List.of(
-                Map.of("batch_id", "b1", "output_table", "events_raw"),
-                Map.of("batch_id", "b2", "output_table", "other_store"));   // a batch to a different store → excluded
+                Map.of("consignment_id", "b1", "output_table", "events_raw"),
+                Map.of("consignment_id", "b2", "output_table", "other_store"));   // a batch to a different store → excluded
         List<Map<String, String>> lineage = List.of(
-                Map.of("batch_id", "b1", "input_file", "subs.csv", "partition", "day=2020-04-03", "row_count", "1234"),
-                Map.of("batch_id", "b2", "input_file", "ignored.csv", "partition", "day=2020-04-04", "row_count", "9"));
+                Map.of("consignment_id", "b1", "input_file", "subs.csv", "partition", "day=2020-04-03", "row_count", "1234"),
+                Map.of("consignment_id", "b2", "input_file", "ignored.csv", "partition", "day=2020-04-04", "row_count", "9"));
 
         var out = LineageRoutes.stitchUpstream("lineage_etl", "events_raw", batches, lineage);
 

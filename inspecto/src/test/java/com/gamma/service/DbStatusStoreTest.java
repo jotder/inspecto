@@ -101,7 +101,7 @@ class DbStatusStoreTest {
         String batchId = db.committedBatches(cfg).iterator().next();
         List<Map<String, String>> filtered = db.lineage(cfg, batchId);
         assertFalse(filtered.isEmpty(), "lineage rows exist for the committed batch");
-        assertTrue(filtered.stream().allMatch(r -> batchId.equals(r.get("batch_id"))),
+        assertTrue(filtered.stream().allMatch(r -> batchId.equals(r.get("consignment_id"))),
                 "every filtered lineage row belongs to the requested batch");
         // an unknown batch yields nothing
         assertTrue(db.lineage(cfg, "no-such-batch").isEmpty());

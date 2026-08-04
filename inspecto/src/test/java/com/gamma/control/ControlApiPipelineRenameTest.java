@@ -195,7 +195,7 @@ class ControlApiPipelineRenameTest {
             assertEquals("batch-1", commits.get(0).asText());
             JsonNode batches = V1Body.of(get(c.port, "/runs/mini_v2/batches").body());
             assertEquals(1, batches.size());
-            assertEquals("batch-1", batches.get(0).path("batch_id").asText());
+            assertEquals("batch-1", batches.get(0).path("consignment_id").asText());
 
             // The old id no longer resolves to anything; the new one is what /pipelines lists.
             assertEquals(404, get(c.port, "/pipelines/mini_etl/graph").statusCode());

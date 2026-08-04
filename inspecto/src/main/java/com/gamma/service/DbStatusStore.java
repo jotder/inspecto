@@ -178,7 +178,7 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
                 deletePipeline(p);
                 insertCommits(p, source.committedBatches(cfg));
                 insertRows(T_BATCHES, p, source.batches(cfg), null);
-                insertRows(T_LINEAGE, p, source.lineage(cfg, null), "batch_id");
+                insertRows(T_LINEAGE, p, source.lineage(cfg, null), "consignment_id");
                 insertRows(T_FILES, p, source.files(cfg), null);
                 insertRows(T_QUARANTINE, p, source.quarantine(cfg), null);
             }
@@ -244,6 +244,11 @@ public final class DbStatusStore implements StatusStore, AutoCloseable, com.gamm
      * Insert payload rows for one pipeline. When {@code batchIdKey} is non-null the
      * row's value for that key is also stored in the indexed {@code batch_id} column
      * (lineage), so {@link #lineage} can filter without parsing every payload.
+     *
+     * <p>Note the asymmetry, which is deliberate: the <b>key read from the row map</b> is the canonical
+     * {@code consignment_id} (ledger headers are canonicalised by {@code Csv.readInto}), while this table's own
+     * <b>DDL column stays {@code batch_id}</b> — renaming a column in existing {@code .duckdb} files needs a
+     * real {@code ALTER TABLE} migration, which is scoped out of the §11.3 slice that renamed the ledgers.
      */
     private void insertRows(String table, String pipeline,
                             List<Map<String, String>> rows, String batchIdKey) throws SQLException {

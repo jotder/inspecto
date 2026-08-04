@@ -24,7 +24,7 @@ class CommitLogTest {
         Path f = dir.resolve("p_commits.log");
         new CommitLog(f.toString());
         assertTrue(Files.exists(f));
-        assertEquals("committed_at,batch_id,pipeline,status,member_count,output_count,output_rows,output_bytes",
+        assertEquals("committed_at,consignment_id,pipeline,status,member_count,output_count,output_rows,output_bytes",
                 Files.readAllLines(f).get(0));
     }
 

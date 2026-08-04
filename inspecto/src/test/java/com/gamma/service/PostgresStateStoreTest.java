@@ -207,14 +207,14 @@ class PostgresStateStoreTest {
         StatusStore source = new StatusStore() {
             @Override public Set<String> committedBatches(PipelineConfig c) { return Set.of("b1", "b2"); }
             @Override public List<Map<String, String>> batches(PipelineConfig c) {
-                return List.of(Map.of("batch_id", "b1", "status", "SUCCESS"),
-                               Map.of("batch_id", "b2", "status", "SUCCESS"));
+                return List.of(Map.of("consignment_id", "b1", "status", "SUCCESS"),
+                               Map.of("consignment_id", "b2", "status", "SUCCESS"));
             }
             @Override public List<Map<String, String>> files(PipelineConfig c) {
                 return List.of(Map.of("file", "data.csv"));
             }
             @Override public List<Map<String, String>> lineage(PipelineConfig c, String batchId) {
-                return List.of(Map.of("batch_id", "b1", "rows", "3"));
+                return List.of(Map.of("consignment_id", "b1", "rows", "3"));
             }
             @Override public List<Map<String, String>> quarantine(PipelineConfig c) { return List.of(); }
         };
@@ -224,7 +224,7 @@ class PostgresStateStoreTest {
             assertEquals(Set.of("b1", "b2"), db.committedBatches(cfg), "commits projected to Postgres");
             assertEquals(2, db.batches(cfg).size(), "batch rows round-tripped through Postgres");
             assertEquals(1, db.files(cfg).size());
-            assertEquals("b1", db.lineage(cfg, "b1").get(0).get("batch_id"), "lineage filter by batch on Postgres");
+            assertEquals("b1", db.lineage(cfg, "b1").get(0).get("consignment_id"), "lineage filter by batch on Postgres");
             assertTrue(db.quarantine(cfg).isEmpty());
         }
     }

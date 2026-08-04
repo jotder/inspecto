@@ -1,14 +1,28 @@
 package com.gamma.etl;
 
+import com.google.gson.annotations.SerializedName;
+
 import java.util.List;
 
 /**
  * Serializable record of everything a batch produced, used by
- * {@code ura reprocess <batch_id>} to delete outputs/markers and restore members.
+ * {@code ura reprocess <consignment_id>} to delete outputs/markers and restore members.
  *
  * <p>Plain mutable fields (not a record) for straightforward Gson (de)serialization.
  */
 public final class BatchManifest {
+
+    /**
+     * The unit of work this manifest describes. Serialised as {@code "consignmentId"} and read from
+     * <b>either</b> spelling (consignment-ELT plan §11.3, decision 2's mandated accept-both-on-read).
+     *
+     * <p>Gson had no annotation here before, so the on-disk key was the field name, camelCase
+     * {@code "batchId"}. Renaming the field alone would have yielded {@code null} for every manifest already
+     * on disk <b>with no exception thrown</b>, silently breaking {@code ReprocessCommand}. {@code alternate}
+     * is what makes the old key keep working; the Java field name stays {@code batchId} because §3/§15 keep
+     * the {@code Batch*} internals and their accessors out of this slice's scope.
+     */
+    @SerializedName(value = "consignmentId", alternate = {"batchId"})
     public String batchId;
     public String pipeline;
     public String schemaName;

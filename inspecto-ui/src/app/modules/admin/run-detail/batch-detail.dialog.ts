@@ -78,8 +78,8 @@ export class BatchDetailDialog implements OnInit {
             lineage: this.api.lineage(pipeline, batchId),
         }).subscribe({
             next: ({ batches, files, lineage }) => {
-                this.batchRow = batches.find((b) => b['batch_id'] === batchId) || null;
-                this.batchFiles = files.filter((f) => f['batch_id'] === batchId);
+                this.batchRow = batches.find((b) => b['consignment_id'] === batchId) || null;
+                this.batchFiles = files.filter((f) => f['consignment_id'] === batchId);
                 this.batchLineage = lineage;
                 this.loading = false;
             },

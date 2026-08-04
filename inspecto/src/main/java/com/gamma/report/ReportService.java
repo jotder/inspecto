@@ -132,7 +132,7 @@ public final class ReportService implements ReportRunner {
                 List<Map<String, String>> batches = store.batches(cfg);
                 if (!batches.isEmpty()) {
                     Map<String, String> last = batches.get(batches.size() - 1);   // newest run last
-                    lastId     = last.getOrDefault("batch_id", "");
+                    lastId     = last.getOrDefault("consignment_id", "");
                     lastStatus = last.getOrDefault("status", "");
                     lastTime   = last.getOrDefault("end_time", last.getOrDefault("start_time", ""));
                 }

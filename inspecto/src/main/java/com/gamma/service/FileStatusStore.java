@@ -51,7 +51,7 @@ public final class FileStatusStore implements StatusStore {
     public List<Map<String, String>> lineage(PipelineConfig cfg, String batchId) {
         List<Map<String, String>> rows = readRuns(cfg, "_lineage_");
         if (batchId == null || batchId.isBlank()) return rows;
-        rows.removeIf(r -> !batchId.equals(r.get("batch_id")));
+        rows.removeIf(r -> !batchId.equals(r.get("consignment_id")));
         return rows;
     }
 

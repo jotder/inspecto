@@ -33,16 +33,16 @@ final class OperationalTables {
     // ── canonical ledger schemas (the audit-writer header contracts) ─────────────────────
 
     static final List<String> BATCHES = List.of(
-            "batch_id", "pipeline", "schema_name", "output_table", "start_time", "end_time", "status",
+            "consignment_id", "pipeline", "schema_name", "output_table", "start_time", "end_time", "status",
             "member_count", "rejected_count", "total_input_rows", "total_output_rows",
             "output_file_count", "total_output_bytes", "duration_ms", "error");
 
     static final List<String> FILES = List.of(
             "start_time", "end_time", "filename", "status", "parsed_rows", "error_rows",
-            "output_paths", "output_sizes_bytes", "duration_ms", "error", "batch_id");
+            "output_paths", "output_sizes_bytes", "duration_ms", "error", "consignment_id");
 
     static final List<String> LINEAGE = List.of(
-            "batch_id", "src_id", "input_file", "output_file", "partition", "row_count");
+            "consignment_id", "src_id", "input_file", "output_file", "partition", "row_count");
 
     static final List<String> QUARANTINE = List.of("file", "reason", "path", "size_bytes");
 

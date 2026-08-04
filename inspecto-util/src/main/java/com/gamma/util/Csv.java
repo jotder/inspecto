@@ -36,9 +36,29 @@ public final class Csv {
     }
 
     /**
+     * Legacy header spellings mapped to their canonical name as rows are read — <b>the accept-both-on-read half
+     * of the {@code batch_id} → {@code consignment_id} rename</b> (consignment-ELT plan §11.3, decision 2).
+     *
+     * <p><b>Why the rename needs this, and why here.</b> {@link CsvLedger} writes a header only when the file
+     * does not yet exist, so existing audit ledgers keep {@code batch_id} forever while new ones get
+     * {@code consignment_id} — and {@code FileStatusStore.readRuns} globs <em>many</em> run-timestamped files
+     * into one row list, so both spellings legitimately coexist <b>in the same result</b>. Fixing that at each
+     * consumer would mean every one of them checking two keys forever, and any consumer missed would fail
+     * <em>silently</em> (a wrong key reads as an absent column, not an error). Normalising once, here at the
+     * only header-keyed reader, means every consumer downstream sees exactly one spelling.
+     *
+     * <p>This intentionally does <b>not</b> keep the legacy key alongside the canonical one: a row carrying both
+     * would re-introduce the ambiguity, and would surface the extra column to
+     * {@code OperationalTables}' drift warning as un-queryable ledger drift.
+     */
+    private static final Map<String, String> LEGACY_HEADERS = Map.of("batch_id", "consignment_id");
+
+    /**
      * Append each data row of a header-bearing CSV to {@code out} as an ordered
      * header→value map (short rows pad with {@code ""}). Rows read before a mid-file
      * parse error remain in {@code out} — the caller decides how to report the failure.
+     *
+     * <p>Header names are canonicalised on the way in; see {@link #LEGACY_HEADERS}.
      */
     public static void readInto(Path file, List<Map<String, String>> out)
             throws IOException, CsvValidationException {
@@ -50,7 +70,8 @@ public final class Csv {
             while ((row = csv.readNext()) != null) {
                 Map<String, String> m = new LinkedHashMap<>();
                 for (int i = 0; i < header.length; i++)
-                    m.put(header[i], i < row.length ? row[i] : "");
+                    m.put(LEGACY_HEADERS.getOrDefault(header[i], header[i]),
+                            i < row.length ? row[i] : "");
                 out.add(m);
             }
         }

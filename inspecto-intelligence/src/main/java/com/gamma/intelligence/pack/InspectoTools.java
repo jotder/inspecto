@@ -424,7 +424,7 @@ final class InspectoTools {
     }
 
     private static Map<String, String> batchRow(List<Map<String, String>> rows, String batchId) {
-        return rows.stream().filter(r -> batchId.equals(r.get("batch_id"))).findFirst().orElse(null);
+        return rows.stream().filter(r -> batchId.equals(r.get("consignment_id"))).findFirst().orElse(null);
     }
 
     /** The comparison view over one raw {@code _batches_} audit row (every CSV cell is a string). */
