@@ -356,7 +356,12 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   can be set explicitly, e.g. `tier:'required', required:false` for an always-visible optional field
   (`widget-option-attributes.ts`). Duplicate-name guard on create is a local `uniqueNameValidator` attached
   to the id control, skipped entirely when the field is locked on edit (jobs/dataset-editor/
-  dashboard-editor/widgets all use this shape).
+  dashboard-editor/widgets all use this shape). ⚠ **Pipeline NODE attributes are a special case since
+  2026-08-04: the server publishes them** on `GET /pipelines/node-types` (`attributes[]`, from
+  `NodeAttributes.java`), so `pipelines/node-attributes.ts` is a **fallback**, not the source. Change a node
+  attribute in BOTH, or the committed `inspecto/mock/node-attributes.contract.json` drift check fails on one
+  of the two sides (deliberately — see `okf/frontend/features/pipelines.md`). Adding an `AttributeType` still
+  needs `FindingsSpec.TYPES` widened, which `NodeAttribute` now delegates to.
 - **Optimistic mutations** — `optimisticMutate({apply,commit,reconcile,rollback,onError})` (`inspecto/api/
   optimistic.ts`); reassign arrays (`rows=[...]`) so the grid re-renders.
 - **G6 graph** — reuse `modules/admin/catalog/graph-view.component.ts` (`@Input data`, `@Output nodeClick`);
