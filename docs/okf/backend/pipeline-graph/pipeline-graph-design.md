@@ -1028,7 +1028,7 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   The G6 authoring canvas is `inspecto-ui` `modules/admin/pipelines/pipeline-editor.component.ts` +
   `pipeline-editor-graph.component.ts` (the Pipelines pane's **Edit** mode, `PipelinesViewMode`): palette
   drag/click node-add (17 processor types + CONTROL), two-click + Shift-drag edge-add, keyboard delete,
-  per-node config dialogs (`NodeConfigDialog`/`ParserConfigDialog`), dry-run/validate/activate, last-run
+  per-node config dialogs (`NodeConfigDialog`/`GrammarEditorDialog`), dry-run/validate/activate, last-run
   overlay (T17), all persisted through this row's own `/pipelines/authored` CRUD (`POST`/`GET …/raw`/`PUT`/
   `DELETE` — live-verified end-to-end 2026-07-19). Landed incrementally from `4ffc378` (2026-06-30,
   mock-backed) through the T32-era real-route wiring. Wiring authored flows into the live executor

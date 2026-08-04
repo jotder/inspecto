@@ -16,7 +16,7 @@ timestamp: 2026-06-28T00:00:00Z
 * **Compile** (`query-sql.ts`): `compileSql(model, source)` → an illustrative DuckDB-style SQL string; `compileSqlWithParams(model, source)` → SQL with `:fieldValue` binds + the param list (basis for a [rule](rule.md) template).
 * **Eval** (`query-eval.ts`): `evaluateRows(model, source)` runs the structured model over rows in-browser (used for the standalone panel's live preview).
 * **Builder** (`query-condition-group.component.ts`): `<inspecto-query-condition-group>` — the recursive AND/OR filter editor, reused by the data-table's pro filter builder.
-* **Panel** (`query-panel.component.ts`): `<inspecto-query-panel>` — the original all-in-one queryable table (projection + builder + SQL + live preview). Still used by the parser-config parsed-output; the data-table composes the pieces directly instead.
+* **Panel** (`query-panel.component.ts`): `<inspecto-query-panel>` — the original all-in-one queryable table (projection + builder + SQL + live preview). Still used by the Grammar editor's parsed output; the data-table composes the pieces directly instead.
 
 Note the offline split: the standalone panel **evaluates the structured model** (`evaluateRows`); the
 data-table Pro editor **executes free SQL** via AlaSQL (see [data-table](data-table.md)).
