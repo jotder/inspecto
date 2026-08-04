@@ -49,6 +49,12 @@ is required with `-am`, since upstream modules contain none of the named classes
 fail the reactor before it reaches the module under test. **A narrowed run is never "verified"** —
 `mvn -o clean test` is.
 
+⚠ **`-am` is also what makes it COMPILE**, not just a Surefire concern: without it, `-pl <module>`
+resolves that module's siblings from the **installed `.m2` jars**, which are stale the moment a sibling
+gains a member in your working tree. Observed 2026-08-04 — `-pl inspecto-engine` failed with
+`cannot find symbol: method where()` on `PipelineConfig.CsvSettings` (added in `8e6e605d`, never
+`install`ed), which reads like a broken edit rather than a stale dependency. Always pass `-am`.
+
 ### ⚠ …and `mvn -o clean test` alone is a false green for the edition modules
 
 `inspecto-security` and `inspecto-policy` enter the reactor **only** under `-Pedition-standard` /
