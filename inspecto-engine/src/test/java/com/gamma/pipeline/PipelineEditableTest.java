@@ -111,6 +111,64 @@ class PipelineEditableTest {
                 "the edit lands in parsing:, the block that wins the overlay");
     }
 
+    /**
+     * A parser node bound to a reusable Grammar component lowers to a config that still references it.
+     * {@link PipelineNode} documents {@code grammar/<id>} as an intended {@code use:} ref and the
+     * Grammar editor writes exactly that — but {@code lower()} used to translate only
+     * {@code connection/}, so the binding was dropped on the way to disk (and, with no PARSER_OWNED
+     * key present, refused {@code PARSER_NO_SCHEMA} instead).
+     */
+    @Test
+    void grammarBindingSurvivesLowering() {
+        PipelineGraph g = new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                new PipelineNode("parse", "parser", Map.of(), "grammar/pipe_delimited"),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, new LinkedHashMap<>(), true);
+
+        Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+        assertNotNull(parsing, "a grammar-bound parser lowers to a parsing: block");
+        assertEquals("grammar/pipe_delimited", parsing.get("grammar"),
+                "the Grammar the operator bound must survive the round-trip to disk");
+    }
+
+    /** Unbinding the Grammar in the editor unbinds it on disk — a strict save is the whole truth. */
+    @Test
+    void unbindingTheGrammarClearsTheRef() {
+        Map<String, Object> existing = new LinkedHashMap<>();
+        existing.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/old", "frontend", "delimited")));
+        PipelineGraph g = new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of("schema_file", "s.toon")),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, existing, true);
+
+        Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+        assertNull(parsing == null ? null : parsing.get("grammar"), "the stale Grammar ref is cleared");
+    }
+
+    /** The binding round-trips: a grammar-bound file lifts back to a use: ref, not a raw config key. */
+    @Test
+    void grammarRefLiftsBackOntoUse(@TempDir Path dir) throws Exception {
+        Path toon = writeParsingBlockPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> parsing = (Map<String, Object>) raw.get("parsing");
+        parsing.put("grammar", "grammar/pipe_delimited");
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<?, ?> parser = nodeOfType(PipelineEditable.toMap(cfg, raw), "parser");
+
+        assertEquals("grammar/pipe_delimited", parser.get("use"),
+                "a bound Grammar presents as a binding, like connection/ on acquisition");
+        Map<?, ?> config = (Map<?, ?>) parser.get("config");
+        Map<?, ?> nodeParsing = config == null ? null : (Map<?, ?>) config.get("parsing");
+        assertNull(nodeParsing == null ? null : nodeParsing.get("grammar"),
+                "…and not ALSO as a free-text config key the operator could corrupt");
+    }
+
     /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */
     @Test
     void twoDistinctDatabasesLowerToASinksList() {

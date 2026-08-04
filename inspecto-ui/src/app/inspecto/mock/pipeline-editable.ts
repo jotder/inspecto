@@ -123,7 +123,17 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     // `PipelineEditable.editableConfig`). It OVERLAYS processing.csv_settings in the engine, so a
     // parser node that could not see it would edit the losing key.
     if (config['parsing'] != null) parserCfg['parsing'] = config['parsing'];
-    nodes.push({ id: 'parse', type: 'parser', name: 'Parser', config: parserCfg });
+    // A bound reusable Grammar presents as `use:`, mirroring connection/ on acquisition — never ALSO
+    // as a free-text config key.
+    let parserUse: string | undefined;
+    if (typeof asMap(config['parsing'])['grammar'] === 'string') {
+        parserUse = String(asMap(config['parsing'])['grammar']);
+        const stripped = asMap(parserCfg['parsing']);
+        delete stripped['grammar'];
+        if (Object.keys(stripped).length) parserCfg['parsing'] = stripped;
+        else delete parserCfg['parsing'];
+    }
+    nodes.push({ id: 'parse', type: 'parser', name: 'Parser', use: parserUse, config: parserCfg });
     edges.push({ from: upstream, rel: 'data', to: 'parse' });
     let sinkUpstream = 'parse';
     if (Object.keys(filterCfg).length) {
@@ -194,8 +204,9 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         if (!primarySink || primarySink.config?.['database'] == null)
             refusals.push({ code: 'NO_PERSISTENT_SINK', message: 'an active pipeline needs a persistent sink with a database dir' });
         const schemaKeys = ['parsing', 'csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config'];
-        if (parser && !schemaKeys.some((k) => parser!.config?.[k] != null))
-            refusals.push({ code: 'PARSER_NO_SCHEMA', nodeId: parser.id, message: 'the parser names no parsing: block / schema_file / schemas / segments' });
+        const grammarBound = !!parser?.use?.startsWith('grammar/');
+        if (parser && !grammarBound && !schemaKeys.some((k) => parser!.config?.[k] != null))
+            refusals.push({ code: 'PARSER_NO_SCHEMA', nodeId: parser.id, message: 'the parser names no Grammar / parsing: block / schema_file / schemas / segments' });
     }
     if (refusals.length) return { refusals };
 
@@ -240,8 +251,14 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         }
         // …and the top-level parsing: block it owns. Removed only in strict mode: a partial merge
         // must not drop a block it was never given (mirrors `overlayOwned`).
-        if (parser.config?.['parsing'] != null) out['parsing'] = parser.config['parsing'];
-        else if (strict) delete out['parsing'];
+        const parsingBlock = asMap(parser.config?.['parsing'] ?? out['parsing']);
+        if (parser.config?.['parsing'] == null && strict) for (const k of Object.keys(parsingBlock)) delete parsingBlock[k];
+        // …and the Grammar binding it carries on use:. Without this the ref rides the graph model and
+        // is silently dropped on the way to disk (mirrors PipelineEditable.lower).
+        if (parser.use?.startsWith('grammar/')) parsingBlock['grammar'] = parser.use;
+        else if (strict) delete parsingBlock['grammar'];
+        if (Object.keys(parsingBlock).length) out['parsing'] = parsingBlock;
+        else delete out['parsing'];
     }
 
     if (primarySink) {

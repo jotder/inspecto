@@ -215,16 +215,22 @@ final class PipelineConfigParser {
         // The delimited parse grammar may live inline under processing.csv_settings, in a separate
         // reusable file referenced by processing.grammar, or both (inline keys win). resolveGrammar
         // returns the effective map (or null when neither is present — defaults then apply).
-        String grammarRef = blankToNull(proc.get("grammar"));
-        if (grammarRef != null) b.referencedFiles.add(Paths.get(grammarRef));
-        Map<String, Object> csv = resolveGrammar(proc);
-
         // ── unified parsing: block (additive, 4.8) ────────────────────────────
         // A top-level `parsing:` block is the design-of-record grammar (docs/parsing-options-reference.md
         // §5): `parsing.delimited` aliases today's `processing.csv_settings`, `parsing.plugin` aliases
         // `processing.ingester`/`segments`/`ingester_config`. Absent ⇒ nothing changes (every existing
         // config parses byte-for-byte identically). Keys from `parsing:` overlay the legacy blocks.
         Map<String, Object> parsing = (Map<String, Object>) raw.get("parsing");
+
+        // `parsing.grammar` (design-of-record) wins over the legacy `processing.grammar`, consistent
+        // with every other key in the block. Either may be a plain path OR a registry reference
+        // (`grammar/<id>`), which is what a Grammar-bound parser node lowers to.
+        String grammarRef = parsing != null ? blankToNull(parsing.get("grammar")) : null;
+        if (grammarRef == null) grammarRef = blankToNull(proc.get("grammar"));
+        Path grammarFile = grammarRef == null ? null : resolveGrammarRef(grammarRef, configDir);
+        if (grammarFile != null) b.referencedFiles.add(grammarFile);
+        Map<String, Object> csv = resolveGrammar(proc, grammarFile);
+
         if (parsing != null) csv = mergeParsing(csv, parsing);
 
         String frontend = "delimited";
@@ -574,6 +580,36 @@ final class PipelineConfigParser {
      * @return the path to read; absolute refs and the null-{@code configDir} case return {@code ref} as-is,
      *         byte-identically to the pre-W1b behaviour
      */
+    /**
+     * Resolve a grammar reference to the file to read. Two spellings are accepted:
+     *
+     * <ul>
+     *   <li>a <b>registry reference</b> — {@code grammar/<id>}, what a Grammar-bound parser node
+     *       lowers to — which resolves to {@code <configDir>/registry/grammars/<id>.toon}, the path
+     *       {@code ComponentStore} writes;</li>
+     *   <li>a plain <b>path</b> (the pre-existing {@code processing.grammar} spelling), resolved with
+     *       the same config-dir-relative rules as every schema reference.</li>
+     * </ul>
+     *
+     * <p>Both now go through {@link #resolveSchemaRef}, so a grammar and a schema reference in the
+     * same file resolve alike — previously this was a bare {@code Paths.get}, so a relative grammar
+     * path resolved from the working directory while its sibling schema ref resolved from the config
+     * dir. That is a <b>consistency</b> fix, not a containment one: {@code resolveSchemaRef} is
+     * explicitly not a security boundary (see its javadoc).
+     *
+     * <p>A registry ref has no legacy working-directory meaning, so it resolves under {@code configDir}
+     * or not at all; with a null {@code configDir} (in-memory draft) it cannot resolve and is returned
+     * as authored, which surfaces as the usual "Grammar file not found".
+     */
+    private static Path resolveGrammarRef(String ref, Path configDir) {
+        if (!ref.startsWith(GRAMMAR_REF_PREFIX)) return resolveSchemaRef(ref, configDir);
+        String id = ref.substring(GRAMMAR_REF_PREFIX.length());
+        return resolveSchemaRef("registry/grammars/" + id + ".toon", configDir);
+    }
+
+    /** The registry-reference prefix a Grammar-bound parser node carries ({@code use: grammar/<id>}). */
+    private static final String GRAMMAR_REF_PREFIX = "grammar/";
+
     private static Path resolveSchemaRef(String ref, Path configDir) {
         Path asAuthored = Paths.get(ref);
         if (configDir == null || asAuthored.isAbsolute()) return asAuthored;
@@ -953,17 +989,16 @@ final class PipelineConfigParser {
      * @throws FileNotFoundException if {@code processing.grammar} names a file that does not exist
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> resolveGrammar(Map<String, Object> proc) throws IOException {
-        String grammarPath = blankToNull(proc.get("grammar"));
+    private static Map<String, Object> resolveGrammar(Map<String, Object> proc, Path grammarFile)
+            throws IOException {
         Map<String, Object> inline = (Map<String, Object>) proc.get("csv_settings");
         Map<String, Object> grammar = null;
-        if (grammarPath != null) {
-            Path gp = Paths.get(grammarPath);
-            if (!Files.exists(gp))
-                throw new FileNotFoundException("Grammar file not found: " + grammarPath);
+        if (grammarFile != null) {
+            if (!Files.exists(grammarFile))
+                throw new FileNotFoundException("Grammar file not found: " + grammarFile);
             grammar = (Map<String, Object>)
-                    JToon.decode(Files.readString(gp, StandardCharsets.UTF_8));
-            log.info("[CONFIG] Delimited grammar: {}", grammarPath);
+                    JToon.decode(Files.readString(grammarFile, StandardCharsets.UTF_8));
+            log.info("[CONFIG] Delimited grammar: {}", grammarFile);
         }
         if (grammar == null && inline == null) return null;
         Map<String, Object> merged = new LinkedHashMap<>();

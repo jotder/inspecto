@@ -77,6 +77,46 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
         );
     });
 
+    it('presents a bound Grammar as use:, not as a config key', () => {
+        const existing = { ...parsingBlockConfig(), parsing: { frontend: 'delimited', grammar: 'grammar/pipe_delimited' } };
+
+        const parser = liftConfig(existing).nodes.find((n) => n.type === 'parser')!;
+
+        expect(parser.use).toBe('grammar/pipe_delimited');
+        expect((parser.config?.['parsing'] as Record<string, unknown> | undefined)?.['grammar']).toBeUndefined();
+    });
+
+    it('lowers the Grammar binding back into parsing.grammar', () => {
+        const g = liftConfig(parsingBlockConfig());
+        g.nodes.find((n) => n.type === 'parser')!.use = 'grammar/pipe_delimited';
+
+        const res = lowerGraph(g, parsingBlockConfig(), true);
+
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['grammar']).toBe('grammar/pipe_delimited');
+    });
+
+    it('clears the ref when the Grammar is unbound', () => {
+        const existing = { ...parsingBlockConfig(), parsing: { frontend: 'delimited', grammar: 'grammar/old' } };
+        const g = liftConfig(existing);
+        g.nodes.find((n) => n.type === 'parser')!.use = undefined;
+
+        const res = lowerGraph(g, existing, true);
+
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing?.['grammar']).toBeUndefined();
+    });
+
+    it('accepts a Grammar binding as satisfying PARSER_NO_SCHEMA', () => {
+        const existing = parsingBlockConfig();
+        delete (existing as Record<string, unknown>)['parsing'];
+        delete (existing.processing as Record<string, unknown>)['schema_file'];
+        const g = liftConfig(existing);
+        g.nodes.find((n) => n.type === 'parser')!.use = 'grammar/pipe_delimited';
+
+        expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+    });
+
     it('does not drop a parsing: block it was never given (non-strict merge)', () => {
         const existing = parsingBlockConfig();
         const g = liftConfig(existing);

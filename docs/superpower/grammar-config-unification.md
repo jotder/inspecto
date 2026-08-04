@@ -128,17 +128,30 @@ master is the oldest affected line and there is no merge-forward set.
 Verified: full reactor **BUILD SUCCESS** (23 modules, `inspecto-processor` 661 tests) with only the
 slice-1 red test excluded; UI 2035 passed / 310 files; `lint:tokens` clean.
 
-### Slice 3 — the Grammar binding resolves (closes Defect A)
-- `PipelineEditable.lower()`: translate `use: grammar/<id>` → `parsing.grammar: grammar/<id>`;
-  `PipelineLift` synthesizes it back. Drop `PARSER_NO_SCHEMA` when a grammar ref is present.
-- `PipelineConfigParser.resolveGrammar`: accept a **registry ref** (`grammar/<id>` →
-  `<configDir>/registry/grammars/<id>.toon`) alongside a plain path, both through the jailed
-  `resolveSchemaRef` (§1.3). Inline-wins precedence already exists there — keep it; it *is* the
-  "inline by default, extractable" semantics at the engine level.
-- `PipelineValidator`: refuse an **unknown `use:` prefix** as a named refusal rather than ignoring it.
-- New real-HTTP test: save a graph whose parse node is grammar-bound → re-read → ref present and the
-  pipeline parses with the component's options.
-- Verify: `mvn -o clean test`.
+### Slice 3 — the Grammar binding resolves (closes Defect A) — **SHIPPED**
+- `PipelineEditable.lower()` translates `use: grammar/<id>` → `parsing.grammar`; the **editable lift**
+  (not `PipelineLift`) synthesizes it back onto `use:` and strips it from the node's `parsing` config,
+  so a bound Grammar shows as a binding and never *also* as a corruptible free-text key. Never
+  clobbers an existing `use:` — a plugin parser's `ingester/<fqcn>` is a different thing.
+  `PARSER_NO_SCHEMA` accepts a grammar-bound parser. Unbinding in the editor clears the ref on disk.
+- `PipelineConfigParser`: new `resolveGrammarRef` accepts a **registry ref** (`grammar/<id>` →
+  `<configDir>/registry/grammars/<id>.toon`, the path `ComponentStore` writes) alongside a plain path,
+  both through `resolveSchemaRef` — so a grammar and a schema ref in one file resolve alike.
+  `parsing.grammar` (design-of-record) wins over legacy `processing.grammar`. Inline-wins precedence
+  was already in `resolveGrammar` and is kept: it **is** "inline by default, extractable".
+- ⚠ **Correction to §1.3:** this is a *consistency* fix, NOT a containment one. `resolveSchemaRef`'s
+  own javadoc says it is "deliberately not a security boundary". Full containment stays BACKLOG §6.
+
+**DEFERRED from this slice: the unknown-`use:`-prefix refusal.** Grounding refuted its safety.
+`parseUseRef` (`component-model/refs.ts:21`) deliberately maps **`connections/`** (plural) to the
+`connection` kind, and the mock **seeds** `use: 'connections/cdr_sftp_prod'` — while `lower()` emits
+and reads `connection/` (singular). A blanket refusal would fail-closed on graphs the UI legitimately
+produces today; allow-listing both spellings would bake the inconsistency into the engine contract.
+Fix the vocabulary first (BACKLOG), then add the refusal. Until then a bad binding still fails
+silently — but a *grammar* binding no longer can, which was the actual defect.
+
+Verified: full reactor **BUILD SUCCESS**; the 9 new test methods confirmed present + passing in the
+surefire XML (not silently filtered); UI 2039 passed / 310 files; `lint:tokens` clean.
 
 ### Slice 4 — extract `<inspecto-grammar-editor>` (the whole surface)
 `inspecto/grammar/grammar-editor.component.ts`, standalone/OnPush/signals, **no write path** (hosts

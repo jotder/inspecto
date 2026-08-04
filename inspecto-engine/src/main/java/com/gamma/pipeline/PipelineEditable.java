@@ -71,6 +71,9 @@ public final class PipelineEditable {
     private static final Set<String> PARSER_OWNED = Set.of(
             "csv_settings", "schema_file", "schemas", "segments", "ingester", "ingester_config");
 
+    /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
+    static final String GRAMMAR_REF_PREFIX = "grammar/";
+
     /** Sink-owned processing keys (batch/write tuning carried on the persistent sink node). */
     private static final Set<String> SINK_PROC_OWNED = Set.of(
             "threads", "duckdb_threads", "batch_max_files", "batch_max_bytes");
@@ -102,6 +105,12 @@ public final class PipelineEditable {
             if (n.hasName()) nm.put("name", n.name());
             if (n.description() != null && !n.description().isBlank()) nm.put("description", n.description());
             if (n.hasUse()) nm.put("use", n.use());
+            else if (BuiltinNodeType.PARSER.type().equals(n.type())
+                    && section(raw, "parsing").get("grammar") instanceof String ref)
+                // A parser bound to a reusable Grammar presents that binding as use:, mirroring
+                // connection/ on acquisition. Never clobbers an existing use: — a plugin parser's
+                // synthesized ingester/<fqcn> binding is a different thing and stays.
+                nm.put("use", ref);
             Map<String, Object> c = editableConfig(n, raw, collector, dirs, output, processing);
             if (!c.isEmpty()) nm.put("config", c);
             nodes.add(nm);
@@ -142,6 +151,15 @@ public final class PipelineEditable {
             // node that could not see it would edit the losing key and the operator's change would be
             // silently masked by the block Onboarding wrote.
             putIfPresent(c, "parsing", raw.get("parsing"));
+            // parsing.grammar is carried on use: instead — the same edit-time presentation the
+            // acquisition node gives connection/ — so the editor shows a bound Grammar as a binding,
+            // not as a free-text key the operator could corrupt.
+            if (c.get("parsing") instanceof Map<?, ?> pb && pb.get("grammar") != null) {
+                Map<String, Object> stripped = section(raw, "parsing");
+                stripped.remove("grammar");
+                if (stripped.isEmpty()) c.remove("parsing");
+                else c.put("parsing", stripped);
+            }
         } else if (BuiltinNodeType.GAP.type().equals(t)) {
             if (collector.get("gap_detection") instanceof Map<?, ?> gd)
                 for (Map.Entry<?, ?> e : gd.entrySet())
@@ -232,10 +250,11 @@ public final class PipelineEditable {
                 refusals.add(new PipelineCompileException.Refusal(NO_PERSISTENT_SINK, null,
                         "an active pipeline needs a persistent sink with a database dir"));
             final PipelineNode p = parser;
-            if (p != null && p.cfg("parsing") == null
+            boolean grammarBound = p != null && p.use() != null && p.use().startsWith(GRAMMAR_REF_PREFIX);
+            if (p != null && !grammarBound && p.cfg("parsing") == null
                     && PARSER_OWNED.stream().noneMatch(k -> p.cfg(k) != null))
                 refusals.add(new PipelineCompileException.Refusal(PARSER_NO_SCHEMA, p.id(),
-                        "the parser names no parsing: block / schema_file / schemas / segments"));
+                        "the parser names no Grammar / parsing: block / schema_file / schemas / segments"));
         }
         if (!refusals.isEmpty()) throw new PipelineCompileException(refusals);
 
@@ -283,6 +302,16 @@ public final class PipelineEditable {
             // absent from the file, but only in strict mode: a partial merge must not drop a block it
             // was never given.
             overlayOwned(out, "parsing", parser.cfg("parsing"), strict);
+            // A Grammar-bound parser carries the reusable component on use: — the presentation half,
+            // exactly like connection/ on acquisition. It lowers into parsing.grammar, which the engine
+            // resolves to the registry file. Without this the binding rides the graph model and is
+            // silently dropped on the way to disk.
+            Map<String, Object> parsingBlock = section(out, "parsing");
+            if (parser.use() != null && parser.use().startsWith(GRAMMAR_REF_PREFIX))
+                parsingBlock.put("grammar", parser.use());
+            else if (strict) parsingBlock.remove("grammar");   // unbound in the editor ⇒ unbound on disk
+            if (!parsingBlock.isEmpty()) out.put("parsing", parsingBlock);
+            else out.remove("parsing");
             if (!filters.isEmpty()) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> csv = (Map<String, Object>)

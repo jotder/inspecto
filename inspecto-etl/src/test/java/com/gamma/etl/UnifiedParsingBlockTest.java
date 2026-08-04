@@ -168,4 +168,75 @@ class UnifiedParsingBlockTest {
         Files.writeString(p, pipe, StandardCharsets.UTF_8);
         return PipelineConfig.load(p.toString());
     }
+
+    // ── reusable Grammar components (parsing.grammar) ──────────────────────────
+
+    /**
+     * `parsing.grammar: grammar/<id>` — what a Grammar-bound parser node lowers to — resolves to the
+     * registry file ComponentStore writes, and its options drive the parse.
+     */
+    @Test
+    void grammarRegistryRefResolvesToTheComponentFile(@TempDir Path dir) throws Exception {
+        writeGrammarComponent(dir, "pipe_delimited", "delimiter: \"|\"\nskip_header_lines: 3\n");
+
+        PipelineConfig cfg = load(dir, "gref", "", """
+                parsing:
+                  frontend: delimited
+                  grammar: grammar/pipe_delimited
+                """);
+
+        assertEquals("|", cfg.csv().delimiter(), "the component's options drive the parse");
+        assertEquals(3, cfg.csv().skipHeaderLines());
+    }
+
+    /** Inline keys still win over the referenced component — the "extractable, overridable" contract. */
+    @Test
+    void inlineKeysOverrideTheReferencedGrammar(@TempDir Path dir) throws Exception {
+        writeGrammarComponent(dir, "pipe_delimited", "delimiter: \"|\"\nskip_header_lines: 3\n");
+
+        PipelineConfig cfg = load(dir, "govr", "", """
+                parsing:
+                  frontend: delimited
+                  grammar: grammar/pipe_delimited
+                  delimited:
+                    delimiter: ";"
+                """);
+
+        assertEquals(";", cfg.csv().delimiter(), "the inline override wins");
+        assertEquals(3, cfg.csv().skipHeaderLines(), "…and the component supplies the rest");
+    }
+
+    /** parsing.grammar (design-of-record) wins over the legacy processing.grammar spelling. */
+    @Test
+    void parsingGrammarWinsOverLegacyProcessingGrammar(@TempDir Path dir) throws Exception {
+        writeGrammarComponent(dir, "winner", "delimiter: \"|\"\n");
+        writeGrammarComponent(dir, "loser", "delimiter: \"#\"\n");
+
+        PipelineConfig cfg = load(dir, "gwin", "  grammar: registry/grammars/loser.toon\n", """
+                parsing:
+                  frontend: delimited
+                  grammar: grammar/winner
+                """);
+
+        assertEquals("|", cfg.csv().delimiter());
+    }
+
+    /** A ref naming no component fails loudly at load — never a silent default-delimiter parse. */
+    @Test
+    void unknownGrammarRefFailsLoudly(@TempDir Path dir) {
+        Exception e = assertThrows(Exception.class, () -> load(dir, "gmiss", "", """
+                parsing:
+                  frontend: delimited
+                  grammar: grammar/nope
+                """));
+        assertTrue(String.valueOf(e.getMessage()).contains("Grammar file not found"),
+                "actual: " + e.getMessage());
+    }
+
+    /** Write a grammar component where ComponentStore puts it: <configDir>/registry/grammars/<id>.toon */
+    private static void writeGrammarComponent(Path dir, String id, String body) throws Exception {
+        Path g = dir.resolve("registry").resolve("grammars");
+        Files.createDirectories(g);
+        Files.writeString(g.resolve(id + ".toon"), "name: " + id + "\n" + body, StandardCharsets.UTF_8);
+    }
 }
