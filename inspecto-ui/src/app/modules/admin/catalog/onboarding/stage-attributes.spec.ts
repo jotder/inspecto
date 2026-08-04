@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
 import { NODE_TYPES } from 'app/inspecto/mock/handlers/pipelines.handler';
 import { REFERENCE_STAGES, STREAM_STAGES } from './onboarding-state.service';
-import { parsingAttributesFor } from './parsing-attributes';
+import { parsingAttributesFor } from 'app/inspecto/grammar';
 import { stageAttributesFor } from './stage-attributes';
 
 /**

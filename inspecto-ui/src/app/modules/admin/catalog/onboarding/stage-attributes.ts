@@ -1,5 +1,5 @@
 import { AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
-import { ParsingFrontend, parsingAttributesFor } from './parsing-attributes';
+import { ParsingFrontend, parsingAttributesFor } from 'app/inspecto/grammar';
 import { OnboardingStageId } from './onboarding-state.service';
 
 /**

@@ -139,6 +139,22 @@ src/app/
   until this component started re-seeding). ⚠ On the node dialog the way to UN-bind a Connection is the
   **mode toggle**, not blanking the text — an empty picker while still in Connection mode is a refusal,
   because a non-local collector with no Connection is the state that used to fail at run time.
+- **Authoring how raw bytes become rows → `<inspecto-grammar-editor>`** (`inspecto/grammar/`, 2026-08-04).
+  ONE surface for a **Grammar**: the built-in + served-plugin format catalog, the schema form over
+  `parsingAttributesFor()`/the served `grammarSchema`, sample + sniff suggestion, Test parse, the
+  table/tree result, and the fixed-width slice table. Adopters: Onboarding's Parsing stage and the
+  Pipelines parse node dialog. **No write path** — hosts persist, because one writes a `parsing:` block
+  into a pipeline config and the other writes a reusable `grammar` component. ⚠ **Vocabulary is
+  binding**: this authors a *Grammar*; ⛔ never "parser config"/"parse options" in UI copy
+  (`GLOSSARY.md:272`). *Parser* = the engine that applies a Grammar; different concept.
+  ⚠ Same spec-swap trap as the collector: switching format rebuilds every control from its default, so
+  the editor re-seeds from the live form first. ⚠ The catalog **degrades** — the four built-ins render
+  even when `GET /parsers` fails; never "fix" that into an empty list. ⚠ A saved plugin is identified by
+  its **`ingesterClass` FQCN**, never the parser id, so re-selection can only happen off the served
+  catalog — and `configuredIngester` is a SETTER because inputs are not bound when the constructor runs.
+  ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
+  `.toon` written per segment before the block that references them, which is a write path this
+  component deliberately does not have.
 - **Editing a pipeline graph → the canonical `*_pipeline.toon` round-trip** (`modules/admin/pipelines/`,
   W5 2026-08-01). The Pipelines editor is an editor **over** the canonical config, not a second model.
   Load with `PipelinesService.pipelineGraphRaw(name)` (`GET /pipelines/{name}/graph/raw` — the lifted,

@@ -15,7 +15,7 @@ import { ConfigService, LensService, SpacesService, apiErrorMessage } from 'app/
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { suggestTypes } from './parsing-sniff';
+import { suggestTypes } from 'app/inspecto/grammar';
 import { OnboardingStateService } from './onboarding-state.service';
 
 /** The four types `TransformCompiler.direct()` actually TRY_CASTs — everything else is stored as

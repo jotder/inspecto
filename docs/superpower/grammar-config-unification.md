@@ -153,7 +153,30 @@ silently — but a *grammar* binding no longer can, which was the actual defect.
 Verified: full reactor **BUILD SUCCESS**; the 9 new test methods confirmed present + passing in the
 surefire XML (not silently filtered); UI 2039 passed / 310 files; `lint:tokens` clean.
 
-### Slice 4 — extract `<inspecto-grammar-editor>` (the whole surface)
+### Slice 4 — extract `<inspecto-grammar-editor>` — **SHIPPED (component only; hosts adopt in 5/6)**
+Landed at `inspecto/grammar/` with `parsing-attributes.ts` + `parsing-sniff.ts` `git mv`'d out of the
+onboarding feature (a shared component cannot import a feature). 15 tests incl. axe.
+
+Absorbed as planned: format catalog (built-ins ∪ served, **with Onboarding's degrade-on-error** — the
+dialog's empty-dropdown behaviour was strictly worse), schema form, sample + sniff chip, Test parse,
+table/tree result, fixed-width slice table, unserved-plugin banner. Sample UI is `sampleMode:
+'own' | 'host'` so Onboarding keeps its cross-stage sample strip. Built-in preview stays routable via
+`previewFn` — Onboarding parses through `/config/preview/parsing` so the parsed hop feeds the Schema
+stage, and `ParsingPreview` is structurally `ParserTablePreview` + `frontend`, so the host adapts it.
+
+**Departure: the segments editor is projected (`[grammarExtras]`), not absorbed.** Segments require
+one schema `.toon` written per segment *before* the block referencing them — a host write path, and
+this component has none by design. Absorbing it would have put persistence back inside the shared
+surface, which is the property that lets one component serve two stores.
+
+Two real bugs found by writing the tests, both fixed: `configuredIngester` was read in the constructor
+where **inputs are not yet bound** (a saved plugin would silently present as the built-in it
+normalizes to) — now a setter that re-attempts the rehydrate; and the hidden file input had no label
+(axe critical).
+
+Verified: `ng build` clean, UI **2055 passed / 310 files**, `lint:tokens` clean.
+
+### Slice 4 (original plan text, for reference)
 `inspecto/grammar/grammar-editor.component.ts`, standalone/OnPush/signals, **no write path** (hosts
 persist — the rule that made `<inspecto-collector-config>` and `<inspecto-enrichment-editor>` safe).
 

@@ -1,0 +1,164 @@
+<!-- The config names a plugin this server does not provide — say so, rather than letting the
+     normalized built-in read as "this stream is delimited". -->
+@if (unservedPlugin()) {
+    <inspecto-alert variant="warning" title="Parser plugin not available here">
+        This Grammar parses through <span class="font-mono text-xs">{{ unservedPlugin() }}</span
+        >, which no parser on this server provides. The options below are the built-in fallback — saving
+        would replace the plugin settings.
+    </inspecto-alert>
+}
+
+<!-- ── file format ─────────────────────────────────────────────────────────── -->
+<div class="mt-2">
+    <div class="mb-1 text-xs font-semibold uppercase opacity-70">File format</div>
+    <mat-button-toggle-group
+        [value]="activeType()"
+        (change)="setType($event.value)"
+        aria-label="File format"
+        class="flex-wrap">
+        @for (f of frontends; track f.id) {
+            <mat-button-toggle [value]="f.id" [matTooltip]="f.hint">{{ f.label }}</mat-button-toggle>
+        }
+        @for (p of pluginTypes(); track p.id) {
+            <mat-button-toggle [value]="p.id" [matTooltip]="typeHint(p.label)">{{ typeName(p.label) }}</mat-button-toggle>
+        }
+    </mat-button-toggle-group>
+
+    @if (suggestion(); as sg) {
+        <button
+            type="button"
+            class="mt-2"
+            (click)="applySuggestion()"
+            matTooltip="Apply the suggested file format">
+            <inspecto-chip variant="soft" tone="primary">
+                Looks like {{ sg.reason }} — use {{ frontendLabel(sg.frontend) }}?
+            </inspecto-chip>
+        </button>
+    }
+</div>
+
+<!-- ── sample ──────────────────────────────────────────────────────────────── -->
+@if (sampleMode === 'own') {
+    <div class="mt-4">
+        <div class="mb-1 flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase opacity-70">Sample</span>
+            <button mat-stroked-button type="button" class="!min-h-0 !py-0 !text-xs" (click)="fileInput.click()">
+                Choose a file
+            </button>
+            <input
+                #fileInput
+                type="file"
+                class="hidden"
+                aria-label="Choose a sample file"
+                (change)="onSampleFile($any($event.target).files)" />
+        </div>
+        <mat-form-field class="w-full" subscriptSizing="dynamic">
+            <textarea
+                matInput
+                rows="6"
+                class="font-mono !text-xs"
+                placeholder="Paste a few lines of your data…"
+                aria-label="Sample content"
+                [value]="sampleText()"
+                (input)="onSampleText($any($event.target).value)"></textarea>
+        </mat-form-field>
+    </div>
+}
+
+<!-- ── properties ──────────────────────────────────────────────────────────── -->
+<div class="mt-4">
+    <div class="mb-1 text-xs font-semibold uppercase opacity-70">Options</div>
+    <inspecto-schema-form [specs]="specs()" [initial]="seed()" (submitted)="submitted.emit()" />
+</div>
+
+<!-- Fixed-width slices: positional, so there is nothing a flat spec table could express. -->
+@if (!pluginDef() && frontend() === 'fixedwidth') {
+    <div class="mt-3" [formGroup]="fwForm">
+        <div class="mb-1 text-xs font-semibold uppercase opacity-70">Fields</div>
+        <div formArrayName="fields" class="flex flex-col gap-2">
+            @for (g of fwFields.controls; track $index) {
+                <div [formGroupName]="$index" class="flex items-start gap-2">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Name</mat-label>
+                        <input matInput formControlName="name" />
+                        @if (g.get('name')?.hasError('required')) { <mat-error>Required</mat-error> }
+                    </mat-form-field>
+                    <mat-form-field class="w-24" subscriptSizing="dynamic">
+                        <mat-label>Start</mat-label>
+                        <input matInput type="number" formControlName="start" />
+                    </mat-form-field>
+                    <mat-form-field class="w-24" subscriptSizing="dynamic">
+                        <mat-label>Length</mat-label>
+                        <input matInput type="number" formControlName="length" />
+                    </mat-form-field>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        class="mt-1"
+                        [attr.aria-label]="'Remove field ' + ($index + 1)"
+                        (click)="removeField($index)">
+                        <mat-icon class="icon-size-4">remove_circle_outline</mat-icon>
+                    </button>
+                </div>
+            }
+        </div>
+        <button mat-stroked-button type="button" class="mt-2 !text-xs" (click)="addField()">Add field</button>
+    </div>
+}
+
+<!-- Host-owned extras that need a write path the editor deliberately does not have (segments). -->
+<ng-content select="[grammarExtras]"></ng-content>
+
+<!-- ── test ────────────────────────────────────────────────────────────────── -->
+<div class="mt-4 flex items-center gap-2">
+    <button mat-stroked-button type="button" [disabled]="testing() || !sampleText()" (click)="test()">
+        @if (testing()) { <mat-spinner diameter="16" class="mr-2" /> }
+        Test parse
+    </button>
+    @if (!sampleText()) {
+        <span class="text-secondary text-xs">Add a sample to test these settings.</span>
+    }
+</div>
+
+@if (error()) {
+    <div class="mt-3">
+        <inspecto-alert variant="error">{{ error() }}</inspecto-alert>
+    </div>
+}
+
+<!-- ── result ──────────────────────────────────────────────────────────────── -->
+@if (preview(); as p) {
+    <div class="mt-4">
+        <div class="mb-1 flex items-center gap-3">
+            <span class="text-xs font-semibold uppercase opacity-70">Parsed</span>
+            <span class="text-secondary text-xs">{{ activeType() }}</span>
+            @if (p.kind === 'table') {
+                <inspecto-chip variant="soft">{{ p.columns.length }} columns</inspecto-chip>
+                <inspecto-chip variant="soft">{{ p.rowCount }} rows</inspecto-chip>
+                @if (p.rejectedRows > 0) { <inspecto-chip variant="outline">{{ p.rejectedRows }} rejected</inspecto-chip> }
+            } @else {
+                <inspecto-chip variant="soft">{{ p.recordCount }} records</inspecto-chip>
+            }
+
+            @if (sampleTree()) {
+                <mat-button-toggle-group [value]="resultView()" (change)="resultView.set($event.value)" aria-label="Result view" class="ml-auto">
+                    <mat-button-toggle value="table">Table</mat-button-toggle>
+                    <mat-button-toggle value="tree">Tree</mat-button-toggle>
+                </mat-button-toggle-group>
+            }
+        </div>
+
+        @if (treeNodes(); as nodes) {
+            <app-parser-tree [nodes]="nodes" />
+        } @else if (sampleTree() && resultView() === 'tree') {
+            <app-parser-tree [nodes]="sampleTree()!" />
+        } @else {
+            <inspecto-data-table
+                tier="pro"
+                sourceName="parsed"
+                exportName="parsed-sample"
+                [autoHeight]="true"
+                [rows]="rows()" />
+        }
+    </div>
+}
