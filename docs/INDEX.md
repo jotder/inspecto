@@ -106,8 +106,17 @@ former root reference docs** (each index lists them):
   `invalid` rather than creating a phantom partition** (§10.3). §11 grounds the persistence model against
   the existing `BatchAuditWriter` CSVs / `EventType` / `Signal` / `ObjectType` — most of the event surface
   already exists; the real gap is **no durable output-file registry** (`PartitionOutput` is in-memory only),
-  which §5.3 reprocessing, §5.5 and §6.3 compaction all need. **Open: `ProcessorContext` (§14)** — start
-  there. New model surface listed in §13; unverified items and open decisions in §15.
+  which §5.3 reprocessing, §5.5 and §6.3 compaction all need. **`ProcessorContext` (§14) is now DESIGNED
+  (2026-08-04), still unbuilt** — grounded against the code, and the grounding **corrected §4.7**: there is no
+  `on_commit` Job trigger (commit-fired Jobs ride the `pipeline.commit` **Signal**, which carries `batchId`),
+  and `ON_COMMIT_SAME_GRAPH` is a graph-structure refusal that says nothing about Jobs, so it must not be cited
+  as enforcing the in-motion/at-rest line. §14's decisions: the context is a Consignment-scoped façade over the
+  **existing** Job seam (`JobTypeProvider`/`JobTypeRegistry` — no new SPI), an 8-member surface that delegates
+  three `JobContext` emitters rather than exposing `JobContext`, a `SummaryEmitter` that enforces §7.2
+  (`count` mandatory, additive-only) instead of a raw writer, and no writable connection / no `PipelineConfig`
+  / no in-motion types. **§14 and §11.3 are one unit of work** — `outputs()` needs row counts that
+  `PartitionOutput` does not carry. Build order + verify conditions in §14.4. New model surface listed in §13;
+  unverified items and open decisions in §15.
 
 - [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) —
   **IN FLIGHT (opened 2026-08-02). Steps 0–4 SHIPPED same day** (`4fe388a1`): the armed-pipeline silent

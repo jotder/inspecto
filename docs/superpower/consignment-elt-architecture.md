@@ -96,9 +96,24 @@ needed (`BuiltinNodeType` is closed on purpose, plan §3.3):
 binding line (`pipeline-graph-design.md` §3.8: *"an at-rest operator cannot be an in-motion node"*), and
 summary/reconciliation work runs after the Consignment has landed — i.e. it is at-rest. So:
 7. **Custom processors** declaring `grain: BATCH` — incremental summary, reconciliation, Java
-   extensions — are **Jobs triggered `on_commit`**, not Steps on the pipeline canvas. This is also why
-   `ON_COMMIT_SAME_GRAPH`'s refusal is correct as-is and should not be revisited: it enforces exactly
-   this line.
+   extensions — are **Jobs fired by the commit Signal**, not Steps on the pipeline canvas.
+
+   ⚠ **Corrected 2026-08-04 (grounded, §14).** This item previously said "Jobs triggered `on_commit`" and
+   cited `ON_COMMIT_SAME_GRAPH` as enforcing the at-rest line. Both are wrong in detail, though the
+   conclusion survives:
+   - **There is no `on_commit` Job trigger.** `on_commit` is a *pipeline-edge* relationship (`PipelineRel.ON_COMMIT`,
+     cross-pipeline only). Commit-fired Jobs are real but ride the **Signal** bus: `JobService.mirrorPipelineCommit`
+     ([`JobService.java:512`](../../inspecto-engine/src/main/java/com/gamma/job/JobService.java)) emits a
+     `pipeline.commit` Signal per terminal batch, carrying `batchId` in the payload *and* as the Signal's
+     `correlationId`; a Job matches it with `on_signal:` config. (The legacy `on_pipeline:` path,
+     `JobService.java:474`, fires on `BatchEvent` but hands over **only the pipeline name** — it cannot tell a
+     processor which Consignment committed, so it is not a candidate here.)
+   - **`ON_COMMIT_SAME_GRAPH` says nothing about Jobs.** It is a graph-structure refusal
+     ([`PipelineValidator.java:58`, enforced at 146–153](../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineValidator.java))
+     forbidding an `on_commit` edge whose target is a node in the *same* graph. Reading it as enforcement of
+     the in-motion/at-rest line is an inference, not what the code checks. **Do not cite it as the enforcement.**
+     The real reason the tier is Jobs is narrower and stronger: **Jobs are the only SPI that reads at-rest data**
+     (§14).
 8. **Compaction** — see §6.
 
 Two design rules:
@@ -735,20 +750,123 @@ Not config — actual additions:
 It evaluates against the summary/manifest relation rather than raw detail (cheap) and slots into the
 existing `ExpectationRoutes` → `raiseIncident` path, so Incident/Signal plumbing is free.
 
-## 14. Open — `ProcessorContext`
+## 14. `ProcessorContext` — DESIGNED 2026-08-04 (grounded, not built)
 
-**The one deliberately unresolved piece, and the one where a wrong guess is most expensive**, because every
-custom processor anyone writes binds to it.
+**The one piece where a wrong guess is most expensive**, because every custom processor anyone writes binds
+to it.
 
-Requirements gathered so far: a processor needs the Consignment id, a manifest **already scoped to that
+Requirements as originally gathered: a processor needs the Consignment id, a manifest **already scoped to that
 Consignment**, the output file list with row counts, and a read-only DuckDB connection. Everything it emits
-should be stamped with the Consignment id without the author thinking about it.
+should be stamped with the Consignment id without the author thinking about it. The tension: too thin and it
+is useless; too fat and it can never change. §7.2's composability rules mean the context must make it *easy
+to get summary semantics right without knowing the storage rules* — which argues for a summary-emit helper
+rather than a raw writer.
 
-The tension: too thin and it is useless; too fat and it can never change. And §7.2's composability rules
-mean the context has to make it *easy for a processor author to get summary semantics right without knowing
-the storage rules* — which argues for the context offering a summary-emit helper rather than a raw writer.
+### 14.1 What grounding changed
 
-**Not designed. Next session should start here.**
+Four findings against the code reshape the design. Each was checked, not assumed.
+
+1. **There is no context seam in either execution path to extend.** `BatchProcessor` hands stages a `Batch`
+   record + `PipelineConfig` via `BatchIngestStrategy.ingest(Batch, PipelineConfig)`. `PipelineExecutor` is a
+   static class threading `Connection`/`PipelineGraph`/`seeds`/`batchId` as loose parameters, handing nodes
+   only `SinkWriter` and `ProvenanceCollector`; `transform.*` nodes are handed nothing — the executor routes
+   them to `RowShaper` itself. So this is a **net-new seam**, and it must not be bolted onto either path.
+2. **The prior art is `JobContext`, and §4.7 puts the tier there anyway.**
+   [`JobContext`](../../inspecto-engine/src/main/java/com/gamma/job/JobContext.java) already supplies
+   `runId` · `spaceId` · `trigger` · `config` · `params` · `log` · `signals` · `artifacts` · `dryRun`, with
+   `RunContext` as the framework-side impl. **Decision: `ProcessorContext` is not a parallel SPI.** It is a
+   Consignment-scoped façade *derived from* a Job run. This is the single biggest scope reduction available —
+   registration, config, parameter resolution, run audit, dry-run and signal plumbing are all already built.
+3. **A read-only connection does not exist anywhere.** No provider, pool or holder; ~8 Jobs each open their
+   own (`BackupTask:328`, `PipelineJobRunner:148`, `MaterializeTask:84`, `MaintenanceJob:476`,
+   `ObjectsAnalyticsJob:186`, `PartitionCompactor:62`, `ReferenceCompactor:116`, `StorageTrendTask:64`,
+   `SqlTemplateJob:90`), and no `readOnly` notion appears in the engine at all. §14's "read-only DuckDB
+   connection" is therefore **net-new plumbing to design**, not a wiring detail — and consolidating that
+   repeated pattern is an incidental win, not this design's job.
+4. **`outputs()` is blocked on §11.3.** `PartitionOutput(partition, outputFile, bytes)` is an in-memory
+   return value with **no row count**; the `lineage` CSV has `row_count` but is an input→output matrix, not
+   an output registry with lifecycle state. **§14 and §11.3 are one unit of work, not two** — the context
+   method has nothing durable to read until `consignment_outputs` exists.
+
+### 14.2 The seam
+
+Third parties implement a thin Consignment-shaped interface; the framework supplies a built-in
+`JobTypeProvider` adapter that resolves the Consignment and calls it. Authors never touch `Job`/`JobContext`.
+
+```java
+public interface ConsignmentProcessor {          // what an author implements
+    ProcessorResult process(ProcessorContext ctx) throws Exception;
+}
+```
+
+Registration reuses the **existing** SPI: `JobTypeProvider` is already the `ServiceLoader` seam for optional
+modules and hot-deployable Job Packs, and `JobTypeRegistry` already keys by `type()` with an `owner` tag for
+deregistration and a duplicate-id guard that built-ins can never be displaced by. **No new registry, no new
+`ServiceLoader` contract.** House style is `CollectorConnectorFactory`'s factory-not-instance shape, which
+`JobTypeProvider` already matches.
+
+The adapter is the framework half, and it is where the "author doesn't think about it" promise is kept: it
+reads the Consignment id from the commit Signal (`$signal.batchId` / `correlationId`, resolved by
+`ParameterResolver`'s existing `$signal.<path>` support), scopes the manifest, opens the read-only connection,
+and stamps every emission.
+
+### 14.3 The surface
+
+Deliberately eight members. Each traces to a stated requirement or to an emitter that already exists.
+
+```java
+public interface ProcessorContext {
+    String consignmentId();                 // resolved by the adapter, never by the author
+    Manifest manifest();                    // ALREADY SCOPED to this Consignment (§4 accretion rules)
+    List<ConsignmentOutput> outputs();      // §11.3 registry — path, rows, bytes, partition, record_day
+    Connection read();                      // read-only DuckDB over the warehouse — net-new (§14.1.3)
+    SummaryEmitter summaries();             // §7.2 guardrail, NOT a raw writer
+    RunLog log();                           // delegated from JobContext
+    SignalEmitter signals();                // delegated; consignment_id auto-stamped
+    boolean dryRun();                       // delegated
+}
+```
+
+**Why delegate `log`/`signals`/`dryRun` rather than expose `JobContext` itself.** A `job()` accessor would be
+one method instead of three and is the wrong trade: it leaks the entire Job surface into a contract every
+third-party processor binds to, so nothing in `JobContext` could ever change again. Delegation keeps the
+blast radius at three known signatures. `RunLog` is 3 methods, `SignalEmitter` is 1 — both are tiny and
+stable enough to re-expose.
+
+**`summaries()` is the whole point of the context, and the reason it is not a writer.** §7.2's rules get
+wrong numbers *quietly* when unenforced, and a raw writer makes every author responsible for them.
+`SummaryEmitter` therefore enforces at the seam what §7.2 says the validator enforces in config: **`count` is
+mandatory on every row**; measures must be declared additive; non-additive ones must be bucketed or declared
+computed-from-detail. It refuses rather than guesses, matching the `projection_author` precedent. It also
+gets §7.2's free reconciliation for nothing — summed `row_count` against detail row count per partition,
+into the existing `ProvenanceCollector`/`ConservationCheck` machinery.
+
+**Note `ArtifactRecorder` is deliberately NOT delegated.** Its two methods (`dataset(...)`, `file(...)`) are
+run-scoped artifact audit, not Consignment summary output; exposing both it and `SummaryEmitter` would give
+authors two plausible ways to emit the same thing — a one-concept-two-words violation. Summary output goes
+through `summaries()`, full stop.
+
+**Explicitly excluded, and why:** no writable connection (append-only is the invariant, §5.1 — a writable
+handle makes the read-modify-write of §5.2 expressible); no `PipelineConfig` (partition-affecting config must
+come from the **pinned** manifest per §5.6, or a config edit silently breaks replace-by-batch); no path
+builders (§11.3's registry is the addressing authority); no `Batch`/`PipelineNode` (would re-couple the
+at-rest tier to an in-motion type).
+
+### 14.4 Sequencing
+
+1. **§11.3 `consignment_outputs` first** — `outputs()` is unimplementable without it, and it is independently
+   the design's biggest addition. → verify: a Consignment's outputs survive process restart with row counts.
+2. **Read-only connection accessor** — smallest net-new piece, independently testable. → verify: a write
+   attempt through `read()` fails.
+3. **`ProcessorContext` + adapter + `ConsignmentProcessor`**, with a reference processor. → verify: a
+   third-party processor gets the right Consignment id from a `pipeline.commit` Signal without declaring
+   anything about signals.
+4. **`SummaryEmitter` guardrails.** → verify RED first: a summary without `count`, and a bare `AVG` measure,
+   are both **refused**. Per the standing rule, prove the guard red before trusting it green.
+
+**Still open (not blocking the above):** whether `ProcessorResult` is a distinct type or reuses `JobResult`
+— it depends on whether a processor needs to report anything `JobResult` cannot express, which the reference
+processor in step 3 will answer. `Manifest` as a Java type is specified by §2/§4, not here.
 
 ## 15. What this does not cover
 
