@@ -245,3 +245,68 @@ stance phrased for a legal/DPA reader live in
 purging*. ⚠ **Nothing schedules `incident_purge`, and nothing should.** That is the decision, not a
 residual: a shipped default that hard-deletes business records is indefensible, so standing the job up is
 an operator act exactly like `receipt_prune`.
+
+## `consignment.process` — the third-party Consignment SPI (shipped 2026-08-04)
+
+The Job Type that lets someone outside this repo do work over one committed Consignment, from the
+[consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §14. It is the framework half of a
+two-sided seam:
+
+| Side | Type | Who writes it |
+|---|---|---|
+| Author | [`ConsignmentProcessor`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentProcessor.java) — `id()` + `process(ProcessorContext)` | third party, discovered by `ServiceLoader` |
+| Framework | [`ConsignmentProcessJobType`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentProcessJobType.java) — a `JobTypeProvider` | this repo, registered in `JobService` beside the other built-ins |
+
+**Authors never touch `Job` or `JobContext`.** Nothing new was added to the Job framework for this: registration
+reuses the existing `JobTypeProvider` seam (a class-based provider, as `SqlTemplateJobType` already is), so
+`JobTypeRegistry`'s duplicate-id guard means a Job Pack can never displace it.
+
+**How the Consignment id arrives without the author knowing about Signals.** `consignment_id` is a
+`ParameterDecl` whose `deduce` expression is `$signal.batchId`, resolved by the existing `ParameterResolver`
+against the firing Signal's payload — which `JobService.mirrorPipelineCommit` already populates for every
+`pipeline.commit`. A manual run binds `consignment_id` in config instead; neither present ⇒ the run is REJECTED
+before author code executes, because the parameter is `required`.
+
+### `ProcessorContext` — what an author gets
+
+`consignmentId()` · `outputs()` (the §11.3 registry) · `read()` · `summaries()` · `log()` · `signals()` ·
+`dryRun()`. `log`/`signals`/`dryRun` are **delegated member-by-member rather than exposing `JobContext`**: a
+`job()` accessor would be one method instead of three, but it would leak the whole Job surface into a contract
+every third-party processor binds to. `ArtifactRecorder` is deliberately *not* delegated — beside
+`summaries()` it would give authors two plausible ways to emit the same thing. Signals are stamped with
+`consignment_id` by the adapter.
+
+### Reading is a narrow seam, not a `Connection`
+
+[`ConsignmentReader`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/ConsignmentReader.java)
+exposes `query(sql)` + `relations()`, **not** the JDBC `Connection` the plan originally specified. A raw handle
+makes the read-modify-write §5.1 forbids trivially expressible, so the plan's own acceptance test ("a write
+attempt fails") is unsatisfiable with one — and it leaks a far larger surface than the `job()` accessor rejected
+above. Enforcement reuses what already existed rather than new plumbing:
+
+- **`SqlGuard`** vets every query (single `SELECT`/`WITH`; no DDL/DML, no `read_*`/`copy`/`attach`/`set`).
+- **`SqlSandbox`** provides the hardened connection (extensions off, memory/thread caps, query timeout).
+- Relations come from the **§11.3 registry, not a directory glob** — a partition directory holds files from
+  every Consignment that wrote that day, so a glob would silently widen the read past this unit of work. Only
+  `LIVE` outputs are readable; a `LIVE` row whose file is missing is skipped with a warning rather than left to
+  break every query over its relation.
+
+⚠ **The sandbox is deliberately never `seal()`ed.** Sealing sets `enable_external_access=false`, which is why
+`SqlOracle` materialises its inputs first — it can afford to, needing only column types (`LIMIT 0`). A processor
+needs the actual rows, and copying a whole Consignment into scratch is the cost §11.3 exists to avoid. So
+relations stay lazy views and `SqlGuard` keeps the blocked surface out. **This is invariant protection, not a
+defence against hostile in-process code.**
+
+### Summaries are guarded, not written
+
+[`SummaryEmitter`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/SummaryEmitter.java) enforces
+§7.2 at the seam, because non-composable measures produce *quietly* wrong numbers: `count` is mandatory on every
+row, and every `Measure` must declare its `Composability` (`ADDITIVE` / `BUCKETED` / `COMPUTED_FROM_DETAIL`) —
+undeclared is refused, never assumed. A measure whose name says it is not additive (`avg`, `ratio`, `p95`,
+`distinct_*`, `min`/`max`, …) declared `ADDITIVE` is refused too. Every violation is reported at once, so a
+refusal costs one repair round. `reconcile(outputs)` gives §7.2's conservation check for free — summed `count`
+against the registry's detail rows — **reported, never thrown**, since summarising a filtered subset is legal.
+
+⚠ **Durable summary storage is NOT here.** §7.3's partition-summary tier and §7.4's rollup cache are still
+design; inventing a format now would pin the shape §7.3 must decide. The emitter validates and holds the rows.
+When §7.3 lands it gains a sink and neither the guardrail nor its tests change.

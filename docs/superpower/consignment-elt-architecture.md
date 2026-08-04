@@ -5,15 +5,15 @@ This began as the record of a design conversation, so the bulk below is still de
 
 | Piece | State as of 2026-08-04 |
 |---|---|
-| §14 `ProcessorContext` | **DESIGNED, unbuilt** — grounded against the code; decisions + build order in §14.1–§14.4 |
-| §11.3 `consignment_outputs` | **SLICES 1 + 2 BUILT + VERIFIED** — `DbConsignmentOutputStore` (default-off) now has production callers on **all three** write paths, with real per-file `row_count`. §7.2 reconciliation is asserted on each |
+| §11.3 `consignment_outputs` | **SLICES 1 + 2 BUILT + VERIFIED** — `DbConsignmentOutputStore` (default-off) has production callers on **all three** write paths, with real per-file `row_count`. §7.2 reconciliation is asserted on each |
+| §14 `ProcessorContext` | **BUILT + VERIFIED (all of §14.4)** — `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` `JobTypeProvider` adapter, `ConsignmentReader`, and `SummaryEmitter`'s §7.2 guardrails. As-built in [`okf/backend/control-plane/jobs.md`](../okf/backend/control-plane/jobs.md) |
 | Everything else (§2, §4–§10, §11.4, §12, §13) | design only, nothing implemented |
 
-**Next:** §14.4 steps 2–4 (read-only connection accessor → `ProcessorContext` + adapter → `SummaryEmitter`
-guardrails, the last proved RED first). Also still open in §11.3: **slice 3**, the `batch_id` →
-`consignment_id` rename in persisted artifacts (scope + the six name-keyed read sites are in *Decided
-2026-08-04* item 2), and the state-transition mutators (`supersede`/`compactedAway`) that §6.3 compaction
-needs — the registry records writes today, and nothing yet flips a row's state.
+**Next:** the two remaining §11.3 items — **slice 3**, the `batch_id` → `consignment_id` rename in persisted
+artifacts (scope + the six name-keyed read sites are in *Decided 2026-08-04* item 2), and the state-transition
+mutators (`supersede`/`compactedAway`) that §6.3 compaction needs: the registry records writes today, and
+nothing yet flips a row's state, so the `PartitionCompactor` duplicate-rows bug §11.3(a) documents is still
+live. After that, the design-only sections — §7.3's summary storage is the one `SummaryEmitter` is waiting on.
 
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time
@@ -877,7 +877,7 @@ Not config — actual additions:
 It evaluates against the summary/manifest relation rather than raw detail (cheap) and slots into the
 existing `ExpectationRoutes` → `raiseIncident` path, so Incident/Signal plumbing is free.
 
-## 14. `ProcessorContext` — DESIGNED 2026-08-04 (grounded, not built)
+## 14. `ProcessorContext` — BUILT 2026-08-04 (as-built notes at §14.5)
 
 **The one piece where a wrong guess is most expensive**, because every custom processor anyone writes binds
 to it.
@@ -991,9 +991,52 @@ at-rest tier to an in-motion type).
 4. **`SummaryEmitter` guardrails.** → verify RED first: a summary without `count`, and a bare `AVG` measure,
    are both **refused**. Per the standing rule, prove the guard red before trusting it green.
 
-**Still open (not blocking the above):** whether `ProcessorResult` is a distinct type or reuses `JobResult`
-— it depends on whether a processor needs to report anything `JobResult` cannot express, which the reference
-processor in step 3 will answer. `Manifest` as a Java type is specified by §2/§4, not here.
+### 14.5 AS BUILT 2026-08-04 — and §14.1's third finding was wrong
+
+All four steps of §14.4 shipped. **Two of this section's own conclusions did not survive contact with the code.**
+
+**(g) §14.1.3 was wrong: the read-only mechanism already existed, twice over.** It claimed "no `readOnly` notion
+appears in the engine at all" and that this was "net-new plumbing to design". In fact
+[`SqlGuard`](../../inspecto-sql/src/main/java/com/gamma/sql/SqlGuard.java) already classifies SQL as *"a single,
+read-only `SELECT`/`WITH` statement"* and rejects the DDL/DML and file/extension surface;
+[`SqlSandbox`](../../inspecto-sql/src/main/java/com/gamma/sql/SqlSandbox.java) already provides the hardened
+two-phase connection (trusted registration, then `seal()`); and `SqlOracle` is the composition precedent. What
+was actually net-new is a thin Consignment-scoped composition of the three, not a mechanism.
+
+**(h) `Connection read()` was the wrong surface, by §14.3's own argument.** §14.3 rejected a `job()` accessor
+because it "leaks the entire Job surface into a contract every third-party processor binds to" — and then
+specified a raw `java.sql.Connection`, which leaks a far larger one. It is also *unenforceable*: with a raw
+handle, `createStatement().execute("CREATE TABLE …")` makes §5.1's forbidden read-modify-write trivially
+expressible, so **§14.4 step 2's own acceptance test ("a write attempt through `read()` fails") cannot pass**.
+Built instead as `ConsignmentReader` — `query(sql)` + `relations()` — which is read-only *by construction*
+(no method could write) with `SqlGuard` vetting each query.
+
+⚠ **The sandbox is deliberately never sealed, and this is load-bearing.** `seal()` sets
+`enable_external_access=false`, killing all file reads — which is why `SqlOracle` materialises inputs as tables
+first (`CREATE TABLE … LIMIT inputCap`). It can afford that because it only needs column types. A processor
+needs the rows, and materialising a whole Consignment into scratch is precisely the cost §11.3 exists to avoid.
+So relations stay **lazy views over the registry's exact paths** — not a directory glob, which would silently
+widen the read to every other Consignment that wrote into the same partition directory.
+
+**The two open questions §14.4 left are answered:**
+
+1. **`ProcessorResult` is a distinct type** — and only just. `JobResult` carries `durationMs`, which the
+   framework measures and a processor cannot know; reusing it would force every author to pass a number that is
+   wrong or a placeholder. The adapter converts, supplying the duration it timed. Failure stays exception-based,
+   the Job framework's existing convention.
+2. **`Manifest manifest()` is DEFERRED, not built** — no `Manifest` type exists, and §2/§4 (which specify it as a
+   relation) are still design, so it is blocked exactly as `outputs()` was blocked on §11.3. The existing
+   per-Consignment `BatchManifest` was **rejected as a stand-in**: it is an ingest-side Gson DTO, and §14.3
+   excludes in-motion types specifically to stop the at-rest tier re-coupling to them. Until §2/§4 land,
+   `outputs()` is the addressing authority. **The shipped surface is therefore seven members, not eight.**
+
+**`SummaryEmitter` guards but does not store.** §7.3's partition-summary tier and §7.4's rollup cache are still
+design, so no storage format was invented — that would pin the shape §7.3 must decide. The emitter validates,
+holds the validated rows, and offers §7.2's `reconcile()` conservation check. When §7.3 lands it gains a sink and
+neither the guardrail nor its tests change.
+
+**The reference processor lives in test scope** (`ConsignmentProcessJobTypeTest.RowCounter`), not in main: a toy
+processor shipped as a built-in would be speculative surface, and its job is to prove the contract closes.
 
 ## 15. What this does not cover
 

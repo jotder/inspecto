@@ -89,8 +89,11 @@ former root reference docs** (each index lists them):
   (2026-08-04): `DbConsignmentOutputStore` behind `-Dconsignment.outputs.backend` (default-off), now with
   production callers on all three write paths — ingest (`BatchProcessor.finalizeSource`), enrichment, and
   Pipeline sinks — each carrying a real per-file `row_count` and asserting §7.2 reconciliation. As-built DDL in
-  [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §3.9. Next is §14.4 (`ProcessorContext`,
-  designed but unbuilt); everything else here is still design.** Captures the design conversation behind a
+  [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §3.9. **§14 is BUILT too** — the
+  `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` Job Type, `ConsignmentReader` and
+  `SummaryEmitter`'s §7.2 guardrails; as-built in
+  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md). Next: §11.3's slice 3 (`batch_id` →
+  `consignment_id` in persisted artifacts) and the compaction state mutators; everything else is still design.** Captures the design conversation behind a
   Consignment-based ELT model that replaces a Kafka record-at-a-time ETL. Core claim: the two apparent
   execution systems (`BatchProcessor` file/batch path · `PipelineExecutor` graph path) are one model built
   from both ends, joined by making the **Consignment manifest a first-class DuckDB relation** flowing on
