@@ -31,16 +31,43 @@ describe('node-attributes', () => {
 
     it('classifies every attribute of every known type into a tier', () => {
         for (const type of ['acquisition', 'transform.filter', 'transform.route',
-            'sink.persistent', 'sink.materialized', 'sink.view']) {
+            'transform.dedup.fingerprint', 'sink.persistent', 'sink.materialized', 'sink.view']) {
             for (const s of nodeAttributesFor(type)!) {
                 expect(['required', 'optional', 'advanced']).toContain(s.tier);
             }
         }
     });
 
-    /** U-D's whole point: one table per concern, so the acquisition node cannot drift from Onboarding. */
-    it('authors the collector block with the SAME shared table Onboarding uses', () => {
-        expect(nodeAttributesFor('acquisition')).toBe(COLLECTOR_ATTRIBUTES);
+    /**
+     * U-D's whole point: one table per concern, so the acquisition node cannot drift from Onboarding.
+     * Since D9 it is a **derivation** rather than the whole table — asserted by spec *identity*, so the
+     * membership can differ but a forked copy of a spec object still fails.
+     */
+    it('authors the collector block from the SAME shared specs Onboarding uses', () => {
+        for (const s of nodeAttributesFor('acquisition')!) expect(COLLECTOR_ATTRIBUTES).toContain(s);
+    });
+
+    /**
+     * D9 (2026-08-04): a shared attribute table is correct per BLOCK, not per NODE. On the graph the
+     * `collector:` block is split across nodes — `PipelineEditable.lower:255` overlays `duplicate:` from
+     * the fingerprint-dedup node while `NOT_ACQ_OWNED:60` strips it from acquisition — so declaring these
+     * on acquisition meant the operator's value was silently discarded on save. The keys stay in the
+     * shared table for Onboarding (which authors the block whole); only this adopter splits them.
+     */
+    it('declares the duplicate policy on the node the engine reads it from', () => {
+        const acq = nodeAttributesFor('acquisition')!.map((s) => s.key);
+        expect(acq).not.toContain('duplicate__mode');
+        expect(acq).not.toContain('duplicate__on_change');
+
+        const dedup = nodeAttributesFor('transform.dedup.fingerprint')!.map((s) => s.key);
+        expect(dedup).toEqual(['duplicate__mode', 'duplicate__on_change']);
+    });
+
+    /** The split is a derivation, not a fork: every key still lives in exactly one shared table. */
+    it('loses no collector key to the split', () => {
+        const split = [...nodeAttributesFor('acquisition')!,
+            ...nodeAttributesFor('transform.dedup.fingerprint')!];
+        expect(new Set(split)).toEqual(new Set(COLLECTOR_ATTRIBUTES));
     });
 
     it('offers the engine-real collector keys, not the old best-guess ones', () => {

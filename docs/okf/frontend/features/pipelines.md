@@ -285,12 +285,22 @@ that are easy to get wrong again:
 `COLLECTOR_ATTRIBUTES` is deliberately shared with Onboarding so one table serves both features — but the two
 adopters reach the `collector:` block differently, and a key can be real for one and unreachable for the other:
 
-| Key | Onboarding (authors `collector:` directly) | Acquisition **node** (flat lower) |
-|---|---|---|
-| `connection` | real | ⛔ stripped — rides on `use: connection/<name>` (**D3**) |
-| `duplicate__mode`, `duplicate__on_change` | real | ⛔ discarded — the `duplicate:` block belongs to the fingerprint-dedup node (`NOT_ACQ_OWNED`, overlaid at `PipelineEditable.java:255`) (**D9**) |
+| Key | Onboarding (authors `collector:` directly) | Acquisition **node** (flat lower) | Resolution (2026-08-04) |
+|---|---|---|---|
+| `connection` | real | not a cfg key — rides on `use: connection/<name>` (**D3**) | the attribute **writes the binding**: seeded from `use` on load, written back to `use` on save |
+| `duplicate__mode`, `duplicate__on_change` | real | the `duplicate:` block belongs to the fingerprint-dedup node (`NOT_ACQ_OWNED`, overlaid at `PipelineEditable.java:255`) (**D9**) | declared on `transform.dedup.fingerprint`; acquisition takes a **derivation** of the shared table without them |
 
-⛔ **Neither is a dead key, and pruning the shared table is the wrong fix** — that would break the adopter for
-which the key is real. This is the third time this shape has appeared (D3, D9, and the near-miss on `key_columns`),
-so treat "declared but unreachable" as a *per-adopter* question from the start. Both gaps are pinned by tests
-asserting the current, defective behaviour, which fail — by design — the moment someone closes them.
+⛔ **Neither was a dead key, and pruning the shared table would have been the wrong fix** — it would break the
+adopter for which the key is real. This shape has now appeared three times (D3, D9, and the near-miss on
+`key_columns`), so treat "declared but unreachable" as a *per-adopter* question from the start. The fix is always
+one of: **derive** the adopter's table (never fork it), or move the key to the node the engine reads it from.
+
+Two traps worth carrying forward from closing these:
+
+- **A Connection is not a `ComponentType`.** The obvious fix for D3 — `bindKindFor('SOURCE') → 'connection'` —
+  produces a picker that calls `GET /components/connection`, a route that does not exist; connections have their
+  own service. `bindKind` is only for the component registry (`grammar`/`transform`/`sink`).
+- **`transform.dedup.fingerprint` is synthesised only when the policy is already content-based**
+  (`PipelineLift.java:70`). So configuring the node covers editing and turning dedup *off*, while turning it *on*
+  means **adding** the node from the palette — which works because the type is in `LOWERABLE`, and which reads
+  more honestly anyway: dedup is a step in the graph, not a checkbox on the collector.

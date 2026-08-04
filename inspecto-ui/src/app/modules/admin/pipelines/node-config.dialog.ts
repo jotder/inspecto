@@ -23,7 +23,7 @@ import {
 import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
-import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { connectionOptionLoader, pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
@@ -112,7 +112,9 @@ export interface NodeConfigResult {
                             <span class="font-mono">{{ form.value.use || '—' }}</span>
                         </p>
                     </div>
-                } @else if (!isEnrichment) {
+                } @else if (!isEnrichment && !isAcquisition) {
+                    <!-- Acquisition owns "use" through its Connection attribute (see isAcquisition), so
+                         it must not also get a free-text box — two controls writing one field. -->
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Use (component ref)</mat-label>
                         <input matInput formControlName="use" placeholder="transform/my_component" />
@@ -149,7 +151,8 @@ export interface NodeConfigResult {
                 <!-- Schema-driven config for known node types (required up front, rest behind disclosure). -->
                 @if (specs().length) {
                     <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Config</div>
-                    <inspecto-schema-form [specs]="specs()" [initial]="schemaInitial"></inspecto-schema-form>
+                    <inspecto-schema-form [specs]="specs()" [initial]="schemaInitial"
+                                          [optionLoaders]="configLoaders"></inspecto-schema-form>
                 }
 
                 <!-- Additional / free-form config: the primary editor for unknown types, else a collapsed
@@ -274,6 +277,24 @@ export class NodeConfigDialog {
         ? this.data.bindKind.charAt(0).toUpperCase() + this.data.bindKind.slice(1)
         : '';
 
+    /**
+     * An acquisition node's Connection is a **binding, not config** (D3-remainder, closed 2026-08-04).
+     * `PipelineEditable` carries it on `use: connection/<name>` and strips a cfg-level one on both lift
+     * (`:125`) and lower (`:248`), so the declared `connection` attribute used to be discarded on every
+     * save while the operator had nothing else to set — `bindKindFor('SOURCE')` is `null`, so the dialog
+     * showed only a free-text `use` box.
+     *
+     * <p>⚠ It is deliberately NOT wired as a `bindKind`: the component picker calls
+     * `GET /components/{kind}`, and a Connection is not a `ComponentType` — it has its own service and
+     * route. So the existing `connection` autocomplete stays the surface, and this flag makes it write
+     * `use:` instead of cfg. The attribute also stays in the shared `COLLECTOR_ATTRIBUTES` because
+     * Onboarding authors the `collector:` block directly, where `connection` IS a real key.
+     */
+    readonly isAcquisition = this.data.node.type === 'acquisition';
+    /** `use: connection/<name>` prefix — the one place the binding's shape is spelled. */
+    private static readonly CONNECTION_REF = 'connection/';
+    readonly configLoaders = this.isAcquisition ? { connection: connectionOptionLoader() } : {};
+
     /** The node type's declared attribute schema (empty ⇒ free-form editor only). */
     readonly specs = computed<AttributeSpec[]>(() => nodeAttributesFor(this.data.node.type) ?? []);
     /** Schema-form seed: the node's config entries whose key the schema knows. */
@@ -313,6 +334,11 @@ export class NodeConfigDialog {
         const schemaKeys = new Set(this.specs().map((s) => s.key));
         for (const [key, value] of Object.entries(flattenBlock(n.config))) {
             if (schemaKeys.has(key)) this.schemaInitial[key] = value;
+        }
+        // An acquisition node's Connection lives on `use:`, never in cfg (see isAcquisition), so it is
+        // seeded from there — the loop above can never find it.
+        if (this.isAcquisition && (n.use ?? '').startsWith(NodeConfigDialog.CONNECTION_REF)) {
+            this.schemaInitial['connection'] = n.use!.slice(NodeConfigDialog.CONNECTION_REF.length);
         }
         // A top-level key is schema-owned when a spec names it or names a leaf beneath it (`duplicate` is
         // owned by `duplicate__mode`). Owned roots are seeded above and must NOT also appear as free-form
@@ -484,12 +510,21 @@ export class NodeConfigDialog {
         for (const row of v.config as { key: string; value: string }[]) {
             if (row.key && row.key.trim()) config[row.key.trim()] = row.value;
         }
+        // An acquisition node's Connection is a binding: move it off cfg (where lower strips it) onto
+        // `use: connection/<name>`, which is where the engine reads it from. Clearing it clears the
+        // binding. See isAcquisition for why this is not a `bindKind`.
+        let use = v.use?.trim() || undefined;
+        if (this.isAcquisition) {
+            const picked = String(config['connection'] ?? '').trim();
+            delete config['connection'];
+            use = picked ? NodeConfigDialog.CONNECTION_REF + picked : undefined;
+        }
         const node: AuthoredNode = {
             id: this.data.node.id,
             type: this.data.node.type,
             name: v.name?.trim() || undefined,
             description: v.description?.trim() || undefined,
-            use: v.use?.trim() || undefined,
+            use,
             config: Object.keys(config).length ? config : undefined,
         };
         this.ref.close({ node });

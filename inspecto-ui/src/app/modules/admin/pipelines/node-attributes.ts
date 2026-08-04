@@ -53,7 +53,9 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
  * from `catalog/onboarding/` in the same change) — this is U-D's "one table per concern": both features
  * author the same `collector:` block, so a second hand-written table is exactly the drift that produced
  * fictional keys (`recursive`, `min_age_seconds`) here while Onboarding had the real ones
- * (`recursive_depth`, `stability__window`). One table, one truth.
+ * (`recursive_depth`, `stability__window`). One table, one truth. Since D9 (2026-08-04) it reuses a
+ * **derivation** of that table rather than the whole of it — the `duplicate__*` keys moved to
+ * `transform.dedup.fingerprint`, the node the engine actually reads them from.
  *
  * <p>⚠ **A connector's OWN options are not node config.** `query`, `watermark_column`, `topic`,
  * `bootstrap_servers` live in the ConnectionProfile's `options:` map, read by each connector
@@ -73,8 +75,37 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
 // authors, so it is the shared `OUTPUT_ATTRIBUTES` (component-model) — W4a collapsed the local
 // `SINK_ATTRIBUTES` fork exactly as U-D collapsed the collector one. All three sink kinds write
 // the same block — the kind is the materialisation behaviour, not a different config shape.
+/**
+ * The `duplicate:` keys, taken from the shared table but declared on the node that actually owns them.
+ *
+ * <p>⚠ **A shared attribute table is correct per BLOCK, not per NODE** (D9, 2026-08-04).
+ * `COLLECTOR_ATTRIBUTES` describes the `collector:` block, and Onboarding authors that block whole — so
+ * `duplicate__*` are real keys there. On the *graph* the same block is split across nodes:
+ * `PipelineLift.dedupFingerprintNode` synthesises `transform.dedup.fingerprint` carrying
+ * `duplicate`/`incremental`, and `PipelineEditable.lower` overlays `duplicate:` back from **that** node
+ * (`:255`) while `NOT_ACQ_OWNED` (`:60`) strips it from the acquisition node. So a value typed on the
+ * acquisition node was silently discarded on save. Found by `NodeConfigNameContractTest` on its first run.
+ *
+ * <p>⛔ **The fix is NOT to prune the shared table** — that would break Onboarding, for which the keys are
+ * live. It is this per-adopter split: the keys move to the node the engine reads them from, and the
+ * acquisition adopter derives its table without them. Same shape as D3.
+ */
+const DEDUP_FINGERPRINT_ATTRIBUTES: AttributeSpec[] = COLLECTOR_ATTRIBUTES.filter((s) =>
+    s.key.startsWith('duplicate__'),
+);
+
+/**
+ * `acquisition`'s derivation of the shared table: everything except the keys the fingerprint-dedup node
+ * owns (see {@link DEDUP_FINGERPRINT_ATTRIBUTES}). A **derivation, not a fork** — the specs are the shared
+ * objects, only the membership differs, so there is still one place to edit a key.
+ */
+const ACQUISITION_ATTRIBUTES: AttributeSpec[] = COLLECTOR_ATTRIBUTES.filter(
+    (s) => !DEDUP_FINGERPRINT_ATTRIBUTES.includes(s),
+);
+
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
-    acquisition: COLLECTOR_ATTRIBUTES,
+    acquisition: ACQUISITION_ATTRIBUTES,
+    'transform.dedup.fingerprint': DEDUP_FINGERPRINT_ATTRIBUTES,
     'sink.persistent': OUTPUT_ATTRIBUTES,
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,

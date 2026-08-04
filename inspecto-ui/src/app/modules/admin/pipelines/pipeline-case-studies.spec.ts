@@ -116,6 +116,12 @@ describe('CS2 fraud_velocity_stream — clone-mode streaming + alerting', () => 
         expect(rels(p)).toContain('route:archive');
     });
 
+    /**
+     * ⚠ This is what saved D8: a key-hygiene sweep deleted `key_columns` as a zero-reader key and THIS
+     * assertion failed, proving upsert-by-key is a documented invariant. It is real but pipeline-level
+     * (`reference: {load, key}` + `produces: reference`), with no node-level equivalent to rename to —
+     * see the seed's header. Keep asserting the narrative, not the engine contract.
+     */
     it('raises a CRITICAL alert and upserts candidates by key', () => {
         expect(p.nodes.find((n) => n.id === 'a_fraud')!.config?.['severity']).toBe('CRITICAL');
         const sink = p.nodes.find((n) => n.id === 's_cases')!;

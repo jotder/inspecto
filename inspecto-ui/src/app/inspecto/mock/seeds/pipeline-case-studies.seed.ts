@@ -10,6 +10,23 @@ import { putComponent } from './seed-utils';
  * alerting (CS2), disconnected multi-leg feeds (CS3), the full exotic-parser gauntlet via reusable
  * grammars (CS4), and every control-flow relation wired on a deep chain (CS5).
  * Invariants pinned by `modules/admin/pipelines/pipeline-case-studies.spec.ts`.
+ *
+ * ⚠ **These are `AuthoredPipeline`s — the authored-graph representation, whose write routes are 405
+ * since W5.** They are narrative fixtures for user testing, not a config the editor can save, so their
+ * node vocabulary is deliberately NOT the flat `*_pipeline.toon` contract (`transform.derive`, `alert`
+ * and `adapter` have no flat home at all). Do not "fix" them against `node-attributes.ts`.
+ *
+ * ⛔ **`sink.materialized`'s `mode: 'upsert'` + `key_columns` have zero Java readers — and must NOT be
+ * deleted for it** (D8 of `docs/superpower/vocabulary-and-config-contract-plan.md`). Zero readers meant
+ * *misnamed*, not fictional: upsert-by-key is real, but **pipeline-level**, as
+ * `reference: {load: upsert|scd2, key: [...]}` on a pipeline that also declares `produces: reference`
+ * (`PipelineConfigParser.java:413-429`, executed by `BatchIngestStrategy.java:107-119`). There is no
+ * node-level equivalent to rename these to: `reference:` is a top-level block that the flat editable
+ * graph carries as opaque passthrough and never surfaces, and `sink.materialized` is not in
+ * `PipelineEditable.LOWERABLE` at all — such a node is refused `UNSUPPORTED_NODE` on save. So the
+ * capability is unauthorable from any UI today (BACKLOG), and these keys stay as demo narrative.
+ * The rule this established: **before deleting a zero-reader key, look for a differently-named
+ * equivalent** — a key-hygiene sweep otherwise removes a capability someone documented.
  */
 
 /** Reusable grammars the case-study parser nodes bind via `use: 'grammar/<id>'` — together they

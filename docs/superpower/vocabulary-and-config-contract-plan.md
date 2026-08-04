@@ -39,9 +39,31 @@ renamed to `collectors.md`), plus 2 prose-rule bugs (`Source-of-truth` false pos
 `flow:`→`pipeline:` job-config key dual-read, JSON response keys dual-emit. No version bump (nothing
 breaks — see §4's rationale). All three Flow→Pipeline tiers are now closed.
 
-**Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), and the §3.2 guard on
-Java+TS source. Do not archive this plan until those close.
+**D9 + D3-remainder SHIPPED, D6 + D8 reclassified — 2026-08-04.** See §2. Both code fixes turned out to
+share one mechanism (a per-adopter *derivation* of a shared attribute table), and both reclassifications
+turned out to be "the filed fix would have made things worse":
+
+- **D9 closed** — `duplicate__*` moved onto `transform.dedup.fingerprint`, the node `lower:255` overlays
+  them from; the pipelines `acquisition` adopter takes a derivation of `COLLECTOR_ATTRIBUTES` (never a
+  prune — Onboarding authors the block whole). Dedup is turned **on** by adding the node from the palette:
+  `PipelineLift:70` only synthesises it when the policy is already content-based, and the type is in
+  `LOWERABLE`. Positive contracts added to `NodeConfigNameContractTest.contracts()`.
+- **D3-remainder closed** — the acquisition `connection` attribute now writes `use: connection/<name>`
+  instead of cfg. ⚠ **The plan's own proposed fix was infeasible**: `bindKindFor('SOURCE') → 'connection'`
+  would make the dialog call `GET /components/connection`, and a Connection is **not** a `ComponentType`
+  (`components.service.ts:12`) — it has its own service and route. The existing `connection` autocomplete
+  became the binding surface instead, with the free-text `use` box suppressed for acquisition.
+- **D6 reclassified** to a Job-framework scheduling feature — ⛔ **not** a missing UI surface. Moved to
+  `docs/BACKLOG.md`.
+- **D8 reclassified** as documented-and-deliberate, not a pending decision — there is no node-level shape
+  to rename to. Moved to `docs/BACKLOG.md`.
+
+**The generalisable rule from D3+D9, now the plan's main durable output:** *a shared attribute table is
+correct per BLOCK, not per NODE.* Onboarding authors `collector:` whole; the graph splits the same block
+across nodes. The fix for a per-adopter gap is a documented derivation, never a prune and never a fork.
+
+**Open:** the §3.2 guard on Java+TS source (item 11) and §3.1 serve-cfg-vocabulary-from-server (item 12).
+Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -95,11 +117,11 @@ placeholder?}` — note **`key` is the config key**, `label` is display-only, an
 | **D3** | `acquisition` reuses `COLLECTOR_ATTRIBUTES` — the `collector:` TOON block keys, not acquisition-node cfg | six sub-mismatches, below | acquisition nodes mis-author across the board |
 | **D4** | generic node dialog never bridged flat spec keys ↔ nested config — **in BOTH directions** | `node-config.dialog.ts:439-449` (save) **and** the constructor's split (load); enrichment path *does* (`:496`), onboarding panes do (`collection-pane:265`, `publish-pane:93`, `parsing-pane:298`) | ✅ **FIXED 2026-08-03.** Save wrote `__` keys literally (`duplicate__mode`, read by nothing); load compared *raw* top-level keys to *flat* spec keys, so a real `duplicate: {mode}` block matched no spec, fell into free-form as a JSON **string**, and — free-form being applied last — **overwrote the schema form's own value on save**. The load half was found only because the save-half regression test failed on it |
 | **D5** | `partition_by` is a phantom key | mock seeds `pipeline-case-studies.seed.ts:50`, `telecom-ra.seed.ts:44`, `default-space.seed.ts:325` | matches no backend key; real partitioning is schema-level `partitionKey`/`partitions[]` — ✅ **FIXED 2026-08-03**: it had spread to **five** seed files (also `financial-audit`, `link-analysis`, and a 2nd case study), all stripped; already correctly absent from the UI specs. New guard `mock/seeds/seeded-node-config.spec.ts` stops it coming back |
-| **D6** | no timezone surface in the UI while the backend specs `meta.domain.timezone` | zero `timezone\|timeZone\|zoneId` hits in `inspecto-ui/src` | unmodeled config surface (not a rename) |
+| **D6** | ⚠ **RECLASSIFIED 2026-08-04 — the premise was half wrong.** Filed as "no timezone surface in the UI"; the real defect is that the key has **no behaviour to surface** | parsed at `SemanticModel.DomainNotes` (`:74-82,131-134`), served by `MetadataGraphService.domain()` → `CatalogRoutes:107` (`/catalog/kpis`) — and consumed by nothing else. The two live zone consumers, `PipelineScheduler:117` and `JobService:205` (→ `ParameterResolver.Context.zone`, `$today`/`$day(-1)`), both hardcode `ZoneId.systemDefault()`. Also unvalidated: no `ZoneId.of` check, any string is accepted | display-only catalog metadata. ⛔ **A picker would be worse than the gap** — it would imply control over date math it does not have. Real work = make a zone govern cron firing + date macros, a behaviour change on live schedules ⇒ **moved to `docs/BACKLOG.md`** (Job framework) |
 | **D7** | `transform.filter` on the flat path has a **real, round-tripping vocabulary that the UI does not declare** — the spec declares the *authored-graph* one instead (⚠ re-scoped 2026-08-03, see below; the original "unrunnable" framing was wrong) | `PipelineLift.java:180-186,242-251` **emits** a `transform.filter` node carrying `filter_target_column`/`include_prefixes`/`include_regex`/`exclude_prefixes`/`exclude_regex`; `PipelineEditable.java:277` lowers it back into `processing.csv_settings`; `PipelineConfigParser.java:255-259` reads exactly those keys. The spec's `where` belongs to `RowShaper.java:79`, reachable only from an authored `*_flow.toon` via `PipelineJobRunner.java:126-135` (writes 405 since W5) | a dialog-authored `where` no-ops, **and** the filtering that *does* work here is unreachable from the UI |
 
 | **D8** | `sink.materialized` upsert config is **misnamed**, not phantom | seeds `pipeline-case-studies.seed.ts:51,93` carry `mode: 'upsert'` + `key_columns` (0 Java readers), but the real capability is pipeline-level `reference: {load: upsert, key: [...]}` (`PipelineConfigParser.java:406-412`, `Load.from`, `strList`) | the demo narrative is implementable but unspelled; a naive "delete the dead key" sweep would destroy it |
-| **D9** | `duplicate__mode` / `duplicate__on_change` are declared on the **acquisition** node but the flat lower routes `duplicate:` to the **fingerprint-dedup** node | `PipelineEditable.NOT_ACQ_OWNED = {duplicate, incremental, gap_detection}` (`:60`) excludes it from the acquisition node's editable cfg, and `lower` overlays the block from the fingerprint node (`:255`) — so a value set on the acquisition node is discarded even though `PipelineConfigParser` reads the key. Proven by `NodeConfigNameContractTest.collectorAttributesTheAcquisitionNodeCannotSaveStayPinned` | dedup settings authored on an acquisition node are silently lost — **found 2026-08-04 by the §3.3 check on its first run** |
+| **D9** | `duplicate__mode` / `duplicate__on_change` are declared on the **acquisition** node but the flat lower routes `duplicate:` to the **fingerprint-dedup** node | `PipelineEditable.NOT_ACQ_OWNED = {duplicate, incremental, gap_detection}` (`:60`) excludes it from the acquisition node's editable cfg, and `lower` overlays the block from the fingerprint node (`:255`) — so a value set on the acquisition node is discarded even though `PipelineConfigParser` reads the key. Proven by `NodeConfigNameContractTest.collectorAttributesTheAcquisitionNodeCannotSaveStayPinned` | dedup settings authored on an acquisition node are silently lost — **found 2026-08-04 by the §3.3 check on its first run**; ✅ **FIXED the same day**, see the header |
 
 **D8 — found 2026-08-03 by the new seed guard, and it is the counter-example to D2/D5.** The guard flagged
 `key_columns`, I deleted it, and `pipeline-case-studies.spec.ts` failed on *"upserts candidates by key"* — a
@@ -108,19 +130,52 @@ placeholder?}` — note **`key` is the config key**, `label` is display-only, an
 for a `produces: reference` store, rather than node-level `mode`/`key_columns`. **The deletion was reverted**
 and the key was left in place deliberately. ⚠ The rule this establishes, now pinned in the guard's own
 docblock: before deleting a zero-reader key, check for a **differently-named equivalent** — otherwise a
-key-hygiene sweep silently removes a capability someone documented. Fixing D8 means renaming the seed to the
-engine's shape (and deciding whether upsert belongs on the node at all, since `sink.materialized` is not in
-`LOWERABLE` and cannot round-trip a flat config) — a modeling decision, left open.
+key-hygiene sweep silently removes a capability someone documented.
+
+⚠ **RECLASSIFIED 2026-08-04 — "rename the seed to the engine's shape" is not available, so this was never a
+pending decision.** Grounding it turned up three facts the original entry did not have:
+
+- `reference: {load, key, refresh_seconds}` is a **top-level pipeline block**, gated by a sibling
+  `produces: reference` — not a sink property. `Load` is `REPLACE | UPSERT | SCD2`
+  (`PipelineConfig.java:566-579`), parsed at `PipelineConfigParser.java:413-429` (which also enforces that
+  upsert/scd2 carry a non-empty `key` whose columns exist in the schema), and genuinely executed:
+  `BatchIngestStrategy.java:107-119` diverts the write into `__ref_versioned` and stamps versions.
+- `PipelineEditable` lists `produces`/`reference` among the keys **the graph does not model** — `lower()`
+  preserves them verbatim from the existing file, but they are never lifted into a node, so **the UI cannot
+  author them at all.** No committed TOON under `spaces/` uses either key; only tests do.
+- `sink.materialized` is not in `LOWERABLE`, so such a node is **refused `UNSUPPORTED_NODE`** on save
+  (`PipelineEditable.java:189-192`) — the seed describes a node the editor could not persist regardless.
+
+So there is **no node-level shape to rename to**, and the capability is unauthorable from any UI today. The
+seeds are `AuthoredPipeline` fixtures for the **retired** authored-graph representation (writes 405 since
+W5) — narrative, not contract. Resolution: the keys stay, the real engine shape is now documented in the
+seed's own header (so the next sweep cannot mistake them again) and in the invariant test's docblock, and
+the genuine buildable — *surface the pipeline-level `reference:` block in the editor* — moved to
+`docs/BACKLOG.md`.
 
 **D9 — found 2026-08-04 by the §3.3 check, and it is D3's shape, not D2/D5's.** ⛔ **Do not "fix" it by
 deleting the two attributes from `COLLECTOR_ATTRIBUTES`.** That table is *shared with Onboarding*, which
 authors the `collector:` block directly and for which `duplicate.mode`/`duplicate.on_change` are real,
 read keys (`PipelineConfigParser.java:449-460`). The key is not dead — it is **unreachable from one
-adopter**, exactly like D3's `connection`. Two candidate fixes, both a modeling decision rather than a key
-rename: surface the keys on the **fingerprint-dedup node** (where the flat lower already routes them), or
-make `lower` accept them from the acquisition node. Until then the gap is pinned by a test that will fail
-the moment it is closed. This is the second time a shared table has produced a per-adopter gap — the
-pattern is now worth naming: **a shared attribute table is correct per-block, not per-node.**
+adopter**, exactly like D3's `connection`. This is the second time a shared table has produced a
+per-adopter gap — the pattern is now worth naming: **a shared attribute table is correct per-block, not
+per-node.**
+
+✅ **FIXED 2026-08-04, via option (a): surface the keys on the fingerprint-dedup node.** Chosen over
+"teach `lower` to accept them from acquisition" because parser, lift and lower already agree that the
+fingerprint node owns the block — option (b) would have had to fight `NOT_ACQ_OWNED`, `PipelineLift`'s node
+synthesis and `PipelineEditable`'s per-type routing all at once, to no gain.
+
+The one thing that made option (a) look incomplete, and the answer: `PipelineLift:70` synthesises the node
+**only when `duplicate().contentBased()`**, so on a `mode: path` pipeline there is no node to configure and
+dedup could seemingly never be turned *on*. It can — `transform.dedup.fingerprint` is in `LOWERABLE` and on
+the palette, so the operator **adds** the node, which is a truer representation anyway (turning dedup on
+adds a step; setting `mode: path` on the node drops it again on the next lift). Pinned by
+`declaredTypesTheFlatEditorCannotSaveAreKnown`, which now asserts the type stays lowerable.
+
+The acquisition adopter takes `ACQUISITION_ATTRIBUTES`, a **derivation** of the shared table — the same
+spec objects, minus the two keys — so there is still exactly one place to edit a key, and
+`node-attributes.spec.ts` asserts membership by *identity* so a forked copy still fails.
 
 Also confirmed while verifying D2/D5, so a future sweep does not get it wrong: `mode` is engine-real for
 `transform.route` (`RowShaper.java:104`, `ConservationCheck.java:78`) and `table` is round-tripped for
@@ -222,12 +277,22 @@ the shape the flat parser reads. ✅ **D4 done 2026-08-03** (`node-config.dialog
 `null` (`pipeline-graph.spec.ts:207`), so the acquisition dialog renders **no** Connection picker and falls
 back to a free-text `use` box. The discarded `connection` attribute is therefore the *only discoverable* way
 to set a connection on the node; deleting it would leave the operator hand-typing `connection/<name>` into a
-free-text field. The fix is to give acquisition a real binding — `bindKindFor('SOURCE') → 'connection'` with
-the existing autocomplete writing `use: connection/<name>` — **and then** drop the cfg attribute. Note the
-attribute must stay in the shared `COLLECTOR_ATTRIBUTES` for **Onboarding**, which authors the `collector:`
-block directly and for which `connection` *is* a real key; so this is a per-adopter exclusion (a documented
-derivation of the shared table), **not** a fork and not an edit to the shared table. Small, but a UX change
-rather than a key fix — left open deliberately.
+free-text field. Note the attribute must stay in the shared `COLLECTOR_ATTRIBUTES` for **Onboarding**, which
+authors the `collector:` block directly and for which `connection` *is* a real key; so this is a per-adopter
+concern, **not** a fork and not an edit to the shared table.
+
+✅ **FIXED 2026-08-04 — but not the way this section proposed.** ⛔ **`bindKindFor('SOURCE') → 'connection'`
+is infeasible; do not try it.** The `bindKind` picker calls `ComponentsService.list(kind)` →
+`GET /components/{kind}`, and a Connection is **not** a `ComponentType` (`components.service.ts:12`) — it
+has its own service and route. Wiring it that way would have produced a picker that 404s.
+
+What shipped instead: the **existing `connection` autocomplete is the binding surface.** `NodeConfigDialog`
+gains an `isAcquisition` flag that (a) passes the already-existing `connectionOptionLoader()` into the config
+schema-form, (b) seeds the attribute from `use: connection/<name>` on load, since lift strips a cfg-level one
+so the normal config seeding can never find it, and (c) on save moves the picked value off cfg onto `use`,
+clearing the binding when emptied. The free-text `use` box is suppressed for acquisition so two controls
+can't write one field. **The engine contract is unchanged** — `connection` is still not a cfg key, which is
+why `NodeConfigNameContractTest` keeps asserting a cfg-level one is stripped.
 
 <details><summary>Original D3 detail table (authored-graph path — kept for provenance, do not act on it
 without first confirming which representation the surface saves to)</summary>
