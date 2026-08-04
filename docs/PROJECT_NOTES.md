@@ -118,8 +118,10 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   write the schema as an **inline TOON string** (`fields[N]{name,selector,type}: …`), not via `toToon(schemaMap)`.
   Round-trip only works when the map was originally JToon-decoded (e.g. a `SchemaSelector` loaded from a real
   `.toon`).
-- **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. Watch for
-  these whenever generating SQL with date/trigger columns.
+- **DuckDB reserved words** — `day` is a keyword: alias it (`run_day`) in SQL; quote `"trigger"` too. `rows` is
+  one as well (window frames: `ROWS BETWEEN`), which is why the `consignment_outputs` registry spells its count
+  column `row_count` even though the plan sketch says `rows` — matching `inspecto_pipeline_provenance` and the
+  `lineage` CSV. Watch for these whenever generating SQL with date/trigger/count columns.
 - **`schema` names TWO unrelated config shapes — never resolve one to the other's spec.** The **registry
   component** is a bare column list (`{fields:[{name,type[,format]}]}`, stored under `schemas/`, authored by
   the Components pane, validated by `ConfigSpecs.schemaComponent()`); the **TOON schema config** describes a
@@ -251,6 +253,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   stall (~+15% tax, widens with cores).
 - **Quarantine semantics:** throw → `QUARANTINED_UNREADABLE`; 0 emitted rows → `QUARANTINED_MISMATCH`;
   `SinkFlushException` → fail the batch.
+- **Output files: the JSON manifest is authoritative for EXISTENCE, `consignment_outputs` only for STATE.**
+  `PartitionOutput(partition, outputFile, bytes)` is an *ephemeral* return value — produced by
+  `PartitionWriter.reveal()`, consumed once, discarded — in **four** paths (`BatchIngestStrategy.writeAndTrace`,
+  `PartitionSinkWriter`, `EnrichmentEngine.run`, `DecisionRuleApplier`). The durable registry
+  (`DbConsignmentOutputStore`, plan §11.3) is **default-off** and `ServiceStores` degrades a failed open to
+  `null`, so **never read a missing registry row as proof a file does not exist** — `BatchManifest`/
+  `ManifestStore` stays the artifact of record. Note also that no per-file row count exists at write time (a
+  multi-file partitioned `COPY` reports none); it must be summed from `LineageCollector`'s
+  per-`(srcId, partition)` counts. → [`db-layer.md`](okf/backend/engine/db-layer.md) §3.9.
 - **`com.gamma.util` CLI cluster** (~11 `main()` tools: `MainApp`, `TarExtractor`, …) sits at low coverage and is
   **kept by decision** (self-contained; `MainApp` is wired into `package.ps1`/ops). Tested engine+control-plane
   is ~86%. Long-term: extract the CLI cluster to its own module. → [`performance.md`](okf/backend/build-run/performance.md).

@@ -1,15 +1,29 @@
 # Consignment-based ELT: one execution model, batch as the unit of work
 
-**Status:** DESIGN — brainstorm captured 2026-08-03, nothing implemented. No code written, no
-vocabulary landed, no config schema drafted. This is the record of a design conversation so the next
-shift starts from the decisions rather than the transcript.
+**Status:** IN FLIGHT — brainstorm captured 2026-08-03; **first code landed 2026-08-04** (`cf3742a5`).
+This began as the record of a design conversation, so the bulk below is still design. What has moved:
+
+| Piece | State as of 2026-08-04 |
+|---|---|
+| §14 `ProcessorContext` | **DESIGNED, unbuilt** — grounded against the code; decisions + build order in §14.1–§14.4 |
+| §11.3 `consignment_outputs` | **SLICE 1 BUILT + VERIFIED** — `DbConsignmentOutputStore`, default-off, 8 tests green. **No production caller yet** |
+| Everything else (§2, §4–§10, §11.4, §12, §13) | design only, nothing implemented |
+
+**Next:** slice 2 — sum `row_count` from `LineageCollector` and hook the four `PartitionOutput` write paths
+(§11.3 grounding (b)/(c)); then §14.4 steps 2–4.
+
 **Trigger:** operator question — *"why do we need two execution systems? what processor blocks on our
 pipeline make sense?"* — asked while scoping a replacement for an existing Kafka-based record-at-a-time
 ETL system.
 
 **Scope:** the ingestion execution model, storage layout, summary semantics, and completeness checking.
-Does **not** cover the UI/designer surface, the migration path off the current two paths, or the
-`ProcessorContext` SPI (§14 — the one deliberately unresolved piece).
+Does **not** cover the UI/designer surface or the migration path off the current two paths. (§14, the
+`ProcessorContext` SPI, was originally out of scope as the one deliberately unresolved piece; it is now
+designed in place.)
+
+⚠ **Read §4.7, §11.3 and §15 for corrections.** Grounding refuted three of this plan's own statements —
+the `on_commit` Job trigger, `ON_COMMIT_SAME_GRAPH`'s meaning, and §15's CSV-vs-registry framing. Each is
+corrected inline where it was stated, not silently fixed.
 
 ---
 

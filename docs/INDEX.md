@@ -85,7 +85,12 @@ former root reference docs** (each index lists them):
   cfg vocabulary; client and server are byte-compared).
 
 - [`superpower/consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) —
-  **DESIGN (opened 2026-08-03). Nothing implemented.** Captures the design conversation behind a
+  **IN FLIGHT (opened 2026-08-03). First code landed 2026-08-04 (`cf3742a5`): §11.3's
+  `consignment_outputs` registry, slice 1 — `DbConsignmentOutputStore`, default-off behind
+  `-Dconsignment.outputs.backend`, 8 tests green, no production caller yet (that is slice 2: sum `row_count`
+  from `LineageCollector` and hook the four `PartitionOutput` write paths). As-built DDL in
+  [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §3.9. Everything else here is still
+  design.** Captures the design conversation behind a
   Consignment-based ELT model that replaces a Kafka record-at-a-time ETL. Core claim: the two apparent
   execution systems (`BatchProcessor` file/batch path · `PipelineExecutor` graph path) are one model built
   from both ends, joined by making the **Consignment manifest a first-class DuckDB relation** flowing on
