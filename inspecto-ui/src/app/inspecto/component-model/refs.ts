@@ -12,7 +12,16 @@ import { getKind } from './component-registry';
  * {@link ComponentKind.deriveRefs} takes precedence — the seam future kinds implement.
  */
 
-/** Split a node's `use: '<kind>/<id>'` binding. The `connections` prefix maps to the `connection` kind. */
+/**
+ * Split a node's `use: '<kind>/<id>'` binding.
+ *
+ * ⚠ The canonical prefix is the SINGULAR `connection/` — what the backend `PipelineEditable` lowers
+ * and reads, and what the node dialog writes. The plural `connections/` is tolerated on READ only,
+ * for graphs persisted before 2026-08-04 (the mock seeds authored it, so a seeded pipeline saved
+ * through the editor silently lost its binding: `lower()` translates only the singular form).
+ * **Never author the plural.** When the engine gains an unknown-`use:`-prefix refusal, this tolerance
+ * is what it must not be built on.
+ */
 export function parseUseRef(use: string | undefined): { kind: string; id: string } | null {
     const trimmed = use?.trim();
     if (!trimmed) return null;

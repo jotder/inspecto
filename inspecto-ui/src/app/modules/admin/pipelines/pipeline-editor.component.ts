@@ -34,7 +34,7 @@ import {
     LensService,
     apiErrorMessage,
 } from 'app/inspecto/api';
-import { type AttributeSpec, pipelineScaffold } from 'app/inspecto/component-model';
+import { type AttributeSpec, parseUseRef, pipelineScaffold } from 'app/inspecto/component-model';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -830,8 +830,14 @@ export class PipelineEditorComponent implements OnInit {
         const pipelineId = this.selectedId();
         const m = this.model();
         if (!pipelineId || !m) return;
-        const src = m.nodes.find((n) => this.typeCategory(n.type) === 'SOURCE' && n.use?.startsWith('connections/'));
-        const connectionId = src?.use ? src.use.slice('connections/'.length) : null;
+        // Through `parseUseRef` — the ONE derivation of what a binding references — rather than a
+        // hand-rolled prefix match. The hand-rolled one tested for the plural `connections/` while
+        // the backend lowers and the dialog writes the singular `connection/`, so until 2026-08-04
+        // it never found a binding authored through the dialog.
+        const src = m.nodes.find(
+            (n) => this.typeCategory(n.type) === 'SOURCE' && parseUseRef(n.use)?.kind === 'connection',
+        );
+        const connectionId = parseUseRef(src?.use)?.id ?? null;
         const ref = this.dialog.open(RunToHereDialog, {
             width: '760px',
             autoFocus: false,

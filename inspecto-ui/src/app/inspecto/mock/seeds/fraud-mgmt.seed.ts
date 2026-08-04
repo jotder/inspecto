@@ -37,7 +37,7 @@ export function seedFraudMgmt(store: MockStore, space: string): void {
         name: 'fraud_scoring',
         active: true,
         nodes: [
-            { id: 'collect', type: 'acquisition', name: 'Collect xDRs', use: 'connections/mediation_sftp', config: { include: 'glob:**/*.dat' } },
+            { id: 'collect', type: 'acquisition', name: 'Collect xDRs', use: 'connection/mediation_sftp', config: { include: 'glob:**/*.dat' } },
             { id: 'parse', type: 'parser', name: 'Parse xDR', config: { delimiter: '|', header: false } },
             { id: 'score', type: 'transform.derive', name: 'Velocity + destination scoring' },
             { id: 'gate', type: 'transform.filter', name: 'Keep high-risk', config: { predicate: 'risk_score > 0.8' } },

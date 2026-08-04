@@ -38,7 +38,7 @@ export function seedTelecomRa(store: MockStore, space: string): void {
         name: 'switch_cdr_ingest',
         active: true,
         nodes: [
-            { id: 'collect', type: 'acquisition', name: 'Collect switch CDRs', use: 'connections/switch_sftp', config: { include: 'glob:**/*.csv.gz' } },
+            { id: 'collect', type: 'acquisition', name: 'Collect switch CDRs', use: 'connection/switch_sftp', config: { include: 'glob:**/*.csv.gz' } },
             { id: 'parse', type: 'parser', name: 'Parse CDR CSV', config: { delimiter: ',', header: true } },
             { id: 'filter', type: 'transform.filter', name: 'Drop zero-duration', config: { predicate: 'duration_s > 0' } },
             { id: 'write', type: 'sink.persistent', name: 'Switch CDR parquet', config: { format: 'PARQUET' } },
@@ -53,7 +53,7 @@ export function seedTelecomRa(store: MockStore, space: string): void {
         name: 'billing_rated_load',
         active: true,
         nodes: [
-            { id: 'extract', type: 'acquisition', name: 'Extract rated events', use: 'connections/billing_db' },
+            { id: 'extract', type: 'acquisition', name: 'Extract rated events', use: 'connection/billing_db' },
             { id: 'daily', type: 'transform.derive', name: 'Daily rated totals' },
             { id: 'load', type: 'sink.materialized', name: 'Load rated side' },
         ],

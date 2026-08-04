@@ -57,7 +57,7 @@ describe('connectionsHandler', () => {
 
     it('409s deleting a connection an authored pipeline still uses', () => {
         const store = seededStore();
-        // Seeded pipeline cdr_ingest binds `use: 'connections/cdr_sftp_prod'`.
+        // Seeded pipeline cdr_ingest binds `use: 'connection/cdr_sftp_prod'`.
         const res = handler(req('DELETE', '/api/connections/cdr_sftp_prod'), store);
         expect(res?.status).toBe(409);
         expect(String((res?.body as { error: string }).error)).toContain('cdr_ingest');

@@ -232,7 +232,7 @@ describe('computeNodeStatus', () => {
 
     it('treats a source as unconfigured until a connection is bound', () => {
         expect(computeNodeStatus({ id: 's', type: 'acquisition' }, 'SOURCE', refs, noTests)).toBe('unconfigured');
-        expect(computeNodeStatus({ id: 's', type: 'acquisition', use: 'connections/cdr' }, 'SOURCE', refs, noTests)).toBe('configured');
+        expect(computeNodeStatus({ id: 's', type: 'acquisition', use: 'connection/cdr' }, 'SOURCE', refs, noTests)).toBe('configured');
     });
 });
 
@@ -244,7 +244,7 @@ describe('validatePipeline', () => {
         const flow: AuthoredPipeline = {
             name: 'f', active: false,
             nodes: [
-                { id: 'src', type: 'acquisition', use: 'connections/cdr' },
+                { id: 'src', type: 'acquisition', use: 'connection/cdr' },
                 { id: 'parse', type: 'parser' },          // no grammar → error
                 { id: 'write', type: 'sink.persistent', use: 'sink/out' },
             ],

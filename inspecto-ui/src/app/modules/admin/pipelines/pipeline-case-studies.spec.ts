@@ -8,7 +8,7 @@ import { CASE_STUDY_GRAMMARS, PIPELINE_CASE_STUDIES } from 'app/inspecto/mock/se
  * that future seed edits can't silently defuse it. Mirrors `geo-case-studies.spec.ts`.
  */
 
-/** Connections seeded by operations.seed.ts — every `use: connections/<id>` must resolve here. */
+/** Connections seeded by operations.seed.ts — every `use: connection/<id>` must resolve here. */
 const SEEDED_CONNECTIONS = ['cdr_sftp_prod', 'pg_warehouse', 's3_archive', 'local_inbox', 'legacy_ftp_down'];
 /** Grammars seeded outside the pack (registry seeds in default-space.seed.ts). */
 const REGISTRY_GRAMMARS = ['cdr_csv', 'pipe_delimited'];
@@ -185,6 +185,6 @@ describe('CS5 deadletter_torture — every control relation on a deep chain', ()
     });
 
     it('collects from the known-down FTP connection (the failure paths are the point)', () => {
-        expect(p.nodes.find((n) => n.id === 't_collect')!.use).toBe('connections/legacy_ftp_down');
+        expect(p.nodes.find((n) => n.id === 't_collect')!.use).toBe('connection/legacy_ftp_down');
     });
 });

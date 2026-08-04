@@ -16,8 +16,11 @@ import {
  * every consumer — reuse-graph, delete protection, bundle closure, import fit-check.
  */
 describe('parseUseRef', () => {
-    it('splits use bindings and maps the connections prefix to the connection kind', () => {
+    it('splits use bindings, tolerating the legacy plural connections prefix on read', () => {
         expect(parseUseRef('grammar/cdr_csv')).toEqual({ kind: 'grammar', id: 'cdr_csv' });
+        // canonical (what the backend lowers and the node dialog writes)
+        expect(parseUseRef('connection/cdr_sftp_prod')).toEqual({ kind: 'connection', id: 'cdr_sftp_prod' });
+        // legacy, read-only: graphs persisted before the 2026-08-04 vocabulary fix
         expect(parseUseRef('connections/cdr_sftp_prod')).toEqual({ kind: 'connection', id: 'cdr_sftp_prod' });
         expect(parseUseRef('grammar/nested/id')).toEqual({ kind: 'grammar', id: 'nested/id' });
         for (const bad of [undefined, '', '  ', 'nokind', '/noid', 'kind/']) expect(parseUseRef(bad)).toBeNull();
@@ -77,7 +80,7 @@ describe('structural derivations', () => {
     it('pipeline: binds every node use ref, anchored on the node id', () => {
         const flow = {
             nodes: [
-                { id: 'c', type: 'acquisition', use: 'connections/cdr_sftp_prod' },
+                { id: 'c', type: 'acquisition', use: 'connection/cdr_sftp_prod' },
                 { id: 'p', type: 'parser', use: 'grammar/cdr_asn1_ber' },
                 { id: 's', type: 'sink.persistent' },
             ],

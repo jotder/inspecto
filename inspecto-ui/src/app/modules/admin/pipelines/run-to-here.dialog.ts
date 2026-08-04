@@ -21,7 +21,7 @@ import { ConnectionTreeComponent } from 'app/modules/admin/connections/connectio
 export interface RunToHereData {
     pipelineId: string;
     node: AuthoredNode;
-    /** The seed source's connection id (`connections/<id>` → `<id>`), or null when none is bound. */
+    /** The seed source's connection id (`connection/<id>` → `<id>`), or null when none is bound. */
     connectionId: string | null;
 }
 
@@ -58,7 +58,7 @@ export interface RunToHereData {
                 <div class="flex items-center justify-between gap-2">
                     <h3 class="text-sm font-semibold">Inbox files</h3>
                     @if (data.connectionId) {
-                        <span class="text-secondary font-mono text-xs">connections/{{ data.connectionId }}</span>
+                        <span class="text-secondary font-mono text-xs">connection/{{ data.connectionId }}</span>
                     }
                 </div>
 
