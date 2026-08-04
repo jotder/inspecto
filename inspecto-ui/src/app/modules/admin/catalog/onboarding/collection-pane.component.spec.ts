@@ -36,21 +36,28 @@ function create(
     return { fixture, state, patch };
 }
 
+/**
+ * The pane is a thin host over the shared `<inspecto-collector-config>` (2026-08-04): the collector
+ * chrome (mode, fields, Connection affordances, derived connector) is asserted through
+ * `componentInstance.collector`, while what stays the PANE's job — nesting, delete markers and the
+ * `POST /config/patch` block write — is asserted on the `patch` spy.
+ */
 describe('OnboardingCollectionPaneComponent', () => {
     beforeEach(() => localStorage.removeItem('inspecto.currentLens'));
 
-    it('initialises from the existing collector block (Connection mode for a non-local connector)', () => {
+    it('initialises the shared component from the existing collector block (Connection mode for a non-local connector)', () => {
         const { fixture } = create({ name: 'x', collector: { connector: 'sftp', duplicate: { mode: 'checksum' } } });
         const c = fixture.componentInstance;
-        expect(c.mode()).toBe('connection');
+        expect(c.collector.mode()).toBe('connection');
         expect(c.initial['duplicate__mode']).toBe('checksum');
+        expect(c.collector.schemaForm.form.get('duplicate__mode')?.value).toBe('checksum');
     });
 
     it('local save injects connector "local" and nests dot keys, then marks the form pristine', () => {
         const { fixture, state, patch } = create({ name: 'x' });
         const c = fixture.componentInstance;
-        expect(c.mode()).toBe('local');
-        c.schemaForm.form.get('include')?.setValue('*.csv, *.txt');
+        expect(c.collector.mode()).toBe('local');
+        c.collector.schemaForm.form.get('include')?.setValue('*.csv, *.txt');
         c.save();
         expect(patch).toHaveBeenCalledTimes(1);
         const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
@@ -65,10 +72,10 @@ describe('OnboardingCollectionPaneComponent', () => {
     it('derives the connector from the picked Connection — it is never asked', () => {
         const { fixture, patch } = create({ name: 'x' }, undefined, [{ id: 'blob_prod', connector: 'azure' }]);
         const c = fixture.componentInstance;
-        c.setMode('connection');
+        c.collector.setMode('connection');
         fixture.detectChanges();
-        c.schemaForm.form.get('connection')?.setValue('blob_prod');
-        expect(c.derivedConnector()).toBe('azure');
+        c.collector.schemaForm.form.get('connection')?.setValue('blob_prod');
+        expect(c.collector.derivedConnector()).toBe('azure');
         c.save();
         const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
         expect(collector['connector']).toBe('azure');
@@ -82,8 +89,8 @@ describe('OnboardingCollectionPaneComponent', () => {
             [{ id: 'sftp_prod', connector: 'sftp' }],
         );
         const c = fixture.componentInstance;
-        expect(c.mode()).toBe('connection');
-        c.setMode('local');
+        expect(c.collector.mode()).toBe('connection');
+        c.collector.setMode('local');
         fixture.detectChanges();
         c.save();
         const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
@@ -94,38 +101,38 @@ describe('OnboardingCollectionPaneComponent', () => {
     it('blocks a Connection-mode save with no Connection picked', () => {
         const { fixture, patch } = create({ name: 'x' });
         const c = fixture.componentInstance;
-        c.setMode('connection');
+        c.collector.setMode('connection');
         fixture.detectChanges();
         c.save();
         expect(patch).not.toHaveBeenCalled();
-        expect(c.saveError()).toContain('Pick a Connection');
+        expect(c.collector.error()).toContain('Pick a Connection');
     });
 
     it('blocks when the typed Connection id is not a saved profile', () => {
         const { fixture, patch } = create({ name: 'x' }, undefined, [{ id: 'blob_prod', connector: 'azure' }]);
         const c = fixture.componentInstance;
-        c.setMode('connection');
+        c.collector.setMode('connection');
         fixture.detectChanges();
-        c.schemaForm.form.get('connection')?.setValue('ghost');
+        c.collector.schemaForm.form.get('connection')?.setValue('ghost');
         c.save();
         expect(patch).not.toHaveBeenCalled();
-        expect(c.saveError()).toContain('"ghost" is not a saved Connection');
+        expect(c.collector.error()).toContain('"ghost" is not a saved Connection');
     });
 
     it('grandfathers a hand-authored non-local connector with no Connection (TOON survives)', () => {
         const { fixture, patch } = create({ name: 'x', collector: { connector: 'sftp' } });
         const c = fixture.componentInstance;
-        expect(c.mode()).toBe('connection');
+        expect(c.collector.mode()).toBe('connection');
         c.save();
         const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
         expect(collector['connector']).toBe('sftp');
-        expect(c.saveError()).toBeNull();
+        expect(c.collector.error()).toBeNull();
     });
 
     it('a mode switch alone marks the pane dirty', () => {
         const { fixture, state } = create({ name: 'x' });
         expect(state.isDirty()).toBe(false);
-        fixture.componentInstance.setMode('connection');
+        fixture.componentInstance.collector.setMode('connection');
         expect(state.isDirty()).toBe(true);
     });
 
