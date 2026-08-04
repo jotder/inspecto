@@ -23,6 +23,7 @@ import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.service.CollectorService;
 import com.gamma.service.DbStatusStore;
+import com.gamma.service.SpaceRoot;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
@@ -127,11 +128,11 @@ final class PipelineRoutes implements RouteModule {
     }
 
     private Path flowsRootOrNull(ApiContext api) {
-        return api.writeRoot() == null ? null : api.writeRoot().resolve("flows");
+        return api.writeRoot() == null ? null : SpaceRoot.pipelinesSubdir(api.writeRoot());
     }
 
     private PipelineStore flowStore(ApiContext api) {
-        return new PipelineStore(WriteGates.requireWriteRoot(api, "pipeline write").resolve("flows"));
+        return new PipelineStore(SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline write")));
     }
 
     /** {@code GET /pipelines/authored} — summaries of every authored flow (empty when no write root). */
@@ -972,7 +973,7 @@ final class PipelineRoutes implements RouteModule {
      * optional {@code ?actor=} attributes the fire. 503 without a write root, 404 if the flow is absent.
      */
     private Object runFlow(ApiContext api, HttpExchange e, String id) throws IOException {
-        Path root = WriteGates.requireWriteRoot(api, "pipeline run").resolve("flows");
+        Path root = SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline run"));
         if (!new PipelineStore(root).exists(id)) throw new ApiException(404, "no authored flow '" + id + "'");
         String runId;
         try {

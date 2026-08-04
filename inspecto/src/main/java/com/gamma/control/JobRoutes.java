@@ -101,8 +101,15 @@ final class JobRoutes implements RouteModule {
 
         // ── data-plane provenance (T22, §11): per-(node, relationship) record counts of a past flow run,
         // for painting quantities onto the PipelineGraph edges (Sankey). 404 unless -Dprovenance.backend is set. ──
-        api.get("/provenance", (e, m) -> provenanceData(api, ApiContext.query(e, "flow"), ApiContext.query(e, "batch")));
-        api.get("/provenance/batches", (e, m) -> provenanceBatches(api, ApiContext.query(e, "flow"), ApiContext.query(e, "limit")));
+        api.get("/provenance", (e, m) -> provenanceData(api, pipelineParam(e), ApiContext.query(e, "batch")));
+        api.get("/provenance/batches", (e, m) -> provenanceBatches(api, pipelineParam(e), ApiContext.query(e, "limit")));
+    }
+
+    /** Tier 3 dual-read (vocabulary plan §4): {@code ?pipeline=} is canonical, {@code ?flow=} the
+     *  pre-rename query param — kept for any caller not yet updated. */
+    private static String pipelineParam(HttpExchange e) {
+        String p = ApiContext.query(e, "pipeline");
+        return (p == null || p.isBlank()) ? ApiContext.query(e, "flow") : p;
     }
 
     /**

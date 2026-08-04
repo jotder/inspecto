@@ -27,13 +27,14 @@ writes to a sink store. It is hosted as a [`JobType.PIPELINE`](../control-plane/
 5. `PartitionSinkWriter` (the `SinkWriter` impl) delegates each sink write to
    [`PartitionWriter`](../engine/output-sinks.md).
 6. Optionally collect provenance (`DbProvenanceStore`) and run `ConservationCheck` → emit
-   `FLOW_CONSERVATION_IMBALANCE` events when records are lost at a non-amplifying node.
+   `PIPELINE_CONSERVATION_IMBALANCE` events when records are lost at a non-amplifying node.
 7. Advance `PipelineWatermarkStore` per source (opt-in incremental mode); register `sink.view` outputs as durable
    `ViewDefinition`s.
 8. Publish a `BatchEvent`, return a `JobResult`.
 
-Config (`*_job.toon`): `type: pipeline`, `flow: <authored-pipeline-id>` (the `flow:` key name is verbatim
-legacy), plus `cron:` / `on_pipeline:` / manual.
+Config (`*_job.toon`): `type: pipeline`, `pipeline: <authored-pipeline-id>` (canonical since the Tier 3
+rename, vocabulary plan §4 — the pre-rename `flow:` key still reads, dual-read only, never written again).
+
 
 ## Config-less ad-hoc run (2026-07-18)
 

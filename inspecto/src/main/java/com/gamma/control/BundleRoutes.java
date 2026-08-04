@@ -10,6 +10,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineStore;
+import com.gamma.service.SpaceRoot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -373,7 +374,7 @@ final class BundleRoutes implements RouteModule {
         Path root = api.writeRoot();
         if (root == null) return null;
         return switch (kind) {
-            case "authored-pipeline" -> new PipelineBundleSource(new PipelineStore(root.resolve("flows")));
+            case "authored-pipeline" -> new PipelineBundleSource(new PipelineStore(SpaceRoot.pipelinesSubdir(root)));
             case "job" -> new JobBundleSource(api);
             case "saved-view" -> new SavedViewBundleSource(api.service().savedViews());
             case "connection" -> new ConnectionBundleSource(api);

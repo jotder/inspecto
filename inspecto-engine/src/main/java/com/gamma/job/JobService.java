@@ -273,7 +273,7 @@ public final class JobService implements AutoCloseable {
                 c -> new MaintenanceJob(c, dataDir, auditDir, ledger.runStore().orElse(null), this)));
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("pipeline", "Pipeline",
                 "Runs an authored Pipeline over data at rest; emits a commit downstream jobs can chain on.",
-                List.of(ParameterDecl.required("flow", ParamType.STRING, "Authored Pipeline id to run"),
+                List.of(ParameterDecl.required("pipeline", ParamType.STRING, "Authored Pipeline id to run"),
                         ParameterDecl.optional("incremental_column", ParamType.STRING, null, "Watermark column for incremental runs")),
                 List.of("pipeline.commit"), List.of()),
                 this::buildFlowJob));
@@ -619,7 +619,7 @@ public final class JobService implements AutoCloseable {
      */
     public String triggerPipelineRun(String pipelineId, String actor) {
         JobConfig cfg = new JobConfig(pipelineId, "pipeline", null, null, true, false,
-                Map.of("flow", pipelineId), null, null);
+                Map.of("pipeline", pipelineId), null, null);
         Job job = buildFlowJob(cfg);   // fails closed without an authored-flow store
         String runId = newRunId(pipelineId);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
@@ -898,7 +898,8 @@ public final class JobService implements AutoCloseable {
      */
     private String trackFlowStart(Job job, JobConfig cfg, String name) {
         if (!"pipeline".equals(job.type())) return null;
-        String pipelineId = cfg != null ? cfg.opt("flow", name) : name;
+        // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key.
+        String pipelineId = cfg != null ? cfg.opt("pipeline", cfg.opt("flow", name)) : name;
         runningPipelines.add(pipelineId);
         return pipelineId;
     }

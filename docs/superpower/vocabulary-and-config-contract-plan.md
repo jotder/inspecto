@@ -35,10 +35,13 @@ renamed to `collectors.md`), plus 2 prose-rule bugs (`Source-of-truth` false pos
 `inspecto_pipeline_provenance` + `ProvenanceRow.flowId`→`pipelineId` + `FLOW_CONSERVATION_IMBALANCE`→
 `PIPELINE_CONSERVATION_IMBALANCE` with a legacy read-alias.
 
+**Flow→Pipeline Tier 3 SHIPPED** 2026-08-04 — see §4 above: `config/flows/`→`pipelines/` dual-read,
+`flow:`→`pipeline:` job-config key dual-read, JSON response keys dual-emit. No version bump (nothing
+breaks — see §4's rationale). All three Flow→Pipeline tiers are now closed.
+
 **Open:** D3-remainder (the `connection` binding — a UX change), **D6** (unstarted; a new timezone surface
-needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), the §3.2 guard on Java+TS
-source, and Flow→Pipeline Tier 3 (§4, needs a version bump via `release-workflow`). Do not archive this
-plan until those close.
+needing design), **D8** (awaiting operator decision), **D9** (new, 2026-08-04), and the §3.2 guard on
+Java+TS source. Do not archive this plan until those close.
 **Trigger:** operator asks, in order — *"match necessary configs/naming with UI/pipeline config … UI looks
 different, need to same that saves to pipeline and execute engine use it"*, then *"remove flow from
 everywhere, use pipeline. create a common checking point, validation layer"*, then *"remove Cube, use
@@ -393,18 +396,35 @@ tier boundary in its own right, independent of persistence and JSON.**
   still promote, proven by `anImbalanceUnderTheLegacyPreRenameTypeStillPromotes` in
   `EventObjectBridgeTest`. Nothing is ever written under the legacy value again.
 
-**Tier 3 — breaking, external contract.**
+**Tier 3 — breaking, external contract. ✅ SHIPPED 2026-08-04.**
 
-- `spaces/*/config/flows/` → `pipelines/` (live — `spaces/default/config/flows/` exists). Needs a boot-time
-  migration or dual-read.
-- `flow:` → `pipeline:` in `*_job.toon` (`type: pipeline` jobs). Existing configs stop parsing without a
-  dual-read fallback; the key is described in `okf/backend/pipeline-graph/live-execution.md` as *"the
-  `flow:` key name is verbatim legacy"*.
-- JSON response keys.
+- `spaces/*/config/flows/` → `pipelines/`. **No boot-time move** — `SpaceRoot.pipelinesDir()` (and the new
+  static `SpaceRoot.pipelinesSubdir(Path)` helper, reused by the three `PipelineRoutes`/`LineageRoutes`/
+  `BundleRoutes` call sites that built a `PipelineStore` root directly off a write root rather than through
+  `SpaceRoot`) prefers `config/pipelines/`, falling back to a pre-existing `config/flows/` only when the
+  renamed dir is absent — same shape as `LegacySpaceRoot.statusDbUrl()`'s existing pre-rebrand-file pattern.
+  A space adopts `pipelines/` the instant anything writes there; renaming a directory a job might be
+  actively reading was judged a hazard not worth taking for a purely-internal path. `SpaceLayoutContract`
+  allows both names now.
+- `flow:` → `pipeline:` in `*_job.toon` (`type: pipeline` jobs). `PipelineJobRunner.run()` and
+  `JobService.trackFlowStart()` read `pipeline:` first, falling back to `flow:`; the job type's declared
+  `ParameterDecl` is now `pipeline` (required), and `ParameterResolver.value()` gained a `pipeline`-specific
+  fallback so authored-config resolution (not just the runtime read) honours old files. New/re-authored
+  configs write `pipeline:` only (`JobService.triggerPipelineRun`'s synthetic config).
+  `okf/backend/pipeline-graph/live-execution.md` updated off its own *"verbatim legacy"* callout.
+- JSON response keys: dual-emit, not a cutover — `PipelineProjection.graph()`'s top-level array
+  (`pipelines` + retained `flows`) and each node/edge (`pipeline` + retained `flow`); `ViewRoutes`/
+  `ViewDefinition` (`pipeline` + retained `flow`, both directions — `ViewDefinition.toMap()`/`fromMap()`
+  read `pipeline` first); the `/provenance` + `/provenance/batches` routes now also accept `?pipeline=`
+  (checked before the retained `?flow=`).
 
-Tier 3 requires a version bump per `docs/BRANCHING.md` and **must go through the `release-workflow`
-skill**. Recommended sequencing: Tier 1 in its own commit; Tier 2 with the read-alias and a test proving
-old rows still resolve; Tier 3 last, with the migration and dual-read, as one coordinated change.
+No version bump: every surface above is dual-read/dual-emit, so no existing space, `*_job.toon`, or API
+caller stops working — the same "no contract/data in the wild yet" rationale the earlier no-bump Tier 1
+UI/backend rename used, just achieved here by aliasing rather than by there being nothing to break.
+Verified: `mvn -o clean test -pl inspecto-event,inspecto-engine,inspecto -am` → 650/650, plus new tests
+(`PipelineJobRunnerTest.runsFlowWithTheCanonicalPipelineKeyNotJustTheLegacyFlowKey`,
+`ControlApiProvenanceTest`'s `?pipeline=` assertions) alongside the many pre-existing `flow:`-keyed tests,
+which now double as legacy-path regression coverage.
 
 ## 5. Cube → Matrix — ✅ DONE 2026-08-04
 
@@ -460,7 +480,8 @@ this file's subject IS the rename — same shape as the existing `bare-flow` ent
    **done 2026-08-04.**
 8. **Cube → Matrix** additive labels; mark §13 ✅. — ✅ **done 2026-08-04.**
 9. **Flow Tier 2** with read-alias. — ✅ **done 2026-08-04.**
-10. **Flow Tier 3** with migration — via `release-workflow`, version bump.
+10. **Flow Tier 3** with migration — via `release-workflow`, version bump. — ✅ **done 2026-08-04** (no
+    version bump needed — see §4: dual-read/dual-emit everywhere, nothing to break).
 11. **§3.2** guard on Java + TS source, with allowlist. Last, largest allowlist.
 12. **§3.1** serve cfg vocabulary from the server — the structural fix. Can start any time after 4;
     sequenced last because it is the largest and 4 already prevents regression.

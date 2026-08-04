@@ -125,7 +125,10 @@ public final class PipelineJobRunner implements Job {
 
     @Override
     public JobResult run() throws Exception {
-        String pipelineId = cfg.require("flow");
+        // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
+        // read only, kept for existing *_job.toon files that were never resaved.
+        String pipelineIdOpt = cfg.opt("pipeline", null);
+        final String pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
         PipelineGraph g = flowStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
                 "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
         String dir = cfg.opt("data_dir", dataDir);

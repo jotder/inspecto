@@ -163,8 +163,8 @@ public final class CollectorService implements AutoCloseable {
      *  otherwise; {@linkplain EventLog#register registered} under {@link #spaceId} so MDC-routed emitters
      *  (the capture appender, the poll-path telemetry) reach it. */
     private final EventLog eventLog;
-    /** Authored-flow store ({@link SpaceRoot#flowsDir()}); lets the deletion fence (T32) see flow jobs as
-     *  store producers/consumers. {@code null} when no write root is configured. */
+    /** Authored-pipeline store ({@link SpaceRoot#pipelinesDir()}); lets the deletion fence (T32) see
+     *  pipeline jobs as store producers/consumers. {@code null} when no write root is configured. */
     private final PipelineStore flowStore;
     /** Per-pipeline ingest exclusion: an operator-triggered run (Control API {@code /trigger},
      *  {@code /runs/{name}/trigger}) can never overlap a poll-cycle run — or another trigger — <em>of the

@@ -34,13 +34,13 @@ final class ServiceStores {
     private ServiceStores() {}
 
     /**
-     * Authored-flow store at {@link SpaceRoot#flowsDir()}, or {@code null} when no write root is
-     * configured. Lets the deletion fence (T32) see flow jobs as store producers/consumers; without a
-     * write root a configured flow job fails closed at build time with a clear message.
+     * Authored-pipeline store at {@link SpaceRoot#pipelinesDir()}, or {@code null} when no write root is
+     * configured. Lets the deletion fence (T32) see pipeline jobs as store producers/consumers; without a
+     * write root a configured pipeline job fails closed at build time with a clear message.
      */
     static PipelineStore openFlowStore(SpaceRoot root) {
-        Path flows = root.flowsDir();
-        return flows == null ? null : new PipelineStore(flows);
+        Path pipelines = root.pipelinesDir();
+        return pipelines == null ? null : new PipelineStore(pipelines);
     }
 
     /**

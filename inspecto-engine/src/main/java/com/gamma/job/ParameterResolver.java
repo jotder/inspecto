@@ -113,6 +113,12 @@ final class ParameterResolver {
         }
         String c = config.get(d.name());
         if (c != null && !c.isBlank()) return c;
+        // Tier 3 dual-read (vocabulary plan §4): the `pipeline` job parameter's pre-rename config key was
+        // `flow` — read-only fallback for *_job.toon files that were never resaved under the new name.
+        if ("pipeline".equals(d.name())) {
+            String legacy = config.get("flow");
+            if (legacy != null && !legacy.isBlank()) return legacy;
+        }
         if (d.deduce() != null && !d.deduce().isBlank()) {
             String dv = deduce(d.deduce().trim(), ctx);
             if (dv != null) return dv;

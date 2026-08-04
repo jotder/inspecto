@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineStores;
+import com.gamma.service.SpaceRoot;
 import com.gamma.util.Csv;
 
 import java.nio.file.Files;
@@ -105,10 +106,11 @@ final class LineageRoutes implements RouteModule {
         List<Map<String, Object>> flows = new ArrayList<>();
         Path writeRoot = api.writeRoot();
         if (writeRoot == null) return flows;
-        for (PipelineGraph g : new PipelineStore(writeRoot.resolve("flows")).list()) {
+        for (PipelineGraph g : new PipelineStore(SpaceRoot.pipelinesSubdir(writeRoot)).list()) {
             if (!PipelineStores.consumed(g).contains(store)) continue;
             Map<String, Object> f = new LinkedHashMap<>();
-            f.put("flow", g.name());
+            f.put("pipeline", g.name());
+            f.put("flow", g.name());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
             f.put("sinks", new ArrayList<>(PipelineStores.produced(g)));
             flows.add(f);
         }

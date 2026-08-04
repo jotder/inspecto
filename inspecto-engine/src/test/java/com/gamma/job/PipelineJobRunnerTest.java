@@ -66,6 +66,28 @@ class PipelineJobRunnerTest {
     }
 
     @Test
+    void runsFlowWithTheCanonicalPipelineKeyNotJustTheLegacyFlowKey() throws Exception {
+        // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is the canonical *_job.toon key going
+        // forward; every other test in this file still uses the pre-rename `flow:` key deliberately, to
+        // keep proving that read path too.
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_rollup", new PipelineGraph("evt_rollup", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        new PipelineNode("out", "sink.persistent", "Rollup", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+
+        JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline", "evt_rollup", "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of(1, 2), readIds(dataDir, "rollup"));
+    }
+
+    @Test
     void rerunWithSameBatchIdSkipsTheCommittedBranch() throws Exception {
         String dataDir = tmp.resolve("data").toString();
         String auditDir = tmp.resolve("audit").toString();

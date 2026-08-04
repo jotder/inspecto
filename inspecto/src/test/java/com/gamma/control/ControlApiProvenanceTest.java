@@ -49,6 +49,10 @@ class ControlApiProvenanceTest {
             // params present but no provenance backend configured → 404 (default-off)
             assertEquals(404, get(c.port, "/provenance?flow=f&batch=b").statusCode());
             assertEquals(404, get(c.port, "/provenance/batches?flow=f").statusCode());
+
+            // Tier 3 dual-read (vocabulary plan §4): the canonical `pipeline=` param works the same way
+            assertEquals(404, get(c.port, "/provenance?pipeline=f&batch=b").statusCode());
+            assertEquals(404, get(c.port, "/provenance/batches?pipeline=f").statusCode());
         }
     }
 

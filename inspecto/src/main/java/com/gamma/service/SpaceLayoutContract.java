@@ -35,7 +35,9 @@ final class SpaceLayoutContract {
 
     /** The known top-level entries of a conforming space tree (everything else is flagged). */
     private static final Set<String> KNOWN_TOP_LEVEL =
-            Set.of("config", "data", "audit", "duckdb", "flows", "views", "space.toon");
+            // "flows" kept for spaces that predate the Tier 3 flows/->pipelines/ rename (vocabulary plan
+            // §4) — SpaceRoot#pipelinesDir() dual-reads it, so it is not yet a contract violation.
+            Set.of("config", "data", "audit", "duckdb", "flows", "pipelines", "views", "space.toon");
 
     /** Canonical subdirs a healthy space owns (beyond {@code config/}, which discovery already requires). */
     private static final List<String> REQUIRED_SUBDIRS = List.of("data", "audit", "duckdb");

@@ -29,10 +29,13 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
         sourceStores = sourceStores == null ? List.of() : List.copyOf(sourceStores);
     }
 
-    /** Lossless map form for {@code ConfigCodec.toToon} persistence. */
+    /** Lossless map form for {@code ConfigCodec.toToon} persistence. Tier 3 dual-emit (vocabulary plan
+     *  §4): writes both {@code pipeline} (canonical) and {@code flow} (pre-rename, read by any consumer
+     *  not yet updated) — never a hard cutover on a persisted file format. */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("store", store);
+        m.put("pipeline", flow);
         m.put("flow", flow);
         m.put("source_store", sourceStores);
         if (derivedSql != null && !derivedSql.isBlank()) m.put("derived_sql", derivedSql);
@@ -40,11 +43,14 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
         return m;
     }
 
+    /** Dual-read: {@code pipeline} (canonical) preferred, {@code flow} (pre-rename) as fallback for
+     *  definitions written before the Tier 3 rename. */
     public static ViewDefinition fromMap(Map<String, Object> m) {
         Object ss = m.get("source_store");
         List<String> sources = ss instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
+        String pipeline = m.get("pipeline") != null ? str(m.get("pipeline")) : str(m.get("flow"));
         return new ViewDefinition(
-                str(m.get("store")), str(m.get("flow")), sources,
+                str(m.get("store")), pipeline, sources,
                 str(m.get("derived_sql")), str(m.get("defined_at")));
     }
 

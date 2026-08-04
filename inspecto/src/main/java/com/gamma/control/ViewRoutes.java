@@ -97,7 +97,8 @@ final class ViewRoutes implements RouteModule {
     private static Map<String, Object> viewSummary(ViewDefinition def) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("store", def.store());
-        m.put("flow", def.flow());
+        m.put("pipeline", def.flow());
+        m.put("flow", def.flow());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
         m.put("source_store", def.sourceStores());
         m.put("has_derived_sql", def.derivedSql() != null && !def.derivedSql().isBlank());
         m.put("defined_at", def.definedAt());

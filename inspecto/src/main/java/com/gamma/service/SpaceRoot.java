@@ -39,11 +39,13 @@ public interface SpaceRoot {
     /** Data root where partition stores are written. */
     String dataDir();
 
-    /** Authored-flow store directory, or {@code null} when flow authoring is disabled. Always the same
-     *  {@code flows/} subtree of the write root the HTTP flow CRUD ({@code /pipelines/authored}) writes,
-     *  so a UI-authored flow is visible to pipeline-type jobs and the deletion fence (T32):
-     *  {@code config/flows/} for a space, {@code -Dassist.write.root/flows} for {@link #legacy()}. */
-    Path flowsDir();
+    /** Authored-pipeline store directory, or {@code null} when pipeline authoring is disabled. Always the
+     *  same {@code pipelines/} subtree of the write root the HTTP pipeline CRUD ({@code /pipelines/authored})
+     *  writes, so a UI-authored pipeline is visible to pipeline-type jobs and the deletion fence (T32):
+     *  {@code config/pipelines/} for a space, {@code -Dassist.write.root/pipelines} for {@link #legacy()}.
+     *  ⚠ Tier 3 rename (vocabulary plan §4): a space whose {@code config/flows/} predates the rename keeps
+     *  resolving there until it is renamed on disk — see {@link DirSpaceRoot#pipelinesDir()}. */
+    Path pipelinesDir();
 
     /** Rolling-Parquet event-store directory. */
     Path eventsDir();
@@ -81,6 +83,16 @@ public interface SpaceRoot {
     static SpaceRoot under(Path base) {
         return new DirSpaceRoot(base.toAbsolutePath().normalize());
     }
+
+    /** Shared dual-read rule for the Tier 3 {@code flows/}→{@code pipelines/} rename (vocabulary plan §4):
+     *  {@code root/pipelines} unless only the pre-rename {@code root/flows} exists. Callers resolving an
+     *  authored-pipeline directory directly off a write root (not through a {@link SpaceRoot} instance —
+     *  the Control API routes take a caller-supplied write root) use this instead of duplicating the check. */
+    static Path pipelinesSubdir(Path root) {
+        Path legacy = root.resolve("flows");
+        Path renamed = root.resolve("pipelines");
+        return (!Files.exists(renamed) && Files.exists(legacy)) ? legacy : renamed;
+    }
 }
 
 /** Pre-spaces single-tenant layout — flat files in the working directory under their historical names. */
@@ -95,9 +107,9 @@ final class LegacySpaceRoot implements SpaceRoot {
 
     public String dataDir() { return "database"; }
 
-    public Path flowsDir() {
+    public Path pipelinesDir() {
         String wr = System.getProperty("assist.write.root");
-        return (wr == null || wr.isBlank()) ? null : Path.of(wr.trim()).resolve("flows");
+        return (wr == null || wr.isBlank()) ? null : SpaceRoot.pipelinesSubdir(Path.of(wr.trim()));
     }
 
     public Path eventsDir() { return Path.of("inspecto-events"); }
@@ -140,7 +152,11 @@ final class DirSpaceRoot implements SpaceRoot {
 
     public String dataDir() { return base.resolve("data").toString(); }
 
-    public Path flowsDir() { return config().resolve("flows"); }
+    /** Pre-rebrand {@code config/flows/} is honoured when present and {@code config/pipelines/} is absent
+     *  (dual-read, same shape as {@link LegacySpaceRoot#statusDbUrl()}) — no boot-time move, since renaming
+     *  a directory a job may currently be reading from is itself a hazard; a space adopts {@code pipelines/}
+     *  the moment anything writes there. */
+    public Path pipelinesDir() { return SpaceRoot.pipelinesSubdir(config()); }
 
     public Path eventsDir() { return base.resolve("data").resolve("events"); }
 
