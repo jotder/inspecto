@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
+import { COLLECTOR_ACQUISITION_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
 import { NODE_TYPES } from 'app/inspecto/mock/handlers/pipelines.handler';
 import { REFERENCE_STAGES, STREAM_STAGES } from './onboarding-state.service';
 import { parsingAttributesFor } from './parsing-attributes';
@@ -37,7 +37,18 @@ describe('onboarding stage model (W4a)', () => {
     });
 
     it('collection renders the SAME shared collector table the Pipelines acquisition node renders', () => {
-        expect(stageAttributesFor('collection')).toBe(COLLECTOR_ATTRIBUTES);
+        expect(stageAttributesFor('collection')).toBe(COLLECTOR_ACQUISITION_ATTRIBUTES);
+    });
+
+    /**
+     * Collector-config unification (2026-08-04): dedup is authored only on the
+     * `transform.dedup.fingerprint` node — the Collection stage must not offer the keys the
+     * engine reads from that node's block overlay.
+     */
+    it('offers no duplicate-detection keys on the collection stage', () => {
+        const keys = stageAttributesFor('collection')!.map((s) => s.key);
+        expect(keys).not.toContain('duplicate__mode');
+        expect(keys).not.toContain('duplicate__on_change');
     });
 
     it('publish renders the SAME shared output table the Pipelines sink nodes render', () => {

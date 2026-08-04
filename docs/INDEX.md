@@ -73,6 +73,13 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/collector-config-unification.md`](superpower/collector-config-unification.md) —
+  **IN FLIGHT (opened 2026-08-04).** Unifies the two collector-authoring surfaces (Onboarding
+  Collection stage ↔ Pipelines `acquisition` node): dedup keys off the Collection pane (slice 1,
+  shipped), a server-side-merged `POST /config/patch` block write killing the stale-read clobber,
+  one shared `<inspecto-collector-config>` component for both hosts. At-rest format unchanged
+  (`collector.connection`; `use:` stays edit-time-only).
+
 - ~~`superpower/vocabulary-and-config-contract-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
   ([archive copy](archived-documents/plans-archive/vocabulary-and-config-contract-plan.md), provenance only).
   All nine defects (D1–D9) and all twelve sequence items closed or reclassified. As-built knowledge lives in

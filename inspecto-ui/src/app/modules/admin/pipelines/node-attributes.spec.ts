@@ -76,8 +76,9 @@ describe('node-attributes', () => {
      * D9 (2026-08-04): a shared attribute table is correct per BLOCK, not per NODE. On the graph the
      * `collector:` block is split across nodes — `PipelineEditable.lower:255` overlays `duplicate:` from
      * the fingerprint-dedup node while `NOT_ACQ_OWNED:60` strips it from acquisition — so declaring these
-     * on acquisition meant the operator's value was silently discarded on save. The keys stay in the
-     * shared table for Onboarding (which authors the block whole); only this adopter splits them.
+     * on acquisition meant the operator's value was silently discarded on save. Since the
+     * collector-config unification (2026-08-04) Onboarding's Collection stage adopts the same
+     * acquisition subset, so dedup is authored only on the fingerprint node on both surfaces.
      */
     it('declares the duplicate policy on the node the engine reads it from', () => {
         const acq = nodeAttributesFor('acquisition')!.map((s) => s.key);

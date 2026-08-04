@@ -1,4 +1,9 @@
-import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app/inspecto/component-model';
+import {
+    type AttributeSpec,
+    COLLECTOR_ACQUISITION_ATTRIBUTES,
+    COLLECTOR_DEDUP_ATTRIBUTES,
+    OUTPUT_ATTRIBUTES,
+} from 'app/inspecto/component-model';
 
 /**
  * Per-node-type config attribute schemas for the generic {@link NodeConfigDialog} — the non-parser
@@ -76,37 +81,17 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
 // authors, so it is the shared `OUTPUT_ATTRIBUTES` (component-model) — W4a collapsed the local
 // `SINK_ATTRIBUTES` fork exactly as U-D collapsed the collector one. All three sink kinds write
 // the same block — the kind is the materialisation behaviour, not a different config shape.
-/**
- * The `duplicate:` keys, taken from the shared table but declared on the node that actually owns them.
- *
- * <p>⚠ **A shared attribute table is correct per BLOCK, not per NODE** (D9, 2026-08-04).
- * `COLLECTOR_ATTRIBUTES` describes the `collector:` block, and Onboarding authors that block whole — so
- * `duplicate__*` are real keys there. On the *graph* the same block is split across nodes:
- * `PipelineLift.dedupFingerprintNode` synthesises `transform.dedup.fingerprint` carrying
- * `duplicate`/`incremental`, and `PipelineEditable.lower` overlays `duplicate:` back from **that** node
- * (`:255`) while `NOT_ACQ_OWNED` (`:60`) strips it from the acquisition node. So a value typed on the
- * acquisition node was silently discarded on save. Found by `NodeConfigNameContractTest` on its first run.
- *
- * <p>⛔ **The fix is NOT to prune the shared table** — that would break Onboarding, for which the keys are
- * live. It is this per-adopter split: the keys move to the node the engine reads them from, and the
- * acquisition adopter derives its table without them. Same shape as D3.
- */
-const DEDUP_FINGERPRINT_ATTRIBUTES: AttributeSpec[] = COLLECTOR_ATTRIBUTES.filter((s) =>
-    s.key.startsWith('duplicate__'),
-);
-
-/**
- * `acquisition`'s derivation of the shared table: everything except the keys the fingerprint-dedup node
- * owns (see {@link DEDUP_FINGERPRINT_ATTRIBUTES}). A **derivation, not a fork** — the specs are the shared
- * objects, only the membership differs, so there is still one place to edit a key.
- */
-const ACQUISITION_ATTRIBUTES: AttributeSpec[] = COLLECTOR_ATTRIBUTES.filter(
-    (s) => !DEDUP_FINGERPRINT_ATTRIBUTES.includes(s),
-);
-
+// The `duplicate:` keys were split off the shared table in D9 (2026-08-04): on the graph the
+// `collector:` block is split across nodes — `PipelineLift.dedupFingerprintNode` synthesises
+// `transform.dedup.fingerprint` carrying `duplicate`/`incremental`, and `PipelineEditable.lower`
+// overlays `duplicate:` back from THAT node while `NOT_ACQ_OWNED` strips it from acquisition, so a
+// value typed on the acquisition node was silently discarded (found by `NodeConfigNameContractTest`).
+// The derivations now live in shared `component-model/collector-attributes.ts` because the
+// collector-config unification (2026-08-04) made Onboarding's Collection stage adopt the SAME
+// acquisition subset — dedup is authored only on the fingerprint node, on both surfaces.
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
-    acquisition: ACQUISITION_ATTRIBUTES,
-    'transform.dedup.fingerprint': DEDUP_FINGERPRINT_ATTRIBUTES,
+    acquisition: COLLECTOR_ACQUISITION_ATTRIBUTES,
+    'transform.dedup.fingerprint': COLLECTOR_DEDUP_ATTRIBUTES,
     'sink.persistent': OUTPUT_ATTRIBUTES,
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,
