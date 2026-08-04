@@ -44,6 +44,7 @@ final class CapabilityManifest {
             new Entry("POST", "/components/([^/]+)/([^/]+)/versions/([^/]+)/restore", Roles.CAN_AUTHOR_WORKBENCH),
             // ConfigRoutes
             new Entry("POST", "/config/write", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/config/patch", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/config/([^/]+)/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // ConnectionRoutes
             new Entry("POST", "/connections", Roles.CAN_ONBOARD_CONNECTIONS),

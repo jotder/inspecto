@@ -55,6 +55,10 @@ final class ConfigRoutes implements RouteModule {
         api.post("/config/preview/schema", (e, m) -> previewSchema(api.body(e)));
         // Requires canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
         api.post("/config/write", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> writeConfig(api, e, api.body(e))));
+        // Block-level save (collector-config unification, 2026-08-04): deep-merge a patch over the
+        // file's CURRENT content server-side, so a stage pane can never clobber blocks it didn't
+        // edit with a stale client-held copy. Same gates and response shape as /config/write.
+        api.post("/config/patch", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> patchConfig(api, e, api.body(e))));
         // Draft discard (stream onboarding): delete a config file under the write root — never an
         // active pipeline. Optional ?subdir= mirrors /config/write's subdir.
         api.delete("/config/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
@@ -172,6 +176,111 @@ final class ConfigRoutes implements RouteModule {
         r.put("overwritten", exists);
         r.put("findings", findings);   // warnings only at this point (errors would have 422'd)
         return r;
+    }
+
+    /**
+     * {@code POST /config/patch} — deep-merge a partial draft over a config file's <em>current</em>
+     * on-disk content and rewrite it atomically (collector-config unification, 2026-08-04). The
+     * merge happens server-side, against the file as it is NOW — not against whatever the client
+     * last read — which is what kills the stale-read clobber {@code /config/write overwrite:true}
+     * invites when two surfaces author the same file (an onboarding stage pane vs. the pipeline
+     * editor's graph save).
+     *
+     * <p>Body {@code {type, name, patch, subdir?}}. Merge semantics: maps merge recursively,
+     * scalars/lists replace, an explicit JSON {@code null} deletes its key. The whole merged draft
+     * is validated through the same gates as {@code /config/write} and the response has the same
+     * shape, so callers route findings identically.
+     *
+     * <p>Fail-closed gate order: write-root 503 → unknown type 404 → bad body 400 → unsafe name
+     * 422 → subdir jail 403 → missing target 404 (patch needs an existing file — create via
+     * {@code /config/write}) → identity change 409 → merged-draft ERROR findings 422
+     * ({@code written:false}) → atomic write.
+     */
+    private Object patchConfig(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "config patch");
+
+        String type = ApiContext.str(body, "type");
+        String name = ApiContext.str(body, "name");
+        Object patchObj = body.get("patch");
+        if (type == null || name == null || name.isBlank() || !(patchObj instanceof Map<?, ?>))
+            throw new ApiException(400, "body must include 'type', 'name' and 'patch' (a partial config map)");
+        ConfigSpec spec = ConfigSpecs.forType(type);
+        if (spec == null) throw new ApiException(404, "unknown config type: " + type);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> patch = (Map<String, Object>) patchObj;
+        String fileName = WriteGates.safeName(name, "config name");
+
+        Path dir = writeRoot;
+        String subdir = ApiContext.str(body, "subdir");
+        if (subdir != null && !subdir.isBlank()) {
+            Path sub = Path.of(subdir.trim());
+            if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+            dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
+        }
+        Path target = resolveConfigFile(writeRoot, dir, type, fileName);
+        String rel = writeRoot.relativize(target).toString().replace('\\', '/');
+        if (!Files.isRegularFile(target))
+            throw new ApiException(404, "no such config: " + rel + " (create it via /config/write first)");
+
+        Map<String, Object> existing = ConfigLoader.filesystem().decode(target.toString());
+        Map<String, Object> merged = deepMerge(existing, patch);
+
+        // The filename derives from the identity field, so a patch may not move it — a renamed
+        // identity under the old filename would silently split the config from its index entry.
+        String idField = identityField(type);
+        String before = dottedString(existing, idField);
+        String after = dottedString(merged, idField);
+        WriteGates.conflictIf(before != null && !before.equals(after),
+                "patch changes the identity field '" + idField + "' (" + before + " → " + after
+                        + "); rename via /config/write");
+
+        // Same gate as /config/write, over the WHOLE merged draft: spec + hard-fail safety check;
+        // schema references resolve config-relative here because the file has a home directory.
+        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(spec, merged));
+        findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy()));
+        findings.addAll(schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
+        findings.addAll(armedWithoutSchemaFindings(type, merged));
+        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
+            return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                    "error", "merged config has ERROR-level findings; not written", "findings", findings));
+        }
+
+        byte[] bytes = ConfigCodec.toToon(merged).getBytes(StandardCharsets.UTF_8);
+        AtomicFiles.write(target, bytes, ".cfg-");
+        log.info("[CONFIG-PATCH] type={} patched {} ({} bytes)", type, rel, bytes.length);
+
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("type", type);
+        r.put("written", true);
+        r.put("path", rel);
+        r.put("name", fileName);
+        r.put("bytes", bytes.length);
+        r.put("overwritten", true);
+        r.put("findings", findings);   // warnings only at this point (errors would have 422'd)
+        return r;
+    }
+
+    /**
+     * Recursive merge for {@link #patchConfig}: maps merge key-by-key, anything else replaces, an
+     * explicit {@code null} patch value deletes its key. Copies — never mutates either argument.
+     */
+    private static Map<String, Object> deepMerge(Map<String, Object> base, Map<String, Object> patch) {
+        Map<String, Object> out = new LinkedHashMap<>(base);
+        for (Map.Entry<String, Object> e : patch.entrySet()) {
+            Object pv = e.getValue();
+            if (pv == null) {
+                out.remove(e.getKey());
+            } else if (pv instanceof Map<?, ?> pm && out.get(e.getKey()) instanceof Map<?, ?> bm) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> basePart = (Map<String, Object>) bm;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> patchPart = (Map<String, Object>) pm;
+                out.put(e.getKey(), deepMerge(basePart, patchPart));
+            } else {
+                out.put(e.getKey(), pv);
+            }
+        }
+        return out;
     }
 
     /**
