@@ -195,8 +195,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   feedback); lag stays observability only (`CollectorProcessor.oldestInboxAgeSeconds` / `InboxStatus` /
   `inspecto_inbox_oldest_seconds`). B4 (acquisition back-pressure, 2026-08-02) is the deliberate mirror on the
   *producer* side. See `pipeline-graph-design.md` §3.5.
-- **`PartitionWriter` requires non-empty partition columns** (it emits `PARTITION_BY (...)`). The unpartitioned
-  single-file `COPY` path lives in `PartitionSinkWriter`; the legacy writer is untouched.
+- **`PartitionWriter` requires non-empty partition columns** (it emits `PARTITION_BY (...)`, and `reveal` derives
+  each partition from the staged file's parent dir). Unpartitioned single-file `COPY` paths live in
+  `PartitionSinkWriter` and `SummaryWriter.writeFlat`; the legacy writer is untouched.
+- ⚠ **Never issue DuckDB `COPY … PARTITION_BY` directly for durable output.** DuckDB names every partition file
+  `data_0.parquet`, so two writers targeting the same partition **overwrite each other** — which silently converts
+  the append-only invariant into a rewrite. `PartitionWriter` exists for this: it stages, then reveals each file
+  under a caller-supplied per-unit-of-work name. `SummaryWriter` reuses it for exactly this reason.
 - **Flow seed = exactly one `source_store`** in Phase-A live execution (rejects 0 or >1; multi-source merge is
   the `transform.merge` path).
 - **Per-space `space` MDC must reach EVERY worker thread on the execution path.** Singleton routing reads the
@@ -255,13 +260,17 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `SinkFlushException` → fail the batch.
 - **Output files: the JSON manifest is authoritative for EXISTENCE, `consignment_outputs` only for STATE.**
   `PartitionOutput(partition, outputFile, bytes)` is an *ephemeral* return value — produced by
-  `PartitionWriter.reveal()`, consumed once, discarded — in **four** paths (`BatchIngestStrategy.writeAndTrace`,
-  `PartitionSinkWriter`, `EnrichmentEngine.run`, `DecisionRuleApplier`). The durable registry
-  (`DbConsignmentOutputStore`, plan §11.3) is **default-off** and `ServiceStores` degrades a failed open to
-  `null`, so **never read a missing registry row as proof a file does not exist** — `BatchManifest`/
+  `PartitionWriter.reveal()`, consumed once, discarded — in **three** paths: ingest, `EnrichmentEngine`, and
+  `PartitionSinkWriter`. (`DecisionRuleApplier` is *not* a fourth: its `RouteSink` already calls
+  `LineageCollector`, and `BatchIngestStrategy.writeAndTrace` seeds its accumulators from `applied.outputs()`, so
+  routed-rule outputs reach the ingest hook for free. The hook is `BatchProcessor.finalizeSource`, once per
+  Consignment — *not* `writeAndTrace`, which has four callers and is invoked **per segment** in union mode.)
+  The durable registry (`DbConsignmentOutputStore`, plan §11.3) is **default-off** and `ServiceStores` degrades a
+  failed open to `null`, so **never read a missing registry row as proof a file does not exist** — `BatchManifest`/
   `ManifestStore` stays the artifact of record. Note also that no per-file row count exists at write time (a
-  multi-file partitioned `COPY` reports none); it must be summed from `LineageCollector`'s
-  per-`(srcId, partition)` counts. → [`db-layer.md`](okf/backend/engine/db-layer.md) §3.9.
+  multi-file partitioned `COPY` reports none): ingest sums `LineageCollector`'s per-`(srcId, partition)` counts,
+  while enrichment and sinks use `ConsignmentOutputs.countByPartition` (needs no `__src_id`).
+  → [`db-layer.md`](okf/backend/engine/db-layer.md) §3.9.
 - **`com.gamma.util` CLI cluster** (~11 `main()` tools: `MainApp`, `TarExtractor`, …) sits at low coverage and is
   **kept by decision** (self-contained; `MainApp` is wired into `package.ps1`/ops). Tested engine+control-plane
   is ~86%. Long-term: extract the CLI cluster to its own module. → [`performance.md`](okf/backend/build-run/performance.md).

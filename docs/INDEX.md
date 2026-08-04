@@ -85,15 +85,21 @@ former root reference docs** (each index lists them):
   cfg vocabulary; client and server are byte-compared).
 
 - [`superpower/consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) —
-  **IN FLIGHT (opened 2026-08-03). §11.3's `consignment_outputs` registry is BUILT through slice 2
-  (2026-08-04): `DbConsignmentOutputStore` behind `-Dconsignment.outputs.backend` (default-off), now with
-  production callers on all three write paths — ingest (`BatchProcessor.finalizeSource`), enrichment, and
-  Pipeline sinks — each carrying a real per-file `row_count` and asserting §7.2 reconciliation. As-built DDL in
-  [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §3.9. **§14 is BUILT too** — the
-  `ConsignmentProcessor` SPI, `ProcessorContext`, the `consignment.process` Job Type, `ConsignmentReader` and
-  `SummaryEmitter`'s §7.2 guardrails; as-built in
-  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md). Next: §11.3's slice 3 (`batch_id` →
-  `consignment_id` in persisted artifacts) and the compaction state mutators; everything else is still design.** Captures the design conversation behind a
+  **IN FLIGHT (opened 2026-08-03) — three sections are now CLOSED, the rest is still design (2026-08-04).**
+  **§11.3 `consignment_outputs`** is complete: `DbConsignmentOutputStore` behind
+  `-Dconsignment.outputs.backend` (default-off), production callers on all three write paths — ingest
+  (`BatchProcessor.finalizeSource`), enrichment, Pipeline sinks — each with a real per-file `row_count` asserting
+  §7.2 reconciliation; `supersede`/`markCompactedAway` wired to `ReprocessCommand` + `PartitionCompactor`, which
+  turns the §11.3(a) silent row-duplication bug into a refusal; and the `batch_id` → `consignment_id` rename for
+  the audit ledgers + `BatchManifest` (⚠ a **breaking** API-v1 key change — `/runs/*/batches` and `/runs/*/files`
+  now emit `consignment_id`). **§14** is complete: the `ConsignmentProcessor` SPI, `ProcessorContext`, the
+  `consignment.process` Job Type, `ConsignmentReader`, `SummaryEmitter`. **§7.2/§7.3's summary tier** is
+  complete: `SummaryWriter` persists one Parquet file per (Consignment × record-day) with a `_measures.csv`
+  composability sidecar, registered under `<target>__summary`. As-built in
+  [`okf/backend/engine/db-layer.md`](okf/backend/engine/db-layer.md) §3.4/§3.9 and
+  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md); deferred items in
+  [`BACKLOG.md`](BACKLOG.md) §4. Nothing built now waits on the plan — the next section anything depends on is
+  §8's end-of-period pass, which needs a decision rather than code. Captures the design conversation behind a
   Consignment-based ELT model that replaces a Kafka record-at-a-time ETL. Core claim: the two apparent
   execution systems (`BatchProcessor` file/batch path · `PipelineExecutor` graph path) are one model built
   from both ends, joined by making the **Consignment manifest a first-class DuckDB relation** flowing on
