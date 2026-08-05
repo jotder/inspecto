@@ -43,6 +43,19 @@ public final class RecipeCompiler {
      *         represented — never a partial compile
      */
     public static Map<String, Object> compile(Map<String, Object> recipe) {
+        boolean active = !(recipe.get("active") instanceof Boolean b) || b;
+        return compile(recipe, Map.of(), active);
+    }
+
+    /**
+     * Compile over {@code existing} (a decoded pipeline config): keys the recipe does not model —
+     * {@code dirs.errors}, {@code duplicate_check}, {@code gap_detection}, … — are preserved by
+     * {@link PipelineEditable#lower}'s ownership rule instead of dropped. This is the converter's
+     * round-trip half ({@link RecipeConverter}); {@code strict} is the caller's completeness choice
+     * (lenient preserves sections whose owning verb the recipe never speaks).
+     */
+    public static Map<String, Object> compile(Map<String, Object> recipe, Map<String, Object> existing,
+                                              boolean strict) {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         String name = str(recipe.get("name"));
@@ -118,8 +131,13 @@ public final class RecipeCompiler {
         for (int n = 1; n < nodes.size(); n++)
             edges.add(new PipelineEdge(nodes.get(n - 1).id(), "out", nodes.get(n).id()));
 
-        return PipelineEditable.lower(new PipelineGraph(name, active, nodes, edges), Map.of(), active);
+        return PipelineEditable.lower(new PipelineGraph(name, active, nodes, edges), existing, strict);
     }
+
+    /** Processing keys the parser node owns in the flat config ({@code PipelineEditable.PARSER_OWNED});
+     *  a parse step spelling one of these carries it on the node directly, not inside {@code parsing:}. */
+    private static final java.util.Set<String> PARSE_PROCESSING_KEYS = java.util.Set.of(
+            "csv_settings", "schema_file", "mapping_file", "schemas", "segments", "ingester", "ingester_config");
 
     // ── per-verb node builders ───────────────────────────────────────────────────
 
@@ -135,12 +153,17 @@ public final class RecipeCompiler {
         return new PipelineNode(id, BuiltinNodeType.ACQUISITION.type(), c, use);
     }
 
-    /** {@code parse} → parser node; {@code grammar:} rides {@code use:}, every other key travels
-     *  verbatim inside the {@code parsing:} block the parser node owns. */
+    /** {@code parse} → parser node; {@code grammar:} rides {@code use:}, parser-owned processing keys
+     *  ({@code csv_settings}, {@code schemas}, {@code ingester}, …) land on the node directly, and every
+     *  other key travels verbatim inside the {@code parsing:} block the parser node owns. */
     private static PipelineNode parse(String id, Map<String, Object> cfg) {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
         String use = takeRef(c, "grammar", "grammars/", "grammar/");
         Map<String, Object> node = new LinkedHashMap<>();
+        for (String k : PARSE_PROCESSING_KEYS) {
+            Object v = c.remove(k);
+            if (v != null) node.put(k, v);
+        }
         if (!c.isEmpty()) node.put("parsing", c);
         return new PipelineNode(id, BuiltinNodeType.PARSER.type(), node, use);
     }

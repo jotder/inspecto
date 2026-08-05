@@ -644,6 +644,19 @@ Compiled config proven executable: written via `ConfigCodec.toToon` and loaded b
 `PipelineConfig.load` with the `schema/<id>` ref resolving. Discovery per grounding decision:
 compile to `<name>_pipeline.toon`; no new suffix. Control-plane route + UI editor ride the UI plan.
 
+**P2 S4 SHIPPED 2026-08-05** — `RecipeConverter` (inspecto-engine) projects a decoded canonical
+config into the recipe shape; the round-trip half is `RecipeCompiler.compile(recipe, existing,
+lenient)` — lower's ownership rule preserves everything the recipe does not model (markers, gap
+watch, dirs.errors…), so the converter never widens the recipe vocabulary to survive a fixture.
+**Parity gate green over the real corpus:** `RecipeConverterTest` walks every repo
+`spaces/**/*_pipeline.toon` (6 fixtures, incl. multi-schema voucher + plugin subscriber) and
+asserts `compile(toRecipe(cfg), cfg, false)` == original. Two compiler amendments ridden in:
+parse carries parser-owned processing keys on the node (not inside `parsing:`), and the
+converter's sink step carries the sink-owned write-tuning keys (`threads`, `duckdb_threads`,
+`batch_max_*`) — the gate caught both as real drops. Phase 2 remaining: `route` lowering,
+`dedup` (QUALIFY) lowering, wiring TypeFlow into save/dry-run + the `/pipelines/{id}` recipe
+route — queued behind the operator's next call (UI S1–S3 are unblocked in parallel).
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
