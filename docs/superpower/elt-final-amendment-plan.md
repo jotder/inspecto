@@ -791,6 +791,24 @@ shaped. This is genuine new design, not a slicing choice, so it is left to the o
 explicitly rather than forced now. **S4 (fixture parity gate) can still proceed independently** —
 it targets the S1/S2 verbs already shipped, not S3.
 
+**P3 S4 SHIPPED 2026-08-06** — the parity gate, scoped honestly to what S1/S2 shipped: the new
+verbs are compile-only (arming refused), so the original "identical outputs" wording cannot be
+executed — what IS gated is **parity of representation against the real artifacts** the verbs claim
+compatibility with. Three legs: (1) `orders_enriched_rollup_pipeline.toon` (inactive draft carrying
+dedup + join + summarize over the real orders schema) joined the walked `spaces/` corpus, so
+`RecipeConverterTest`'s every-fixture round trip now covers the new sections over a real on-disk
+file permanently (7 fixtures); (2) `RecipeVerbParityTest.everyRealEnrichmentReferenceIsExpressibleAsATransformJoin`
+walks every real `*_enrich.toon`, loads it through `EnrichmentConfig.fromMap`, and asserts each
+`references` entry (path and `ref` variants) compiles through the join verb with the source spelling
+carried verbatim — the D-4 claim, gated over the corpus; (3)
+`theDraftFixturesSummarizeMeasuresSpeakTheMaterializeGrammar` splits the fixture's `measures` by
+`MaterializeTask.compileSpec`'s documented `count | agg(field)` contract and compiles them through
+`MeasureCompiler` — the S1 byte-compatibility claim, pinned (if the grammar drifts, this fails).
+Full reactor green, incl. every boot/registry scan over the new fixture. **The execution half of
+the original S4 gate (enrich + materialize actually running as recipes with identical outputs)
+lands with S3's executor machinery — it is S3-blocked, not forgotten.** Phase 3 status: S1/S2/S4
+shipped; S3 deferred (documented gap above).
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

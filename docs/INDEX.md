@@ -114,8 +114,12 @@ former root reference docs** (each index lists them):
   `MaterializeTask`/`EnrichmentEngine`) and `dirs.poll`/`dirs.database` are hard-required at parse
   time, before any arming gate could apply. Needs real new machinery (a Dataset-write Signal +
   a Pipeline-bindable collect variant), not a slicing choice — left as a documented gap pending
-  operator scheduling. Phase 3 remaining: S3 (deferred, real design work) + S4 (fixture parity gate,
-  independent of S3). Next: S4, or UI slices S1–S3 (unblocked).
+  operator scheduling. **S4 SHIPPED 2026-08-06**: the parity gate, scoped to representation (the
+  verbs are compile-only): a real draft fixture (dedup+join+summarize) joined the walked corpus;
+  every real `*_enrich.toon` reference proven expressible as `transform.join`; summarize measures
+  pinned to `MaterializeTask`'s grammar via `MeasureCompiler` (`RecipeVerbParityTest`). The
+  execution half of the gate is S3-blocked. **Phase 3: S1/S2/S4 shipped, S3 deferred.** Next: the
+  S3 design (operator call), Phase 4 (Guarantees + Stage C + per-Step `enabled:`), or UI S1–S3.
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:

@@ -1,0 +1,25 @@
+name: orders_enriched_rollup
+active: false
+version: 1
+
+dirs:
+  poll:       spaces/demo/data/inbox/orders
+  database:   spaces/demo/data/orders/rollup_draft
+  errors:     spaces/demo/data/orders/errors
+  quarantine: spaces/demo/data/orders/quarantine
+
+output:
+  format: PARQUET
+
+processing:
+  file_pattern: "glob:**/*.csv"
+  schema_file: spaces/demo/config/orders/orders_schema.toon
+  dedup:
+    keys[1]: ORDER_ID
+    order_by: EVENT_TS DESC
+  join:
+    reference: spaces/demo/data/ref/region_dim.csv
+    on[1]: REGION
+  summarize:
+    group_by[1]: REGION
+    measures[2]: count, "sum(GROSS)"
