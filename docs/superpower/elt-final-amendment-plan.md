@@ -615,6 +615,19 @@ round-trip parity. `route` compilation follows S3 once a lowerable route node ex
 merged them at load), located by `batch.schemaName()` across single/selector/segments. The
 enrichment/Pipeline-sink paths deliberately record null until S2's derived output schemas exist.
 
+**P2 S2 SHIPPED 2026-08-05** — per-Step type flow: `DataTransformer.selectFor` extracted (pure SQL
+text, byte-identical assembly); `TypeFlow` (inspecto-etl) `DESCRIBE`s that SELECT over an empty
+scratch table shaped like the raw ingest table (CSV path = all-VARCHAR, plugin path = declared
+types) — deriving `transformedColumns`/`sinkColumns` without executing, and failing at authoring
+time with DuckDB's binder error naming the column for a mapping over a nonexistent field.
+**Footer-parity gate holding:** `TypeFlowTest.derivedSinkSchemaMatchesTheWrittenParquetFooter`
+materializes + `PartitionWriter.write`s real rows and compares the derived sink schema to
+`read_parquet(…, hive_partitioning=false)` — equal name-for-name, type-for-type. (Gotcha for
+later fixtures: default `read_parquet` re-derives partition columns from the Hive path; the footer
+itself carries sink columns minus partitions.) Save-time/dry-run wiring of these derivations into
+ConfigRoutes/PipelineDryRun deliberately rides S3+ (needs the recipe/pipeline context, not the
+schema component alone).
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

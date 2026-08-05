@@ -56,10 +56,35 @@ public final class DataTransformer {
      * @param sourceTable  DuckDB table to read from (e.g. {@code "raw_CALL"})
      * @param destTable    DuckDB table to create    (e.g. {@code "transformed_CALL"})
      */
-    @SuppressWarnings("unchecked")
     public static void materialize(Connection conn, Map<String, Object> schemaConfig,
                                    PipelineConfig cfg,
                                    String sourceTable, String destTable) throws Exception {
+
+        String select = selectFor(schemaConfig, cfg, sourceTable);
+
+        // ── post-parse row predicate (csv_settings.where) ─────────────────────
+        // Wrapped as a derived table rather than appended as a WHERE on the SELECT above: the
+        // predicate is written against the *target* column names, and SQL cannot reference a
+        // SELECT's own output aliases from its own WHERE. The pre-parse include_*/exclude_*
+        // filters are a different moment entirely (DuckDbCsvIngester.filterWhere, inside read_csv).
+        String sql = "CREATE TABLE \"" + destTable + "\" AS " + select;
+        if (cfg.csv().hasRowPredicate())
+            sql = "CREATE TABLE \"" + destTable + "\" AS SELECT * FROM (" + select + ") AS __shaped "
+                    + "WHERE COALESCE((" + cfg.csv().where() + "), FALSE)";
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+        }
+    }
+
+    /**
+     * The transform SELECT — mapped data columns, partition columns, {@code __src_id} — as pure SQL text,
+     * <b>without</b> the row-predicate wrapper or any {@code CREATE TABLE}. Separated from
+     * {@link #materialize} so {@link TypeFlow} can hand the identical query to {@code DESCRIBE} and derive
+     * the Step's output schema without executing it (ELT amendment §3.4 item 4).
+     */
+    @SuppressWarnings("unchecked")
+    public static String selectFor(Map<String, Object> schemaConfig, PipelineConfig cfg, String sourceTable) {
 
         List<Map<String, Object>> fields =
                 (List<Map<String, Object>>) ((Map<String, Object>) schemaConfig.get("raw")).get("fields");
@@ -98,19 +123,6 @@ public final class DataTransformer {
         // ── lineage tag ───────────────────────────────────────────────────────
         select.append(", \"").append(sourceTable).append("\".\"__src_id\" AS __src_id");
         select.append(" FROM \"").append(sourceTable).append('"');
-
-        // ── post-parse row predicate (csv_settings.where) ─────────────────────
-        // Wrapped as a derived table rather than appended as a WHERE on the SELECT above: the
-        // predicate is written against the *target* column names, and SQL cannot reference a
-        // SELECT's own output aliases from its own WHERE. The pre-parse include_*/exclude_*
-        // filters are a different moment entirely (DuckDbCsvIngester.filterWhere, inside read_csv).
-        String sql = "CREATE TABLE \"" + destTable + "\" AS " + select;
-        if (cfg.csv().hasRowPredicate())
-            sql = "CREATE TABLE \"" + destTable + "\" AS SELECT * FROM (" + select + ") AS __shaped "
-                    + "WHERE COALESCE((" + cfg.csv().where() + "), FALSE)";
-
-        try (Statement stmt = conn.createStatement()) {
-            stmt.execute(sql);
-        }
+        return select.toString();
     }
 }
