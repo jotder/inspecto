@@ -109,9 +109,13 @@ former root reference docs** (each index lists them):
   **Phase 3 S2 SHIPPED 2026-08-06**: the reference join compiles per D-4 (`transform: {join:
   references/x, on: k}` → `transform.join` node → `processing.join {reference, on}`) — as its own
   node kind, NOT the companion-persisted `enrichment` node (which lower deliberately ignores);
-  compile-only, same arming posture. Phase 3 remaining: S3 (table-entry `collect` + Signal wiring —
-  needs a design spike, no existing partial implementation), S4 (fixture parity gate). Next: those,
-  or UI slices S1–S3 (unblocked).
+  compile-only, same arming posture. **S3 design spike 2026-08-06**: table-entry `collect` does
+  NOT get the S1/S2 compile-only treatment — no real runtime shape to mirror (unlike
+  `MaterializeTask`/`EnrichmentEngine`) and `dirs.poll`/`dirs.database` are hard-required at parse
+  time, before any arming gate could apply. Needs real new machinery (a Dataset-write Signal +
+  a Pipeline-bindable collect variant), not a slicing choice — left as a documented gap pending
+  operator scheduling. Phase 3 remaining: S3 (deferred, real design work) + S4 (fixture parity gate,
+  independent of S3). Next: S4, or UI slices S1–S3 (unblocked).
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:

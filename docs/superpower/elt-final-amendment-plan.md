@@ -761,6 +761,36 @@ emits the node right after map (dedup/summarize downstream see the enriched row 
 extended), `NodeConfigNameContractTest` (+1 pinned-lowerable, +1 draft-path). Full reactor green.
 **Phase 3 remaining: S3 + S4.**
 
+#### Phase 3 S3 design spike 2026-08-06 — table-entry `collect` does NOT get the S1/S2 treatment
+
+Before touching code, checked whether S3 could ship compile-only the way S1 (`summarize`) and S2
+(`join`) did — add a config record + flat home + node kind, gated shut at `prepare()`. **It cannot,
+for two independent reasons, and the slice should stay a documented gap rather than be forced into
+that shape:**
+
+1. **No real target shape to mirror.** S1/S2 each round-tripped against a runtime that already
+   exists and already consumes that exact config (`MaterializeTask`'s measure params,
+   `EnrichmentConfig.Reference`'s `ref` join). Table-entry collect has no such counterpart:
+   `EnrichmentConfig.Reference` (`EnrichmentConfig.java:78`) is a read-only *lookup* joined against
+   Stage-1 partitions, not a triggerable row source; `PipelineConfig.Reference`
+   (`PipelineConfig.java:612`) is the *produce*-side opposite. Authoring `processing.collect_table
+   {dataset: <id>}` now would be structure that corresponds to nothing executable anywhere in the
+   system — worse than authoring-only, it would be fictional.
+2. **`dirs.poll`/`dirs.database` are unconditionally required at parse time, not just at arming.**
+   `PipelineConfigParser.java:129-130` (`require(dirs, "poll"/"database")`) plus `validateDirs`
+   (`:785-803`) reject a config missing them — before `prepare()`'s arming gate is ever reached. Every
+   other authoring-only section (`route`, `summarize`, `join`) parses fine on an inactive draft and is
+   refused only at arming; a table-sourced draft would fail to load at all unless `dirs.poll`'s
+   hard requirement is loosened first — a change to a load-bearing invariant every existing pipeline
+   kind relies on, not a wiring job.
+
+**What would actually need to exist first (the real S3 scope, deferred):** a Signal a Dataset write
+publishes, and a `collect` variant a Pipeline can bind to it instead of `CollectorConnector` — i.e.
+`EnrichJob`/`EnrichmentEngine`'s publish path becoming (or being joined by) something Pipeline-node
+shaped. This is genuine new design, not a slicing choice, so it is left to the operator to schedule
+explicitly rather than forced now. **S4 (fixture parity gate) can still proceed independently** —
+it targets the S1/S2 verbs already shipped, not S3.
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
