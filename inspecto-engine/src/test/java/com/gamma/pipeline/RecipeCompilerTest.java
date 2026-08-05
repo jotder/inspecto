@@ -122,7 +122,7 @@ class RecipeCompilerTest {
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");
         ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
-                step("summarize", new LinkedHashMap<>(Map.of("group_by", List.of("region")))));
+                step("transform", new LinkedHashMap<>(Map.of("join", "references/x"))));
         recipe.put("guarantees", Map.of("file_dedup", "fingerprint"));
 
         PipelineCompileException e = assertThrows(PipelineCompileException.class,
@@ -146,6 +146,32 @@ class RecipeCompilerTest {
                 ((Map<String, Object>) out.get("processing")).get("dedup");
         assertEquals(List.of("ORDER_ID"), dd.get("keys"));
         assertEquals("EVENT_TS DESC", dd.get("order_by"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void summarizeCompilesToProcessingSummarize() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1,   // between transform and sink
+                step("summarize", new LinkedHashMap<>(Map.of(
+                        "group_by", List.of("REGION"), "measures", List.of("count", "sum(AMT)")))));
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> sm = (Map<String, Object>)
+                ((Map<String, Object>) out.get("processing")).get("summarize");
+        assertEquals(List.of("REGION"), sm.get("group_by"));
+        assertEquals(List.of("count", "sum(AMT)"), sm.get("measures"));
+    }
+
+    @Test
+    void summarizeWithoutMeasuresRefuses() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
+                step("summarize", new LinkedHashMap<>(Map.of("group_by", List.of("REGION")))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r -> r.message().contains("measures")), e.getMessage());
     }
 
     @Test

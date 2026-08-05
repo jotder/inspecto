@@ -102,8 +102,13 @@ former root reference docs** (each index lists them):
   `dedup` (QUALIFY) lowering — `dedup` ships with real execution at the `writeAndTrace` seam,
   `route` is lowering-only behind a fail-closed `prepare()` arming gate (no production call site
   yet for the branch-aware executor). Remaining pre-Phase-3 loose ends (TypeFlow save/dry-run
-  wiring, the recipe API route) are UI-adjacent plumbing, not compiler work. Next: Phase 3
-  (table-entry collect + summarize), or UI slices S1–S3 (unblocked).
+  wiring, the recipe API route) are UI-adjacent plumbing, not compiler work. **Phase 3 S1 SHIPPED
+  2026-08-06**: `summarize` compiles (`transform.summarize` node, `processing.summarize
+  {group_by[], measures[]}` reusing `MaterializeTask`'s measure shorthand grammar) — compile-only,
+  same fail-closed `prepare()` arming posture as `route` (`MaterializeTask` stays the runtime).
+  Phase 3 remaining: S2 (enrichment verb onto `RecipeCompiler`), S3 (table-entry `collect` + Signal
+  wiring — needs a design spike, no existing partial implementation), S4 (fixture parity gate).
+  Next: those, or UI slices S1–S3 (unblocked).
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:

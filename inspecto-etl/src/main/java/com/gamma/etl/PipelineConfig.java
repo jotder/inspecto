@@ -639,6 +639,27 @@ public final class PipelineConfig {
         }
     }
 
+    /**
+     * Group-by rollup ({@code processing.summarize}, ELT amendment §2.4/Phase 3: {@code summarize} is
+     * a Step). {@code measures} reuses {@code MaterializeTask}'s compact shorthand ({@code count},
+     * {@code sum(amount)}, …) so a compiled recipe is byte-compatible with the existing
+     * {@code materialize} maintenance-task grammar once the two are wired together — this record is
+     * authoring/round-trip only for now (see {@link #prepare()}): {@code MaterializeTask} stays the
+     * runtime until Phase 3 wires a recipe-driven executor.
+     *
+     * @param groupBy  the group-by columns (may be empty when every row collapses into one summary row)
+     * @param measures the measure shorthand list; never empty
+     */
+    @PublicApi(since = "5.6.0")
+    public record Summarize(List<String> groupBy, List<String> measures) {
+        public Summarize {
+            if (measures == null || measures.isEmpty())
+                throw new IllegalArgumentException("processing.summarize needs a non-empty measures[] list");
+            groupBy = groupBy == null ? List.of() : List.copyOf(groupBy);
+            measures = List.copyOf(measures);
+        }
+    }
+
     // ── grouped state + accessors ──────────────────────────────────────────────
 
     private final Identity   identity;
@@ -713,6 +734,9 @@ public final class PipelineConfig {
     /** The {@code route:} block verbatim; {@code null} when absent. See {@link #routeConfig()}. */
     private final Map<String, Object> route;
 
+    /** Group-by rollup ({@code processing.summarize}); {@code null} when absent. */
+    private final Summarize summarize;
+
     /**
      * Other config files this pipeline read at parse time (schema / grammar / segment {@code .toon}s),
      * as given in the file (not absolutised). Used by {@link com.gamma.service.ConfigRegistry} to detect
@@ -773,6 +797,13 @@ public final class PipelineConfig {
      * the linear batch path cannot execute a branch tree — arming lands with the branch-aware executor.
      */
     public Map<String, Object> routeConfig() { return route; }
+    /**
+     * Group-by rollup ({@code processing.summarize}), or {@code null} when absent. Authoring/round-trip
+     * only for now: {@link #prepare()} refuses an {@code active} pipeline carrying it, because
+     * {@code MaterializeTask} (the only executor of this measure grammar) runs over a Dataset relation,
+     * not the linear batch path — arming lands once a recipe-driven executor is wired (Phase 3).
+     */
+    public Summarize summarize() { return summarize; }
     /** The schema/grammar/segment files this config referenced at parse time (for change-watching). */
     public List<Path>     referencedFiles() { return referencedFiles; }
 
@@ -823,6 +854,7 @@ public final class PipelineConfig {
         this.trigger = b.trigger;
         this.dedup = b.dedup;
         this.route = b.route;
+        this.summarize = b.summarize;
         this.referencedFiles = List.copyOf(b.referencedFiles);
     }
 
@@ -870,6 +902,7 @@ public final class PipelineConfig {
         this.trigger = src.trigger;
         this.dedup = src.dedup;
         this.route = src.route;
+        this.summarize = src.summarize;
         this.referencedFiles = src.referencedFiles;
     }
 
@@ -970,6 +1003,14 @@ public final class PipelineConfig {
                     "route: is authoring-only until the branch-aware executor lands — "
                             + "keep the pipeline inactive (active: false) or remove the route: block");
         }
+        // processing.summarize (Phase 3) has no linear-batch executor either — MaterializeTask runs
+        // over a Dataset relation on its own schedule, not this pipeline's ingest path. Arming would be
+        // dead config the engine silently ignores (the same W1 lesson route's gate already applies).
+        if (active && summarize != null) {
+            throw new IllegalStateException(
+                    "processing.summarize is authoring-only until a recipe-driven executor lands — "
+                            + "keep the pipeline inactive (active: false) or remove the summarize block");
+        }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));
         }
@@ -989,6 +1030,7 @@ public final class PipelineConfig {
         Map<String, Object> trigger = null;   // optional entry-node trigger: block (T13); null ⇒ default poll
         Dedup dedup = null;                   // record-grain dedup (processing.dedup); null ⇒ none
         Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline
+        Summarize summarize = null;           // group-by rollup (processing.summarize); null ⇒ none
         final List<Path> referencedFiles = new ArrayList<>();   // schema/grammar/segment files read at parse
         String pollDir       = "";
         String databaseDir   = "";

@@ -46,6 +46,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
+            BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
@@ -210,7 +211,7 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
-        PipelineNode recordDedup = null, routeNode = null;
+        PipelineNode recordDedup = null, routeNode = null, summarizeNode = null;
         PipelineNode primarySink = null, quarantineSink = null;
         List<PipelineNode> filters = new ArrayList<>();
         // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
@@ -229,6 +230,7 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) recordDedup = n;
             else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) routeNode = n;
+            else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) summarizeNode = n;
             else if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(t)) filters.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
@@ -304,6 +306,16 @@ public final class PipelineEditable {
             out.put("route", routeSection(g, routeNode));
         } else if (strict) {
             out.remove("route");
+        }
+
+        // group-by rollup → processing.summarize ({group_by, measures}) — authoring-only (ELT P3)
+        if (summarizeNode != null) {
+            Map<String, Object> sm = new LinkedHashMap<>();
+            putIfPresent(sm, "group_by", summarizeNode.cfg("group_by"));
+            putIfPresent(sm, "measures", summarizeNode.cfg("measures"));
+            processing.put("summarize", sm);
+        } else if (strict) {
+            processing.remove("summarize");
         }
 
         if (marker != null) {

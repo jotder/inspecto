@@ -677,6 +677,72 @@ in parallel).
 
 ---
 
+#### Phase 3 GROUNDED 2026-08-06 — findings that shape the slices
+
+1. **`summarize` is explicitly refused today** (`RecipeCompiler.java:113-114`, `"summarize is Phase
+   3's verb"`) — no node kind exists. `MaterializeTask` (`inspecto-engine/.../job/MaterializeTask.java:28-165`)
+   is the at-rest runtime: a `JobConfig`-driven maintenance task (`dataset/target/measures/group_by/limit`)
+   that compiles group-by + measures via `MeasureCompiler.parse/compile` (`:122-141`, the same BI-7
+   grammar a dataset-scope report uses), stage-and-swaps to Parquet, registers a Dataset. It is **not**
+   Pipeline-shaped — it runs over a `DatasetRelation.relationSql`, with no `PipelineConfig`/recipe
+   involvement, so a `summarize` node's natural config (`processing.summarize {group_by[], measures[]}`)
+   can reuse `MeasureCompiler`'s grammar verbatim (mirrors how dedup's Phase-2 slice reused `QUALIFY`)
+   but compiling it does not by itself make it executable — wiring the recipe into `MaterializeTask`'s
+   runtime is separate work, same posture as Phase 2's `route` arming gate.
+2. **§2's "in-motion" half of `summarize` (`SummaryWriter`) is a weaker seam than the plan assumes.**
+   `SummaryWriter` (`inspecto-engine/.../consignment/SummaryWriter.java:26-70`, §7.3) writes
+   per-Consignment `SummaryRow`s into `_summaries/<target>/` with a composability sidecar
+   (`_measures.csv`, so averages can't be re-summed), but it is invoked from consignment-processing
+   code (a `GuardedSummaryEmitter`), not from any Pipeline node — there is no existing call site where
+   a Pipeline emits into it. The "in-motion" tier is aspirational, not a seam to wire against yet.
+3. **Enrichment is a distinct node kind, not a `transform` variant, and has no compiler verb.**
+   `BuiltinNodeType.ENRICHMENT` (`:79-81`) is already in `PipelineEditable.LOWERABLE`
+   (`PipelineEditable.java:44-50`) — added ahead of compiler support — but `RecipeCompiler`'s verb
+   switch (`:18-22,96-116`) has no `enrich`/`transform.join` case; an `enrich` step today hits the
+   generic unknown-verb refusal. §2's "Enrichment retired, join model lives inside `transform`" is
+   aspirational: `EnrichmentEngine` (`inspecto-engine/.../enrich/EnrichmentEngine.java:51-110`) runs a
+   distinct Stage-2 SQL join over Stage-1 partitions (`references[]` as DuckDB views + a `transform`
+   SQL string), driven by `EnrichmentConfig` — folding that into `transform.filter/derive`'s existing
+   SQL machinery is real design work, not plumbing. Decision needed before compiling: keep `enrich` as
+   its own verb (lower risk, matches the existing distinct node kind) vs. fold into `transform.join`
+   (matches §2's vocabulary table but requires a semantics merge).
+4. **Table-entry `collect` has zero existing code — the highest-risk item.** `collect` in
+   `RecipeCompiler` always builds an `ACQUISITION` node (files/Connection); nothing publishes a
+   Table-write Signal a Pipeline could subscribe to. The closest machinery is `pipeline.commit`
+   (`JobService.java:233,278,283,516-527`, mirrored from every committed `BatchEvent`) and
+   `consignment.process` (`ConsignmentProcessJobType.java:22-41,84`, a Job Type resolved from that
+   Signal) — both fire *after* a file-based commit, never from a bare Table read. `EnrichJob`
+   (`inspecto-engine/.../job/EnrichJob.java:56`) is the existing wrapper that calls `EnrichmentEngine`
+   and publishes a `BatchEvent` — the thing a table-entry Pipeline's `collect` would need to become or
+   replace. §2's "table-entry rides the Signal bus (§4.2)" is unimplemented in both directions.
+
+**Slices of record:** **S1** `summarize` node kind + at-rest lowering only (compile-only, no new
+executor — `MaterializeTask` stays the runtime until wired, same posture as Phase 2's `route`) · **S2**
+enrichment verb onto `RecipeCompiler` (wires the already-`LOWERABLE` `ENRICHMENT` node into the verb
+switch; join-config shape is a real decision, not just glue) · **S3** table-entry `collect` + Signal
+wiring (largest-risk slice — no existing partial implementation to grow from; a design spike may
+precede slicing further) · **S4** fixture parity gate — convert a real `*_enrich.toon` + a
+`materialize` task to recipes, assert identical `EnrichmentEngine`/`MaterializeTask` output, closing
+the Phase-3 verify gate.
+
+**P3 S1 SHIPPED 2026-08-06** — `summarize` compiles: `BuiltinNodeType.TRANSFORM_SUMMARIZE`
+(`transform.summarize`) joins `PipelineEditable.LOWERABLE`; flat home `processing.summarize
+{group_by[], measures[]}` (`group_by` validated against `declaredColumns`, same posture as
+`reference.key`/`processing.dedup`; `measures` reuses `MaterializeTask`'s shorthand grammar verbatim
+— `count`, `sum(amount)`, …, so a future wiring slice is byte-compatible with the existing
+`materialize` maintenance-task params). `PipelineLift` emits the node between dedup and any route;
+`RecipeCompiler` compiles a `summarize:` step to the node; `RecipeConverter` projects it back.
+**Same fail-closed posture as `route`:** `PipelineConfig.prepare()` refuses an `active` pipeline
+carrying `processing.summarize` — `MaterializeTask` runs over a Dataset relation on its own schedule,
+not this pipeline's linear ingest path, so arming it would be dead config the engine silently ignores
+(the W1 lesson, again). Compile-only; no new executor in this slice. Tests: `RecordDedupRouteConfigTest`
+(+3), `RecipeCompilerTest` (+2), `RecipeConverterTest` (extended fixture),
+`NodeConfigNameContractTest` (+1 pinned-lowerable flip, +1 draft-path test). Full reactor green.
+**Phase 3 remaining:** S2 (enrichment verb), S3 (table-entry `collect` + Signal wiring — the
+design-spike item), S4 (fixture parity gate).
+
+---
+
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
 
 | # | Decision | Resolution (binding) |

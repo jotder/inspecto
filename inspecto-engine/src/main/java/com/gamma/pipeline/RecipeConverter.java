@@ -93,6 +93,14 @@ public final class RecipeConverter {
             steps.add(step("dedup", dedup));
         }
 
+        // ── summarize ── (group-by rollup: processing.summarize — compile-only, ELT amendment Phase 3 S1)
+        if (processing.get("summarize") instanceof Map<?, ?> sm) {
+            Map<String, Object> summarize = new LinkedHashMap<>();
+            putIfPresent(summarize, "group_by", sm.get("group_by"));
+            putIfPresent(summarize, "measures", sm.get("measures"));
+            steps.add(step("summarize", summarize));
+        }
+
         // ── sink(s) / route ── The output:/dirs shorthand is the first destination (it carries
         // backup/temp + the sink-owned write tuning, which plural entries never do); further sinks:
         // entries follow. With a route: block, every destination lives INSIDE its branch instead —

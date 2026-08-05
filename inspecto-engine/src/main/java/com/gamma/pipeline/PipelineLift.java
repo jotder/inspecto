@@ -198,6 +198,19 @@ public final class PipelineLift {
             sinkUpstream = dedupId;
         }
 
+        // Group-by rollup (processing.summarize) sits after dedup, before any route — authoring-only
+        // (MaterializeTask stays the runtime until a recipe-driven executor lands, Phase 3).
+        if (cfg.summarize() != null) {
+            String summarizeId = "summarize" + suffix;
+            Map<String, Object> sc = new LinkedHashMap<>();
+            sc.put("group_by", cfg.summarize().groupBy());
+            sc.put("measures", cfg.summarize().measures());
+            nodes.add(new PipelineNode(summarizeId, BuiltinNodeType.TRANSFORM_SUMMARIZE.type(),
+                    "Summarize", null, sc, null));
+            edges.add(PipelineEdge.data(sinkUpstream, summarizeId));
+            sinkUpstream = summarizeId;
+        }
+
         // An authored route: block lifts as a transform.route node whose route:<key> edges feed the
         // sinks — branch↔sink pairing is by the branch's declared destination database. Authoring-only
         // for now (prepare() refuses arming), so this exists for the editor/recipe round-trip.

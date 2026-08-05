@@ -68,6 +68,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_ROUTE("transform.route", NodeCategory.TRANSFORM, "Route",
             "Content-based routing into operator-defined branches (case / clone).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), true),
+    // Group-by rollup (ELT amendment §2.4/Phase 3: summarize IS a Step). Flat home: processing.summarize
+    // {group_by, measures} — measures reuse MaterializeTask's shorthand grammar (count, sum(amount), …).
+    // Compile-only for now: MaterializeTask stays the runtime until a recipe-driven executor lands.
+    TRANSFORM_SUMMARIZE("transform.summarize", NodeCategory.TRANSFORM, "Summarize",
+            "Group-by rollup with algebraically-composable measures.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
     TRANSFORM_SPLIT("transform.split", NodeCategory.TRANSFORM, "Split",
             "Explodes one row into many (UNNEST).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

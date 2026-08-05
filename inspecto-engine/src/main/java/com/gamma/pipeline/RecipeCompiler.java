@@ -15,13 +15,14 @@ import java.util.Map;
  * The result is the canonical {@code *_pipeline.toon} map; discovery stays suffix-based (grounding
  * finding 2: compile-at-authoring, the registry learns no second format).
  *
- * <p><b>Verb coverage (this slice):</b> {@code collect / parse / map / transform.filter / sink} — the
- * linear file-entry chain. {@code map} folds into the parser node (schema/mapping resolution is
- * parser-owned in the flat config). Not yet compilable, refused with named codes rather than silently
- * dropped: {@code dedup} (record-grain QUALIFY lowering lands post-S3), {@code route} (no lowerable
- * route node yet), {@code summarize} (Phase 3's verb), a non-empty {@code guarantees:} block (the
- * Phase-4 fold), and {@code transform.join}/{@code transform.derive} (compile targets land with the
- * Signal-bus unification).
+ * <p><b>Verb coverage:</b> {@code collect / parse / map / dedup / route / summarize / transform.filter
+ * / sink} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
+ * the parser node (schema/mapping resolution is parser-owned in the flat config); {@code summarize} is
+ * compile-only (Phase 3 S1 — {@code MaterializeTask} stays the runtime until a recipe-driven executor
+ * lands, same posture as {@code route}'s arming gate). Not yet compilable, refused with named codes
+ * rather than silently dropped: a non-empty {@code guarantees:} block (the Phase-4 fold) and
+ * {@code transform.join}/{@code transform.derive}/{@code enrich} (compile targets land with the
+ * Signal-bus unification, Phase 3 S2+).
  */
 @PublicApi(since = "5.1.0")
 public final class RecipeCompiler {
@@ -110,8 +111,7 @@ public final class RecipeCompiler {
                     route(id, cfg, nodes, branchSinks, routeEdges, refusals);
                     routeSeen = true;
                 }
-                case "summarize" -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
-                        "summarize is Phase 3's verb (table-entry collect + Signal bus)"));
+                case "summarize" -> nodes.add(summarize(id, cfg, refusals));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                         "unknown step verb '" + verb + "'"));
             }
@@ -220,6 +220,26 @@ public final class RecipeCompiler {
         if (keys != null) node.put("keys", keys);
         if (orderBy != null) node.put("order_by", orderBy);
         return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_DEDUP.type(), node);
+    }
+
+    /** {@code summarize: {group_by: […], measures: […]}} → the group-by rollup node
+     *  ({@code processing.summarize}). Compile-only for now — {@code MaterializeTask} stays the
+     *  runtime until a recipe-driven executor lands (ELT amendment Phase 3). */
+    private static PipelineNode summarize(String id, Map<String, Object> cfg,
+                                          List<PipelineCompileException.Refusal> refusals) {
+        Map<String, Object> c = new LinkedHashMap<>(cfg);
+        Object groupBy = c.remove("group_by");
+        Object measures = c.remove("measures");
+        if (measures == null)
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "summarize needs a non-empty measures: […] list"));
+        for (String other : c.keySet())
+            refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
+                    "summarize does not understand '" + other + "' (only group_by / measures)"));
+        Map<String, Object> node = new LinkedHashMap<>();
+        if (groupBy != null) node.put("group_by", groupBy);
+        if (measures != null) node.put("measures", measures);
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), node);
     }
 
     /**

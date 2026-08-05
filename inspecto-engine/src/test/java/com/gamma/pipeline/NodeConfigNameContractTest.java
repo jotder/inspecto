@@ -201,6 +201,11 @@ class NodeConfigNameContractTest {
         assertTrue(PipelineEditable.isLowerable("transform.route"));
         assertTrue(PipelineEditable.isLowerable("transform.dedup"));
 
+        // transform.summarize became lowerable in the ELT amendment P3 S1 slice; like route, an active
+        // pipeline carrying it is refused at prepare() (compile-only until a recipe-driven executor
+        // lands), so its contract is the draft-path test below too, not contracts().
+        assertTrue(PipelineEditable.isLowerable("transform.summarize"));
+
         for (String authoredOnly : List.of("sink.materialized", "sink.view"))
             assertFalse(PipelineEditable.isLowerable(authoredOnly),
                     authoredOnly + " became lowerable — its declared attributes now need a contract entry");
@@ -237,6 +242,41 @@ class NodeConfigNameContractTest {
         assertNotNull(reparsed.routeConfig());
         assertEquals("clone", reparsed.routeConfig().get("mode"),
                 "a route edit typed in the editor must survive the draft save");
+    }
+
+    /**
+     * The summarize node's draft-path contract: {@code processing.summarize} survives lift → edit →
+     * lenient lower → re-decode. Uses {@code fromMap} (no {@code prepare()}) because arming an active
+     * pipeline carrying {@code summarize} is deliberately refused, same posture as {@code route}.
+     */
+    @Test
+    void summarizeAttributesSurviveTheDraftSavePath(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("active", Boolean.FALSE);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.put("summarize", new LinkedHashMap<>(Map.of(
+                "group_by", List.of("EVENT_DATE"), "measures", List.of("count"))));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.summarize".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            c.put("measures", List.of("count", "sum(AMOUNT)"));
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        PipelineConfig reparsed = PipelineConfig.fromMap(lowered);
+        assertNotNull(reparsed.summarize());
+        assertEquals(List.of("EVENT_DATE"), reparsed.summarize().groupBy());
+        assertEquals(List.of("count", "sum(AMOUNT)"), reparsed.summarize().measures(),
+                "a summarize edit typed in the editor must survive the draft save");
     }
 
     // ── the editor's real save path ────────────────────────────────────────────────

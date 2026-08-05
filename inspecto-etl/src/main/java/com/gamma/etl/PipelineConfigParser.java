@@ -221,6 +221,18 @@ final class PipelineConfigParser {
             b.dedup = new PipelineConfig.Dedup(keys, blankToNull(recDedup.get("order_by")));
         }
 
+        // ── summarize (ELT amendment §2.4/Phase 3 — group-by rollup, authoring/round-trip only) ──
+        Map<String, Object> recSummarize = (Map<String, Object>) proc.get("summarize");
+        if (recSummarize != null) {
+            List<String> groupBy = new ArrayList<>();
+            if (recSummarize.get("group_by") instanceof List<?> gs)
+                for (Object g : gs) groupBy.add(String.valueOf(g));
+            List<String> measures = new ArrayList<>();
+            if (recSummarize.get("measures") instanceof List<?> ms)
+                for (Object m : ms) measures.add(String.valueOf(m));
+            b.summarize = new PipelineConfig.Summarize(groupBy, measures);
+        }
+
         // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──
         // The linear batch path cannot execute a branch tree, so arming is refused in prepare():
         // an active pipeline with route: fails fast rather than silently landing every row in the
@@ -478,6 +490,14 @@ final class PipelineConfigParser {
                     throw new IllegalArgumentException("Config error in " + sourceLabel
                             + ": processing.dedup key column '" + k + "' is not declared in the pipeline schema "
                             + declaredColumns);
+
+        // summarize's group_by columns are target column names too — same validation posture as dedup.
+        if (b.summarize != null && !declaredColumns.isEmpty())
+            for (String k : b.summarize.groupBy())
+                if (!declaredColumns.contains(k))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": processing.summarize group_by column '" + k + "' is not declared in the pipeline "
+                            + "schema " + declaredColumns);
 
         // ── source / connector (additive; absent ⇒ implicit LOCAL reading dirs.poll) ──────────────
         // A pipeline with no `source:` block scans the local poll dir exactly as before: the single

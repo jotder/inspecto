@@ -10,10 +10,13 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ELT amendment Phase 2 (route/dedup lowering): the flat-config homes. {@code processing.dedup} is the
- * record-grain dedup Step's section (keys validated like {@code reference.key}); {@code route:} is
- * carried verbatim and is <b>authoring-only</b> — arming a pipeline with it is refused at
- * {@code prepare()} until the branch-aware executor is wired into the ingest path.
+ * ELT amendment Phase 2 (route/dedup lowering) + Phase 3 S1 (summarize lowering): the flat-config
+ * homes. {@code processing.dedup} is the record-grain dedup Step's section (keys validated like
+ * {@code reference.key}); {@code route:} is carried verbatim and is <b>authoring-only</b> — arming a
+ * pipeline with it is refused at {@code prepare()} until the branch-aware executor is wired into the
+ * ingest path. {@code processing.summarize} is the group-by rollup Step's section (group_by columns
+ * validated the same way) and is likewise authoring-only until a recipe-driven executor replaces
+ * {@code MaterializeTask}'s standalone Dataset-relation runtime.
  */
 class RecordDedupRouteConfigTest {
 
@@ -95,5 +98,42 @@ class RecordDedupRouteConfigTest {
         PipelineConfig cfg = PipelineConfig.load(p.toString());
         assertNotNull(cfg.routeConfig());
         assertEquals("case", cfg.routeConfig().get("mode"));
+    }
+
+    @Test
+    void processingSummarizeParsesGroupByAndMeasures(@TempDir Path dir) throws Exception {
+        Path p = write(dir, false, """
+                  summarize:
+                    group_by[1]: EVENT_DATE
+                    measures[2]: count, "sum(AMT)"
+                """, "");
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        assertNotNull(cfg.summarize());
+        assertEquals(java.util.List.of("EVENT_DATE"), cfg.summarize().groupBy());
+        assertEquals(java.util.List.of("count", "sum(AMT)"), cfg.summarize().measures());
+    }
+
+    @Test
+    void aSummarizeGroupByColumnOutsideTheSchemaIsRefusedAtParse(@TempDir Path dir) throws Exception {
+        Path p = write(dir, false, """
+                  summarize:
+                    group_by[1]: NO_SUCH_COLUMN
+                    measures[1]: count
+                """, "");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("NO_SUCH_COLUMN"), e.getMessage());
+    }
+
+    @Test
+    void anActivePipelineWithSummarizeRefusesToArm(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, """
+                  summarize:
+                    measures[1]: count
+                """, "");
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "MaterializeTask, not the linear batch path, is the only executor for this measure grammar — arming must fail fast");
+        assertTrue(e.getMessage().contains("summarize"), e.getMessage());
     }
 }
