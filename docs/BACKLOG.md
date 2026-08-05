@@ -909,7 +909,10 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     non-breaking. Positional callers depend on it; do not tidy the overload away.
   - ⚠ Three `@PublicApi` store interfaces gained **abstract** methods ⇒ `feat!:`. A **third** independent
     reason the next release is MAJOR, alongside D15's required `-Dauth.oidc.tokenEndpoint` and D4's
-    `DELETE /spaces/{id}?purge=true` 409.
+    `DELETE /spaces/{id}?purge=true` 409. **A fourth landed 2026-08-04**: `61dc8280` `feat(pipeline)!` —
+    file dedup folded into the acquisition node, `transform.dedup.fingerprint` config key removed. Pushed
+    to `origin/master`; live and undocumented for clients until release notes are actually written at the
+    next tag cut.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
