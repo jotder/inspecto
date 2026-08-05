@@ -7,6 +7,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -171,6 +172,25 @@ class PipelineValidatorTest {
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertTrue(codes(r).contains(PipelineValidator.UNKNOWN_TYPE));
         assertTrue(r.ok());   // a warning does not block; wiring around the unknown type is skipped
+    }
+
+    @Test
+    void unknownUseKindIsAnError() {
+        PipelineGraph g = new PipelineGraph("bad-use", true,
+                List.of(new PipelineNode("p", "parser.dsv", Map.of(), "bogus/thing")),
+                List.of());
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertTrue(codes(r).contains(PipelineValidator.UNKNOWN_USE_KIND));
+        assertTrue(r.errors().stream().anyMatch(i -> i.code().equals(PipelineValidator.UNKNOWN_USE_KIND)));
+    }
+
+    @Test
+    void knownUseKindDoesNotFlag() {
+        PipelineGraph g = new PipelineGraph("good-use", true,
+                List.of(new PipelineNode("p", "parser.dsv", Map.of(), "grammar/pipe-delimited")),
+                List.of());
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertFalse(codes(r).contains(PipelineValidator.UNKNOWN_USE_KIND));
     }
 
     @Test

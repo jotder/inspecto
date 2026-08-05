@@ -40,6 +40,12 @@ import java.util.Set;
  *       for {@code data} edges — a control/split outcome ({@code failure}/{@code unmatched}/{@code gap})
  *       routed to a handler (sink/alert) is governed by the emitter, so handlers need not list every
  *       inbound outcome. An unregistered node type is flagged (warning) and its wiring left unchecked.</li>
+ *   <li><b>Unknown {@code use:} kind</b> — a node's {@code use:} reference must have a recognized
+ *       {@code <kind>/<name>} prefix ({@link ComponentRegistry#isComponentType}); an unrecognized kind
+ *       (typo or removed component type) is a hard error, since it silently falls back to the node's
+ *       local config today with no signal to the author. This checks only the kind, not whether
+ *       {@code <name>} resolves to an actual on-disk component — that requires a live registry scan,
+ *       unlike every other check here which is pure IR.</li>
  * </ul>
  */
 @PublicApi(since = "4.3.0")
@@ -61,6 +67,7 @@ public final class PipelineValidator {
     public static final String ILLEGAL_EMIT = "ILLEGAL_EMIT";
     public static final String ILLEGAL_ACCEPT = "ILLEGAL_ACCEPT";
     public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
+    public static final String UNKNOWN_USE_KIND = "UNKNOWN_USE_KIND";
 
     /** One validation finding: a {@code severity}, a stable {@code code}, and a human message. */
     public record Issue(Severity severity, String code, String message) {
@@ -210,6 +217,16 @@ public final class PipelineValidator {
             if (!PipelineNodeTypes.isKnown(n.type())) {
                 issues.add(new Issue(Severity.WARNING, UNKNOWN_TYPE,
                         "Node '" + n.id() + "' has unregistered type '" + n.type() + "' — wiring not validated."));
+            }
+            if (n.hasUse()) {
+                String use = n.use();
+                int slash = use.indexOf('/');
+                String kind = slash < 0 ? use : use.substring(0, slash);
+                if (!ComponentRegistry.isComponentType(kind)) {
+                    issues.add(new Issue(Severity.ERROR, UNKNOWN_USE_KIND,
+                            "Node '" + n.id() + "' has use: '" + use + "' with unrecognized component kind '"
+                                    + kind + "'."));
+                }
             }
         }
         for (PipelineEdge e : g.edges()) {
