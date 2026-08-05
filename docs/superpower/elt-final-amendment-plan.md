@@ -938,6 +938,30 @@ trip. Tests: `RecipeCompilerTest` (+3: fold, backup-refuses, marker-refuses),
 quarantine/retention). Full reactor green (200+ tests, 0 failures). **Phase 4 remaining: S2
 (per-file stage progression), S3 (counters), S4 (per-Step enabled park/drain).**
 
+**P4 S2 SHIPPED 2026-08-06** — per-file stage progression: `BatchProcessor.finalizeSource`'s
+documented crash-safe commit ordering (register → manifest → backup → markers LAST →
+ledger/watermark, finding 3) is now durable, queryable state, not just code sequencing. New
+`FileStage` enum (`REGISTERED, MANIFESTED, OUTPUT_REGISTERED, BACKED_UP, MARKED,
+WATERMARK_ADVANCED` — only the boundaries the method genuinely crosses, none invented ahead of the
+code that would report them) + `DbFileStageStore`/`FileStages` (`com.gamma.consignment`), an
+**insert-only** registry mirroring `DbConsignmentOutputStore`/`ConsignmentOutputStores` exactly:
+same JDBC-over-DuckDB shape, same default-off contract (`-Dfile.stages.backend`), same fail-open
+best-effort `record()`. Wired into `finalizeSource` at all six boundaries, keyed by
+`(sourceId, relativePath)` — the same key `AcquisitionLedger` uses. Full production wiring, not a
+stub: `SpaceRoot.fileStagesDbUrl()` + `ServiceStores.openFileStageStore` +
+`CollectorService`/`SpaceManager` register/unregister, mirroring the output-registry's wiring
+line for line. **"Where is file X" is answerable today**: `GET
+/runs/{name}/files/stage?path=<relative>` returns the recorded progression (empty, not an error,
+when the registry is default-off — the same degraded-but-correct contract as every other
+optional store). Tests: `DbFileStageStoreTest` (store unit tests, mirroring
+`DbConsignmentOutputStoreTest`), `FileStageRegistrationTest` (integration — asserts the recorded
+order matches `finalizeSource`'s own ordering comment, and that commit succeeds unaffected when
+the registry is off), `ControlApiTest` (+1, the route's required-param + default-off-degrades-empty
+contract). `docs/okf/backend/engine/db-layer.md` gained §3.10 + the file-topology/Postgres-flag
+rows. Full reactor green (666 tests in inspecto-engine, 200 in inspecto, 0 failures). **Phase 4
+remaining: S3 (edge-grain counters — legacy-lane dedup/filter/quarantine counts + provenance
+extension), S4 (per-Step `enabled:` park/drain, D-13) — S4 is gated on this slice per §2.7 cost 3.**
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

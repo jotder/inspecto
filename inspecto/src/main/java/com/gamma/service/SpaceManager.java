@@ -372,6 +372,7 @@ public final class SpaceManager implements AutoCloseable {
         // it: the registry's DuckDB file lives under the space dir, so on Windows a retained handle would make
         // the purge below fail outright. unregister is idempotent, so the double call is free.
         com.gamma.consignment.ConsignmentOutputStores.unregister(id.value());
+        com.gamma.consignment.FileStages.unregister(id.value());
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
             if (base.startsWith(spacesRoot) && Files.isDirectory(base)) deleteRecursively(base);

@@ -65,6 +65,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
 | Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
 | Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | `none` |
+| Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
 | Ops escalation queues | `ops/queue/QueueStore` | **none** — in-memory only | — | — |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
 
@@ -310,6 +311,33 @@ absolutising at write time would make the row depend on the writing process's wo
 therefore normalises *both sides in Java*; a two-spelling SQL `WHERE` cannot do it, since an already-absolute
 probe normalises to itself.
 
+### 3.10 `file_stages` — per-file stage-progression registry  · **M**
+File: `inspecto-file-stages.db`
+
+```sql
+CREATE TABLE IF NOT EXISTS file_stages (
+  source_id      VARCHAR,
+  relative_path  VARCHAR,
+  batch_id       VARCHAR,
+  stage          VARCHAR,  -- FileStage: REGISTERED | MANIFESTED | OUTPUT_REGISTERED | BACKED_UP | MARKED | WATERMARK_ADVANCED
+  recorded_at    VARCHAR
+);
+```
+
+Phase 4 §2.4's per-file stage progression: one row per `(source_id, relative_path)` file at each
+boundary `BatchProcessor.finalizeSource` genuinely crosses, so *"where is file X right now"* is a
+query instead of a re-read of the manifest and a guess about how far a crashed commit got.
+**Insert-only** — a stage is a fact about a point in time, never updated; a file's history is its
+own append-only progression through `finalizeSource`'s documented crash-safe ordering (register →
+manifest → backup → markers LAST → ledger/watermark). `(source_id, relative_path)` is the same key
+`AcquisitionLedger` uses.
+
+Written by `FileStages.record`, an ambient per-space registry (the `ConsignmentOutputStores` idiom)
+called from `BatchProcessor.finalizeSource` after each of the six boundaries; default-off and
+best-effort, same fail-open contract as `consignment_outputs` — absence means no index, never a
+change to the commit ordering itself. Read by `FileStages.stages(sourceId, relativePath)`, exposed
+at `GET /runs/{name}/files/stage?path=<relative>`.
+
 ---
 
 ## 4. File topology (per space)
@@ -321,7 +349,7 @@ single-writer-locked (documented in `ServiceStores`). Locations come from
 | Layout | Capability file locations |
 |---|---|
 | **`DirSpaceRoot`** (per-space dir) | `<spaceBase>/duckdb/<file>` — e.g. `spaces/demo/duckdb/inspecto-ops.db` |
-| **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db`, `./inspecto-consignment-outputs.db` |
+| **`LegacySpaceRoot`** (flat working dir) | `./inspecto-ops.db`, `./inspecto-ops-links.db`, `./inspecto-ops-notes.db`, `./inspecto-status.db`, `./jobs_report.duckdb`, `./provenance.duckdb`, `./inspecto-acquisition.db`, `./inspecto-consignment-outputs.db`, `./inspecto-file-stages.db` |
 
 So across N spaces you get N separate sets of these files. Events live under `<dataDir>/events/`
 (`DirSpaceRoot`) or `./inspecto-events/` (legacy). Every `-D<capability>.db.url` flag overrides the
@@ -340,8 +368,9 @@ The layer was **designed** for this: stores are JDBC-pluggable by URL scheme, th
 portable (`VARCHAR`/`BIGINT`, composite PKs, no auto-increment, no upserts — explicit DELETE-then-INSERT),
 and there is a **real embedded-Postgres round-trip test**
 ([`PostgresStateStoreTest`](../../../../inspecto/src/test/java/com/gamma/service/PostgresStateStoreTest.java))
-covering 6 of the 8 DB-backed stores — **`consignment_outputs` is one of the two it does not cover.** Its DDL
-is portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that is reasoned, not proved.
+covering 6 of the 9 DB-backed stores — **`consignment_outputs` and `file_stages` are two of the three it does
+not cover.** Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
+is reasoned, not proved.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
@@ -353,6 +382,7 @@ is portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), bu
 | Provenance | `-Dprovenance.backend=postgres` | `-Dprovenance.db.url` | (in URL) |
 | Acquisition ledger | `-Dacquire.ledger.backend=db` | (property in [`AcquisitionLedgers`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/AcquisitionLedgers.java)) | — |
 | Consignment outputs | `-Dconsignment.outputs.backend=postgres` | `-Dconsignment.outputs.db.url` | (in URL) |
+| File stages | `-Dfile.stages.backend=postgres` | `-Dfile.stages.db.url` | (in URL) |
 | Events | `-Devents.backend=parquet` | — | **No Postgres path** |
 
 Point each URL at `jdbc:postgresql://…`; the three ops URLs may share one database/schema (table names

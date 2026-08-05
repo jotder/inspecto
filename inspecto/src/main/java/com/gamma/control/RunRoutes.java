@@ -61,6 +61,16 @@ final class RunRoutes implements RouteModule {
         // pipeline is currently ingesting. Complements the audit-backed /files (processed history).
         api.get("/runs/([^/]+)/pending",    (e, m) ->
                 api.service().inboxStatus(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m))));
+        // "Where is file X right now" (Phase 4 §2.4 — Stage C's per-file stage progression), backed by the
+        // durable FileStages registry; empty when the registry is default-off or the file predates it —
+        // never an error, since the registry is an index beside the manifest, not the record of existence.
+        api.get("/runs/([^/]+)/files/stage", (e, m) -> {
+                    PipelineConfig cfg = cfg(api, m);
+                    String rel = ApiContext.query(e, "path");
+                    if (rel == null || rel.isBlank()) throw new ApiException(400, "?path= is required");
+                    return Map.of("pipeline", ApiContext.name(m), "path", rel,
+                            "stages", com.gamma.consignment.FileStages.stages(cfg.collector().id(), rel));
+                });
 
         api.post("/runs/([^/]+)/reprocess", ApiContext.withCapability("canOperateRuns", (e, m) -> {
             var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));

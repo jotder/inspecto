@@ -88,6 +88,7 @@ import java.util.regex.Pattern;
  *   GET  /runs/{name}/commits            committed batch ids
  *   GET  /runs/{name}/batches            batch audit rows
  *   GET  /runs/{name}/files              per-file audit rows
+ *   GET  /runs/{name}/files/stage?path=  a file's recorded Stage-C progression [v5.1.0, Phase 4 §2.4]
  *   GET  /runs/{name}/lineage[?batchId=] input→output lineage rows
  *   GET  /runs/{name}/quarantine         quarantined inputs + reason
  *   POST /runs/{name}/reprocess          body {"batchId":"…"} — replay a batch

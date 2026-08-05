@@ -77,6 +77,10 @@ public interface SpaceRoot {
     /** Default JDBC URL for the Consignment output-file registry, when {@code -Dconsignment.outputs.backend} is set. */
     String consignmentOutputsDbUrl();
 
+    /** Default JDBC URL for the per-file stage-progression registry (Phase 4 §2.4), when
+     *  {@code -Dfile.stages.backend} is set. */
+    String fileStagesDbUrl();
+
     /** The pre-spaces flat layout: historical file names in the working directory. */
     static SpaceRoot legacy() {
         return new LegacySpaceRoot();
@@ -139,6 +143,8 @@ final class LegacySpaceRoot implements SpaceRoot {
     public String acquisitionLedgerDbUrl() { return "jdbc:duckdb:inspecto-acquisition.db"; }
 
     public String consignmentOutputsDbUrl() { return "jdbc:duckdb:inspecto-consignment-outputs.db"; }
+
+    public String fileStagesDbUrl() { return "jdbc:duckdb:inspecto-file-stages.db"; }
 }
 
 /** A self-contained per-space directory: {@code base/{config,data,audit,duckdb}}. */
@@ -195,4 +201,6 @@ final class DirSpaceRoot implements SpaceRoot {
     public String acquisitionLedgerDbUrl() { return duckdb("inspecto-acquisition.db"); }
 
     public String consignmentOutputsDbUrl() { return duckdb("inspecto-consignment-outputs.db"); }
+
+    public String fileStagesDbUrl() { return duckdb("inspecto-file-stages.db"); }
 }

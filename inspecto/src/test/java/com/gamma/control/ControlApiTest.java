@@ -181,6 +181,27 @@ class ControlApiTest {
         }
     }
 
+    /**
+     * Phase 4 §2.4 — the "where is file X" endpoint. Default-off in this harness (no
+     * {@code -Dfile.stages.backend}), so an empty list is the correct, non-error answer — the same
+     * fail-open contract as every other default-off registry.
+     */
+    @Test
+    void fileStageEndpointRequiresPathAndDegradesEmptyWhenRegistryIsOff(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> missing = send(c.port, "GET", "/runs/" + c.name + "/files/stage", null);
+            assertEquals(400, missing.statusCode(), "?path= is required");
+
+            HttpResponse<String> ok = send(c.port, "GET",
+                    "/runs/" + c.name + "/files/stage?path=solo.csv", null);
+            assertEquals(200, ok.statusCode());
+            JsonNode body = json(ok);
+            assertEquals("solo.csv", body.get("path").asText());
+            assertTrue(body.get("stages").isArray() && body.get("stages").isEmpty(),
+                    "no registry registered ⇒ empty history, never an error");
+        }
+    }
+
     @Test
     void pauseAndResumeToggleState(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

@@ -368,6 +368,10 @@ public final class CollectorService implements AutoCloseable {
         // (BatchProcessor.finalizeSource, EnrichmentEngine.runResult) are static — the AcquisitionLedgers idiom.
         com.gamma.consignment.ConsignmentOutputStores.register(
                 spaceId, ServiceStores.openConsignmentOutputStore(root));
+        // This space's per-file stage-progression registry (Phase 4 §2.4) — same default-off, static-registry
+        // idiom as the output-file registry above, since BatchProcessor.finalizeSource is static.
+        com.gamma.consignment.FileStages.register(
+                spaceId, ServiceStores.openFileStageStore(root));
         this.registry          = new CopyOnWriteArrayList<>(registry);
         this.pollSeconds       = Math.max(1, pollSeconds);
         this.maxConcurrentRuns = Math.max(1, maxConcurrentRuns);
@@ -1502,6 +1506,7 @@ public final class CollectorService implements AutoCloseable {
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log
         // Release the output-file registry this service registered (+ its DB handle); no-op when default-off.
         com.gamma.consignment.ConsignmentOutputStores.unregister(spaceId);
+        com.gamma.consignment.FileStages.unregister(spaceId);
         if (status instanceof AutoCloseable c) {       // close a DB-backed store's connection
             try { c.close(); } catch (Exception e) { log.warn("Error closing status store: {}", e.getMessage()); }
         }

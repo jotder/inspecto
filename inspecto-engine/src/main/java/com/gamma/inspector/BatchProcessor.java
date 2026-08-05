@@ -5,6 +5,9 @@ import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.acquire.LedgerEntry;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentOutputs;
+import com.gamma.consignment.FileStage;
+import com.gamma.consignment.FileStageRecord;
+import com.gamma.consignment.FileStages;
 import com.gamma.etl.*;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -123,6 +126,10 @@ public final class BatchProcessor {
         DuckLakeRegistrar.register(outputs.stream().map(PartitionOutput::outputFile).toList(),
                 batch.table(), cfg);
 
+        String stageSourceId = cfg.collector().id();
+        String batchIdForStages = batch.batchId();
+        recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.REGISTERED);
+
         Path poll   = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         Path backup = (cfg.dirs().backup() != null && !cfg.dirs().backup().isBlank())
                 ? Paths.get(cfg.dirs().backup()).toAbsolutePath() : null;
@@ -192,43 +199,75 @@ public final class BatchProcessor {
                     .map(o -> new BatchManifest.OutputEntry(o.partition(), o.outputFile())).toList();
             manifest.markers     = markerPaths;
             ManifestStore.write(cfg.dirs().manifestsDir(), manifest);
+            recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MANIFESTED);
         }
 
         // §11.3 — index the output files, AFTER the manifest and never before it. The manifest is authoritative
         // for a file's existence, this registry only for its state, so a crash between the two must lose the
         // index and never the record that the files exist. Best-effort and default-off: with no registry
         // registered for this space, record() is a no-op and nothing about this sequence changes.
-        if (lineage != null && !lineage.isEmpty())
+        if (lineage != null && !lineage.isEmpty()) {
             ConsignmentOutputStores.record(ConsignmentOutputs.fromLineage(
                     batch.batchId(), null, batch.table(), outputs, lineage, schemaFingerprint));
+            recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.OUTPUT_REGISTERED);
+        }
 
         // Backup BEFORE markers — see ordering rationale at top of method.
-        if (backup != null)
+        if (backup != null) {
             for (Batch.Member m : survivors) backupFile(m.file(), cfg);
+            recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.BACKED_UP);
+        }
 
         // Markers LAST — created only after every other side-effect is durable (PATH-mode dedup only;
         // content-based mode uses the ledger below — see writeMarkers above).
-        if (writeMarkers)
+        if (writeMarkers) {
             for (Batch.Member m : survivors) MarkerManager.createMarkerFile(m.file(), cfg);
+            recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MARKED);
+        }
 
         // Fingerprint ledger LAST too (content-based dedup; same stranding-safety reason as markers).
         if (ledgerRecord) {
             AcquisitionLedger ledger = AcquisitionLedgers.shared();
             for (LedgerEntry e : ledgerEntries) ledger.record(e);
+            recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.MARKED);
         }
 
         // Row-level DB-export watermark LAST too, and independently of dedup mode: a DB-export connector stashes the
         // new max watermark during fetchTo; advance it only now that the batch is durable (resumable). Source-type-
         // agnostic — takeDbWatermark is empty for any file no connector stashed.
         AcquisitionLedger wmLedger = null;
+        List<Batch.Member> watermarked = new ArrayList<>();
         for (Batch.Member m : survivors) {
             Path filePath = m.file().toPath().toAbsolutePath().normalize();
             var wm = AcquisitionLedgers.takeDbWatermark(filePath);
             if (wm.isPresent()) {
                 if (wmLedger == null) wmLedger = AcquisitionLedgers.shared();
                 wmLedger.recordDbWatermark(wm.get().key(), wm.get().value());
+                watermarked.add(m);
             }
         }
+        if (!watermarked.isEmpty())
+            recordStages(stageSourceId, batchIdForStages, watermarked, cfg, FileStage.WATERMARK_ADVANCED);
+    }
+
+    /**
+     * Record {@code stage} for every survivor in the calling space's {@link FileStages} registry —
+     * a no-op when none is registered (Phase 4 Slice 2, §2.4). Best-effort, like every other Stage-C
+     * side effect: a file's real path is relativized against {@code dirs.poll}, the same key
+     * {@code AcquisitionLedger} uses, so a stage row and a ledger row for the same file always agree.
+     */
+    private static void recordStages(String sourceId, String batchId, List<Batch.Member> survivors,
+                                      PipelineConfig cfg, FileStage stage) {
+        if (FileStages.shared() == null) return;
+        Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        String now = LocalDateTime.now().format(DuckDbUtil.DT_FMT);
+        List<FileStageRecord> records = new ArrayList<>();
+        for (Batch.Member m : survivors) {
+            String rel = poll.relativize(m.file().toPath().toAbsolutePath().normalize())
+                    .toString().replace('\\', '/');
+            records.add(new FileStageRecord(sourceId, rel, batchId, stage, now));
+        }
+        FileStages.record(records);
     }
 
     /**

@@ -115,6 +115,28 @@ final class ServiceStores {
     }
 
     /**
+     * Per-file stage-progression registry (Phase 4 §2.4), gated by {@code -Dfile.stages.backend}: same
+     * three-value contract as {@link #openConsignmentOutputStore(SpaceRoot)} — {@code duckdb}, {@code postgres}/
+     * {@code postgresql} ({@code -Dfile.stages.db.url}), or a raw {@code jdbc:} URL. Any other value ⇒
+     * {@code null} ⇒ no per-file stage index is kept; the crash-safe commit ordering
+     * {@code BatchProcessor.finalizeSource} enforces is unchanged either way.
+     */
+    static com.gamma.consignment.DbFileStageStore openFileStageStore(SpaceRoot root) {
+        String backend = System.getProperty("file.stages.backend", "none").trim().toLowerCase();
+        boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
+        if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
+        String url = backend.startsWith("jdbc:")
+                ? backend
+                : System.getProperty("file.stages.db.url", root.fileStagesDbUrl());
+        try {
+            return com.gamma.consignment.DbFileStageStore.open(url);
+        } catch (Exception e) {
+            log.warn("Could not open file-stages DB ({}) — stage registry disabled: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Select the Phase-1 event-store backend (v4.2.0): {@code -Devents.backend=memory} (default — a
      * bounded in-memory ring; the lean fat-JAR keeps no extra files and tests stay light) or
      * {@code -Devents.backend=parquet} (durable rolling Hive-partitioned Parquet under
