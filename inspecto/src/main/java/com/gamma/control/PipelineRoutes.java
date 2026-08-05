@@ -41,6 +41,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -183,11 +184,25 @@ final class PipelineRoutes implements RouteModule {
     /**
      * {@code PUT /pipelines/{name}/graph} — <b>lower the graph to the canonical config</b> (W5, U-A):
      * decode + structurally validate the posted graph (URL name authoritative), lower it over the
-     * existing {@code <name>_pipeline.toon} ({@link PipelineEditable#lower} — verbatim sections,
+     * pipeline's <b>existing registered file</b> ({@link PipelineEditable#lower} — verbatim sections,
      * unmodeled keys preserved), run the SAME spec + safety gate as {@code POST /config/write}, and
      * write atomically. An {@code active} graph (or a brand-new file) must be complete; an inactive
      * draft may be partial. Unrepresentable topologies 422 with named {@code refusals[]} instead of
      * being silently truncated.
+     *
+     * <p>The target file prefers the pipeline's registered path ({@link CollectorService#pathFor})
+     * over assuming {@code <name>_pipeline.toon} at the config root — a pipeline registered from a
+     * legacy or differently-named path under the write root (e.g.
+     * {@code subscriber/subscriber_pipeline.toon}) must be overwritten in place. Guessing the
+     * canonical name here previously created a second, shadow file: the save looked successful but
+     * the running pipeline (still bound to its original file) never saw the edit, and a later
+     * restart found two files claiming the same pipeline id. The registered path is only trusted
+     * when it is ITSELF inside the write root — a pipeline registered from outside it (a read-only
+     * seed/fixture living elsewhere) is not writable there, so a save falls back to the canonical
+     * path the same as a brand-new pipeline, same as before this fix. Whether to overlay existing
+     * content is decided by whether {@code target} already exists on disk, not by registration —
+     * a pipeline's first save (nothing registered yet) still overlays its own just-written file on
+     * every save after the first.
      */
     private Object saveGraph(ApiContext api, HttpExchange e, String name, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
@@ -195,8 +210,11 @@ final class PipelineRoutes implements RouteModule {
         withId.put("name", name);   // the URL name wins over any name in the body
         PipelineGraph g = parseAndValidateFlow(withId);
 
-        String fileName = WriteGates.safeName(name, "pipeline name") + "_pipeline.toon";
-        Path target = WriteGates.jail(writeRoot, writeRoot.resolve(fileName), "resolved path");
+        Optional<Path> registered = api.service().pathFor(name).map(Path::normalize)
+                .filter(p -> p.startsWith(writeRoot));
+        Path target = WriteGates.jail(writeRoot,
+                registered.orElseGet(() -> writeRoot.resolve(WriteGates.safeName(name, "pipeline name") + "_pipeline.toon")),
+                "resolved path");
         Map<String, Object> existing = Files.exists(target)
                 ? ConfigLoader.filesystem().decode(target.toString()) : new LinkedHashMap<>();
 
@@ -225,7 +243,7 @@ final class PipelineRoutes implements RouteModule {
 
         byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
-        log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, fileName, bytes.length);
+        log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, target.getFileName(), bytes.length);
 
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("written", true);
