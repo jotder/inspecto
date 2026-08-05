@@ -79,7 +79,14 @@ import { type AttributeSpec, COLLECTOR_ATTRIBUTES, OUTPUT_ATTRIBUTES } from 'app
 // the same block — the kind is the materialisation behaviour, not a different config shape.
 const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     acquisition: COLLECTOR_ATTRIBUTES,
-    'sink.persistent': OUTPUT_ATTRIBUTES,
+    // The persistent sink adds its destination to the shared output block: `database` is the one key
+    // `PipelineEditable.lower` HARD-requires on the primary sink (`NO_PERSISTENT_SINK` refuses the save
+    // without it), so it must be askable up front — but `required: false`, because a quarantine sink is
+    // a `sink.persistent` too and sets `dir`, never `database`.
+    'sink.persistent': [
+        { key: 'database', label: 'Database directory', type: 'string', tier: 'required', required: false, placeholder: 'data/<pipeline>/database', help: "Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead." },
+        ...OUTPUT_ATTRIBUTES,
+    ],
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,
     // Two DIFFERENT filtering moments, both real on the flat path — see the D7 note in the file header.

@@ -89,7 +89,11 @@ class NodeConfigNameContractTest {
                 new Contract("acquisition", "duplicate__on_change", "duplicate.on_change",
                         "skip", c -> c.collector().duplicate().onChange(), "skip"),
 
-                // ── sink.persistent — the shared OUTPUT_ATTRIBUTES table ────────────────────────
+                // ── sink.persistent — the destination + the shared OUTPUT_ATTRIBUTES table ──────
+                // `database` is the key `lower` hard-requires on the primary sink (NO_PERSISTENT_SINK);
+                // it lowers onto `dirs.database`, which is where the engine reads the write root.
+                new Contract("sink.persistent", "database", "database", "data/contract/db2",
+                        c -> c.dirs().database(), "data/contract/db2"),
                 new Contract("sink.persistent", "format", "format", "PARQUET",
                         c -> c.output().format(), "PARQUET"),
                 new Contract("sink.persistent", "compression", "compression", "zstd",

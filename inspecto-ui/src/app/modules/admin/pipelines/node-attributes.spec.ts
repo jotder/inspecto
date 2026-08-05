@@ -38,15 +38,23 @@ describe('node-attributes', () => {
         const specs = nodeAttributesFor('sink.persistent');
         expect(specs).toBeDefined();
         const grouped = byTier(specs!);
-        expect(grouped.required.map((s) => s.key)).toEqual(['format']);
+        // `database` is the key `PipelineEditable.lower` HARD-requires on the primary sink
+        // (NO_PERSISTENT_SINK) — required-tier visibility, but `required: false` because a
+        // quarantine sink is a `sink.persistent` too and sets `dir`, never `database`.
+        expect(grouped.required.map((s) => s.key)).toEqual(['database', 'format']);
+        expect(isRequired(grouped.required[0])).toBe(false);
         // W4a moved compression advanced → optional when the table unified with Onboarding's
         // (which always showed it) — a deliberate tier choice, not a regression.
         expect(grouped.optional.map((s) => s.key)).toEqual(['compression']);
     });
 
-    /** W4a: the sink's output block is the SAME shared table Onboarding's publish stage renders. */
+    /** W4a: the sink's output block is the SAME shared table Onboarding's publish stage renders —
+     *  by element identity, so a forked copy fails even if the keys look the same. The persistent
+     *  sink prepends its own destination (`database`) to that shared block. */
     it('authors the output block with the shared OUTPUT_ATTRIBUTES table', () => {
-        expect(nodeAttributesFor('sink.persistent')).toBe(OUTPUT_ATTRIBUTES);
+        const specs = nodeAttributesFor('sink.persistent')!;
+        expect(specs.slice(1)).toEqual(OUTPUT_ATTRIBUTES);
+        for (const [i, shared] of OUTPUT_ATTRIBUTES.entries()) expect(specs[i + 1]).toBe(shared);
     });
 
     /** The shared table's format default is the ENGINE's absent-key behaviour, not a UX suggestion. */
@@ -153,11 +161,13 @@ describe('node-attributes', () => {
         expect(keys).not.toContain('route_column');
     });
 
-    /** All three sink kinds write the same `output:` block — the kind is behaviour, not a config shape. */
+    /** All three sink kinds write the same `output:` block — the kind is behaviour, not a config shape.
+     *  Only the persistent sink also owns a destination (`database`); the other two kinds are not
+     *  lowerable and keep the bare shared block. */
     it('gives every sink kind the same output-block schema', () => {
-        const persistent = nodeAttributesFor('sink.persistent');
-        expect(nodeAttributesFor('sink.materialized')).toBe(persistent);
-        expect(nodeAttributesFor('sink.view')).toBe(persistent);
+        expect(nodeAttributesFor('sink.materialized')).toBe(OUTPUT_ATTRIBUTES);
+        expect(nodeAttributesFor('sink.view')).toBe(OUTPUT_ATTRIBUTES);
+        expect(nodeAttributesFor('sink.persistent')!.slice(1)).toEqual(OUTPUT_ATTRIBUTES);
     });
 
     it('drops the sink keys the backend never read', () => {

@@ -181,6 +181,14 @@
     "help" : "Named routes and their predicates are edited on the canvas edges."
   } ],
   "sink.persistent" : [ {
+    "key" : "database",
+    "label" : "Database directory",
+    "type" : "string",
+    "tier" : "required",
+    "required" : false,
+    "help" : "Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead.",
+    "placeholder" : "data/<pipeline>/database"
+  }, {
     "key" : "format",
     "label" : "Output format",
     "type" : "select",

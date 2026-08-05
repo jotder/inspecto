@@ -85,6 +85,24 @@ public final class NodeAttributes {
                     .help("Codec for the output (e.g. snappy / zstd / gzip); blank = format default."));
 
     /**
+     * {@code sink.persistent} = the destination ({@code database}) plus the shared {@code output:} block.
+     * The {@code database} dir is the one key {@code PipelineEditable.lower} HARD-requires on the primary
+     * sink ({@code NO_PERSISTENT_SINK} refuses the save without it), so the dialog must ask it up front —
+     * but {@code required(false)}: a quarantine sink is a {@code sink.persistent} too, and it sets
+     * {@code dir}, never {@code database}, so form-level enforcement would block a legitimate node.
+     */
+    public static final List<NodeAttribute> SINK_PERSISTENT = sinkPersistent();
+
+    private static List<NodeAttribute> sinkPersistent() {
+        List<NodeAttribute> attrs = new ArrayList<>();
+        attrs.add(NodeAttribute.of("database", "Database directory", "string", "required").required(false)
+                .placeholder("data/<pipeline>/database")
+                .help("Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead."));
+        attrs.addAll(OUTPUT);
+        return List.copyOf(attrs);
+    }
+
+    /**
      * {@code transform.filter} has TWO filtering moments on the flat path and both are real (D7) — they
      * are NOT synonyms and must never be collapsed:
      * <ul>
@@ -129,7 +147,7 @@ public final class NodeAttributes {
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
-        for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, TRANSFORM_FILTER, TRANSFORM_ROUTE))
+        for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, SINK_PERSISTENT, TRANSFORM_FILTER, TRANSFORM_ROUTE))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -137,7 +155,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.ACQUISITION.type(), COLLECTOR);
         m.put(BuiltinNodeType.TRANSFORM_FILTER.type(), TRANSFORM_FILTER);
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
-        m.put(BuiltinNodeType.SINK_PERSISTENT.type(), OUTPUT);
+        m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);
         m.put(BuiltinNodeType.SINK_MATERIALIZED.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_VIEW.type(), OUTPUT);
         // NOT Map.copyOf: that returns an UNORDERED map, so the committed contract JSON would come out in a
