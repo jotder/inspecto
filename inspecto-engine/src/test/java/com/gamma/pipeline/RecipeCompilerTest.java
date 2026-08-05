@@ -122,7 +122,7 @@ class RecipeCompilerTest {
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");
         ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
-                step("dedup", new LinkedHashMap<>(Map.of("key", List.of("ORDER_ID")))));
+                step("summarize", new LinkedHashMap<>(Map.of("group_by", List.of("region")))));
         recipe.put("guarantees", Map.of("file_dedup", "fingerprint"));
 
         PipelineCompileException e = assertThrows(PipelineCompileException.class,
@@ -130,6 +130,101 @@ class RecipeCompilerTest {
         List<String> codes = e.refusals().stream().map(PipelineCompileException.Refusal::code).toList();
         assertTrue(codes.contains(RecipeCompiler.UNSUPPORTED_STEP), codes.toString());
         assertTrue(codes.contains(RecipeCompiler.GUARANTEES_NOT_LOWERABLE), codes.toString());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void dedupCompilesToProcessingDedup() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1,   // between transform and sink
+                step("dedup", new LinkedHashMap<>(Map.of(
+                        "key", List.of("ORDER_ID"), "keep", "first", "order_by", "EVENT_TS DESC"))));
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> dd = (Map<String, Object>)
+                ((Map<String, Object>) out.get("processing")).get("dedup");
+        assertEquals(List.of("ORDER_ID"), dd.get("keys"));
+        assertEquals("EVENT_TS DESC", dd.get("order_by"));
+    }
+
+    @Test
+    void dedupKeepOtherThanFirstRefuses() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
+                step("dedup", new LinkedHashMap<>(Map.of("key", List.of("ID"), "keep", "last"))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r -> r.message().contains("order_by")), e.getMessage());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void routeCompilesToARouteSectionWithBranchStampedDestinations() {
+        Map<String, Object> recipe = new LinkedHashMap<>();
+        recipe.put("name", "orders");
+        recipe.put("steps", List.of(
+                step("collect", new LinkedHashMap<>(Map.of("files", "glob:**/*.csv"))),
+                step("parse", new LinkedHashMap<>(Map.of("grammar", "grammars/pipe"))),
+                step("route", new LinkedHashMap<>(Map.of(
+                        "mode", "case",
+                        "branches", new LinkedHashMap<>(Map.of(
+                                "emea", new LinkedHashMap<>(Map.of(
+                                        "when", "region IN ('DE','FR')",
+                                        "steps", List.of(step("sink", new LinkedHashMap<>(Map.of(
+                                                "database", "/data/emea", "format", "PARQUET")))))),
+                                "other", new LinkedHashMap<>(Map.of(
+                                        "default", true,
+                                        "steps", List.of(step("sink", new LinkedHashMap<>(Map.of(
+                                                "database", "/data/other", "format", "PARQUET")))))))))))));
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> route = (Map<String, Object>) out.get("route");
+        assertEquals("case", route.get("mode"));
+        List<Map<String, Object>> branches = (List<Map<String, Object>>) route.get("branches");
+        assertEquals(2, branches.size());
+        Map<String, Object> emea = branches.stream()
+                .filter(b -> "emea".equals(b.get("key"))).findFirst().orElseThrow();
+        assertEquals("region IN ('DE','FR')", emea.get("where"));
+        assertEquals("/data/emea", emea.get("database"),
+                "the branch↔sink pairing survives into the flat file as the stamped database");
+        assertEquals("other", route.get("default"), "per-branch default: true → the top-level default key");
+        assertNotNull(out.get("sinks"), "two destinations ⇒ the plural sinks: block");
+    }
+
+    @Test
+    void aRouteBranchWithMoreThanASinkRefuses() {
+        Map<String, Object> recipe = new LinkedHashMap<>();
+        recipe.put("name", "orders");
+        recipe.put("active", false);
+        recipe.put("steps", List.of(
+                step("collect", new LinkedHashMap<>()),
+                step("parse", new LinkedHashMap<>()),
+                step("route", new LinkedHashMap<>(Map.of("branches", new LinkedHashMap<>(Map.of(
+                        "emea", new LinkedHashMap<>(Map.of("steps", List.of(
+                                step("transform", new LinkedHashMap<>(Map.of("filter", "x > 0"))),
+                                step("sink", new LinkedHashMap<>())))))))))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r ->
+                RecipeCompiler.UNSUPPORTED_STEP.equals(r.code()) && r.nodeId().contains("emea")),
+                e.getMessage());
+    }
+
+    @Test
+    void stepsAfterRouteRefuse() {
+        Map<String, Object> recipe = new LinkedHashMap<>();
+        recipe.put("name", "orders");
+        recipe.put("active", false);
+        recipe.put("steps", List.of(
+                step("collect", new LinkedHashMap<>()),
+                step("route", new LinkedHashMap<>(Map.of("branches", new LinkedHashMap<>(Map.of(
+                        "a", new LinkedHashMap<>(Map.of("steps", List.of(step("sink", new LinkedHashMap<>()))))))))),
+                step("sink", new LinkedHashMap<>())));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r -> r.message().contains("route ends the trunk")),
+                e.getMessage());
     }
 
     @Test

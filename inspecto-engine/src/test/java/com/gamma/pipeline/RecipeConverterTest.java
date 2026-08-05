@@ -64,6 +64,35 @@ class RecipeConverterTest {
                         + String.join("\n", failures));
     }
 
+    /** The new sections (route/dedup lowering) round-trip like every fixture: convert → compile-over-original. */
+    @Test
+    void aConfigWithDedupAndRouteRoundTrips() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "orders");
+        cfg.put("active", false);   // route: is authoring-only — an armed config could never exist on disk
+        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/data/emea")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of(
+                "file_pattern", "glob:**/*.csv",
+                "dedup", new LinkedHashMap<>(Map.of(
+                        "keys", List.of("ORDER_ID"), "order_by", "EVENT_TS DESC")))));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+        cfg.put("route", new LinkedHashMap<>(Map.of(
+                "mode", "case",
+                "branches", List.of(
+                        new LinkedHashMap<>(Map.of("key", "emea",
+                                "where", "region IN ('DE','FR')", "database", "/data/emea")),
+                        new LinkedHashMap<>(Map.of("key", "other", "database", "/data/other"))),
+                "default", "other")));
+        cfg.put("sinks", List.of(
+                new LinkedHashMap<>(Map.of("database", "/data/emea", "format", "PARQUET")),
+                new LinkedHashMap<>(Map.of("database", "/data/other", "format", "PARQUET"))));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+        Map<String, Object> back = RecipeCompiler.compile(recipe, cfg, false);
+        assertEquals(cfg, back);
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void projectsTheLinearVocabulary() {

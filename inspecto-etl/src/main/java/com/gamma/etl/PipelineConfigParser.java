@@ -212,6 +212,25 @@ final class PipelineConfigParser {
             b.retentionDays         = toInt(dup.getOrDefault("retention_days", 90));
         }
 
+        // ── record-grain dedup (ELT amendment §2.4 — the dedup STEP, not file dedup) ──
+        Map<String, Object> recDedup = (Map<String, Object>) proc.get("dedup");
+        if (recDedup != null) {
+            List<String> keys = new ArrayList<>();
+            if (recDedup.get("keys") instanceof List<?> ks)
+                for (Object k : ks) keys.add(String.valueOf(k));
+            b.dedup = new PipelineConfig.Dedup(keys, blankToNull(recDedup.get("order_by")));
+        }
+
+        // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──
+        // The linear batch path cannot execute a branch tree, so arming is refused in prepare():
+        // an active pipeline with route: fails fast rather than silently landing every row in the
+        // primary sink (the same fail-safe posture as the schema-less draft rule).
+        if (raw.get("route") instanceof Map<?, ?> routeBlock) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : routeBlock.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
+            b.route = copy;
+        }
+
         // ── csv settings (inline csv_settings and/or external grammar file) ─────
         // The delimited parse grammar may live inline under processing.csv_settings, in a separate
         // reusable file referenced by processing.grammar, or both (inline keys win). resolveGrammar
@@ -450,6 +469,15 @@ final class PipelineConfigParser {
             }
             b.reference = new Reference(key, load, refreshSeconds);
         }
+
+        // record-dedup keys are target (mapped) column names — validate like reference.key, here where
+        // declaredColumns has been accumulated from every resolved schema.
+        if (b.dedup != null && !declaredColumns.isEmpty())
+            for (String k : b.dedup.keys())
+                if (!declaredColumns.contains(k))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": processing.dedup key column '" + k + "' is not declared in the pipeline schema "
+                            + declaredColumns);
 
         // ── source / connector (additive; absent ⇒ implicit LOCAL reading dirs.poll) ──────────────
         // A pipeline with no `source:` block scans the local poll dir exactly as before: the single

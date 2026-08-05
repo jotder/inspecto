@@ -112,10 +112,18 @@ interface BatchIngestStrategy {
         // `load: replace` (the default) is untouched — plain overwrite. (Refused with sinks:>1 at prepare().)
         String writeTable = table;
         String writeBase  = baseName;
+
+        // Record-grain dedup (processing.dedup — the dedup STEP, ELT amendment §2.4): one winner per
+        // business key via ROW_NUMBER, applied to the transformed rows BEFORE reference versioning
+        // (versioning a duplicate would mint a spurious version) and before the partitioned write.
+        if (cfg.dedup() != null)
+            writeTable = applyRecordDedup(conn, writeTable, cfg.dedup(), batchId);
+
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
-            writeTable = "__ref_versioned";
-            stampReferenceVersions(conn, table, writeTable, cfg.reference().key(), batchId,
+            String versioned = "__ref_versioned";
+            stampReferenceVersions(conn, writeTable, versioned, cfg.reference().key(), batchId,
                     existingStoreReader(dbDir, cfg.output().format()));
+            writeTable = versioned;
             writeBase = baseName + "__v_" + batchId;   // batch-unique ⇒ append, never overwrite
         }
 
@@ -134,6 +142,36 @@ interface BatchIngestStrategy {
             lineage.addAll(LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols));
         }
         return new Written(outputs, lineage);
+    }
+
+    /**
+     * Materialise {@code __dedup} from {@code src} keeping one row per {@code processing.dedup} business
+     * key ({@code ROW_NUMBER() OVER (PARTITION BY keys [ORDER BY order_by]) = 1} — no {@code order_by}
+     * means the winner is arbitrary). Duplicates are counted and logged with the batch id; landing them
+     * in quarantine as a browsable reject stream is the Phase-4 Guarantee work, not silently done here.
+     */
+    static String applyRecordDedup(Connection conn, String src, PipelineConfig.Dedup dedup,
+                                   String batchId) throws SQLException {
+        String dst = "__dedup";
+        StringBuilder part = new StringBuilder();
+        for (String k : dedup.keys()) {
+            if (part.length() > 0) part.append(", ");
+            part.append('"').append(k).append('"');
+        }
+        String window = "PARTITION BY " + part
+                + (dedup.orderBy() != null && !dedup.orderBy().isBlank() ? " ORDER BY " + dedup.orderBy() : "");
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE OR REPLACE TABLE \"" + dst + "\" AS SELECT * FROM \"" + src
+                    + "\" QUALIFY ROW_NUMBER() OVER (" + window + ") = 1");
+            try (var rs = st.executeQuery("SELECT (SELECT COUNT(*) FROM \"" + src + "\") - COUNT(*) FROM \""
+                    + dst + "\"")) {
+                long dupes = rs.next() ? rs.getLong(1) : 0;
+                if (dupes > 0)
+                    org.slf4j.LoggerFactory.getLogger(BatchIngestStrategy.class).info(
+                            "[DEDUP] [{}] {} duplicate record(s) dropped by key {}", batchId, dupes, dedup.keys());
+            }
+        }
+        return dst;
     }
 
     /** The reference system columns a versioned store carries (§2.1) — never part of the payload hash. */

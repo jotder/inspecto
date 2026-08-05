@@ -653,9 +653,27 @@ watch, dirs.errors…), so the converter never widens the recipe vocabulary to s
 asserts `compile(toRecipe(cfg), cfg, false)` == original. Two compiler amendments ridden in:
 parse carries parser-owned processing keys on the node (not inside `parsing:`), and the
 converter's sink step carries the sink-owned write-tuning keys (`threads`, `duckdb_threads`,
-`batch_max_*`) — the gate caught both as real drops. Phase 2 remaining: `route` lowering,
-`dedup` (QUALIFY) lowering, wiring TypeFlow into save/dry-run + the `/pipelines/{id}` recipe
-route — queued behind the operator's next call (UI S1–S3 are unblocked in parallel).
+`batch_max_*`) — the gate caught both as real drops.
+
+**P2 S5 SHIPPED 2026-08-06** — `route` + `dedup` (QUALIFY) lowering, closing Phase 2's two
+remaining verbs. `dedup` shipped as full lowering **and** real execution in the same slice
+(avoiding the W1 dead-config trap): new `BuiltinNodeType.TRANSFORM_DEDUP` node kind; flat home
+`processing.dedup {keys[], order_by}` (keys validated against `declaredColumns`, same posture as
+`reference.key`); `BatchIngestStrategy.writeAndTrace` runs a `QUALIFY ROW_NUMBER() OVER (PARTITION
+BY <keys> [ORDER BY order_by]) = 1` between transform materialisation and reference-versioning/the
+partitioned write, logging dropped-duplicate counts. `route` shipped as lowering/round-trip **only**
+with a fail-closed arming gate: `PipelineConfig.prepare()` throws for an `active` pipeline carrying
+`route:` (`BatchGraphRunner`, the only thing that could execute a branch tree, has no production
+call site — grounded, not assumed), same posture as the schema-less-draft rule. The `route:` block
+is carried verbatim (RowShaper shape: `mode`, `branches:[{key, where?, database}]`, top-level
+`default:`); branch↔sink pairing survives the flat file (which has no edges) by stamping each
+branch's `database` at lower time and re-deriving `route:<key>` edges at lift time from a matching
+sink's `database`. `RecipeCompiler` compiles both verbs (`route` v1: each branch's steps = exactly
+one `sink` step, `route` ends the trunk per §2.6, `keep:` other than `first` refused — `order_by`
+picks the winner); `RecipeConverter` projects both back losslessly. **Phase 2 is now fully closed**;
+remaining pre-Phase-3 loose ends — TypeFlow save/dry-run wiring and the `/pipelines/{id}` recipe
+route — are UI-adjacent plumbing, not compiler/lowering work, and ride the UI plan (S1–S3 unblocked
+in parallel).
 
 ---
 

@@ -44,6 +44,8 @@ public final class PipelineEditable {
     private static final Set<String> LOWERABLE = Set.of(
             BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(), BuiltinNodeType.GAP.type(),
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
+            BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
+            BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
@@ -208,6 +210,7 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
+        PipelineNode recordDedup = null, routeNode = null;
         PipelineNode primarySink = null, quarantineSink = null;
         List<PipelineNode> filters = new ArrayList<>();
         // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
@@ -224,6 +227,8 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
+            else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) recordDedup = n;
+            else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) routeNode = n;
             else if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(t)) filters.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
@@ -282,6 +287,24 @@ public final class PipelineEditable {
             replaceOrRemove(processing, "file_pattern", acq.cfg("file_pattern"));
         }
         overlayOwned(collector, "gap_detection", gap == null ? null : gapSection(gap), strict);
+
+        // record-grain dedup → processing.dedup ({keys, order_by} — the QUALIFY the engine applies)
+        if (recordDedup != null) {
+            Map<String, Object> dd = new LinkedHashMap<>();
+            putIfPresent(dd, "keys", recordDedup.cfg("keys"));
+            putIfPresent(dd, "order_by", recordDedup.cfg("order_by"));
+            processing.put("dedup", dd);
+        } else if (strict) {
+            processing.remove("dedup");
+        }
+
+        // route: block — node config verbatim, each branch stamped with the destination database its
+        // route:<key> edge feeds, so the flat file (which has no edges) keeps the branch↔sink pairing.
+        if (routeNode != null) {
+            out.put("route", routeSection(g, routeNode));
+        } else if (strict) {
+            out.remove("route");
+        }
 
         if (marker != null) {
             Map<String, Object> dc = new LinkedHashMap<>();
@@ -357,6 +380,31 @@ public final class PipelineEditable {
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * The {@code route:} section for {@code routeNode}: its config deep-copied, with each branch entry's
+     * {@code database} stamped from the sink its {@code route:<key>} edge feeds (edges don't survive the
+     * flat file, the stamped database is what {@code PipelineLift} pairs branches back with).
+     */
+    private static Map<String, Object> routeSection(PipelineGraph g, PipelineNode routeNode) {
+        Map<String, Object> rc = deepCopy(routeNode.config());
+        if (!(rc.get("branches") instanceof List<?> branches)) return rc;
+        Map<String, PipelineNode> byId = new LinkedHashMap<>();
+        for (PipelineNode n : g.nodes()) byId.put(n.id(), n);
+        for (PipelineEdge e : g.edges()) {
+            if (!e.from().equals(routeNode.id()) || !PipelineRel.isRoute(e.rel())) continue;
+            String key = PipelineRel.routeKey(e.rel());
+            PipelineNode sink = byId.get(e.to());
+            if (sink == null || sink.cfg("database") == null) continue;
+            for (Object b : branches)
+                if (b instanceof Map<?, ?> m && key.equals(String.valueOf(m.get("key")))) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> mm = (Map<String, Object>) m;
+                    mm.put("database", sink.cfg("database"));
+                }
+        }
+        return rc;
+    }
 
     /** Legacy files may spell the block {@code source:}; write back whichever key the file uses. */
     private static String collectorKey(Map<String, Object> raw) {

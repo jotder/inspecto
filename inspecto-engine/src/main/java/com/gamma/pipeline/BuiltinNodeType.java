@@ -56,6 +56,12 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_DEDUP_MARKER("transform.dedup.marker", NodeCategory.TRANSFORM, "Dedup (marker)",
             "File-level dedup via marker files (MarkerManager) — a distinct subsystem (G2).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false),
+    // Record-grain dedup (ELT amendment §2.4: business-key dedup IS a Step, unlike file dedup).
+    // RowShaper already executed the "transform.dedup" type string ad hoc; this constant makes it a
+    // declared kind so it can join LOWERABLE (flat home: processing.dedup {keys, order_by}).
+    TRANSFORM_DEDUP("transform.dedup", NodeCategory.TRANSFORM, "Dedup (record)",
+            "Record-grain dedup by business key (QUALIFY); duplicates are a counted reject stream.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.DUPLICATE), false),
     // transform.dedup.fingerprint was REMOVED 2026-08-04: content-fingerprint dedup executes inside
     // the CollectorProcessor poll cycle (ledgerFilter reads collector.duplicate), so the separate
     // node had no runtime of its own — the policy is authored on the acquisition node now.

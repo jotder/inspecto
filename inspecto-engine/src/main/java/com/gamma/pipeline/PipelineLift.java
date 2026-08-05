@@ -184,6 +184,33 @@ public final class PipelineLift {
         nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_MAP.type(), mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));
 
+        // Record-grain dedup (processing.dedup) sits between map and the sink(s) — exactly where the
+        // engine applies its QUALIFY (BatchIngestStrategy.writeAndTrace, before the partitioned write).
+        String sinkUpstream = mapId;
+        if (cfg.dedup() != null) {
+            String dedupId = "dedup" + suffix;
+            Map<String, Object> dc = new LinkedHashMap<>();
+            dc.put("keys", cfg.dedup().keys());
+            put(dc, "order_by", cfg.dedup().orderBy());
+            nodes.add(new PipelineNode(dedupId, BuiltinNodeType.TRANSFORM_DEDUP.type(),
+                    "Dedup (record)", null, dc, null));
+            edges.add(PipelineEdge.data(mapId, dedupId));
+            sinkUpstream = dedupId;
+        }
+
+        // An authored route: block lifts as a transform.route node whose route:<key> edges feed the
+        // sinks — branch↔sink pairing is by the branch's declared destination database. Authoring-only
+        // for now (prepare() refuses arming), so this exists for the editor/recipe round-trip.
+        String routeId = null;
+        Map<String, Object> routeCfg = cfg.routeConfig();
+        if (routeCfg != null) {
+            routeId = "route" + suffix;
+            nodes.add(new PipelineNode(routeId, BuiltinNodeType.TRANSFORM_ROUTE.type(),
+                    "Route", null, routeCfg, null));
+            edges.add(PipelineEdge.data(sinkUpstream, routeId));
+            sinkUpstream = routeId;
+        }
+
         // The declared data-store this sink produces — the join key a downstream job/enrichment matches
         // its source store against, so the topology superimposes from config/metadata (see PipelineStores).
         // Legacy pipelines only ever write a resting store, so the lift always emits sink.persistent;
@@ -201,8 +228,21 @@ public final class PipelineLift {
             if (schema != null) sinkCfg.put("schema", schema);   // partitions derived from it at compile-back
             // The sink's display name is the store it produces — typically a business object/concept (§3.1).
             nodes.add(new PipelineNode(sinkId, BuiltinNodeType.SINK_PERSISTENT.type(), store, "Persistent store", sinkCfg, null));
-            edges.add(PipelineEdge.data(mapId, sinkId));
+            String branchKey = routeId == null ? null : branchKeyForDatabase(routeCfg, sinks.get(d).database());
+            edges.add(branchKey != null
+                    ? new PipelineEdge(routeId, PipelineRel.route(branchKey), sinkId)
+                    : PipelineEdge.data(sinkUpstream, sinkId));
         }
+    }
+
+    /** The route branch key whose declared {@code database} matches {@code database}, or {@code null}. */
+    private static String branchKeyForDatabase(Map<String, Object> routeCfg, String database) {
+        if (routeCfg == null || database == null || !(routeCfg.get("branches") instanceof List<?> branches))
+            return null;
+        for (Object b : branches)
+            if (b instanceof Map<?, ?> m && database.equals(m.get("database")) && m.get("key") != null)
+                return String.valueOf(m.get("key"));
+        return null;
     }
 
     private static void addQuarantine(List<PipelineNode> nodes, List<PipelineEdge> edges, PipelineConfig cfg) {

@@ -84,10 +84,19 @@ public final class RecipeConverter {
         // ── transform ──
         if (where != null) steps.add(step("transform", new LinkedHashMap<>(Map.of("filter", where))));
 
-        // ── sink(s) ── First step = the output:/dirs shorthand (it carries backup/temp, which the plural
-        // entries never do). A plural sinks: block adds one step per FURTHER destination — the shorthand
-        // is "consistent with the first destination" by the lowering contract, so re-lowering rebuilds
-        // the same sinks: list from the distinct databases.
+        // ── dedup ── (record-grain: processing.dedup — between the transform and the sink, where the
+        // engine applies its QUALIFY)
+        if (processing.get("dedup") instanceof Map<?, ?> dd) {
+            Map<String, Object> dedup = new LinkedHashMap<>();
+            putIfPresent(dedup, "key", dd.get("keys"));
+            putIfPresent(dedup, "order_by", dd.get("order_by"));
+            steps.add(step("dedup", dedup));
+        }
+
+        // ── sink(s) / route ── The output:/dirs shorthand is the first destination (it carries
+        // backup/temp + the sink-owned write tuning, which plural entries never do); further sinks:
+        // entries follow. With a route: block, every destination lives INSIDE its branch instead —
+        // the trunk ends at route (§2.6).
         Map<String, Object> sink = new LinkedHashMap<>();
         putIfPresent(sink, "format", output.get("format"));
         putIfPresent(sink, "compression", output.get("compression"));
@@ -99,18 +108,60 @@ public final class RecipeConverter {
         // lowering, so the projection must carry them or a round trip deletes them.
         for (String k : new String[]{"threads", "duckdb_threads", "batch_max_files", "batch_max_bytes"})
             putIfPresent(sink, k, processing.get(k));
-        steps.add(step("sink", sink));
+
+        List<Map<String, Object>> extraSinks = new ArrayList<>();
         if (config.get("sinks") instanceof List<?> sinks) {
             for (Object s : sinks)
                 if (s instanceof Map<?, ?> m && !String.valueOf(m.get("database")).equals(dirs.get("database"))) {
                     Map<String, Object> extra = new LinkedHashMap<>();
                     for (Map.Entry<?, ?> e : m.entrySet()) extra.put(String.valueOf(e.getKey()), e.getValue());
-                    steps.add(step("sink", extra));
+                    extraSinks.add(extra);
                 }
+        }
+
+        if (config.get("route") instanceof Map<?, ?> routeBlock) {
+            steps.add(step("route", routeStep(routeBlock, sink, extraSinks, dirs)));
+        } else {
+            steps.add(step("sink", sink));
+            for (Map<String, Object> extra : extraSinks) steps.add(step("sink", extra));
         }
 
         recipe.put("steps", steps);
         return recipe;
+    }
+
+    /**
+     * The recipe {@code route:} step for a flat {@code route:} block: named branches with {@code when}/
+     * {@code default} and one sink step each — the branch whose {@code database} is the shorthand
+     * destination gets the full shorthand sink config; others get their {@code sinks:} entry.
+     */
+    private static Map<String, Object> routeStep(Map<?, ?> routeBlock, Map<String, Object> shorthandSink,
+                                                 List<Map<String, Object>> extraSinks,
+                                                 Map<String, Object> dirs) {
+        Map<String, Object> route = new LinkedHashMap<>();
+        putIfPresent(route, "mode", routeBlock.get("mode"));
+        Object defaultKey = routeBlock.get("default");
+        Map<String, Object> branches = new LinkedHashMap<>();
+        if (routeBlock.get("branches") instanceof List<?> list) {
+            for (Object b : list) {
+                if (!(b instanceof Map<?, ?> m) || m.get("key") == null) continue;
+                String key = String.valueOf(m.get("key"));
+                Map<String, Object> branch = new LinkedHashMap<>();
+                putIfPresent(branch, "when", m.get("where"));
+                if (key.equals(defaultKey)) branch.put("default", true);
+                Object db = m.get("database");
+                Map<String, Object> branchSink = null;
+                if (db != null && db.equals(dirs.get("database"))) branchSink = shorthandSink;
+                else if (db != null)
+                    for (Map<String, Object> extra : extraSinks)
+                        if (db.equals(extra.get("database"))) branchSink = extra;
+                branch.put("steps", List.of(step("sink",
+                        branchSink != null ? branchSink : new LinkedHashMap<>())));
+                branches.put(key, branch);
+            }
+        }
+        route.put("branches", branches);
+        return route;
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────

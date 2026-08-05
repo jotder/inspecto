@@ -89,6 +89,12 @@ class NodeConfigNameContractTest {
                 new Contract("acquisition", "duplicate__on_change", "duplicate.on_change",
                         "skip", c -> c.collector().duplicate().onChange(), "skip"),
 
+                // ── transform.dedup — the record-grain dedup Step (ELT amendment P2 lowering) ────
+                new Contract("transform.dedup", "keys", "keys", List.of("EVENT_DATE"),
+                        c -> c.dedup().keys(), List.of("EVENT_DATE")),
+                new Contract("transform.dedup", "order_by", "order_by", "EVENT_DATE DESC",
+                        c -> c.dedup().orderBy(), "EVENT_DATE DESC"),
+
                 // ── sink.persistent — the destination + the shared OUTPUT_ATTRIBUTES table ──────
                 // `database` is the key `lower` hard-requires on the primary sink (NO_PERSISTENT_SINK);
                 // it lowers onto `dirs.database`, which is where the engine reads the write root.
@@ -189,9 +195,48 @@ class NodeConfigNameContractTest {
         // in the poll cycle), so a stale graph still carrying one is refused rather than half-honoured.
         assertFalse(PipelineEditable.isLowerable("transform.dedup.fingerprint"));
 
-        for (String authoredOnly : List.of("transform.route", "sink.materialized", "sink.view"))
+        // transform.route and transform.dedup became lowerable in the ELT amendment P2 route/dedup
+        // slice; dedup's keys joined contracts(), route's contract is the draft-path test below
+        // (arming a route: pipeline is refused at prepare(), so it cannot ride saveThrough's load).
+        assertTrue(PipelineEditable.isLowerable("transform.route"));
+        assertTrue(PipelineEditable.isLowerable("transform.dedup"));
+
+        for (String authoredOnly : List.of("sink.materialized", "sink.view"))
             assertFalse(PipelineEditable.isLowerable(authoredOnly),
                     authoredOnly + " became lowerable — its declared attributes now need a contract entry");
+    }
+
+    /**
+     * The route node's draft-path contract: {@code route:} survives lift → edit → lenient lower →
+     * re-decode, with each branch stamped with its destination database. Uses {@code fromMap} (no
+     * {@code prepare()}) because arming a {@code route:} pipeline is deliberately refused.
+     */
+    @Test
+    void routeAttributesSurviveTheDraftSavePath(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("active", Boolean.FALSE);
+        raw.put("route", new LinkedHashMap<>(Map.of(
+                "mode", "case",
+                "branches", List.of(new LinkedHashMap<>(Map.of("key", "emea", "where", "ID LIKE 'E%'"))))));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.route".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            c.put("mode", "clone");
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        PipelineConfig reparsed = PipelineConfig.fromMap(lowered);
+        assertNotNull(reparsed.routeConfig());
+        assertEquals("clone", reparsed.routeConfig().get("mode"),
+                "a route edit typed in the editor must survive the draft save");
     }
 
     // ── the editor's real save path ────────────────────────────────────────────────
@@ -299,6 +344,9 @@ class NodeConfigNameContractTest {
                 processing:
                   threads: 2
                   schema_file: %2$s
+                  dedup:
+                    keys[1]: ID
+                    order_by: ID
                   csv_settings:
                     delimiter: ","
                     include_regex[1]: "^A"

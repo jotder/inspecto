@@ -68,9 +68,12 @@ public final class RecipeCompiler {
                     "the guarantees: fold lands in Phase 4 — remove the block for now"));
 
         List<PipelineNode> nodes = new ArrayList<>();
+        List<PipelineNode> branchSinks = new ArrayList<>();
+        List<PipelineEdge> routeEdges = new ArrayList<>();
         PipelineNode parser = null;
         Map<String, Object> mapStep = null;
         String mapStepId = null;
+        boolean routeSeen = false;
 
         int i = 0;
         for (Object rawStep : steps(recipe, refusals)) {
@@ -85,6 +88,11 @@ public final class RecipeCompiler {
             Map<String, Object> cfg = configOf(e.getValue());
             String id = verb + "-" + i;
 
+            if (routeSeen) {
+                refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                        "route ends the trunk (§2.6) — steps after it belong inside its branches"));
+                continue;
+            }
             switch (verb) {
                 case "collect" -> nodes.add(collect(id, cfg, recipe.get("trigger")));
                 case "parse" -> {
@@ -97,10 +105,11 @@ public final class RecipeCompiler {
                 }
                 case "transform" -> transform(id, cfg, nodes, refusals);
                 case "sink" -> nodes.add(sink(id, cfg));
-                case "dedup" -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
-                        "the record-grain dedup Step is not lowerable yet (its QUALIFY compile target lands after S3)"));
-                case "route" -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
-                        "route compiles once a lowerable route node exists — author branching on the canvas for now"));
+                case "dedup" -> nodes.add(dedup(id, cfg, refusals));
+                case "route" -> {
+                    route(id, cfg, nodes, branchSinks, routeEdges, refusals);
+                    routeSeen = true;
+                }
                 case "summarize" -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
                         "summarize is Phase 3's verb (table-entry collect + Signal bus)"));
                 default -> refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
@@ -130,6 +139,8 @@ public final class RecipeCompiler {
         List<PipelineEdge> edges = new ArrayList<>();
         for (int n = 1; n < nodes.size(); n++)
             edges.add(new PipelineEdge(nodes.get(n - 1).id(), "out", nodes.get(n).id()));
+        nodes.addAll(branchSinks);
+        edges.addAll(routeEdges);
 
         return PipelineEditable.lower(new PipelineGraph(name, active, nodes, edges), existing, strict);
     }
@@ -185,6 +196,79 @@ public final class RecipeCompiler {
     /** {@code sink} → persistent sink node (keys pass verbatim: table/format/compression/database/…). */
     private static PipelineNode sink(String id, Map<String, Object> cfg) {
         return PipelineNode.of(id, BuiltinNodeType.SINK_PERSISTENT.type(), new LinkedHashMap<>(cfg));
+    }
+
+    /** {@code dedup: {key: […], order_by: …}} → the record-grain dedup node ({@code processing.dedup}).
+     *  {@code keep:} other than {@code first} is refused — the winner is {@code order_by}'s job. */
+    private static PipelineNode dedup(String id, Map<String, Object> cfg,
+                                      List<PipelineCompileException.Refusal> refusals) {
+        Map<String, Object> c = new LinkedHashMap<>(cfg);
+        Object keys = c.remove("key");
+        if (keys == null) keys = c.remove("keys");
+        Object keep = c.remove("keep");
+        if (keep != null && !"first".equalsIgnoreCase(String.valueOf(keep)))
+            refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
+                    "dedup keep: '" + keep + "' — only 'first' compiles; pick the winner with order_by"));
+        Object orderBy = c.remove("order_by");
+        if (keys == null)
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "dedup needs a key: […] list (the business-key columns)"));
+        for (String other : c.keySet())
+            refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
+                    "dedup does not understand '" + other + "' (only key / keep / order_by)"));
+        Map<String, Object> node = new LinkedHashMap<>();
+        if (keys != null) node.put("keys", keys);
+        if (orderBy != null) node.put("order_by", orderBy);
+        return PipelineNode.of(id, BuiltinNodeType.TRANSFORM_DEDUP.type(), node);
+    }
+
+    /**
+     * {@code route:} — the one user-visible branching construct (§2.6). Named branches, each a linear
+     * sub-chain; <b>v1 restriction:</b> a branch's steps must be exactly one {@code sink} (mid-branch
+     * transforms land with the branch-aware executor). Compiles to a {@code transform.route} node
+     * (RowShaper's shape: {@code mode} / {@code branches:[{key,where}]} / top-level {@code default})
+     * plus one sink node per branch fed by a {@code route:<key>} edge. Arming stays gated:
+     * {@code PipelineConfig.prepare()} refuses an active pipeline carrying {@code route:}.
+     */
+    private static void route(String id, Map<String, Object> cfg, List<PipelineNode> nodes,
+                              List<PipelineNode> branchSinks, List<PipelineEdge> routeEdges,
+                              List<PipelineCompileException.Refusal> refusals) {
+        String mode = cfg.get("mode") == null ? "case" : String.valueOf(cfg.get("mode"));
+        if (!(cfg.get("branches") instanceof Map<?, ?> branches) || branches.isEmpty()) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "route needs a non-empty branches: map of named branches"));
+            return;
+        }
+        List<Map<String, Object>> entries = new ArrayList<>();
+        String defaultKey = null;
+        for (Map.Entry<?, ?> br : branches.entrySet()) {
+            String key = String.valueOf(br.getKey());
+            Map<String, Object> bc = configOf(br.getValue());
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("key", key);
+            if (bc.get("when") != null) entry.put("where", bc.get("when"));
+            if (Boolean.TRUE.equals(bc.get("default"))) defaultKey = key;
+            entries.add(entry);
+
+            Object steps = bc.get("steps");
+            if (!(steps instanceof List<?> l) || l.size() != 1
+                    || !(l.get(0) instanceof Map<?, ?> s) || s.size() != 1
+                    || !"sink".equals(String.valueOf(s.entrySet().iterator().next().getKey()))) {
+                refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id + ":" + key,
+                        "a route branch compiles as exactly one sink step for now — "
+                                + "mid-branch transforms land with the branch-aware executor"));
+                continue;
+            }
+            Map<String, Object> sinkCfg = configOf(((Map<?, ?>) l.get(0)).values().iterator().next());
+            PipelineNode sinkNode = sink("sink-" + key, sinkCfg);
+            branchSinks.add(sinkNode);
+            routeEdges.add(new PipelineEdge(id, PipelineRel.route(key), sinkNode.id()));
+        }
+        Map<String, Object> node = new LinkedHashMap<>();
+        node.put("mode", mode);
+        node.put("branches", entries);
+        if (defaultKey != null) node.put("default", defaultKey);
+        nodes.add(PipelineNode.of(id, BuiltinNodeType.TRANSFORM_ROUTE.type(), node));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────

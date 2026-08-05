@@ -94,12 +94,16 @@ former root reference docs** (each index lists them):
   the gate seam is `ConfigRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
   fixture count was wrong). Phase 1 slices 1–3 SHIPPED 2026-08-05: sibling `_mapping.csv` dual-read;
   split-write + BACKWARD compatibility gate at `ConfigRoutes`; `schema`/`mapping` component kinds
-  with `schema/<id>` + `mapping_file` execution wiring. **Phase 2 S1–S4 SHIPPED 2026-08-05**:
-  schema fingerprint pinned per Consignment (manifest + `consignment_outputs`); per-Step type flow
-  (`TypeFlow` DESCRIBE-derived output schemas, footer-parity gate green); `RecipeCompiler` (linear
-  verbs onto `PipelineEditable.lower`); `RecipeConverter` + fixture round-trip parity over the whole
-  repo corpus. Phase 2 remaining: `route`/`dedup` lowering, TypeFlow save/dry-run wiring, the recipe
-  API route. Next: those, Phase 3 (table-entry collect + summarize), or UI slices S1–S3 (unblocked).
+  with `schema/<id>` + `mapping_file` execution wiring. **Phase 2 S1–S5 SHIPPED (S1-S4 2026-08-05,
+  S5 2026-08-06) — Phase 2 fully closed**: schema fingerprint pinned per Consignment (manifest +
+  `consignment_outputs`); per-Step type flow (`TypeFlow` DESCRIBE-derived output schemas,
+  footer-parity gate green); `RecipeCompiler` (linear verbs onto `PipelineEditable.lower`);
+  `RecipeConverter` + fixture round-trip parity over the whole repo corpus; **S5**: `route` +
+  `dedup` (QUALIFY) lowering — `dedup` ships with real execution at the `writeAndTrace` seam,
+  `route` is lowering-only behind a fail-closed `prepare()` arming gate (no production call site
+  yet for the branch-aware executor). Remaining pre-Phase-3 loose ends (TypeFlow save/dry-run
+  wiring, the recipe API route) are UI-adjacent plumbing, not compiler work. Next: Phase 3
+  (table-entry collect + summarize), or UI slices S1–S3 (unblocked).
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:

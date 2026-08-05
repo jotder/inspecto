@@ -621,6 +621,24 @@ public final class PipelineConfig {
         public boolean refreshEnabled() { return refreshSeconds > 0; }
     }
 
+    /**
+     * Record-grain dedup ({@code processing.dedup}, ELT amendment §2.4: business-key dedup is a
+     * <b>Step</b>, unlike file dedup which is a Guarantee). Compiles to a {@code ROW_NUMBER() OVER
+     * (PARTITION BY keys ORDER BY orderBy)} QUALIFY between transform materialisation and the
+     * partition write — the winner per key survives, duplicates are counted.
+     *
+     * @param keys    the business-key columns (target/mapped names); never empty
+     * @param orderBy optional SQL order deciding the winner per key (blank ⇒ arbitrary/first seen)
+     */
+    @PublicApi(since = "5.5.0")
+    public record Dedup(List<String> keys, String orderBy) {
+        public Dedup {
+            if (keys == null || keys.isEmpty())
+                throw new IllegalArgumentException("processing.dedup needs a non-empty keys[] list");
+            keys = List.copyOf(keys);
+        }
+    }
+
     // ── grouped state + accessors ──────────────────────────────────────────────
 
     private final Identity   identity;
@@ -689,6 +707,12 @@ public final class PipelineConfig {
      */
     private final Map<String, Object> trigger;
 
+    /** Record-grain dedup ({@code processing.dedup}); {@code null} when absent. */
+    private final Dedup dedup;
+
+    /** The {@code route:} block verbatim; {@code null} when absent. See {@link #routeConfig()}. */
+    private final Map<String, Object> route;
+
     /**
      * Other config files this pipeline read at parse time (schema / grammar / segment {@code .toon}s),
      * as given in the file (not absolutised). Used by {@link com.gamma.service.ConfigRegistry} to detect
@@ -741,6 +765,14 @@ public final class PipelineConfig {
     public String          stream()     { return stream; }
     /** The raw entry-node {@code trigger:} block (T13), or {@code null} when absent (⇒ default poll). */
     public Map<String, Object> triggerConfig() { return trigger; }
+    /** Record-grain dedup ({@code processing.dedup}), or {@code null} when absent. */
+    public Dedup dedup() { return dedup; }
+    /**
+     * The top-level {@code route:} block <b>verbatim</b>, or {@code null} when absent. Authoring/
+     * round-trip only for now: {@link #prepare()} refuses an {@code active} pipeline carrying it, because
+     * the linear batch path cannot execute a branch tree — arming lands with the branch-aware executor.
+     */
+    public Map<String, Object> routeConfig() { return route; }
     /** The schema/grammar/segment files this config referenced at parse time (for change-watching). */
     public List<Path>     referencedFiles() { return referencedFiles; }
 
@@ -789,6 +821,8 @@ public final class PipelineConfig {
         this.reference = b.reference;
         this.stream = b.stream;
         this.trigger = b.trigger;
+        this.dedup = b.dedup;
+        this.route = b.route;
         this.referencedFiles = List.copyOf(b.referencedFiles);
     }
 
@@ -834,6 +868,8 @@ public final class PipelineConfig {
         this.reference = src.reference;
         this.stream = src.stream;
         this.trigger = src.trigger;
+        this.dedup = src.dedup;
+        this.route = src.route;
         this.referencedFiles = src.referencedFiles;
     }
 
@@ -925,6 +961,15 @@ public final class PipelineConfig {
                             + "combining it with multiple sinks: destinations is not supported "
                             + "(see docs/superpower/sinks-config-format-plan.md)");
         }
+        // route: is representable/round-trippable (lift/lower/recipe) but the linear batch path cannot
+        // execute a branch tree — running it would silently land every row in the primary sink. Same
+        // fail-safe posture as the schema-less draft rule: author freely, arming refused until the
+        // branch-aware executor is wired into the ingest path (BatchGraphRunner has no production caller).
+        if (active && route != null) {
+            throw new IllegalStateException(
+                    "route: is authoring-only until the branch-aware executor lands — "
+                            + "keep the pipeline inactive (active: false) or remove the route: block");
+        }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));
         }
@@ -942,6 +987,8 @@ public final class PipelineConfig {
         Reference reference  = Reference.DEFAULT;  // `reference:` block; full-replace/no-key when absent
         String   stream;                           // logical Catalog Stream; parser defaults it to pipelineName
         Map<String, Object> trigger = null;   // optional entry-node trigger: block (T13); null ⇒ default poll
+        Dedup dedup = null;                   // record-grain dedup (processing.dedup); null ⇒ none
+        Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline
         final List<Path> referencedFiles = new ArrayList<>();   // schema/grammar/segment files read at parse
         String pollDir       = "";
         String databaseDir   = "";
