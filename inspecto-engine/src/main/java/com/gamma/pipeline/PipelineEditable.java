@@ -47,6 +47,7 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
             BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), // group-by rollup → processing.summarize (ELT P3), authoring-only
+            BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
 
@@ -211,7 +212,7 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
-        PipelineNode recordDedup = null, routeNode = null, summarizeNode = null;
+        PipelineNode recordDedup = null, routeNode = null, summarizeNode = null, joinNode = null;
         PipelineNode primarySink = null, quarantineSink = null;
         List<PipelineNode> filters = new ArrayList<>();
         // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
@@ -231,6 +232,7 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) recordDedup = n;
             else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) routeNode = n;
             else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) summarizeNode = n;
+            else if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(t)) joinNode = n;
             else if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(t)) filters.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
@@ -306,6 +308,16 @@ public final class PipelineEditable {
             out.put("route", routeSection(g, routeNode));
         } else if (strict) {
             out.remove("route");
+        }
+
+        // reference join → processing.join ({reference, on}) — authoring-only (ELT P3 S2, D-4)
+        if (joinNode != null) {
+            Map<String, Object> jn = new LinkedHashMap<>();
+            putIfPresent(jn, "reference", joinNode.cfg("reference"));
+            putIfPresent(jn, "on", joinNode.cfg("on"));
+            processing.put("join", jn);
+        } else if (strict) {
+            processing.remove("join");
         }
 
         // group-by rollup → processing.summarize ({group_by, measures}) — authoring-only (ELT P3)

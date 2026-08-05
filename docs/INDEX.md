@@ -106,9 +106,12 @@ former root reference docs** (each index lists them):
   2026-08-06**: `summarize` compiles (`transform.summarize` node, `processing.summarize
   {group_by[], measures[]}` reusing `MaterializeTask`'s measure shorthand grammar) — compile-only,
   same fail-closed `prepare()` arming posture as `route` (`MaterializeTask` stays the runtime).
-  Phase 3 remaining: S2 (enrichment verb onto `RecipeCompiler`), S3 (table-entry `collect` + Signal
-  wiring — needs a design spike, no existing partial implementation), S4 (fixture parity gate).
-  Next: those, or UI slices S1–S3 (unblocked).
+  **Phase 3 S2 SHIPPED 2026-08-06**: the reference join compiles per D-4 (`transform: {join:
+  references/x, on: k}` → `transform.join` node → `processing.join {reference, on}`) — as its own
+  node kind, NOT the companion-persisted `enrichment` node (which lower deliberately ignores);
+  compile-only, same arming posture. Phase 3 remaining: S3 (table-entry `collect` + Signal wiring —
+  needs a design spike, no existing partial implementation), S4 (fixture parity gate). Next: those,
+  or UI slices S1–S3 (unblocked).
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:

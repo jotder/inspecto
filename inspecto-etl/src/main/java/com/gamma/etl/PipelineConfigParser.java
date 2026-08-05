@@ -233,6 +233,17 @@ final class PipelineConfigParser {
             b.summarize = new PipelineConfig.Summarize(groupBy, measures);
         }
 
+        // ── join (ELT amendment D-4/Phase 3 S2 — reference join, authoring/round-trip only) ──
+        Map<String, Object> recJoin = (Map<String, Object>) proc.get("join");
+        if (recJoin != null) {
+            List<String> on = new ArrayList<>();
+            if (recJoin.get("on") instanceof List<?> os)
+                for (Object o : os) on.add(String.valueOf(o));
+            else if (recJoin.get("on") != null)
+                on.add(String.valueOf(recJoin.get("on")));   // single-key shorthand: on: k
+            b.join = new PipelineConfig.Join(blankToNull(recJoin.get("reference")), on);
+        }
+
         // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──
         // The linear batch path cannot execute a branch tree, so arming is refused in prepare():
         // an active pipeline with route: fails fast rather than silently landing every row in the
@@ -498,6 +509,14 @@ final class PipelineConfigParser {
                     throw new IllegalArgumentException("Config error in " + sourceLabel
                             + ": processing.summarize group_by column '" + k + "' is not declared in the pipeline "
                             + "schema " + declaredColumns);
+
+        // join's on keys name INPUT-side (this pipeline's) columns — same validation posture again.
+        if (b.join != null && !declaredColumns.isEmpty())
+            for (String k : b.join.on())
+                if (!declaredColumns.contains(k))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": processing.join on column '" + k + "' is not declared in the pipeline schema "
+                            + declaredColumns);
 
         // ── source / connector (additive; absent ⇒ implicit LOCAL reading dirs.poll) ──────────────
         // A pipeline with no `source:` block scans the local poll dir exactly as before: the single

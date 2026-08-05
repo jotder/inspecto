@@ -206,6 +206,11 @@ class NodeConfigNameContractTest {
         // lands), so its contract is the draft-path test below too, not contracts().
         assertTrue(PipelineEditable.isLowerable("transform.summarize"));
 
+        // transform.join (P3 S2, D-4's one-verb reference join) — same compile-only arming posture,
+        // same draft-path contract. NOT the `enrichment` node: that one stays companion-persisted
+        // (truth = *_enrich.toon) and is deliberately ignored by lower.
+        assertTrue(PipelineEditable.isLowerable("transform.join"));
+
         for (String authoredOnly : List.of("sink.materialized", "sink.view"))
             assertFalse(PipelineEditable.isLowerable(authoredOnly),
                     authoredOnly + " became lowerable — its declared attributes now need a contract entry");
@@ -277,6 +282,40 @@ class NodeConfigNameContractTest {
         assertEquals(List.of("EVENT_DATE"), reparsed.summarize().groupBy());
         assertEquals(List.of("count", "sum(AMOUNT)"), reparsed.summarize().measures(),
                 "a summarize edit typed in the editor must survive the draft save");
+    }
+
+    /**
+     * The join node's draft-path contract: {@code processing.join} survives lift → edit → lenient
+     * lower → re-decode. Same {@code fromMap} route as summarize/route — arming is refused.
+     */
+    @Test
+    void joinAttributesSurviveTheDraftSavePath(@TempDir Path dir) throws Exception {
+        Path toon = writeFixture(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("active", Boolean.FALSE);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
+        processing.put("join", new LinkedHashMap<>(Map.of(
+                "reference", "reference/region_dim", "on", List.of("ID"))));
+
+        PipelineConfig cfg = PipelineConfig.fromMap(raw);
+        PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            if (!"transform.join".equals(n.type())) { nodes.add(n); continue; }
+            Map<String, Object> c = new LinkedHashMap<>(n.config());
+            c.put("reference", "reference/customer_dim");
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+        }
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph(g.name(), g.active(), nodes, g.edges()), raw, false);
+
+        PipelineConfig reparsed = PipelineConfig.fromMap(lowered);
+        assertNotNull(reparsed.join());
+        assertEquals("reference/customer_dim", reparsed.join().reference(),
+                "a join edit typed in the editor must survive the draft save");
+        assertEquals(List.of("ID"), reparsed.join().on());
     }
 
     // ── the editor's real save path ────────────────────────────────────────────────

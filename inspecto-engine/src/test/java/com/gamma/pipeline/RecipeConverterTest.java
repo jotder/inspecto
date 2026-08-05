@@ -64,9 +64,9 @@ class RecipeConverterTest {
                         + String.join("\n", failures));
     }
 
-    /** The new sections (route/dedup/summarize lowering) round-trip like every fixture: convert → compile-over-original. */
+    /** The new sections (route/dedup/summarize/join lowering) round-trip like every fixture: convert → compile-over-original. */
     @Test
-    void aConfigWithDedupRouteAndSummarizeRoundTrips() {
+    void aConfigWithDedupRouteSummarizeAndJoinRoundTrips() {
         Map<String, Object> cfg = new LinkedHashMap<>();
         cfg.put("name", "orders");
         cfg.put("active", false);   // route: is authoring-only — an armed config could never exist on disk
@@ -76,6 +76,8 @@ class RecipeConverterTest {
                 "file_pattern", "glob:**/*.csv",
                 "dedup", new LinkedHashMap<>(Map.of(
                         "keys", List.of("ORDER_ID"), "order_by", "EVENT_TS DESC")),
+                "join", new LinkedHashMap<>(Map.of(
+                        "reference", "reference/region_dim", "on", List.of("REGION"))),
                 "summarize", new LinkedHashMap<>(Map.of(
                         "group_by", List.of("REGION"), "measures", List.of("count", "sum(AMT)"))))));
         cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));

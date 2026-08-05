@@ -81,7 +81,13 @@ public final class RecipeConverter {
         putRef(map, "mapping", processing.get("mapping_file"), "mapping/", "mappings/");
         if (!map.isEmpty()) steps.add(step("map", map));
 
-        // ── transform ──
+        // ── transform ── (join first — enrich the row set, then filter; D-4's one-verb join)
+        if (processing.get("join") instanceof Map<?, ?> jn) {
+            Map<String, Object> join = new LinkedHashMap<>();
+            putRef(join, "join", jn.get("reference"), "reference/", "references/");
+            putIfPresent(join, "on", jn.get("on"));
+            steps.add(step("transform", join));
+        }
         if (where != null) steps.add(step("transform", new LinkedHashMap<>(Map.of("filter", where))));
 
         // ── dedup ── (record-grain: processing.dedup — between the transform and the sink, where the

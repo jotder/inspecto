@@ -68,6 +68,13 @@ public enum BuiltinNodeType implements PipelineNodeType {
     TRANSFORM_ROUTE("transform.route", NodeCategory.TRANSFORM, "Route",
             "Content-based routing into operator-defined branches (case / clone).",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), true),
+    // Reference join (ELT amendment D-4/Phase 3 S2: the join is a transform concern — no enrich verb).
+    // Flat home: processing.join {reference, on}. Distinct from ENRICHMENT below: that node is the
+    // companion-persisted post-commit stage (truth = *_enrich.toon, ignored by lower); this one IS
+    // lowered, and is compile-only until an in-pipeline join executor lands.
+    TRANSFORM_JOIN("transform.join", NodeCategory.TRANSFORM, "Join",
+            "Joins against a Reference Dataset by key.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
     // Group-by rollup (ELT amendment §2.4/Phase 3: summarize IS a Step). Flat home: processing.summarize
     // {group_by, measures} — measures reuse MaterializeTask's shorthand grammar (count, sum(amount), …).
     // Compile-only for now: MaterializeTask stays the runtime until a recipe-driven executor lands.

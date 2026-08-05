@@ -19,10 +19,11 @@ import java.util.Map;
  * / sink} — every linear-chain verb except the Signal-bus unification's own. {@code map} folds into
  * the parser node (schema/mapping resolution is parser-owned in the flat config); {@code summarize} is
  * compile-only (Phase 3 S1 — {@code MaterializeTask} stays the runtime until a recipe-driven executor
- * lands, same posture as {@code route}'s arming gate). Not yet compilable, refused with named codes
- * rather than silently dropped: a non-empty {@code guarantees:} block (the Phase-4 fold) and
- * {@code transform.join}/{@code transform.derive}/{@code enrich} (compile targets land with the
- * Signal-bus unification, Phase 3 S2+).
+ * lands, same posture as {@code route}'s arming gate). {@code transform.join} compiles per D-4
+ * ({@code transform: {join: references/x, on: k}} → {@code processing.join}), compile-only too —
+ * the join model executes post-commit via {@code EnrichmentEngine}, never in the linear ingest path
+ * yet. Not yet compilable, refused with named codes rather than silently dropped: a non-empty
+ * {@code guarantees:} block (the Phase-4 fold) and {@code transform.derive} (Phase 3 S3+).
  */
 @PublicApi(since = "5.1.0")
 public final class RecipeCompiler {
@@ -179,16 +180,36 @@ public final class RecipeCompiler {
         return new PipelineNode(id, BuiltinNodeType.PARSER.type(), node, use);
     }
 
-    /** {@code transform: {filter: <predicate>}} → transform.filter node ({@code csv_settings.where}). */
+    /** {@code transform: {filter: <predicate>}} → transform.filter node ({@code csv_settings.where});
+     *  {@code transform: {join: references/x, on: k}} → transform.join node ({@code processing.join},
+     *  D-4's one-verb join — {@code on} rides the join, it is not a verb of its own). */
     private static void transform(String id, Map<String, Object> cfg, List<PipelineNode> nodes,
                                   List<PipelineCompileException.Refusal> refusals) {
-        for (Map.Entry<String, Object> e : cfg.entrySet()) {
+        Map<String, Object> c = new LinkedHashMap<>(cfg);
+        Object join = c.remove("join");
+        Object on = c.remove("on");
+        if (join != null) {
+            Map<String, Object> node = new LinkedHashMap<>();
+            String s = join.toString().trim();
+            node.put("reference", s.startsWith("references/")
+                    ? "reference/" + s.substring("references/".length()) : s);
+            if (on != null) node.put("on", on instanceof List<?> l ? l : List.of(on.toString()));
+            else refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "transform.join needs on: — the join-key column(s)"));
+            // a step carrying both join and filter compiles to two chained nodes — distinct ids
+            nodes.add(PipelineNode.of(c.containsKey("filter") ? id + "-join" : id,
+                    BuiltinNodeType.TRANSFORM_JOIN.type(), node));
+        } else if (on != null) {
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "on: only makes sense next to join: (transform: {join: references/x, on: k})"));
+        }
+        for (Map.Entry<String, Object> e : c.entrySet()) {
             if ("filter".equals(e.getKey())) {
                 nodes.add(PipelineNode.of(id, BuiltinNodeType.TRANSFORM_FILTER.type(),
                         Map.of("where", e.getValue())));
             } else {
                 refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_STEP, id,
-                        "transform." + e.getKey() + " is not lowerable yet (only filter compiles in this slice)"));
+                        "transform." + e.getKey() + " is not lowerable yet (only filter / join compile)"));
             }
         }
     }

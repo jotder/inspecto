@@ -122,7 +122,7 @@ class RecipeCompilerTest {
     void notYetCompilableVerbsRefuseWithNamedCodesNeverSilently() {
         Map<String, Object> recipe = linearRecipe("/data/db");
         ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
-                step("transform", new LinkedHashMap<>(Map.of("join", "references/x"))));
+                step("transform", new LinkedHashMap<>(Map.of("derive", Map.of("total", "a + b")))));
         recipe.put("guarantees", Map.of("file_dedup", "fingerprint"));
 
         PipelineCompileException e = assertThrows(PipelineCompileException.class,
@@ -162,6 +162,33 @@ class RecipeCompilerTest {
                 ((Map<String, Object>) out.get("processing")).get("summarize");
         assertEquals(List.of("REGION"), sm.get("group_by"));
         assertEquals(List.of("count", "sum(AMT)"), sm.get("measures"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void transformJoinCompilesToProcessingJoin() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1,   // between transform and sink
+                step("transform", new LinkedHashMap<>(Map.of(
+                        "join", "references/region_dim", "on", "ACCOUNT_NUMBER"))));
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> jn = (Map<String, Object>)
+                ((Map<String, Object>) out.get("processing")).get("join");
+        assertEquals("reference/region_dim", jn.get("reference"),
+                "the recipe's plural references/ spelling normalises to the registry's singular");
+        assertEquals(List.of("ACCOUNT_NUMBER"), jn.get("on"), "on: k is the single-key shorthand");
+    }
+
+    @Test
+    void transformJoinWithoutOnRefuses() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
+                step("transform", new LinkedHashMap<>(Map.of("join", "references/region_dim"))));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r -> r.message().contains("on:")), e.getMessage());
     }
 
     @Test

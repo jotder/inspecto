@@ -660,6 +660,29 @@ public final class PipelineConfig {
         }
     }
 
+    /**
+     * Reference join ({@code processing.join}, ELT amendment §2 D-4: the join is a {@code transform}
+     * concern — {@code transform: {join: references/x, on: k}} in the recipe; no separate enrich verb).
+     * {@code reference} names the join source: a {@code reference/<id>} registry ref (a
+     * {@code produces: reference} pipeline, {@code EnrichmentConfig.Reference}'s {@code ref} variant)
+     * or a verbatim path. Authoring/round-trip only for now (see {@link #prepare()}): the linear batch
+     * path has no in-pipeline join executor — {@code EnrichmentEngine} runs the join model post-commit
+     * off the companion {@code *_enrich.toon}, not off this section.
+     *
+     * @param reference the join source ({@code reference/<id>} or a path); never blank
+     * @param on        the join-key columns (input-side names); never empty
+     */
+    @PublicApi(since = "5.6.0")
+    public record Join(String reference, List<String> on) {
+        public Join {
+            if (reference == null || reference.isBlank())
+                throw new IllegalArgumentException("processing.join needs a reference (reference/<id> or a path)");
+            if (on == null || on.isEmpty())
+                throw new IllegalArgumentException("processing.join needs a non-empty on[] key list");
+            on = List.copyOf(on);
+        }
+    }
+
     // ── grouped state + accessors ──────────────────────────────────────────────
 
     private final Identity   identity;
@@ -737,6 +760,9 @@ public final class PipelineConfig {
     /** Group-by rollup ({@code processing.summarize}); {@code null} when absent. */
     private final Summarize summarize;
 
+    /** Reference join ({@code processing.join}); {@code null} when absent. */
+    private final Join join;
+
     /**
      * Other config files this pipeline read at parse time (schema / grammar / segment {@code .toon}s),
      * as given in the file (not absolutised). Used by {@link com.gamma.service.ConfigRegistry} to detect
@@ -804,6 +830,13 @@ public final class PipelineConfig {
      * not the linear batch path — arming lands once a recipe-driven executor is wired (Phase 3).
      */
     public Summarize summarize() { return summarize; }
+    /**
+     * Reference join ({@code processing.join}), or {@code null} when absent. Authoring/round-trip only:
+     * {@link #prepare()} refuses an {@code active} pipeline carrying it — the linear batch path has no
+     * in-pipeline join executor ({@code EnrichmentEngine} is post-commit, companion-file-driven), so
+     * arming would be dead config. Same posture as {@code route}/{@code summarize}.
+     */
+    public Join join() { return join; }
     /** The schema/grammar/segment files this config referenced at parse time (for change-watching). */
     public List<Path>     referencedFiles() { return referencedFiles; }
 
@@ -855,6 +888,7 @@ public final class PipelineConfig {
         this.dedup = b.dedup;
         this.route = b.route;
         this.summarize = b.summarize;
+        this.join = b.join;
         this.referencedFiles = List.copyOf(b.referencedFiles);
     }
 
@@ -903,6 +937,7 @@ public final class PipelineConfig {
         this.dedup = src.dedup;
         this.route = src.route;
         this.summarize = src.summarize;
+        this.join = src.join;
         this.referencedFiles = src.referencedFiles;
     }
 
@@ -1011,6 +1046,13 @@ public final class PipelineConfig {
                     "processing.summarize is authoring-only until a recipe-driven executor lands — "
                             + "keep the pipeline inactive (active: false) or remove the summarize block");
         }
+        // processing.join (Phase 3 S2) too: the join model executes post-commit via EnrichmentEngine
+        // (companion *_enrich.toon), never inside this pipeline's linear ingest path.
+        if (active && join != null) {
+            throw new IllegalStateException(
+                    "processing.join is authoring-only until an in-pipeline join executor lands — "
+                            + "keep the pipeline inactive (active: false) or remove the join block");
+        }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));
         }
@@ -1031,6 +1073,7 @@ public final class PipelineConfig {
         Dedup dedup = null;                   // record-grain dedup (processing.dedup); null ⇒ none
         Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline
         Summarize summarize = null;           // group-by rollup (processing.summarize); null ⇒ none
+        Join join = null;                     // reference join (processing.join); null ⇒ none
         final List<Path> referencedFiles = new ArrayList<>();   // schema/grammar/segment files read at parse
         String pollDir       = "";
         String databaseDir   = "";

@@ -741,6 +741,26 @@ not this pipeline's linear ingest path, so arming it would be dead config the en
 **Phase 3 remaining:** S2 (enrichment verb), S3 (table-entry `collect` + Signal wiring — the
 design-spike item), S4 (fixture parity gate).
 
+**P3 S2 SHIPPED 2026-08-06** — the reference join compiles, per D-4's one-verb spelling
+(`transform: {join: references/x, on: k}`; `on: k` is the single-key shorthand, a list otherwise).
+**Grounding correction ridden in:** the slice proposal said "wire the already-`LOWERABLE`
+`ENRICHMENT` node into the verb switch," but `PipelineEditable.lower` deliberately *ignores*
+enrichment nodes (their truth is the companion `*_enrich.toon`, W4b) — compiling onto that node
+could never round-trip through the flat file. The join therefore shipped as its own
+`BuiltinNodeType.TRANSFORM_JOIN` node kind with flat home `processing.join {reference, on}`
+(`reference` = a `reference/<id>` registry ref — a `produces: reference` pipeline, the
+`EnrichmentConfig.Reference.ref` variant — or a verbatim path; `on` columns validated against
+`declaredColumns`). The `enrichment` node stays companion-persisted and ignored by lower; the two
+retire together at the Phase-6 migration. A `transform` step carrying both `join` and `filter`
+compiles to two chained nodes. **Same compile-only arming posture as route/summarize:**
+`PipelineConfig.prepare()` refuses an `active` pipeline carrying `processing.join` — the join model
+executes post-commit via `EnrichmentEngine`, never in the linear ingest path yet. `PipelineLift`
+emits the node right after map (dedup/summarize downstream see the enriched row set);
+`RecipeConverter` projects it back with the plural `references/` spelling. Tests:
+`RecordDedupRouteConfigTest` (+3), `RecipeCompilerTest` (+2), `RecipeConverterTest` (fixture
+extended), `NodeConfigNameContractTest` (+1 pinned-lowerable, +1 draft-path). Full reactor green.
+**Phase 3 remaining: S3 + S4.**
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

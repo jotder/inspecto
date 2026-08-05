@@ -184,9 +184,22 @@ public final class PipelineLift {
         nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_MAP.type(), mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));
 
+        // Reference join (processing.join) sits right after map — dedup/summarize downstream see the
+        // enriched row set. Authoring-only (prepare() refuses arming), like route/summarize below.
+        String sinkUpstream = mapId;
+        if (cfg.join() != null) {
+            String joinId = "join" + suffix;
+            Map<String, Object> jc = new LinkedHashMap<>();
+            jc.put("reference", cfg.join().reference());
+            jc.put("on", cfg.join().on());
+            nodes.add(new PipelineNode(joinId, BuiltinNodeType.TRANSFORM_JOIN.type(),
+                    "Join", null, jc, null));
+            edges.add(PipelineEdge.data(sinkUpstream, joinId));
+            sinkUpstream = joinId;
+        }
+
         // Record-grain dedup (processing.dedup) sits between map and the sink(s) — exactly where the
         // engine applies its QUALIFY (BatchIngestStrategy.writeAndTrace, before the partitioned write).
-        String sinkUpstream = mapId;
         if (cfg.dedup() != null) {
             String dedupId = "dedup" + suffix;
             Map<String, Object> dc = new LinkedHashMap<>();
@@ -194,7 +207,7 @@ public final class PipelineLift {
             put(dc, "order_by", cfg.dedup().orderBy());
             nodes.add(new PipelineNode(dedupId, BuiltinNodeType.TRANSFORM_DEDUP.type(),
                     "Dedup (record)", null, dc, null));
-            edges.add(PipelineEdge.data(mapId, dedupId));
+            edges.add(PipelineEdge.data(sinkUpstream, dedupId));
             sinkUpstream = dedupId;
         }
 

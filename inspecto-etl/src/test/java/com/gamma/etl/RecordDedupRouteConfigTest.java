@@ -16,7 +16,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * pipeline with it is refused at {@code prepare()} until the branch-aware executor is wired into the
  * ingest path. {@code processing.summarize} is the group-by rollup Step's section (group_by columns
  * validated the same way) and is likewise authoring-only until a recipe-driven executor replaces
- * {@code MaterializeTask}'s standalone Dataset-relation runtime.
+ * {@code MaterializeTask}'s standalone Dataset-relation runtime. {@code processing.join} (Phase 3 S2,
+ * D-4's one-verb reference join) follows the same three-part contract: parse + column validation +
+ * fail-closed arming, since the join model executes post-commit via {@code EnrichmentEngine}.
  */
 class RecordDedupRouteConfigTest {
 
@@ -123,6 +125,44 @@ class RecordDedupRouteConfigTest {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> PipelineConfig.load(p.toString()));
         assertTrue(e.getMessage().contains("NO_SUCH_COLUMN"), e.getMessage());
+    }
+
+    @Test
+    void processingJoinParsesReferenceAndOnIncludingTheSingleKeyShorthand(@TempDir Path dir) throws Exception {
+        Path p = write(dir, false, """
+                  join:
+                    reference: reference/region_dim
+                    on: ID
+                """, "");
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        assertNotNull(cfg.join());
+        assertEquals("reference/region_dim", cfg.join().reference());
+        assertEquals(java.util.List.of("ID"), cfg.join().on(), "on: k is the single-key shorthand (D-4)");
+    }
+
+    @Test
+    void aJoinOnColumnOutsideTheSchemaIsRefusedAtParse(@TempDir Path dir) throws Exception {
+        Path p = write(dir, false, """
+                  join:
+                    reference: reference/region_dim
+                    on[1]: NO_SUCH_COLUMN
+                """, "");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("NO_SUCH_COLUMN"), e.getMessage());
+    }
+
+    @Test
+    void anActivePipelineWithJoinRefusesToArm(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, """
+                  join:
+                    reference: reference/region_dim
+                    on[1]: ID
+                """, "");
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "the join model executes post-commit via EnrichmentEngine, never in the linear ingest path — arming must fail fast");
+        assertTrue(e.getMessage().contains("join"), e.getMessage());
     }
 
     @Test
