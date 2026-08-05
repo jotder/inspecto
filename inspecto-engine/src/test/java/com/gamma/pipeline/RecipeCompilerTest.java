@@ -123,13 +123,64 @@ class RecipeCompilerTest {
         Map<String, Object> recipe = linearRecipe("/data/db");
         ((List<Map<String, Object>>) (List<?>) recipe.get("steps")).add(
                 step("transform", new LinkedHashMap<>(Map.of("derive", Map.of("total", "a + b")))));
-        recipe.put("guarantees", Map.of("file_dedup", "fingerprint"));
+        recipe.put("guarantees", Map.of("self_heal", true));   // not a §2.4 guarantee — must refuse
 
         PipelineCompileException e = assertThrows(PipelineCompileException.class,
                 () -> RecipeCompiler.compile(recipe));
         List<String> codes = e.refusals().stream().map(PipelineCompileException.Refusal::code).toList();
         assertTrue(codes.contains(RecipeCompiler.UNSUPPORTED_STEP), codes.toString());
         assertTrue(codes.contains(RecipeCompiler.GUARANTEES_NOT_LOWERABLE), codes.toString());
+    }
+
+    /** The Phase-4 Guarantees fold (§2.4): every declared guarantee lands on its live flat home. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void guaranteesCompileOntoTheirHousekeepingHomes() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        Map<String, Object> guarantees = new LinkedHashMap<>();
+        guarantees.put("file_dedup", "fingerprint");
+        guarantees.put("gap_watch", new LinkedHashMap<>(Map.of(
+                "enabled", true, "sequence", "CDR_{yyyyMMddHH}")));
+        guarantees.put("markers", new LinkedHashMap<>(Map.of(
+                "dir", "/data/markers", "marker_extension", ".done")));
+        guarantees.put("quarantine", "/data/quarantine");
+        guarantees.put("retention", 30);
+        recipe.put("guarantees", guarantees);
+
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> collector = (Map<String, Object>) out.get("collector");
+        assertEquals(Map.of("mode", "checksum"), collector.get("duplicate"),
+                "file_dedup: fingerprint is the recipe spelling of duplicate mode checksum");
+        assertEquals(Map.of("enabled", true, "sequence", "CDR_{yyyyMMddHH}"),
+                collector.get("gap_detection"));
+        Map<String, Object> processing = (Map<String, Object>) out.get("processing");
+        assertEquals(Map.of("enabled", true, "marker_extension", ".done"),
+                processing.get("duplicate_check"));
+        assertEquals(30, processing.get("retention_days"));
+        Map<String, Object> dirs = (Map<String, Object>) out.get("dirs");
+        assertEquals("/data/markers", dirs.get("markers"));
+        assertEquals("/data/quarantine", dirs.get("quarantine"));
+    }
+
+    @Test
+    void guaranteeBackupRefusesTowardTheSinkStep() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        recipe.put("guarantees", Map.of("backup", "/data/backup"));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r ->
+                RecipeCompiler.GUARANTEES_NOT_LOWERABLE.equals(r.code())
+                        && r.message().contains("sink step")), e.getMessage());
+    }
+
+    @Test
+    void fileDedupMarkerRefusesTowardTheMarkersGuarantee() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        recipe.put("guarantees", Map.of("file_dedup", "marker"));
+        PipelineCompileException e = assertThrows(PipelineCompileException.class,
+                () -> RecipeCompiler.compile(recipe));
+        assertTrue(e.refusals().stream().anyMatch(r -> r.message().contains("markers:")),
+                e.getMessage());
     }
 
     @Test

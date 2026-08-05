@@ -70,10 +70,18 @@ class RecipeConverterTest {
         Map<String, Object> cfg = new LinkedHashMap<>();
         cfg.put("name", "orders");
         cfg.put("active", false);   // route: is authoring-only — an armed config could never exist on disk
-        cfg.put("dirs", new LinkedHashMap<>(Map.of("poll", "/in", "database", "/data/emea")));
+        cfg.put("collector", new LinkedHashMap<>(Map.of(
+                "duplicate", new LinkedHashMap<>(Map.of("mode", "checksum", "algorithm", "SHA256")),
+                "gap_detection", new LinkedHashMap<>(Map.of("enabled", true, "sequence", "ORD_{yyyyMMdd}")))));
+        cfg.put("dirs", new LinkedHashMap<>(Map.of(
+                "poll", "/in", "database", "/data/emea",
+                "markers", "/data/markers", "quarantine", "/data/quarantine")));
         cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
         cfg.put("processing", new LinkedHashMap<>(Map.of(
                 "file_pattern", "glob:**/*.csv",
+                "retention_days", 14,
+                "duplicate_check", new LinkedHashMap<>(Map.of(
+                        "enabled", true, "marker_extension", ".done")),
                 "dedup", new LinkedHashMap<>(Map.of(
                         "keys", List.of("ORDER_ID"), "order_by", "EVENT_TS DESC")),
                 "join", new LinkedHashMap<>(Map.of(
@@ -95,6 +103,37 @@ class RecipeConverterTest {
         Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
         Map<String, Object> back = RecipeCompiler.compile(recipe, cfg, false);
         assertEquals(cfg, back);
+    }
+
+    /** The Phase-4 Guarantees fold (§2.4): housekeeping projects under its declared names, never on steps. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void projectsHousekeepingAsGuarantees() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("name", "orders");
+        cfg.put("collector", new LinkedHashMap<>(Map.of(
+                "duplicate", new LinkedHashMap<>(Map.of("mode", "checksum")),
+                "gap_detection", new LinkedHashMap<>(Map.of("enabled", true, "sequence", "F_{yyyyMMdd}")))));
+        cfg.put("dirs", new LinkedHashMap<>(Map.of(
+                "poll", "/in", "database", "/db",
+                "markers", "/db/markers", "quarantine", "/db/quarantine")));
+        cfg.put("parsing", new LinkedHashMap<>(Map.of("grammar", "grammar/pipe")));
+        cfg.put("processing", new LinkedHashMap<>(Map.of(
+                "retention_days", 7,
+                "duplicate_check", new LinkedHashMap<>(Map.of("enabled", true)))));
+        cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(cfg);
+        Map<String, Object> g = (Map<String, Object>) recipe.get("guarantees");
+        assertEquals(Map.of("mode", "checksum"), g.get("file_dedup"));
+        assertEquals(Map.of("enabled", true, "sequence", "F_{yyyyMMdd}"), g.get("gap_watch"));
+        assertEquals(Map.of("dir", "/db/markers"), g.get("markers"));
+        assertEquals("/db/quarantine", g.get("quarantine"));
+        assertEquals(7, g.get("retention"));
+
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) recipe.get("steps");
+        Map<String, Object> collect = (Map<String, Object>) steps.get(0).get("collect");
+        assertFalse(collect.containsKey("duplicate"), "file dedup is a Guarantee, not a collect key");
     }
 
     @Test

@@ -12,22 +12,26 @@ import java.util.Set;
  * <b>The read-side converter (ELT amendment Phase 2 S4, §6 step 1):</b> projects a decoded canonical
  * {@code *_pipeline.toon} map into the linear recipe shape ({@code name/trigger/steps}). The inverse of
  * {@link RecipeCompiler} for the verbs it speaks; keys the recipe does not model ({@code dirs.errors},
- * {@code duplicate_check}, {@code gap_detection}, …) are deliberately NOT projected — the round trip
- * preserves them by compiling <b>over the original</b> ({@link RecipeCompiler#compile(Map, Map, boolean)},
- * lower's ownership rule), never by widening the recipe vocabulary.
+ * {@code dirs.status_dir}, …) are deliberately NOT projected — the round trip preserves them by
+ * compiling <b>over the original</b> ({@link RecipeCompiler#compile(Map, Map, boolean)}, lower's
+ * ownership rule), never by widening the recipe vocabulary. The housekeeping keys DO project since
+ * the Phase-4 Guarantees fold: {@code collector.duplicate} / {@code gap_detection} /
+ * {@code duplicate_check}+{@code dirs.markers} / {@code dirs.quarantine} /
+ * {@code retention_days} appear under {@code guarantees:} (§2.4).
  *
  * <p>Parity contract (the Phase-2 gate): for every fixture,
  * {@code compile(toRecipe(cfg), cfg, false)} equals {@code cfg} (modulo the always-written
- * {@code active} default). Lenient compile is the converter's mode — a projection must not delete the
- * sections whose owning verb the recipe cannot speak yet (file-dedup markers, gap watch → Phase 4).
+ * {@code active} default). Lenient compile is the converter's mode — a projection must not delete
+ * the sections whose owning verb the recipe cannot speak yet.
  */
 @PublicApi(since = "5.1.0")
 public final class RecipeConverter {
 
     private RecipeConverter() {}
 
-    /** Collector keys that ride recipe syntax rather than passing verbatim. */
-    private static final Set<String> COLLECT_SPECIAL = Set.of("connection", "gap_detection");
+    /** Collector keys that ride recipe syntax rather than passing verbatim: {@code connection} rides
+     *  the ref spelling; {@code gap_detection} and {@code duplicate} are Guarantees (Phase 4 fold). */
+    private static final Set<String> COLLECT_SPECIAL = Set.of("connection", "gap_detection", "duplicate");
 
     /** Project {@code config} (a decoded canonical pipeline map) into the recipe shape. */
     public static Map<String, Object> toRecipe(Map<String, Object> config) {
@@ -141,6 +145,32 @@ public final class RecipeConverter {
         }
 
         recipe.put("steps", steps);
+
+        // ── guarantees ── (the Phase-4 fold, §2.4: housekeeping projected under its declared names;
+        // the compiler overlays these back onto the same homes, so the round trip is exact)
+        Map<String, Object> guarantees = new LinkedHashMap<>();
+        if (collector.get("duplicate") instanceof Map<?, ?> dup) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : dup.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
+            guarantees.put("file_dedup", copy);
+        }
+        if (collector.get("gap_detection") instanceof Map<?, ?> gw) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : gw.entrySet()) copy.put(String.valueOf(e.getKey()), e.getValue());
+            guarantees.put("gap_watch", copy);
+        }
+        if (processing.get("duplicate_check") instanceof Map<?, ?> dc
+                && Boolean.TRUE.equals(dc.get("enabled"))) {
+            Map<String, Object> markers = new LinkedHashMap<>();
+            putIfPresent(markers, "dir", dirs.get("markers"));
+            for (Map.Entry<?, ?> e : dc.entrySet())
+                if (!"enabled".equals(e.getKey())) markers.put(String.valueOf(e.getKey()), e.getValue());
+            guarantees.put("markers", markers);
+        }
+        putIfPresent(guarantees, "quarantine", dirs.get("quarantine"));
+        putIfPresent(guarantees, "retention", processing.get("retention_days"));
+        if (!guarantees.isEmpty()) recipe.put("guarantees", guarantees);
+
         return recipe;
     }
 

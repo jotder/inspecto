@@ -22,8 +22,19 @@ import java.util.Map;
  * lands, same posture as {@code route}'s arming gate). {@code transform.join} compiles per D-4
  * ({@code transform: {join: references/x, on: k}} → {@code processing.join}), compile-only too —
  * the join model executes post-commit via {@code EnrichmentEngine}, never in the linear ingest path
- * yet. Not yet compilable, refused with named codes rather than silently dropped: a non-empty
- * {@code guarantees:} block (the Phase-4 fold) and {@code transform.derive} (Phase 3 S3+).
+ * yet. Not yet compilable, refused with named codes rather than silently dropped:
+ * {@code transform.derive} (Phase 3 S3+) and unknown {@code guarantees:} keys.
+ *
+ * <p><b>The Guarantees fold (Phase 4, §2.4):</b> the top-level {@code guarantees:} block compiles
+ * onto the existing housekeeping homes, all of which are live executable config (no arming gate):
+ * {@code file_dedup} → {@code collector.duplicate} ({@code fingerprint} is the recipe spelling of
+ * mode {@code checksum}), {@code gap_watch} → {@code collector.gap_detection}, {@code markers} →
+ * {@code processing.duplicate_check} + {@code dirs.markers}, {@code quarantine} →
+ * {@code dirs.quarantine}, {@code retention} → {@code processing.retention_days}. The overlay is
+ * applied AFTER {@link PipelineEditable#lower}, because lower's ownership rule clears these
+ * sections when their owning node kind is absent from the compiled graph. {@code backup} is
+ * deliberately NOT a guarantee key — the sink step already owns the backup dir
+ * ({@code sink: {backup: …}}), and one concept gets one spelling.
  */
 @PublicApi(since = "5.1.0")
 public final class RecipeCompiler {
@@ -65,9 +76,9 @@ public final class RecipeCompiler {
             refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, null, "a recipe needs a name"));
         boolean active = !(recipe.get("active") instanceof Boolean b) || b;
 
-        if (recipe.get("guarantees") instanceof Map<?, ?> g && !g.isEmpty())
-            refusals.add(new PipelineCompileException.Refusal(GUARANTEES_NOT_LOWERABLE, null,
-                    "the guarantees: fold lands in Phase 4 — remove the block for now"));
+        Map<String, Object> guarantees = recipe.get("guarantees") instanceof Map<?, ?> g
+                ? configOf(g) : new LinkedHashMap<>();
+        validateGuarantees(guarantees, refusals);
 
         List<PipelineNode> nodes = new ArrayList<>();
         List<PipelineNode> branchSinks = new ArrayList<>();
@@ -143,7 +154,81 @@ public final class RecipeCompiler {
         nodes.addAll(branchSinks);
         edges.addAll(routeEdges);
 
-        return PipelineEditable.lower(new PipelineGraph(name, active, nodes, edges), existing, strict);
+        Map<String, Object> out =
+                PipelineEditable.lower(new PipelineGraph(name, active, nodes, edges), existing, strict);
+        applyGuarantees(out, guarantees);
+        return out;
+    }
+
+    /** The guarantee keys this compiler folds (§2.4); anything else refuses loudly, never drops. */
+    private static final java.util.Set<String> GUARANTEE_KEYS = java.util.Set.of(
+            "file_dedup", "gap_watch", "markers", "quarantine", "retention");
+
+    private static void validateGuarantees(Map<String, Object> g,
+                                           List<PipelineCompileException.Refusal> refusals) {
+        for (Map.Entry<String, Object> e : g.entrySet()) {
+            String k = e.getKey();
+            if ("backup".equals(k)) {
+                refusals.add(new PipelineCompileException.Refusal(GUARANTEES_NOT_LOWERABLE, null,
+                        "backup rides the sink step (sink: {backup: <dir>}), not guarantees:"));
+            } else if (!GUARANTEE_KEYS.contains(k)) {
+                refusals.add(new PipelineCompileException.Refusal(GUARANTEES_NOT_LOWERABLE, null,
+                        "unknown guarantee '" + k + "' (only "
+                                + "file_dedup / gap_watch / markers / quarantine / retention fold)"));
+            } else if ("file_dedup".equals(k) && "marker".equals(String.valueOf(e.getValue()))) {
+                refusals.add(new PipelineCompileException.Refusal(GUARANTEES_NOT_LOWERABLE, null,
+                        "marker-file housekeeping is the markers: guarantee — "
+                                + "file_dedup speaks path / metadata / fingerprint / etag"));
+            } else if (("gap_watch".equals(k) || "markers".equals(k)) && !(e.getValue() instanceof Map)) {
+                refusals.add(new PipelineCompileException.Refusal(GUARANTEES_NOT_LOWERABLE, null,
+                        k + " is a map guarantee, e.g. " + ("markers".equals(k)
+                                ? "markers: {dir: …, marker_extension: …}"
+                                : "gap_watch: {enabled: true, sequence: …}")));
+            }
+        }
+    }
+
+    /**
+     * Overlay the validated {@code guarantees:} keys onto their flat homes. Runs after
+     * {@link PipelineEditable#lower} because lower's ownership rule clears these sections when the
+     * owning node kind is absent from the compiled graph. Overlay-only: absent guarantee keys leave
+     * the existing config's sections untouched (the converter round-trip relies on this).
+     */
+    private static void applyGuarantees(Map<String, Object> out, Map<String, Object> g) {
+        if (g.isEmpty()) return;
+        Object fd = g.get("file_dedup");
+        if (fd != null) {
+            Map<String, Object> dup = fd instanceof Map<?, ?> m ? configOf(m)
+                    : new LinkedHashMap<>(Map.of("mode",
+                            "fingerprint".equals(fd.toString()) ? "checksum" : fd.toString()));
+            getOrNew(out, out.containsKey("source") && !out.containsKey("collector")
+                    ? "source" : "collector").put("duplicate", dup);
+        }
+        if (g.get("gap_watch") instanceof Map<?, ?> gw)
+            getOrNew(out, out.containsKey("source") && !out.containsKey("collector")
+                    ? "source" : "collector").put("gap_detection", configOf(gw));
+        if (g.get("markers") instanceof Map<?, ?> mk) {
+            Map<String, Object> markers = configOf(mk);
+            Object dir = markers.remove("dir");
+            if (dir != null) getOrNew(out, "dirs").put("markers", dir);
+            Map<String, Object> dc = new LinkedHashMap<>();
+            dc.put("enabled", true);
+            dc.putAll(markers);
+            getOrNew(out, "processing").put("duplicate_check", dc);
+        }
+        if (g.get("quarantine") != null)
+            getOrNew(out, "dirs").put("quarantine", g.get("quarantine"));
+        if (g.get("retention") != null)
+            getOrNew(out, "processing").put("retention_days", g.get("retention"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> getOrNew(Map<String, Object> out, String key) {
+        Object v = out.get(key);
+        if (v instanceof Map<?, ?> m) return (Map<String, Object>) m;
+        Map<String, Object> fresh = new LinkedHashMap<>();
+        out.put(key, fresh);
+        return fresh;
     }
 
     /** Processing keys the parser node owns in the flat config ({@code PipelineEditable.PARSER_OWNED});

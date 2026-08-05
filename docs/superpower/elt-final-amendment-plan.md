@@ -809,6 +809,135 @@ the original S4 gate (enrich + materialize actually running as recipes with iden
 lands with S3's executor machinery — it is S3-blocked, not forgotten.** Phase 3 status: S1/S2/S4
 shipped; S3 deferred (documented gap above).
 
+#### Phase 3 S3 DESIGN 2026-08-06 — table-entry `collect` via a Dataset-write Signal (design of record, pre-implementation)
+
+Grounding (2026-08-06, full pass over the Signal/trigger/write machinery) established four facts the
+design must respect:
+
+1. **Three parallel commit mechanisms exist, all pipeline-shaped, none Dataset-shaped.**
+   (a) `PipelineScheduler.onUpstreamCommit` (`PipelineScheduler.java:389`) fires downstream
+   pipelines whose entry trigger is `{type: event, on: commit, from: flows/<id>}`
+   (`PipelineTrigger.of`, `PipelineTrigger.java:60-97`, with `coalesce:`); (b)
+   `JobService.mirrorPipelineCommit` (`JobService.java:519-529`) mirrors every terminal
+   `BatchEvent` as a `pipeline.commit` Signal (payload `{pipeline, batchId, status, rows, ms,
+   parts}`) consumed by `on_signal:` jobs; (c) `PipelineBatchSignal.emit`
+   (`PipelineBatchSignal.java:29-53`) adds the observability `pipeline.batch.committed|failed`.
+   None carries a Dataset id or database path.
+2. **No Dataset-write Signal exists.** The write sites are `MaterializeTask.run:109-115`
+   (stage-and-swap, then `store.write("dataset", target, …)` — no publish) and
+   `ConsignmentProcessJobType.persistSummaries:178-198` (`ConsignmentOutputStores.record`, no
+   publish). Nothing is stubbed for it.
+3. **`EnrichJob` is the template for a non-file entry** (`EnrichJob.java:20-60`): it runs an
+   engine over at-rest data and then publishes a plain
+   `BatchEvent(job.name(), runId, "SUCCESS", …)` — fabricating pipeline-shape so the whole
+   commit fabric (triggers, mirror Signal, coalescers) works unchanged.
+4. **`dirs.poll`/`dirs.database` are load-bearing four ways** (the spike's blocker, now sized):
+   the two `require()`s (`PipelineConfigParser.java:128-130`); `validateDirs:784-796` fences
+   every other dir against `pollDir`; `errors`/`quarantine` **default off `pollDir`**
+   (`:133-136`); and `MarkerManager` markers are file-paths-relative-to-poll
+   (`MarkerManager.java:16,66`) — a table-entry pipeline has no file to mark, so its
+   "already processed" concept must be a **watermark**, not a marker.
+
+**Design of record (recommendation; operator sign-off before implementation):**
+
+- **New Signal `dataset.write`** — published at the moment a Dataset's data becomes visible
+  (post-swap in `MaterializeTask`, post-`record` in `persistSummaries`, and any future
+  Dataset-producing sink). Payload `{dataset, rows, at, producer}` (`producer` = pipeline/job
+  name). Additive, mirrors the `PipelineBatchSignal` posture — never replaces the pipeline-shaped
+  signals.
+- **Trigger form** — `PipelineTrigger` gains `{type: event, on: dataset, from: datasets/<id>,
+  coalesce: …}`, resolved by the same scheduler path as `onUpstreamCommit` (a
+  `onDatasetWrite` sibling subscribing to the new Signal). Recipe spelling:
+  `collect: {dataset: datasets/<id>}` with the trigger riding the entry step as today (§2.7).
+- **Runtime** — a `TableCollectRunner` in the `EnrichJob` mold: reads the bound
+  `DatasetRelation` (watermark-filtered), feeds the existing transform/sink chain, and publishes
+  a normal `BatchEvent` on commit so everything downstream (mirror Signal, counters, Stage C)
+  works unchanged. Consignment = one watermark window over the Dataset.
+- **Watermark, not marker** — per (pipeline, dataset) high-water state (last consumed
+  `materialized.at` / row fingerprint) persisted in the ledger DB (the `AcquisitionLedger`
+  precedent), replacing `MarkerManager` for this entry kind. Semantics v1: whole-Dataset
+  re-read on change is the honest default; incremental (partition/row watermark) is a declared
+  fast-follow — never faked.
+- **Parser loosening, fenced** — `dirs.poll` becomes conditionally required: mandatory unless the
+  entry is dataset-shaped; `dirs.database` stays mandatory always (the sink side).
+  `validateDirs` skips the poll fence when poll is absent; `errors`/`quarantine` then default
+  off `databaseDir` instead. Every existing pipeline kind is untouched (poll still required for
+  them — the invariant narrows, it does not vanish).
+
+**Implementation slices (each shippable, in order):** **S3a** the `dataset.write` Signal + tests
+(publish at both write sites; additive) · **S3b** trigger form (`PipelineTrigger` + scheduler
+subscription + coalesce) · **S3c** parser loosening + `collect: {dataset:}` config shape + the
+`TableCollectRunner` + watermark ledger (the big slice — config without this runner would be
+fictional, per the spike) · **S3d** recipe verb + converter projection + the deferred execution
+half of the P3 S4 parity gate (enrich/materialize as recipes, identical outputs).
+
+#### Phase 4 GROUNDED 2026-08-06 — findings that shape the slices
+
+1. **The housekeeping keys are scattered but all real** — each Guarantee has an existing home and
+   consumer: file dedup = `source.duplicate` (`PipelineConfig.java:359-383`, modes
+   path/metadata/checksum/etag) consumed in `BatchProcessor.finalizeSource`; backup =
+   `dirs.backup` + inline `BatchProcessor.backupFile` (`:267-281` — distinct from the job-level
+   `BackupTask`, a different concern); quarantine = `dirs.quarantine` + `QuarantineManager`;
+   markers = `dirs.markers` + `MarkerManager`; gap watch = `source.gap_detection`
+   (`:342-357`) + `GapDetector`/`GapTracker` (inspecto-acquire); retention =
+   `processing.retention_days` (`:72`) + `MarkerManager.java:118-120`. `source.guarantee`
+   (`:316-340`) is the delivery-class enum, a separate concept the fold must not conflate.
+2. **`RecipeCompiler` already reserves the block**: non-empty `guarantees:` refused with
+   `GUARANTEES_NOT_LOWERABLE` (`RecipeCompiler.java:68-70`) — the fold replaces that refusal for
+   known keys only; unknown keys stay refused loudly.
+3. **Stage progression exists as *code ordering*, not durable state.** `BatchProcessor.finalizeSource`
+   (`:89-220`) documents the crash-safe commit order (register → manifest → backup → markers LAST →
+   ledger), but `BatchManifest.MemberEntry.status` is one flat terminal string and `StatusStore`
+   (`StatusStore.java:21-45`, impls `FileStatusStore`/`DbStatusStore`) is read-side derivation
+   only. Phase 4(b) formalizes the ordering the code already enforces into recorded per-file stages.
+4. **Premise correction — per-node conservation counters already exist** in the executor lane:
+   `PipelineExecutor.ProvenanceCollector` (`:59-70,226`) fires per `(nodeId, rel, rowCount)`,
+   persisted as `ProvenanceRow` (`PipelineJobRunner.java:171-184`), and `ConservationCheck.imbalances`
+   (`ConservationCheck.java:46-71`) already flags LOSS/AMPLIFICATION as
+   `PIPELINE_CONSERVATION_IMBALANCE` events (`PipelineJobRunner.java:239-259`). §11.3's deliverable
+   is the **legacy-lane gap**: `BatchIngestStrategy.writeAndTrace` only *logs* dedup drops (`:171`)
+   and counts nothing else — plus edge-grain (diverted per reject stream) on the substrate.
+5. **Premise correction — `PipelineNode.enabled()` already exists but with the WRONG semantics for
+   D-13**: today it is a pure in-memory bypass (`PipelineExecutor.java:135,187` — `continue`,
+   "NiFi stopped processor produces nothing"), carried through lift/lower by `PipelineEditable`
+   (`:170,335,445`). D-13 requires halt-and-**park** (durable, manifest `parked_at`, drain on
+   re-enable) — a semantics change on the same flag, not a new one. `RecipeCompiler` does not yet
+   compile a per-Step `enabled:`.
+6. **The plan's "split acquire/ingest timers" half-pause is a docs simplification** — no such
+   scheduler class exists; the closest primitives are `CollectorProcessor`'s poll loop +
+   `StabilityGate` + the high-watermark filter (`CollectorProcessor.java:451-475`), all gating
+   *discovery*, not mid-graph Steps. The durable "inbox" is `dirs.poll` itself; drain = next poll.
+
+**Slices of record (each shippable):** **P4 S1** the Guarantees fold — recipe `guarantees:`
+{`file_dedup`, `backup`, `quarantine`, `markers`, `gap_watch`, `retention`} compiles onto the
+existing homes above (executable today — no arming gate needed, these consumers are live) +
+converter projection + round-trip over the fixture corpus; unknown keys keep the named refusal ·
+**P4 S2** per-file stage progression — durable stage records through `finalizeSource`'s documented
+ordering + "where is file X" answerable via `StatusStore`/API · **P4 S3** counters — persist the
+legacy lane's dedup/filter/quarantine counts and extend the provenance substrate to
+`recordsIn/recordsOut/diverted` edge grain; conservation gate green over a fixture · **P4 S4**
+per-Step `enabled:` park/drain (D-13) — flip executor bypass to halt-at-boundary, manifest
+`parked_at` accretion, drain on re-enable, recipe compiles per-Step `enabled:`; gated by the S2
+stage progression (per §2.7 cost 3).
+
+**P4 S1 SHIPPED 2026-08-06** — the Guarantees fold: `RecipeCompiler` compiles a top-level
+`guarantees:` map ({`file_dedup`, `gap_watch`, `markers`, `quarantine`, `retention`}) onto the live
+housekeeping homes named in the grounding (finding 1) — **no arming gate**, these consumers
+(`BatchProcessor`, `MarkerManager`, `QuarantineManager`, `GapDetector`) already run today, so a
+compiled recipe is immediately executable, unlike Phase 3's compile-only verbs. Applied as a
+post-`lower` overlay (`applyGuarantees`) because lower's ownership rule would otherwise clear these
+sections when no owning node models them. `file_dedup: fingerprint` is the recipe spelling of
+`source.duplicate.mode: checksum`; `file_dedup: marker` refuses toward the `markers:` guarantee
+(one-word-one-concept: marker housekeeping is not a dedup mode). `backup` stays OUT of
+`guarantees:` by design — it is the sink step's own key (`sink: {backup: …}`) — and refuses with a
+named code pointing there if declared as a guarantee. Unknown guarantee keys refuse loudly
+(`GUARANTEES_NOT_LOWERABLE`, the same code the old blanket refusal used, now precise). Converter
+projects the same five keys back under `guarantees:` (never onto a step), completing the round
+trip. Tests: `RecipeCompilerTest` (+3: fold, backup-refuses, marker-refuses),
+`RecipeConverterTest` (+1 projection test, fixture extended with duplicate/gap_detection/markers/
+quarantine/retention). Full reactor green (200+ tests, 0 failures). **Phase 4 remaining: S2
+(per-file stage progression), S3 (counters), S4 (per-Step enabled park/drain).**
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)
