@@ -54,6 +54,12 @@ edges) — **if the loaded graph is not recipe-expressible, the editor opens in 
   reject counts from dry-run/provenance instead.
 - **Dirty/close guard**: `guardDirtyClose` on every dialog (already the rule); the editor's own
   unsaved-state banner stays.
+- **Per-Step pause (D-13, Phase-4-backend-gated — extends S7)**: each Step card gets an
+  enable/disable toggle (`enabled:`) with the park-at-boundary model surfaced honestly: a disabled
+  Step shows a "parked Consignments" count chip (from the Stage-C stage progression), and re-enabling
+  shows the drain. Gate the toggle on `canOperateRuns()` (it is an operational action, not config
+  authoring — the Runs precedent). Never present pause as instant/queue-like: the tooltip states
+  that in-flight Consignments finish their current Step and park.
 
 ### 2.2 Canvas demotion
 

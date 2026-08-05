@@ -1,9 +1,10 @@
 # ELT Final Amendment — one model, one vocabulary, one authoring surface
 
-**Status: APPROVED v1.0 (2026-08-05) — all eleven §9 decisions resolved; the operator took the
-recommended option on each. Build starts at Phase 0 (GLOSSARY amendments), then Phase 1.**
-*(Was DRAFT v0 earlier the same day; iterated through routing/§2.6, the Pipeline Document/§5.1, the
-dedup boundary/§2.4, and schema-registry semantics/§3.4 before approval.)*
+**Status: APPROVED v1.1 (2026-08-05) — all thirteen §9 decisions resolved. Phase 0 DONE; Phase 1
+grounded, slice 1 of record set. v1.1 adds D-12 (Batch→Consignment = Phase 7, in-window, sequenced
+last) and D-13 (per-Step `enabled:` pause with park/drain, Phase 4) plus the §2.7 Step-lifecycle
+table.** *(Was DRAFT v0 earlier the same day; iterated through routing/§2.6, the Pipeline
+Document/§5.1, the dedup boundary/§2.4, and schema-registry semantics/§3.4 before approval.)*
 
 > **What this is.** The operator's 2026-08-05 directive: *"unify into one, on a single plan, for the
 > final time — we have pretty much all functionalities."* Each unit activity becomes a uniform
@@ -58,7 +59,7 @@ Per GLOSSARY §0: one concept → one word; one word → one concept. The user-f
 | Verb | Does | Compiles onto (exists today) |
 |---|---|---|
 | `collect` | files from a Connection **or rows from a Table** — the entry Step; carries the trigger | acquisition / `CollectorConnector` SPI; table-entry rides the Signal bus (§4.2) |
-| `parse` | Grammar → rows; hierarchical formats → segment rows (§2.7) | `ParserPlugin` SPI, two transparent engines |
+| `parse` | Grammar → rows; hierarchical formats → segment rows (§2.8) | `ParserPlugin` SPI, two transparent engines |
 | `map` | apply Schema + Mapping | `transform.map` + `TransformCompiler` registry |
 | `dedup` | drop duplicate **records** by a declared business key + winner policy (`keep: first`, `order_by`); the duplicates leave as a counted, quarantined reject stream (§2.6) — inspectable and reportable, never silently discarded. ⚠ Record-grain, distinct from **file** dedup, which is a Guarantee (§2.4). v1 scope = within one Consignment (SQL); cross-Consignment window is §9 D-9 | `transform.dedup` (`QUALIFY ROW_NUMBER()`, design doc §3.4) |
 | `transform` | filter / derive / reference-join (SQL-compiled, fusable) | `transform.filter/derive/select`, `RowShaper`; reference-join = the `EnrichmentConfig` join model |
@@ -247,7 +248,32 @@ pipeline-graph-design §3.4/§3.5/§3.7. The compile target exists today (`trans
 relationships + per-branch edges); the recipe form is sugar over it, and the canvas renders the
 compiled tree identically to any other topology.
 
-### 2.7 Flattener — resolved by placement, not by a new node
+### 2.7 Step lifecycle — scheduled / per-Consignment / invoked / paused (operator question, 2026-08-05)
+
+| Lifecycle verb | Answer | Mechanism |
+|---|---|---|
+| **Scheduled** | **Entry Step only.** `collect` carries the trigger (`poll` / `cron` / `on: commit` / manual); every downstream Step is **data-driven**. Per-Step independent scheduling is deliberately rejected — it presumes inter-Step queues (the locked no-queue decision, design doc §3.5/§3.6) | trigger on the entry node; topological walk downstream |
+| **Per Consignment** | **Yes — this IS the execution model.** Every Step runs once per Consignment; each Step-run is a job on a virtual thread firing the next; commit unit `(consignment, branch)`. Post-chain plugin processors (grain `BATCH`) fire per Consignment via the commit Signal | the §2.2 contract; `consignment.process` (shipped) |
+| **Invoked** | Three forms: manual Pipeline trigger; per-Step **dry-run/preview through production logic** (test endpoints, run-to-here — shipped); **reprocess a Consignment** (`ReprocessCommand` — a new Run over the same Consignment). ⛔ No standalone production invoke of a mid-chain Step: its input is a Consignment, so the request has no defined input — dry-run is the honest form | `/pipelines/{id}/trigger`, `/components/{type}/{id}/test`, reprocess |
+| **Paused** | Today: `active:` (whole Pipeline) + the Stage-B **half-pause** — acquire on / ingest off, backlog parks in the durable inbox under the B4 high-water gate. **Per-Step `enabled:` is now SCHEDULED (D-13, operator call 2026-08-05)** with **batch-honest semantics**: no queues ⇒ a disabled Step halts the chain at that boundary and Consignments **park durably** — pause is admission control, never RAM buffering | `active:`, split acquire/ingest timers; `enabled:` lands Phase 4 (below) |
+
+**Per-Step pause as the testing dev-loop (D-13).** The operator's driver: *"if we can pause the
+individual Pipeline Step, we are close to a NiFi processor — real help for testing."* Exactly right,
+and the batch model can deliver it without queues, because **the durable park IS the queue, at
+Consignment grain**: disable Step N+1 → real Consignments process through Step N and **park at the
+boundary** → inspect the actual intermediate output → enable → parked Consignments **drain** through
+the rest of the chain. That is NiFi-style incremental bring-up over *production data*, complementing
+the scratch-only paths that already exist (dry-run, run-to-here). Three honest costs, all bounded:
+1. **A pause boundary is a materialisation boundary** — linear Steps normally fuse into one SQL pass
+   (§3.4 fusion), so pausing mid-fusion forces the intermediate to materialise (temp/scratch
+   partition). Same rule as `route`; the fusion optimisation resumes when the pause lifts.
+2. **A parked Consignment is NOT committed** — no source finalisation, no markers; the manifest
+   accretes a `parked_at: <stepId>` state (crash-safe, same accretion discipline as the Decoder
+   tier). Resume = drain from the manifest, a cousin of `ReprocessCommand`.
+3. **Parking needs per-file/stage progression to be inspectable** — which is exactly Stage C
+   (§2.4), so `enabled:` lands **with it in Phase 4**, not before.
+
+### 2.8 Flattener — resolved by placement, not by a new node
 
 Tree-shaped parses (ASN.1, XML) flatten **inside `parse`** onto segment Schemas — one input record →
 N rows across N segment tables, exactly what `Asn1RecordIngester` does today. The recipe surface:
@@ -474,9 +500,10 @@ sealing/completeness tier (consignment doc §8–9) unchanged and out of this pl
 | **1** | Mapping split out of Schema + CSV codec for the two kinds (independent, immediate reuse value) + the **schema compatibility save-gate** (§3.4.2) | round-trip tests; existing schema fixtures load via both shapes; breaking edit refused with cell-level error |
 | **2** | Recipe format + compiler onto existing primitives; converter (read side); **per-Step type flow** (§3.4.4 — `DESCRIBE`-derived output schemas) + schema fingerprint pinned in manifest/`ConsignmentOutput` (§3.4.3) | full suite green through compiled path; converter round-trips all fixtures; derived sink schema matches actual Parquet footer on every fixture |
 | **3** | Table-entry `collect` (+ `summarize` verb) — enrich/matrix unification onto the Signal bus | events/orders enrich + a materialize task run as recipes with identical outputs |
-| **4** | Guarantees fold + Stage C per-file stage progression + per-edge counters | conservation check runs on a fixture; "where is file X" answerable via API |
+| **4** | Guarantees fold + Stage C per-file stage progression + per-edge counters + **per-Step `enabled:` with park/drain (D-13)** | conservation check runs on a fixture; "where is file X" answerable via API; a fixture Consignment parks at a disabled Step, is inspectable, and drains cleanly on re-enable |
 | **5** | UI recipe editor (incl. the §2.6 route surface); canvas demoted; `step-types` endpoint; specs for all seven verbs; **Pipeline Document generator + mapping import loop (§5.1)** | GAUNTLET; axe-core gate; onboarding walkthrough over the recipe editor; document regenerates deterministically from fixtures and an edited mapping CSV round-trips through validate → preview → apply |
-| **6** | Migration executed; legacy formats removed; MAJOR cut | suite green with legacy path deleted; release notes cover all 5 breaking reasons |
+| **6** | Migration executed; legacy formats removed | suite green with legacy path deleted |
+| **7** | **Batch→Consignment rename (D-12)** — the §13 "save for last" row, executed as the final pre-release phase; then the MAJOR cut | rename scoped by concept (grouping-sense `batch` untouched); read-aliases verified on persisted rows; full suite green; release notes cover all 5 breaking reasons + the rename |
 
 Phases 1–3 are pure backend and de-risk everything (same shape as the graph design's own roadmap).
 The UI slices are planned separately in [`elt-amendment-ui-plan.md`](elt-amendment-ui-plan.md)
@@ -533,6 +560,8 @@ editor is a second projection of the existing `AuthoredPipeline` model.
 | D-9 | **Cross-Consignment record dedup** | v1 `dedup` = within-Consignment (SQL `QUALIFY`, exists). The windowed keyed ledger (`scope: window(P4D)`) is a designed fast-follow — **never** faked with unbounded history |
 | D-10 | **Schema compatibility class (§3.4)** | **`BACKWARD`** save-gate default: additive fields + type widening allowed in place; rename/delete/narrow/selector-move refused → copy-as-new-name or explicit override |
 | D-11 | **Declared semantic relations** | **Derived from usage** (joins/group-bys project into the catalog graph — no authoring burden). A hand-authored `relations` CSV component is deferred until a business relation exists that no Pipeline exercises |
+| D-12 | **Batch→Consignment rename** *(resolved 2026-08-05 — operator: "go")* | **Taken INSIDE the MAJOR window as Phase 7**, the final pre-release phase — the `AnnotationKinds` precedent (post-release the same rename costs a deprecation cycle). Scoped **by concept, not by string** (GLOSSARY §13 row): only the unit-of-work entity renames (`BatchEvent`/`BatchManifest`/`BatchProcessor`/…, `batch_id` where persisted); the generic grouping sense stays `batch` (`batch_max_files`, JDBC/telemetry batching). Read-aliases for persisted rows, never a hard cutover. **Sequenced LAST** — 517 files / 39 `@PublicApi` types is the largest blast radius, and every earlier phase touches `Batch*` files |
+| D-13 | **Per-Step pause (`enabled:`)** *(resolved 2026-08-05 — operator: the NiFi-processor testing loop)* | **Scheduled, Phase 4**, with park-at-boundary semantics (§2.7): disable → Consignments park durably at the boundary → inspect real intermediates → enable → drain. Pause boundary = materialisation boundary; a parked Consignment is uncommitted (manifest `parked_at`); requires the Stage-C stage progression, hence Phase 4. Dry-run/run-to-here remain the scratch-only paths |
 
 ---
 

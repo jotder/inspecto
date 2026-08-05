@@ -86,8 +86,9 @@ former root reference docs** (each index lists them):
   compatibility save-gate, schema fingerprint pinned per Consignment, compile-time type flow via
   DuckDB `DESCRIBE`, relations derived from usage. Umbrella for the branch-aware-executor thread
   (Stage C SIGNED OFF 2026-08-05, folded as its §2.4/Phase 4) and headline of the already-MAJOR
-  release (breaking reason #5). **All eleven §9 decisions resolved 2026-08-05 — recommended options
-  taken.** **Phase 0 DONE 2026-08-05** (GLOSSARY amended — new §5 entries, §6-A Job retirement note,
+  release (breaking reason #5). **All thirteen §9 decisions resolved 2026-08-05** — incl. D-12
+  (Batch→Consignment = Phase 7, in-window, sequenced last) and D-13 (per-Step `enabled:` pause with
+  durable park/drain, Phase 4 — the NiFi-style testing loop over production data). **Phase 0 DONE 2026-08-05** (GLOSSARY amended — new §5 entries, §6-A Job retirement note,
   six §13 rename rows; vocabulary guard green). **Phase 1 GROUNDED 2026-08-05** — five premise
   corrections in the plan's §8 block (no SchemaConfig class; ConfigCodec has no format registry;
   the gate seam is `ConfigRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
