@@ -76,12 +76,12 @@ in the palette or the docs a user reads first.
 | *Job* | **Pipeline** (table-entry) for data work; "job" survives only as engine-internal scheduling vocabulary | `JobService`, Signal bus, `consignment.process` kept verbatim as the compile target |
 | *Enrichment* (file kind `*_enrich.toon`) | a **Pipeline** whose `collect` reads a Table | `EnrichmentEngine` retired after migration (§6); the join model lives on inside `transform` |
 | *Matrix* (maintenance task `materialize`) | a **Pipeline** with a `summarize` Step | `MaterializeTask` becomes the at-rest compile target of `summarize` |
-| *Flow* / `*_flow.toon` | **Pipeline** | file kind deleted (already read-only since W5) |
+| ⛔ *Flow* / `*_flow.toon` | **Pipeline** | file kind deleted (already read-only since W5) |
 | *Node* (user-facing) | **Step** | `PipelineNode` IR name unchanged internally |
 | bare *Batch* (for the unit of work) | **Consignment** | `BatchProcessor` etc. keep the name as legacy internals (consignment doc §3) |
 
 GLOSSARY §13 gains one rename-map row per line above (UI → model → backend), same discipline as the
-Source→Collector flip.
+⛔ Source → **Collector** flip of 2026-07-14.
 
 ---
 
@@ -145,7 +145,7 @@ Every Step, built-in or plugin:
 
 `collect` is the only entry Step and comes in two sources:
 
-| Source | Trigger | Engine driver (unchanged) |
+| Entry | Trigger | Engine driver (unchanged) |
 |---|---|---|
 | `connection:` (files, in-motion) | `poll` / `cron` / file-arrival | the Stage-B acquire + ingest timers (`PipelineScheduler`), StabilityGate, ledger, B4 back-pressure |
 | `table:` (rows at rest) | `on: commit of <pipeline>` / `cron` / manual | the Signal bus — `pipeline.commit` Signal → `JobService`, the shipped `consignment.process` shape |
@@ -479,6 +479,42 @@ sealing/completeness tier (consignment doc §8–9) unchanged and out of this pl
 | **6** | Migration executed; legacy formats removed; MAJOR cut | suite green with legacy path deleted; release notes cover all 5 breaking reasons |
 
 Phases 1–3 are pure backend and de-risk everything (same shape as the graph design's own roadmap).
+The UI slices are planned separately in [`elt-amendment-ui-plan.md`](elt-amendment-ui-plan.md)
+(companion, v1.0) — S1–S3 there are unblocked before any backend phase lands, because the recipe
+editor is a second projection of the existing `AuthoredPipeline` model.
+
+#### Phase 1 GROUNDED 2026-08-05 — five findings that correct this plan's premises
+
+1. **There is no `SchemaConfig` class and no schema-specific parser.** The schema `.toon` decodes to
+   a raw `Map` (`ConfigCodec.toMap`) consumed structurally: `PipelineConfigParser.resolveSchemaRef`
+   (`:624`; three branches at `:342/:371/:404`), `DataTransformer.materialize` reads
+   `mapping.rules` as `List<Map<String,String>>` (`:60-115`), `PartitionDef.fromSchema` (`:62-94`),
+   `TransformCompiler.dataColumn` (`:28-81`). The split therefore needs a **merge point** that keeps
+   handing downstream one conflated map — not a model refactor.
+2. **`ConfigCodec` is TOON-only with zero format abstraction** (61 lines, hardcoded JToon,
+   `@PublicApi 4.0.0`); atomic writes live in `AtomicFiles`, and no secret masking exists on the
+   schema path (none needed). The plan's "CSV codec" is therefore **not** a codec-registry job in
+   slice 1 — a plain reader for the two flat shapes is the honest size.
+3. **The compatibility-gate seam is `ConfigRoutes.writeConfig`/`patchConfig`** (`:114-179`, atomic
+   write at `:165`), which already holds both the existing file and the draft. `ConfigSpecs.schema()`
+   is UI-description-only, **`ConfigSpecs.schemaComponent()` does not exist**, and
+   `ConfigSafetyValidator` deliberately skips `schema` — the BACKWARD diff (§3.4.2) is genuinely new
+   logic inserted as ERROR findings in that route, not a wiring job.
+4. **`schema` was deliberately removed from `ComponentStore.WRITABLE_TYPES`** (2026-07-31, W1:
+   the id-addressed registry copy was never wired to execution; only path-addressed
+   `processing.schema_file` executes) — while `ComponentRegistry.TYPE_BY_DIR` still lists
+   `schemas/` read-side. **Sequencing call:** slice 1 keeps Mapping **path-addressed** (a sibling
+   `<name>_mapping.csv` dual-read, injected into the decoded map when present — additive, zero
+   fixture impact); promoting Schema/Mapping to id-addressed component kinds (`WRITABLE_TYPES` +
+   `TYPE_BY_DIR` + `ComponentRoutes`) is a later slice and must resolve that latent
+   read/write inconsistency deliberately.
+5. **The "~80 fixtures" figure was wrong.** Reality: 7 real `*_schema.toon` (all with `mapping:`,
+   3 with `partitions:`, none with `segments:`) + 18 `examples/**/schema.toon` + inline TOON
+   literals across 28 Java test files. The Phase-2 parity gate counts THOSE, not 80 files.
+
+**Slice 1 of record:** dual-read only — sibling `_mapping.csv` overrides `mapping.rules` at the
+`resolveSchemaRef` merge point; plain CSV parse; `ConfigSpecs`/`ConfigSafetyValidator`/
+`ComponentStore`/`ConfigRoutes` untouched until slices 2 (split-write + gate) and 3 (component kinds).
 
 ---
 

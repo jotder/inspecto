@@ -88,8 +88,21 @@ former root reference docs** (each index lists them):
   (Stage C SIGNED OFF 2026-08-05, folded as its §2.4/Phase 4) and headline of the already-MAJOR
   release (breaking reason #5). **All eleven §9 decisions resolved 2026-08-05 — recommended options
   taken.** **Phase 0 DONE 2026-08-05** (GLOSSARY amended — new §5 entries, §6-A Job retirement note,
-  six §13 rename rows; vocabulary guard green). Next: Phase 1 (Mapping split + CSV codec +
-  `BACKWARD` compatibility gate).
+  six §13 rename rows; vocabulary guard green). **Phase 1 GROUNDED 2026-08-05** — five premise
+  corrections in the plan's §8 block (no SchemaConfig class; ConfigCodec has no format registry;
+  the gate seam is `ConfigRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
+  fixture count was wrong). Next: Phase 1 slice 1 (sibling `_mapping.csv` dual-read).
+
+- [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
+  (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:
+  the recipe editor is a **second projection of the existing `AuthoredPipeline` model** — same
+  reducers, same `PUT /pipelines/{name}/graph` save, canvas kept behind a mode toggle for
+  non-expressible graphs. Seven slices S1–S7 (S1–S3 unblocked before any backend phase): Step
+  cards + Guarantees panel + route-branch UI + "Step" copy sweep now; step-types palette,
+  Schema/Mapping grid editors with cell-level compatibility findings, Pipeline Document
+  export/import, and table-entry collect as the backend phases land. Applies the `angular-ui`
+  skill; reuses the shared editors (grammar/collector/enrichment/schema-form/data-table) —
+  no new dialog kinds.
 
 - ~~`superpower/grammar-config-unification.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
   ([archive copy](archived-documents/plans-archive/grammar-config-unification.md), provenance only).
