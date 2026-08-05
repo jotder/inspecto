@@ -73,6 +73,24 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) —
+  **APPROVED v1.0 (2026-08-05) — the ELT final amendment: one model, one vocabulary, one authoring
+  surface.** The operator's unification directive: a Pipeline is an ordered chain of uniform Steps
+  (seven verbs + plugins — record `dedup` is a Step by operator call; file dedup stays a Guarantee),
+  Schema and Mapping split into separate reusable CSV component files,
+  Enrichment and Matrix become table-entry Pipelines, housekeeping becomes declared Guarantees, and
+  the 20-id node palette leaves the user surface. Routing is first-class in the recipe (§2.6:
+  `route` with nested branch chains — recipe = tree, rejects Guarantee-routed, fan-in stays canvas),
+  and the generated **Pipeline Document** (§5.1) serves business verification/sign-off with a
+  CSV-mapping import change loop. Schema-registry *semantics* without a registry service (§3.4):
+  compatibility save-gate, schema fingerprint pinned per Consignment, compile-time type flow via
+  DuckDB `DESCRIBE`, relations derived from usage. Umbrella for the branch-aware-executor thread
+  (Stage C SIGNED OFF 2026-08-05, folded as its §2.4/Phase 4) and headline of the already-MAJOR
+  release (breaking reason #5). **All eleven §9 decisions resolved 2026-08-05 — recommended options
+  taken.** **Phase 0 DONE 2026-08-05** (GLOSSARY amended — new §5 entries, §6-A Job retirement note,
+  six §13 rename rows; vocabulary guard green). Next: Phase 1 (Mapping split + CSV codec +
+  `BACKWARD` compatibility gate).
+
 - ~~`superpower/grammar-config-unification.md`~~ — **SHIPPED and ARCHIVED 2026-08-04**
   ([archive copy](archived-documents/plans-archive/grammar-config-unification.md), provenance only).
   One `<inspecto-grammar-editor>` for the Onboarding Parsing stage and the Pipelines `parse` node

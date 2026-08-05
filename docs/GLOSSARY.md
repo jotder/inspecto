@@ -173,7 +173,10 @@ concept: if it has a status and an id, it is a **Consignment**; if it is just a 
 
 **Schema** *(= table/record schema)* — The column-and-type structure of one relation: field names, **Attribute
 Types**, and validation. It describes a **Table**'s shape. ⚠️ It is **not** a database *namespace* — say "table
-schema" if ambiguity is possible.
+schema" if ambiguity is possible. **Structure only (ELT final amendment v1.0, 2026-08-05):** a Schema carries
+*no field mapping* — reshaping rules are a **Mapping** (below). As a component it becomes a flat **CSV** file
+under `schemas/` (field, type, selector, unit, description, classification; filename = identity, amendment
+D-3). *(Split lands amendment Phase 1; until then `*_schema.toon` still conflates both.)*
 
 > ⚠️ **One word, two config shapes — a known violation of "one concept → one word", recorded 2026-07-27.**
 > `schema` names both the **registry component** (a bare column list, `{fields:[{name,type[,format]}]}`, stored
@@ -181,9 +184,16 @@ schema" if ambiguity is possible.
 > `raw.format`, `mapping.canonicalName` — describing a *raw source*, e.g. `events/call_schema.toon`). They are
 > validated by two different specs (`ConfigSpecs.schemaComponent()` vs `ConfigSpecs.schema()`), and conflating
 > them broke `component_draft` for two slices. Renaming either is a breaking change to on-disk directories and
-> the UI `ComponentType` union, so the collision **stands deliberately** — say *"schema component"* or *"schema
+> the UI `ComponentType` union, so the collision **stood deliberately** — say *"schema component"* or *"schema
 > config"* whenever the reading is not obvious from context, and never resolve one to the other's spec.
-> → `okf/frontend/features/inline-ai-authoring.md`.
+> → `okf/frontend/features/inline-ai-authoring.md`. **Resolution now scheduled (2026-08-05):** the ELT final
+> amendment's Phase 1 splits the TOON schema config into **Schema** (structure, CSV) + **Mapping** (CSV),
+> retiring the two-shape collision inside the already-MAJOR release.
+
+**Mapping** — The reusable field map applied by a *map* Step: rows of *target column ← source expression
+(+ kind: direct/expr)*. A flat **CSV** component under `mappings/` (filename = identity), reusable across
+Schemas and Pipelines, and rendered verbatim as the **Pipeline Document**'s field table. ⛔ never fold a
+Mapping back inside a Schema. *(New component kind — ELT final amendment v1.0 §1.1/§3.2, lands Phase 1.)*
 
 **Field** *(Attribute)* — One column in a Schema: name, selector (how to locate it in the raw file), Attribute
 Type, and optional rules.
@@ -244,12 +254,22 @@ Execution / Signal networks. A consequence that targets a component `invokes` it
 > lakehouse, producing Derived Tables.
 
 **Pipeline** — A named, authored **DAG of Steps** that turns raw source files into clean, partitioned Tables.
-The Pipeline's `wiring` *is* its graph. ⛔ never "Flow".
+The Pipeline's `wiring` *is* its graph. ⛔ never "Flow". **Amendment v1.0 (2026-08-05,
+`superpower/elt-final-amendment-plan.md`):** the authoring shape is an ordered **chain** of Steps — a tree
+once `route` opens named branches; fan-*in* stays canvas-authored — with a **trigger** and **Guarantees**. A
+Pipeline enters from **files** (a Connection) or from a **Table** (at rest, Signal-fired), the second
+absorbing what `*_enrich.toon` files and `materialize` tasks author today. One authoring shape; the
+in-motion/at-rest line stays an engine seam.
 
-**Step** — One node in a Pipeline, drawn from the **closed `BuiltinNodeType` vocabulary** (20 ids, served
-verbatim by `GET /pipelines/node-types`): the SOURCE pair (`acquisition` / `adapter`), `parser`, the TRANSFORM
-family (`transform.*` + `enrichment`), the three `sink.*` kinds, and the CONTROL trio (`gap` / `alert` /
-`event`). ⚠ Closed on purpose — contrast **Job types**, which are an *open* registry (`JobTypeProvider`).
+**Step** — One unit activity in a Pipeline: a processor with the uniform contract *Consignment in →
+Consignment out (+ rejects)*. **User surface (amendment v1.0): seven verbs** — `collect` · `parse` · `map` ·
+`dedup` · `transform` · `summarize` · `sink` — plus self-describing **plugin Steps** (`ConsignmentProcessor`
+SPI, declared grain `RECORD | FILE | BATCH`). ⛔ *Node* (user-facing) → **Step**. The **closed
+`BuiltinNodeType` vocabulary** (20 ids, served verbatim by `GET /pipelines/node-types`): the SOURCE pair
+(`acquisition` / `adapter`), `parser`, the TRANSFORM family (`transform.*` + `enrichment`), the three
+`sink.*` kinds, and the CONTROL trio (`gap` / `alert` / `event`) — remains the **compile-target set** the
+verbs lower onto; it leaves the user surface at the amendment's Phase 5 but is still the served palette
+until then. ⚠ Closed on purpose — contrast **Job types**, which are an *open* registry (`JobTypeProvider`).
 
 > ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
 > were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
@@ -276,9 +296,28 @@ Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserC
 `okf/frontend/features/grammar-config.md`.
 
 **Transform** — Reshapes/derives/aggregates (cubes) data. When it materializes output it produces a **Derived
-Table**.
+Table**. **Amendment v1.0 (D-4):** the `transform` Step verb covers filter / derive / **reference join**
+(`transform: {join: references/x, on: k}`) — the join formerly called "enrichment".
 
-**Enrichment** — Augments each record via lookup against reference data.
+**Enrichment** — Augments each record via lookup against reference data. ⚠ **Retiring user-facing (amendment
+v1.0, D-4):** the *operation* is the reference **join inside a `transform` Step**; the *file kind*
+`*_enrich.toon` becomes a **table-entry Pipeline** (amendment Phases 3/6, §13 row). Existing enrich files
+keep running until migration; author no new user-facing "Enrichment" copy.
+
+**Guarantee** — A declared property of a Pipeline that the runtime honors regardless of chain shape:
+`file_dedup` (path / fingerprint / marker), `backup`, `quarantine` (always on — keys only tune
+location/retention), `markers`, `gap_watch`, `retention`. **Never a Step, never designer-wired** —
+*"housekeeping is runtime-guaranteed"*. ⚠ **The dedup boundary (operator call, 2026-08-05):** **file** dedup
+("seen this file?") is the Guarantee `file_dedup`; **record** dedup (business key, winner policy, duplicates
+quarantined as a counted, reportable reject stream) is the `dedup` **Step** — the bare word `dedup` belongs
+to the Step alone. *(Amendment v1.0 §2.4; the fold lands its Phase 4.)*
+
+**Pipeline Document** — A **generated**, human-readable specification of one Pipeline — source, Steps, the
+field-level Mapping + transformation tables, Guarantees, outputs, with worked sample rows from dry-run — used
+for business verification and sign-off. Stamped with a **config fingerprint** (staleness of an approval is
+detectable); reviewer edits to the mapping tables re-import as proposed **Mapping** changes (validate →
+dry-run diff → apply). **Never hand-authored** — always a projection of config. *(Amendment v1.0 §5.1; lands
+its Phase 5.)*
 
 **Sink** — Writes processed records to a destination. The lakehouse Sink writes **Parquet into a Table**.
 
@@ -297,6 +336,10 @@ of what a Pipeline landed. Its kinds are an **open registry** keyed by string id
 `JobTypeRegistry`); the built-ins are `enrich` · `report` · `maintenance` · `pipeline`. ⛔ There is deliberately
 **no `ingest` job type** (removed 2026-06-17) — ingestion is the Pipeline's sole responsibility, and an
 `ingest` job is now a config error. ⚠ A Job is **not** embeddable as a **Step** (see §5).
+⚠ **User-facing retirement (amendment v1.0, 2026-08-05):** end users author **table-entry Pipelines** for
+at-rest data work; "Job" survives as **engine-internal scheduling vocabulary only** (`JobService`, the Signal
+bus, `consignment.process` — kept verbatim as the compile target of a table-entry `collect`). Rollout at the
+amendment's Phases 3/6; §13 row.
 
 **Scheduler** — The Operations engine that owns **Triggers** and starts **Executables** (Pipelines or Jobs). It
 defines *when*, not *what*.
@@ -646,6 +689,12 @@ routes' `?pipeline=`/`?flow=` query param). |
 | `USES` *(lineage edge)* | **`CONSUMES`** | ✅ **DONE** (breaking → 5.0): `EdgeKind.CONSUMES`, `MetadataGraphBuilder` report→kpi edge; FE `models.ts` `EdgeKind` already `CONSUMES`. ⚠️ `/catalog/graph` emits the new value (no alias). |
 | `EVENT_TABLE` / `TRANSFORMED_TABLE` / `REFERENCE_TABLE` | **`TABLE`** / **`DERIVED_TABLE`** / **`REFERENCE_DATASET`** | ✅ **DONE** (breaking → 5.0): `NodeKind` enum + all usages (`IdScheme`, `CatalogOverlay`, `MetadataGraphService`, `KpiToSqlSkill`, `SuggestConfigSkill`) + 5 test files; FE `models.ts` union + `node-detail.dialog.ts` `isStore()` + `catalog-graph.ts` shape/glyph. Id tokens (`event`/`xform`/`ref`) unchanged. ⚠️ `/catalog/graph` emits the new enum values (no alias). |
 | `LineageRow` *(file→partition rows)* | **Provenance** *(concept)* | `inspecto/etl/LineageRow.java`, `BatchAuditWriter`; the asset graph keeps the name *Lineage* |
+| Node *(user-facing, pipeline canvas)* | **Step** | **NOT STARTED — ELT final amendment Phase 5** (`superpower/elt-final-amendment-plan.md`). UI copy in the pipeline editor/palette/inspector ("node" → "Step"); `GET /pipelines/node-types` → `/pipelines/step-types` (serve both during rollout); `NodeConfigDialog` title copy. Internal `PipelineNode`/`BuiltinNodeType`/`NodeAttributes` names KEPT — the IR is engine-internal, same discipline as the Metric row keeping ops `MetricRegistry`. |
+| Job *(user-facing, at-rest data work)* | **Pipeline** *(table-entry)* | **NOT STARTED — amendment Phases 3/6.** User surface only: Jobs panes/routes and `*_job.toon` authoring for the `enrich`/`report` data kinds migrate to table-entry Pipelines (`collect: {table:, on: commit}`); `maintenance` stays standalone (deleters keep their fence, design doc §3.8). Engine internals KEPT verbatim: `JobService`, `JobTypeProvider` open registry, Signal bus, `consignment.process`. |
+| Enrichment *(file kind + Step name)* | **table-entry Pipeline** / `transform: {join:}` | **NOT STARTED — amendment Phases 3/6 (D-4).** `*_enrich.toon` → table-entry Pipeline recipes via the one-shot converter; the `enrichment` BuiltinNodeType id becomes compile-internal; `EnrichmentEngine` retired after migration parity. The *word* survives only in engine internals until their natural rename. |
+| `materialize` *(maintenance task as Matrix authoring)* | **`summarize` Step** | **NOT STARTED — amendment Phase 3 (D-7).** The **Matrix** noun (summary Derived Table, Cube row above) is unaffected — this row retires only the *authoring path*: `MaterializeTask` becomes the at-rest compile target of a `summarize` Step in a table-entry Pipeline. |
+| `mapping:` *(block inside `*_schema.toon`)* | **Mapping** *(own CSV component kind)* | **NOT STARTED — amendment Phase 1 (D-3).** Splits the §3 two-shape collision: Schema = structure CSV, Mapping = field-map CSV, both filename-identity. Touchpoints: schema TOON codec, `ConfigSpecs.schema()`, schema editor UI, the ~80 fixtures (one-shot converter). |
+| bare `dedup` *(config key, file sense)* | **`file_dedup`** *(Guarantee)* vs **`dedup`** *(Step, records)* | **NOT STARTED — amendment Phase 4 (§2.4 boundary).** The word splits by grain: Guarantee key `file_dedup` (path/fingerprint/marker — today `collector.duplicate` + `processing.duplicate_check`); the bare verb `dedup` is reserved for the record-grain Step (`transform.dedup` compile target). |
 | Batch *(the unit-of-work entity)* | **Consignment** | **NOT STARTED — now the largest blast radius in this table; supersedes Flow→Pipeline as the "save for last" row.** Decided 2026-08-03 for the greenfield ELT design (`docs/superpower/consignment-elt-architecture.md`), which authors the concept under this name. Scale: **517 Java files** mention `Batch`, **39 of them `@PublicApi`** — so this is a **breaking API rename needing a version bump** (unlike Flow→Pipeline, contracts here *have* shipped). Core touchpoints: `BatchEvent` + `BatchEventBus` (the event seam every consumer subscribes to), `BatchManifest`, `BatchAuditWriter`/`BatchAuditReport`, `BatchProcessor`, `BatchIngestStrategy`/`BatchStrategy`, `BatchPlanner`, `BatchGraphRunner`, `BatchSink`, `BatchSignal`, `BatchRow`; plus `batch_id` wherever persisted, and the UI's Runs/Processing-Status surfaces. ⚠ **Scope this rename by concept, not by string.** Only the entity with an id and a status renames. The generic grouping sense stays `batch`: `batch_max_files`/`batch_max_bytes` config keys, `BatchedOperations`/`BatchedOperationMs` telemetry, JDBC/DuckDB batching. Same discipline as the Metric row keeping ops `MetricRegistry`. ⚠ Persisted `Batch*` event rows and audit tables need a **read-alias**, not a hard cutover. |
 
 **Migration underway** (the *2b* coordinated breaking change, toward **5.0** — one term per verified PR). ✅ = the

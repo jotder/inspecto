@@ -406,7 +406,7 @@ inbox). §3.5's escalation clause gained the matching "first slice shipped on ac
 writes open decision #1's justification of record (skew/latency → "don't let a slow ingest make acquisition fill
 local disk") into §3.5/§3.8 as required. `live-execution.md` needed no change — it describes at-rest authored
 pipelines (`JobType.PIPELINE`), which never touch the acquire/ingest inbox that Stage B reconciles.
-### Stage C — per-file stage housekeeping (NEEDS SIGN-OFF; reverses B10 ordering)
+### Stage C — per-file stage housekeeping (✅ SIGNED OFF 2026-08-05 — folded into [`elt-final-amendment-plan.md`](elt-final-amendment-plan.md) §2.4 + Phase 4; reverses B10 ordering)
 
 Today every durable store records a **terminal fact**, not a progression: ledger keyed
 `(sourceId, relativePath)`, markers boolean, `BatchManifest` per-`batchId` written once at commit,
@@ -426,8 +426,10 @@ counters §11.3 wants, not a new store from scratch.
    concrete: *"don't let a slow ingest make acquisition fetch unboundedly and fill local disk."* B4 exercises
    §3.5 on the acquire→ingest edge (durable inbox = the spill queue), throttling the producer — negative
    feedback, no throughput SLA needed. Write this into §3.5/§3.8 with B5.
-2. **Stage C now or after B?** B10 puts per-file stage tracking at phase 4.5/6; the operator's model
-   implies it is co-equal with B ("full housekeeping for all files, its stages").
+2. ~~**Stage C now or after B?**~~ — ✅ **resolved 2026-08-05 (elt-final-amendment-plan §9 D-5).**
+   After B, as part of the ELT final amendment: Stage C is folded there as the per-file housekeeping
+   Guarantee (§2.4) and lands in its Phase 4, after the recipe compiler (Phases 1–3). That plan is
+   the sign-off of record; this stage closes here by reference.
 3. ~~**Pin the stale `fetchTo` doc line**~~ — ✅ settled 2026-08-01. `connectors.md` was wrong (fetch never
    went to the backup dir; backup is post-commit in `BatchProcessor.backupFile`). Rewritten, and B3a made
    the answer concrete: fetch lands in the staging tree, then renames into `dirs.poll`.
