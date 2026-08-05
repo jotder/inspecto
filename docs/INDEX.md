@@ -94,8 +94,12 @@ former root reference docs** (each index lists them):
   the gate seam is `ConfigRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
   fixture count was wrong). Phase 1 slices 1–3 SHIPPED 2026-08-05: sibling `_mapping.csv` dual-read;
   split-write + BACKWARD compatibility gate at `ConfigRoutes`; `schema`/`mapping` component kinds
-  with `schema/<id>` + `mapping_file` execution wiring. Next: Phase 2 (recipe compiler + type flow),
-  or UI slices S1–S3 (unblocked).
+  with `schema/<id>` + `mapping_file` execution wiring. **Phase 2 S1–S4 SHIPPED 2026-08-05**:
+  schema fingerprint pinned per Consignment (manifest + `consignment_outputs`); per-Step type flow
+  (`TypeFlow` DESCRIBE-derived output schemas, footer-parity gate green); `RecipeCompiler` (linear
+  verbs onto `PipelineEditable.lower`); `RecipeConverter` + fixture round-trip parity over the whole
+  repo corpus. Phase 2 remaining: `route`/`dedup` lowering, TypeFlow save/dry-run wiring, the recipe
+  API route. Next: those, Phase 3 (table-entry collect + summarize), or UI slices S1–S3 (unblocked).
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:
