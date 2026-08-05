@@ -242,9 +242,14 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
   bytes          BIGINT,
   written_at     VARCHAR,
   generation     INTEGER,
-  state          VARCHAR   -- LIVE | SUPERSEDED | COMPACTED_AWAY
+  state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY
+  schema_fingerprint VARCHAR  -- §3.4.3 CanonicalHash of the schema that wrote the file; NULL pre-column / no-schema paths
 );
 ```
+
+`initSchema()` follows the CREATE with `ALTER TABLE consignment_outputs ADD COLUMN IF NOT EXISTS
+schema_fingerprint VARCHAR` — the additive migration for registries created before the column existed
+(CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows read back `NULL`.
 
 The durable output registry from the
 [consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §11.3 — the catalog substitute

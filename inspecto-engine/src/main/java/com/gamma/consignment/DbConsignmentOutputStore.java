@@ -45,7 +45,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      *  the spelling in {@code inspecto_pipeline_provenance} and the {@code lineage} CSV. */
     private static final String COLS =
             "consignment_id, run_id, table_name, partition_key, record_day, "
-                    + "path, row_count, bytes, written_at, generation, state";
+                    + "path, row_count, bytes, written_at, generation, state, schema_fingerprint";
 
     private final Connection conn;
 
@@ -72,7 +72,10 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                     + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
                     + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
                     + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
-                    + "generation INTEGER, state VARCHAR)");
+                    + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR)");
+            // §3.4.3 additive migration: CREATE TABLE IF NOT EXISTS never widens a pre-existing table, so a
+            // registry created before the column existed gets it added here; existing rows read back NULL.
+            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS schema_fingerprint VARCHAR");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise consignment-outputs schema", e);
         }
@@ -98,7 +101,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     public synchronized void record(List<ConsignmentOutput> outputs) {
         if (outputs == null || outputs.isEmpty()) return;
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?)")) {
+                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")) {
             for (ConsignmentOutput o : outputs) {
                 ps.setString(1, o.consignmentId());
                 ps.setString(2, o.runId());
@@ -111,6 +114,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 ps.setString(9, o.writtenAt());
                 ps.setInt(10, o.generation());
                 ps.setString(11, o.state().name());
+                ps.setString(12, o.schemaFingerprint());
                 ps.addBatch();
             }
             ps.executeBatch();
@@ -251,7 +255,8 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 rs.getLong("bytes"),
                 rs.getString("written_at"),
                 rs.getInt("generation"),
-                state(rs.getString("state")));
+                state(rs.getString("state")),
+                rs.getString("schema_fingerprint"));
     }
 
     /** Unknown state text degrades to {@code LIVE} rather than throwing: a row written by a newer build must

@@ -566,6 +566,55 @@ resolved** — `processing.schema_file: schema/<id>` now executes the registry c
 **Phase 1 remaining:** the schema *structure* CSV shape (§3.2 first table) — schemas persist as
 TOON for now; revisit with Phase 2's type flow.
 
+#### Phase 2 GROUNDED 2026-08-05 — findings that shape the slices
+
+1. **The recipe compile target is `PipelineEditable.lower` over a `PipelineGraph`** — build one node
+   per Step in chain order and every existing refusal/validation gate (`LOWERABLE`, `NO_ACQUISITION`,
+   `PARSER_NO_SCHEMA`, `ConfigSpecs.pipeline()` + `ConfigSafetyValidator`) comes for free
+   (`PipelineEditable.java:44-48/:207`, `PipelineRoutes.saveGraph:184-239`). Verb→node: collect →
+   `acquisition`, parse → `parser`, dedup → `transform.dedup_marker`, transform.filter →
+   `transform.filter`, sink → `sink.persistent` (+ the plural `sinks:` list). **`route` is not
+   lowerable today** (explicitly refused `UNSUPPORTED_NODE`) and **no `summarize` node kind exists** —
+   the latter is Phase 3's verb anyway, so the Phase-2 compiler covers the linear file-entry verbs
+   and `route` lands as its own later slice.
+2. **Discovery keys on the `_pipeline.toon` suffix** (`ConfigRegistry.PIPELINE_SUFFIX:41`); a bare
+   `pipelines/<name>.toon` recipe is invisible. **Decision of record: the compiler writes a canonical
+   `<name>_pipeline.toon`** (compile-at-authoring, discovery unchanged) rather than teaching the
+   registry a second suffix.
+3. **The recipe `guarantees:` block is richer than `source.guarantee`** (a single enum,
+   `PipelineConfig.java:317-338`) — the fold is Phase 4's deliverable (§2.4); Phase 2's compiler
+   passes through what exists and refuses what doesn't, loudly.
+4. **Type flow is a small extraction, not new machinery.** `DataTransformer.materialize` builds its
+   full SELECT *before* wrapping it in `CREATE TABLE AS` (`:107-110`) — expose the SELECT and wrap it
+   in `DESCRIBE (…)` over a throwaway `DuckDbUtil` connection (the `SchemaExtractor:79-155` /
+   `ComponentPreview` precedent). `SchemaExtractor.mapType(:355)` is the one existing DuckDB→schema
+   type mapping. Footer parity for the verify gate: `PartitionWriter` writes Parquet via
+   `COPY (SELECT …)` (`:83-111`), so the footer schema is exactly the SELECT's inferred types —
+   readable back with `parquet_schema()` / `DESCRIBE (SELECT * FROM read_parquet(…))`, zero new deps.
+5. **The §5.6 "pinned config" precedent does not exist in code** — the fingerprint is the FIRST
+   pinning, not a follow-on. Seams: `BatchManifest` (Gson POJO, null-tolerant on old files — the
+   `consignmentId`/`batchId` alias precedent), populated in `BatchProcessor.finalizeSource:178-189`;
+   `ConsignmentOutput` + `DbConsignmentOutputStore.initSchema:69-79` (schema-on-open, **no ALTER
+   migration precedent** — needs `ALTER TABLE … ADD COLUMN IF NOT EXISTS`). `cfg.referencedFiles()`
+   (`PipelineConfig.java:698,745`) is exactly the schema+mapping file set to hash; **no shared
+   content-hash utility is reachable from etl/engine** (`ContentHash` is package-private in
+   `com.gamma.control`) — a small SHA-256 helper lands in `inspecto-util`.
+
+**Slices of record (each shippable):** **S1** fingerprint pinning (manifest + `consignment_outputs`
+column + shared hash util) · **S2** per-Step type flow (`DESCRIBE`-derived output schemas + the
+footer-parity gate + save-time cell errors) · **S3** recipe format + compiler (linear verbs →
+`PipelineGraph` → `lower` → `<name>_pipeline.toon`) · **S4** read-side converter + fixture
+round-trip parity. `route` compilation follows S3 once a lowerable route node exists.
+
+**P2 S1 SHIPPED 2026-08-05** — the §3.4.3 schema fingerprint: `com.gamma.util.CanonicalHash`
+(SHA-256 over a canonical rendering — map keys sorted, scalars length-prefixed);
+`BatchManifest.schemaFingerprint` (Gson-tolerant, null on old manifests);
+`ConsignmentOutput.schemaFingerprint` + `consignment_outputs.schema_fingerprint` (DDL widened,
+`ADD COLUMN IF NOT EXISTS` migration on open, old rows read null); pinned in
+`BatchProcessor.finalizeSource` from the resolved schema map (mapping rules included — the parser
+merged them at load), located by `batch.schemaName()` across single/selector/segments. The
+enrichment/Pipeline-sink paths deliberately record null until S2's derived output schemas exist.
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

@@ -28,6 +28,14 @@ public final class BatchManifest {
     public String schemaName;
     public String outputTable;     // null when writing directly to dirs.database
     public String createdAt;
+
+    /**
+     * SHA-256 fingerprint ({@link com.gamma.util.CanonicalHash}) of the resolved schema map — mapping rules
+     * included — that wrote this Consignment (ELT amendment §3.4.3: data carries its schema identity, without
+     * an id server). {@code null} on manifests written before the field existed, and for schema-less drafts;
+     * readers must tolerate that, never require it.
+     */
+    public String schemaFingerprint;
     public List<MemberEntry> members;
     public List<OutputEntry> outputs;
     public List<String>      markers;

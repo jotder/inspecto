@@ -52,13 +52,24 @@ public final class ConsignmentOutputs {
      */
     public static List<ConsignmentOutput> fromLineage(String consignmentId, String runId, String tableName,
                                                       List<PartitionOutput> outputs, List<LineageRow> lineage) {
+        return fromLineage(consignmentId, runId, tableName, outputs, lineage, null);
+    }
+
+    /**
+     * {@link #fromLineage(String, String, String, List, List)} with the §3.4.3 schema fingerprint of the
+     * resolved schema that wrote the Consignment stamped on every row ({@code null} when unknown).
+     */
+    public static List<ConsignmentOutput> fromLineage(String consignmentId, String runId, String tableName,
+                                                      List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                                      String schemaFingerprint) {
         Map<String, Long> byPath = new HashMap<>();
         if (lineage != null)
             for (LineageRow r : lineage) {
                 if (r.outputFile() == null || r.outputFile().isBlank()) continue;
                 byPath.merge(r.outputFile(), r.rowCount(), Long::sum);
             }
-        return build(consignmentId, runId, tableName, outputs, o -> byPath.getOrDefault(o.outputFile(), 0L));
+        return build(consignmentId, runId, tableName, outputs,
+                o -> byPath.getOrDefault(o.outputFile(), 0L), schemaFingerprint);
     }
 
     /**
@@ -69,7 +80,10 @@ public final class ConsignmentOutputs {
                                                               List<PartitionOutput> outputs,
                                                               Map<String, Long> rowsByPartition) {
         Map<String, Long> counts = rowsByPartition == null ? Map.of() : rowsByPartition;
-        return build(consignmentId, runId, tableName, outputs, o -> counts.getOrDefault(o.partition(), 0L));
+        // No fingerprint on this path: enrichment and Pipeline sinks derive their output from a query, not a
+        // declared schema — their derived output schema arrives with the per-Step type flow (Phase 2 S2).
+        return build(consignmentId, runId, tableName, outputs,
+                o -> counts.getOrDefault(o.partition(), 0L), null);
     }
 
     /**
@@ -158,14 +172,15 @@ public final class ConsignmentOutputs {
      */
     private static List<ConsignmentOutput> build(String consignmentId, String runId, String tableName,
                                                  List<PartitionOutput> outputs,
-                                                 ToLongFunction<PartitionOutput> rows) {
+                                                 ToLongFunction<PartitionOutput> rows,
+                                                 String schemaFingerprint) {
         if (outputs == null || outputs.isEmpty()) return List.of();
         String writtenAt = Instant.now().toString();
         List<ConsignmentOutput> registry = new ArrayList<>(outputs.size());
         for (PartitionOutput o : outputs)
             registry.add(new ConsignmentOutput(consignmentId, runId, tableName, o.partition(),
                     recordDay(o.partition()), o.outputFile(), rows.applyAsLong(o), o.bytes(),
-                    writtenAt, 0, ConsignmentOutput.State.LIVE));
+                    writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint));
         return registry;
     }
 }

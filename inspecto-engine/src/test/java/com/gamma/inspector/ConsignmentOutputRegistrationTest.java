@@ -101,6 +101,9 @@ class ConsignmentOutputRegistrationTest {
                 assertTrue(o.bytes() > 0, "bytes come from the revealed file on disk: " + o.path());
                 assertTrue(Files.exists(Path.of(o.path())), "the registered path must be the revealed file");
                 assertNotNull(o.writtenAt());
+                assertEquals(com.gamma.util.CanonicalHash.sha256(cfg.schemas().single()),
+                        o.schemaFingerprint(),
+                        "§3.4.3: every row pins the fingerprint of the schema that wrote it");
             }
             assertEquals(List.of("2026-07-01", "2026-07-02"),
                     rows.stream().map(ConsignmentOutput::recordDay).sorted().toList(),

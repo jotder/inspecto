@@ -36,6 +36,10 @@ import com.gamma.api.PublicApi;
  * @param generation    per-partition compaction generation (§6.3) — compaction stages a new generation and
  *                      flips it, so a crash between write and unlink cannot double-count.
  * @param state         lifecycle state; see {@link State}.
+ * @param schemaFingerprint SHA-256 ({@code CanonicalHash}) of the resolved schema map — mapping rules
+ *                      included — that wrote the file (ELT amendment §3.4.3: data carries its schema
+ *                      identity). {@code null} for rows written before the column existed and for write
+ *                      paths that carry no pipeline schema (enrichment, Pipeline sinks) — never required.
  */
 @PublicApi(since = "5.0.0")
 public record ConsignmentOutput(
@@ -49,7 +53,16 @@ public record ConsignmentOutput(
         long bytes,
         String writtenAt,
         int generation,
-        State state) {
+        State state,
+        String schemaFingerprint) {
+
+    /** Fingerprint-less form — pre-§3.4.3 call sites and write paths with no pipeline schema. */
+    public ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey,
+                             String recordDay, String path, long rows, long bytes, String writtenAt,
+                             int generation, State state) {
+        this(consignmentId, runId, tableName, partitionKey, recordDay, path, rows, bytes, writtenAt,
+                generation, state, null);
+    }
 
     /**
      * Lifecycle of a registered output file.

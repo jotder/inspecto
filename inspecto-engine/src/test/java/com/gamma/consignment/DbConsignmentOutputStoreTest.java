@@ -117,7 +117,7 @@ class DbConsignmentOutputStoreTest {
             try (Statement st = raw.createStatement()) {
                 st.execute("INSERT INTO consignment_outputs VALUES "
                         + "('c1','run-1','cdr','dt=2026-08-04','2026-08-04','/w/x.parquet',1,100,"
-                        + "'2026-08-04T10:00:00Z',1,'QUARANTINED_BY_A_FUTURE_BUILD')");
+                        + "'2026-08-04T10:00:00Z',1,'QUARANTINED_BY_A_FUTURE_BUILD',NULL)");
             } catch (SQLException e) {
                 fail("raw insert should succeed: " + e.getMessage());
             }
@@ -142,6 +142,55 @@ class DbConsignmentOutputStoreTest {
             assertDoesNotThrow(() -> db.record(List.of()));
             assertDoesNotThrow(() -> db.record(null));
             assertTrue(db.outputs("c1").isEmpty());
+        }
+    }
+
+    // ── schema fingerprint (ELT amendment §3.4.3) ─────────────────────────────────
+
+    @Test
+    void schemaFingerprintRoundTripsAndAbsentStaysNull() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    new ConsignmentOutput("c1", "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
+                            "/w/a.parquet", 1, 100, "2026-08-04T10:00:00Z", 1, State.LIVE, "abc123"),
+                    out("c1", "/w/b.parquet", 2, State.LIVE)));   // fingerprint-less form → null
+
+            List<ConsignmentOutput> rows = db.outputs("c1");
+            assertEquals("abc123", rows.stream().filter(o -> o.path().endsWith("a.parquet"))
+                    .findFirst().orElseThrow().schemaFingerprint());
+            assertNull(rows.stream().filter(o -> o.path().endsWith("b.parquet"))
+                    .findFirst().orElseThrow().schemaFingerprint(),
+                    "write paths carrying no pipeline schema record null, never a fabricated hash");
+        }
+    }
+
+    /**
+     * A registry file created before the column existed must gain it on reopen — CREATE TABLE IF NOT EXISTS
+     * never widens an existing table, so initSchema's ADD COLUMN IF NOT EXISTS is the migration. Pre-migration
+     * rows read back with a null fingerprint (the "old row ⇒ unknown, don't throw" rule the state column set).
+     */
+    @Test
+    void preFingerprintRegistryGainsTheColumnOnReopen(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("outputs.duckdb");
+        try (Connection legacy = com.gamma.util.JdbcDrivers.connect(url);
+             Statement st = legacy.createStatement()) {
+            st.execute("CREATE TABLE consignment_outputs ("
+                    + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
+                    + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
+                    + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
+                    + "generation INTEGER, state VARCHAR)");
+            st.execute("INSERT INTO consignment_outputs VALUES "
+                    + "('c0','run-0','cdr','dt=2026-08-01','2026-08-01','/w/old.parquet',9,900,"
+                    + "'2026-08-01T10:00:00Z',0,'LIVE')");
+        }
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open(url)) {
+            List<ConsignmentOutput> old = db.outputs("c0");
+            assertEquals(1, old.size(), "pre-migration rows stay readable");
+            assertNull(old.get(0).schemaFingerprint());
+
+            db.record(List.of(new ConsignmentOutput("c1", "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
+                    "/w/new.parquet", 1, 100, "2026-08-04T10:00:00Z", 1, State.LIVE, "fp-1")));
+            assertEquals("fp-1", db.outputs("c1").get(0).schemaFingerprint());
         }
     }
 

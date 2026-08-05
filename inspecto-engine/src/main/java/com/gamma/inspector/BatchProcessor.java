@@ -175,6 +175,10 @@ public final class BatchProcessor {
                     m.file().getName(), m.srcId(), rel, backupPath, "SUCCESS"));
         }
 
+        // §3.4.3 — the schema fingerprint that wrote this Consignment, pinned in the manifest and the output
+        // registry (data carries its schema identity). Null for schema-less drafts; readers never require it.
+        String schemaFingerprint = schemaFingerprintFor(cfg, batch.schemaName());
+
         if (cfg.dirs().manifestsDir() != null) {
             BatchManifest manifest = new BatchManifest();
             manifest.batchId     = batch.batchId();
@@ -182,6 +186,7 @@ public final class BatchProcessor {
             manifest.schemaName  = batch.schemaName();
             manifest.outputTable = batch.table();
             manifest.createdAt   = LocalDateTime.now().format(DuckDbUtil.DT_FMT);
+            manifest.schemaFingerprint = schemaFingerprint;
             manifest.members     = memberEntries;
             manifest.outputs     = outputs.stream()
                     .map(o -> new BatchManifest.OutputEntry(o.partition(), o.outputFile())).toList();
@@ -195,7 +200,7 @@ public final class BatchProcessor {
         // registered for this space, record() is a no-op and nothing about this sequence changes.
         if (lineage != null && !lineage.isEmpty())
             ConsignmentOutputStores.record(ConsignmentOutputs.fromLineage(
-                    batch.batchId(), null, batch.table(), outputs, lineage));
+                    batch.batchId(), null, batch.table(), outputs, lineage, schemaFingerprint));
 
         // Backup BEFORE markers — see ordering rationale at top of method.
         if (backup != null)
@@ -224,6 +229,39 @@ public final class BatchProcessor {
                 wmLedger.recordDbWatermark(wm.get().key(), wm.get().value());
             }
         }
+    }
+
+    /**
+     * The §3.4.3 schema fingerprint: SHA-256 ({@link com.gamma.util.CanonicalHash}) of the resolved schema
+     * map — mapping rules included, since the parser merged them at load — that wrote this Consignment.
+     * {@code null} when no schema resolves (schema-less draft, or a multi-schema name that no longer matches).
+     */
+    static String schemaFingerprintFor(PipelineConfig cfg, String schemaName) {
+        Map<String, Object> schema = resolvedSchema(cfg, schemaName);
+        return schema == null ? null : com.gamma.util.CanonicalHash.sha256(schema);
+    }
+
+    /** The schema map the batch was ingested with, located by {@code batch.schemaName()} ({@code raw.name}). */
+    private static Map<String, Object> resolvedSchema(PipelineConfig cfg, String schemaName) {
+        PipelineConfig.Schemas s = cfg.schemas();
+        if (s == null) return null;
+        if (s.single() != null) return s.single();
+        if (s.selector() != null)
+            for (SchemaSelector.Descriptor d : s.selector().descriptors())
+                if (schemaName != null && schemaName.equals(rawName(d.schema()))) return d.schema();
+        if (s.segments() != null && schemaName != null) {
+            Map<String, Object> seg = s.segments().get(schemaName);
+            if (seg != null) return seg;
+            for (Map<String, Object> m : s.segments().values())
+                if (schemaName.equals(rawName(m))) return m;
+        }
+        return null;
+    }
+
+    private static String rawName(Map<String, Object> schema) {
+        Object raw = schema == null ? null : schema.get("raw");
+        if (raw instanceof Map<?, ?> m && m.get("name") != null) return m.get("name").toString();
+        return null;
     }
 
     private static void backupFile(File inputFile, PipelineConfig cfg) throws IOException {
