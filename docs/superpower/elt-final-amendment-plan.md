@@ -628,6 +628,22 @@ itself carries sink columns minus partitions.) Save-time/dry-run wiring of these
 ConfigRoutes/PipelineDryRun deliberately rides S3+ (needs the recipe/pipeline context, not the
 schema component alone).
 
+**P2 S3 SHIPPED 2026-08-05** — `RecipeCompiler` (inspecto-engine): the linear recipe
+(`name/trigger/steps/guarantees`) compiles by building one `PipelineNode` per Step in list order
+and delegating to `PipelineEditable.lower`, so every existing refusal/completeness gate applies
+(proved in test: an active recipe missing parse/sink surfaces `NO_PARSER`/`NO_PERSISTENT_SINK`).
+Verbs this slice: `collect` (connection→`use:`, files→file_pattern, recipe `trigger` rides the
+entry node — §2.7), `parse` (grammar→`use:`, other keys verbatim in `parsing:`), `map` (FOLDS into
+the parser node — `schema/`+`mapping/` registry refs onto `processing.schema_file/mapping_file`;
+plural spellings normalised), `transform.filter` (→ `csv_settings.where`), `sink` (verbatim;
+multi-destination rides the existing `sinks:` lowering). NOT compilable, refused with named codes
+(never dropped): `dedup` (QUALIFY lowering post-S3), `route`, `summarize` (Phase 3), non-empty
+`guarantees:` (Phase 4), `transform.join/derive`. Amendment ridden in: **`mapping_file` added to
+`PipelineEditable.PARSER_OWNED`** — without it every graph save dropped the new slice-3 key.
+Compiled config proven executable: written via `ConfigCodec.toToon` and loaded by
+`PipelineConfig.load` with the `schema/<id>` ref resolving. Discovery per grounding decision:
+compile to `<name>_pipeline.toon`; no new suffix. Control-plane route + UI editor ride the UI plan.
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

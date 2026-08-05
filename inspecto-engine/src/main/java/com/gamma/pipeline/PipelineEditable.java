@@ -69,7 +69,7 @@ public final class PipelineEditable {
      * {@code processing:} key — it is carried verbatim under its own node-config key.
      */
     private static final Set<String> PARSER_OWNED = Set.of(
-            "csv_settings", "schema_file", "schemas", "segments", "ingester", "ingester_config");
+            "csv_settings", "schema_file", "mapping_file", "schemas", "segments", "ingester", "ingester_config");
 
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
