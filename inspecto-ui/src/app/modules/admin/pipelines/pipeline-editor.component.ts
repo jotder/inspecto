@@ -352,7 +352,11 @@ export class PipelineEditorComponent implements OnInit {
         });
         this.api.nodeTypes().subscribe({
             next: (ts) => {
-                this.paletteGroups.set(groupByCategory(ts));
+                // The palette offers only lowerable types — a step that can never be saved to this
+                // pipeline format (adapter, the unspecced transform.*, sink.materialized/view, alert,
+                // event) is not offered at all. The full catalog still feeds the maps below, so a
+                // grandfathered graph carrying such a node keeps rendering + flagging (unsupported()).
+                this.paletteGroups.set(groupByCategory(ts.filter((t) => t.lowerable)));
                 this.typeCat.set(typeCategoryMap(ts));
                 this.typeEmits.set(new Map(ts.map((t) => [t.type, t.emits])));
                 this.typeLowerable.set(new Map(ts.map((t) => [t.type, t.lowerable])));
@@ -801,7 +805,8 @@ export class PipelineEditorComponent implements OnInit {
                       data: { node, typeLabel: node.type, categoryLabel: categoryLabel(category) },
                   })
                 : this.dialog.open(NodeConfigDialog, {
-                      width: '520px',
+                      width: '680px',
+                      maxWidth: '95vw',
                       autoFocus: false,
                       data: {
                           node,

@@ -5,7 +5,10 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PipelineViewData, ViewsService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 /** Dialog data: the `sink.view` node's store name (its `derived_sql` runs against this). */
 export interface ViewPreviewData {
@@ -21,11 +24,26 @@ export interface ViewPreviewData {
 @Component({
     selector: 'app-view-preview-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule, InspectoAlertComponent, DataTableComponent],
+    imports: [MatDialogModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, InspectoAlertComponent, InspectoDialogResizeDirective, DataTableComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>View · {{ data.viewName }}</h2>
-        <mat-dialog-content class="!max-h-[70vh]">
+        <h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
+            <span class="min-w-0 truncate">View · {{ data.viewName }}</span>
+            <span class="flex-1"></span>
+            <button
+                mat-icon-button
+                type="button"
+                [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                [matTooltip]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                (click)="chrome.toggleMaximize()"
+            >
+                <mat-icon
+                    class="icon-size-5"
+                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                ></mat-icon>
+            </button>
+        </h2>
+        <mat-dialog-content>
             @if (loading()) {
                 <div class="flex items-center gap-2 text-sm">
                     <mat-spinner diameter="16"></mat-spinner> Loading…

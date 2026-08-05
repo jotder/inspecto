@@ -14,6 +14,7 @@ import {
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { ConnectionTreeComponent } from 'app/modules/admin/connections/connection-tree.component';
 
@@ -42,12 +43,28 @@ export interface RunToHereData {
         MatTooltipModule,
         ConnectionTreeComponent,
         InspectoAlertComponent,
+        InspectoDialogResizeDirective,
         InspectoEmptyStateComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>Run to here · {{ data.node.name || data.node.id }}</h2>
-        <mat-dialog-content class="!max-h-[70vh]">
+        <h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
+            <span class="min-w-0 truncate">Run to here · {{ data.node.name || data.node.id }}</span>
+            <span class="flex-1"></span>
+            <button
+                mat-icon-button
+                type="button"
+                [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                [matTooltip]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                (click)="chrome.toggleMaximize()"
+            >
+                <mat-icon
+                    class="icon-size-5"
+                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                ></mat-icon>
+            </button>
+        </h2>
+        <mat-dialog-content>
             <p class="text-secondary mb-3 text-sm">
                 Runs the pipeline up to this node over the files you pick and lands the result as scratch
                 Parquet — nothing is written to production.

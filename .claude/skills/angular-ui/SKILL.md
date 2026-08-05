@@ -313,6 +313,15 @@ src/app/
   same two-step pattern (a `step` signal + a `saveForm` asked only at save time, id pre-filled from the
   config via `suggestedName()`; the config step is `[hidden]`-wrapped — never `@if`'d — so schema-form
   ViewChilds survive the step switch). New create dialogs must not ask the immutable id up front.
+- **Resizable / maximizable dialogs → `[inspectoDialogResize]`** (`inspecto/components/dialog-resize.directive.ts`,
+  2026-08-05): put the attribute on the dialog's `mat-dialog-title` (`#chrome="inspectoDialogResize"`). It appends a
+  bottom-right drag grip (pointer + arrow keys, a11y-labelled) and tags the pane `inspecto-dialog-resizable`
+  (content max-height raised to ~80vh; once sized/maximized, `inspecto-dialog-sized` drops the clamp so content
+  flexes instead of scrolling — styles in `styles.scss`). Big dialogs add a maximize icon button in the title row
+  calling `chrome.toggleMaximize()` / reading `chrome.maximized()`; maximize reuses the `.dialog-fullscreen`
+  panel class. Never re-roll a per-dialog fullscreen toggle (the grammar dialog's local one was the extraction
+  source). ⚠ Don't put an inline `[style.maxHeight]` on `mat-dialog-content` in an adopting dialog — the inline
+  style beats the sized/maximized CSS and pins the scrollbar back. Adopters: all 7 Pipelines dialogs.
 - **Resizable panes → `[inspectoSplit]`** (`inspecto/components/split.directive.ts`, R7): put it on the
   separator div between two panes (`inspectoSplit="<stateKey>"`, `#h="inspectoSplit"`, min/max/
   defaultWidth, `pane="right"` when the controlled pane sits right of the handle) and bind the pane's

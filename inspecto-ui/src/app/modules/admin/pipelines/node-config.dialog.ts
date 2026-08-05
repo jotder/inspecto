@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
@@ -23,6 +24,7 @@ import {
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
@@ -81,13 +83,30 @@ export interface NodeConfigResult {
         MatInputModule,
         MatProgressSpinnerModule,
         MatSelectModule,
+        MatTooltipModule,
         InspectoAlertComponent,
+        InspectoDialogResizeDirective,
         InspectoSchemaFormComponent,
         CollectorConfigComponent,
         EnrichmentEditorComponent,
     ],
     template: `
-        <h2 mat-dialog-title>Configure · {{ data.node.id }}</h2>
+        <h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
+            <span class="min-w-0 truncate">Configure · {{ data.node.id }}</span>
+            <span class="flex-1"></span>
+            <button
+                mat-icon-button
+                type="button"
+                [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                [matTooltip]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                (click)="chrome.toggleMaximize()"
+            >
+                <mat-icon
+                    class="icon-size-5"
+                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                ></mat-icon>
+            </button>
+        </h2>
         <form [formGroup]="form" (ngSubmit)="save()">
             <mat-dialog-content class="space-y-1">
                 <p class="mb-2 text-xs opacity-70">{{ data.typeLabel }} · {{ data.categoryLabel }}</p>

@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
@@ -39,10 +40,11 @@ export interface PipelineTemplateResultData {
         MatFormFieldModule,
         MatInputModule,
         InspectoAlertComponent,
+        InspectoDialogResizeDirective,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>Save '{{ data.source }}' as a template</h2>
+        <h2 mat-dialog-title inspectoDialogResize>Save '{{ data.source }}' as a template</h2>
         <mat-dialog-content>
             <inspecto-alert variant="info" title="A template is not runnable">
                 The copy keeps this pipeline's shape — parsing, schema, output format and settings — but

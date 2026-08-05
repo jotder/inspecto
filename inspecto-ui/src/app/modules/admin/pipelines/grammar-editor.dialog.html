@@ -1,23 +1,23 @@
-<h2 mat-dialog-title class="flex items-center gap-2">
+<h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
     <span class="min-w-0 truncate">{{ step() === 'name' ? 'Save as reusable Grammar' : 'Edit Grammar · ' + data.node.id }}</span>
     <span class="flex-1"></span>
     @if (step() === 'config') {
         <button
             mat-icon-button
             type="button"
-            [attr.aria-label]="fullscreen() ? 'Exit full screen' : 'Full screen'"
-            [matTooltip]="fullscreen() ? 'Exit full screen' : 'Full screen'"
-            (click)="toggleFullscreen()"
+            [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+            [matTooltip]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+            (click)="chrome.toggleMaximize()"
         >
             <mat-icon
                 class="icon-size-5"
-                [svgIcon]="fullscreen() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
             ></mat-icon>
         </button>
     }
 </h2>
 
-<mat-dialog-content class="flex flex-col" [style.maxHeight]="fullscreen() ? 'calc(100vh - 9rem)' : '80vh'">
+<mat-dialog-content class="flex flex-col">
     @if (step() === 'config') {
         <p class="text-secondary mb-3 text-xs">{{ data.typeLabel }} · {{ data.categoryLabel }}</p>
 

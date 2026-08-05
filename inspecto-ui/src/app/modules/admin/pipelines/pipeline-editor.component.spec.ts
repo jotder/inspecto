@@ -52,7 +52,11 @@ describe('PipelineEditorComponent', () => {
         api = {
             list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(
-                of([{ type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false }]),
+                of([
+                    { type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false, lowerable: true },
+                    // Unlowerable — must be kept OUT of the palette but IN the type maps (unsupported()).
+                    { type: 'adapter', category: 'TRANSFORM', label: 'Adapter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false, lowerable: false },
+                ]),
             ),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             savePipelineGraph: vi.fn().mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
@@ -96,6 +100,19 @@ describe('PipelineEditorComponent', () => {
     function canvasOf(c: PipelineEditorComponent) {
         return (c as unknown as { canvas: ReturnType<typeof canvasMock> }).canvas;
     }
+
+    describe('palette catalog', () => {
+        it('offers only lowerable types, while the type maps keep the full catalog', () => {
+            const c = make();
+            const offered = c.paletteGroups().flatMap((g) => g.types.map((t) => t.type));
+            expect(offered).toEqual(['transform.filter']);
+            // The grandfathered `adapter` node still renders + flags on an opened graph: the
+            // unsupported-nodes banner derives from the FULL catalog, not the filtered palette.
+            c.select('demo');
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'legacy', type: 'adapter', config: {} }] }));
+            expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['legacy']);
+        });
+    });
 
     describe('open set / tabs', () => {
         it('opens nothing on arrival — listing is cheap, lifting a graph is not', () => {

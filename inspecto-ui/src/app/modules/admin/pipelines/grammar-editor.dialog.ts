@@ -12,6 +12,7 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, AuthoredNode, ComponentDef, ComponentsService, ParserDef } from 'app/inspecto/api';
 import { parseUseRef } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
@@ -55,6 +56,7 @@ export interface GrammarEditorDialogData {
         MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        InspectoDialogResizeDirective,
         GrammarEditorComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,8 +90,6 @@ export class GrammarEditorDialog {
     readonly pluginBlocked = computed(() => this.plugin() !== null);
 
     readonly saving = signal(false);
-    /** Expand the dialog to fill the viewport. */
-    readonly fullscreen = signal(false);
 
     /** `config` (author + test) → `name` (asked only when extracting to a reusable Grammar). */
     readonly step = signal<'config' | 'name'>('config');
@@ -146,14 +146,6 @@ export class GrammarEditorDialog {
         if (!def) return;
         this.boundGrammarId.set(id);
         this.seedFrom(grammarBlock(def.content ?? {}));
-    }
-
-    /** Expand the dialog to the full viewport (a panel class that overrides the open-time maxWidth). */
-    toggleFullscreen(): void {
-        const on = !this.fullscreen();
-        this.fullscreen.set(on);
-        if (on) this.ref.addPanelClass('dialog-fullscreen');
-        else this.ref.removePanelClass('dialog-fullscreen');
     }
 
     /** The suggested id for a freshly extracted Grammar: `<frontend>_grammar`, sanitized. */

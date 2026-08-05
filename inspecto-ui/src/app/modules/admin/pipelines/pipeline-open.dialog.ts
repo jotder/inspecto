@@ -4,6 +4,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { PipelineSummary } from 'app/inspecto/api';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 
 export interface PipelineOpenData {
     /** Every pipeline the server lists — names only; no graph is fetched to build this. */
@@ -24,10 +25,10 @@ export interface PipelineOpenData {
 @Component({
     selector: 'app-pipeline-open-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatCheckboxModule, MatIconModule],
+    imports: [MatDialogModule, MatButtonModule, MatCheckboxModule, MatIconModule, InspectoDialogResizeDirective],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>Open pipelines</h2>
+        <h2 mat-dialog-title inspectoDialogResize>Open pipelines</h2>
         <mat-dialog-content>
             <div class="relative mb-2">
                 <mat-icon

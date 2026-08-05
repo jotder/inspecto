@@ -87,24 +87,14 @@ describe('PipelinePaletteComponent', () => {
         expect(text(fixture)).toContain('File writer');
     });
 
-    it('disables a non-lowerable type instead of letting Save refuse it later', () => {
-        TestBed.configureTestingModule({
-            imports: [PipelinePaletteComponent],
-            providers: [provideNoopAnimations()],
-        });
-        const fixture = TestBed.createComponent(PipelinePaletteComponent);
-        fixture.componentRef.setInput('groups', [
-            { category: 'SOURCE', types: [type('acquisition', 'SOURCE', 'File')] },
-            { category: 'TRANSFORM', types: [type('transform.split', 'TRANSFORM', 'Split', false)] },
-        ] satisfies NodeTypeGroup[]);
-        fixture.detectChanges();
-
+    it('renders every entry addable and draggable — the host pre-filters to lowerable types', () => {
+        const { fixture } = create();
         const btn = (label: string) =>
             Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
                 .find((b) => b.textContent?.includes(label))!;
         expect(btn('File').disabled).toBe(false);
-        expect(btn('Split').disabled).toBe(true);
-        expect(btn('Split').getAttribute('draggable')).toBe('false');
+        expect(btn('File').getAttribute('draggable')).toBe('true');
+        expect(btn('File writer').getAttribute('draggable')).toBe('true');
     });
 
     it('has no a11y violations expanded or filtered', async () => {

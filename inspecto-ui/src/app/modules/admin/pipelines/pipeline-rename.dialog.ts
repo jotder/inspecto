@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -37,10 +38,11 @@ export interface PipelineRenameResultData {
         MatFormFieldModule,
         MatInputModule,
         InspectoAlertComponent,
+        InspectoDialogResizeDirective,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>Rename pipeline</h2>
+        <h2 mat-dialog-title inspectoDialogResize>Rename pipeline</h2>
         <mat-dialog-content>
             <inspecto-alert variant="info" title="The identity stays '{{ data.id }}'">
                 Only the label changes. Run history, the dedup ledger and the data catalog keep using
