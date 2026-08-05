@@ -92,7 +92,8 @@ former root reference docs** (each index lists them):
   six §13 rename rows; vocabulary guard green). **Phase 1 GROUNDED 2026-08-05** — five premise
   corrections in the plan's §8 block (no SchemaConfig class; ConfigCodec has no format registry;
   the gate seam is `ConfigRoutes.writeConfig`; Mapping stays path-addressed in slice 1; the
-  fixture count was wrong). Next: Phase 1 slice 1 (sibling `_mapping.csv` dual-read).
+  fixture count was wrong). Phase 1 slice 1 (sibling `_mapping.csv` dual-read) SHIPPED 2026-08-05.
+  Next: Phase 1 slice 2 (split-write + BACKWARD compatibility gate at `ConfigRoutes.writeConfig`).
 
 - [`superpower/elt-amendment-ui-plan.md`](superpower/elt-amendment-ui-plan.md) — **v1.0
   (2026-08-05) — the amendment's unified UI plan** (companion to the above). One design call:

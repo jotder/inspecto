@@ -345,6 +345,7 @@ final class PipelineConfigParser {
                     throw new FileNotFoundException("Segment schema not found for '" + key + "': " + schemaPath);
                 Map<String, Object> schema = (Map<String, Object>)
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingMapping(schema, schemaFile, b);
                 Identifiers.validateSchema(schema, "segment[" + key + "]");
                 declaredColumns.addAll(columnNamesOf(schema));
                 b.segmentSchemas.put(key, schema);
@@ -378,6 +379,7 @@ final class PipelineConfigParser {
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 Map<String, Object> schemaCfg = (Map<String, Object>)
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingMapping(schemaCfg, schemaFile, b);
                 Identifiers.validateSchema(schemaCfg, "schemas[col=" + colCount + "]");
                 declaredColumns.addAll(columnNamesOf(schemaCfg));
                 if (table != null && !table.isBlank())
@@ -415,6 +417,7 @@ final class PipelineConfigParser {
                     throw new FileNotFoundException("Schema file not found: " + schemaPath);
                 b.singleSchema = (Map<String, Object>)
                         JToon.decode(Files.readString(schemaFile, StandardCharsets.UTF_8));
+                mergeSiblingMapping(b.singleSchema, schemaFile, b);
                 Identifiers.validateSchema(b.singleSchema, "schema_file");
                 declaredColumns.addAll(columnNamesOf(b.singleSchema));
                 validateFixedWidthSelectors(b.fixedWidth, b.singleSchema, "schema_file");
@@ -631,6 +634,110 @@ final class PipelineConfigParser {
         // config (whose ref resolves from the working directory) must keep loading unchanged.
         if (candidate.startsWith(base) && Files.exists(candidate)) return candidate;
         return asAuthored;
+    }
+
+    // ── sibling Mapping CSV (ELT amendment Phase 1 slice 1) ───────────────────
+
+    /**
+     * Dual-read for the Schema/Mapping split (ELT final amendment §3, Phase 1 slice 1): if a sibling
+     * {@code <name>_mapping.csv} exists next to the resolved schema file, its rows <b>replace</b> the
+     * schema's inline {@code mapping.rules} in the decoded map — downstream consumers
+     * ({@link DataTransformer}, {@link Identifiers#validateSchema}) keep receiving the one conflated
+     * map they already read. Additive: no sibling file, no behaviour change.
+     *
+     * <p>Sibling naming: {@code x_schema.toon → x_mapping.csv}; a schema file not following the
+     * {@code _schema.toon} convention pairs with {@code <stem>_mapping.csv}.
+     */
+    @SuppressWarnings("unchecked")
+    private static void mergeSiblingMapping(Map<String, Object> schema, Path schemaFile, Builder b)
+            throws IOException {
+        Path csv = siblingMappingCsv(schemaFile);
+        if (!Files.exists(csv)) return;
+        List<Map<String, String>> rules = readMappingCsv(csv);
+        Map<String, Object> mapping = (Map<String, Object>) schema.get("mapping");
+        if (mapping == null) {
+            mapping = new LinkedHashMap<>();
+            schema.put("mapping", mapping);
+        }
+        mapping.put("rules", rules);
+        b.referencedFiles.add(csv);
+        log.info("[CONFIG] Mapping CSV {} overrides mapping.rules of {} ({} rule(s))",
+                csv.getFileName(), schemaFile.getFileName(), rules.size());
+    }
+
+    private static Path siblingMappingCsv(Path schemaFile) {
+        String fn = schemaFile.getFileName().toString();
+        String base = fn.endsWith("_schema.toon") ? fn.substring(0, fn.length() - "_schema.toon".length())
+                : fn.endsWith(".toon")            ? fn.substring(0, fn.length() - ".toon".length())
+                : fn;
+        Path parent = schemaFile.getParent();
+        String sibling = base + "_mapping.csv";
+        return parent == null ? Paths.get(sibling) : parent.resolve(sibling);
+    }
+
+    /**
+     * Plain CSV, header {@code targetColumn,sourceExpression,transformType} (any column order;
+     * a blank {@code transformType} means DIRECT, matching {@link TransformCompiler#dataColumn}).
+     * Quoted fields carry commas — how EXPR expressions travel. Deliberately not a codec: the
+     * grounded slice-1 call is a plain reader, not a {@code ConfigCodec} format registry.
+     */
+    private static List<Map<String, String>> readMappingCsv(Path csv) throws IOException {
+        List<String> lines = Files.readAllLines(csv, StandardCharsets.UTF_8);
+        int first = 0;
+        while (first < lines.size() && lines.get(first).isBlank()) first++;
+        if (first == lines.size())
+            throw new IllegalArgumentException("Mapping CSV is empty: " + csv);
+        List<String> header = splitCsvLine(lines.get(first), csv, first + 1);
+        int tIdx = header.indexOf("targetColumn");
+        int sIdx = header.indexOf("sourceExpression");
+        int kIdx = header.indexOf("transformType");
+        if (tIdx < 0 || sIdx < 0)
+            throw new IllegalArgumentException("Mapping CSV " + csv + " header must name "
+                    + "targetColumn and sourceExpression (optional transformType); got: " + header);
+        List<Map<String, String>> rules = new ArrayList<>();
+        for (int i = first + 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.isBlank()) continue;
+            List<String> cells = splitCsvLine(line, csv, i + 1);
+            if (cells.size() <= Math.max(tIdx, sIdx))
+                throw new IllegalArgumentException(
+                        "Mapping CSV " + csv + " line " + (i + 1) + ": too few columns");
+            Map<String, String> rule = new LinkedHashMap<>();
+            rule.put("targetColumn", cells.get(tIdx).trim());
+            rule.put("sourceExpression", cells.get(sIdx));
+            String kind = kIdx >= 0 && kIdx < cells.size() ? cells.get(kIdx).trim() : "";
+            rule.put("transformType", kind);
+            rules.add(rule);
+        }
+        if (rules.isEmpty())
+            throw new IllegalArgumentException("Mapping CSV has a header but no rules: " + csv);
+        return rules;
+    }
+
+    /** RFC-4180-style split of one line: quoted fields may contain commas; {@code ""} escapes a quote. */
+    private static List<String> splitCsvLine(String line, Path csv, int lineNo) {
+        List<String> cells = new ArrayList<>();
+        StringBuilder cell = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (quoted) {
+                if (c == '"') {
+                    if (i + 1 < line.length() && line.charAt(i + 1) == '"') { cell.append('"'); i++; }
+                    else quoted = false;
+                } else cell.append(c);
+            } else if (c == '"' && cell.isEmpty()) {
+                quoted = true;
+            } else if (c == ',') {
+                cells.add(cell.toString());
+                cell.setLength(0);
+            } else cell.append(c);
+        }
+        if (quoted)
+            throw new IllegalArgumentException(
+                    "Mapping CSV " + csv + " line " + lineNo + ": unterminated quote");
+        cells.add(cell.toString());
+        return cells;
     }
 
     // ── dir validation ────────────────────────────────────────────────────────

@@ -542,6 +542,11 @@ editor is a second projection of the existing `AuthoredPipeline` model.
 **Slice 1 of record:** dual-read only — sibling `_mapping.csv` overrides `mapping.rules` at the
 `resolveSchemaRef` merge point; plain CSV parse; `ConfigSpecs`/`ConfigSafetyValidator`/
 `ComponentStore`/`ConfigRoutes` untouched until slices 2 (split-write + gate) and 3 (component kinds).
+**✅ SHIPPED 2026-08-05** — `PipelineConfigParser.mergeSiblingMapping` wired at all three schema-decode
+sites (segment/multi/single), before `Identifiers.validateSchema` so merged rules validate and count
+toward `declaredColumns`; CSV header `targetColumn,sourceExpression,transformType` (any order, blank
+kind = DIRECT, quoted cells carry commas); the CSV joins `referencedFiles` for hot-reload.
+`MappingCsvDualReadTest` (6 tests); module suite green (222/0).
 
 ---
 
