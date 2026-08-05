@@ -1,5 +1,23 @@
 # Parsing UX reflow — Connection-first Collection + sample-on-top parsing flow
 
+> **Archived 2026-08-05 — superseded, all parts independently shipped.** It sat in `docs/superpower/`
+> unlisted in `docs/INDEX.md` after the collector-config and grammar-config unifications overtook it.
+> Verified against current code before archiving:
+> - **Part A** (Connection-first Collection) — shipped: `collection-pane.component.ts` has the
+>   mode toggle + derived-connector display described here.
+> - **Part B** (sample strip on top, 40 lines) — shipped: `sample-panel.component.ts` has
+>   `RAW_PREVIEW_LINES = 40` and the shell no longer mounts a separate aside.
+> - **Part C** (sniffer, tree view, type autodetect) — shipped, relocated: `suggestTypes` now lives
+>   in `app/inspecto/grammar` (not the planned standalone `parsing-sniff.ts`) and is wired into
+>   `schema-mapping-pane.component.ts`; `parsing-pane.component.ts` does sample sniffing and tree
+>   preview via `ParserTreeNode`.
+> - **Part D** (Parser config dialog reflow) — moot: `parser-config.dialog.ts` no longer exists: it
+>   was renamed/unified into `GrammarEditorDialog` by the grammar-config unification, which covers
+>   the "sample on top" reorder itself. See `docs/okf/frontend/features/grammar-config.md`.
+>
+> No open residual carried forward — the flatten-DSL follow-on this plan flagged (Part E) is already
+> tracked independently in `docs/BACKLOG.md`.
+
 > On approval, persist this plan to `docs/superpower/parsing-ux-reflow.md` (repo rule: plans live in-repo).
 
 ## Context
