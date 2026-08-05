@@ -4,6 +4,7 @@ import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
+import com.gamma.config.safety.SchemaCompatibility;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
@@ -12,6 +13,7 @@ import com.gamma.etl.ConfigValidator;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.exec.ComponentPreview;
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.MappingCsv;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,8 +163,28 @@ final class ConfigRoutes implements RouteModule {
                 "file exists: " + writeRoot.relativize(target).toString().replace('\\', '/')
                         + " (pass overwrite:true to replace)");
 
+        // Schema compatibility save-gate (ELT amendment §3.4.2, D-10): a schema OVERWRITE is diffed
+        // old→new under the BACKWARD class; breaking edits (remove/narrow/selector-move) 422 with
+        // cell-level findings. Escape hatches: copy to a new name, or the explicit override below.
+        if ("schema".equals(type) && exists && !compatibilityOverridden(body)) {
+            Map<String, Object> current = ConfigLoader.filesystem().decode(target.toString());
+            List<Finding> breaking = SchemaCompatibility.check(current, draft);
+            if (!breaking.isEmpty()) {
+                findings.addAll(breaking);
+                return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                        "error", "schema edit is not BACKWARD-compatible; not written", "findings", findings));
+            }
+        }
+
         // Encode and write atomically: a partial/concurrent reader never sees a half-written file.
-        byte[] bytes = ConfigCodec.toToon(draft).getBytes(StandardCharsets.UTF_8);
+        Map<String, Object> toWrite = draft;
+        String mappingRel = null;
+        if ("schema".equals(type)) {
+            SchemaSplit split = splitMapping(writeRoot, target, draft);
+            toWrite = split.structure();
+            mappingRel = split.mappingRel();
+        }
+        byte[] bytes = ConfigCodec.toToon(toWrite).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         log.info("[CONFIG-WRITE] type={} wrote {} ({} bytes, overwrote={})", type, rel, bytes.length, exists);
@@ -171,11 +193,66 @@ final class ConfigRoutes implements RouteModule {
         r.put("type", type);
         r.put("written", true);
         r.put("path", rel);
+        if (mappingRel != null) r.put("mappingPath", mappingRel);
         r.put("name", safeIdentity);
         r.put("bytes", bytes.length);
         r.put("overwritten", exists);
         r.put("findings", findings);   // warnings only at this point (errors would have 422'd)
         return r;
+    }
+
+    /** The explicit D-10 escape hatch: {@code compatibility: "none"} in the request body. */
+    private static boolean compatibilityOverridden(Map<String, Object> body) {
+        return "none".equalsIgnoreCase(String.valueOf(body.get("compatibility")));
+    }
+
+    /** A schema draft split for persistence: the structure map (no {@code mapping.rules}) + the CSV's rel path. */
+    private record SchemaSplit(Map<String, Object> structure, String mappingRel) {}
+
+    /**
+     * Split-write for the Schema/Mapping separation (ELT amendment Phase 1 slice 2): a schema draft's
+     * {@code mapping.rules} are persisted as the sibling {@code <name>_mapping.csv} (the shape the
+     * engine's slice-1 dual-read consumes) and stripped from the TOON. A draft without rules writes
+     * the TOON unchanged — an existing sibling CSV then remains the mapping source of truth.
+     */
+    @SuppressWarnings("unchecked")
+    private static SchemaSplit splitMapping(Path writeRoot, Path target, Map<String, Object> draft)
+            throws IOException {
+        Object mappingObj = draft.get("mapping");
+        if (!(mappingObj instanceof Map<?, ?> mapping)) return new SchemaSplit(draft, null);
+        Object rulesObj = mapping.get("rules");
+        if (!(rulesObj instanceof List<?> rules) || rules.isEmpty()) return new SchemaSplit(draft, null);
+
+        Path csv = MappingCsv.siblingFor(target);
+        String text = MappingCsv.encode((List<? extends Map<String, ?>>) rules);
+        AtomicFiles.write(csv, text.getBytes(StandardCharsets.UTF_8), ".map-");
+
+        Map<String, Object> structure = new LinkedHashMap<>(draft);
+        Map<String, Object> mappingRest = new LinkedHashMap<>((Map<String, Object>) mapping);
+        mappingRest.remove("rules");
+        if (mappingRest.isEmpty()) structure.remove("mapping");
+        else structure.put("mapping", mappingRest);
+        return new SchemaSplit(structure, writeRoot.relativize(csv).toString().replace('\\', '/'));
+    }
+
+    /**
+     * The read-side of the split: merge a schema file's sibling {@code _mapping.csv} (if any) into
+     * its decoded map, so clients always see the conflated shape they authored — the same dual-read
+     * the engine's {@code PipelineConfigParser} performs.
+     */
+    private static void mergeSiblingMapping(Path schemaFile, Map<String, Object> config) throws IOException {
+        Path csv = MappingCsv.siblingFor(schemaFile);
+        if (!Files.exists(csv)) return;
+        List<Map<String, String>> rules =
+                MappingCsv.parse(Files.readString(csv, StandardCharsets.UTF_8), csv.toString());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mapping = config.get("mapping") instanceof Map<?, ?> m
+                ? (Map<String, Object>) m : null;
+        if (mapping == null) {
+            mapping = new LinkedHashMap<>();
+            config.put("mapping", mapping);
+        }
+        mapping.put("rules", rules);
     }
 
     /**
@@ -223,6 +300,9 @@ final class ConfigRoutes implements RouteModule {
             throw new ApiException(404, "no such config: " + rel + " (create it via /config/write first)");
 
         Map<String, Object> existing = ConfigLoader.filesystem().decode(target.toString());
+        // Split storage (schema): patch over the CONFLATED view, so a partial draft can address
+        // mapping.rules whether they live inline or in the sibling CSV.
+        if ("schema".equals(type)) mergeSiblingMapping(target, existing);
         Map<String, Object> merged = deepMerge(existing, patch);
 
         // The filename derives from the identity field, so a patch may not move it — a renamed
@@ -245,7 +325,24 @@ final class ConfigRoutes implements RouteModule {
                     "error", "merged config has ERROR-level findings; not written", "findings", findings));
         }
 
-        byte[] bytes = ConfigCodec.toToon(merged).getBytes(StandardCharsets.UTF_8);
+        // Same BACKWARD save-gate as /config/write — a patch is an edit of an existing schema.
+        if ("schema".equals(type) && !compatibilityOverridden(body)) {
+            List<Finding> breaking = SchemaCompatibility.check(existing, merged);
+            if (!breaking.isEmpty()) {
+                findings.addAll(breaking);
+                return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
+                        "error", "schema edit is not BACKWARD-compatible; not written", "findings", findings));
+            }
+        }
+
+        Map<String, Object> toWrite = merged;
+        String mappingRel = null;
+        if ("schema".equals(type)) {
+            SchemaSplit split = splitMapping(writeRoot, target, merged);
+            toWrite = split.structure();
+            mappingRel = split.mappingRel();
+        }
+        byte[] bytes = ConfigCodec.toToon(toWrite).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
         log.info("[CONFIG-PATCH] type={} patched {} ({} bytes)", type, rel, bytes.length);
 
@@ -253,6 +350,7 @@ final class ConfigRoutes implements RouteModule {
         r.put("type", type);
         r.put("written", true);
         r.put("path", rel);
+        if (mappingRel != null) r.put("mappingPath", mappingRel);
         r.put("name", fileName);
         r.put("bytes", bytes.length);
         r.put("overwritten", true);
@@ -313,6 +411,8 @@ final class ConfigRoutes implements RouteModule {
         }
 
         Files.delete(target);
+        // Split storage (schema): the sibling _mapping.csv is part of the component — discard it too.
+        if ("schema".equals(type)) Files.deleteIfExists(MappingCsv.siblingFor(target));
         if ("pipeline".equals(type)) {
             api.service().unregisterPipeline(target);   // drop the ghost row instead of waiting for the next poll cycle
         } else if ("enrichment".equals(type)) {
@@ -350,6 +450,8 @@ final class ConfigRoutes implements RouteModule {
         if (!Files.isRegularFile(target)) throw new ApiException(404, "no such config: " + rel);
 
         Map<String, Object> config = ConfigLoader.filesystem().decode(target.toString());
+        // Split storage (schema): serve the conflated view — sibling _mapping.csv rules merged in.
+        if ("schema".equals(type)) mergeSiblingMapping(target, config);
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", type);
         r.put("name", fileName);

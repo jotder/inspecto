@@ -548,6 +548,24 @@ toward `declaredColumns`; CSV header `targetColumn,sourceExpression,transformTyp
 kind = DIRECT, quoted cells carry commas); the CSV joins `referencedFiles` for hot-reload.
 `MappingCsvDualReadTest` (6 tests); module suite green (222/0).
 
+**Slices 2+3 SHIPPED 2026-08-05.** Slice 2 (split-write + BACKWARD gate): shared
+`com.gamma.util.MappingCsv` (RFC4180 via the platform `Csv` reader; canonical header
+`targetColumn,sourceExpression,transformType`, §3.2's `target,source,kind` accepted as read
+aliases); `SchemaCompatibility.check` (inspecto-config) = the §3.4.2 BACKWARD diff → cell-level
+findings (`raw.fields[NAME]`/`.type`/`.selector`); `ConfigRoutes` write/patch of a schema now
+split-writes `mapping.rules` to the sibling `<name>_mapping.csv`, reads/serves the conflated view,
+deletes the sibling with the TOON, and refuses breaking overwrites 422 unless
+`compatibility: "none"` (D-10's explicit override). Slice 3 (component kinds): `mapping` =
+first CSV-backed registry kind (`registry/mappings/<id>.csv`, filename = identity per D-3, no
+sharing envelope by shape); `schema` re-added to `WRITABLE_TYPES` **with the W1 objection
+resolved** — `processing.schema_file: schema/<id>` now executes the registry copy
+(`resolveSchemaRef`, mirroring `grammar/<id>`), and `processing.mapping_file` (path or
+`mapping/<id>`) supplies rules with precedence explicit > sibling > inline. Tests:
+`MappingCsvTest`, `SchemaCompatibilityTest`, `MappingComponentTest`, `ControlApiSchemaSplitTest`
+(+ the two W1 guard tests flipped to the new contract). Full reactor green.
+**Phase 1 remaining:** the schema *structure* CSV shape (§3.2 first table) — schemas persist as
+TOON for now; revisit with Phase 2's type flow.
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

@@ -80,17 +80,18 @@ class ComponentStoreTest {
     }
 
     /**
-     * A schema has exactly ONE home: the path-addressed config TOON the engine executes
-     * (`processing.schema_file`). The id-addressed registry copy was retired in unification W1 because
-     * nothing could run it. This guards the ambiguity from creeping back.
+     * Schema was retired as a component kind in unification W1 (nothing could run the registry
+     * copy) and RE-ADDED in ELT amendment Phase 1 slice 3 with that objection resolved:
+     * {@code processing.schema_file: schema/<id>} now resolves to {@code registry/schemas/<id>.toon}
+     * (PipelineConfigParser.resolveSchemaRef), so an authored registry schema IS executable.
      */
     @Test
-    void schemaIsNotAWritableComponentKind(@TempDir Path root) {
-        assertFalse(ComponentStore.WRITABLE_TYPES.contains("schema"),
-                "schema lives in the config TOON only — see onboarding-pipeline-unification.md U-C");
+    void schemaIsAWritableComponentKindAgain(@TempDir Path root) throws Exception {
+        assertTrue(ComponentStore.WRITABLE_TYPES.contains("schema"),
+                "slice 3 re-added schema with the schema/<id> execution wiring");
         ComponentStore store = new ComponentStore(root);
-        assertThrows(IllegalArgumentException.class,
-                () -> store.write("schema", "orders", Map.of("fields", List.of())));
+        store.write("schema", "orders", Map.of("raw", Map.of("name", "orders", "format", "CSV")));
+        assertTrue(store.get("schema", "orders").isPresent());
     }
 
     @Test

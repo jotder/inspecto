@@ -141,21 +141,28 @@ class ControlApiComponentsTest {
     }
 
     /**
-     * A schema is NOT a registry component (unification W1, 2026-07-31). It has one home: the
-     * path-addressed config TOON the engine executes. Both the CRUD and the old {@code /test} route must
-     * be gone, so an operator cannot author a schema that looks saved but can never run.
-     * The surviving TRY_CAST split lives on {@code POST /config/preview/schema}
-     * (covered by {@code ControlApiOnboardingLifecycleTest}).
+     * Schema returned as a registry component in ELT amendment Phase 1 slice 3 — the W1 objection
+     * (a registry schema nothing could run) is resolved by the {@code schema/<id>} reference wiring
+     * in {@code PipelineConfigParser.resolveSchemaRef}. CRUD works again; the old {@code /test}
+     * route stays gone (the TRY_CAST split lives on {@code POST /config/preview/schema}).
+     * The {@code mapping} kind (same slice) is CSV-backed: {@code registry/mappings/<id>.csv}.
      */
     @Test
-    void schemaIsNotAComponentKind(@TempDir Path dir) throws Exception {
+    void schemaAndMappingAreComponentKinds(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
-            assertEquals(400, send(c.port, "POST", "/components/schema",
-                    "{\"id\":\"typed\",\"fields\":[{\"name\":\"id\",\"type\":\"integer\"}]}").statusCode(),
-                    "writing a schema component is refused, not silently accepted");
-            assertEquals(400, send(c.port, "GET", "/components/schema", null).statusCode());
+            assertEquals(200, send(c.port, "POST", "/components/schema",
+                    "{\"id\":\"typed\",\"raw\":{\"name\":\"typed\",\"format\":\"CSV\"}}").statusCode(),
+                    "slice 3: a schema component persists again");
+            assertEquals(200, send(c.port, "GET", "/components/schema", null).statusCode());
             assertEquals(404, send(c.port, "POST", "/components/schema/typed/test",
-                    "{\"sampleRows\":[]}").statusCode(), "the schema /test route is unregistered");
+                    "{\"sampleRows\":[]}").statusCode(), "the schema /test route stays unregistered");
+
+            assertEquals(200, send(c.port, "POST", "/components/mapping",
+                    "{\"id\":\"std\",\"rules\":[{\"targetColumn\":\"A\",\"sourceExpression\":\"A\",\"transformType\":\"DIRECT\"}]}")
+                    .statusCode(), "slice 3: the CSV-backed mapping kind persists");
+            HttpResponse<String> one = send(c.port, "GET", "/components/mapping/std", null);
+            assertEquals(200, one.statusCode());
+            assertTrue(one.body().contains("targetColumn"), one.body());
         }
     }
 

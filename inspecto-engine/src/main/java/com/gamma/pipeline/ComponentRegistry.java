@@ -39,12 +39,23 @@ public final class ComponentRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ComponentRegistry.class);
     private static final String TOON = ".toon";
+    private static final String CSV = ".csv";
+
+    /**
+     * Component kinds whose on-disk file is a flat CSV, not TOON (ELT amendment §3.2, D-3):
+     * identity = filename stem (CSV has no in-file identity block). {@code mapping} decodes to
+     * {@code {name, rules:[{targetColumn,sourceExpression,transformType}]}} via
+     * {@link com.gamma.util.MappingCsv}. ⚠ A CSV file carries ONLY its rules: extra content keys
+     * (including an R3 sharing envelope) are not persisted — CSV kinds are unshared/public by shape.
+     */
+    public static final Set<String> CSV_KINDS = Set.of("mapping");
 
     /** On-disk directory (plural) → component type used in {@code use:} (singular). */
     static final Map<String, String> TYPE_BY_DIR = Map.ofEntries(
             Map.entry("connections", "connection"),
             Map.entry("grammars", "grammar"),
             Map.entry("schemas", "schema"),
+            Map.entry("mappings", "mapping"),        // ELT amendment Phase 1 slice 3: the Mapping CSV kind
             Map.entry("transforms", "transform"),   // new: extracted DataTransformer settings
             Map.entry("sinks", "sink"),              // new: extracted Output settings
             Map.entry("datasets", "dataset"),        // W3: Studio metadata kinds now persist (ComponentStore.WRITABLE_TYPES)
@@ -113,9 +124,10 @@ public final class ComponentRegistry {
                 Path dir = registryRoot.resolve(e.getKey());
                 if (!Files.isDirectory(dir)) continue;
                 String type = e.getValue();
+                String suffix = CSV_KINDS.contains(type) ? CSV : TOON;
                 try (Stream<Path> files = Files.list(dir)) {
                     files.filter(Files::isRegularFile)
-                            .filter(p -> p.getFileName().toString().endsWith(TOON))
+                            .filter(p -> p.getFileName().toString().endsWith(suffix))
                             .sorted()
                             .forEach(p -> load(type, p, idx));
                 } catch (IOException io) {
@@ -128,7 +140,7 @@ public final class ComponentRegistry {
 
     private static void load(String type, Path p, Map<String, Component> idx) {
         try {
-            Map<String, Object> content = ToonHelper.load(p.toString());
+            Map<String, Object> content = CSV_KINDS.contains(type) ? csvContent(p) : ToonHelper.load(p.toString());
             String name = componentName(content, p);
             String ref = type + "/" + name;
             noteDivergence(p, name);
@@ -139,6 +151,17 @@ public final class ComponentRegistry {
         } catch (Exception ex) {
             log.warn("Could not load component {}: {}", p, ex.getMessage());
         }
+    }
+
+    /** Decode a CSV-kind component: {@code {name: <stem>, rules: [...]}} — filename = identity (D-3). */
+    private static Map<String, Object> csvContent(Path p) throws IOException {
+        String f = p.getFileName().toString();
+        String stem = f.endsWith(CSV) ? f.substring(0, f.length() - CSV.length()) : f;
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("name", stem);
+        content.put("rules", com.gamma.util.MappingCsv.parse(
+                Files.readString(p, java.nio.charset.StandardCharsets.UTF_8), p.toString()));
+        return content;
     }
 
     /** In-file {@code name}/{@code id}, else the filename stem. */

@@ -43,18 +43,18 @@ public final class ComponentStore {
      * so they persist for real instead of being Angular-mock-only (unblocks the backend-backlog items that
      * all waited on this one set); each has a matching registry dir in {@link ComponentRegistry#TYPE_BY_DIR}.
      *
-     * <p>⚠ <b>{@code schema} was REMOVED 2026-07-31 (unification W1) — do not add it back.</b> A schema had
-     * two homes: this id-addressed registry, and the path-addressed config TOON
-     * ({@code processing.schema_file} → {@code <base>/config/<pipeline>_schema.toon}). Only the config TOON
-     * is <b>executable</b>: all three schema branches in {@code PipelineConfigParser} resolve a literal path
-     * via {@code Paths.get}/{@code Files.readString}, and no code path anywhere turned a component id into a
-     * schema the engine could run. Nothing even pointed at the registry copy — {@code bindKindFor} never
-     * offered {@code schema} as a bindable kind. So this entry could only ever produce a schema that looked
-     * authored but was never used, which is exactly the ambiguity the unification removes.
-     * See {@code docs/superpower/onboarding-pipeline-unification.md} U-C.
+     * <p>⚠ <b>{@code schema} history:</b> removed 2026-07-31 (unification W1) because the id-addressed
+     * registry copy was never executable — no code path turned a component id into a schema the engine
+     * could run, so an authored registry schema silently did nothing. <b>Re-added 2026-08-05 (ELT
+     * amendment Phase 1 slice 3) with that objection resolved</b>: {@code PipelineConfigParser.resolveSchemaRef}
+     * now accepts {@code processing.schema_file: schema/<id>} → {@code registry/schemas/<id>.toon}
+     * (the exact mirror of the {@code grammar/<id>} wiring), so a registry schema IS the executed schema.
+     * {@code mapping} (same slice) is the first <b>CSV-backed</b> kind ({@link ComponentRegistry#CSV_KINDS}):
+     * executed via {@code processing.mapping_file: mapping/<id>} or the sibling-CSV dual-read.
      */
     public static final Set<String> WRITABLE_TYPES =
-            Set.of("grammar", "transform", "sink", "dataset", "widget", "dashboard", "query",
+            Set.of("grammar", "schema", "mapping",
+                    "transform", "sink", "dataset", "widget", "dashboard", "query",
                     "expectation", "requirement",
                     // INV-1/INV-2 saved investigation views (2026-07-08): the UI's SavedViewStore already
                     // speaks the /components contract — widening here is what moves them off the mock store.
@@ -99,6 +99,11 @@ public final class ComponentStore {
 
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
+
+    /** File suffix for a component type: CSV kinds persist as {@code .csv}, everything else {@code .toon}. */
+    private static String suffixFor(String type) {
+        return ComponentRegistry.CSV_KINDS.contains(type) ? ".csv" : TOON;
+    }
 
     /**
      * MET-5 version history: prior copies of an overwritten component live under a {@code .history/}
@@ -165,9 +170,20 @@ public final class ComponentStore {
         Map<String, Object> doc = new LinkedHashMap<>(content);
         doc.put("name", name);   // canonicalise: in-file identity == URL id == filename stem
         if (archive) archivePrevious(type, name, file);   // MET-5: snapshot the outgoing copy first
-        byte[] bytes = ConfigCodec.toToon(doc).getBytes(StandardCharsets.UTF_8);
+        byte[] bytes = encode(type, name, doc).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(file, bytes, ".comp-");
         return new ComponentRegistry.Component(type, name, file, doc);
+    }
+
+    /** TOON for regular kinds; a CSV kind serialises its {@code rules} list (identity = filename, D-3). */
+    private static String encode(String type, String name, Map<String, Object> doc) {
+        if (!ComponentRegistry.CSV_KINDS.contains(type)) return ConfigCodec.toToon(doc);
+        if (!(doc.get("rules") instanceof List<?> rules) || rules.isEmpty())
+            throw new IllegalArgumentException(
+                    type + " component '" + name + "' needs a non-empty 'rules' list");
+        @SuppressWarnings("unchecked")
+        List<? extends Map<String, ?>> rows = (List<? extends Map<String, ?>>) rules;
+        return com.gamma.util.MappingCsv.encode(rows);
     }
 
     /** Delete a component's backing file (resolved by in-file identity). Returns whether a file was removed. */
@@ -188,13 +204,17 @@ public final class ComponentStore {
     public List<ComponentVersion> versions(String type, String id) {
         validateType(type);
         String name = validId(id);
+        String suffix = suffixFor(type);
         Path dir = historyDir(type);
         List<ComponentVersion> out = new ArrayList<>();
-        for (Path p : historyFiles(dir, name)) {
-            int v = versionOf(p, name);
+        for (Path p : historyFiles(dir, name, suffix)) {
+            int v = versionOf(p, name, suffix);
             if (v < 0) continue;
             try {
-                Map<String, Object> content = ConfigCodec.toMap(Files.readString(p, StandardCharsets.UTF_8));
+                String text = Files.readString(p, StandardCharsets.UTF_8);
+                Map<String, Object> content = ComponentRegistry.CSV_KINDS.contains(type)
+                        ? csvVersionContent(name, text)
+                        : ConfigCodec.toMap(text);
                 out.add(new ComponentVersion(v, Files.getLastModifiedTime(p).toInstant(), content));
             } catch (IOException | RuntimeException ignored) {
                 // a corrupt/half archived copy is skipped, never blocking the rest of the history
@@ -216,9 +236,10 @@ public final class ComponentStore {
      */
     private void archivePrevious(String type, String id, Path current) throws IOException {
         if (!Files.exists(current)) return;
+        String suffix = suffixFor(type);
         Path dir = historyDir(type);
-        int next = maxVersion(dir, id) + 1;
-        Path archived = dir.resolve(id + ".v" + next + TOON);
+        int next = maxVersion(dir, id, suffix) + 1;
+        Path archived = dir.resolve(id + ".v" + next + suffix);
         FileTime saved = Files.getLastModifiedTime(current);
         AtomicFiles.write(archived, Files.readAllBytes(current), ".hist-");
         try {
@@ -226,17 +247,25 @@ public final class ComponentStore {
         } catch (IOException ignored) {
             // best-effort; falls back to the archive time if the fs rejects the stamp
         }
-        prune(dir, id);
+        prune(dir, id, suffix);
     }
 
-    private void prune(Path dir, String id) throws IOException {
-        List<Path> files = historyFiles(dir, id);
-        files.sort(Comparator.comparingInt((Path p) -> versionOf(p, id)).reversed());
+    private void prune(Path dir, String id, String suffix) throws IOException {
+        List<Path> files = historyFiles(dir, id, suffix);
+        files.sort(Comparator.comparingInt((Path p) -> versionOf(p, id, suffix)).reversed());
         for (int i = HISTORY_KEEP; i < files.size(); i++) Files.deleteIfExists(files.get(i));
     }
 
     private void purgeHistory(String type, String id) throws IOException {
-        for (Path p : historyFiles(historyDir(type), id)) Files.deleteIfExists(p);
+        for (Path p : historyFiles(historyDir(type), id, suffixFor(type))) Files.deleteIfExists(p);
+    }
+
+    /** An archived CSV version decodes exactly like a live one: {@code {name, rules}}. */
+    private static Map<String, Object> csvVersionContent(String name, String text) {
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("name", name);
+        content.put("rules", com.gamma.util.MappingCsv.parse(text, name));
+        return content;
     }
 
     private Path historyDir(String type) {
@@ -245,28 +274,28 @@ public final class ComponentStore {
         return registryRoot.resolve(dir).resolve(HISTORY_DIR);
     }
 
-    /** The {@code <id>.v<N>.toon} archive files for {@code id} in {@code dir} (empty if the dir is absent). */
-    private static List<Path> historyFiles(Path dir, String id) {
+    /** The {@code <id>.v<N><suffix>} archive files for {@code id} in {@code dir} (empty if the dir is absent). */
+    private static List<Path> historyFiles(Path dir, String id, String suffix) {
         if (!Files.isDirectory(dir)) return List.of();
         try (Stream<Path> s = Files.list(dir)) {
             return s.filter(Files::isRegularFile)
-                    .filter(p -> versionOf(p, id) >= 0)
+                    .filter(p -> versionOf(p, id, suffix) >= 0)
                     .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         } catch (IOException e) {
             return List.of();
         }
     }
 
-    private static int maxVersion(Path dir, String id) {
-        return historyFiles(dir, id).stream().mapToInt(p -> versionOf(p, id)).max().orElse(0);
+    private static int maxVersion(Path dir, String id, String suffix) {
+        return historyFiles(dir, id, suffix).stream().mapToInt(p -> versionOf(p, id, suffix)).max().orElse(0);
     }
 
-    /** Parse N from a {@code <id>.v<N>.toon} filename, or {@code -1} if it isn't one (digits only). */
-    private static int versionOf(Path p, String id) {
+    /** Parse N from a {@code <id>.v<N><suffix>} filename, or {@code -1} if it isn't one (digits only). */
+    private static int versionOf(Path p, String id, String suffix) {
         String f = p.getFileName().toString();
         String prefix = id + ".v";
-        if (!f.startsWith(prefix) || !f.endsWith(TOON)) return -1;
-        String mid = f.substring(prefix.length(), f.length() - TOON.length());
+        if (!f.startsWith(prefix) || !f.endsWith(suffix)) return -1;
+        String mid = f.substring(prefix.length(), f.length() - suffix.length());
         if (mid.isEmpty() || !mid.chars().allMatch(Character::isDigit)) return -1;
         try {
             return Integer.parseInt(mid);
@@ -295,7 +324,7 @@ public final class ComponentStore {
     private Path fileFor(String type, String id) {
         String dir = ComponentRegistry.dirForType(type)
                 .orElseThrow(() -> new IllegalArgumentException("no registry dir for type '" + type + "'"));
-        Path target = registryRoot.resolve(dir).resolve(id + TOON).normalize();
+        Path target = registryRoot.resolve(dir).resolve(id + suffixFor(type)).normalize();
         if (!target.startsWith(registryRoot))
             throw new IllegalArgumentException("resolved path escapes the registry root");
         return target;

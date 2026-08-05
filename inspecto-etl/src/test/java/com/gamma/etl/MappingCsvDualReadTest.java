@@ -93,8 +93,9 @@ class MappingCsvDualReadTest {
     @Test
     void aBadHeaderFailsFastNamingTheFile(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("orders_schema.toon"), SCHEMA, StandardCharsets.UTF_8);
+        // NB: target/source/kind are accepted read aliases (MappingCsv) — this header is truly wrong.
         Files.writeString(dir.resolve("orders_mapping.csv"), """
-                target,source
+                colA,colB
                 A,B
                 """, StandardCharsets.UTF_8);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> load(dir));
@@ -113,6 +114,60 @@ class MappingCsvDualReadTest {
                 "merged rules must pass through Identifiers.validateSchema like inline ones");
     }
 
+    // ── slice 3: registry refs + explicit mapping_file ─────────────────────────
+
+    @Test
+    void aSchemaRegistryRefResolvesToTheRegistryCopy(@TempDir Path dir) throws Exception {
+        // schema/<id> → registry/schemas/<id>.toon — the wiring that makes an id-addressed
+        // schema component executable (the W1 objection, resolved).
+        Path schemas = Files.createDirectories(dir.resolve("registry/schemas"));
+        Files.writeString(schemas.resolve("orders_v1.toon"), SCHEMA, StandardCharsets.UTF_8);
+        Path pipeline = writePipelineWithSchemaRef(dir, "schema/orders_v1", "");
+        assertDoesNotThrow(() -> PipelineConfig.load(pipeline.toString()));
+    }
+
+    @Test
+    void anExplicitMappingFileWinsOverTheSibling(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("orders_schema.toon"), SCHEMA, StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("orders_mapping.csv"), """
+                targetColumn,sourceExpression,transformType
+                FROM_SIBLING,ACCOUNT_NUMBER,DIRECT
+                """, StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("explicit.csv"), """
+                targetColumn,sourceExpression,transformType
+                FROM_EXPLICIT,ACCOUNT_NUMBER,DIRECT
+                """, StandardCharsets.UTF_8);
+        Path pipeline = writePipelineWithSchemaRef(dir, "orders_schema.toon",
+                "  mapping_file: explicit.csv");
+        List<Map<String, String>> rules = rules(PipelineConfig.load(pipeline.toString()));
+        assertEquals("FROM_EXPLICIT", rules.get(0).get("targetColumn"),
+                "explicit mapping_file > sibling dual-read > inline rules");
+    }
+
+    @Test
+    void aMappingRegistryRefResolvesToTheRegistryCsv(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("orders_schema.toon"), SCHEMA, StandardCharsets.UTF_8);
+        Path mappings = Files.createDirectories(dir.resolve("registry/mappings"));
+        Files.writeString(mappings.resolve("std.csv"), """
+                targetColumn,sourceExpression,transformType
+                FROM_REGISTRY,ACCOUNT_NUMBER,DIRECT
+                """, StandardCharsets.UTF_8);
+        Path pipeline = writePipelineWithSchemaRef(dir, "orders_schema.toon",
+                "  mapping_file: mapping/std");
+        List<Map<String, String>> rules = rules(PipelineConfig.load(pipeline.toString()));
+        assertEquals("FROM_REGISTRY", rules.get(0).get("targetColumn"));
+    }
+
+    @Test
+    void aDeclaredMappingFileThatDoesNotResolveFailsFast(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("orders_schema.toon"), SCHEMA, StandardCharsets.UTF_8);
+        Path pipeline = writePipelineWithSchemaRef(dir, "orders_schema.toon",
+                "  mapping_file: mapping/nope");
+        assertThrows(java.io.FileNotFoundException.class,
+                () -> PipelineConfig.load(pipeline.toString()),
+                "unlike the best-effort sibling, an explicit reference must exist");
+    }
+
     // ── helpers ────────────────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
@@ -123,6 +178,34 @@ class MappingCsvDualReadTest {
 
     private static PipelineConfig load(Path configDir) throws Exception {
         return PipelineConfig.load(writePipeline(configDir, "").toString());
+    }
+
+    /** Like {@link #writePipeline} but with a custom schema reference and an extra processing line. */
+    private static Path writePipelineWithSchemaRef(Path configDir, String schemaRef,
+                                                   String processingExtra) throws Exception {
+        String d = configDir.toString().replace('\\', '/');
+        Path pipeline = configDir.resolve("orders_pipeline.toon");
+        Files.writeString(pipeline, """
+                name: ORDERS_ETL
+                version: 1
+                dirs:
+                  poll: %s/inbox
+                  database: %s/db
+                  backup: %s/backup
+                  temp: %s/temp
+                  errors: %s/errors
+                  quarantine: %s/quarantine
+                  status_dir: %s/status
+                output:
+                  format: PARQUET
+                processing:
+                  threads: 1
+                  file_pattern: "glob:**/*.csv"
+                  schema_file: %s
+                %s
+                """.formatted(d, d, d, d, d, d, d, schemaRef, processingExtra).stripTrailing() + "\n",
+                StandardCharsets.UTF_8);
+        return pipeline;
     }
 
     private static Path writePipeline(Path configDir, String extra) throws Exception {
