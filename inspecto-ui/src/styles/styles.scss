@@ -132,3 +132,15 @@ body.dark {
         outline-offset: 1px;
     }
 }
+
+/* Cell-level compatibility findings on <inspecto-editable-grid> (ELT UI plan S5): an inset outline
+ * via the warn token (never a background fill — the lint:tokens rule), thicker for errors. The
+ * textual message travels as the cell tooltip + the host's role="alert" summary, so colour is
+ * never the only signal. */
+.inspecto-cell-error {
+    box-shadow: inset 0 0 0 2px var(--gamma-warn);
+    font-weight: 600;
+}
+.inspecto-cell-warning {
+    box-shadow: inset 0 0 0 1px var(--gamma-warn);
+}

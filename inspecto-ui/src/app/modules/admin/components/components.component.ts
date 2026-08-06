@@ -12,6 +12,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { ComponentFormDialog, ComponentFormResult } from './component-form.dialog';
+import { MappingEditorDialog } from './mapping-editor.dialog';
 
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
@@ -79,9 +80,11 @@ export class ComponentsComponent implements OnInit {
     }
 
     private openForm(kind: ComponentType, def?: ComponentDef): void {
-        this.dialog
-            .open(ComponentFormDialog, { data: { kind, def }, width: '760px', maxHeight: '88vh' })
-            .afterClosed()
+        // The mapping kind is a flat rule table — it gets the S5 grid editor, not the generic form.
+        const opened = kind === 'mapping'
+            ? this.dialog.open(MappingEditorDialog, { data: { def }, width: '900px', maxHeight: '88vh' })
+            : this.dialog.open(ComponentFormDialog, { data: { kind, def }, width: '760px', maxHeight: '88vh' });
+        opened.afterClosed()
             .subscribe((r?: ComponentFormResult) => {
                 if (r?.writesDisabled) this.writesDisabled = true;
                 if (r?.saved) this.load();

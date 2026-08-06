@@ -223,6 +223,35 @@ recipe editor changes nothing there).
 > no `output:` block (`getOrNew` speculation) — caught by the fixture round-trip gate over a live
 > scratch pipeline; fixed server-side + mock mirror.
 | **S5** | Schema/Mapping grid editors + compatibility findings | Phase 1 gate + CSV kinds | ag-Grid editing module registered explicitly; cell-findings a11y (`role=alert` summary) |
+
+> **S5 GROUNDED 2026-08-06 — two premise corrections.** (1) §2.4's "two flat-table CSV kinds" is
+> half right: only `mapping` is CSV-backed on disk (`ComponentRegistry.CSV_KINDS`, canonical header
+> `targetColumn,sourceExpression,transformType` via `MappingCsv`); a `schema` component is TOON.
+> Either way the WIRE is JSON, never raw CSV: a mapping component's content is
+> `{rules: [{targetColumn, sourceExpression, transformType}]}` through the generic
+> `/components/{type}` CRUD (both kinds are in `ComponentStore.WRITABLE_TYPES`; the UI's
+> `ComponentType` union has neither yet). (2) The BACKWARD gate (`SchemaCompatibility`) fires ONLY
+> on `/config/write` + `/config/patch` for `type=schema` — generic component CRUD bypasses it — and
+> findings anchor by dotted `fieldPath` (`raw.fields[NAME]`, `.type`, `.selector`; shape
+> `{severity, fieldPath, message}`, HTTP 422 with `written:false` on ERROR, warnings ride the 200),
+> NOT by row/column as §2.4 assumed. Consequence: the **schema** grid editor must save through
+> `/config/write type=schema` (the gated path; `compatibility:"none"` is the deliberate override),
+> while the **mapping** grid editor saves through `PUT /components/mapping/{id}` (rules[] JSON) —
+> and fieldPath maps onto grid cells by field NAME, which the schema grid keys rows on anyway.
+
+> **S5a SHIPPED 2026-08-06.** Shared `<inspecto-editable-grid>` (`inspecto/components/`) — ag-Grid
+> spreadsheet-lite with add/remove row, text/select in-cell editors (`TextEditorModule` /
+> `SelectEditorModule` / `CellStyleModule` registered explicitly, still no `AllCommunityModule`),
+> CSV import/export (minimal RFC-4180 `parseCsv`), and cell findings keyed `"<rowIndex>|<colKey>"`
+> rendered as inset `var(--gamma-warn)` box-shadows + tooltips (never a background fill; the
+> `role=alert` summary is HOST-owned). First adopter: `MappingEditorDialog` — the mapping kind now
+> opens a grid over `rules[{targetColumn, sourceExpression, transformType}]` (transformType select =
+> TransformCompiler's DIRECT/EXPR/CONCAT_DT/FILENAME_DATE), saves via generic component CRUD with
+> non-rules content keys preserved verbatim, refuses an empty rule list, drops all-blank rows.
+> `ComponentType` union gained `schema`/`mapping`; `mapping` joined `COMPONENT_TYPES` (page section).
+> Traps hit: specs need the `InspectoGridThemeService` stub (real one walks to `GAMMA_APP_CONFIG`);
+> a hidden `<input type=file>` still needs an `aria-label` or axe fails the whole spec. S5b (schema
+> grid over the gated `/config/write`) is next.
 | **S6** | Pipeline Document export + mapping import loop | Phase 5 generator | diff preview renders the dry-run sample; fingerprint shown |
 | **S7** | Table-entry collect + summarize cards; Jobs nav retirement | Phase 3 / Phase 6 | nav retirement = 3 edits incl. `ACCESS_ACTION_NODES`; `access-catalog.spec` green |
 

@@ -7,6 +7,7 @@ import { GammaConfigService } from '@gamma/services/config';
 import { ICellRendererAngularComp } from 'ag-grid-angular';
 import {
     CellApiModule,
+    CellStyleModule,
     ClientSideRowModelModule,
     ColDef,
     ColumnApiModule,
@@ -21,6 +22,8 @@ import {
     RowAutoHeightModule,
     RowSelectionModule,
     ScrollApiModule,
+    SelectEditorModule,
+    TextEditorModule,
     TextFilterModule,
     Theme,
     themeQuartz,
@@ -51,6 +54,11 @@ ModuleRegistry.registerModules([
     ScrollApiModule,
     RenderApiModule,
     CellApiModule,
+    // Cell editing + per-cell styling for <inspecto-editable-grid> (ELT UI plan S5): the text/select
+    // editors plus cellClassRules for compatibility-finding highlights. Still no AllCommunityModule.
+    TextEditorModule,
+    SelectEditorModule,
+    CellStyleModule,
     ...(isDevMode() ? [ValidationModule] : []),
 ]);
 

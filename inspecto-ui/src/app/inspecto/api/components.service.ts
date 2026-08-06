@@ -9,10 +9,10 @@ import { apiUrl } from './api-base';
  *  keep this union in lockstep with `WRITABLE_TYPES`, since a kind the server does not know 400s on every
  *  list/create/remove (that is exactly how `rule-template` stayed broken; the mock served it regardless).
  *  None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
-export type ComponentType = 'grammar' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
+export type ComponentType = 'grammar' | 'schema' | 'mapping' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
 
-/** The component kinds, in palette order, for the list/editor. */
-export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'transform', 'sink'];
+/** The component kinds, in palette order, for the list/editor. `mapping` opens the S5 grid editor. */
+export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'mapping', 'transform', 'sink'];
 
 /**
  * One registry component (GET /components/{type}[/{id}]) — its kind, in-file identity, `<type>/<id>` ref,
