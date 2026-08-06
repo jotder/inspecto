@@ -430,6 +430,31 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- 🔴 **BUILD-1 — the offline reactor build is BROKEN, and the recorded test baseline is unverified
+  (found 2026-08-06).** `mvn -o clean test` cannot complete: (a) `asn-parser/asn-decoders/pom.xml`
+  pinned surefire **3.5.3**, of which `.m2` holds only the plugin jar and none of its runtime deps
+  (`maven-surefire-common:3.5.3` absent), so `asn-core` dies at mojo load — **before any `inspecto-*`
+  module builds, and `-DskipTests` does not help** (the plugin realm loads before the skip check);
+  (b) past that, `asn-core`'s tests need `junit-platform-launcher:1.12.2` and `com.gamma.asn:legacy-code`
+  needs `jackson-annotations:2.17.1` + `postgresql:42.7.2` — none cached, all unreachable offline.
+  `inspecto-engine` hard-depends on `com.gamma.asn:asn-facade`, itself only obtainable by building that
+  same sub-reactor. **Workaround that works today:** `mvn -o -pl inspecto -am install -DskipTests`
+  (note `-DskipTests`, *not* `-Dmaven.test.skip`, or the `inspecto-etl` test-jar is missing), after
+  which `-pl inspecto` / `-pl inspecto-engine` run standalone. An **uncommitted** local retarget of that
+  pin to the cached 3.5.2 is what got the reactor past (a) — keep or drop, but the underlying `.m2` gap
+  is real and the rest of the repo pins **3.2.5**, so 3.5.3 is an unexplained outlier.
+  ⚠ **Consequence:** `SESSION_STATUS`'s three "full reactor, BUILD SUCCESS" passes of 2026-08-06 could
+  not be reproduced and could not be reconciled — the `.m2` gap looks months old, yet the tests it names
+  live in modules that need `asn-facade` to compile. **Treat that baseline as unverified** until someone
+  reproduces it; per-module runs (`inspecto-engine` 982, `inspecto` 681, 0 failures) are what is actually
+  confirmed.
+- **VOCAB-1 — the vocabulary guard is red on `master`, and silently under-reports.**
+  `docs/superpower/job-parameter-contract-plan.md:66` uses banned *Source* as an acquisition entity
+  (a table header). Separately, `node tools/check-vocabulary.mjs` **skips its TOON and source passes and
+  exits 0** whenever git cannot read the checkout — which is the default for any operator whose Windows
+  profile differs from the checkout owner. Run it as
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=<repo> node tools/check-vocabulary.mjs`
+  to get the real verdict (exit 1, 1 violation as of 2026-08-06).
 - **Build → Test → Run authoring journey — G1–G5 SHIPPED 2026-08-02; only "test against real data"
   remains.** Plan of record:
   [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md).
