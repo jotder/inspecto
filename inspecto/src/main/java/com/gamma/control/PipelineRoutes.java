@@ -1080,18 +1080,26 @@ final class PipelineRoutes implements RouteModule {
      * {@code POST /pipelines/authored/{id}/dry-run} — run a bounded sample through an authored flow's
      * transform→sink subgraph on a throwaway DuckDB (T18, §7.2); per-node + per-sink row counts. 404 if the
      * flow is absent, 400 on a bad sample, 422 on a validation/SQL error. Never touches production output.
+     *
+     * <p>A {@code pipeline} body key dry-runs that <b>candidate</b> graph instead of the stored one, so the
+     * editor can preview an edit before saving it — and diff the two by running once with the key and once
+     * without. The candidate is never written anywhere: it is parsed, validated and executed on the scratch
+     * database like any other graph. With the key present the stored flow is not consulted at all, so a
+     * draft of a pipeline that does not exist yet previews too (no 404).
      */
     private Object dryRunFlow(ApiContext api, String id, Map<String, Object> body) {
-        Path root = pipelinesRootOrNull(api);
-        PipelineGraph g;
-        try {
-            g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+        PipelineGraph g = candidateGraph(body);
+        if (g == null) {
+            Path root = pipelinesRootOrNull(api);
+            try {
+                g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
+            } catch (IllegalArgumentException e) {
+                throw new ApiException(400, e.getMessage());
+            }
+            // W5: the editor now edits registered pipelines too — fall back to the lifted config.
+            if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
+            if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         }
-        // W5: the editor now edits registered pipelines too — fall back to the lifted config.
-        if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
-        if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         try {
             return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body));
         } catch (IllegalArgumentException e) {
@@ -1099,6 +1107,17 @@ final class PipelineRoutes implements RouteModule {
         } catch (Exception e) {
             throw new ApiException(422, "dry-run failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * The candidate graph in a dry-run body's {@code pipeline} key, or {@code null} when the caller wants the
+     * stored flow. Goes through the same {@link #parseAndValidateFlow} the save route uses — a draft that
+     * could not be saved must not preview as if it could (400 malformed / 422 invalid, identically).
+     */
+    @SuppressWarnings("unchecked")
+    private PipelineGraph candidateGraph(Map<String, Object> body) {
+        if (body == null || !(body.get("pipeline") instanceof Map<?, ?> candidate)) return null;
+        return parseAndValidateFlow((Map<String, Object>) candidate);
     }
 
     /**

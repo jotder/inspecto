@@ -258,6 +258,50 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /**
+     * A {@code pipeline} body key dry-runs a candidate graph instead of the stored one — the editor's "preview
+     * before you save" seam. Pinning three things: the candidate's own topology drives the result (not the
+     * stored flow's, which differs); a candidate that would fail {@code /graph}'s own validation 422s the
+     * SAME way (no separate, laxer path); and the candidate never touches disk (the stored flow is untouched,
+     * and a candidate for an id that has no stored flow at all previews with no 404).
+     */
+    @Test
+    void dryRunOverACandidateBodyPreviewsWithoutTouchingTheStoredFlow(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        seedFlow(wr, VALID);   // stored: acq -> sink, no filter
+        String candidate = """
+            {"pipeline":
+              {"name":"demo_flow","active":false,
+               "nodes":[{"id":"acq","type":"acquisition"},
+                        {"id":"flt","type":"transform.filter","config":{"where":"CAST(amt AS INT) >= 100"}},
+                        {"id":"sink","type":"sink.persistent","config":{"store":"big"}}],
+               "edges":[{"from":"acq","rel":"data","to":"flt"},{"from":"flt","rel":"data","to":"sink"}]},
+             "sampleRows":[{"id":"1","amt":"150"},{"id":"2","amt":"50"}]}""";
+        try (Ctx c = open(dir, wr)) {
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/demo_flow/dry-run", candidate);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode body = json(r);
+            assertEquals(1, body.get("sinks").get(0).get("rowCount").asInt(), body.toString());  // the filter ran
+
+            // an invalid candidate 422s the same way the save route would — no laxer preview-only path
+            // (an edge naming a node that doesn't exist — the same shape PipelineValidator rejects at save)
+            String invalid = """
+                {"pipeline":{"name":"demo_flow","active":false,
+                  "nodes":[{"id":"acq","type":"acquisition"}],
+                  "edges":[{"from":"acq","rel":"data","to":"ghost"}]},
+                 "sampleRows":[{"id":"1"}]}""";
+            assertEquals(422, send(c.port, "POST", "/pipelines/authored/demo_flow/dry-run", invalid).statusCode());
+
+            // a candidate for an id with no stored flow previews too — the candidate alone is enough
+            String freshId = candidate.replace("demo_flow", "brand_new");
+            assertEquals(200, send(c.port, "POST", "/pipelines/authored/brand_new/dry-run", freshId).statusCode());
+
+            // the stored flow is unchanged by any of this
+            JsonNode stored = json(send(c.port, "GET", "/pipelines/authored/demo_flow", null));
+            assertEquals(2, stored.get("nodes").size(), "still acq+sink — the candidate was never persisted");
+        }
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     private static JsonNode node(JsonNode nodes, String id) {
