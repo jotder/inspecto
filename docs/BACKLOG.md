@@ -968,7 +968,13 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     `DELETE /spaces/{id}?purge=true` 409. **A fourth landed 2026-08-04**: `61dc8280` `feat(pipeline)!` —
     file dedup folded into the acquisition node, `transform.dedup.fingerprint` config key removed. Pushed
     to `origin/master`; live and undocumented for clients until release notes are actually written at the
-    next tag cut.
+    next tag cut. **A fifth landed 2026-08-07**: `e8a8a755` `feat(jobs)!` — a Job's `deduce:`/`bind:`
+    value naming an *unregistered* `$`-token now fails the Run **REJECTED** instead of falling through to
+    the next parameter layer, so a declaration carrying a misspelled token that was quietly running on its
+    `defaultValue` is now rejected until corrected (job-parameter-contract §6.3; the whole point is that
+    the old behaviour hid the typo). No shipped built-in is affected — every built-in `deduce:` value
+    resolves through `BuiltinExpressions`. Release notes must also mention the `$$` escape: in a
+    `deduce:`/`bind:` position `$$x` now yields the literal `$x`.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
