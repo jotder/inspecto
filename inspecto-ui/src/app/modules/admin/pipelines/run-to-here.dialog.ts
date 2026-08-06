@@ -66,7 +66,7 @@ export interface RunToHereData {
         </h2>
         <mat-dialog-content>
             <p class="text-secondary mb-3 text-sm">
-                Runs the pipeline up to this node over the files you pick and lands the result as scratch
+                Runs the pipeline up to this Step over the files you pick and lands the result as scratch
                 Parquet — nothing is written to production.
             </p>
 

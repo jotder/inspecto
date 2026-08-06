@@ -158,7 +158,7 @@
                     [disabled]="!hasSelection()"
                     (click)="onDeleteKey()"
                     matTooltip="Delete selected"
-                    aria-label="Delete the selected node or edge"
+                    aria-label="Delete the selected Step or edge"
                 >
                     <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
                 </button>
@@ -187,7 +187,7 @@
             <span class="ml-auto flex flex-wrap items-center gap-2">
                 @if (connectFrom()) {
                     <span class="text-xs" role="status" style="color: var(--gamma-primary)">
-                        connecting from '{{ connectFrom() }}' — click a target node
+                        connecting from '{{ connectFrom() }}' — click a target Step
                     </span>
                 }
                 @if (dirty()) {
@@ -380,6 +380,11 @@
                         (insertStep)="onRecipeInsert($event)"
                         (remove)="onRecipeRemove($event)"
                         (move)="onRecipeMove($event)"
+                        (addBranch)="onRecipeAddBranch($event)"
+                        (removeBranch)="onRecipeRemoveBranch($event)"
+                        (branchWhere)="onRecipeBranchWhere($event)"
+                        (setDefault)="onRecipeSetDefault($event)"
+                        (modeChange)="onRecipeModeChange($event)"
                     ></app-pipeline-step-cards>
                     <div class="px-3 pb-3">
                         <app-pipeline-guarantees-panel

@@ -21,7 +21,7 @@ const NODE: AuthoredNode = { id: 'parse', type: 'parser.dsv', name: 'Parse CSV',
 describe('PipelineInspectorComponent', () => {
     it('shows the idle hint when nothing is selected', () => {
         const { fixture } = create();
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Drag a processor');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Drag a Step');
     });
 
     it('renders a selected node: category, status, name/use, and config rows', () => {
@@ -61,7 +61,7 @@ describe('PipelineInspectorComponent', () => {
         buttons.find((b) => b.textContent?.includes('Configure'))?.click();
         buttons.find((b) => b.textContent?.includes('Run to here'))?.click();
         buttons.find((b) => b.textContent?.includes('Connect'))?.click();
-        buttons.find((b) => b.getAttribute('aria-label') === 'Delete node')?.click();
+        buttons.find((b) => b.getAttribute('aria-label') === 'Delete Step')?.click();
         expect(configure).toHaveBeenCalledWith(NODE);
         expect(runToHere).toHaveBeenCalledWith(NODE);
         expect(connect).toHaveBeenCalled();

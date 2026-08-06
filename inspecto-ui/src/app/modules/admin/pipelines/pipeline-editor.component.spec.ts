@@ -361,7 +361,7 @@ describe('PipelineEditorComponent', () => {
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[aria-label="New pipeline"]')).toBeNull();
         expect(el.querySelector('[aria-label="Save pipeline"]')).toBeNull();
-        expect(el.querySelector('[aria-label="Delete the selected node or edge"]')).toBeNull();
+        expect(el.querySelector('[aria-label="Delete the selected Step or edge"]')).toBeNull();
     });
 
     it('the Business lens blocks model mutation even when called directly (defense-in-depth)', () => {

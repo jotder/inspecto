@@ -16,7 +16,7 @@
     @if (result(); as r) {
         <div class="mt-3 grid grid-cols-2 gap-4 text-sm">
             <div>
-                <div class="mb-1 font-semibold">Nodes (seed: {{ r.seedNode }})</div>
+                <div class="mb-1 font-semibold">Steps (seed: {{ r.seedNode }})</div>
                 @for (n of r.nodes; track n.node) {
                     <div class="flex justify-between">
                         <span>{{ n.node }}</span>

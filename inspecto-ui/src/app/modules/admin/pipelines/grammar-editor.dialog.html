@@ -25,13 +25,13 @@
         <mat-form-field subscriptSizing="dynamic" class="w-72">
             <mat-label>Grammar</mat-label>
             <mat-select [value]="boundGrammarId() ?? ''" (selectionChange)="onGrammarChange($event.value)" cdkFocusInitial>
-                <mat-option value="">Inline — this node only</mat-option>
+                <mat-option value="">Inline — this Step only</mat-option>
                 @for (g of grammars(); track g.name) {
                     <mat-option [value]="g.name">{{ g.name }}</mat-option>
                 }
             </mat-select>
             <mat-hint>
-                {{ boundGrammarId() ? 'Shared — editing it changes every pipeline that uses it.' : 'Private to this node.' }}
+                {{ boundGrammarId() ? 'Shared — editing it changes every pipeline that uses it.' : 'Private to this Step.' }}
             </mat-hint>
         </mat-form-field>
 
@@ -55,7 +55,7 @@
         <!-- Extract step: the id pipelines will reference via `use: grammar/<id>`. -->
         <section aria-label="Name this Grammar" class="space-y-1" [formGroup]="nameForm">
             <div class="text-secondary text-sm">
-                Give this Grammar a unique name to save it as a reusable component. The node will reference it
+                Give this Grammar a unique name to save it as a reusable component. The Step will reference it
                 instead of holding its own copy.
             </div>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -70,7 +70,7 @@
                         <mat-error>A Grammar with this name already exists — pick it from the Grammar list to edit it instead.</mat-error>
                     }
                 }
-                <mat-hint>Unique — this is the Grammar id pipeline nodes reference.</mat-hint>
+                <mat-hint>Unique — this is the Grammar id pipeline Steps reference.</mat-hint>
             </mat-form-field>
         </section>
     }

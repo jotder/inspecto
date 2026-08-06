@@ -42,7 +42,7 @@ import { NodeStatus, statusGlyph } from './pipeline-graph';
         class="h-full w-full focus:outline-none"
         tabindex="0"
         role="application"
-        aria-label="Pipeline editor canvas — drag a node type from the palette, drag node-to-node to connect, double-click a node to configure, Delete to remove"
+        aria-label="Pipeline editor canvas — drag a Step type from the palette, drag Step-to-Step to connect, double-click a Step to configure, Delete to remove"
         (dragover)="onDragOver($event)"
         (drop)="onDrop($event)"
         (keydown)="onKeydown($event)"

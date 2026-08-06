@@ -5,6 +5,11 @@ import {
     TestOutcome,
     addEdgeToModel,
     addNodeToModel,
+    addRouteBranch,
+    insertRouteAfter,
+    removeRouteBranch,
+    setRouteBranchWhere,
+    setRouteDefault,
     applyNodePatchInModel,
     authoredToG6,
     bindKindFor,
@@ -439,6 +444,7 @@ describe('detectStepChain', () => {
         expect(chain!.trunk.map((n) => n.id)).toEqual(['collect-1', 'route-1']);
         expect(chain!.branches).toHaveLength(2);
         const emea = chain!.branches!.find((b) => b.key === 'emea')!;
+        expect(emea.routeId).toBe('route-1'); // branch edits target the owning route node (S3)
         expect(emea.where).toBe("region = 'EU'");
         expect(emea.isDefault).toBe(false);
         expect(emea.chain.trunk.map((n) => n.id)).toEqual(['sink-emea']);
@@ -518,8 +524,8 @@ describe('flattenStepChain', () => {
         const chain = {
             trunk: [an('collect-1')],
             branches: [
-                { key: 'emea', where: "region='EU'", isDefault: false, chain: { trunk: [an('sink-emea')] } },
-                { key: 'other', isDefault: true, chain: { trunk: [an('sink-other')] } },
+                { routeId: 'r', key: 'emea', where: "region='EU'", isDefault: false, chain: { trunk: [an('sink-emea')] } },
+                { routeId: 'r', key: 'other', isDefault: true, chain: { trunk: [an('sink-other')] } },
             ],
         };
         const rows = flattenStepChain(chain);
@@ -663,5 +669,156 @@ describe('recipe edit round trip (over the mock lift/lower, which mirrors the se
         // and the round trip re-lifts to a chain carrying the new Step
         const relifted = detectStepChain(liftConfig(out));
         expect(relifted!.trunk.some((n) => n.type === 'transform.filter')).toBe(true);
+    });
+});
+
+// ── S3: route branch reducers + the route parity round trip ────────────────────────────────────────
+
+/** A routed pipeline: collect → route with two branches, each feeding its own sink. */
+const routedPipeline = (): AuthoredPipeline => ({
+    name: 'p',
+    active: false,
+    nodes: [
+        an('collect-1', 'acquisition'),
+        an('route-1', 'transform.route', {
+            mode: 'case',
+            branches: [{ key: 'emea', where: "region = 'EU'" }, { key: 'other' }],
+            default: 'other',
+        }),
+        an('sink-emea', 'sink.persistent'),
+        an('sink-other', 'sink.persistent'),
+    ],
+    edges: [
+        { from: 'collect-1', rel: 'data', to: 'route-1' },
+        { from: 'route-1', rel: 'route:emea', to: 'sink-emea' },
+        { from: 'route-1', rel: 'route:other', to: 'sink-other' },
+    ],
+});
+
+describe('addRouteBranch', () => {
+    it('adds the branch entry plus an unconfigured sink wired via route:<key>', () => {
+        const next = addRouteBranch(routedPipeline(), 'route-1', 'apac')!;
+        expect(next).not.toBeNull();
+        const route = next.nodes.find((n) => n.id === 'route-1')!;
+        expect((route.config!['branches'] as { key: string }[]).map((b) => b.key)).toEqual(['emea', 'other', 'apac']);
+        const edge = next.edges.find((e) => e.rel === 'route:apac')!;
+        expect(edge.from).toBe('route-1');
+        const sink = next.nodes.find((n) => n.id === edge.to)!;
+        expect(sink.type).toBe('sink.persistent');
+        // the whole thing stays recipe-expressible
+        expect(detectStepChain(next)!.branches!.map((b) => b.key)).toEqual(['emea', 'other', 'apac']);
+    });
+
+    it('refuses a duplicate key (the recipe branches map would silently collapse it server-side) and a blank key', () => {
+        expect(addRouteBranch(routedPipeline(), 'route-1', 'emea')).toBeNull();
+        expect(addRouteBranch(routedPipeline(), 'route-1', '  ')).toBeNull();
+        expect(addRouteBranch(routedPipeline(), 'sink-emea', 'x')).toBeNull(); // not a route node
+    });
+});
+
+describe('removeRouteBranch', () => {
+    it('removes the entry, the edge, and the branch subtree; clears default when it pointed there', () => {
+        const next = removeRouteBranch(routedPipeline(), 'route-1', 'other')!;
+        expect(next).not.toBeNull();
+        expect(next.nodes.some((n) => n.id === 'sink-other')).toBe(false);
+        expect(next.edges.some((e) => e.rel === 'route:other')).toBe(false);
+        const route = next.nodes.find((n) => n.id === 'route-1')!;
+        expect((route.config!['branches'] as { key: string }[]).map((b) => b.key)).toEqual(['emea']);
+        expect(route.config!['default']).toBeUndefined();
+    });
+
+    it('refuses when a branch node is reachable from outside the branch (fan-in — canvas work)', () => {
+        const m = routedPipeline();
+        m.edges.push({ from: 'sink-emea', rel: 'data', to: 'sink-other' });
+        expect(removeRouteBranch(m, 'route-1', 'other')).toBeNull();
+    });
+});
+
+describe('setRouteBranchWhere / setRouteDefault', () => {
+    it('sets and clears a branch predicate on the route node config', () => {
+        const set = setRouteBranchWhere(routedPipeline(), 'route-1', 'other', "region <> 'EU'")!;
+        const branches = set.nodes.find((n) => n.id === 'route-1')!.config!['branches'] as { key: string; where?: string }[];
+        expect(branches.find((b) => b.key === 'other')!.where).toBe("region <> 'EU'");
+
+        const cleared = setRouteBranchWhere(set, 'route-1', 'other', '  ')!;
+        const cb = cleared.nodes.find((n) => n.id === 'route-1')!.config!['branches'] as { key: string; where?: string }[];
+        expect('where' in cb.find((b) => b.key === 'other')!).toBe(false);
+        expect(setRouteBranchWhere(routedPipeline(), 'route-1', 'nope', 'x')).toBeNull();
+    });
+
+    it('marks zero-or-one default via the scalar default key (the engine contract — no exactly-one rule exists)', () => {
+        const set = setRouteDefault(routedPipeline(), 'route-1', 'emea')!;
+        expect(set.nodes.find((n) => n.id === 'route-1')!.config!['default']).toBe('emea');
+        const cleared = setRouteDefault(set, 'route-1', null)!;
+        expect(cleared.nodes.find((n) => n.id === 'route-1')!.config!['default']).toBeUndefined();
+        expect(setRouteDefault(routedPipeline(), 'route-1', 'nope')).toBeNull(); // default must name a branch
+    });
+});
+
+describe('insertRouteAfter', () => {
+    it('splices the route in, rewiring the downstream edge as its first branch', () => {
+        const route = an('route-1', 'transform.route', { mode: 'case', branches: [{ key: 'branch_1' }] });
+        const next = insertRouteAfter(linearPipeline(), route, 'parse-1')!;
+        expect(next).not.toBeNull();
+        expect(next.edges).toContainEqual({ from: 'parse-1', rel: 'data', to: 'route-1' });
+        expect(next.edges).toContainEqual({ from: 'route-1', rel: 'route:branch_1', to: 'sink-1' });
+        const chain = detectStepChain(next)!;
+        expect(chain.trunk.map((n) => n.id)).toEqual(['collect-1', 'parse-1', 'route-1']);
+        expect(chain.branches!.map((b) => b.key)).toEqual(['branch_1']);
+    });
+
+    it('refuses at the tail (nothing to route to) and without a seeded branch', () => {
+        const route = an('route-1', 'transform.route', { mode: 'case', branches: [{ key: 'branch_1' }] });
+        expect(insertRouteAfter(linearPipeline(), route, 'sink-1')).toBeNull();
+        expect(insertRouteAfter(linearPipeline(), an('route-2', 'transform.route'), 'parse-1')).toBeNull();
+    });
+});
+
+describe('route parity round trip (mock lift/lower mirrors PipelineEditable/PipelineLift)', () => {
+    it('a route: block lifts to branches, an added branch lowers back with its database stamped', async () => {
+        const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');
+        const cfg = {
+            name: 'orders',
+            active: false,
+            collector: { id: 'SRC' },
+            dirs: { poll: '/in', database: '/db' },
+            parsing: { grammar: 'grammar/pipe' },
+            output: { format: 'PARQUET' },
+            route: {
+                mode: 'case',
+                branches: [{ key: 'main', where: 'AMT > 0', database: '/db' }],
+            },
+        } as Record<string, unknown>;
+
+        // lift: the route node exists and its branch pairs with the sink by database
+        const lifted = liftConfig(structuredClone(cfg));
+        expect(lifted.nodes.some((n) => n.type === 'transform.route')).toBe(true); // mock is NOT stricter than the server
+        const chain = detectStepChain(lifted)!;
+        expect(chain.branches!.map((b) => b.key)).toEqual(['main']);
+
+        // edit: add a branch, configure its sink's destination
+        let edited = addRouteBranch(lifted, 'route', 'errors')!;
+        const errSink = edited.edges.find((e) => e.rel === 'route:errors')!.to;
+        const sink = edited.nodes.find((n) => n.id === errSink)!;
+        edited = applyNodePatchInModel(edited, { ...sink, config: { ...sink.config, database: '/db-errors' } });
+        edited = setRouteBranchWhere(edited, 'route', 'errors', 'AMT <= 0')!;
+
+        // lower: no UNSUPPORTED_NODE refusal; route block carries both branches, databases stamped
+        const lowered = lowerGraph(edited, structuredClone(cfg), false);
+        expect('config' in lowered, JSON.stringify(lowered)).toBe(true);
+        const out = (lowered as { config: Record<string, unknown> }).config;
+        const route = out['route'] as { branches: { key: string; where?: string; database?: string }[] };
+        expect(route.branches.map((b) => b.key)).toEqual(['main', 'errors']);
+        expect(route.branches[1].database).toBe('/db-errors');
+        expect(route.branches[1].where).toBe('AMT <= 0');
+        // two destinations ⇒ plural sinks: block alongside the shorthand
+        expect((out['sinks'] as unknown[]).length).toBe(2);
+        // untouched sections stay byte-stable
+        expect(out['collector']).toEqual(cfg['collector']);
+        expect(out['parsing']).toEqual(cfg['parsing']);
+
+        // and the round trip re-lifts both branches
+        const relifted = detectStepChain(liftConfig(out))!;
+        expect(relifted.branches!.map((b) => b.key).sort()).toEqual(['errors', 'main']);
     });
 });

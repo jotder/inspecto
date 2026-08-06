@@ -16,6 +16,7 @@ export interface Refusal {
 const LOWERABLE = new Set([
     'acquisition', 'parser', 'gap', 'transform.dedup.marker',
     'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
+    'transform.route',   // route: block — authoring-only until the executor lands (mirrors backend S3)
 ]);
 
 type Cfg = Record<string, unknown>;
@@ -142,7 +143,18 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         sinkUpstream = 'filter';
     }
 
-    // single persistent sink (the flat config's one primary output)
+    // route: block — lifts as a transform.route node whose route:<key> edges feed the sinks,
+    // branch↔sink pairing by the branch's declared destination database (mirrors PipelineLift).
+    const routeCfg = config['route'] != null ? structuredClone(asMap(config['route'])) : null;
+    if (routeCfg) {
+        nodes.push({ id: 'route', type: 'transform.route', name: 'Route', config: routeCfg });
+        edges.push({ from: sinkUpstream, rel: 'data', to: 'route' });
+        sinkUpstream = 'route';
+    }
+
+    // persistent sink(s): the single output:/dirs.database shorthand, plus any extra destinations a
+    // plural sinks: block declares (slice 4 lowers >1 destination; the lift must read them back or a
+    // routed pipeline loses its branch targets on reopen).
     const sinkCfg: Cfg = {};
     if (output['format'] != null) sinkCfg['format'] = output['format'];
     if (output['compression'] != null) sinkCfg['compression'] = output['compression'];
@@ -155,8 +167,28 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     }
     const store = String(config['name'] ?? 'out');
     sinkCfg['store'] = store;
-    nodes.push({ id: 'sink', type: 'sink.persistent', name: store, description: 'Persistent store', config: sinkCfg });
-    edges.push({ from: sinkUpstream, rel: 'data', to: 'sink' });
+    const sinkDefs: { id: string; name: string; cfg: Cfg }[] = [{ id: 'sink', name: store, cfg: sinkCfg }];
+    const sinksList = Array.isArray(config['sinks']) ? (config['sinks'] as unknown[]).map(asMap) : [];
+    let extra = 2;
+    for (const s of sinksList) {
+        if (s['database'] == null || String(s['database']) === String(dirs['database'])) continue;   // primary already lifted
+        const c: Cfg = { database: s['database'] };
+        for (const k of ['format', 'compression', 'ducklake']) if (s[k] != null) c[k] = s[k];
+        sinkDefs.push({ id: `sink_${extra}`, name: `out_${extra}`, cfg: c });
+        extra++;
+    }
+    const branchKeyFor = (db: unknown): string | null => {
+        if (!routeCfg || db == null || !Array.isArray(routeCfg['branches'])) return null;
+        const hit = (routeCfg['branches'] as Cfg[]).find((b) => String(b['database']) === String(db) && b['key'] != null);
+        return hit ? String(hit['key']) : null;
+    };
+    for (const d of sinkDefs) {
+        nodes.push({ id: d.id, type: 'sink.persistent', name: d.name, description: 'Persistent store', config: d.cfg });
+        const key = branchKeyFor(d.cfg['database']);
+        edges.push(key != null
+            ? { from: 'route', rel: `route:${key}`, to: d.id }
+            : { from: sinkUpstream, rel: 'data', to: d.id });
+    }
 
     return { name: String(config['name'] ?? ''), active: config['active'] === true, nodes, edges };
 }
@@ -169,7 +201,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
 export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean): { config: Cfg } | { refusals: Refusal[] } {
     const refusals: Refusal[] = [];
     let acq: AuthoredNode | undefined, parser: AuthoredNode | undefined, gap: AuthoredNode | undefined;
-    let marker: AuthoredNode | undefined;
+    let marker: AuthoredNode | undefined, routeNode: AuthoredNode | undefined;
     let primarySink: AuthoredNode | undefined, quarantine: AuthoredNode | undefined;
     const filters: AuthoredNode[] = [];
     // Distinct output destinations keyed by database dir (order-preserving). One => the single
@@ -185,6 +217,7 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'parser') parser = n;
         else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
+        else if (n.type === 'transform.route') routeNode = n;
         else if (n.type === 'transform.filter') filters.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
@@ -195,8 +228,8 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
             }
         }
     }
-    // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4).
-    // Row-routing can't reach here: a transform.route/derive node is not LOWERABLE (UNSUPPORTED_NODE above).
+    // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4);
+    // a transform.route node lowers to the route: block below (backend route lowering, S3).
 
     if (strict) {
         if (!acq) refusals.push({ code: 'NO_ACQUISITION', message: 'an active pipeline needs an acquisition node' });
@@ -239,6 +272,25 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     } else if (strict) {
         delete processing['duplicate_check'];
         delete dirs['markers'];
+    }
+
+    // route: block — node config verbatim, each branch stamped with the destination database its
+    // route:<key> edge feeds (mirrors PipelineEditable.routeSection; edges don't survive the flat file).
+    if (routeNode) {
+        const rc = structuredClone(routeNode.config ?? {}) as Cfg;
+        if (Array.isArray(rc['branches'])) {
+            const byId = new Map(g.nodes.map((n) => [n.id, n]));
+            for (const e of g.edges) {
+                if (e.from !== routeNode.id || !e.rel.startsWith('route:')) continue;
+                const key = e.rel.slice('route:'.length);
+                const db = byId.get(e.to)?.config?.['database'];
+                if (db == null) continue;
+                for (const b of rc['branches'] as Cfg[]) if (String(b['key']) === key) b['database'] = db;
+            }
+        }
+        out['route'] = rc;
+    } else if (strict) {
+        delete out['route'];
     }
 
     if (parser) {

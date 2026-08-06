@@ -174,6 +174,31 @@ recipe editor changes nothing there).
 > re-`liftConfig`, asserting untouched sections (`collector`, `parsing`, `dirs.quarantine`)
 > byte-stable while the edit lands. lint:tokens + build + test:ci green (2087 passed, exit 0).
 | **S3** | Route branch UI + "Step" vocabulary sweep | no | branch add/remove/default rules match `PipelineValidator` refusals (mock parity spec) |
+
+> **S3 SHIPPED 2026-08-06.** Grounding first corrected the gate's own premise: `PipelineValidator`
+> has NO per-branch rules (its only route check is `ILLEGAL_EMIT` — a `route:*` edge must leave a
+> node with `emitsNamedRoutes`); the real branch-shape rules live in `RecipeCompiler.route()`
+> (`MALFORMED_STEP` for a missing/empty branches map, `UNSUPPORTED_STEP` for anything but exactly
+> one sink per branch) and `RowShaper` at runtime. Notably NO duplicate-branch-key or
+> exactly-one-default rule exists anywhere server-side — the recipe's branches *map* would silently
+> collapse duplicates, so the UI refuses duplicates itself, and default is zero-or-one via the
+> scalar `default` key (structurally at-most-one). Branch editing = pure reducers in
+> `pipeline-graph.ts` (`addRouteBranch` — entry + an unconfigured sink per RecipeCompiler's
+> one-sink-per-branch; `removeRouteBranch` — subtree removal, refusing outside fan-in;
+> `setRouteBranchWhere`/`setRouteDefault`; `insertRouteAfter` — a route splices by rewiring its
+> downstream edge as its FIRST branch, so it refuses at the tail); `route` joined `RECIPE_VERBS`.
+> Cards: `case|clone` mode toggle + add-branch draft on the route card, inline `when` input +
+> default star + remove on branch rows (trunk-depth only), all host-applied behind `canAuthor()`.
+> **Mock parity (the gate):** the mock was STALE-STRICT — the server has lowered `transform.route`
+> since backend route lowering shipped, but the mock still refused UNSUPPORTED_NODE and lifted
+> neither `route:` nor plural `sinks:`. It now mirrors `PipelineEditable.routeSection` (branch
+> `database` stamped from the sink its `route:<key>` edge feeds) and `PipelineLift`'s
+> branch↔sink-by-database pairing, pinned by a lift→edit→lower→re-lift parity spec. The same
+> staleness for `transform.dedup`/`summarize`/`join` is a flagged follow-up, not S3 scope.
+> Vocab sweep (§2.7): editor canvas aria-labels, inspector hints/Delete, grammar dialog, dry-run
+> panel, run-to-here, `validatePipeline` messages — the combined read-only topology view keeps
+> "node" deliberately (its graph mixes Steps with synthetic store nodes). One stale spec pinned the
+> old "Drag a processor" copy and was updated with the sweep.
 | **S4** | `step-types` palette + 7-verb specs, dual-read fallback | main plan Phase 5 endpoint | contract JSON byte-compare (extend `NodeAttributesContractTest` pattern) |
 | **S5** | Schema/Mapping grid editors + compatibility findings | Phase 1 gate + CSV kinds | ag-Grid editing module registered explicitly; cell-findings a11y (`role=alert` summary) |
 | **S6** | Pipeline Document export + mapping import loop | Phase 5 generator | diff preview renders the dry-run sample; fingerprint shown |

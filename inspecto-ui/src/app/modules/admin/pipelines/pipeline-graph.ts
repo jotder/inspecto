@@ -105,7 +105,7 @@ export function validatePipeline(
 ): PipelineFinding[] {
     const findings: PipelineFinding[] = [];
     if (!flow.nodes.length) {
-        return [{ severity: 'error', message: 'The pipeline has no nodes.' }];
+        return [{ severity: 'error', message: 'The pipeline has no Steps.' }];
     }
     const incoming = new Set(flow.edges.map((e) => e.to));
     let hasSource = false;
@@ -129,7 +129,7 @@ export function validatePipeline(
             findings.push({ severity: 'warning', nodeId: n.id, message: `${name}: has no input connection.` });
         }
     }
-    if (!hasSource) findings.push({ severity: 'warning', message: 'No source node — nothing feeds the pipeline.' });
+    if (!hasSource) findings.push({ severity: 'warning', message: 'No source Step — nothing feeds the pipeline.' });
     if (!hasSink) findings.push({ severity: 'warning', message: 'No writer/sink — the pipeline produces no output.' });
     return findings;
 }
@@ -487,6 +487,8 @@ export interface StepChain {
 /** One named branch off a route Step: its predicate/default flag (from the route node's own config)
  *  plus its own recursively-detected chain — a branch may itself end in another route. */
 export interface StepBranch {
+    /** The route node this branch hangs off — the id branch edits (predicate/default/remove) target. */
+    routeId: string;
     key: string;
     where?: string;
     isDefault: boolean;
@@ -563,7 +565,7 @@ function walkStepChain(
                 const sub = walkStepChain(next, nodeById, outBy, inCount, seen);
                 if (!sub) return null;
                 const bc = cfg.branches?.find((b) => b?.key === key);
-                branches.push({ key, where: bc?.where, isDefault: key === cfg.default, chain: sub });
+                branches.push({ routeId: cur.id, key, where: bc?.where, isDefault: key === cfg.default, chain: sub });
             }
             return { trunk, branches };
         }
@@ -575,8 +577,8 @@ function walkStepChain(
 /**
  * The recipe verbs the Add-Step palette offers, mapped client-side onto the lowerable node types
  * (UI plan §2.1). DELETED when the server serves `GET /pipelines/step-types` (S4) — this table is the
- * documented interim, not a second vocabulary. `route` is deliberately absent until S3's branch UI:
- * inserting a branch point without a branch editor strands the chain in a shape S2 cannot edit.
+ * documented interim, not a second vocabulary. `route` (S3) inserts via {@link insertRouteAfter},
+ * not {@link insertStepAfter}: a branch point rewires its downstream edge as its first branch.
  */
 export const RECIPE_VERBS: readonly { verb: string; type: string; label: string }[] = [
     { verb: 'collect', type: 'acquisition', label: 'Collect' },
@@ -585,6 +587,7 @@ export const RECIPE_VERBS: readonly { verb: string; type: string; label: string 
     { verb: 'dedup', type: 'transform.dedup', label: 'Dedup' },
     { verb: 'transform', type: 'transform.filter', label: 'Transform (filter)' },
     { verb: 'summarize', type: 'transform.summarize', label: 'Summarize' },
+    { verb: 'route', type: 'transform.route', label: 'Route' },
     { verb: 'sink', type: 'sink.persistent', label: 'Sink' },
 ];
 
@@ -682,7 +685,7 @@ export function moveStepInChain(model: AuthoredPipeline, id: string, dir: 'up' |
 /** One row of a flattened {@link StepChain} for a simple indented list render (no recursive component). */
 export type StepRow =
     | { kind: 'node'; rowId: string; node: AuthoredNode; depth: number }
-    | { kind: 'branch'; rowId: string; key: string; where?: string; isDefault: boolean; depth: number };
+    | { kind: 'branch'; rowId: string; routeId: string; key: string; where?: string; isDefault: boolean; depth: number };
 
 /** Flatten a {@link StepChain} into an ordered, indented row list — depth-first, branches after their trunk. */
 export function flattenStepChain(chain: StepChain, depth = 0): StepRow[] {
@@ -692,6 +695,7 @@ export function flattenStepChain(chain: StepChain, depth = 0): StepRow[] {
             rows.push({
                 kind: 'branch',
                 rowId: `branch:${b.key}:${depth}`,
+                routeId: b.routeId,
                 key: b.key,
                 where: b.where,
                 isDefault: b.isDefault,
@@ -701,6 +705,126 @@ export function flattenStepChain(chain: StepChain, depth = 0): StepRow[] {
         }
     }
     return rows;
+}
+
+// ── Route branch reducers (S3, §2.6): branch edits are node-config + edge rewrites on the SAME model ──
+
+/** The route node's `branches` list, cloned for mutation (`[]` when absent/malformed). */
+function routeBranchesOf(node: AuthoredNode): { key?: string; where?: string; [k: string]: unknown }[] {
+    const b = node.config?.['branches'];
+    return Array.isArray(b) ? structuredClone(b) : [];
+}
+
+/**
+ * Add a named branch to a route Step: the branch entry lands in the node's `branches` list and a new
+ * UNCONFIGURED persistent sink is wired via a `route:<key>` edge — RecipeCompiler's rule (a branch
+ * compiles as exactly one sink step for now), so the graph never holds a dangling branch entry.
+ * Returns `null` for a missing/non-route node, a blank key, or a duplicate key (the recipe `branches`
+ * map would silently collapse duplicates server-side — the UI refuses instead).
+ */
+export function addRouteBranch(model: AuthoredPipeline, routeId: string, key: string): AuthoredPipeline | null {
+    const route = model.nodes.find((n) => n.id === routeId);
+    if (!route || route.type !== 'transform.route' || !key.trim()) return null;
+    const k = key.trim();
+    const branches = routeBranchesOf(route);
+    if (branches.some((b) => b?.key === k)) return null;
+    if (model.edges.some((e) => e.from === routeId && e.rel === `route:${k}`)) return null;
+    branches.push({ key: k });
+    const sink: AuthoredNode = {
+        id: uniqueNodeId(model, 'sink.persistent'),
+        type: 'sink.persistent',
+        name: k,
+        config: {},
+    };
+    return {
+        ...model,
+        nodes: [...applyNodePatchInModel(model, { ...route, config: { ...route.config, branches } }).nodes, sink],
+        edges: [...model.edges, { from: routeId, rel: `route:${k}`, to: sink.id }],
+    };
+}
+
+/**
+ * Remove a route branch: its entry, its `route:<key>` edge, and the branch's whole downstream
+ * subtree. Returns `null` when any subtree node is reachable from outside the branch (fan-in — the
+ * removal would orphan wiring the recipe view can't see; that's canvas work).
+ */
+export function removeRouteBranch(model: AuthoredPipeline, routeId: string, key: string): AuthoredPipeline | null {
+    const route = model.nodes.find((n) => n.id === routeId);
+    const rel = `route:${key}`;
+    const start = model.edges.find((e) => e.from === routeId && e.rel === rel)?.to;
+    if (!route || route.type !== 'transform.route' || !start) return null;
+    // collect the branch subtree
+    const doomed = new Set<string>([start]);
+    let grew = true;
+    while (grew) {
+        grew = false;
+        for (const e of model.edges)
+            if (doomed.has(e.from) && !doomed.has(e.to)) { doomed.add(e.to); grew = true; }
+    }
+    // refuse when the subtree is reachable from outside it (other than the branch edge itself)
+    for (const e of model.edges)
+        if (doomed.has(e.to) && !doomed.has(e.from) && !(e.from === routeId && e.rel === rel)) return null;
+    const branches = routeBranchesOf(route).filter((b) => b?.key !== key);
+    const cfg = { ...route.config, branches };
+    if (cfg['default'] === key) delete cfg['default'];
+    const withPatch = applyNodePatchInModel(model, { ...route, config: cfg });
+    return {
+        ...withPatch,
+        nodes: withPatch.nodes.filter((n) => !doomed.has(n.id)),
+        edges: withPatch.edges.filter((e) => !doomed.has(e.from) && !doomed.has(e.to)),
+    };
+}
+
+/** Set (or clear, with `''`) a branch's `when`/`where` predicate on the route node's config. */
+export function setRouteBranchWhere(model: AuthoredPipeline, routeId: string, key: string, where: string): AuthoredPipeline | null {
+    const route = model.nodes.find((n) => n.id === routeId);
+    if (!route || route.type !== 'transform.route') return null;
+    const branches = routeBranchesOf(route);
+    const b = branches.find((x) => x?.key === key);
+    if (!b) return null;
+    if (where.trim()) b.where = where.trim();
+    else delete b.where;
+    return applyNodePatchInModel(model, { ...route, config: { ...route.config, branches } });
+}
+
+/**
+ * Mark `key` the route's default branch (`null` clears it). Zero-or-one default is the engine's real
+ * contract (RowShaper's case-mode `ELSE`; no exactly-one refusal exists server-side) — the scalar
+ * `default` key enforces at-most-one structurally.
+ */
+export function setRouteDefault(model: AuthoredPipeline, routeId: string, key: string | null): AuthoredPipeline | null {
+    const route = model.nodes.find((n) => n.id === routeId);
+    if (!route || route.type !== 'transform.route') return null;
+    if (key !== null && !routeBranchesOf(route).some((b) => b?.key === key)) return null;
+    const cfg = { ...route.config };
+    if (key === null) delete cfg['default'];
+    else cfg['default'] = key;
+    return applyNodePatchInModel(model, { ...route, config: cfg });
+}
+
+/**
+ * Splice a route Step in after `afterId`, rewiring the single downstream `data` edge as the route's
+ * FIRST branch (`route:<branches[0].key>`) — a branch point routes *to* something, so unlike
+ * {@link insertStepAfter} a downstream is required, and the node must arrive carrying at least one
+ * branch entry. Returns `null` otherwise, or when `afterId` isn't strictly linear.
+ */
+export function insertRouteAfter(model: AuthoredPipeline, node: AuthoredNode, afterId: string): AuthoredPipeline | null {
+    if (model.nodes.some((n) => n.id === node.id)) return null;
+    const key = (node.config?.['branches'] as { key?: string }[] | undefined)?.[0]?.key;
+    if (node.type !== 'transform.route' || !key) return null;
+    const outBy = new Map<string, AuthoredEdge[]>();
+    for (const e of model.edges) outBy.set(e.from, [...(outBy.get(e.from) ?? []), e]);
+    const outs = (outBy.get(afterId) ?? []).filter((e) => !isGuaranteeSideEdge(e, outBy));
+    if (outs.length !== 1 || outs[0].rel !== 'data') return null;
+    return {
+        ...model,
+        nodes: [...model.nodes, node],
+        edges: [
+            ...model.edges.filter((e) => !(e.from === afterId && e.rel === 'data')),
+            { from: afterId, rel: 'data', to: node.id },
+            { from: node.id, rel: `route:${key}`, to: outs[0].to },
+        ],
+    };
 }
 
 /** Relationships a canvas edge may carry: the source node's emitted rels, `data`, and the edge's current rel. */

@@ -90,7 +90,7 @@ import {
                     <button mat-stroked-button type="button" (click)="connect.emit()">
                         <mat-icon svgIcon="heroicons_outline:arrow-right"></mat-icon> Connect
                     </button>
-                    <button mat-stroked-button type="button" (click)="deleteSelected.emit()" aria-label="Delete node">
+                    <button mat-stroked-button type="button" (click)="deleteSelected.emit()" aria-label="Delete Step">
                         <mat-icon svgIcon="heroicons_outline:trash"></mat-icon> Delete
                     </button>
                 }
@@ -114,10 +114,10 @@ import {
         } @else {
             <p class="text-sm opacity-70">
                 @if (readOnly) {
-                    Click a node or edge to inspect it. Authoring is read-only in the Business lens.
+                    Click a Step or edge to inspect it. Authoring is read-only in the Business lens.
                 } @else {
-                    Drag a processor from the toolbar onto the canvas. Click a node or edge to select it;
-                    <b>double-click</b> a node (or use <b>Configure</b>) to edit its attributes.
+                    Drag a Step from the toolbar onto the canvas. Click a Step or edge to select it;
+                    <b>double-click</b> a Step (or use <b>Configure</b>) to edit its attributes.
                     <b>Delete selected</b> removes the selected item.
                 }
             </p>

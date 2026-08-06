@@ -78,9 +78,14 @@ import {
     findingTint,
     flattenStepChain,
     groupByCategory,
+    addRouteBranch,
+    insertRouteAfter,
     insertStepAfter,
     moveStepInChain,
+    removeRouteBranch,
     removeStepFromChain,
+    setRouteBranchWhere,
+    setRouteDefault,
     nodeConfigEntries,
     nodeLastRunTotal,
     provenanceCounts,
@@ -344,6 +349,27 @@ export class PipelineEditorComponent implements OnInit {
         if (!this.canAuthor()) return; // defense in depth, not just the hidden affordance
         const m = this.model();
         if (!m) return;
+        // A route Step splices differently (S3): its downstream edge becomes its first branch, so it
+        // needs a downstream to route to — never insertable at the tail or as the entry.
+        if (e.type === 'transform.route') {
+            if (e.afterId === null) {
+                this.toast.warning('A Route Step needs something to route to — add it after a Step, not at the start.');
+                return;
+            }
+            const node: AuthoredNode = {
+                id: uniqueNodeId(m, e.type),
+                type: e.type,
+                config: { mode: 'case', branches: [{ key: 'branch_1' }] },
+            };
+            const next = insertRouteAfter(m, node, e.afterId);
+            if (!next) {
+                this.toast.warning('Cannot insert a Route here — it needs exactly one downstream Step. Use the Canvas.');
+                return;
+            }
+            this.model.set(next);
+            this.dirty.set(true);
+            return;
+        }
         const node: AuthoredNode = { id: uniqueNodeId(m, e.type), type: e.type };
         const next = insertStepAfter(m, node, e.afterId);
         if (!next) {
@@ -378,6 +404,69 @@ export class PipelineEditorComponent implements OnInit {
         const next = moveStepInChain(m, e.id, e.dir);
         if (!next) return;
         this.model.set(next);
+        this.dirty.set(true);
+    }
+
+    // ── Route branch editing (S3, §2.6) — the same pure-reducer pattern ────────────────────────────
+
+    /** Add a named branch (+ its unconfigured sink) to a route Step. */
+    onRecipeAddBranch(e: { routeId: string; key: string }): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        if (!m) return;
+        const next = addRouteBranch(m, e.routeId, e.key);
+        if (!next) {
+            this.toast.warning(`Cannot add branch '${e.key}' — a branch with that key already exists.`);
+            return;
+        }
+        this.model.set(next);
+        this.dirty.set(true);
+    }
+
+    /** Remove a branch and its downstream Steps. */
+    onRecipeRemoveBranch(e: { routeId: string; key: string }): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        if (!m) return;
+        const next = removeRouteBranch(m, e.routeId, e.key);
+        if (!next) {
+            this.toast.warning('Cannot remove this branch — its Steps are wired beyond the branch. Use the Canvas.');
+            return;
+        }
+        this.model.set(next);
+        this.clearSelection();
+        this.dirty.set(true);
+    }
+
+    /** Set/clear a branch's `when` predicate. */
+    onRecipeBranchWhere(e: { routeId: string; key: string; where: string }): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        if (!m) return;
+        const next = setRouteBranchWhere(m, e.routeId, e.key, e.where);
+        if (!next) return;
+        this.model.set(next);
+        this.dirty.set(true);
+    }
+
+    /** Mark/clear the route's default branch (zero-or-one — the engine's real contract). */
+    onRecipeSetDefault(e: { routeId: string; key: string | null }): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        if (!m) return;
+        const next = setRouteDefault(m, e.routeId, e.key);
+        if (!next) return;
+        this.model.set(next);
+        this.dirty.set(true);
+    }
+
+    /** Flip the route's `case|clone` mode on its own config. */
+    onRecipeModeChange(e: { routeId: string; mode: 'case' | 'clone' }): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        const route = m?.nodes.find((n) => n.id === e.routeId);
+        if (!m || !route) return;
+        this.model.set(applyNodePatchInModel(m, { ...route, config: { ...route.config, mode: e.mode } }));
         this.dirty.set(true);
     }
 

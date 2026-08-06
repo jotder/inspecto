@@ -25,8 +25,10 @@ import {
  * that needs). With {@link editable} the cards gain: click/Configure → {@link open} (the host routes
  * it to the EXISTING dialogs — no new dialog kinds), an Add-Step affordance between trunk cards
  * offering the {@link RECIPE_VERBS} (→ {@link insertStep}), remove (→ {@link remove}) and
- * move up/down (→ {@link move}). Branch rows (depth > 0) stay read-only cards except Configure —
- * trunk-only editing is S2's deliberate scope; the branch editor is S3.
+ * move up/down (→ {@link move}). Nested Step cards (depth > 0) configure but don't splice — that
+ * stays canvas work. S3 adds the branch editor on top: a route Step card gains a `case|clone` mode
+ * toggle and an add-branch draft input; each branch row gains an inline `when` predicate input, a
+ * default toggle, and remove — all emitted to the host, which applies the pure reducers.
  */
 @Component({
     selector: 'app-pipeline-step-cards',
@@ -124,6 +126,38 @@ import {
                                 </div>
                             }
                         }
+                        <!-- S3: the route Step's own branch controls (mode toggle + add-branch draft) -->
+                        @if (editable && row.node.type === 'transform.route') {
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                <button
+                                    mat-stroked-button
+                                    class="min-h-8"
+                                    (click)="modeChange.emit({ routeId: row.node.id, mode: routeMode(row.node) === 'clone' ? 'case' : 'clone' })"
+                                    [matTooltip]="routeMode(row.node) === 'clone'
+                                        ? 'clone: every matching branch fires — switch to case (first match wins)'
+                                        : 'case: first matching branch wins — switch to clone (every match fires)'"
+                                    [attr.aria-label]="'Route mode: ' + routeMode(row.node) + ' — click to switch'"
+                                >
+                                    mode: {{ routeMode(row.node) }}
+                                </button>
+                                <input
+                                    class="rounded border bg-transparent px-2 py-1 text-xs"
+                                    style="border-color: var(--gamma-border)"
+                                    placeholder="new branch key"
+                                    [attr.aria-label]="'New branch key for ' + row.node.id"
+                                    #branchDraft
+                                    (keydown.enter)="commitBranch(row.node.id, branchDraft)"
+                                />
+                                <button
+                                    mat-icon-button
+                                    (click)="commitBranch(row.node.id, branchDraft)"
+                                    [matTooltip]="'Add a branch to ' + row.node.id"
+                                    [attr.aria-label]="'Add a branch to ' + row.node.id"
+                                >
+                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
+                                </button>
+                            </div>
+                        }
                     </li>
                     @if (editable && row.depth === 0) {
                         <li class="flex justify-center">
@@ -145,8 +179,38 @@ import {
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-turn-down-right"></mat-icon>
                         <span>branch: {{ row.key }}</span>
-                        @if (row.where) {
-                            <span class="font-normal normal-case opacity-80">when {{ row.where }}</span>
+                        @if (editable) {
+                            <input
+                                class="rounded border bg-transparent px-2 py-1 font-normal normal-case"
+                                style="border-color: var(--gamma-border)"
+                                placeholder="when …"
+                                [value]="row.where ?? ''"
+                                [attr.aria-label]="'Branch ' + row.key + ' predicate'"
+                                (change)="branchWhere.emit({ routeId: row.routeId, key: row.key, where: $any($event.target).value })"
+                            />
+                            <button
+                                mat-icon-button
+                                (click)="setDefault.emit({ routeId: row.routeId, key: row.isDefault ? null : row.key })"
+                                [matTooltip]="row.isDefault ? 'Clear default' : 'Make this the default branch'"
+                                [attr.aria-label]="(row.isDefault ? 'Clear default branch ' : 'Make default branch ') + row.key"
+                            >
+                                <mat-icon
+                                    class="icon-size-4"
+                                    [svgIcon]="row.isDefault ? 'heroicons_solid:star' : 'heroicons_outline:star'"
+                                ></mat-icon>
+                            </button>
+                            <button
+                                mat-icon-button
+                                (click)="removeBranch.emit({ routeId: row.routeId, key: row.key })"
+                                [matTooltip]="'Remove branch ' + row.key + ' and its Steps'"
+                                [attr.aria-label]="'Remove branch ' + row.key"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
+                            </button>
+                        } @else {
+                            @if (row.where) {
+                                <span class="font-normal normal-case opacity-80">when {{ row.where }}</span>
+                            }
                         }
                         @if (row.isDefault) {
                             <inspecto-chip variant="soft" tone="neutral">default</inspecto-chip>
@@ -182,6 +246,16 @@ export class PipelineStepCardsComponent {
     @Output() readonly remove = new EventEmitter<string>();
     /** Move a trunk Step one place up/down the chain. */
     @Output() readonly move = new EventEmitter<{ id: string; dir: 'up' | 'down' }>();
+    /** S3: add a named branch (+ its unconfigured sink) to a route Step. */
+    @Output() readonly addBranch = new EventEmitter<{ routeId: string; key: string }>();
+    /** S3: remove a branch and its downstream Steps. */
+    @Output() readonly removeBranch = new EventEmitter<{ routeId: string; key: string }>();
+    /** S3: set/clear a branch's `when` predicate. */
+    @Output() readonly branchWhere = new EventEmitter<{ routeId: string; key: string; where: string }>();
+    /** S3: mark a branch the route's default (`key: null` clears it — zero-or-one, the engine's contract). */
+    @Output() readonly setDefault = new EventEmitter<{ routeId: string; key: string | null }>();
+    /** S3: flip the route's `case|clone` mode. */
+    @Output() readonly modeChange = new EventEmitter<{ routeId: string; mode: 'case' | 'clone' }>();
 
     /** Where the open verb menu will insert (set by the clicked "+" before the menu opens). */
     insertAfterId: string | null = null;
@@ -196,5 +270,18 @@ export class PipelineStepCardsComponent {
     /** The card's compact config summary — up to 4 entries, so a wide config doesn't dwarf the card. */
     configSummary(node: AuthoredNode): { k: string; v: string }[] {
         return nodeConfigEntries(node).slice(0, 4);
+    }
+
+    /** The route node's mode — `case` (exclusive first-match) unless the config says `clone` (RowShaper's rule). */
+    routeMode(node: AuthoredNode): 'case' | 'clone' {
+        return String(node.config?.['mode'] ?? '').toLowerCase() === 'clone' ? 'clone' : 'case';
+    }
+
+    /** Commit the add-branch draft input (Enter or the + button), clearing it on emit. */
+    commitBranch(routeId: string, draft: HTMLInputElement): void {
+        const key = draft.value.trim();
+        if (!key) return;
+        this.addBranch.emit({ routeId, key });
+        draft.value = '';
     }
 }

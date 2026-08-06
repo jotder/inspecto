@@ -39,9 +39,9 @@ describe('PipelineStepCardsComponent', () => {
     it('renders a branch-header row indented and shows its predicate + default flag', () => {
         const rows: StepRow[] = [
             { kind: 'node', rowId: 'route-1', node: { id: 'route-1', type: 'transform.route' }, depth: 0 },
-            { kind: 'branch', rowId: 'branch:emea:0', key: 'emea', where: "region = 'EU'", isDefault: false, depth: 0 },
+            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', where: "region = 'EU'", isDefault: false, depth: 0 },
             { kind: 'node', rowId: 'sink-emea', node: { id: 'sink-emea', type: 'sink.persistent' }, depth: 1 },
-            { kind: 'branch', rowId: 'branch:other:0', key: 'other', isDefault: true, depth: 0 },
+            { kind: 'branch', rowId: 'branch:other:0', routeId: 'route-1', key: 'other', isDefault: true, depth: 0 },
             { kind: 'node', rowId: 'sink-other', node: { id: 'sink-other', type: 'sink.persistent' }, depth: 1 },
         ];
         const typeCat = new Map([['transform.route', 'TRANSFORM'], ['sink.persistent', 'SINK']]);
@@ -108,5 +108,70 @@ describe('PipelineStepCardsComponent', () => {
         const rows: StepRow[] = [{ kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 }];
         const { fixture } = create({ rows, typeCat: new Map([['acquisition', 'SOURCE']]), editable: false });
         expect((fixture.nativeElement as HTMLElement).querySelectorAll('button')).toHaveLength(0);
+    });
+
+    it('S3: a route card offers mode toggle + add-branch; branch rows emit where/default/remove', async () => {
+        const ROUTE: AuthoredNode = {
+            id: 'route-1', type: 'transform.route',
+            config: { mode: 'case', branches: [{ key: 'emea', where: "region = 'EU'" }], default: 'emea' },
+        };
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: ROUTE.id, node: ROUTE, depth: 0 },
+            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', where: "region = 'EU'", isDefault: true, depth: 0 },
+            { kind: 'node', rowId: 'sink-emea', node: { id: 'sink-emea', type: 'sink.persistent' }, depth: 1 },
+        ];
+        const typeCat = new Map([['transform.route', 'TRANSFORM'], ['sink.persistent', 'SINK']]);
+        const { fixture, c } = create({ rows, typeCat, editable: true });
+        const added: unknown[] = [];
+        const removed: unknown[] = [];
+        const wheres: unknown[] = [];
+        const defaults: unknown[] = [];
+        const modes: unknown[] = [];
+        c.addBranch.subscribe((e) => added.push(e));
+        c.removeBranch.subscribe((e) => removed.push(e));
+        c.branchWhere.subscribe((e) => wheres.push(e));
+        c.setDefault.subscribe((e) => defaults.push(e));
+        c.modeChange.subscribe((e) => modes.push(e));
+
+        const el = fixture.nativeElement as HTMLElement;
+        const btn = (label: string): HTMLButtonElement | undefined =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label);
+
+        // mode toggle flips case → clone
+        btn('Route mode: case — click to switch')!.click();
+        expect(modes).toEqual([{ routeId: 'route-1', mode: 'clone' }]);
+
+        // add-branch commits the draft on the + button and clears it
+        const draft = el.querySelector<HTMLInputElement>('[aria-label="New branch key for route-1"]')!;
+        draft.value = 'apac';
+        btn('Add a branch to route-1')!.click();
+        expect(added).toEqual([{ routeId: 'route-1', key: 'apac' }]);
+        expect(draft.value).toBe('');
+
+        // branch row: predicate input emits on change; star toggles default off (it IS the default)
+        const when = el.querySelector<HTMLInputElement>('[aria-label="Branch emea predicate"]')!;
+        expect(when.value).toBe("region = 'EU'");
+        when.value = "region <> 'US'";
+        when.dispatchEvent(new Event('change'));
+        expect(wheres).toEqual([{ routeId: 'route-1', key: 'emea', where: "region <> 'US'" }]);
+
+        btn('Clear default branch emea')!.click();
+        expect(defaults).toEqual([{ routeId: 'route-1', key: null }]);
+
+        btn('Remove branch emea')!.click();
+        expect(removed).toEqual([{ routeId: 'route-1', key: 'emea' }]);
+
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('S3: branch rows show the predicate as text only when not editable', () => {
+        const rows: StepRow[] = [
+            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', where: "region = 'EU'", isDefault: false, depth: 0 },
+        ];
+        const { fixture } = create({ rows, typeCat: new Map(), editable: false });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.textContent).toContain("when region = 'EU'");
+        expect(el.querySelectorAll('input')).toHaveLength(0);
+        expect(el.querySelectorAll('button')).toHaveLength(0);
     });
 });
