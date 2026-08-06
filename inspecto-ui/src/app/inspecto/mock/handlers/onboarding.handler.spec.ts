@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
+import { componentCollection } from './components.handler';
 import { onboardingHandler, PIPELINE_CONFIGS_COLL, StoredPipelineConfig } from './onboarding.handler';
 
 /**
@@ -101,5 +102,107 @@ describe('onboardingHandler POST /config/patch', () => {
         const collector = storedConfig(store, 'cleared')['collector'] as Record<string, unknown>;
         expect('connection' in collector).toBe(false);
         expect(collector['connector']).toBe('local');
+    });
+});
+
+// ── the schema BACKWARD gate (S5b) — pins the mock to SchemaCompatibility.check exactly ──────────
+
+const schemaConfig = (fields: Record<string, unknown>[]): Record<string, unknown> => ({
+    raw: { name: 'ev', format: 'CSV', fields },
+});
+
+function writeSchema(store: MockStore, fields: Record<string, unknown>[], compatibility?: string):
+    ReturnType<typeof handler> {
+    return handler(req('POST', '/api/config/write', {
+        type: 'schema', config: schemaConfig(fields), overwrite: true,
+        ...(compatibility ? { compatibility } : {}),
+    }), store);
+}
+
+describe('onboardingHandler schema BACKWARD gate on /config/write', () => {
+    const BASE = [
+        { name: 'ID', selector: '0', type: 'VARCHAR' },
+        { name: 'QTY', selector: '1', type: 'INTEGER' },
+    ];
+
+    it('lets a first write and a compatible edit (add field, widen type) through', () => {
+        const store = new MockStore();
+        expect(writeSchema(store, BASE)?.status ?? 200).toBe(200);
+        const res = writeSchema(store, [
+            { name: 'ID', selector: '0', type: 'VARCHAR' },
+            { name: 'QTY', selector: '1', type: 'BIGINT' },       // INTEGER → BIGINT widening
+            { name: 'NOTE', selector: '2', type: 'VARCHAR' },     // added field
+        ]);
+        expect(res?.status ?? 200).toBe(200);
+    });
+
+    it('422s a removed field, anchored raw.fields[NAME]', () => {
+        const store = new MockStore();
+        writeSchema(store, BASE);
+        const res = writeSchema(store, [{ name: 'ID', selector: '0', type: 'VARCHAR' }]);
+        expect(res?.status).toBe(422);
+        const body = res?.body as { written: boolean; findings: { severity: string; fieldPath: string }[] };
+        expect(body.written).toBe(false);
+        expect(body.findings).toHaveLength(1);
+        expect(body.findings[0]).toMatchObject({ severity: 'ERROR', fieldPath: 'raw.fields[QTY]' });
+    });
+
+    it('422s a non-widening type change (.type) and a moved selector (.selector), and does not store', () => {
+        const store = new MockStore();
+        writeSchema(store, BASE);
+        const res = writeSchema(store, [
+            { name: 'ID', selector: '9', type: 'VARCHAR' },       // selector moved
+            { name: 'QTY', selector: '1', type: 'DATE' },         // INTEGER → DATE: not a widening
+        ]);
+        expect(res?.status).toBe(422);
+        const findings = (res?.body as { findings: { fieldPath: string }[] }).findings;
+        expect(findings.map((f) => f.fieldPath).sort()).toEqual(['raw.fields[ID].selector', 'raw.fields[QTY].type']);
+        // refused ⇒ the stored schema is untouched
+        const stored = store.get<{ config: Record<string, unknown> }>('default', 'schema-config', 'ev')!.config;
+        expect((stored['raw'] as Record<string, unknown>)['fields']).toEqual(BASE);
+    });
+
+    it('compatibility: "none" overrides the gate (case-insensitive), like the server', () => {
+        const store = new MockStore();
+        writeSchema(store, BASE);
+        const res = writeSchema(store, [{ name: 'ID', selector: '0', type: 'VARCHAR' }], 'NONE');
+        expect(res?.status ?? 200).toBe(200);
+    });
+
+    it('runs the same gate on /config/patch, which has NO override key', () => {
+        const store = new MockStore();
+        writeSchema(store, BASE);
+        const res = handler(req('POST', '/api/config/patch', {
+            type: 'schema', name: 'ev',
+            patch: { raw: { fields: [{ name: 'ID', selector: '0', type: 'VARCHAR' }] } },
+        }), store);
+        expect(res?.status).toBe(422);
+        expect((res?.body as { findings: { fieldPath: string }[] }).findings[0].fieldPath).toBe('raw.fields[QTY]');
+    });
+});
+
+describe('onboardingHandler schema gate ↔ component-registry bridge', () => {
+    it('gates against a schema that exists only in the component registry (one file server-side)', () => {
+        const store = new MockStore();
+        store.put('default', componentCollection('schema'), 'ev', {
+            type: 'schema', name: 'ev', ref: 'schema/ev',
+            content: { raw: { name: 'ev', fields: [{ name: 'ID', selector: '0', type: 'VARCHAR' }] } },
+        });
+        const res = handler(req('POST', '/api/config/write', {
+            type: 'schema', overwrite: true,
+            config: { raw: { name: 'ev', fields: [] } },   // removes ID
+        }), store);
+        expect(res?.status).toBe(422);
+    });
+
+    it('mirrors a gated write into the component registry, so the components page reflects it', () => {
+        const store = new MockStore();
+        handler(req('POST', '/api/config/write', {
+            type: 'schema',
+            config: { raw: { name: 'ev', fields: [{ name: 'ID', selector: '0', type: 'VARCHAR' }] } },
+        }), store);
+        const comp = store.get<{ content: Record<string, unknown> }>('default', componentCollection('schema'), 'ev');
+        expect(comp).toBeDefined();
+        expect((comp!.content['raw'] as Record<string, unknown>)['name']).toBe('ev');
     });
 });

@@ -38,11 +38,12 @@ export class ConfigService {
   validateDraft(type: ConfigType, config: Record<string, unknown>, safety = false): Observable<ValidateResult> {
     return this.http.post<ValidateResult>(apiUrl('/validate'), { type, config, safety });
   }
-  /** Persist a validated draft under the write root; `overwrite: true` replaces (stage save). */
+  /** Persist a validated draft under the write root; `overwrite: true` replaces (stage save).
+   *  `compatibility: 'none'` is the schema BACKWARD-gate override — the deliberate escape hatch. */
   write(
     type: ConfigType,
     config: Record<string, unknown>,
-    opts?: { subdir?: string; overwrite?: boolean },
+    opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none' },
   ): Observable<ConfigWriteResult> {
     return this.http.post<ConfigWriteResult>(apiUrl('/config/write'), { type, config, ...opts });
   }

@@ -11,8 +11,9 @@ import { apiUrl } from './api-base';
  *  None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
 export type ComponentType = 'grammar' | 'schema' | 'mapping' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
 
-/** The component kinds, in palette order, for the list/editor. `mapping` opens the S5 grid editor. */
-export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'mapping', 'transform', 'sink'];
+/** The component kinds, in palette order, for the list/editor. `schema`/`mapping` open the S5 grid
+ *  editors (schema saves through the gated `/config/write`, never this service's CRUD). */
+export const COMPONENT_TYPES: ComponentType[] = ['grammar', 'schema', 'mapping', 'transform', 'sink'];
 
 /**
  * One registry component (GET /components/{type}[/{id}]) — its kind, in-file identity, `<type>/<id>` ref,

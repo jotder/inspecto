@@ -13,6 +13,7 @@ import { ComponentHistoryDialog } from 'app/inspecto/components/component-histor
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { ComponentFormDialog, ComponentFormResult } from './component-form.dialog';
 import { MappingEditorDialog } from './mapping-editor.dialog';
+import { SchemaEditorDialog } from './schema-editor.dialog';
 
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
@@ -65,6 +66,10 @@ export class ComponentsComponent implements OnInit {
         const c = def.content ?? {};
         switch (def.type) {
             case 'grammar': return `delimiter ${disp(c['delimiter'], ',')}${c['has_header'] ? ', header' : ''}`;
+            case 'schema': {
+                const fields = ((c['raw'] as Record<string, unknown>)?.['fields'] as unknown[]) ?? [];
+                return `${fields.length} field${fields.length === 1 ? '' : 's'}`;
+            }
             case 'transform': return String(c['type'] ?? 'transform');
             case 'sink': return `${disp(c['type'], 'sink')} → ${disp(c['store'], '(no store)')}`;
             default: return '';
@@ -80,9 +85,12 @@ export class ComponentsComponent implements OnInit {
     }
 
     private openForm(kind: ComponentType, def?: ComponentDef): void {
-        // The mapping kind is a flat rule table — it gets the S5 grid editor, not the generic form.
+        // The mapping/schema kinds are flat row tables — they get the S5 grid editors, not the
+        // generic form (schema also saves through the gated /config/write, not the component CRUD).
         const opened = kind === 'mapping'
             ? this.dialog.open(MappingEditorDialog, { data: { def }, width: '900px', maxHeight: '88vh' })
+            : kind === 'schema'
+            ? this.dialog.open(SchemaEditorDialog, { data: { def }, width: '1000px', maxHeight: '88vh' })
             : this.dialog.open(ComponentFormDialog, { data: { kind, def }, width: '760px', maxHeight: '88vh' });
         opened.afterClosed()
             .subscribe((r?: ComponentFormResult) => {

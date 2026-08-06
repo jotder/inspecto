@@ -1,6 +1,7 @@
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
+import { componentCollection } from './components.handler';
 
 /**
  * Stream-onboarding mock domain — the offline mirror of the server-side draft lifecycle
@@ -85,13 +86,31 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 const raw = (body.config['raw'] ?? {}) as Record<string, unknown>;
                 const name = String(raw['name'] ?? '').trim();
                 if (!name) return error(422, "config is missing its identity field 'raw.name'");
+                // The registry component (component:schema) and the config file (schema-config) are
+                // the SAME file server-side — the gate must diff against whichever the mock holds.
+                const compColl = componentCollection('schema');
                 const existing = store.get<StoredSchemaConfig>(space, SCHEMA_CONFIGS_COLL, name);
+                const existingComp = store.get<{ content?: Record<string, unknown> }>(space, compColl, name);
+                const baseline = existing?.config ?? existingComp?.content;
+                // The BACKWARD compatibility gate (SchemaCompatibility.check + ConfigRoutes.write,
+                // mock-never-more-lenient): 422 with cell-anchored findings unless overridden.
+                const compatibility = String((body as { compatibility?: unknown }).compatibility ?? '');
+                if (baseline && compatibility.toLowerCase() !== 'none') {
+                    const findings = schemaBackwardFindings(baseline, body.config);
+                    if (findings.length) {
+                        return error(422, 'schema edit is not BACKWARD-compatible; not written',
+                            { type: 'schema', written: false, findings });
+                    }
+                }
                 store.put(space, SCHEMA_CONFIGS_COLL, name, {
                     id: name, path: `${name}.toon`, config: body.config,
                 } satisfies StoredSchemaConfig);
+                store.put(space, compColl, name, {
+                    type: 'schema', name, ref: `schema/${name}`, content: body.config,
+                });
                 return json({
                     type: 'schema', written: true, path: `${name}.toon`, name,
-                    bytes: JSON.stringify(body.config).length, overwritten: !!existing, findings: [],
+                    bytes: JSON.stringify(body.config).length, overwritten: !!baseline, findings: [],
                 });
             }
             if (body.type === 'enrichment') {
@@ -136,6 +155,17 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
             const after = identityOf(merged, body.type);
             if (before && before !== after) {
                 return error(409, `patch changes the identity field '${idField}' (${before} → ${after}); rename via /config/write`);
+            }
+            // Same BACKWARD gate as /config/write; patch has NO compatibility override key.
+            if (body.type === 'schema') {
+                const findings = schemaBackwardFindings(rec.config, merged);
+                if (findings.length) {
+                    return error(422, 'schema edit is not BACKWARD-compatible; not written',
+                        { type: 'schema', written: false, findings });
+                }
+                store.put(space, componentCollection('schema'), name, {
+                    type: 'schema', name, ref: `schema/${name}`, content: merged,
+                });
             }
             store.put(space, coll, name, { ...rec, config: merged });
             return json({
@@ -210,6 +240,77 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
 
         return undefined;
     };
+}
+
+/** Old type → the strictly-more-general types it may widen to (SchemaCompatibility.WIDENINGS). */
+const WIDENINGS: Record<string, string[]> = {
+    INTEGER: ['BIGINT', 'DOUBLE'],
+    BIGINT: ['DOUBLE'],
+    DATE: ['TIMESTAMP'],
+};
+
+/**
+ * Mirrors `SchemaCompatibility.check` exactly (mock-never-more-lenient, both directions): BACKWARD-
+ * diff existing → draft `raw.fields[]`. ERROR on field removed, type changed outside the widening
+ * lattice (anything → VARCHAR is fine; types compare case-insensitively), or selector moved
+ * (compared verbatim). Findings anchor `raw.fields[NAME]` / `.type` / `.selector`, same messages.
+ */
+export function schemaBackwardFindings(
+    existing: Record<string, unknown>,
+    draft: Record<string, unknown>,
+): { severity: string; fieldPath: string; message: string }[] {
+    const oldFields = fieldsByName(existing);
+    const newFields = fieldsByName(draft);
+    if (!oldFields.size) return [];
+
+    const findings: { severity: string; fieldPath: string; message: string }[] = [];
+    const up = (v: unknown): string => (v === null || v === undefined ? '' : String(v).trim().toUpperCase());
+    const verbatim = (v: unknown): string => (v === null || v === undefined ? '' : String(v).trim());
+    const isWidening = (o: string, n: string): boolean => n === 'VARCHAR' || (WIDENINGS[o] ?? []).includes(n);
+
+    for (const [name, of] of oldFields) {
+        const nf = newFields.get(name);
+        if (!nf) {
+            findings.push({ severity: 'ERROR', fieldPath: `raw.fields[${name}]`,
+                message: `breaking change (BACKWARD): field '${name}' removed — existing data and referencing `
+                    + `Mappings still expect it; copy the schema to a new name, or pass compatibility: "none" to override` });
+            continue;
+        }
+        const oldType = up(of['type']);
+        const newType = up(nf['type']);
+        if (oldType && oldType !== newType && !isWidening(oldType, newType)) {
+            findings.push({ severity: 'ERROR', fieldPath: `raw.fields[${name}].type`,
+                message: `breaking change (BACKWARD): type of '${name}' changed ${oldType} → `
+                    + `${newType || '(none)'} (not a widening) — already-written data would not read back; `
+                    + `copy to a new name, or pass compatibility: "none"` });
+        }
+        const oldSel = verbatim(of['selector']);
+        const newSel = verbatim(nf['selector']);
+        if (oldSel && oldSel !== newSel) {
+            findings.push({ severity: 'ERROR', fieldPath: `raw.fields[${name}].selector`,
+                message: `breaking change (BACKWARD): selector of '${name}' moved '${oldSel}' → '${newSel}' — `
+                    + `existing raw files would parse into different columns; copy to a new name, or pass compatibility: "none"` });
+        }
+    }
+    return findings;
+}
+
+/** `raw.fields[].name → field map`, declaration order; empty on any shape mismatch. */
+function fieldsByName(schema: Record<string, unknown>): Map<string, Record<string, unknown>> {
+    const out = new Map<string, Record<string, unknown>>();
+    const raw = schema?.['raw'];
+    if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return out;
+    const fields = (raw as Record<string, unknown>)['fields'];
+    if (!Array.isArray(fields)) return out;
+    for (const f of fields) {
+        if (f !== null && typeof f === 'object' && !Array.isArray(f)) {
+            const name = (f as Record<string, unknown>)['name'];
+            if (name !== null && name !== undefined && String(name).trim().length) {
+                out.set(String(name).trim(), f as Record<string, unknown>);
+            }
+        }
+    }
+    return out;
 }
 
 /** The config's identity value, per type (mirrors ConfigRoutes.identityField). */

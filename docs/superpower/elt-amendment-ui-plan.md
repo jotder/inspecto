@@ -252,6 +252,23 @@ recipe editor changes nothing there).
 > Traps hit: specs need the `InspectoGridThemeService` stub (real one walks to `GAMMA_APP_CONFIG`);
 > a hidden `<input type=file>` still needs an `aria-label` or axe fails the whole spec. S5b (schema
 > grid over the gated `/config/write`) is next.
+
+> **S5b SHIPPED 2026-08-06 — S5 CLOSED.** `SchemaEditorDialog`: `raw.fields[]`
+> (name/selector/type/description/unit/classification) as a grid; type stays FREE-TEXT (the server
+> enforces no enum, only the widening lattice on edit — a select would be stricter than the
+> server). Saves through the gated `POST /config/write type=schema` with `overwrite:true`
+> (`ConfigService.write` opts gained the typed `compatibility?: 'none'`); non-fields raw keys and
+> the mapping section travel verbatim. A 422's `error.details.findings` (the pipeline-editor
+> refusals idiom) translate onto cells by field NAME (`raw.fields[NAME]`(`.type`|`.selector`) →
+> `"<rowIndex>|<colKey>"`; a removed field has no row and rides the summary only), rendered in a
+> `role=alert` `<inspecto-alert>`; the refusal arms "Save anyway (skip compatibility check)" →
+> confirmDestructive → re-send with `compatibility:"none"`. `schema` joined `COMPONENT_TYPES`.
+> **Mock parity:** `schemaBackwardFindings` mirrors `SchemaCompatibility.check` exactly (same
+> fieldPaths/messages; case-insensitive types, verbatim selectors) on both `/config/write`
+> (override honored) and `/config/patch` (no override key, like the server) — and a split-brain
+> was closed: the mock held registry schemas (`component:schema`) and config-file schemas
+> (`schema-config`) in separate stores, so a demo-seeded schema bypassed the gate; writes now diff
+> against and mirror into both. Pinned in `onboarding.handler.spec.ts` + `schema-editor.dialog.spec.ts`.
 | **S6** | Pipeline Document export + mapping import loop | Phase 5 generator | diff preview renders the dry-run sample; fingerprint shown |
 | **S7** | Table-entry collect + summarize cards; Jobs nav retirement | Phase 3 / Phase 6 | nav retirement = 3 edits incl. `ACCESS_ACTION_NODES`; `access-catalog.spec` green |
 
