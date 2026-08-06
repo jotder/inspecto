@@ -28,12 +28,37 @@
 // Zero dependencies (pure Node). Run via `node tools/check-vocabulary.mjs`; wired into CI (ci.yml).
 // Escape hatch: append `vocab-allow` in a comment on the offending line for a justified exception.
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// `git ls-files` failing has two causes and only ONE of them is benign: a source tarball with no `.git`
+// (skip the git-backed passes), versus git refusing to read a real checkout — `detected dubious ownership`,
+// which is the default for any operator whose Windows profile differs from the checkout owner. Both used to
+// land in the same silent skip, so three of four passes scanned NOTHING and the guard exited 0 while the
+// repo was red. Probe once, up front, and fail closed on the second case.
+const gitAccess = (() => {
+    try {
+        execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: repoRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+        return { ok: true };
+    } catch (err) {
+        if (!existsSync(join(repoRoot, '.git'))) return { ok: false, tarball: true };
+        return { ok: false, reason: String(err.stderr ?? '').trim() || 'git rev-parse failed' };
+    }
+})();
+
+if (!gitAccess.ok && !gitAccess.tarball) {
+    console.error('\n✖ Vocabulary guard: CANNOT RUN — this is a git checkout, but git refuses to read it.\n');
+    console.error(`  ${gitAccess.reason.replace(/\n/g, '\n  ')}\n`);
+    console.error('Three of the four passes scan the committed corpus via `git ls-files`. Without it they scan');
+    console.error('nothing, and a green result would mean only that the guard was blindfolded. Fix git access,');
+    console.error('then re-run. For a checkout owned by a different user than the current profile:\n');
+    console.error(`  git config --global --add safe.directory ${repoRoot.replace(/\\/g, '/')}\n`);
+    process.exit(2);
+}
 
 // The curated set of user-facing docs whose canonical vocabulary must stay pristine.
 const USER_FACING = [
@@ -278,7 +303,10 @@ function trackedFiles(pattern) {
         return execFileSync('git', ['ls-files', '-z', pattern], { cwd: repoRoot, encoding: 'utf8' })
             .split('\0')
             .filter(Boolean);
-    } catch {
+    } catch (err) {
+        // Reachable only for a source tarball: a checkout git cannot read already exited 2 above. A failure
+        // here despite working git is a real fault, never a reason to quietly narrow the scan to nothing.
+        if (gitAccess.ok) throw err;
         return null; // not a git checkout (e.g. a source tarball) — skip the pass rather than fail the build
     }
 }
@@ -366,7 +394,8 @@ for (const rel of USER_FACING) violations.push(...scanProse(rel));
 // same local==CI reason as pass 2.
 const usedDocAllow = new Set();
 const treeViolations = [];
-const treeDocs = (trackedFiles('*.md') ?? []).filter(
+const treeMarkdown = trackedFiles('*.md');
+const treeDocs = (treeMarkdown ?? []).filter(
     (p) => DOC_TREES.some((t) => p.startsWith(`${t}/`)),
 );
 for (const rel of treeDocs) {
@@ -451,10 +480,13 @@ if (all.length) {
     process.exit(1);
 }
 
+const treeScope = treeMarkdown === null
+    ? 'docs/{okf,superpower} pass skipped (not a git checkout)'
+    : `${treeDocs.length} docs/{okf,superpower} doc(s)`;
 const configScope = toonFiles === null
     ? 'TOON pass skipped (not a git checkout)'
     : `${toonFiles.length} committed TOON config(s) clean`;
 const sourceScope = sourceFiles === null
     ? 'source pass skipped (not a git checkout)'
     : `${sourceFiles.length} Java/TS source file(s) clean`;
-console.log(`✓ Vocabulary guard: ${USER_FACING.length} user-facing doc(s) + ${treeDocs.length} docs/{okf,superpower} doc(s) + ${configScope} + ${sourceScope} — no banned synonyms or concept-confusion.`);
+console.log(`✓ Vocabulary guard: ${USER_FACING.length} user-facing doc(s) + ${treeScope} + ${configScope} + ${sourceScope} — no banned synonyms or concept-confusion.`);

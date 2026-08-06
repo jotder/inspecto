@@ -63,7 +63,7 @@ so the `DATASET_REF` picker is wiring, not new machinery.
 `ParameterResolver.value()` (`inspecto-engine/.../ParameterResolver.java:105-127`) walks five layers.
 **Only two of them evaluate `$`-expressions:**
 
-| Layer | Source | Evaluated? |
+| Layer | Origin | Evaluated? |
 |---|---|---|
 | 1. trigger `args` | manual `POST` body / Trigger `args:` | ❌ returned raw |
 | 2. signal `bind` | Trigger's `bind:` map | ✅ `deduce()` |
