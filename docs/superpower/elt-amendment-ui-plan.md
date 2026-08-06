@@ -372,6 +372,29 @@ recipe editor changes nothing there).
 > cannot drift. Full reactor green throughout; vocabulary guard clean. **Still open, deliberately not done
 > here:** wiring the UI's old-vs-new output-row diff and §5.1's per-Step sample rows onto this seam — the
 > backend capability exists now, the UI call sites do not yet.
+> **S6 UI wiring SHIPPED 2026-08-06 — `5d7706e0` + `6a2024c8`.** Grounding this found the seam did NOT
+> in fact work for the case it was built for. `RowShaper.columnsOf` demanded a `PipelineConfig.CsvSettings`
+> **record**, but `PipelineCodec` keeps a decoded node's config verbatim, so a JSON `csv` block is always a
+> plain `Map` and the cast could never hold: **every** dry-run whose `transform.map` carried rules 400'd —
+> a candidate body *and* a `GET …/graph/raw` round-trip, i.e. any pipeline with a mapping. `bff141cc`'s test
+> only used `transform.filter`, so it never touched the path. Fixed in `5d7706e0` (`csvSettingsOf` resolves
+> record | map | absent; `csv` is read for exactly `dateFormats`/`tsFormats`, so absent degrades to
+> `TRY_CAST` instead of failing), covered at engine and route level.
+> **Two design calls the plan did not anticipate.** (1) §2.5 assumed a host pipeline ("with and without the
+> `pipeline` key"), but `MappingEditorDialog` is opened only from the Components pane and a mapping has
+> **0..N** referencing pipelines — so each side is a **synthesized throwaway graph** (seed → `transform.map`
+> → sink) with the draft rules INLINE; a `use:` ref would resolve the *stored* mapping and miss the draft.
+> (2) Dry-run always needs `sampleRows` and the plan never said where they come from — the operator
+> **uploads a sample data CSV** (operator decision 2026-08-06), and with no sample the rule-level diff
+> remains the whole review, so nothing regresses.
+> **The mock was the real risk**: it ignored the candidate body AND `sampleRows`, answering with two canned
+> rows per node — an old-vs-new diff on it would have shown identical rows on both sides *forever* while the
+> offline preview looked correct. It now walks the graph and projects DIRECT rules; **EXPR yields `null`, never
+> a fabricated value** (`MockHandler` is synchronous, so the data-table's lazy AlaSQL is unreachable), and it
+> reports `rel: data` — it said `success`, a name no dry-run response has ever carried.
+> ⚠ **Still open:** §5.1's per-Step sample rows are **NOT** a UI task — `PipelineDocument.render` is pure by
+> design and S6a excluded them deliberately (a live dry-run is neither pure nor deterministic, and a
+> byte-wise golden-file test pins the format). Adding them is a backend change that trades away both.
 | **S7** | Table-entry collect + summarize cards | Phase 3 | Jobs nav retirement CANCELLED 2026-08-06 (Job un-banned) — table-entry cards ship additively; no `ACCESS_ACTION_NODES`/nav removal |
 
 ## 5. Known traps to carry (from the skill, amendment-specific)
