@@ -519,3 +519,79 @@ describe('PipelineEditorComponent', () => {
         expect(c.flows().some((f) => f.name === 'taken')).toBe(false);
     });
 });
+
+describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
+    let api: { list: ReturnType<typeof vi.fn>; nodeTypes: ReturnType<typeof vi.fn>; pipelineGraphRaw: ReturnType<typeof vi.fn>; provenanceBatches: ReturnType<typeof vi.fn>; provenance: ReturnType<typeof vi.fn> };
+
+    beforeEach(() => {
+        localStorage.removeItem('inspecto.currentLens');
+        localStorage.removeItem('inspecto.pipelines.viewMode');
+        api = {
+            list: vi.fn().mockReturnValue(of([])),
+            nodeTypes: vi.fn().mockReturnValue(of([])),
+            pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
+            provenanceBatches: vi.fn().mockReturnValue(of([])),
+            provenance: vi.fn().mockReturnValue(of([])),
+        };
+        TestBed.configureTestingModule({
+            imports: [PipelineEditorComponent],
+            providers: [
+                provideNoopAnimations(),
+                { provide: PipelinesService, useValue: api },
+                { provide: ConfigService, useValue: { write: vi.fn(), registerPipeline: vi.fn(), remove: vi.fn() } },
+                { provide: ComponentsService, useValue: { list: vi.fn().mockReturnValue(of([])) } },
+                { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+                { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn().mockResolvedValue(true) } },
+                { provide: MatDialog, useValue: { open: vi.fn() } },
+            ],
+        });
+    });
+
+    function make(): PipelineEditorComponent {
+        const c = TestBed.createComponent(PipelineEditorComponent).componentInstance;
+        c.ngOnInit();
+        (c as unknown as { canvas: unknown }).canvas = { setNodeStatus: vi.fn() };
+        return c;
+    }
+
+    it('defaults to Recipe for an expressible graph and detects its chain', () => {
+        const c = make();
+        c.select('demo');
+        expect(c.viewMode()).toBe('recipe');
+        expect(c.effectiveMode()).toBe('recipe');
+        expect(c.stepChain()?.trunk.map((n) => n.id)).toEqual(['src', 'flt']);
+        expect(c.forcedToCanvas()).toBe(false);
+    });
+
+    it('forces Canvas and flags it when the open graph is not recipe-expressible (fan-in)', () => {
+        api.pipelineGraphRaw.mockReturnValue(of({
+            name: 'demo',
+            active: false,
+            nodes: [{ id: 'a', type: 'acquisition' }, { id: 'b', type: 'acquisition' }, { id: 'c', type: 'sink.persistent' }],
+            edges: [{ from: 'a', rel: 'data', to: 'c' }, { from: 'b', rel: 'data', to: 'c' }],
+        }));
+        const c = make();
+        c.select('demo');
+        expect(c.stepChain()).toBeNull();
+        expect(c.viewMode()).toBe('recipe'); // the preference itself is untouched
+        expect(c.effectiveMode()).toBe('canvas'); // but the graph forces the actual view
+        expect(c.forcedToCanvas()).toBe(true);
+    });
+
+    it('persists the device preference across instances (localStorage, mirrors the lens/space pattern)', () => {
+        const c1 = make();
+        c1.setViewMode('canvas');
+        expect(localStorage.getItem('inspecto.pipelines.viewMode')).toBe('canvas');
+
+        const c2 = make();
+        expect(c2.viewMode()).toBe('canvas');
+    });
+
+    it('flattens the detected chain into step rows for the cards view', () => {
+        const c = make();
+        c.select('demo');
+        const rows = c.stepRows();
+        expect(rows.map((r) => r.rowId)).toEqual(['src', 'flt']);
+        expect(rows.every((r) => r.kind === 'node')).toBe(true);
+    });
+});

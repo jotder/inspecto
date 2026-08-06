@@ -2,6 +2,7 @@ import { NodeKind } from 'app/inspecto/api';
 import {
     AuthoredPipeline,
     AuthoredNode,
+    AuthoredEdge,
     ComponentType,
     PipelineCombined,
     PipelineGraph,
@@ -471,6 +472,113 @@ export function setEdgeRelInModel(
 /** Replace a node in the model with its edited version (by id). */
 export function applyNodePatchInModel(model: AuthoredPipeline, updated: AuthoredNode): AuthoredPipeline {
     return { ...model, nodes: model.nodes.map((n) => (n.id === updated.id ? updated : n)) };
+}
+
+// ── Recipe view (ELT amendment UI plan §1): chain detection over the same AuthoredPipeline model ──
+
+/** One Step's place in the read-only recipe chain — a node plus, only at a branch point, its branches. */
+export interface StepChain {
+    /** Nodes from the entry Step to (and including) the last node before a fan-out. */
+    trunk: AuthoredNode[];
+    /** Present only when the trunk's last node is a content-routing branch point (§2.6 — `route`). */
+    branches?: StepBranch[];
+}
+
+/** One named branch off a route Step: its predicate/default flag (from the route node's own config)
+ *  plus its own recursively-detected chain — a branch may itself end in another route. */
+export interface StepBranch {
+    key: string;
+    where?: string;
+    isDefault: boolean;
+    chain: StepChain;
+}
+
+/**
+ * Detect the linear-chain/tree shape the recipe view renders (UI plan §1): walk from the single entry
+ * node (no incoming edges) via `data` edges; a node whose only outgoing edges are all named
+ * `route:<key>` branches into one {@link StepBranch} per edge — the one user-visible branching
+ * construct (§2.6). Returns `null` when the graph is not expressible this way: no single entry, a node
+ * with more than one incoming edge (fan-in / `merge`), or a node whose outgoing edges are anything else
+ * (an exotic control edge, or a fan-out mixing `data` with other relationships) — the recipe view then
+ * falls back to Canvas mode with an explanatory alert, per the amendment's "no dual model" rule.
+ */
+export function detectStepChain(model: AuthoredPipeline): StepChain | null {
+    const nodeById = new Map(model.nodes.map((n) => [n.id, n]));
+    const outBy = new Map<string, AuthoredEdge[]>();
+    const inCount = new Map<string, number>();
+    for (const n of model.nodes) inCount.set(n.id, 0);
+    for (const e of model.edges) {
+        if (!nodeById.has(e.from) || !nodeById.has(e.to)) return null;
+        outBy.set(e.from, [...(outBy.get(e.from) ?? []), e]);
+        inCount.set(e.to, (inCount.get(e.to) ?? 0) + 1);
+    }
+    const roots = model.nodes.filter((n) => (inCount.get(n.id) ?? 0) === 0);
+    if (roots.length !== 1) return null;
+    return walkStepChain(roots[0], nodeById, outBy, inCount, new Set());
+}
+
+function walkStepChain(
+    start: AuthoredNode,
+    nodeById: Map<string, AuthoredNode>,
+    outBy: Map<string, AuthoredEdge[]>,
+    inCount: Map<string, number>,
+    seen: Set<string>,
+): StepChain | null {
+    const trunk: AuthoredNode[] = [];
+    let cur: AuthoredNode | undefined = start;
+    while (cur) {
+        if (seen.has(cur.id)) return null; // a cycle — defensive; inCount already rules out most shapes
+        seen.add(cur.id);
+        trunk.push(cur);
+        const outs = outBy.get(cur.id) ?? [];
+        if (outs.length === 0) return { trunk };
+        if (outs.length === 1 && outs[0].rel === 'data') {
+            const next = nodeById.get(outs[0].to);
+            if (!next || (inCount.get(next.id) ?? 0) !== 1) return null; // fan-in into next — not a tree
+            cur = next;
+            continue;
+        }
+        if (outs.every((e) => e.rel.startsWith('route:'))) {
+            const cfg = (cur.config ?? {}) as { branches?: { key?: string; where?: string }[]; default?: string };
+            const branches: StepBranch[] = [];
+            for (const e of outs) {
+                const key = e.rel.slice('route:'.length);
+                const next = nodeById.get(e.to);
+                if (!next || (inCount.get(next.id) ?? 0) !== 1) return null;
+                const sub = walkStepChain(next, nodeById, outBy, inCount, seen);
+                if (!sub) return null;
+                const bc = cfg.branches?.find((b) => b?.key === key);
+                branches.push({ key, where: bc?.where, isDefault: key === cfg.default, chain: sub });
+            }
+            return { trunk, branches };
+        }
+        return null; // mixed / unrecognized fan-out — not recipe-expressible
+    }
+    return { trunk };
+}
+
+/** One row of a flattened {@link StepChain} for a simple indented list render (no recursive component). */
+export type StepRow =
+    | { kind: 'node'; rowId: string; node: AuthoredNode; depth: number }
+    | { kind: 'branch'; rowId: string; key: string; where?: string; isDefault: boolean; depth: number };
+
+/** Flatten a {@link StepChain} into an ordered, indented row list — depth-first, branches after their trunk. */
+export function flattenStepChain(chain: StepChain, depth = 0): StepRow[] {
+    const rows: StepRow[] = chain.trunk.map((node) => ({ kind: 'node', rowId: node.id, node, depth }));
+    if (chain.branches) {
+        for (const b of chain.branches) {
+            rows.push({
+                kind: 'branch',
+                rowId: `branch:${b.key}:${depth}`,
+                key: b.key,
+                where: b.where,
+                isDefault: b.isDefault,
+                depth,
+            });
+            rows.push(...flattenStepChain(b.chain, depth + 1));
+        }
+    }
+    return rows;
 }
 
 /** Relationships a canvas edge may carry: the source node's emitted rels, `data`, and the edge's current rel. */

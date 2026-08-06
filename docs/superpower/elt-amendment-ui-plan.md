@@ -134,6 +134,22 @@ recipe editor changes nothing there).
 | Slice | Delivers | Gated on backend? | Extra gate |
 |---|---|---|---|
 | **S1** | Recipe view read-only: chain detection, Step cards, mode toggle, non-expressible fallback alert | no | axe on card list; expressibility detector unit-tested against lifted fixtures incl. route/multi-sink |
+
+> **S1 SHIPPED 2026-08-06.** `detectStepChain`/`flattenStepChain` (pure, in `pipeline-graph.ts` — the
+> testable seam, per §5's G6-in-jsdom rule): single-entry `data`-edge walk, `route:*` fan-out becomes
+> nested `StepBranch`es (predicate/default read from the route node's own config), and `null` — the
+> Canvas-fallback signal — for fan-in, multiple entries, or mixed fan-out. `PipelineStepCardsComponent`
+> (presentational: rows + typeCat + optional statusOf in, nothing out yet) renders the indented card
+> list with the shared `<inspecto-chip>` for config summaries; the editor gained the `Recipe | Canvas`
+> toggle (Recipe default; preference persisted at `inspecto.pipelines.viewMode` — imperative write in
+> `setViewMode`, NOT a signal `effect()`, which never fires without `detectChanges()` in specs and lag
+> behind in production too), `effectiveMode` (a non-expressible graph forces Canvas without touching
+> the preference) and the `forcedToCanvas` info alert. Tests: chain detection (7), step-cards
+> component (4, incl. axe), editor recipe-view signals (4). lint:tokens + build + test:ci green
+> (2070 passed, exit 0). Three traps hit and worth carrying: the chip component's export name is
+> `ChipComponent` (selector `inspecto-chip`); a template binding needs the editor's `typeCat` signal
+> public; and an OnPush spec must flip inputs via `fixture.componentRef.setInput`, never by assigning
+> the field.
 | **S2** | Recipe editing: card dialogs wired, add/remove/reorder Step, Guarantees panel (legacy-key projection) | no | round-trip: recipe edit → save → `graph/raw` reload byte-stable on untouched sections |
 | **S3** | Route branch UI + "Step" vocabulary sweep | no | branch add/remove/default rules match `PipelineValidator` refusals (mock parity spec) |
 | **S4** | `step-types` palette + 7-verb specs, dual-read fallback | main plan Phase 5 endpoint | contract JSON byte-compare (extend `NodeAttributesContractTest` pattern) |

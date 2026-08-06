@@ -72,6 +72,40 @@
             }
 
             <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
+            <!-- Recipe | Canvas (ELT amendment UI plan §1) — Recipe is the second projection of the same
+                 model, never a separate save path. Disabled toward Recipe when the open graph forces
+                 Canvas (fan-in/merge/exotic control edges); the alert below explains why. -->
+            <div
+                role="tablist"
+                aria-label="View mode"
+                class="inline-flex shrink-0 overflow-hidden rounded border"
+                style="border-color: var(--gamma-border)"
+            >
+                <button
+                    type="button"
+                    role="tab"
+                    class="px-2 py-1 text-xs font-semibold"
+                    [attr.aria-selected]="effectiveMode() === 'recipe'"
+                    [disabled]="!stepChain()"
+                    [style.background]="effectiveMode() === 'recipe' ? 'var(--gamma-bg-default)' : 'transparent'"
+                    [class.opacity-50]="!stepChain()"
+                    (click)="setViewMode('recipe')"
+                >
+                    Recipe
+                </button>
+                <button
+                    type="button"
+                    role="tab"
+                    class="px-2 py-1 text-xs font-semibold"
+                    [attr.aria-selected]="effectiveMode() === 'canvas'"
+                    [style.background]="effectiveMode() === 'canvas' ? 'var(--gamma-bg-default)' : 'transparent'"
+                    (click)="setViewMode('canvas')"
+                >
+                    Canvas
+                </button>
+            </div>
+
+            <span class="mx-1 h-5 w-px shrink-0" style="background: var(--gamma-border)" aria-hidden="true"></span>
             <button
                 mat-icon-button
                 [disabled]="!selectedId()"
@@ -317,8 +351,8 @@
                 aria-label="Resize the step palette (arrow keys or drag)"
             ></div>
 
-            <!-- canvas — takes everything the docks give back -->
-            <div class="relative min-w-0 flex-1">
+            <!-- canvas / recipe — takes everything the docks give back -->
+            <div class="relative min-w-0 flex-1 overflow-y-auto">
                 <!--
                     G5: this pipeline opened fine but contains node types a save cannot lower back to
                     the flat config. Say so now, not after the user has invested a session of edits.
@@ -330,19 +364,34 @@
                         <b>Save will refuse</b> until {{ n === 1 ? 'it is' : 'they are' }} removed.
                     </inspecto-alert>
                 }
-                <app-pipeline-editor-graph
-                    [data]="g6Data()"
-                    [graphKey]="selectedId()"
-                    (nodeSelected)="onNodeSelected($event)"
-                    (edgeSelected)="onEdgeSelected($event)"
-                    (backgroundClick)="onBackgroundClick()"
-                    (dropAdd)="onDropAdd($event)"
-                    (deleteKey)="onDeleteKey()"
-                    (edgeCreated)="onEdgeCreated($event)"
-                    (nodeHover)="onNodeHover($event)"
-                    (nodeOpen)="onNodeOpen($event)"
-                >
-                </app-pipeline-editor-graph>
+                @if (forcedToCanvas()) {
+                    <inspecto-alert class="block px-2 pt-2" variant="info">
+                        This pipeline's topology can't be shown as a linear recipe (it has a branch or
+                        connection the Recipe view can't represent) — showing Canvas instead.
+                    </inspecto-alert>
+                }
+                @if (effectiveMode() === 'recipe') {
+                    <app-pipeline-step-cards
+                        [rows]="stepRows()"
+                        [typeCat]="typeCat()"
+                        [statusOf]="boundStatusOf"
+                    ></app-pipeline-step-cards>
+                } @else {
+                    <app-pipeline-editor-graph
+                        class="absolute inset-0"
+                        [data]="g6Data()"
+                        [graphKey]="selectedId()"
+                        (nodeSelected)="onNodeSelected($event)"
+                        (edgeSelected)="onEdgeSelected($event)"
+                        (backgroundClick)="onBackgroundClick()"
+                        (dropAdd)="onDropAdd($event)"
+                        (deleteKey)="onDeleteKey()"
+                        (edgeCreated)="onEdgeCreated($event)"
+                        (nodeHover)="onNodeHover($event)"
+                        (nodeOpen)="onNodeOpen($event)"
+                    >
+                    </app-pipeline-editor-graph>
+                }
             </div>
 
             <div

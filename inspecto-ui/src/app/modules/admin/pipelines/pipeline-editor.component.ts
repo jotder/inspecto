@@ -47,6 +47,7 @@ import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component
 import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component';
 import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
+import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
@@ -70,9 +71,11 @@ import {
     categoryVisualKind,
     computeNodeStatus,
     decodeEdgeId,
+    detectStepChain,
     encodeEdgeId,
     findingIcon,
     findingTint,
+    flattenStepChain,
     groupByCategory,
     nodeConfigEntries,
     nodeLastRunTotal,
@@ -114,6 +117,7 @@ import {
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
         PipelinePaletteComponent,
+        PipelineStepCardsComponent,
         InspectoEmptyStateComponent,
         InspectoSplitDirective,
         TransferMenuComponent,
@@ -194,7 +198,8 @@ export class PipelineEditorComponent implements OnInit {
         return id ? [{ kind: 'authored-pipeline' as const, id }] : [];
     });
     readonly paletteGroups = signal<NodeTypeGroup[]>([]);
-    private readonly typeCat = signal<Map<string, string>>(new Map());
+    /** Public (template use only, e.g. the recipe view's category label): not otherwise part of the API. */
+    readonly typeCat = signal<Map<string, string>>(new Map());
     /** type → whether a save can lower it, from `GET /pipelines/node-types` (see G2/G5). */
     private readonly typeLowerable = signal<Map<string, boolean>>(new Map());
     /**
@@ -292,6 +297,41 @@ export class PipelineEditorComponent implements OnInit {
         return m ? authoredToG6(m, this.typeCat(), (n) => this.statusOf(n), this.iconMap(), this.lastRunCounts()) : null;
     });
 
+    // ── Recipe view (ELT amendment UI plan §1, S1) ──────────────────────────────────────────────────
+    /** The device's Recipe/Canvas preference — a UI preference, not config (mirrors the lens/space
+     *  localStorage pattern). Recipe is the default; a graph the recipe cannot express forces Canvas
+     *  regardless (see {@link effectiveMode}), so a stale 'recipe' preference never traps a user on a
+     *  blank view. */
+    private static readonly VIEW_MODE_KEY = 'inspecto.pipelines.viewMode';
+    readonly viewMode = signal<'recipe' | 'canvas'>(
+        (localStorage.getItem(PipelineEditorComponent.VIEW_MODE_KEY) as 'recipe' | 'canvas' | null) ?? 'recipe',
+    );
+
+    setViewMode(mode: 'recipe' | 'canvas'): void {
+        this.viewMode.set(mode);
+        localStorage.setItem(PipelineEditorComponent.VIEW_MODE_KEY, mode);
+    }
+
+    /** `null` when the open graph is not recipe-expressible (§1 — no dual model, no migration risk). */
+    readonly stepChain = computed(() => {
+        const m = this.model();
+        return m ? detectStepChain(m) : null;
+    });
+
+    /** The chain flattened to indented rows for the step-cards view. */
+    readonly stepRows = computed(() => {
+        const chain = this.stepChain();
+        return chain ? flattenStepChain(chain) : [];
+    });
+
+    /** The mode actually shown: the user's preference, unless the open graph forces Canvas. */
+    readonly effectiveMode = computed<'recipe' | 'canvas'>(() =>
+        this.stepChain() ? this.viewMode() : 'canvas',
+    );
+
+    /** Whether the preference is Recipe but the open graph forced a Canvas fallback — drives the alert. */
+    readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
+
     /** The selected node's last-run output (T17), or `null` when that run recorded nothing for it. */
     selectedNodeLastRun(): { rowCount: number; runTs: string } | null {
         const node = this.selectedNode();
@@ -305,6 +345,9 @@ export class PipelineEditorComponent implements OnInit {
     statusOf(n: AuthoredNode): NodeStatus {
         return computeNodeStatus(n, this.typeCategory(n.type), this.validRefs(), this.testedStatus(), this.refsLoaded());
     }
+
+    /** Bound reference to {@link statusOf} for the step-cards `@Input` (a plain method reference would lose `this`). */
+    readonly boundStatusOf = (n: AuthoredNode): NodeStatus => this.statusOf(n);
 
     /** Push every node's current status to the canvas (after the registry refs or test outcomes change). */
     private refreshAllStatuses(): void {

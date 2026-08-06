@@ -12,7 +12,9 @@ import {
     categoryVisualKind,
     computeNodeStatus,
     decodeEdgeId,
+    detectStepChain,
     encodeEdgeId,
+    flattenStepChain,
     groupByCategory,
     nodeConfigEntries,
     nodeDisplayLabel,
@@ -383,5 +385,130 @@ describe('candidateRelsFor', () => {
 
     it('returns an empty list for a malformed edge id', () => {
         expect(candidateRelsFor(null, 'bad', new Map())).toEqual([]);
+    });
+});
+
+// ── Recipe view: chain detection (ELT amendment UI plan §1) ────────────────────────────────────────
+
+const an = (id: string, type = 'transform.filter', config?: Record<string, unknown>): AuthoredNode =>
+    ({ id, type, config });
+
+const linearPipeline = (): AuthoredPipeline => ({
+    name: 'p',
+    active: false,
+    nodes: [an('collect-1', 'acquisition'), an('parse-1', 'parser'), an('sink-1', 'sink.persistent')],
+    edges: [
+        { from: 'collect-1', rel: 'data', to: 'parse-1' },
+        { from: 'parse-1', rel: 'data', to: 'sink-1' },
+    ],
+});
+
+describe('detectStepChain', () => {
+    it('detects a simple linear chain from the single entry node', () => {
+        const chain = detectStepChain(linearPipeline());
+        expect(chain).not.toBeNull();
+        expect(chain!.trunk.map((n) => n.id)).toEqual(['collect-1', 'parse-1', 'sink-1']);
+        expect(chain!.branches).toBeUndefined();
+    });
+
+    it('detects a route node as a branch point, each branch its own chain', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [
+                an('collect-1', 'acquisition'),
+                an('route-1', 'transform.route', {
+                    mode: 'case',
+                    branches: [{ key: 'emea', where: "region = 'EU'" }, { key: 'other' }],
+                    default: 'other',
+                }),
+                an('sink-emea', 'sink.persistent'),
+                an('sink-other', 'sink.persistent'),
+            ],
+            edges: [
+                { from: 'collect-1', rel: 'data', to: 'route-1' },
+                { from: 'route-1', rel: 'route:emea', to: 'sink-emea' },
+                { from: 'route-1', rel: 'route:other', to: 'sink-other' },
+            ],
+        };
+        const chain = detectStepChain(model);
+        expect(chain).not.toBeNull();
+        expect(chain!.trunk.map((n) => n.id)).toEqual(['collect-1', 'route-1']);
+        expect(chain!.branches).toHaveLength(2);
+        const emea = chain!.branches!.find((b) => b.key === 'emea')!;
+        expect(emea.where).toBe("region = 'EU'");
+        expect(emea.isDefault).toBe(false);
+        expect(emea.chain.trunk.map((n) => n.id)).toEqual(['sink-emea']);
+        const other = chain!.branches!.find((b) => b.key === 'other')!;
+        expect(other.isDefault).toBe(true);
+    });
+
+    it('returns null for fan-in (two edges into the same node)', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('a'), an('b'), an('c')],
+            edges: [
+                { from: 'a', rel: 'data', to: 'c' },
+                { from: 'b', rel: 'data', to: 'c' },
+            ],
+        };
+        expect(detectStepChain(model)).toBeNull();
+    });
+
+    it('returns null when there is no single entry node', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('a'), an('b')],
+            edges: [],
+        };
+        expect(detectStepChain(model)).toBeNull();
+    });
+
+    it('returns null for a mixed fan-out (data alongside a non-route relationship)', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('a'), an('b'), an('c')],
+            edges: [
+                { from: 'a', rel: 'data', to: 'b' },
+                { from: 'a', rel: 'gap', to: 'c' },
+            ],
+        };
+        expect(detectStepChain(model)).toBeNull();
+    });
+
+    it('returns null for a graph with no nodes', () => {
+        expect(detectStepChain({ name: 'p', active: false, nodes: [], edges: [] })).toBeNull();
+    });
+});
+
+describe('flattenStepChain', () => {
+    it('flattens a linear trunk with depth 0 throughout', () => {
+        const chain = detectStepChain(linearPipeline())!;
+        const rows = flattenStepChain(chain);
+        expect(rows).toHaveLength(3);
+        expect(rows.every((r) => r.depth === 0 && r.kind === 'node')).toBe(true);
+    });
+
+    it('inserts a branch-header row before each branch and indents its chain one level deeper', () => {
+        const chain = {
+            trunk: [an('collect-1')],
+            branches: [
+                { key: 'emea', where: "region='EU'", isDefault: false, chain: { trunk: [an('sink-emea')] } },
+                { key: 'other', isDefault: true, chain: { trunk: [an('sink-other')] } },
+            ],
+        };
+        const rows = flattenStepChain(chain);
+        expect(rows.map((r) => r.kind)).toEqual(['node', 'branch', 'node', 'branch', 'node']);
+        const emeaHeader = rows[1];
+        expect(emeaHeader.kind).toBe('branch');
+        if (emeaHeader.kind === 'branch') {
+            expect(emeaHeader.key).toBe('emea');
+            expect(emeaHeader.where).toBe("region='EU'");
+            expect(emeaHeader.depth).toBe(0);
+        }
+        expect(rows[2].depth).toBe(1); // sink-emea, one level under its branch header
     });
 });
