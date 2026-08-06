@@ -141,9 +141,17 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
             return json(store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]) ?? null);
         }
         if (method === 'POST' && (m = match(url, DRY_RUN))) {
-            // W5: the editor dry-runs registered pipelines — fall back to the lifted config.
-            const f = store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]) ?? graphOfName(m[1]);
-            return json(dryRun(f));
+            const body = (req.body ?? {}) as {
+                sampleRows?: Record<string, unknown>[];
+                pipeline?: AuthoredPipeline;
+            };
+            // A candidate body previews that DRAFT graph and never consults the stored one — including
+            // for an id with no stored pipeline at all (the server skips the lookup entirely, so no 404).
+            // W5: otherwise the editor dry-runs registered pipelines — fall back to the lifted config.
+            const f = body.pipeline
+                ?? store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1])
+                ?? graphOfName(m[1]);
+            return json(dryRun(f, body.sampleRows));
         }
         if (method === 'POST' && (m = match(url, RUN_TO))) {
             const files = (req.body as { files?: string[] })?.files ?? [];
@@ -442,18 +450,71 @@ function combined(flows: AuthoredPipeline[]): unknown {
     return { flows: flows.map((f) => ({ name: f.name, active: f.active })), nodes, edges, links: [] };
 }
 
-function dryRun(f: AuthoredPipeline | undefined): PipelineDryRunResult {
-    const rows = [
-        { id: 1001, msisdn: '8801700000001', start_time: '2026-06-24 09:00:00', duration_s: 42 },
-        { id: 1002, msisdn: '8801700000002', start_time: '2026-06-24 09:01:30', duration_s: 17 },
-    ];
+/** The canned sample used when the caller sent none — the shape the editor's own dry-run panel seeds. */
+const DRY_RUN_SAMPLE: Record<string, unknown>[] = [
+    { id: 1001, msisdn: '8801700000001', start_time: '2026-06-24 09:00:00', duration_s: 42 },
+    { id: 1002, msisdn: '8801700000002', start_time: '2026-06-24 09:01:30', duration_s: 17 },
+];
+
+/**
+ * One mapping rule as the map node carries it — inline `rules`, or a lifted config's legacy
+ * `schema.mapping.rules`. Both shapes reach the server ({@code RowShaper.mappingSchemaOf}).
+ */
+interface MapRule { targetColumn?: string; sourceExpression?: string; transformType?: string }
+
+function mapRulesOf(node: AuthoredNode): MapRule[] {
+    const cfg = node.config ?? {};
+    const inline = cfg['rules'];
+    if (Array.isArray(inline)) return inline as MapRule[];
+    const schema = cfg['schema'] as { mapping?: { rules?: unknown } } | undefined;
+    const nested = schema?.mapping?.rules;
+    return Array.isArray(nested) ? (nested as MapRule[]) : [];
+}
+
+/**
+ * Project rows through one node. Only `transform.map` reshapes — every other type passes rows through,
+ * which is the honest limit of a mock: the server compiles each rule to DuckDB SQL and runs it.
+ *
+ * ⚠ **EXPR rules evaluate to `null` here, never to a made-up value.** An EXPR rule's source *is* a DuckDB
+ * scalar expression and there is no SQL engine on this path ({@link MockHandler} is synchronous, so the
+ * data-table's lazy AlaSQL is not reachable). A plausible-looking fabricated value would be worse than a
+ * blank: it invites trusting an offline preview that never evaluated anything. DIRECT rules — a plain
+ * column reference — are applied exactly, so a rule-set change still shows a real before/after difference.
+ */
+function projectThrough(node: AuthoredNode, rows: Record<string, unknown>[]): Record<string, unknown>[] {
+    if (node.type !== 'transform.map') return rows;
+    const rules = mapRulesOf(node).filter((r) => (r.targetColumn ?? '').trim().length);
+    if (!rules.length) return rows;
+    return rows.map((row) => Object.fromEntries(rules.map((rule) => [
+        rule.targetColumn as string,
+        (rule.transformType ?? '').trim().toUpperCase() === 'EXPR'
+            ? null
+            : row[(rule.sourceExpression ?? '').trim()] ?? null,
+    ])));
+}
+
+/**
+ * Walk the sample through the graph in declaration order, reporting each non-sink node's output and
+ * each sink's input. `rel` is **`data`**, matching the server's `PipelineRel.DATA` — this said `success`
+ * until 2026-08-06, a name no dry-run response has ever carried.
+ */
+function dryRun(
+    f: AuthoredPipeline | undefined,
+    sampleRows?: Record<string, unknown>[],
+): PipelineDryRunResult {
+    const seed = sampleRows?.length ? sampleRows : DRY_RUN_SAMPLE;
     const seedNode = f?.nodes.find((n) => n.type.startsWith('collector'))?.id ?? f?.nodes[0]?.id ?? '';
-    const nodes = (f?.nodes ?? [])
-        .filter((n) => !n.type.startsWith('sink'))
-        .map((n) => ({ node: n.id, type: n.type, relations: [{ rel: 'success', rowCount: rows.length, rows }] }));
-    const sinks = (f?.nodes ?? [])
-        .filter((n) => n.type.startsWith('sink'))
-        .map((n) => ({ node: n.id, store: n.name || n.id, rowCount: rows.length, rows }));
+    const nodes: PipelineDryRunResult['nodes'] = [];
+    const sinks: PipelineDryRunResult['sinks'] = [];
+    let rows = seed;
+    for (const n of f?.nodes ?? []) {
+        if (n.type.startsWith('sink')) {
+            sinks.push({ node: n.id, store: n.name || n.id, rowCount: rows.length, rows });
+            continue;
+        }
+        rows = projectThrough(n, rows);
+        nodes.push({ node: n.id, type: n.type, relations: [{ rel: 'data', rowCount: rows.length, rows }] });
+    }
     return { seedNode, nodes, sinks };
 }
 

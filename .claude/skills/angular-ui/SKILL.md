@@ -358,6 +358,13 @@ src/app/
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.
+- ⚠ **The breakpoint scale is gamma/Fuse's, NOT stock Tailwind** (2026-08-06): `sm:`=**600px**,
+  `md:`=**960px**, `lg:`=**1280px** (stock is 640/768/1024). So `md:grid-cols-2` does nothing inside a
+  ~900px dialog on a 1000px-wide window — the two columns silently stay stacked, and every unit test
+  still passes because jsdom never evaluates the media query. **Inside a dialog, reach for `sm:`**; save
+  `md:`/`lg:` for routed full-width panes. Caught in-preview on the mapping editor's side-by-side row
+  diff; confirm a responsive class actually fired with
+  `getComputedStyle(el).gridTemplateColumns` rather than by eyeballing a screenshot.
 
 ## 6. Accessibility — WCAG 2.2 AA
 

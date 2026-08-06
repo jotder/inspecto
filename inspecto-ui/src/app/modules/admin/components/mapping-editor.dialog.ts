@@ -5,13 +5,19 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { Observable, catchError, map, of } from 'rxjs';
-import { apiErrorMessage, ComponentDef, ComponentsService, Finding } from 'app/inspecto/api';
+import { Observable, catchError, forkJoin, map, of } from 'rxjs';
+import {
+    apiErrorMessage, AuthoredPipeline, ComponentDef, ComponentsService, Finding,
+    PipelineDryRunResult, PipelinesService,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
+import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import {
-    CellFinding, CsvImport, EditableGridColumn, EditableGridComponent,
+    CellFinding, CsvImport, EditableGridColumn, EditableGridComponent, parseCsv,
 } from 'app/inspecto/components/editable-grid.component';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -46,9 +52,9 @@ function ruleText(r: Record<string, string> | undefined): string {
 }
 
 /**
- * Diff two rule lists by target column. Deliberately a RULE diff, not an output-row diff: showing the
- * rows this mapping would produce needs a dry-run over real sample data, which is a separate backend
- * capability (see the S6b note in the ELT amendment UI plan).
+ * Diff two rule lists by target column — what changed in the mapping ITSELF, always available because it
+ * needs nothing but the two rule sets. The complementary output-ROW diff (what the change does to actual
+ * data) needs a sample to run over, so it appears only once the operator uploads one.
  */
 export function diffRules(
     before: Record<string, string>[],
@@ -69,6 +75,31 @@ export function diffRules(
             out.push({ change: 'Removed', targetColumn: target, before: ruleText(r), after: '' });
     }
     return out;
+}
+
+/** The map step's id in the synthesized preview graph — where the projected rows are read back from. */
+const MAP_NODE = 'map';
+
+/**
+ * A throwaway pipeline that exists only to see what a rule set produces: seed → `transform.map` → sink,
+ * with the rules carried INLINE so unsaved drafts preview. It is posted as the dry-run's candidate body,
+ * which is parsed and validated exactly like a save but never written, and which skips the stored-flow
+ * lookup entirely — so the id need not name a real pipeline. Exported for the spec.
+ */
+export function previewGraph(id: string, rules: Record<string, string>[]): AuthoredPipeline {
+    return {
+        name: id,
+        active: false,
+        nodes: [
+            { id: 'seed', type: 'acquisition' },
+            { id: MAP_NODE, type: 'transform.map', config: { rules } },
+            { id: 'sink', type: 'sink.persistent', config: { store: 'preview' } },
+        ],
+        edges: [
+            { from: 'seed', rel: 'data', to: MAP_NODE },
+            { from: MAP_NODE, rel: 'data', to: 'sink' },
+        ],
+    };
 }
 
 /** One mapping rule row — MappingCsv's canonical columns, verbatim (attribute key = config key). */
@@ -92,13 +123,27 @@ const COLUMNS: EditableGridColumn[] = [
     standalone: true,
     imports: [
         ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule,
-        MatIconModule, MatInputModule, EditableGridComponent, InspectoAlertComponent, ChipComponent,
+        MatIconModule, MatInputModule, MatTooltipModule, EditableGridComponent, InspectoAlertComponent,
+        ChipComponent, DataTableComponent, InspectoDialogResizeDirective,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title class="flex min-w-0 items-center gap-2">
+        <h2 mat-dialog-title class="flex min-w-0 items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
             <mat-icon class="shrink-0" svgIcon="heroicons_outline:table-cells"></mat-icon>
             <span class="min-w-0 truncate">{{ isEdit ? 'Edit Mapping · ' + data.def!.name : 'New Mapping' }}</span>
+            <span class="flex-1"></span>
+            <button
+                mat-icon-button
+                type="button"
+                [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                [matTooltip]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+                (click)="chrome.toggleMaximize()"
+            >
+                <mat-icon
+                    class="icon-size-5"
+                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                ></mat-icon>
+            </button>
         </h2>
         <mat-dialog-content>
             @if (!isEdit) {
@@ -146,6 +191,55 @@ const COLUMNS: EditableGridColumn[] = [
                             </tbody>
                         </table>
                     </div>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                        <button mat-stroked-button type="button" (click)="sampleInput.click()">
+                            <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                            {{ sampleName() ? 'Replace sample data' : 'Preview with sample data' }}
+                        </button>
+                        <input
+                            #sampleInput
+                            type="file"
+                            accept=".csv,text/csv"
+                            class="hidden"
+                            aria-label="Upload sample data rows to preview what this import produces"
+                            (change)="onSample($event)"
+                        />
+                        @if (sampleName(); as name) {
+                            <inspecto-chip variant="outline">{{ name }} · {{ sampleRows().length }} row(s)</inspecto-chip>
+                        } @else {
+                            <span class="text-secondary text-sm">
+                                A few rows of the data itself — not the rules file — to see what these rules produce.
+                            </span>
+                        }
+                    </div>
+
+                    @if (previewError(); as err) {
+                        <inspecto-alert class="mt-2 block" variant="warning" title="Could not preview the rows">
+                            {{ err }}
+                        </inspecto-alert>
+                    }
+                    @if (previewBefore(); as before) {
+                        <!-- sm: = 600px on the gamma/Fuse scale (md: is 960px) — a 900px dialog never reaches md -->
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div class="min-w-0">
+                                <h4 class="mb-1 text-sm font-medium">Before — the rules you had</h4>
+                                <inspecto-data-table
+                                    tier="standard"
+                                    [rows]="before"
+                                    noRowsHint="These rules produced no columns"
+                                ></inspecto-data-table>
+                            </div>
+                            <div class="min-w-0">
+                                <h4 class="mb-1 text-sm font-medium">After — the rules you imported</h4>
+                                <inspecto-data-table
+                                    tier="standard"
+                                    [rows]="previewAfter() ?? []"
+                                    noRowsHint="These rules produced no columns"
+                                ></inspecto-data-table>
+                            </div>
+                        </div>
+                    }
                 </div>
             }
             @if (findings().length) {
@@ -175,6 +269,7 @@ const COLUMNS: EditableGridColumn[] = [
 })
 export class MappingEditorDialog {
     private readonly api = inject(ComponentsService);
+    private readonly pipelines = inject(PipelinesService);
     private readonly toast = inject(ToastrService);
     private readonly fb = inject(FormBuilder);
     private readonly confirm = inject(InspectoConfirmService);
@@ -202,6 +297,17 @@ export class MappingEditorDialog {
     readonly importNote = signal<ImportNote | null>(null);
     /** Rule-level diff of the last import against the rows it replaced. */
     readonly diff = signal<RuleDiff[]>([]);
+
+    // ── the output-row preview (ELT amendment UI plan §2.5's "old vs new output rows") ──
+    /** Sample DATA rows the operator uploaded — the input both sides of the preview run over. */
+    readonly sampleRows = signal<Record<string, unknown>[]>([]);
+    readonly sampleName = signal<string | null>(null);
+    /** Rows the PRE-import rules produce over the sample; null until a preview has run. */
+    readonly previewBefore = signal<Record<string, unknown>[] | null>(null);
+    readonly previewAfter = signal<Record<string, unknown>[] | null>(null);
+    readonly previewError = signal<string | null>(null);
+    /** The rules as they stood before the last import — the left side of both diffs. */
+    private readonly priorRules = signal<Record<string, string>[]>([]);
 
     /**
      * Findings mapped onto grid cells. `rules[N].<key>` is already row-index-anchored, so unlike the
@@ -249,7 +355,9 @@ export class MappingEditorDialog {
             return;
         }
         this.diff.set(diffRules(this.beforeImport, imported.rows));
+        this.priorRules.set(this.beforeImport.map((r) => ({ ...r })));
         this.beforeImport = imported.rows.map((r) => ({ ...r }));
+        this.runPreview();
         const problems = [
             imported.unknownHeaders.length
                 ? `ignored unrecognised column(s): ${imported.unknownHeaders.join(', ')}`
@@ -266,6 +374,75 @@ export class MappingEditorDialog {
                 : 'Review the changes below, then Save to apply them.',
         });
         this.validate().subscribe();
+    }
+
+    /**
+     * Take a sample of the DATA (not the rules file) and preview what the import does to it. Parsed with
+     * the same {@link parseCsv} the rules importer uses; the header names the input columns a rule's
+     * source expression refers to.
+     */
+    async onSample(event: Event): Promise<void> {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = '';
+        if (!file) return;
+        const parsed = parseCsv(await file.text());
+        if (parsed.length < 2) {
+            this.sampleName.set(null);
+            this.sampleRows.set([]);
+            this.clearPreview();
+            this.previewError.set(`${file.name} needs a header row and at least one data row.`);
+            return;
+        }
+        const header = parsed[0].map((h) => h.trim());
+        this.sampleRows.set(parsed.slice(1).map((cells) =>
+            Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']))));
+        this.sampleName.set(file.name);
+        this.runPreview();
+    }
+
+    /**
+     * Run both sides of the row preview: the rules as they stood before the import, and the ones just
+     * imported, over the SAME sample. Each side is a throwaway two-step graph dry-run through the
+     * candidate-config seam — the graph is never saved and the id is never looked up, which is what lets
+     * a mapping with no host pipeline be previewed at all. A `mapping` component declares no field types,
+     * so no csv settings are needed to compile its rules.
+     */
+    private runPreview(): void {
+        const sample = this.sampleRows();
+        if (!sample.length || !this.diff().length) return;
+        this.previewError.set(null);
+        forkJoin({
+            before: this.previewRun(this.priorRules(), sample),
+            after: this.previewRun(this.ruleRows(), sample),
+        }).subscribe({
+            next: ({ before, after }) => {
+                this.previewBefore.set(before);
+                this.previewAfter.set(after);
+            },
+            error: (err: unknown) => {
+                this.clearPreview();
+                // Advisory only — Save runs the real validation gate regardless of what the preview shows.
+                this.previewError.set(apiErrorMessage(err, 'The server could not dry-run these rules'));
+            },
+        });
+    }
+
+    /** One side of the preview: the rows this rule set produces at the map step. */
+    private previewRun(
+        rules: Record<string, string>[],
+        sample: Record<string, unknown>[],
+    ): Observable<Record<string, unknown>[]> {
+        const id = this.isEdit ? this.data.def!.name : (this.id.value.trim() || 'mapping');
+        return this.pipelines.dryRunAuthored(id, sample, previewGraph(id, rules)).pipe(
+            map((r: PipelineDryRunResult) =>
+                r.nodes.find((n) => n.node === MAP_NODE)?.relations[0]?.rows ?? []),
+        );
+    }
+
+    private clearPreview(): void {
+        this.previewBefore.set(null);
+        this.previewAfter.set(null);
     }
 
     /** Validate the current rows server-side, storing the findings. Never throws; transport errors warn. */

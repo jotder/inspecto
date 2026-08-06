@@ -388,10 +388,23 @@ export class PipelinesService {
         return this.http.delete(apiUrl(`/pipelines/authored/${encodeURIComponent(id)}`));
     }
 
-    /** Dry-run a bounded sample through an authored pipeline (per-node + per-sink counts; no production write). */
-    dryRunAuthored(id: string, sampleRows: Record<string, unknown>[]): Observable<PipelineDryRunResult> {
+    /**
+     * Dry-run a bounded sample through an authored pipeline (per-node + per-sink counts; no production write).
+     *
+     * <p>Pass `candidate` to preview a DRAFT graph instead of the stored one: it is parsed and validated
+     * through the same gate the save route uses (an invalid draft 422s identically) and never written
+     * anywhere. When present the stored flow is not consulted at all, so a draft for an id with no stored
+     * pipeline previews too — which is what lets a caller with no pipeline of its own synthesize a
+     * throwaway graph purely to see what some rules would produce.
+     */
+    dryRunAuthored(
+        id: string,
+        sampleRows: Record<string, unknown>[],
+        candidate?: AuthoredPipeline,
+    ): Observable<PipelineDryRunResult> {
         return this.http.post<PipelineDryRunResult>(
-            apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/dry-run`), { sampleRows });
+            apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/dry-run`),
+            candidate ? { sampleRows, pipeline: candidate } : { sampleRows });
     }
 
     /** Test a single processor node over a bounded sample (no production write) — the per-processor test. */

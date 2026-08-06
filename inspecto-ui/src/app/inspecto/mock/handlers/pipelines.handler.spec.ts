@@ -305,3 +305,83 @@ describe('pipelinesHandler — label relabels without moving the identity', () =
         expect(handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: '  ' }), store)?.status).toBe(400);
     });
 });
+
+/**
+ * The dry-run mock used to ignore BOTH the candidate body and `sampleRows`, answering every request with
+ * two canned CDR rows for every node. That is the textbook *mock more lenient than the server* trap in its
+ * most misleading form: an old-vs-new output-row diff built on it would show identical rows on both sides
+ * forever, and the offline preview would look correct the whole time. These pin it to the real contract.
+ */
+describe('pipelinesHandler — dry-run honours the candidate body and the sample', () => {
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
+
+    const candidate = (rules: Record<string, string>[]) => ({
+        name: 'scratch',
+        active: false,
+        nodes: [
+            { id: 'seed', type: 'acquisition' },
+            { id: 'map', type: 'transform.map', config: { rules } },
+            { id: 'sink', type: 'sink.persistent', config: { store: 'out' } },
+        ],
+        edges: [
+            { from: 'seed', rel: 'data', to: 'map' },
+            { from: 'map', rel: 'data', to: 'sink' },
+        ],
+    });
+
+    /** The map step's first output relation — where the projected rows land. */
+    const mapRel = (body: unknown) =>
+        (body as { nodes: { node: string; relations: { rel: string; rows: unknown[] }[] }[] })
+            .nodes.find((n) => n.node === 'map')!.relations[0];
+
+    it('projects the candidate rules over the supplied sample, not canned rows', () => {
+        const store = seededStore();
+        const res = handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
+            sampleRows: [{ a: '8801700000001', b: '150' }],
+            pipeline: candidate([{ targetColumn: 'MSISDN', sourceExpression: 'a', transformType: 'DIRECT' }]),
+        }), store);
+        expect(res?.status ?? 200).toBe(200);
+        const rel = mapRel(res?.body);
+        expect(rel.rows).toEqual([{ MSISDN: '8801700000001' }]);
+        expect(rel.rel).toBe('data');   // the server's PipelineRel.DATA, never 'success'
+    });
+
+    it('a different rule set really produces different rows — what makes an old-vs-new diff meaningful', () => {
+        const store = seededStore();
+        const sampleRows = [{ a: '1', b: '2' }];
+        const before = mapRel(handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
+            sampleRows, pipeline: candidate([{ targetColumn: 'X', sourceExpression: 'a', transformType: 'DIRECT' }]),
+        }), store)?.body).rows;
+        const after = mapRel(handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
+            sampleRows, pipeline: candidate([{ targetColumn: 'X', sourceExpression: 'b', transformType: 'DIRECT' }]),
+        }), store)?.body).rows;
+        expect(before).toEqual([{ X: '1' }]);
+        expect(after).toEqual([{ X: '2' }]);
+    });
+
+    it('an EXPR rule yields null rather than a fabricated value (no SQL engine on this path)', () => {
+        const store = seededStore();
+        const res = handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
+            sampleRows: [{ amt: '5' }],
+            pipeline: candidate([{ targetColumn: 'DOUBLED', sourceExpression: 'amt * 2', transformType: 'EXPR' }]),
+        }), store);
+        expect(mapRel(res?.body).rows).toEqual([{ DOUBLED: null }]);
+    });
+
+    it('a candidate for an id with no stored pipeline previews too — the server skips the lookup, so no 404', () => {
+        const store = seededStore();
+        const res = handler(req('POST', '/api/pipelines/authored/no_such_pipeline_at_all/dry-run', {
+            sampleRows: [{ a: 'x' }],
+            pipeline: candidate([{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }]),
+        }), store);
+        expect(res?.status ?? 200).toBe(200);
+        expect(mapRel(res?.body).rows).toEqual([{ A: 'x' }]);
+    });
+
+    it('without a candidate it still falls back to the stored/lifted pipeline (W5 behaviour kept)', () => {
+        const store = seededStore();
+        const res = handler(req('POST', '/api/pipelines/authored/cdr_ingest/dry-run', { sampleRows: [{ a: '1' }] }), store);
+        expect(res?.status ?? 200).toBe(200);
+        expect((res?.body as { nodes: unknown[] }).nodes.length).toBeGreaterThan(0);
+    });
+});
