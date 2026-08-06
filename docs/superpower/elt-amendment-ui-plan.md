@@ -196,8 +196,18 @@ recipe editor changes nothing there).
 > since backend route lowering shipped, but the mock still refused UNSUPPORTED_NODE and lifted
 > neither `route:` nor plural `sinks:`. It now mirrors `PipelineEditable.routeSection` (branch
 > `database` stamped from the sink its `route:<key>` edge feeds) and `PipelineLift`'s
-> branch↔sink-by-database pairing, pinned by a lift→edit→lower→re-lift parity spec. The same
-> staleness for `transform.dedup`/`summarize`/`join` is a flagged follow-up, not S3 scope.
+> branch↔sink-by-database pairing, pinned by a lift→edit→lower→re-lift parity spec. ~~The same
+> staleness for `transform.dedup`/`summarize`/`join` is a flagged follow-up, not S3 scope.~~
+> **Follow-up CLOSED 2026-08-06.** The staleness was in the mock's `NODE_TYPES` *catalog*, not its
+> lift/lower (which already handled all three): `pipelines.handler.ts` held a **second, stale copy**
+> of the lowerable set — 8 entries against the server's 12 — so `transform.dedup`/`join`/`summarize`
+> never reached the offline canvas palette. The duplicate is deleted; the handler now imports the
+> one `LOWERABLE` from `mock/pipeline-editable.ts`, mirroring how the server has a single definition
+> (`PipelineProjection.catalog()` reads `PipelineEditable.isLowerable`). ⚠ The tripwire spec did not
+> catch this because it **hand-copied the enum into itself** — both copies went stale together, so it
+> passed. Pinning a mirror against a re-typed literal is not a mirror; the spec now asserts 22 types
+> / 12 lowerable, but the durable lesson is that the contract-JSON idiom (S4) is the shape that
+> actually holds.
 > Vocab sweep (§2.7): editor canvas aria-labels, inspector hints/Delete, grammar dialog, dry-run
 > panel, run-to-here, `validatePipeline` messages — the combined read-only topology view keeps
 > "node" deliberately (its graph mixes Steps with synthetic store nodes). One stale spec pinned the

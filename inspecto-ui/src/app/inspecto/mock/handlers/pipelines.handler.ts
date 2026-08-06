@@ -17,7 +17,7 @@ import STEP_TYPES_CONTRACT from '../step-types.contract.json';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
-import { liftConfig, lowerGraph } from '../pipeline-editable';
+import { liftConfig, LOWERABLE, lowerGraph } from '../pipeline-editable';
 import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.handler';
 
 /**
@@ -43,16 +43,6 @@ import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.h
  * file/database/stream split — **which connector a source uses is carried by its Connection profile
  * (`collector.connection`), not by the node type** — and `alert` is CONTROL, not a transform.
  */
-/**
- * Mirrors `PipelineEditable.LOWERABLE` on the server — the 9 of 20 types a save can lower back to the
- * flat config. ⚠ A mock more permissive than the server is the failure mode this whole flag exists to
- * kill: keep these two lists in lockstep.
- */
-const LOWERABLE = new Set([
-    'acquisition', 'parser', 'gap', 'transform.dedup.marker',
-    'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
-]);
-
 export const NODE_TYPES: PipelineNodeType[] = ([
     // entry / acquisition (the collector role)
     { type: 'acquisition', category: 'SOURCE', label: 'Acquisition', description: 'Collects files from a source (poll/listing); the pipeline entry.', accepts: [], emits: ['data', 'gap', 'failure'], emitsNamedRoutes: false },
@@ -67,7 +57,10 @@ export const NODE_TYPES: PipelineNodeType[] = ([
     { type: 'transform.validate', category: 'TRANSFORM', label: 'Validate', description: 'Splits rows into valid / invalid by rule.', accepts: ['data'], emits: ['data', 'invalid'], emitsNamedRoutes: false },
     // marker vs fingerprint are DIFFERENT subsystems — never flatten them into one "dedup"
     { type: 'transform.dedup.marker', category: 'TRANSFORM', label: 'Dedup (marker)', description: 'File-level dedup via marker files.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
+    { type: 'transform.dedup', category: 'TRANSFORM', label: 'Dedup (record)', description: 'Record-grain dedup by business key (QUALIFY); duplicates are a counted reject stream.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
     { type: 'transform.route', category: 'TRANSFORM', label: 'Route', description: 'Content-based routing into operator-defined branches (case / clone).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: true },
+    { type: 'transform.join', category: 'TRANSFORM', label: 'Join', description: 'Joins against a Reference Dataset by key.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
+    { type: 'transform.summarize', category: 'TRANSFORM', label: 'Summarize', description: 'Group-by rollup with algebraically-composable measures.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
     { type: 'transform.split', category: 'TRANSFORM', label: 'Split', description: 'Explodes one row into many (UNNEST).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
     { type: 'transform.merge', category: 'TRANSFORM', label: 'Merge', description: 'Joins / unions multiple inbound data edges (fan-in).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
     { type: 'enrichment', category: 'TRANSFORM', label: 'Enrichment', description: 'Joins against reference data (post-commit stage-2 join).', accepts: ['data', 'on_commit'], emits: ['data', 'on_commit'], emitsNamedRoutes: false },

@@ -13,7 +13,7 @@ export interface Refusal {
     message: string;
 }
 
-const LOWERABLE = new Set([
+export const LOWERABLE = new Set([
     'acquisition', 'parser', 'gap', 'transform.dedup.marker',
     'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
     'transform.route',     // route: block — authoring-only until the executor lands (mirrors backend S3)
