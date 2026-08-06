@@ -876,6 +876,16 @@ subscription + coalesce) · **S3c** parser loosening + `collect: {dataset:}` con
 fictional, per the spike) · **S3d** recipe verb + converter projection + the deferred execution
 half of the P3 S4 parity gate (enrich/materialize as recipes, identical outputs).
 
+#### Phases 3/6 user-surface scope SUPERSEDED 2026-08-06 — user-facing 'Job' un-banned (operator decision)
+
+The v1.0 end-state "Jobs panes/routes and `*_job.toon` authoring migrate to table-entry Pipelines"
+is withdrawn: **Job is again a first-class user-facing concept** (GLOSSARY §6-A entry + §13 row
+updated; authoring contract in `superpower/job-parameter-contract-plan.md` §0-A). The S3a–d design
+of record above is unaffected and proceeds as an *additive* thread — table-entry Pipelines
+complement Jobs, they no longer replace them. Consequences: Phase 6's Jobs-UI retirement is
+cancelled; the per-kind authoring migrations (D-4 enrichment, D-7 materialize) become S3-gated
+options to re-decide when S3 lands, not commitments.
+
 #### Phase 4 GROUNDED 2026-08-06 — findings that shape the slices
 
 1. **The housekeeping keys are scattered but all real** — each Guarantee has an existing home and

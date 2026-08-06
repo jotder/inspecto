@@ -336,10 +336,13 @@ of what a Pipeline landed. Its kinds are an **open registry** keyed by string id
 `JobTypeRegistry`); the built-ins are `enrich` · `report` · `maintenance` · `pipeline`. ⛔ There is deliberately
 **no `ingest` job type** (removed 2026-06-17) — ingestion is the Pipeline's sole responsibility, and an
 `ingest` job is now a config error. ⚠ A Job is **not** embeddable as a **Step** (see §5).
-⚠ **User-facing retirement (amendment v1.0, 2026-08-05):** end users author **table-entry Pipelines** for
-at-rest data work; "Job" survives as **engine-internal scheduling vocabulary only** (`JobService`, the Signal
-bus, `consignment.process` — kept verbatim as the compile target of a table-entry `collect`). Rollout at the
-amendment's Phases 3/6; §13 row.
+⚠ **User-facing retirement REVERSED — Job un-banned (2026-08-06, operator decision):** the amendment v1.0
+(2026-08-05) retirement of user-facing "Job" is superseded — its replacement path hung on the amendment's
+Phase 3 S3 (table-entry `collect`), deferred by its own design spike as genuine new design. **Job is again the
+canonical user-facing term** for any scheduled Executable over data at rest (maintenance, periodic
+report/enrich, dataset operations); the authoring contract completes in
+`superpower/job-parameter-contract-plan.md`. Table-entry Pipelines remain an *additive complement* (S3 design
+of record), never the Job's replacement; §13 row.
 
 **Scheduler** — The Operations engine that owns **Triggers** and starts **Executables** (Pipelines or Jobs). It
 defines *when*, not *what*.
@@ -690,7 +693,7 @@ routes' `?pipeline=`/`?flow=` query param). |
 | `EVENT_TABLE` / `TRANSFORMED_TABLE` / `REFERENCE_TABLE` | **`TABLE`** / **`DERIVED_TABLE`** / **`REFERENCE_DATASET`** | ✅ **DONE** (breaking → 5.0): `NodeKind` enum + all usages (`IdScheme`, `CatalogOverlay`, `MetadataGraphService`, `KpiToSqlSkill`, `SuggestConfigSkill`) + 5 test files; FE `models.ts` union + `node-detail.dialog.ts` `isStore()` + `catalog-graph.ts` shape/glyph. Id tokens (`event`/`xform`/`ref`) unchanged. ⚠️ `/catalog/graph` emits the new enum values (no alias). |
 | `LineageRow` *(file→partition rows)* | **Provenance** *(concept)* | `inspecto/etl/LineageRow.java`, `BatchAuditWriter`; the asset graph keeps the name *Lineage* |
 | Node *(user-facing, pipeline canvas)* | **Step** | **NOT STARTED — ELT final amendment Phase 5** (`superpower/elt-final-amendment-plan.md`). UI copy in the pipeline editor/palette/inspector ("node" → "Step"); `GET /pipelines/node-types` → `/pipelines/step-types` (serve both during rollout); `NodeConfigDialog` title copy. Internal `PipelineNode`/`BuiltinNodeType`/`NodeAttributes` names KEPT — the IR is engine-internal, same discipline as the Metric row keeping ops `MetricRegistry`. |
-| Job *(user-facing, at-rest data work)* | **Pipeline** *(table-entry)* | **NOT STARTED — amendment Phases 3/6.** User surface only: Jobs panes/routes and `*_job.toon` authoring for the `enrich`/`report` data kinds migrate to table-entry Pipelines (`collect: {table:, on: commit}`); `maintenance` stays standalone (deleters keep their fence, design doc §3.8). Engine internals KEPT verbatim: `JobService`, `JobTypeProvider` open registry, Signal bus, `consignment.process`. |
+| Job *(user-facing, at-rest data work)* | **Job** *(kept — un-banned)* | **REVERSED 2026-08-06** (operator decision; same posture as the Source→Collector row's 2026-07-14 reversal). The planned migration to table-entry Pipelines (amendment Phases 3/6) is superseded: its enabling slice S3 was deferred as genuine new design, while Jobs are the shipped at-rest surface (9 registered types; cron/on_pipeline/on_signal/manual triggers). Jobs panes/routes and `*_job.toon` stay canonical; the authoring contract completes in `superpower/job-parameter-contract-plan.md` (§0-A). Engine internals unchanged; table-entry Pipelines proceed as an *additive* thread (S3a–d design of record), not a replacement. |
 | Enrichment *(file kind + Step name)* | **table-entry Pipeline** / `transform: {join:}` | **NOT STARTED — amendment Phases 3/6 (D-4).** `*_enrich.toon` → table-entry Pipeline recipes via the one-shot converter; the `enrichment` BuiltinNodeType id becomes compile-internal; `EnrichmentEngine` retired after migration parity. The *word* survives only in engine internals until their natural rename. |
 | `materialize` *(maintenance task as Matrix authoring)* | **`summarize` Step** | **NOT STARTED — amendment Phase 3 (D-7).** The **Matrix** noun (summary Derived Table, Cube row above) is unaffected — this row retires only the *authoring path*: `MaterializeTask` becomes the at-rest compile target of a `summarize` Step in a table-entry Pipeline. |
 | `mapping:` *(block inside `*_schema.toon`)* | **Mapping** *(own CSV component kind)* | **NOT STARTED — amendment Phase 1 (D-3).** Splits the §3 two-shape collision: Schema = structure CSV, Mapping = field-map CSV, both filename-identity. Touchpoints: schema TOON codec, `ConfigSpecs.schema()`, schema editor UI, the ~80 fixtures (one-shot converter). |

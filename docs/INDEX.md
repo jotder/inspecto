@@ -73,6 +73,32 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/job-parameter-contract-plan.md`](superpower/job-parameter-contract-plan.md) —
+  **REFINED + GROUNDED 2026-08-06 (UI + backend) — the Job authoring contract + extensible runtime
+  Expressions.** **§0-A: user-facing 'Job' un-banned** (operator decision, reverses the ELT
+  amendment's Phases 3/6 retirement — see `docs/GLOSSARY.md` §6-A/§13). Guiding principle:
+  **versatility over built-ins** — capability is added by *registration*, never by editing a
+  `switch`. Findings, verified against source: (1) `AttributeSpec` (UI) is strictly richer than
+  `ParameterDecl` (backend — 9 registered Job Types vs 5 hardcoded in the UI picker); (2)
+  **`ParameterResolver` evaluates `$`-expressions in only 2 of its 5 layers** (plus a 6th legacy
+  `pipeline`/`flow` shim) — authored `config` values (what the UI writes) and trigger `args` are
+  returned raw, so `$yesterday` typed in the UI reaches the Job as a literal string; (3) the
+  vocabulary is a hardcoded `switch` (10 tokens, confirmed exhaustive) — not extensible, not
+  discoverable, unknown tokens fall through silently. Plan: an `ExpressionProvider` SPI + registry
+  mirroring `JobTypeProvider`'s load order, `$$` literal escape, fail-closed unknown tokens (all
+  three load paths, not just Packs — the ServiceLoader path today only warns), `GET
+  /jobs/expressions` catalog with **server-evaluated previews**, a widened `ParameterDecl` +
+  **§7.4 decl→widget mapping table** (the generation contract), `JobTypeDescriptor` provenance,
+  `secret` masking at the route boundary (not `JobConfig.toMap()`, which also feeds bundle export),
+  and `on_signal` trigger authoring in the UI (new). Builder-on-record is confirmed house style
+  (`EventQuery`/`Event`/`ObjectQuery`), not a deviation. **§6.1 recommended resolution:** scoped
+  evaluation — `sql.template`'s SQL body stays `$`-as-template-parameter; expressions resolve in
+  parameter *values* via indirection (`params: {from: "$event_day(-7)"}`), serving the driving use
+  case with zero migration. **Event Day deferred** to its own plan; **dataset-triggered Jobs (§5-A)**
+  are pure configuration once the ELT amendment's `dataset.write` Signal (slice S3a) ships — no new
+  machinery here beyond `on_signal` UI authoring. 17-step delivery table (0–16); step 0 (vocabulary
+  docs) done with this refinement.
+
 - [`superpower/elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) —
   **APPROVED v1.0 (2026-08-05) — the ELT final amendment: one model, one vocabulary, one authoring
   surface.** The operator's unification directive: a Pipeline is an ordered chain of uniform Steps

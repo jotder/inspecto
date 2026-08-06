@@ -106,7 +106,10 @@ local/Connection toggle precedent from `<inspecto-collector-config>`, including 
 (spec-swap re-seeds live values; un-bind via the toggle, never by blanking). Table mode asks:
 `table` (autocomplete via `entity-option-loaders` over Datasets — never free text) and trigger
 (`on: commit of <pipeline>` — pipeline autocomplete; or cron). The `summarize` card renders
-group-by (list type) + measures (list of expressions). Jobs-pane retirement is **Phase 6 and a
+group-by (list type) + measures (list of expressions). ⚠ **Jobs-pane retirement is CANCELLED**
+(2026-08-06, operator decision — user-facing 'Job' un-banned, see `docs/GLOSSARY.md` §6-A and
+`docs/superpower/job-parameter-contract-plan.md` §0-A); table-entry cards ship as an *additive*
+surface alongside Jobs, never a replacement for it. The retirement was originally **Phase 6 and a
 nav change: three edits** (nav item, route, `ACCESS_ACTION_NODES` re-home) — not before the
 converter has migrated `*_job.toon` data kinds.
 
@@ -353,7 +356,23 @@ recipe editor changes nothing there).
 > `components.handler.spec.ts`, so the offline preview cannot green-light a mapping the server 422s.
 > **Verified live** against the real backend (not just tests): a create/update with an unknown transform
 > type 422s before touching disk; clean rules write, list, and delete correctly.
-| **S7** | Table-entry collect + summarize cards; Jobs nav retirement | Phase 3 / Phase 6 | nav retirement = 3 edits incl. `ACCESS_ACTION_NODES`; `access-catalog.spec` green |
+> **S6 dry-run follow-up SHIPPED 2026-08-06 — `97139f24` + `bff141cc`.** Grounding this before building
+> found the premise had a second, worse problem than S6b's own gap: `POST /pipelines/authored/{id}/dry-run`
+> didn't just lack a candidate-body seam, it **was already broken for every registered pipeline**.
+> `PipelineLift` carries a legacy schema on the `transform.map` node, but `RowShaper`'s projection required
+> `columns` and nothing translated between them — any pipeline with a schema 400'd on dry-run (misattributed
+> to "bad sample"). Separately, **no code path anywhere resolved a `use:` component reference before running a
+> graph** — `ComponentRegistry.effectiveConfig` had zero production callers — so a `mapping` component's rules
+> were invisible to the executor. Neither defect was in scope for S6b; both were fixed first (`97139f24`),
+> verified with new tests (`PipelineDryRunTest` 4/4, `ComponentRegistryTest` 4/4), then the candidate-config
+> body landed on that corrected foundation (`bff141cc`): a `pipeline` body key dry-runs a draft graph — parsed
+> and validated through the same `parseAndValidateFlow` the save route uses, so an invalid draft 422s
+> identically, and the draft never touches disk. `DataTransformer.dataColumns` is now the one authority both
+> the legacy engine's `selectFor` and the graph executor's projection compile mapping rules through, so they
+> cannot drift. Full reactor green throughout; vocabulary guard clean. **Still open, deliberately not done
+> here:** wiring the UI's old-vs-new output-row diff and §5.1's per-Step sample rows onto this seam — the
+> backend capability exists now, the UI call sites do not yet.
+| **S7** | Table-entry collect + summarize cards | Phase 3 | Jobs nav retirement CANCELLED 2026-08-06 (Job un-banned) — table-entry cards ship additively; no `ACCESS_ACTION_NODES`/nav removal |
 
 ## 5. Known traps to carry (from the skill, amendment-specific)
 
