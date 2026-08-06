@@ -317,6 +317,42 @@ recipe editor changes nothing there).
 > precedent (`spaces` export isn't either): `MockResponse` carries no headers and v1-wraps every 2xx
 > body, so mocking it would need shared mock-infra surgery — and not mocking cannot violate the
 > mock-strictness rule, since a mock that doesn't exist can't be more lenient than the server.
+
+> **S6b SHIPPED 2026-08-06 — scope narrowed by grounding.** Re-grounded before building: `POST /validate`
+> already existed generically (schema-shaped, not mapping-shaped), and mapping rules are not a separate
+> component type at all — they ride inside `type: "schema"`'s sibling CSV split. So S6b built the ONE
+> piece that genuinely didn't exist — `POST /components/mapping/validate` — and deliberately dropped
+> the dry-run-over-a-candidate-config half of §2.5's "diff preview": that needs a second new backend
+> capability (accepting a draft config body, not the persisted graph) which is real, separable work,
+> not wiring. What shipped instead is a **rule-level diff** (import vs. the rules it replaces, by target
+> column) — genuinely useful for reviewing an import, but not §2.5's "old vs new output rows" data-level
+> diff, which stays a follow-up.
+> **The validation authority is `MappingRules` (inspecto-engine, pure)**, not a restated copy: its
+> transform-type check reads `TransformCompiler.TRANSFORM_TYPES` (added to the compiler itself) so the
+> vocabulary can never drift from what the compiler actually accepts. Every other check is a literal
+> precondition of a `TransformCompiler` method — `CONCAT_DT` needs its `|` separator (the compiler splits
+> unconditionally and throws without it), `FILENAME_DATE` only targets `EVENT_DATE` (the compiler
+> rejects any other target) — so the validator fails the SAME rules the runtime would fail on, before a
+> pipeline ever runs. **Deliberately not validated: an `EXPR` rule's SQL.** `TransformCompiler.expr`
+> already documents that decision — schema config is operator-authored and trusted, the same model as
+> Stage-2 transform SQL — so sandbox-checking it here would contradict an explicit prior call.
+> **Fail-closed at both edges, not just the preview.** `POST /components/mapping/validate` never writes;
+> separately, `ComponentRoutes.validateKind` (the same hook `findings-spec` already used) now refuses an
+> invalid mapping on `POST`/`PUT /components/mapping/*` too — so the preview is advisory, but the write
+> is the real gate, exactly the two-layer shape R6's config-safety gate uses elsewhere.
+> **UI:** the shared `<inspecto-editable-grid>` gained a real `imported` output — Import CSV used to
+> silently replace every row with blanks when the header matched nothing (indistinguishable from
+> successfully importing an empty mapping); it now REFUSES that import and reports which headers
+> matched/were unknown/were absent, matching by column key OR label (Export writes keys, a human editing
+> the file sees labels). `MappingEditorDialog` renders that outcome as an `<inspecto-alert>`, shows the
+> rule-diff table, validates server-side on every import AND before every save (blocking the save on an
+> ERROR finding — a transport failure only warns, since the write re-checks regardless), and reuses the
+> S5 cell-findings plumbing (`rules[N].<key>` is already row-anchored, simpler than the schema editor's
+> by-name `raw.fields[NAME]` resolution). **The mock mirrors `MappingRules`/`validateKind` verbatim** on
+> both the new validate route and the existing create/update routes, pinned in
+> `components.handler.spec.ts`, so the offline preview cannot green-light a mapping the server 422s.
+> **Verified live** against the real backend (not just tests): a create/update with an unknown transform
+> type 422s before touching disk; clean rules write, list, and delete correctly.
 | **S7** | Table-entry collect + summarize cards; Jobs nav retirement | Phase 3 / Phase 6 | nav retirement = 3 edits incl. `ACCESS_ACTION_NODES`; `access-catalog.spec` green |
 
 ## 5. Known traps to carry (from the skill, amendment-specific)

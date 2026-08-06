@@ -125,6 +125,72 @@ describe('componentsHandler', () => {
         expect(studioOnly(req('GET', '/api/components/grammar'), store)).toBeUndefined(); // falls through
     });
 
+    // These pin the mock against the Java `MappingRules` / `validateKind` gate (S6b). A mock that
+    // accepted rules the server 422s would greenlight a broken mapping offline — the exact failure
+    // mode the mock-strictness rule exists to prevent.
+    describe('mapping rules gate', () => {
+        const validate = (rules: unknown) =>
+            handler(req('POST', '/api/components/mapping/validate', { rules }), seededStore());
+
+        it('reports clean rules as clean', () => {
+            const res = validate([{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }]);
+            expect(res?.body).toMatchObject({ type: 'mapping', clean: true, findings: [] });
+        });
+
+        it('anchors each finding to the cell, exactly as the server does', () => {
+            const res = validate([
+                { targetColumn: '', sourceExpression: 'a', transformType: '' },
+                { targetColumn: 'B', sourceExpression: '', transformType: '' },
+                { targetColumn: 'C', sourceExpression: 'x', transformType: 'EXPER' },
+                { targetColumn: 'C', sourceExpression: 'y', transformType: '' },
+                { targetColumn: 'D', sourceExpression: 'nosep', transformType: 'CONCAT_DT' },
+                { targetColumn: 'E', sourceExpression: 'f|p|%Y%m%d', transformType: 'FILENAME_DATE' },
+            ]);
+            const body = res?.body as { clean: boolean; findings: { fieldPath: string }[] };
+            expect(body.clean).toBe(false);
+            expect(body.findings.map((f) => f.fieldPath)).toEqual([
+                'rules[0].targetColumn',
+                'rules[1].sourceExpression',
+                'rules[2].transformType',
+                'rules[3].targetColumn',
+                'rules[4].sourceExpression',
+                'rules[5].targetColumn',
+            ]);
+        });
+
+        it('an empty rule set is not clean, and the finding has no cell anchor', () => {
+            const body = validate([])?.body as { clean: boolean; findings: { fieldPath: string }[] };
+            expect(body.clean).toBe(false);
+            expect(body.findings[0].fieldPath).toBe('');
+        });
+
+        it('a malformed body is 400', () => {
+            expect(validate(undefined)?.status).toBe(400);
+            expect(validate('nope')?.status).toBe(400);
+            expect(validate(['nope'])?.status).toBe(400);
+        });
+
+        it('REFUSES a create and an update carrying invalid rules, like the write gate does', () => {
+            const store = seededStore();
+            const bad = { rules: [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'EXPER' }] };
+            expect(handler(req('POST', '/api/components/mapping', { id: 'm1', ...bad }), store)?.status).toBe(422);
+            expect(store.get('default', componentCollection('mapping'), 'm1')).toBeUndefined();
+
+            const good = { rules: [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'EXPR' }] };
+            expect(handler(req('POST', '/api/components/mapping', { id: 'm1', ...good }), store)?.status).toBe(200);
+            expect(handler(req('PUT', '/api/components/mapping/m1', bad), store)?.status).toBe(422);
+            // and the refused update did NOT overwrite the good rules
+            expect(store.get<ComponentDef>('default', componentCollection('mapping'), 'm1')?.content['rules'])
+                .toEqual(good.rules);
+        });
+
+        it('leaves a body carrying no rules alone (other kinds and partial writes are untouched)', () => {
+            const store = seededStore();
+            expect(handler(req('POST', '/api/components/mapping', { id: 'm2', description: 'later' }), store)?.status)
+                .toBe(200);
+        });
+    });
+
     it('no longer owns the grammar preview — that moved to the served /parsers domain', () => {
         const store = seededStore();
         const res = handler(

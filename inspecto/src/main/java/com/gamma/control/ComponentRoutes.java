@@ -1,7 +1,9 @@
 package com.gamma.control;
 
+import com.gamma.config.spec.Finding;
 import com.gamma.ops.findings.FindingsSpec;
 import com.gamma.pipeline.ComponentRegistry;
+import com.gamma.pipeline.MappingRules;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineReferences;
@@ -42,6 +44,32 @@ final class ComponentRoutes implements RouteModule {
         api.post("/components/transform/([^/]+)/test", (e, m) -> previewTransform(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/grammar/([^/]+)/test", (e, m) -> previewGrammar(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/sink/([^/]+)/test", (e, m) -> previewSink(api, e, ApiContext.name(m), api.body(e)));
+        // S6b: validate mapping rules WITHOUT writing — the import loop's gate. Un-gated like the
+        // /test previews (it reads nothing and writes nothing) and never touches the registry.
+        api.post("/components/mapping/validate", (e, m) -> validateMapping(api.body(e)));
+    }
+
+    /**
+     * {@code POST /components/mapping/validate} — check a draft mapping's {@code rules} against
+     * {@link MappingRules} and return the findings, writing nothing (ELT amendment UI plan §2.5, S6b).
+     * Findings are anchored to {@code rules[N].<key>} so the grid editor can mark the exact cell.
+     * 400 if {@code rules} is absent or is not a list. Mirrors the {@code /validate} response shape.
+     */
+    @SuppressWarnings("unchecked")
+    private Object validateMapping(Map<String, Object> body) {
+        Object rulesObj = body.get("rules");
+        if (!(rulesObj instanceof List<?> list))
+            throw new ApiException(400, "body must include 'rules' (a list of mapping rules)");
+        for (Object row : list) {
+            if (!(row instanceof Map<?, ?>))
+                throw new ApiException(400, "every entry of 'rules' must be an object");
+        }
+        List<Finding> findings = MappingRules.validate((List<Map<String, Object>>) rulesObj);
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("type", "mapping");
+        r.put("findings", findings);
+        r.put("clean", findings.isEmpty());
+        return r;
     }
 
     /** The registry root under the write root, or {@code null} when writes are disabled (no write root). */
@@ -367,6 +395,27 @@ final class ComponentRoutes implements RouteModule {
                 throw new IllegalArgumentException("findings-spec objectType '" + declared
                         + "' must match the component id '" + id + "' (one spec per object type)");
             FindingsSpec.fromMap(stamped);
+        }
+        // S6b: a mapping whose rules break a TransformCompiler precondition cannot run — it either
+        // fails the batch or (CONCAT_DT without a separator) throws mid-materialize. Refuse it at
+        // authoring time, so /components/mapping/validate is a PREVIEW of this gate, not the only one.
+        if ("mapping".equals(type) && content.containsKey("rules")) {
+            Object rules = content.get("rules");
+            if (!(rules instanceof List<?> list))
+                throw new IllegalArgumentException("mapping 'rules' must be a list");
+            List<Map<String, Object>> typed = new java.util.ArrayList<>();
+            for (Object row : list) {
+                if (!(row instanceof Map<?, ?> m))
+                    throw new IllegalArgumentException("every entry of mapping 'rules' must be an object");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> cast = (Map<String, Object>) m;
+                typed.add(cast);
+            }
+            List<Finding> findings = MappingRules.validate(typed);
+            if (!findings.isEmpty())
+                throw new IllegalArgumentException("mapping rules are invalid: " + findings.stream()
+                        .map(f -> (f.fieldPath().isEmpty() ? "" : f.fieldPath() + ": ") + f.message())
+                        .collect(java.util.stream.Collectors.joining("; ")));
         }
     }
 }

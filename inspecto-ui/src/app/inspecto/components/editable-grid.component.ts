@@ -19,6 +19,19 @@ export interface CellFinding {
     message: string;
 }
 
+/** The outcome of an Import CSV, so the host can gate it (validate, diff, confirm) before applying. */
+export interface CsvImport {
+    /** The parsed rows, already projected onto the declared columns. Empty when `applied` is false. */
+    rows: Record<string, string>[];
+    /** Header cells that matched no declared column — almost always the sign of the wrong file. */
+    unknownHeaders: string[];
+    /** Declared columns the header did not carry; these cells import blank. */
+    missingColumns: string[];
+    /** False when the header matched NO declared column: the grid was left untouched. */
+    applied: boolean;
+    fileName: string;
+}
+
 /**
  * The shared editable flat-table grid (ELT amendment UI plan §2.4, S5): an ag-Grid-hosted
  * spreadsheet-lite for the row-list component kinds (mapping rules, schema fields) — add/remove row,
@@ -92,6 +105,13 @@ export class EditableGridComponent {
     /** The full row list after any edit (cell change, add, remove, import). */
     @Output() readonly rowsChange = new EventEmitter<Record<string, string>[]>();
 
+    /**
+     * One Import CSV, with what the header did and did not match. Fires on every import, including a
+     * refused one (`applied: false`) — a host that ignores this still gets the rows via `rowsChange`,
+     * which is why the two are separate.
+     */
+    @Output() readonly imported = new EventEmitter<CsvImport>();
+
     private readonly colSpec = signal<EditableGridColumn[]>([]);
     readonly gridRows = signal<Record<string, string>[]>([]);
     readonly defaultColDef = INSPECTO_DEFAULT_COL_DEF;
@@ -162,6 +182,13 @@ export class EditableGridComponent {
         URL.revokeObjectURL(a.href);
     }
 
+    /**
+     * Import CSV. The header is matched per declared column by `key` first, then by `label`
+     * (case/space-insensitive), because Export CSV writes keys while a human editing the file sees
+     * labels. If the header matches NO declared column the import is REFUSED and the grid is left
+     * as it was — replacing every row with blanks (the earlier behaviour) looks like a successful
+     * import of an empty mapping, which is the worst possible outcome for the wrong file.
+     */
     async importCsv(event: Event): Promise<void> {
         const input = event.target as HTMLInputElement;
         const file = input.files?.[0];
@@ -169,14 +196,34 @@ export class EditableGridComponent {
         if (!file) return;
         const parsed = parseCsv(await file.text());
         if (!parsed.length) return;
+
+        const norm = (s: string): string => s.trim().toLowerCase().replace(/[\s_]+/g, '');
         const header = parsed[0];
-        const rows = parsed.slice(1).map((cells) =>
-            Object.fromEntries(this.colSpec().map((c) => {
-                const idx = header.indexOf(c.key);
-                return [c.key, idx >= 0 ? (cells[idx] ?? '') : ''];
-            })));
-        this.gridRows.set(rows);
-        this.emitRows();
+        const cols = this.colSpec();
+        const indexOf = new Map<string, number>(
+            cols.map((c) => [
+                c.key,
+                header.findIndex((h) => norm(h) === norm(c.key) || norm(h) === norm(c.label)),
+            ]),
+        );
+        const matched = cols.filter((c) => (indexOf.get(c.key) ?? -1) >= 0);
+        const missingColumns = cols.filter((c) => (indexOf.get(c.key) ?? -1) < 0).map((c) => c.key);
+        const claimed = new Set(matched.map((c) => indexOf.get(c.key)));
+        const unknownHeaders = header.filter((_, i) => !claimed.has(i)).filter((h) => h.trim().length);
+
+        const applied = matched.length > 0;
+        const rows = applied
+            ? parsed.slice(1).map((cells) =>
+                  Object.fromEntries(cols.map((c) => {
+                      const idx = indexOf.get(c.key) ?? -1;
+                      return [c.key, idx >= 0 ? (cells[idx] ?? '') : ''];
+                  })))
+            : [];
+        if (applied) {
+            this.gridRows.set(rows);
+            this.emitRows();
+        }
+        this.imported.emit({ rows, unknownHeaders, missingColumns, applied, fileName: file.name });
     }
 }
 

@@ -31,6 +31,55 @@ const COMPONENT_VERSIONS = /\/components\/([^/]+)\/([^/]+)\/versions$/;
 const COMPONENT_RESTORE = /\/components\/([^/]+)\/([^/]+)\/versions\/([^/]+)\/restore$/;
 const COMPONENT_ONE = /\/components\/([^/]+)\/([^/]+)$/;
 const COMPONENTS = /\/components\/([^/]+)$/;
+const MAPPING_VALIDATE = /\/components\/mapping\/validate$/;
+
+/** The transform-type vocabulary — mirrors `TransformCompiler.TRANSFORM_TYPES`. */
+const TRANSFORM_TYPES = new Set(['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE']);
+
+/**
+ * Mapping-rule findings — a deliberate mirror of the Java `MappingRules.validate` (inspecto-engine),
+ * which is the authority. It exists so the offline preview is NOT more lenient than the server: the
+ * backend refuses these rules on both `POST /components/mapping/validate` and the write itself, so a
+ * mock that accepted them would greenlight a mapping the server 422s. Keep the two in lockstep —
+ * `components.handler.spec.ts` pins the cases.
+ */
+export function mappingRuleFindings(rules: Record<string, unknown>[]): {
+    severity: string; fieldPath: string; message: string;
+}[] {
+    const err = (fieldPath: string, message: string) => ({ severity: 'ERROR', fieldPath, message });
+    if (!rules.length) return [err('', 'A mapping needs at least one rule.')];
+    const out: { severity: string; fieldPath: string; message: string }[] = [];
+    const seen = new Map<string, number>();
+    rules.forEach((rule, i) => {
+        const str = (k: string): string => String(rule[k] ?? '').trim();
+        const at = `rules[${i}].`;
+        const target = str('targetColumn');
+        const source = str('sourceExpression');
+        const type = str('transformType').toUpperCase();
+
+        if (!target) out.push(err(`${at}targetColumn`, 'A target column is required.'));
+        else if (seen.has(target))
+            out.push(err(`${at}targetColumn`,
+                `Duplicate target column '${target}' — rule ${seen.get(target)! + 1} already writes it.`));
+        else seen.set(target, i);
+
+        if (type && !TRANSFORM_TYPES.has(type)) {
+            out.push(err(`${at}transformType`, `Unknown transform type '${str('transformType')}'. `
+                + `Valid: DIRECT (or leave blank), ${[...TRANSFORM_TYPES].sort().join(', ')}.`));
+            return;
+        }
+        if (!source) {
+            out.push(err(`${at}sourceExpression`, 'A source expression is required.'));
+            return;
+        }
+        if (type === 'CONCAT_DT' && !source.includes('|'))
+            out.push(err(`${at}sourceExpression`, "CONCAT_DT needs '<dateColumn>|<timeColumn>'."));
+        if (type === 'FILENAME_DATE' && target !== 'EVENT_DATE')
+            out.push(err(`${at}targetColumn`,
+                `FILENAME_DATE is only supported for the EVENT_DATE column, got '${target}'.`));
+    });
+    return out;
+}
 
 export function componentsHandler(flags: MockFlags): MockHandler {
     const enabledFor = (kind: string): boolean =>
@@ -45,6 +94,16 @@ export function componentsHandler(flags: MockFlags): MockHandler {
             // parser framework (`/parsers` — see parsers.handler); this domain keeps only the
             // component registry + per-component test.
             if (method === 'POST' && (m = match(url, COMPONENT_TEST))) return json(componentTest(m[1], m[2]));
+        }
+
+        // S6b mapping validate — before COMPONENT_ONE, which would otherwise read `validate` as an id.
+        if (method === 'POST' && MAPPING_VALIDATE.test(url) && enabledFor('mapping')) {
+            const rules = (req.body as Record<string, unknown> | null)?.['rules'];
+            if (!Array.isArray(rules)) return error(400, "body must include 'rules' (a list of mapping rules)");
+            if (rules.some((r) => typeof r !== 'object' || r === null || Array.isArray(r)))
+                return error(400, "every entry of 'rules' must be an object");
+            const findings = mappingRuleFindings(rules as Record<string, unknown>[]);
+            return json({ type: 'mapping', findings, clean: findings.length === 0 });
         }
 
         // MET-5 version history (before COMPONENT_ONE — these are longer, anchored paths).
@@ -66,6 +125,8 @@ export function componentsHandler(flags: MockFlags): MockHandler {
                 if (!store.get<ComponentDef>(space, coll, id)) {
                     return error(404, `${kind} "${id}" not found`);
                 }
+                const refusal = mappingWriteRefusal(kind, req.body);
+                if (refusal) return error(422, refusal);
                 const saved = putComponent(store, space, kind, req.body, id);
                 emitAudit(store, space, {
                     action: `${kind}.updated`, category: 'config', targetType: kind, targetId: id,
@@ -97,6 +158,8 @@ export function componentsHandler(flags: MockFlags): MockHandler {
                 if (store.get<ComponentDef>(space, componentCollection(kind), id)) {
                     return error(409, `${kind} "${id}" already exists`);
                 }
+                const refusal = mappingWriteRefusal(kind, req.body);
+                if (refusal) return error(422, refusal);
                 const created = putComponent(store, space, kind, req.body);
                 emitAudit(store, space, {
                     action: `${kind}.created`, category: 'config', targetType: kind, targetId: created.name,
@@ -107,6 +170,24 @@ export function componentsHandler(flags: MockFlags): MockHandler {
         }
         return undefined;
     };
+}
+
+/**
+ * The 422 message a mapping write earns, or `null` when it may proceed — mirrors the backend's
+ * `validateKind` gate (S6b), which refuses invalid rules on create AND update. Non-mapping kinds and
+ * a body carrying no `rules` are untouched, exactly as server-side.
+ */
+function mappingWriteRefusal(kind: string, body: unknown): string | null {
+    if (kind !== 'mapping') return null;
+    const rules = (body as Record<string, unknown> | null)?.['rules'];
+    if (rules === undefined) return null;
+    if (!Array.isArray(rules)) return "mapping 'rules' must be a list";
+    if (rules.some((r) => typeof r !== 'object' || r === null || Array.isArray(r)))
+        return "every entry of mapping 'rules' must be an object";
+    const findings = mappingRuleFindings(rules as Record<string, unknown>[]);
+    if (!findings.length) return null;
+    return 'mapping rules are invalid: '
+        + findings.map((f) => (f.fieldPath ? `${f.fieldPath}: ` : '') + f.message).join('; ');
 }
 
 /** Create (POST, id in body) or replace (PUT, id in URL) — mirrors the real id→name split. Exported so

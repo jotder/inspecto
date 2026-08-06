@@ -2,7 +2,10 @@ package com.gamma.etl;
 
 import com.gamma.util.SqlBuilder;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * Pure SQL-expression compiler for {@link DataTransformer}. Turns a single mapping
@@ -50,6 +53,20 @@ public final class TransformCompiler {
             "FILENAME_DATE", TransformCompiler::filenameDate,
             "EXPR",          TransformCompiler::expr
     );
+
+    /**
+     * The transform-type vocabulary this compiler accepts, upper-case, including the implicit
+     * {@code DIRECT} (which {@link #dataColumn} handles before the registry lookup). Exposed so an
+     * authoring-time validator can reject a typo against the SAME set the runtime enforces at
+     * {@link #dataColumn} instead of restating it and drifting.
+     */
+    public static final Set<String> TRANSFORM_TYPES = transformTypes();
+
+    private static Set<String> transformTypes() {
+        Set<String> s = new TreeSet<>(DATA_RULES.keySet());
+        s.add("DIRECT");
+        return Collections.unmodifiableSet(s);
+    }
 
     // ── data columns ────────────────────────────────────────────────────────────
 

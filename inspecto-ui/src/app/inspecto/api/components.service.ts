@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
+import { Finding } from './models';
 
 /** The reusable component-registry kinds (mirrors backend `ComponentStore.WRITABLE_TYPES`). `rule-template`
  *  backs the data-table Pro Max saved query templates; `dataset`/`widget`/`dashboard` back Studio;
@@ -65,6 +66,14 @@ export interface SinkPreview {
     rowCount: number;
     rows: Record<string, unknown>[];
     warnings: string[];
+}
+
+/** Mapping-rule validation result (POST /components/mapping/validate, S6b) — no write, ever. */
+export interface MappingValidation {
+    type: 'mapping';
+    /** Anchored to `rules[N].targetColumn` / `.sourceExpression` / `.transformType`, or blank for the set. */
+    findings: Finding[];
+    clean: boolean;
 }
 
 /** One node in a hierarchical parse preview (ASN.1 / JSON / XML) — a labelled value with optional children. */
@@ -154,6 +163,16 @@ export class ComponentsService {
     /** Scratch-validate a sink against sample rows (store/format/partition checks; no write). */
     testSink(id: string, sampleRows: Record<string, unknown>[]): Observable<SinkPreview> {
         return this.http.post<SinkPreview>(apiUrl(`/components/sink/${encodeURIComponent(id)}/test`), { sampleRows });
+    }
+
+    /**
+     * Validate draft mapping rules WITHOUT writing (S6b) — the import loop's gate. Findings are
+     * anchored to `rules[N].<key>`, which the grid editor maps onto cells. Server-side on purpose:
+     * every rule is a `TransformCompiler` precondition, and a browser-side copy would drift into
+     * accepting a mapping the engine then rejects at run time.
+     */
+    validateMapping(rules: Record<string, unknown>[]): Observable<MappingValidation> {
+        return this.http.post<MappingValidation>(apiUrl('/components/mapping/validate'), { rules });
     }
 
 }
