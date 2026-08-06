@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -214,6 +215,32 @@ public final class ComponentRegistry {
         Map<String, Object> merged = new LinkedHashMap<>(c.content());
         merged.putAll(node.config());
         return merged;
+    }
+
+    /**
+     * {@code g} with every node's {@link #effectiveConfig} in place of its local config — i.e. each
+     * {@code use:} reference resolved into the content it names. Nodes keep their {@code use} (it stays the
+     * provenance); a node with no reference, or an unresolved one, is returned untouched, as is a graph that
+     * needs no rewriting.
+     *
+     * <p>Executing a graph straight from {@link PipelineStore} or {@link PipelineLift} sees only local config,
+     * so a referenced component's content is invisible to it — a {@code transform.map} whose rules live in a
+     * {@code mapping} component would project nothing. Callers that run a graph (rather than just author or
+     * validate it) must resolve first.
+     */
+    public PipelineGraph effectiveGraph(PipelineGraph g) {
+        List<PipelineNode> nodes = new ArrayList<>();
+        boolean rewrote = false;
+        for (PipelineNode n : g.nodes()) {
+            Map<String, Object> eff = effectiveConfig(n);
+            if (eff.equals(n.config())) {
+                nodes.add(n);
+                continue;
+            }
+            nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), eff, n.use()));
+            rewrote = true;
+        }
+        return rewrote ? new PipelineGraph(g.name(), g.active(), nodes, g.edges()) : g;
     }
 
     /**

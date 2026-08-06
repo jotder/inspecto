@@ -40,7 +40,7 @@ public final class TransformCompiler {
     @FunctionalInterface
     public interface ColumnRule {
         String compile(String source, String target, Map<String, String> fieldTypes,
-                       String sourceTable, PipelineConfig cfg);
+                       String sourceTable, PipelineConfig.CsvSettings csv);
     }
 
     /**
@@ -78,25 +78,25 @@ public final class TransformCompiler {
      * {@code EXPER}) fails fast instead of silently degrading to a pass-through.
      */
     public static String dataColumn(Map<String, String> rule, Map<String, String> fieldTypes,
-                                    String sourceTable, PipelineConfig cfg) {
+                                    String sourceTable, PipelineConfig.CsvSettings csv) {
         String source = rule.get("sourceExpression");
         String target = rule.get("targetColumn");
         String type   = rule.get("transformType");
         String norm   = type == null ? "" : type.trim().toUpperCase();
 
         if (norm.isEmpty() || norm.equals("DIRECT"))   // blank / omitted / DIRECT → pass-through cast
-            return direct(source, target, fieldTypes, sourceTable, cfg);
+            return direct(source, target, fieldTypes, sourceTable, csv);
 
         ColumnRule r = DATA_RULES.get(norm);
         if (r == null)
             throw new IllegalArgumentException(
                     "Unknown transformType '" + type + "' for target column '" + target
                     + "'. Valid: DIRECT (or leave blank), EXPR, CONCAT_DT, FILENAME_DATE.");
-        return r.compile(source, target, fieldTypes, sourceTable, cfg);
+        return r.compile(source, target, fieldTypes, sourceTable, csv);
     }
 
     private static String direct(String source, String target, Map<String, String> fieldTypes,
-                                 String sourceTable, PipelineConfig cfg) {
+                                 String sourceTable, PipelineConfig.CsvSettings csv) {
         String col  = "\"" + sourceTable + "\".\"" + source + '"';
         String type = fieldTypes.getOrDefault(source, "VARCHAR");
         StringBuilder sb = new StringBuilder();
@@ -105,9 +105,9 @@ public final class TransformCompiler {
             // already-typed DATE/TIMESTAMP (plugin path) to an ISO string so
             // TRY_STRPTIME always receives a string argument.
             case "TIMESTAMP" -> SqlBuilder.appendCoalesce(sb,
-                    "CAST(" + col + " AS VARCHAR)", cfg.csv().tsFormats(), "TIMESTAMP");
+                    "CAST(" + col + " AS VARCHAR)", csv.tsFormats(), "TIMESTAMP");
             case "DATE"      -> SqlBuilder.appendCoalesce(sb,
-                    "CAST(" + col + " AS VARCHAR)", cfg.csv().dateFormats(), "DATE");
+                    "CAST(" + col + " AS VARCHAR)", csv.dateFormats(), "DATE");
             case "DOUBLE"    -> sb.append("TRY_CAST(").append(col).append(" AS DOUBLE)");
             default          -> sb.append(col);
         }
@@ -124,23 +124,23 @@ public final class TransformCompiler {
      * as the Stage-2 transform SQL), so the expression is not sandbox-validated.
      */
     private static String expr(String source, String target, Map<String, String> fieldTypes,
-                               String sourceTable, PipelineConfig cfg) {
+                               String sourceTable, PipelineConfig.CsvSettings csv) {
         return source;
     }
 
     private static String concatDt(String source, String target, Map<String, String> fieldTypes,
-                                   String sourceTable, PipelineConfig cfg) {
+                                   String sourceTable, PipelineConfig.CsvSettings csv) {
         String[] parts  = source.split("\\|", 2);
         String dateCol  = "\"" + sourceTable + "\".\"" + parts[0] + '"';
         String timeCol  = "\"" + sourceTable + "\".\"" + parts[1] + '"';
         StringBuilder sb = new StringBuilder();
         SqlBuilder.appendCoalesce(sb,
-                dateCol + " || ' ' || " + timeCol, cfg.csv().tsFormats(), "TIMESTAMP");
+                dateCol + " || ' ' || " + timeCol, csv.tsFormats(), "TIMESTAMP");
         return sb.toString();
     }
 
     private static String filenameDate(String source, String target, Map<String, String> fieldTypes,
-                                       String sourceTable, PipelineConfig cfg) {
+                                       String sourceTable, PipelineConfig.CsvSettings csv) {
         if (!"EVENT_DATE".equals(target)) {
             throw new IllegalArgumentException(
                     "FILENAME_DATE transform is only supported for the EVENT_DATE column, got: " + target);
@@ -168,7 +168,7 @@ public final class TransformCompiler {
      * either way.
      */
     public static String partitionColumn(PartitionDef pd, String sourceTable,
-                                         Map<String, String> fieldTypes, PipelineConfig cfg) {
+                                         Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv) {
         String col = "\"" + sourceTable + "\".\"" + pd.source() + "\"";
         StringBuilder sb = new StringBuilder();
         switch (pd.type()) {
@@ -182,7 +182,7 @@ public final class TransformCompiler {
                 String castType    = "TIMESTAMP".equals(srcType) ? "TIMESTAMP" : "DATE";
                 String varcharExpr = "CAST(" + col + " AS VARCHAR)";
                 String dateExpr = SqlBuilder.buildCastExpr(varcharExpr, castType,
-                        cfg.csv().dateFormats(), cfg.csv().tsFormats());
+                        csv.dateFormats(), csv.tsFormats());
                 switch (pd.type()) {
                     case DATE_YEAR  -> sb.append("YEAR(").append(dateExpr).append(")::VARCHAR");
                     case DATE_MONTH -> sb.append("LPAD(MONTH(").append(dateExpr)

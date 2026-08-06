@@ -10,6 +10,7 @@ import com.gamma.util.DuckDbUtil;
 import java.io.File;
 import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,6 +53,7 @@ public final class PipelineDryRun {
     public static Result run(PipelineGraph g, List<Map<String, Object>> sampleRows) throws Exception {
         if (sampleRows == null || sampleRows.isEmpty())
             throw new IllegalArgumentException("at least one sample row is required");
+        g = withMappingContext(g);
         String seedNode = seedNodeOf(g);
         List<String> columns = ScratchTables.columnsOf(sampleRows);
 
@@ -86,6 +88,40 @@ public final class PipelineDryRun {
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
+    }
+
+    /**
+     * Put the parser node's {@code csv} settings within reach of each {@code transform.map} node that carries
+     * mapping rules instead of authored {@code columns} — either a legacy {@code schema}, the shape
+     * {@link com.gamma.pipeline.PipelineLift} produces for a registered pipeline, or the {@code rules} a
+     * resolved {@code mapping} component contributed. {@link RowShaper} compiles them through the legacy
+     * authority, which parses DATE/TIMESTAMP sources with the pipeline's configured format lists; a lifted graph
+     * keeps them on the parser node, out of the map node's reach. Without this, a dry-run of any registered
+     * pipeline with a schema fails on its map node.
+     *
+     * <p>In-memory only — the stored graph is never rewritten, and a graph that needs nothing is returned as is.
+     */
+    private static PipelineGraph withMappingContext(PipelineGraph g) {
+        Object csv = null;
+        for (PipelineNode n : g.nodes())
+            if (BuiltinNodeType.PARSER.type().equals(n.type()) && n.cfg("csv") != null) csv = n.cfg("csv");
+        if (csv == null) return g;
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        boolean rewrote = false;
+        for (PipelineNode n : g.nodes()) {
+            if (BuiltinNodeType.TRANSFORM_MAP.type().equals(n.type())
+                    && (n.cfg("schema") != null || n.cfg("rules") != null)
+                    && n.cfg("columns") == null && n.cfg("csv") == null) {
+                Map<String, Object> c = new LinkedHashMap<>(n.config());
+                c.put("csv", csv);
+                nodes.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+                rewrote = true;
+            } else {
+                nodes.add(n);
+            }
+        }
+        return rewrote ? new PipelineGraph(g.name(), g.active(), nodes, g.edges()) : g;
     }
 
     /** Seed the sample at the parser node (its {@code data} output) if present, else the first entry node. */

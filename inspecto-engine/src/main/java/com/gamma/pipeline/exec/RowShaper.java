@@ -1,6 +1,8 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.etl.DataTransformer;
+import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
@@ -186,15 +188,19 @@ public final class RowShaper {
 
     /** The {@code SELECT … FROM <input>} for a projection node over the table {@code input} (reused by {@link #fuse}). */
     private static String projectionSelect(PipelineNode node, String input) {
-        return projectionSelectFrom(node, q(input));
+        return projectionSelectFrom(node, q(input), input);
     }
 
-    /** As {@link #projectionSelect}, but over a pre-rendered FROM target (a quoted table, or a {@code (subquery) AS _t}). */
+    /**
+     * As {@link #projectionSelect}, but over a pre-rendered FROM target (a quoted table, or a
+     * {@code (subquery) AS _t}). {@code sourceTable} is that target's bare identifier — derived mapping
+     * expressions qualify their column references with it, so it must match what {@code fromTarget} reads.
+     */
     @SuppressWarnings("unchecked")
-    private static String projectionSelectFrom(PipelineNode node, String fromTarget) {
+    private static String projectionSelectFrom(PipelineNode node, String fromTarget, String sourceTable) {
         String type = node.type();
-        Object colsRaw = node.cfg("columns");
-        if (!(colsRaw instanceof List<?> cols) || cols.isEmpty())
+        List<?> cols = columnsOf(node, sourceTable);
+        if (cols == null || cols.isEmpty())
             throw new IllegalArgumentException(type + " node '" + node.id() + "' needs a non-empty 'columns' list");
         StringBuilder sel = new StringBuilder("SELECT ");
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)) {           // narrow to named columns
@@ -217,6 +223,46 @@ public final class RowShaper {
     }
 
     /**
+     * A projection node's {@code columns}, or — for a {@code transform.map} lifted from a legacy config,
+     * which carries the schema itself rather than authored columns ({@code PipelineLift} keeps legacy
+     * sub-records verbatim) — the schema's mapping rules compiled to {@code [{name, expr}]} by
+     * {@link DataTransformer#dataColumns}, the same authority the legacy engine's own SELECT uses.
+     *
+     * <p>Returns {@code null} when neither is available, leaving the caller to raise its own error. The
+     * {@code csv} settings are required because DATE/TIMESTAMP rules parse with the pipeline's configured
+     * format lists; a lifted graph carries them on the sibling parser node, so whoever runs the graph
+     * must put them within the map node's reach (see {@code PipelineDryRun}).
+     */
+    private static List<?> columnsOf(PipelineNode node, String sourceTable) {
+        if (node.cfg("columns") instanceof List<?> authored && !authored.isEmpty()) return authored;
+        if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(node.type())) return null;
+        Map<String, Object> schema = mappingSchemaOf(node);
+        if (schema == null) return null;
+        if (!(node.cfg("csv") instanceof PipelineConfig.CsvSettings csv))
+            throw new IllegalArgumentException("transform.map node '" + node.id()
+                    + "' carries mapping rules but no 'csv' settings to compile them with");
+        return DataTransformer.dataColumns(schema, csv, sourceTable);
+    }
+
+    /**
+     * The {@code {raw.fields, mapping.rules}} map to compile a map node's projection from: a legacy
+     * {@code schema} carried verbatim by a lifted config, or — for a node whose rules come from a
+     * {@code mapping} component, whose content is {@code {name, rules}} — those rules with no declared field
+     * types, which is honest: a mapping component carries none, so every {@code DIRECT} rule is a plain
+     * reference. A node with both prefers the schema, the richer of the two.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> mappingSchemaOf(PipelineNode node) {
+        if (node.cfg("schema") instanceof Map<?, ?> s
+                && s.get("mapping") instanceof Map<?, ?> m
+                && m.get("rules") instanceof List<?> schemaRules && !schemaRules.isEmpty())
+            return (Map<String, Object>) s;
+        if (node.cfg("rules") instanceof List<?> rules && !rules.isEmpty())
+            return Map.of("raw", Map.of("fields", List.of()), "mapping", Map.of("rules", rules));
+        return null;
+    }
+
+    /**
      * <b>T32 follow-up — compile a SIMPLE node to a single {@code SELECT} over {@code innerSql}</b> (a subquery),
      * used to capture a {@code sink.view}'s {@code derived_sql} along a linear path. Handles
      * {@code filter}/{@code map}/{@code select}/{@code derive} (each a single-relation, single-SELECT op);
@@ -236,7 +282,7 @@ public final class RowShaper {
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) {
             try {
-                return Optional.of(projectionSelectFrom(node, from));
+                return Optional.of(projectionSelectFrom(node, from, "_t"));
             } catch (RuntimeException e) {
                 return Optional.empty();
             }

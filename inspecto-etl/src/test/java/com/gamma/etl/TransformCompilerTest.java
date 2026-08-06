@@ -19,11 +19,12 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TransformCompilerTest {
 
-    private static PipelineConfig cfg(Path dir) throws Exception {
+    private static PipelineConfig.CsvSettings cfg(Path dir) throws Exception {
         return TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema())
                 .dateFormats("\"%Y-%m-%d\"")
                 .tsFormats("\"%Y-%m-%d %H:%M:%S\"")
-                .load();
+                .load()
+                .csv();
     }
 
     private static final Map<String, String> TYPES = Map.of(
@@ -82,7 +83,7 @@ class TransformCompilerTest {
 
     @Test
     void exprPassesThroughVerbatim(@TempDir Path dir) throws Exception {
-        PipelineConfig cfg = cfg(dir);
+        PipelineConfig.CsvSettings cfg = cfg(dir);
         // EXPR emits the sourceExpression as-is; unqualified columns resolve against raw_input.
         assertEquals("UPPER(TRIM(X))",
                 TransformCompiler.dataColumn(rule("UPPER(TRIM(X))", "OUT", "EXPR"), TYPES, "raw_input", cfg));
@@ -94,7 +95,7 @@ class TransformCompilerTest {
     @Test
     void unknownTransformTypeThrows(@TempDir Path dir) throws Exception {
         // A non-blank, unrecognised type (typo) fails fast rather than silently degrading to DIRECT.
-        PipelineConfig cfg = cfg(dir);
+        PipelineConfig.CsvSettings cfg = cfg(dir);
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () ->
                 TransformCompiler.dataColumn(rule("X", "OUT", "EXPER"), TYPES, "raw_input", cfg));
         assertTrue(e.getMessage().contains("EXPER"), e.getMessage());
@@ -116,7 +117,7 @@ class TransformCompilerTest {
 
     @Test
     void filenameDateRejectsNonEventDateTarget(@TempDir Path dir) throws Exception {
-        PipelineConfig cfg = cfg(dir);
+        PipelineConfig.CsvSettings cfg = cfg(dir);
         assertThrows(IllegalArgumentException.class, () ->
                 TransformCompiler.dataColumn(rule("F|data_|%Y%m%d", "OTHER", "FILENAME_DATE"),
                         TYPES, "raw_input", cfg));
@@ -133,7 +134,7 @@ class TransformCompilerTest {
 
     @Test
     void partitionDoubleAndInteger(@TempDir Path dir) throws Exception {
-        PipelineConfig cfg = cfg(dir);
+        PipelineConfig.CsvSettings cfg = cfg(dir);
         assertEquals("TRY_CAST(\"raw_input\".\"N\" AS DOUBLE)",
                 TransformCompiler.partitionColumn(new PartitionDef("n", "N", PartitionDef.Type.DOUBLE),
                         "raw_input", TYPES, cfg));
@@ -145,7 +146,7 @@ class TransformCompilerTest {
     @Test
     void partitionDateComponents(@TempDir Path dir) throws Exception {
         // A non-TIMESTAMP source (DT is untyped → VARCHAR) parses via date_formats.
-        PipelineConfig cfg = cfg(dir);
+        PipelineConfig.CsvSettings cfg = cfg(dir);
         String dateExpr = "COALESCE(TRY_STRPTIME(CAST(\"raw_input\".\"DT\" AS VARCHAR), '%Y-%m-%d'))::DATE";
         assertEquals("YEAR(" + dateExpr + ")::VARCHAR",
                 TransformCompiler.partitionColumn(new PartitionDef("year", "DT", PartitionDef.Type.DATE_YEAR),
@@ -162,7 +163,7 @@ class TransformCompilerTest {
     void partitionTimestampSourceUsesTimestampFormats(@TempDir Path dir) throws Exception {
         // A TIMESTAMP-typed source (T) must parse via timestamp_formats, not date_formats — otherwise
         // a value like "2018-04-09-00.00.00" fails a date-only parse and lands in the 1900 sentinel.
-        PipelineConfig cfg = cfg(dir);
+        PipelineConfig.CsvSettings cfg = cfg(dir);
         String tsExpr = "COALESCE(TRY_STRPTIME(CAST(\"raw_input\".\"T\" AS VARCHAR), "
                 + "'%Y-%m-%d %H:%M:%S'))::TIMESTAMP";
         assertEquals("YEAR(" + tsExpr + ")::VARCHAR",

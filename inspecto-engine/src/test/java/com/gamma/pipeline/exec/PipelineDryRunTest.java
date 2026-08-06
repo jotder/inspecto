@@ -1,15 +1,23 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
+import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.gamma.etl.TestConfigs.csv;
 import static org.junit.jupiter.api.Assertions.*;
 
 /** {@link PipelineDryRun} (T18): a bounded sample through a flow's transform→sink subgraph, scratch-only. */
@@ -53,6 +61,75 @@ class PipelineDryRunTest {
         assertEquals("big", sink.store());
         assertEquals(2, sink.rowCount());                        // the sink receives the filter's data branch
         assertFalse(sink.rows().isEmpty());
+    }
+
+    /**
+     * A <b>registered</b> pipeline dry-runs too. Its graph comes from {@link com.gamma.pipeline.PipelineLift},
+     * whose {@code transform.map} node carries the legacy {@code schema} rather than authored {@code columns} —
+     * which used to throw {@code needs a non-empty 'columns' list} (surfaced by the route as a misleading 400),
+     * making dry-run unusable for every pipeline that has a schema.
+     *
+     * <p>The sample carries an extra {@code JUNK} column the mapping does not name, and a text {@code AMT}: a
+     * pass-through would keep {@code JUNK} and leave {@code AMT} a string, so dropping it and typing {@code AMT}
+     * as a {@code DOUBLE} is what proves the schema's mapping rules were really compiled and projected.
+     */
+    @Test
+    void runsSampleThroughALiftedRegisteredPipeline(@TempDir Path dir) throws Exception {
+        PipelineGraph g = PipelineLift.lift(csv(dir, PipelineConfigBatchTest.miniSchema()).load());
+
+        Map<String, Object> sample = new LinkedHashMap<>();
+        sample.put("ID", "a1");
+        sample.put("AMT", "12.50");
+        sample.put("EVENT_DATE", "2026-01-15");
+        sample.put("JUNK", "not mapped");
+
+        PipelineDryRun.Result r = PipelineDryRun.run(g, List.of(sample));
+
+        assertEquals("parse", r.seedNode());                     // lifted graphs always have a parser
+        PipelineDryRun.NodeDryRun map = node(r, "map");
+        assertEquals(1, relCount(map, PipelineRel.DATA));
+
+        Map<String, Object> out = map.relations().get(0).rows().get(0);
+        assertEquals(List.of("ID", "AMT", "EVENT_DATE"), List.copyOf(out.keySet()),
+                "the mapping's target columns, in rule order — JUNK is not one of them");
+        assertEquals(12.5, out.get("AMT"));                      // DOUBLE field ⇒ TRY_CAST, not the raw string
+    }
+
+    /**
+     * A {@code transform.map} whose rules live in a {@code mapping} component projects those rules. Nothing
+     * resolved {@code use:} references before a run — {@code ComponentRegistry.effectiveConfig} existed but had
+     * no production caller — so a referenced mapping was invisible to the executor and the node projected
+     * nothing at all. The registry resolves the graph first; {@code PipelineDryRun} then finds the rules the
+     * component contributed.
+     */
+    @Test
+    void dryRunProjectsAMappingComponentsRules(@TempDir Path root, @TempDir Path cfgDir) throws Exception {
+        Files.createDirectories(root.resolve("mappings"));
+        Files.writeString(root.resolve("mappings/std.csv"), """
+                targetColumn,sourceExpression,transformType
+                ID,ID,DIRECT
+                DOUBLED,TRY_CAST(AMT AS DOUBLE) * 2,EXPR
+                """);
+        // the csv settings the map node needs come off the parser node, as they do in a lifted graph
+        PipelineConfig.CsvSettings csv = csv(cfgDir, PipelineConfigBatchTest.miniSchema()).load().csv();
+
+        PipelineGraph g = new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("parse", "parser", Map.of("csv", csv)),
+                        new PipelineNode("map", "transform.map", null, null, Map.of(), "mapping/std"),
+                        new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
+                List.of(PipelineEdge.data("parse", "map"), PipelineEdge.data("map", "sink")));
+
+        Map<String, Object> sample = new LinkedHashMap<>();
+        sample.put("ID", "a1");
+        sample.put("AMT", "12.50");
+
+        PipelineDryRun.Result r =
+                PipelineDryRun.run(ComponentRegistry.scan(root).effectiveGraph(g), List.of(sample));
+
+        Map<String, Object> out = node(r, "map").relations().get(0).rows().get(0);
+        assertEquals(List.of("ID", "DOUBLED"), List.copyOf(out.keySet()), "the component's target columns");
+        assertEquals("a1", out.get("ID"));
+        assertEquals(25.0, out.get("DOUBLED"));       // the EXPR rule really ran
     }
 
     @Test

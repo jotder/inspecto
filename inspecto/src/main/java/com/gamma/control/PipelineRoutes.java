@@ -1093,12 +1093,22 @@ final class PipelineRoutes implements RouteModule {
         if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
         if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         try {
-            return PipelineDryRun.run(g, ApiContext.sampleRows(body));
+            return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body));
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (Exception e) {
             throw new ApiException(422, "dry-run failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * The component registry backing {@code use:} resolution for a run. Reads only, and a space with writes
+     * disabled simply resolves nothing — the same null-tolerant read-store shape the other routes use, since a
+     * dry-run over a graph with no references must still work.
+     */
+    private static ComponentRegistry componentRegistry(ApiContext api) {
+        Path root = api.writeRoot();
+        return root == null ? ComponentRegistry.empty() : ComponentRegistry.scan(root.resolve("registry"));
     }
 
     /**

@@ -92,19 +92,16 @@ public final class DataTransformer {
         for (Map<String, Object> f : fields)
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
 
-        List<Map<String, String>> rules =
-                (List<Map<String, String>>) ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
-
         StringBuilder select = new StringBuilder("SELECT ");
 
         // ── mapped data columns ───────────────────────────────────────────────
-        // Per-column expression generation is delegated to TransformCompiler (a
-        // transformType → function registry); this method only assembles the SELECT.
-        for (int i = 0; i < rules.size(); i++) {
-            Map<String, String> rule = rules.get(i);
-            select.append(TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, cfg));
-            select.append(" AS \"").append(rule.get("targetColumn")).append('"');
-            if (i < rules.size() - 1) select.append(", ");
+        // The per-rule expressions come from dataColumns() — the same list the graph
+        // executor projects with — so the two paths cannot drift.
+        List<Map<String, Object>> cols = dataColumns(schemaConfig, cfg.csv(), sourceTable);
+        for (int i = 0; i < cols.size(); i++) {
+            select.append(cols.get(i).get("expr"));
+            select.append(" AS \"").append(cols.get(i).get("name")).append('"');
+            if (i < cols.size() - 1) select.append(", ");
         }
 
         // ── partition columns ─────────────────────────────────────────────────
@@ -115,7 +112,7 @@ public final class DataTransformer {
         } else {
             for (PartitionDef pd : partDefs) {
                 select.append(", ");
-                select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, cfg));
+                select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, cfg.csv()));
                 select.append(" AS \"").append(pd.column()).append('"');
             }
         }
@@ -124,5 +121,37 @@ public final class DataTransformer {
         select.append(", \"").append(sourceTable).append("\".\"__src_id\" AS __src_id");
         select.append(" FROM \"").append(sourceTable).append('"');
         return select.toString();
+    }
+
+    /**
+     * The schema's mapping rules as an ordered {@code [{name, expr}]} list — one entry per rule,
+     * {@code name} the target column and {@code expr} its DuckDB scalar expression (no {@code AS}).
+     *
+     * <p>Extracted from {@link #selectFor}, which now assembles its SELECT from this same list, so the
+     * legacy engine and the graph executor's {@code transform.map} projection compile every rule through
+     * one code path instead of two that can drift. Deliberately <b>data columns only</b>: partition
+     * columns and the {@code __src_id} lineage tag are not per-rule output and stay in {@code selectFor}
+     * (in the graph model they belong to the sink node, not to {@code transform.map}).
+     *
+     * <p>Pure. {@code sourceTable} qualifies every column reference, so it must name the table the
+     * caller's {@code FROM} actually reads.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Map<String, Object>> dataColumns(Map<String, Object> schemaConfig,
+                                                       PipelineConfig.CsvSettings csv, String sourceTable) {
+        List<Map<String, Object>> fields =
+                (List<Map<String, Object>>) ((Map<String, Object>) schemaConfig.get("raw")).get("fields");
+        Map<String, String> fieldTypes = new LinkedHashMap<>();
+        for (Map<String, Object> f : fields)
+            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+
+        List<Map<String, String>> rules =
+                (List<Map<String, String>>) ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
+
+        List<Map<String, Object>> cols = new ArrayList<>();
+        for (Map<String, String> rule : rules)
+            cols.add(Map.of("name", rule.get("targetColumn"),
+                    "expr", TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, csv)));
+        return cols;
     }
 }

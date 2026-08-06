@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -61,6 +62,29 @@ class ComponentRegistryTest {
         // unresolved use: ⇒ degrades to local config (caller flags the dangling ref)
         PipelineNode dangling = new PipelineNode("r", "parser", null, null, Map.of("k", 2), "grammar/nope");
         assertEquals(Map.of("k", 2), reg.effectiveConfig(dangling));
+    }
+
+    @Test
+    void effectiveGraphResolvesEveryNodesRefAndLeavesTheRestAlone(@TempDir Path root) throws Exception {
+        writeComponent(root, "grammars", "g.toon", "name: pipe\ndelimiter: \"|\"\n");
+        ComponentRegistry reg = ComponentRegistry.scan(root);
+
+        PipelineNode parse = new PipelineNode("p", "parser", null, null, Map.of("extra", "x"), "grammar/pipe");
+        PipelineNode plain = PipelineNode.of("s", "sink.persistent", Map.of("store", "out"));
+        PipelineGraph g = new PipelineGraph("demo", true, List.of(parse, plain),
+                List.of(PipelineEdge.data("p", "s")));
+
+        PipelineGraph resolved = reg.effectiveGraph(g);
+
+        PipelineNode p = resolved.node("p").orElseThrow();
+        assertEquals("|", p.cfg("delimiter"), "the referenced component's content is now in the node's config");
+        assertEquals("x", p.cfg("extra"));
+        assertEquals("grammar/pipe", p.use(), "the ref stays as provenance");
+        assertSame(plain, resolved.node("s").orElseThrow(), "a node with no ref is untouched");
+
+        // a graph that needs no rewriting comes back as the same instance
+        PipelineGraph refless = new PipelineGraph("d2", true, List.of(plain), List.of());
+        assertSame(refless, reg.effectiveGraph(refless));
     }
 
     @Test
