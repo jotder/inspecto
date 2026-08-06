@@ -16,7 +16,10 @@ export interface Refusal {
 const LOWERABLE = new Set([
     'acquisition', 'parser', 'gap', 'transform.dedup.marker',
     'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
-    'transform.route',   // route: block — authoring-only until the executor lands (mirrors backend S3)
+    'transform.route',     // route: block — authoring-only until the executor lands (mirrors backend S3)
+    'transform.dedup',     // record-grain dedup → processing.dedup (ELT P2)
+    'transform.summarize', // group-by rollup → processing.summarize (ELT P3), authoring-only
+    'transform.join',      // reference join → processing.join (ELT P3 S2), authoring-only
 ]);
 
 type Cfg = Record<string, unknown>;
@@ -143,6 +146,35 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         sinkUpstream = 'filter';
     }
 
+    // Reference join (processing.join) sits right after the parse/filter stretch — dedup/summarize
+    // downstream see the enriched row set (mirrors PipelineLift; authoring-only, like route below).
+    const join = asMap(processing['join']);
+    if (processing['join'] != null) {
+        const jc: Cfg = { reference: join['reference'], on: join['on'] };
+        nodes.push({ id: 'join', type: 'transform.join', name: 'Join', config: jc });
+        edges.push({ from: sinkUpstream, rel: 'data', to: 'join' });
+        sinkUpstream = 'join';
+    }
+
+    // Record-grain dedup (processing.dedup) sits between the parse stretch and the sink(s).
+    const dedup = asMap(processing['dedup']);
+    if (processing['dedup'] != null) {
+        const dc: Cfg = { keys: dedup['keys'] };
+        if (dedup['order_by'] != null) dc['order_by'] = dedup['order_by'];
+        nodes.push({ id: 'dedup', type: 'transform.dedup', name: 'Dedup (record)', config: dc });
+        edges.push({ from: sinkUpstream, rel: 'data', to: 'dedup' });
+        sinkUpstream = 'dedup';
+    }
+
+    // Group-by rollup (processing.summarize) sits after dedup, before any route (authoring-only).
+    const summarize = asMap(processing['summarize']);
+    if (processing['summarize'] != null) {
+        const sc: Cfg = { group_by: summarize['group_by'], measures: summarize['measures'] };
+        nodes.push({ id: 'summarize', type: 'transform.summarize', name: 'Summarize', config: sc });
+        edges.push({ from: sinkUpstream, rel: 'data', to: 'summarize' });
+        sinkUpstream = 'summarize';
+    }
+
     // route: block — lifts as a transform.route node whose route:<key> edges feed the sinks,
     // branch↔sink pairing by the branch's declared destination database (mirrors PipelineLift).
     const routeCfg = config['route'] != null ? structuredClone(asMap(config['route'])) : null;
@@ -202,6 +234,7 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     const refusals: Refusal[] = [];
     let acq: AuthoredNode | undefined, parser: AuthoredNode | undefined, gap: AuthoredNode | undefined;
     let marker: AuthoredNode | undefined, routeNode: AuthoredNode | undefined;
+    let recordDedup: AuthoredNode | undefined, summarizeNode: AuthoredNode | undefined, joinNode: AuthoredNode | undefined;
     let primarySink: AuthoredNode | undefined, quarantine: AuthoredNode | undefined;
     const filters: AuthoredNode[] = [];
     // Distinct output destinations keyed by database dir (order-preserving). One => the single
@@ -218,6 +251,9 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
         else if (n.type === 'transform.route') routeNode = n;
+        else if (n.type === 'transform.dedup') recordDedup = n;
+        else if (n.type === 'transform.summarize') summarizeNode = n;
+        else if (n.type === 'transform.join') joinNode = n;
         else if (n.type === 'transform.filter') filters.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
@@ -272,6 +308,36 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     } else if (strict) {
         delete processing['duplicate_check'];
         delete dirs['markers'];
+    }
+
+    // record-grain dedup → processing.dedup ({keys, order_by} — the QUALIFY the engine applies)
+    if (recordDedup) {
+        const dd: Cfg = {};
+        if (recordDedup.config?.['keys'] != null) dd['keys'] = recordDedup.config['keys'];
+        if (recordDedup.config?.['order_by'] != null) dd['order_by'] = recordDedup.config['order_by'];
+        processing['dedup'] = dd;
+    } else if (strict) {
+        delete processing['dedup'];
+    }
+
+    // reference join → processing.join ({reference, on}) — authoring-only (ELT P3 S2, D-4)
+    if (joinNode) {
+        const jn: Cfg = {};
+        if (joinNode.config?.['reference'] != null) jn['reference'] = joinNode.config['reference'];
+        if (joinNode.config?.['on'] != null) jn['on'] = joinNode.config['on'];
+        processing['join'] = jn;
+    } else if (strict) {
+        delete processing['join'];
+    }
+
+    // group-by rollup → processing.summarize ({group_by, measures}) — authoring-only (ELT P3)
+    if (summarizeNode) {
+        const sm: Cfg = {};
+        if (summarizeNode.config?.['group_by'] != null) sm['group_by'] = summarizeNode.config['group_by'];
+        if (summarizeNode.config?.['measures'] != null) sm['measures'] = summarizeNode.config['measures'];
+        processing['summarize'] = sm;
+    } else if (strict) {
+        delete processing['summarize'];
     }
 
     // route: block — node config verbatim, each branch stamped with the destination database its

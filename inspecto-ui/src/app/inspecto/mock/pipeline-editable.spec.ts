@@ -128,3 +128,71 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
         expect((res as { config: Record<string, unknown> }).config['parsing']).toBeDefined();
     });
 });
+
+/**
+ * Parity guard for the processing-key transform nodes the server lowers (PipelineEditable.LOWERABLE):
+ * transform.dedup → processing.dedup {keys, order_by}, transform.join → processing.join
+ * {reference, on}, transform.summarize → processing.summarize {group_by, measures}. The mock used to
+ * refuse all three with UNSUPPORTED_NODE — stricter than the server, so the offline editor blocked
+ * graphs the real backend accepts. Each case pins lift → lower verbatim round-trip + strict removal.
+ */
+describe('mock pipeline-editable — processing-key transforms (dedup / join / summarize)', () => {
+    const processedConfig = () => ({
+        name: 'PK',
+        active: false,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'PARQUET' },
+        collector: { connector: 'local' },
+        parsing: { grammar: 'grammar/pipe' },
+        processing: {
+            join: { reference: 'reference/rates', on: 'currency' },
+            dedup: { keys: ['call_id'], order_by: 'event_ts DESC' },
+            summarize: { group_by: ['region'], measures: ['sum(amount)'] },
+        },
+    });
+
+    it('lifts the three processing keys as nodes in the server order (join → dedup → summarize)', () => {
+        const g = liftConfig(processedConfig());
+        const chain = g.nodes.map((n) => n.type);
+        const join = chain.indexOf('transform.join');
+        const dedup = chain.indexOf('transform.dedup');
+        const summarize = chain.indexOf('transform.summarize');
+        expect(join).toBeGreaterThan(-1);
+        expect(dedup).toBeGreaterThan(join);
+        expect(summarize).toBeGreaterThan(dedup);
+        expect(g.nodes.find((n) => n.type === 'transform.join')!.config).toEqual({ reference: 'reference/rates', on: 'currency' });
+        expect(g.nodes.find((n) => n.type === 'transform.dedup')!.config).toEqual({ keys: ['call_id'], order_by: 'event_ts DESC' });
+        expect(g.nodes.find((n) => n.type === 'transform.summarize')!.config).toEqual({ group_by: ['region'], measures: ['sum(amount)'] });
+    });
+
+    it('lowers all three back verbatim — no UNSUPPORTED_NODE, keys byte-stable', () => {
+        const existing = processedConfig();
+        const g = liftConfig(existing);
+        const res = lowerGraph(g, existing, true);
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
+        expect(processing['join']).toEqual({ reference: 'reference/rates', on: 'currency' });
+        expect(processing['dedup']).toEqual({ keys: ['call_id'], order_by: 'event_ts DESC' });
+        expect(processing['summarize']).toEqual({ group_by: ['region'], measures: ['sum(amount)'] });
+    });
+
+    it('strict lower removes the processing key when its node was deleted (mirrors the server else-if-strict)', () => {
+        const existing = processedConfig();
+        const g = liftConfig(existing);
+        g.nodes = g.nodes.filter((n) => n.type !== 'transform.summarize');
+        g.edges = g.edges.filter((e) => e.from !== 'summarize' && e.to !== 'summarize');
+        // reconnect dedup → route/sink stretch: dedup fed summarize, summarize fed the sink
+        g.edges.push({ from: 'dedup', rel: 'data', to: 'sink' });
+
+        const strict = lowerGraph(g, existing, true);
+        expect('config' in strict, JSON.stringify(strict)).toBe(true);
+        const sp = (strict as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
+        expect(sp['summarize']).toBeUndefined();
+        expect(sp['dedup']).toEqual({ keys: ['call_id'], order_by: 'event_ts DESC' }); // siblings untouched
+
+        // non-strict merge must NOT drop a key it was never given
+        const lax = lowerGraph(g, processedConfig(), false);
+        const lp = (lax as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
+        expect(lp['summarize']).toEqual({ group_by: ['region'], measures: ['sum(amount)'] });
+    });
+});
