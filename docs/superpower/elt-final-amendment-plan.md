@@ -962,6 +962,72 @@ rows. Full reactor green (666 tests in inspecto-engine, 200 in inspecto, 0 failu
 remaining: S3 (edge-grain counters — legacy-lane dedup/filter/quarantine counts + provenance
 extension), S4 (per-Step `enabled:` park/drain, D-13) — S4 is gated on this slice per §2.7 cost 3.**
 
+**P4 S3 SHIPPED 2026-08-06** — edge-grain counters, in two parts per the grounding's own split
+between "the substrate already exists" and "the legacy lane genuinely has none":
+1. **Executor lane**: `ConservationCheck` gained `RelFlow` + `relFlows(counts)` — the per-`(node,
+   rel)` breakdown underneath `imbalances()`'s existing per-node aggregation, tagging each flow
+   `diverted` when its `rel` is a §2.6 reject stream (`dropped`/`invalid`/`duplicate`/`unmatched`)
+   rather than the main trunk or a named `route:*` branch (ordinary content-routing, not
+   diversion). Pure and additive — `imbalances()`'s contract is untouched (existing tests still
+   pin it). The provenance substrate (`ProvenanceCollector`/`ProvenanceRow`) already carried this
+   at `(node,rel)` grain; the finding was that nothing exposed it as such — `relFlows` is that
+   exposure, for a Pipeline Document or per-file drill-down to show *which* edge carried the
+   diverted rows.
+2. **Legacy lane**: `BatchIngestStrategy.applyRecordDedup` (the CSV-ingest dedup QUALIFY) only
+   logged its drop count via SLF4J — the method's own comment flagged this as deferred Phase-4
+   work. It has no `PipelineGraph`/provenance context to record against (confirmed: no per-node
+   graph exists in this lane), so persisting durably needed a different seam than
+   `DbProvenanceStore`. New `EventType.DEDUP_RECORDS_DROPPED` (mirrors `SEQUENCE_GAP`/
+   `PIPELINE_CONSERVATION_IMBALANCE`'s own idiom — `EventLog.current()`, correctly MDC-routed to
+   the calling space with no new plumbing) carries `keys`/`dropped` attrs + the batch id as
+   `correlationId`; already queryable via the existing `GET /events/search?type=` route — no new
+   API. Filter/quarantine counts stay ungrounded, confirmed genuinely absent (no `where` clause
+   exists anywhere in the legacy lane at all, and quarantine is file-grain only) — nothing to
+   persist because nothing is computed; not a gap this slice manufactures work to fill. Tests:
+   `ConservationCheckTest` (+1), `RecordDedupExecutionTest` (+1, asserting the durable event).
+   Full reactor green.
+
+**Phase 4 S4 — per-Step `enabled:` park/drain: DESIGN SPIKE 2026-08-06, DEFERRED (mirrors the
+Phase 3 S3 pattern — a documented gap, not a forced slice).** Checked whether even compile-only
+authoring support (`RecipeCompiler` accepting a Step-level `enabled: false`) could ship the way
+Phase 3's S1/S2 did. It cannot, for three independent reasons, each confirmed by direct grounding:
+
+1. **The full park/drain semantics D-13 promises do not exist in any form.** `PipelineNode.
+   enabled()` (`PipelineNode.java:63-74`) is a pure in-memory bypass — `PipelineExecutor.java:135,
+   187` `continue`s past a disabled node, so it (and anything reachable only through it) simply
+   never enters `produced`; a disabled sink never enters `sinkInputs`, so its branch is never
+   committed at all (`PipelineExecutorTest.disabledSinkIsNotCommittedAsABranch` pins exactly this
+   skip-and-vanish contract). There is no `PARKED` state (confirmed absent from the Phase-4-S2
+   `FileStage` enum this slice would need to extend), no store for it, and no drain/resume
+   scheduler that would re-enter execution from a parked boundary when the Step re-enables.
+2. **`BatchGraphRunner` — the only thing that could execute a branch-aware chain at all — has zero
+   production call sites**, confirmed by grep across `BatchProcessor.java`: test-only today, the
+   identical status Phase 2 S5 recorded for `route`'s arming gate. Building real park/drain
+   execution semantics onto a lane nothing runs in production would be building on top of dead
+   code, not dead config — a worse version of the W1 trap.
+3. **The flat `*_pipeline.toon` format — `RecipeCompiler`'s own compile target — has no home for a
+   per-node `enabled` flag at all**, unlike every other Phase 2/3 verb. Tracing every branch of
+   `PipelineEditable.lower` (the flat-file lowering RecipeCompiler delegates to) confirms none of
+   them preserve an arbitrary `enabled` config key: the parser branch copies only
+   `PARSER_OWNED` keys, `TRANSFORM_DEDUP`/`TRANSFORM_JOIN`/`TRANSFORM_SUMMARIZE` each emit a fixed,
+   enumerated key set (`processing.dedup {keys, order_by}`, etc.), and the primary-sink branch
+   copies only its own enumerated write-tuning keys. `enabled` is a graph-editor-model concept
+   (`PipelineEditable.toMap`/the canvas JSON), never a flat-file one. Compiling `enabled: false`
+   from a recipe would therefore compile successfully and then **silently vanish on the very next
+   lower** — the exact dead-config failure mode S1/S2's arming gates exist to prevent, except here
+   there is no config shape to gate *inactive*, because the shape itself doesn't survive a save.
+
+**What would actually need to exist first (the real S4 scope, deferred):** a durable `PARKED`
+state (extending `FileStage` or a sibling concept) + a scratch-materialization convention at the
+disabled boundary (route's `RowShaper` already materializes one table per branch on every save,
+so the *mechanism* to reuse exists — nothing currently marks a table's origin as a pause point) +
+a drain/resume scheduler that re-enters `PipelineExecutor` from the parked boundary + a flat-file
+(or graph-native) home for the flag that actually survives a save + `BatchGraphRunner` acquiring a
+real production call site in the first place, since none of the above matters while nothing runs
+it. This is new design across four different subsystems, not a slicing choice — left for the
+operator to schedule explicitly, per the same posture as the deferred Phase 3 S3 (Dataset-write
+Signal). **Phase 4 status: S1/S2/S3 shipped; S4 deferred (documented gap above).**
+
 ---
 
 ## 9. Decisions of record (ALL RESOLVED 2026-08-05 — operator took the recommended option on each)

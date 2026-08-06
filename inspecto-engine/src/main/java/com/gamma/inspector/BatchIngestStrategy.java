@@ -117,7 +117,7 @@ interface BatchIngestStrategy {
         // business key via ROW_NUMBER, applied to the transformed rows BEFORE reference versioning
         // (versioning a duplicate would mint a spurious version) and before the partitioned write.
         if (cfg.dedup() != null)
-            writeTable = applyRecordDedup(conn, writeTable, cfg.dedup(), batchId);
+            writeTable = applyRecordDedup(conn, writeTable, cfg.dedup(), cfg, batchId);
 
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
             String versioned = "__ref_versioned";
@@ -147,11 +147,13 @@ interface BatchIngestStrategy {
     /**
      * Materialise {@code __dedup} from {@code src} keeping one row per {@code processing.dedup} business
      * key ({@code ROW_NUMBER() OVER (PARTITION BY keys [ORDER BY order_by]) = 1} — no {@code order_by}
-     * means the winner is arbitrary). Duplicates are counted and logged with the batch id; landing them
-     * in quarantine as a browsable reject stream is the Phase-4 Guarantee work, not silently done here.
+     * means the winner is arbitrary). Duplicates are counted and recorded durably as a
+     * {@link com.gamma.event.EventType#DEDUP_RECORDS_DROPPED} event (Phase 4 §2.4/§11.3) — the legacy
+     * lane's counter, since this strategy has no per-node provenance graph to record against. Landing
+     * the dropped rows themselves in quarantine as a browsable reject stream remains separate work.
      */
     static String applyRecordDedup(Connection conn, String src, PipelineConfig.Dedup dedup,
-                                   String batchId) throws SQLException {
+                                   PipelineConfig cfg, String batchId) throws SQLException {
         String dst = "__dedup";
         StringBuilder part = new StringBuilder();
         for (String k : dedup.keys()) {
@@ -166,9 +168,18 @@ interface BatchIngestStrategy {
             try (var rs = st.executeQuery("SELECT (SELECT COUNT(*) FROM \"" + src + "\") - COUNT(*) FROM \""
                     + dst + "\"")) {
                 long dupes = rs.next() ? rs.getLong(1) : 0;
-                if (dupes > 0)
+                if (dupes > 0) {
                     org.slf4j.LoggerFactory.getLogger(BatchIngestStrategy.class).info(
                             "[DEDUP] [{}] {} duplicate record(s) dropped by key {}", batchId, dupes, dedup.keys());
+                    com.gamma.event.EventLog.current().emit(
+                            com.gamma.event.Event.builder(com.gamma.event.EventType.DEDUP_RECORDS_DROPPED)
+                                    .source(BatchIngestStrategy.class.getName())
+                                    .pipeline(cfg.identity().pipelineName())
+                                    .correlationId(batchId)
+                                    .message(dupes + " duplicate record(s) dropped by key " + dedup.keys())
+                                    .attr("keys", String.join(",", dedup.keys()))
+                                    .attr("dropped", dupes));
+                }
             }
         }
         return dst;

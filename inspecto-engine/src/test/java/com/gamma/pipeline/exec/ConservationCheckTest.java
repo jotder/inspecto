@@ -80,6 +80,25 @@ class ConservationCheckTest {
         assertTrue(ConservationCheck.imbalances(cloneG, cloneCounts).isEmpty());
     }
 
+    /** Phase 4 §2.4 — edge-grain flows: a reject stream is tagged diverted, the trunk and named route branches are not. */
+    @Test
+    void relFlowsTagsRejectStreamsAsDivertedAndLeavesTrunkAndRouteBranchesAlone() {
+        Map<String, Long> counts = Map.of(
+                "src|data", 3L, "flt|data", 2L, "flt|dropped", 1L,
+                "r|route:hi", 1L, "r|route:lo", 1L, "r|dropped", 1L);
+        List<ConservationCheck.RelFlow> flows = ConservationCheck.relFlows(counts);
+        assertEquals(6, flows.size());
+
+        assertTrue(flows.stream().anyMatch(f -> f.node().equals("flt") && f.rel().equals("dropped")
+                && f.records() == 1L && f.diverted()), "filter's dropped rel is a reject stream");
+        assertTrue(flows.stream().anyMatch(f -> f.node().equals("flt") && f.rel().equals("data")
+                && !f.diverted()), "the main trunk edge is never diverted");
+        assertTrue(flows.stream().anyMatch(f -> f.node().equals("r") && f.rel().equals("route:hi")
+                && !f.diverted()), "a named route branch is ordinary content-routing, not a reject stream");
+        assertTrue(flows.stream().anyMatch(f -> f.node().equals("r") && f.rel().equals("dropped")
+                && f.diverted()), "a route's own dropped (no branch matched, no default) is still a reject stream");
+    }
+
     private static PipelineGraph routeFlow(String mode) {
         return new PipelineGraph("R", true,
                 List.of(PipelineNode.of("src", "parser"),
