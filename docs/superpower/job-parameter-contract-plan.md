@@ -169,6 +169,25 @@ request time** ("`$yesterday` → 2026-08-05"); context-bound tokens return thei
 instead. The UI never re-implements evaluation — step 13's "preview matches backend" is then true by
 construction. This is what makes the token picker (§8.5) possible and keeps it correct as packs load.
 
+### 4.4 As built (step 1, 2026-08-07) — four calls §4 did not specify
+
+1. **One context type, not two.** The SPI needs a public context, and `ParameterResolver.Context` was the
+   package-private record already carrying exactly the right seven components — so it *moved* to public
+   `ExpressionContext` rather than being mirrored. `ParameterResolver.Context` is gone; three test classes
+   and `JobService` follow the rename.
+2. **The registry is threaded, never static.** `ParameterResolver.resolve(...)` takes the
+   `ExpressionRegistry` (`JobService` owns one field). No static convenience default exists on purpose: a
+   default built-ins-only registry would silently bypass a Job Pack's tokens at the one call site that
+   matters.
+3. **`ExpressionDecl.form` drives routing, and longest match wins.** `LITERAL` matches exactly,
+   `PREFIX`/`FUNCTION` match on a head (`$signal.`, `$day(`). Longest-match is what lets a plugin declare
+   `$signal.tenant` without the built-in `$signal.` prefix capturing it — pinned by a test.
+4. **Registration is fail-closed now, not at step 5.** §4.2's "pack posture in all three paths" needed no
+   waiting: `register` throws on a colliding token and is *atomic* (a collision on any one of a provider's
+   tokens leaves the registry untouched). Step 5 only adds the ServiceLoader/pack call sites. An *unknown*
+   token still falls through to the next parameter layer — that is step 2's change, and step 1 deliberately
+   preserved it so this slice is behaviour-neutral.
+
 ## 5. Event Day — deferred, scoped here
 
 **Deferred to its own plan** (decided 2026-08-06). Recorded now so the SPI in §4 is shaped to
@@ -383,7 +402,7 @@ resolution. No key/value row anywhere.
 | # | Step | Verify |
 |---|---|---|
 | 0 | ✅ **Done with this refinement (2026-08-06)** — un-ban recorded: GLOSSARY §6-A entry + §13 row, amendment-plan supersession note; INDEX link already present | docs consistent; `graphify update .` run |
-| 1 | `ExpressionDecl` / `ExpressionProvider` / `ExpressionRegistry`; port the §2 tokens + the `pipeline`/`flow` shim (§1.2 note) to a built-in provider; GLOSSARY gains **Expression** | `mvn -o test` green — every §2 token resolves exactly as before |
+| 1 | ✅ **SHIPPED 2026-08-07** — `ExpressionDecl` / `ExpressionProvider` / `ExpressionContext` / `ExpressionRegistry` + `BuiltinExpressions` carrying the §2 tokens; `ParameterResolver.deduce()`'s switch deleted, the `pipeline`/`flow` shim kept verbatim in `value()`; GLOSSARY §6-A gained **Expression** | `mvn -o -pl inspecto-engine test` → 989 tests, 0 failures (`ExpressionRegistryTest` 5, `ParameterResolverTest` 12); every §2 token resolves exactly as before |
 | 2 | `$$` literal escape + unknown-token `REJECTED` | Unit tests; existing configs unaffected |
 | 3 | Evaluate expressions in layers 1 + 3 through the registry | A `$today` typed as a config param resolves at fire time |
 | 4 | Resolve the §6.1 `sql.template` collision (recommended: scoped evaluation) | Decision recorded; `sql.template` tests green under the chosen rule |

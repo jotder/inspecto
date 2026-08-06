@@ -28,8 +28,8 @@ class SharedDottedPathGrammarTest {
         // R-CHAIN: a job's when: guard and $signal bind address the very same path over the payload map.
         assertTrue(WhenGuard.eval("$signal.stats.rowsOut == 15184", payload));
 
-        var ctx = new ParameterResolver.Context("run-1", java.time.Instant.EPOCH, "cron",
+        var ctx = new ExpressionContext("run-1", java.time.Instant.EPOCH, "cron",
                 java.time.ZoneOffset.UTC, () -> java.util.Optional.empty(), (j, n) -> java.util.Optional.empty(), payload);
-        assertEquals("15184", ParameterResolver.deduce("$signal.stats.rowsOut", ctx));
+        assertEquals("15184", ExpressionRegistry.withBuiltins().evaluate("$signal.stats.rowsOut", ctx).orElse(null));
     }
 }

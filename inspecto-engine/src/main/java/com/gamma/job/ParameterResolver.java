@@ -2,19 +2,10 @@ package com.gamma.job;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.BiFunction;
-import java.util.function.Supplier;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import com.gamma.util.DottedPath;
 
 /**
  * Resolves a Job's declared {@link ParameterDecl}s to concrete values for one Run (job-framework §7.2,
@@ -36,8 +27,9 @@ import com.gamma.util.DottedPath;
  * {@code NumberFormatException} deep inside a Job's {@code run(ctx)} once it tries to parse the string
  * itself ({@link ParamType} was previously form-gen/descriptor metadata only, never enforced).
  *
- * <p>The {@code $upstream(<job>).artifact(<name>).<attr>} token (§10) resolves against recorded Run
- * Artifacts. This is a fresh, minimal evaluator; consolidating it with {@code com.gamma.query.Parameters}
+ * <p>{@code $}-expressions are no longer evaluated here: the vocabulary lives behind the
+ * {@link ExpressionRegistry} seam (job-parameter-contract §4), so a plugin or Job Pack can contribute a
+ * token without editing the engine. Consolidating that registry with {@code com.gamma.query.Parameters}
  * (SQL-literal output, a different token set) and {@link WhenGuard}'s {@code $signal} evaluator is
  * deliberate future work.
  */
@@ -45,29 +37,18 @@ final class ParameterResolver {
 
     private ParameterResolver() {}
 
-    /** The built-in {@code $}-context for deduction (§7.3): this Run's identity/timing, the success
-     *  watermark, an {@code (job, artifactName)} → latest {@link RunArtifact} lookup for {@code $upstream},
-     *  and the firing Signal's payload for {@code $signal.<field>} (empty for cron/manual fires). */
-    record Context(String runId, Instant fireTime, String actor, ZoneId zone,
-                   Supplier<Optional<LocalDateTime>> lastSuccess,
-                   BiFunction<String, String, Optional<RunArtifact>> upstream,
-                   Map<String, Object> signalPayload) {}
-
     /** Outcome: the resolved values, any {@code required} names that stayed unresolved, and any name whose
      *  resolved value didn't parse as its declared {@link ParamType} (both ⇒ REJECTED). */
     record Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType) {}
 
-    private static final Pattern DATE_FN = Pattern.compile("\\$(day|month|year)\\(\\s*(-?\\d+)\\s*\\)");
-    private static final Pattern UPSTREAM =
-            Pattern.compile("\\$upstream\\(([^)]+)\\)\\.artifact\\(([^)]+)\\)\\.(\\w+)");
-
     static Resolution resolve(List<ParameterDecl> decls, Map<String, String> args,
-                              Map<String, String> bind, Map<String, String> config, Context ctx) {
+                              Map<String, String> bind, Map<String, String> config,
+                              ExpressionRegistry expressions, ExpressionContext ctx) {
         Map<String, String> out = new LinkedHashMap<>();
         List<String> missing = new ArrayList<>();
         List<String> invalidType = new ArrayList<>();
         for (ParameterDecl d : decls) {
-            String v = value(d, args, bind, config, ctx);
+            String v = value(d, args, bind, config, expressions, ctx);
             if (v == null) {
                 if (d.required()) missing.add(d.name());
                 continue;
@@ -103,12 +84,13 @@ final class ParameterResolver {
 
     /** First hit of: trigger args → signal bind → authored config → deduce → default. {@code null} ⇒ unresolved. */
     private static String value(ParameterDecl d, Map<String, String> args,
-                                Map<String, String> bind, Map<String, String> config, Context ctx) {
+                                Map<String, String> bind, Map<String, String> config,
+                                ExpressionRegistry expressions, ExpressionContext ctx) {
         String a = args.get(d.name());
         if (a != null && !a.isBlank()) return a;
         String b = bind.get(d.name());
         if (b != null && !b.isBlank()) {
-            String bv = deduce(b.trim(), ctx);
+            String bv = expressions.evaluate(b.trim(), ctx).orElse(null);
             if (bv != null) return bv;
         }
         String c = config.get(d.name());
@@ -120,58 +102,9 @@ final class ParameterResolver {
             if (legacy != null && !legacy.isBlank()) return legacy;
         }
         if (d.deduce() != null && !d.deduce().isBlank()) {
-            String dv = deduce(d.deduce().trim(), ctx);
+            String dv = expressions.evaluate(d.deduce().trim(), ctx).orElse(null);
             if (dv != null) return dv;
         }
         return d.defaultValue();   // may be null
-    }
-
-    /** Evaluate one {@code $}-expression against the context; {@code null} when the token is unknown/unavailable. */
-    static String deduce(String expr, Context ctx) {
-        switch (expr) {
-            case "$today":         return LocalDate.ofInstant(ctx.fireTime(), ctx.zone()).toString();
-            case "$yesterday":     return LocalDate.ofInstant(ctx.fireTime(), ctx.zone()).minusDays(1).toString();
-            case "$tomorrow":      return LocalDate.ofInstant(ctx.fireTime(), ctx.zone()).plusDays(1).toString();
-            case "$now":           return ctx.fireTime().toString();
-            case "$now.epoch_seconds": return String.valueOf(ctx.fireTime().getEpochSecond());
-            case "$now.epoch_millis":  return String.valueOf(ctx.fireTime().toEpochMilli());
-            case "$run.id":        return ctx.runId();
-            case "$run.fire_time": return ctx.fireTime().toString();
-            case "$run.actor":     return ctx.actor();
-            case "$job.last_success_time":
-                return ctx.lastSuccess().get()
-                        .map(t -> t.atZone(ctx.zone()).toInstant().toString()).orElse(null);
-            default:
-                if (expr.startsWith("$signal.")) {
-                    Object v = DottedPath.resolve(ctx.signalPayload(), expr.substring("$signal.".length()));
-                    return v == null ? null : String.valueOf(v);
-                }
-                Matcher m = DATE_FN.matcher(expr);
-                if (m.matches()) {
-                    LocalDate base = LocalDate.ofInstant(ctx.fireTime(), ctx.zone());
-                    int n = Integer.parseInt(m.group(2));
-                    LocalDate shifted = switch (m.group(1)) {
-                        case "day"   -> base.plusDays(n);
-                        case "month" -> base.plusMonths(n);
-                        default      -> base.plusYears(n);   // "year"
-                    };
-                    return shifted.toString();
-                }
-                Matcher u = UPSTREAM.matcher(expr);
-                if (u.matches()) return upstreamAttr(ctx, u.group(1).trim(), u.group(2).trim(), u.group(3));
-                return null;
-        }
-    }
-
-    /** {@code $upstream(<job>).artifact(<name>).<attr>} — an attr of a predecessor's latest artifact (§10). */
-    private static String upstreamAttr(Context ctx, String job, String artifact, String attr) {
-        return ctx.upstream().apply(job, artifact).map(a -> switch (attr) {
-            case "ref"        -> a.ref();
-            case "rows"       -> String.valueOf(a.rows());
-            case "bytes"      -> String.valueOf(a.bytes());
-            case "watermark"  -> a.watermark();
-            case "time_range" -> a.timeRange();
-            default           -> null;
-        }).orElse(null);
     }
 }

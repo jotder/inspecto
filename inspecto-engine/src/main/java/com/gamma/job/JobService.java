@@ -115,6 +115,9 @@ public final class JobService implements AutoCloseable {
     /** Open Job Type registry (job-framework P0) — replaced the compiled-in {@link JobType} switch; the four
      *  built-ins register here in {@link #registerBuiltins()} and {@link #build} delegates to it. */
     private final JobTypeRegistry registry = new JobTypeRegistry();
+    /** The Expression vocabulary authored {@code $}-values and {@code deduce:}/{@code bind:} resolve
+     *  against (job-parameter-contract §4.2). Built-ins only until the open load paths land. */
+    private final ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
 
     /** Hot-deployable Job Packs (P2c, §12) — off unless {@code -Djobs.packs.dir} is set. */
     private final JobPackManager packs;
@@ -768,8 +771,8 @@ public final class JobService implements AutoCloseable {
             Map<String, String> args = new LinkedHashMap<>(cfg != null ? cfg.args() : Map.of());
             args.putAll(firing.args());                         // explicit manual args win over static config args:
             Map<String, String> bind = cfg != null ? cfg.bind() : Map.of();
-            ParameterResolver.Resolution pr = ParameterResolver.resolve(decls, args, bind, params,
-                    new ParameterResolver.Context(runId, Instant.now(), trigger, zone,
+            ParameterResolver.Resolution pr = ParameterResolver.resolve(decls, args, bind, params, expressions,
+                    new ExpressionContext(runId, Instant.now(), trigger, zone,
                             () -> ledger.lastSuccessEnd(name), this::upstreamArtifact, firing.signalPayload()));
             if (!pr.missingRequired().isEmpty() || !pr.invalidType().isEmpty()) {
                 List<String> reasons = new ArrayList<>();

@@ -355,6 +355,15 @@ defines *when*, not *what*.
 *(Was `Run ⊇ Batch ⊇ File` until 2026-08-03; see the Consignment entry in §2 and the §13 row. Identity is
 `(consignment_id, run_id)` — the run is the attempt, so a reprocess is a new Run over the same Consignment.)*
 
+**Expression** *(added 2026-08-07)* — A `$`-token an author writes in place of a literal value, **resolved at
+fire time** against the Run's context: `$today` · `$run.actor` · `$signal.<path>` · `$day(-1)` ·
+`$upstream(<job>).artifact(<name>).<attr>`. The vocabulary is an **open registry** (`ExpressionProvider` /
+`ExpressionRegistry`), so a plugin or Job Pack adds a token by registration, never by editing the engine.
+⛔ The code's older informal names for the same thing — *deduce*, *`$`-expression*, *token* — are not
+canonical; **Expression** is. Canonical style is **lowercase-dotted** (`$event_day`, never `$EventDay`).
+*(Not to be confused with the `$name` tokens inside a `sql.template` Job's SQL body — those are that Job's own
+declared **Parameters**. How the two `$` namespaces coexist is settled at step 4 of the plan.)*
+
 ---
 
 ## 6-B. Data plane (Lakehouse)

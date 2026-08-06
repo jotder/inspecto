@@ -16,26 +16,27 @@ import static org.junit.jupiter.api.Assertions.*;
 class ParameterResolverTest {
 
     private static final Instant FIRE = Instant.parse("2026-07-08T06:00:00Z");
+    private static final ExpressionRegistry EXPR = ExpressionRegistry.withBuiltins();
 
-    private static ParameterResolver.Context ctx(Optional<LocalDateTime> lastSuccess) {
+    private static ExpressionContext ctx(Optional<LocalDateTime> lastSuccess) {
         return ctx(lastSuccess, (job, name) -> Optional.empty());
     }
 
-    private static ParameterResolver.Context ctx(Optional<LocalDateTime> lastSuccess,
+    private static ExpressionContext ctx(Optional<LocalDateTime> lastSuccess,
             java.util.function.BiFunction<String, String, Optional<RunArtifact>> upstream) {
         return ctx(lastSuccess, upstream, Map.of());
     }
 
-    private static ParameterResolver.Context ctx(Optional<LocalDateTime> lastSuccess,
+    private static ExpressionContext ctx(Optional<LocalDateTime> lastSuccess,
             java.util.function.BiFunction<String, String, Optional<RunArtifact>> upstream,
             Map<String, Object> signalPayload) {
-        return new ParameterResolver.Context("run-1", FIRE, "cron", ZoneOffset.UTC, () -> lastSuccess,
+        return new ExpressionContext("run-1", FIRE, "cron", ZoneOffset.UTC, () -> lastSuccess,
                 upstream, signalPayload);
     }
 
     private static ParameterResolver.Resolution resolve(List<ParameterDecl> decls,
-            Map<String, String> config, ParameterResolver.Context ctx) {
-        return ParameterResolver.resolve(decls, Map.of(), Map.of(), config, ctx);
+            Map<String, String> config, ExpressionContext ctx) {
+        return ParameterResolver.resolve(decls, Map.of(), Map.of(), config, EXPR, ctx);
     }
 
     private static ParameterDecl decl(String name, boolean required, String deduce, String def) {
@@ -45,27 +46,27 @@ class ParameterResolverTest {
     @Test
     void deducesTheBuiltInDollarContext() {
         var c = ctx(Optional.of(LocalDateTime.parse("2026-07-07T06:00:04")));
-        assertEquals("2026-07-08", ParameterResolver.deduce("$today", c));
-        assertEquals("2026-07-07", ParameterResolver.deduce("$yesterday", c));
-        assertEquals("2026-07-09", ParameterResolver.deduce("$tomorrow", c));
-        assertEquals("2026-07-07", ParameterResolver.deduce("$day(-1)", c));
-        assertEquals("2026-07-09", ParameterResolver.deduce("$day(1)", c));
-        assertEquals("2026-06-08", ParameterResolver.deduce("$month(-1)", c));
-        assertEquals("2025-07-08", ParameterResolver.deduce("$year(-1)", c));
-        assertEquals("2027-07-08", ParameterResolver.deduce("$year(1)", c));
-        assertEquals("2026-07-08T06:00:00Z", ParameterResolver.deduce("$now", c));
-        assertEquals("1783490400", ParameterResolver.deduce("$now.epoch_seconds", c));
-        assertEquals("1783490400000", ParameterResolver.deduce("$now.epoch_millis", c));
-        assertEquals("run-1", ParameterResolver.deduce("$run.id", c));
-        assertEquals("2026-07-08T06:00:00Z", ParameterResolver.deduce("$run.fire_time", c));
-        assertEquals("cron", ParameterResolver.deduce("$run.actor", c));
-        assertEquals("2026-07-07T06:00:04Z", ParameterResolver.deduce("$job.last_success_time", c));
-        assertNull(ParameterResolver.deduce("$unknown.token", c), "unknown token is unresolved");
+        assertEquals("2026-07-08", EXPR.evaluate("$today", c).orElse(null));
+        assertEquals("2026-07-07", EXPR.evaluate("$yesterday", c).orElse(null));
+        assertEquals("2026-07-09", EXPR.evaluate("$tomorrow", c).orElse(null));
+        assertEquals("2026-07-07", EXPR.evaluate("$day(-1)", c).orElse(null));
+        assertEquals("2026-07-09", EXPR.evaluate("$day(1)", c).orElse(null));
+        assertEquals("2026-06-08", EXPR.evaluate("$month(-1)", c).orElse(null));
+        assertEquals("2025-07-08", EXPR.evaluate("$year(-1)", c).orElse(null));
+        assertEquals("2027-07-08", EXPR.evaluate("$year(1)", c).orElse(null));
+        assertEquals("2026-07-08T06:00:00Z", EXPR.evaluate("$now", c).orElse(null));
+        assertEquals("1783490400", EXPR.evaluate("$now.epoch_seconds", c).orElse(null));
+        assertEquals("1783490400000", EXPR.evaluate("$now.epoch_millis", c).orElse(null));
+        assertEquals("run-1", EXPR.evaluate("$run.id", c).orElse(null));
+        assertEquals("2026-07-08T06:00:00Z", EXPR.evaluate("$run.fire_time", c).orElse(null));
+        assertEquals("cron", EXPR.evaluate("$run.actor", c).orElse(null));
+        assertEquals("2026-07-07T06:00:04Z", EXPR.evaluate("$job.last_success_time", c).orElse(null));
+        assertNull(EXPR.evaluate("$unknown.token", c).orElse(null), "unknown token is unresolved");
     }
 
     @Test
     void lastSuccessTimeIsNullWhenTheJobNeverSucceeded() {
-        assertNull(ParameterResolver.deduce("$job.last_success_time", ctx(Optional.empty())));
+        assertTrue(EXPR.evaluate("$job.last_success_time", ctx(Optional.empty())).isEmpty());
     }
 
     @Test
@@ -76,15 +77,15 @@ class ParameterResolverTest {
         var c = ctx(Optional.empty(),
                 (job, name) -> "loader".equals(job) && "output".equals(name) ? Optional.of(art) : Optional.empty());
 
-        assertEquals("txn_rollup", ParameterResolver.deduce("$upstream(loader).artifact(output).ref", c));
-        assertEquals("4200", ParameterResolver.deduce("$upstream(loader).artifact(output).rows", c));
+        assertEquals("txn_rollup", EXPR.evaluate("$upstream(loader).artifact(output).ref", c).orElse(null));
+        assertEquals("4200", EXPR.evaluate("$upstream(loader).artifact(output).rows", c).orElse(null));
         assertEquals("2026-07-07T06:00:04Z",
-                ParameterResolver.deduce("$upstream(loader).artifact(output).watermark", c));
+                EXPR.evaluate("$upstream(loader).artifact(output).watermark", c).orElse(null));
         assertEquals("2026-07-01..2026-07-07",
-                ParameterResolver.deduce("$upstream(loader).artifact(output).time_range", c));
-        assertNull(ParameterResolver.deduce("$upstream(loader).artifact(missing).ref", c),
+                EXPR.evaluate("$upstream(loader).artifact(output).time_range", c).orElse(null));
+        assertNull(EXPR.evaluate("$upstream(loader).artifact(missing).ref", c).orElse(null),
                 "an absent artifact resolves to null (⇒ REJECTED if the param is required)");
-        assertNull(ParameterResolver.deduce("$upstream(loader).artifact(output).bogus_attr", c),
+        assertNull(EXPR.evaluate("$upstream(loader).artifact(output).bogus_attr", c).orElse(null),
                 "an unknown attribute is unresolved");
     }
 
@@ -125,7 +126,7 @@ class ParameterResolverTest {
         var r = ParameterResolver.resolve(decls,
                 Map.of(),
                 Map.of("event_date", "$signal.event_date", "findings", "$signal.findings"),
-                Map.of(), c);
+                Map.of(), EXPR, c);
 
         assertEquals("2026-07-02", r.resolved().get("event_date"), "bind beats the declared deduce");
         assertEquals("17", r.resolved().get("findings"), "a non-string payload value is stringified");
@@ -141,7 +142,7 @@ class ParameterResolverTest {
                 Map.of("event_date", "2026-01-01"),                 // trigger args
                 Map.of("event_date", "$signal.event_date"),          // bind
                 Map.of("event_date", "2026-05-05"),                  // config
-                c);
+                EXPR, c);
 
         assertEquals("2026-01-01", r.resolved().get("event_date"), "trigger args beat bind, config and deduce");
     }
@@ -151,7 +152,7 @@ class ParameterResolverTest {
         List<ParameterDecl> decls = List.of(decl("scope", true, null, null));
         var c = ctx(Optional.empty(), (j, n) -> Optional.empty(), Map.of());   // empty payload
         var r = ParameterResolver.resolve(decls,
-                Map.of(), Map.of("scope", "$signal.missing"), Map.of("scope", "fallback"), c);
+                Map.of(), Map.of("scope", "$signal.missing"), Map.of("scope", "fallback"), EXPR, c);
 
         assertEquals("fallback", r.resolved().get("scope"),
                 "a bind whose $signal field is absent falls through to the next layer");
@@ -213,7 +214,7 @@ class ParameterResolverTest {
         // parameter must not silently receive "n/a" and blow up deep inside the Job's own parsing.
         List<ParameterDecl> decls = List.of(new ParameterDecl("count", ParamType.INTEGER, true, null, null, "count"));
         var c = ctx(Optional.empty(), (j, n) -> Optional.empty(), Map.of("count", "n/a"));
-        var r = ParameterResolver.resolve(decls, Map.of(), Map.of("count", "$signal.count"), Map.of(), c);
+        var r = ParameterResolver.resolve(decls, Map.of(), Map.of("count", "$signal.count"), Map.of(), EXPR, c);
 
         assertTrue(r.missingRequired().isEmpty(), "bind DID resolve a value — 'n/a'");
         assertEquals(1, r.invalidType().size());

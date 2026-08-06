@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConsignmentProcessParameterTest {
 
     /** The payload shape {@code JobService.mirrorPipelineCommit} publishes for every pipeline.commit. */
+    private static final ExpressionRegistry EXPR = ExpressionRegistry.withBuiltins();
+
     private static Map<String, Object> commitPayload(String batchId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("pipeline", "TEST_ETL");
@@ -31,8 +33,8 @@ class ConsignmentProcessParameterTest {
         return payload;
     }
 
-    private static ParameterResolver.Context ctx(Map<String, Object> signalPayload) {
-        return new ParameterResolver.Context("run-1", Instant.parse("2026-08-04T10:00:00Z"), "tester",
+    private static ExpressionContext ctx(Map<String, Object> signalPayload) {
+        return new ExpressionContext("run-1", Instant.parse("2026-08-04T10:00:00Z"), "tester",
                 ZoneId.of("UTC"), Optional::empty, (job, artifact) -> Optional.empty(), signalPayload);
     }
 
@@ -41,7 +43,7 @@ class ConsignmentProcessParameterTest {
     }
 
     private static ParameterResolver.Resolution resolve(Map<String, Object> payload, Map<String, String> config) {
-        return ParameterResolver.resolve(decls(), Map.of(), Map.of(), config, ctx(payload));
+        return ParameterResolver.resolve(decls(), Map.of(), Map.of(), config, EXPR, ctx(payload));
     }
 
     @Test
