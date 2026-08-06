@@ -34,13 +34,13 @@ public final class ConservationCheck {
     public record Imbalance(String node, long recordsIn, long recordsOut, String kind) {}
 
     /**
-     * Phase 4 §2.4 — one recorded {@code (node, rel)} flow at edge grain: the count a
+     * Phase 4 §2.4 — one recorded {@code (node, rel)} count at edge grain: the count a
      * {@link PipelineExecutor.ProvenanceCollector} recorded on that relationship, and whether it is a
      * <b>reject stream</b> (§2.6 — {@code dropped}/{@code invalid}/{@code duplicate}/{@code unmatched}: the
      * user never wires these, only tunes where they rest) rather than the main trunk or a named
      * {@code route:*} branch, which are ordinary content-routing, not diversion.
      */
-    public record RelFlow(String node, String rel, long records, boolean diverted) {}
+    public record RelCount(String node, String rel, long records, boolean diverted) {}
 
     /** §2.6's reject-stream vocabulary: the diverted side of a record operator, never a user-wired edge. */
     private static final Set<String> REJECT_RELS = Set.of(
@@ -52,7 +52,7 @@ public final class ConservationCheck {
     private ConservationCheck() {}
 
     /**
-     * @param g      the flow that ran
+     * @param g      the pipeline that ran
      * @param counts per-(node, relationship) record counts, keyed {@code "<nodeId>|<rel>"} (as the provenance
      *               rows record them)
      * @return one {@link Imbalance} per conserving node whose in/out counts disagree (empty when all balance)
@@ -85,7 +85,7 @@ public final class ConservationCheck {
     }
 
     /**
-     * Every recorded {@code (node, rel)} flow at edge grain, tagged with whether it is a reject stream
+     * Every recorded {@code (node, rel)} count at edge grain, tagged with whether it is a reject stream
      * (§2.6). {@code recordsIn}/{@code recordsOut} stay {@link #imbalances}'s per-node aggregation —
      * this is the per-relationship breakdown underneath it, so a caller (the Pipeline Document, a
      * per-file drill-down) can show <em>which</em> edge carried the diverted rows, not just that the
@@ -94,14 +94,14 @@ public final class ConservationCheck {
      * @param counts per-(node, relationship) record counts, keyed {@code "<nodeId>|<rel>"}, as recorded
      *               by {@link PipelineExecutor.ProvenanceCollector}
      */
-    public static List<RelFlow> relFlows(Map<String, Long> counts) {
-        List<RelFlow> out = new ArrayList<>();
+    public static List<RelCount> relCounts(Map<String, Long> counts) {
+        List<RelCount> out = new ArrayList<>();
         for (Map.Entry<String, Long> e : counts.entrySet()) {
             int i = e.getKey().indexOf('|');
             if (i < 0) continue;
             String node = e.getKey().substring(0, i);
             String rel = e.getKey().substring(i + 1);
-            out.add(new RelFlow(node, rel, e.getValue(), REJECT_RELS.contains(rel)));
+            out.add(new RelCount(node, rel, e.getValue(), REJECT_RELS.contains(rel)));
         }
         return out;
     }

@@ -969,13 +969,13 @@ extension), S4 (per-Step `enabled:` park/drain, D-13) — S4 is gated on this sl
 
 **P4 S3 SHIPPED 2026-08-06** — edge-grain counters, in two parts per the grounding's own split
 between "the substrate already exists" and "the legacy lane genuinely has none":
-1. **Executor lane**: `ConservationCheck` gained `RelFlow` + `relFlows(counts)` — the per-`(node,
-   rel)` breakdown underneath `imbalances()`'s existing per-node aggregation, tagging each flow
+1. **Executor lane**: `ConservationCheck` gained `RelCount` + `relCounts(counts)` — the per-`(node,
+   rel)` breakdown underneath `imbalances()`'s existing per-node aggregation, tagging each count
    `diverted` when its `rel` is a §2.6 reject stream (`dropped`/`invalid`/`duplicate`/`unmatched`)
    rather than the main trunk or a named `route:*` branch (ordinary content-routing, not
    diversion). Pure and additive — `imbalances()`'s contract is untouched (existing tests still
    pin it). The provenance substrate (`ProvenanceCollector`/`ProvenanceRow`) already carried this
-   at `(node,rel)` grain; the finding was that nothing exposed it as such — `relFlows` is that
+   at `(node,rel)` grain; the finding was that nothing exposed it as such — `relCounts` is that
    exposure, for a Pipeline Document or per-file drill-down to show *which* edge carried the
    diverted rows.
 2. **Legacy lane**: `BatchIngestStrategy.applyRecordDedup` (the CSV-ingest dedup QUALIFY) only
