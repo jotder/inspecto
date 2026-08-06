@@ -118,6 +118,19 @@ public final class PipelineConfig {
         public boolean hasRowPredicate() {
             return where != null && !where.isBlank();
         }
+
+        /**
+         * Default settings carrying only the two format lists — for compiling mapping rules against a
+         * graph that did NOT come from a parsed {@link PipelineConfig}. A graph decoded from JSON keeps
+         * its {@code csv} block as a plain map (config travels verbatim), so this rebuilds the only part
+         * {@link DataTransformer#dataColumns} reads off it. Every other component takes the same default
+         * the builder would; do not use this where the real parse settings matter.
+         */
+        public static CsvSettings ofFormats(List<String> dateFormats, List<String> tsFormats) {
+            return new CsvSettings(",", 0, 0, 0, 0, true, "auto",
+                    List.copyOf(dateFormats), List.copyOf(tsFormats),
+                    null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), 0, null);
+        }
     }
 
     /** Output format/compression and the optional {@code output.ducklake} map ({@code null} if absent). */

@@ -132,6 +132,44 @@ class PipelineDryRunTest {
         assertEquals(25.0, out.get("DOUBLED"));       // the EXPR rule really ran
     }
 
+    /**
+     * A graph decoded from JSON carries its {@code csv} block as a plain map, never a
+     * {@link PipelineConfig.CsvSettings} — {@code PipelineCodec} keeps node config verbatim, and nothing
+     * converts it. {@link RowShaper} used to demand the record itself, so every dry-run over a candidate
+     * body (and every {@code graph/raw} round-trip) whose map node carried rules failed with a misleading
+     * 400. The format lists are read back off the map: this DATE rule can only parse with the one declared.
+     */
+    @Test
+    void dryRunCompilesRulesWhenTheCsvBlockArrivedAsPlainJson() throws Exception {
+        Map<String, Object> schema = Map.of(
+                "raw", Map.of("fields", List.of(Map.of("name", "WHEN", "type", "DATE"))),
+                "mapping", Map.of("rules", List.of(
+                        Map.of("targetColumn", "EVENT_DAY", "sourceExpression", "WHEN", "transformType", "DIRECT"))));
+        Map<String, Object> sample = new LinkedHashMap<>();
+        sample.put("WHEN", "24/06/2026");          // only "%d/%m/%Y" reads this correctly
+
+        // exactly what Jackson hands back for a serialised CsvSettings: component names, plain collections
+        Map<String, Object> csvAsJson = Map.of("dateFormats", List.of("%d/%m/%Y"), "tsFormats", List.of());
+        PipelineDryRun.Result r = PipelineDryRun.run(graphWithMapNode(Map.of("schema", schema, "csv", csvAsJson)),
+                List.of(sample));
+        assertEquals("2026-06-24", String.valueOf(node(r, "map").relations().get(0).rows().get(0).get("EVENT_DAY")),
+                "the format list was read off the JSON csv block");
+
+        // no csv block at all — the rules still compile, the undeclared format just cannot parse this value
+        PipelineDryRun.Result bare = PipelineDryRun.run(graphWithMapNode(Map.of("schema", schema)), List.of(sample));
+        assertNull(node(bare, "map").relations().get(0).rows().get(0).get("EVENT_DAY"),
+                "degrades to TRY_CAST rather than failing the whole dry-run");
+    }
+
+    /** seed --data--> map(config) --data--> sink, the shape a candidate body posts. */
+    private static PipelineGraph graphWithMapNode(Map<String, Object> config) {
+        return new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("seed", "acquisition"),
+                        new PipelineNode("map", "transform.map", null, null, config, null),
+                        new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
+                List.of(PipelineEdge.data("seed", "map"), PipelineEdge.data("map", "sink")));
+    }
+
     @Test
     void emptySampleIsRejected() {
         PipelineGraph g = new PipelineGraph("demo", true,

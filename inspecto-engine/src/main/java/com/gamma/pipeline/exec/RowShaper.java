@@ -228,20 +228,43 @@ public final class RowShaper {
      * sub-records verbatim) — the schema's mapping rules compiled to {@code [{name, expr}]} by
      * {@link DataTransformer#dataColumns}, the same authority the legacy engine's own SELECT uses.
      *
-     * <p>Returns {@code null} when neither is available, leaving the caller to raise its own error. The
-     * {@code csv} settings are required because DATE/TIMESTAMP rules parse with the pipeline's configured
-     * format lists; a lifted graph carries them on the sibling parser node, so whoever runs the graph
-     * must put them within the map node's reach (see {@code PipelineDryRun}).
+     * <p>Returns {@code null} when neither is available, leaving the caller to raise its own error.
      */
     private static List<?> columnsOf(PipelineNode node, String sourceTable) {
         if (node.cfg("columns") instanceof List<?> authored && !authored.isEmpty()) return authored;
         if (!BuiltinNodeType.TRANSFORM_MAP.type().equals(node.type())) return null;
         Map<String, Object> schema = mappingSchemaOf(node);
         if (schema == null) return null;
-        if (!(node.cfg("csv") instanceof PipelineConfig.CsvSettings csv))
-            throw new IllegalArgumentException("transform.map node '" + node.id()
-                    + "' carries mapping rules but no 'csv' settings to compile them with");
-        return DataTransformer.dataColumns(schema, csv, sourceTable);
+        return DataTransformer.dataColumns(schema, csvSettingsOf(node), sourceTable);
+    }
+
+    /**
+     * The {@code csv} settings to compile this node's rules with — DATE/TIMESTAMP sources parse with the
+     * pipeline's configured format lists, and nothing else off {@code csv} is read.
+     *
+     * <p>Three shapes reach this, because a graph arrives by two routes. Lifted in-process, it carries the
+     * real record ({@code PipelineLift} puts it on the parser node, {@code PipelineDryRun} moves it within
+     * the map node's reach). Decoded from JSON — a dry-run candidate body, or the same graph round-tripped
+     * through {@code GET /pipelines/{name}/graph/raw} — {@code PipelineCodec} keeps config verbatim, so the
+     * identical block is a plain map and the formats are rebuilt from it. Absent altogether, the lists are
+     * empty, which compiles a typed column to a plain {@code TRY_CAST} rather than failing the whole run:
+     * a {@code mapping} component declares no field types, so its rules never consult a format list.
+     */
+    private static PipelineConfig.CsvSettings csvSettingsOf(PipelineNode node) {
+        Object csv = node.cfg("csv");
+        if (csv instanceof PipelineConfig.CsvSettings settings) return settings;
+        if (csv instanceof Map<?, ?> m)
+            return PipelineConfig.CsvSettings.ofFormats(
+                    formatList(m.get("dateFormats")), formatList(m.get("tsFormats")));
+        return PipelineConfig.CsvSettings.ofFormats(List.of(), List.of());
+    }
+
+    /** One decoded format list — empty for anything that is not a list, so a malformed block degrades. */
+    private static List<String> formatList(Object value) {
+        if (!(value instanceof List<?> list)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object o : list) if (o != null) out.add(o.toString());
+        return out;
     }
 
     /**

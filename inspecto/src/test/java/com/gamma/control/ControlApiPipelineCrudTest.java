@@ -302,7 +302,45 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /**
+     * A candidate whose {@code transform.map} carries mapping rules previews the rows it would produce.
+     * This is the shape the mapping editor posts to diff an unsaved draft, and the shape a
+     * {@code GET .../graph/raw} round-trip produces for any pipeline with a mapping — both used to 400
+     * ("carries mapping rules but no 'csv' settings"), because a JSON-decoded {@code csv} block is a plain
+     * map and {@link com.gamma.pipeline.exec.RowShaper} demanded the {@code CsvSettings} record itself.
+     * The candidate-body test above only ever used {@code transform.filter}, so it never touched this.
+     */
+    @Test
+    void dryRunProjectsAMapNodesRulesFromACandidateBody(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        seedFlow(wr, VALID);
+        String candidate = """
+            {"pipeline":
+              {"name":"demo_flow","active":false,
+               "nodes":[{"id":"acq","type":"acquisition"},
+                        {"id":"map","type":"transform.map","config":{"rules":[
+                           {"targetColumn":"MSISDN","sourceExpression":"a","transformType":"DIRECT"},
+                           {"targetColumn":"DOUBLED","sourceExpression":"TRY_CAST(b AS DOUBLE) * 2","transformType":"EXPR"}]}},
+                        {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
+               "edges":[{"from":"acq","rel":"data","to":"map"},{"from":"map","rel":"data","to":"sink"}]},
+             "sampleRows":[{"a":"8801700000001","b":"150"}]}""";
+        try (Ctx c = open(dir, wr)) {
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/demo_flow/dry-run", candidate);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode mapped = dryRunNode(json(r).get("nodes"), "map")
+                    .get("relations").get(0).get("rows").get(0);
+            assertEquals("8801700000001", mapped.get("MSISDN").asText(), "the DIRECT rule renamed the column");
+            assertEquals(300.0, mapped.get("DOUBLED").asDouble(), "the EXPR rule really ran");
+        }
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
+
+    /** A dry-run result's per-node entry, which keys on {@code node} rather than a graph node's {@code id}. */
+    private static JsonNode dryRunNode(JsonNode nodes, String id) {
+        for (JsonNode n : nodes) if (id.equals(n.get("node").asText())) return n;
+        throw new AssertionError("no dry-run node '" + id + "' in " + nodes);
+    }
 
     private static JsonNode node(JsonNode nodes, String id) {
         for (JsonNode n : nodes) if (id.equals(n.get("id").asText())) return n;
