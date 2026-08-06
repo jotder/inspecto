@@ -19,7 +19,10 @@ import java.util.regex.Pattern;
 public final class MeasureCompiler {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    private static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
+    /** Package-private, not public: {@code MeasureGrammarContractTest} pins it against the committed
+     *  {@code inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json} the Angular authoring form
+     *  validates from, so adding an aggregate here fails that test until the client agrees. */
+    static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
 
     private MeasureCompiler() {}
 

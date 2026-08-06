@@ -169,8 +169,13 @@ export type AttributeOptionLoader = (
                                         <mat-icon svgIcon="heroicons_outline:plus" />
                                     </button>
                                     @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
-                                    <mat-error>{{ errorFor(spec) }}</mat-error>
+                                    <!-- No <mat-error> here: this field's <input> is a DRAFT, never bound
+                                         to the control, so the form-field has no NgControl and could
+                                         never enter an error state. See listError(). -->
                                 </mat-form-field>
+                                @if (listError(spec)) {
+                                    <p class="text-warn text-xs" role="alert">{{ listError(spec) }}</p>
+                                }
                                 @if (listValue(spec.key).length) {
                                     <div class="flex flex-wrap gap-1 pb-1">
                                         @for (item of listValue(spec.key); track $index) {
@@ -247,7 +252,34 @@ export class InspectoSchemaFormComponent {
         for (const s of this.allSpecs) {
             this.form.addControl(s.key, this.fb.control(defaults[s.key] ?? null, this.validatorsFor(s)), { emitEvent: false });
         }
+        this.applyExtraValidators();
         this.syncVisibility(this.form.getRawValue());
+    }
+
+    /**
+     * Host-supplied validators per attribute key, for a domain rule a declarative spec cannot express
+     * (reference: the Pipelines `measuresValidator` — the engine's `count | agg(field)` grammar). A
+     * validator returning `{ message: '…' }` has that message rendered verbatim by {@link errorFor},
+     * because the generic error keys cannot phrase such a rule.
+     *
+     * <p>Re-applied whenever `specs` is reassigned — that setter rebuilds every control from scratch, so
+     * validators attached earlier would otherwise be silently dropped by a spec swap (the same trap the
+     * collector/grammar editors hit with live *values*).
+     */
+    @Input() set extraValidators(validators: Record<string, ValidatorFn[]> | undefined) {
+        this.hostValidators = validators ?? {};
+        this.applyExtraValidators();
+    }
+
+    private hostValidators: Record<string, ValidatorFn[]> = {};
+
+    private applyExtraValidators(): void {
+        for (const [key, fns] of Object.entries(this.hostValidators)) {
+            const control = this.form.get(key);
+            if (!control) continue; // the key isn't in this spec set — a host may cover several
+            control.addValidators(fns);
+            control.updateValueAndValidity({ emitEvent: false });
+        }
     }
 
     /** Existing values to edit (patched over the declared defaults). */
@@ -356,11 +388,32 @@ export class InspectoSchemaFormComponent {
         return this.form.value as Record<string, unknown>;
     }
 
+    /**
+     * The error text for a `type: 'list'` field, rendered as an explicit line instead of a `<mat-error>`.
+     *
+     * <p><b>Why this is needed at all.</b> A list field's `<input>` holds the uncommitted DRAFT — the
+     * control's value is the chip array — so it is deliberately not bound with `formControlName`. That
+     * leaves `<mat-form-field>` with no `NgControl`, so it never learns the control is invalid and its
+     * `<mat-error>` can never display. Every list error was invisible, `required` included; the validator
+     * ran, the message existed, and nothing reached the screen. Caught in the preview — a unit test
+     * asserting `errorFor()` returns the string passes either way.
+     *
+     * <p>Gated on `touched` to match Material's own display rule, so an untouched required list is not
+     * red on open.
+     */
+    listError(spec: AttributeSpec): string {
+        const c = this.form.get(spec.key);
+        return c && c.invalid && c.touched ? this.errorFor(spec) : '';
+    }
+
     /** The first matching error message for a control, from its spec. */
     errorFor(spec: AttributeSpec): string {
         const c = this.form.get(spec.key);
         if (!c || !c.errors) return '';
         if (c.errors['required']) return `${spec.label} is required`;
+        // A host validator (see `extraValidators`) phrases its own message — a domain rule like the
+        // measure grammar has to name what to write, which no generic key below can do.
+        if (typeof c.errors['message'] === 'string') return c.errors['message'] as string;
         if (c.errors['duplicate']) return `${spec.label} already exists`;
         if (c.errors['pattern']) return `${spec.label} has an invalid format`;
         if (c.errors['min']) return `${spec.label} must be ≥ ${spec.min}`;

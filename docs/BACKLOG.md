@@ -476,6 +476,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `GEMINI_API_KEY` (not set here), so don't read a node-count drop after a code-only update as loss.
   Optional cleanups it reported, neither blocking: `pip install "graphifyy[sql]"` for the 2 skipped
   `.sql` files, and 97 `.json` files that yield zero nodes (upstream #1666).
+- **UI-S7 — table-entry `collect` authoring is S3-blocked; the summarize half shipped 2026-08-06.**
+  The ELT-amendment UI plan's S7 split in two on grounding. The **summarize** half shipped as measure-
+  grammar validation (contract-pinned to `MeasureCompiler.AGGS`; see the plan's "S7 SPLIT" section) and
+  fixed a latent defect where a `type: 'list'` field's `<mat-error>` could never fire, making every list
+  error — `required` included — invisible.
+  The **table-entry** half is **not** buildable and must not be forced: it needs the deferred Phase 3 S3
+  (a Dataset-write Signal), and separately `PipelineConfigParser.java:129-130` requires
+  `dirs.poll`/`dirs.database` **at parse time**, so a table-sourced draft cannot even load. Revisit only
+  when S3 lands. Two deliberate non-goals recorded there: a structured per-measure builder (drift risk
+  against the string grammar) and `group_by` entry validation (same shape, easy follow-up).
 - **Build → Test → Run authoring journey — G1–G5 SHIPPED 2026-08-02; only "test against real data"
   remains.** Plan of record:
   [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md).

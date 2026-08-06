@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { AbstractControl, ValidatorFn } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -22,12 +23,19 @@ const LIST_SPECS: AttributeSpec[] = [
 ];
 
 describe('InspectoSchemaFormComponent', () => {
-    function create(specs: AttributeSpec[] = SPECS, initial?: Record<string, unknown>) {
+    function create(
+        specs: AttributeSpec[] = SPECS,
+        initial?: Record<string, unknown>,
+        extraValidators?: Record<string, ValidatorFn[]>,
+    ) {
         TestBed.configureTestingModule({
             imports: [InspectoSchemaFormComponent],
             providers: [provideNoopAnimations()],
         });
         const fixture = TestBed.createComponent(InspectoSchemaFormComponent);
+        // Deliberately BEFORE `specs`: the controls don't exist yet, so this also proves the setter
+        // re-applies host validators after a spec (re)build rather than dropping them.
+        if (extraValidators) fixture.componentInstance.extraValidators = extraValidators;
         fixture.componentInstance.specs = specs;
         if (initial) fixture.componentInstance.initial = initial;
         fixture.detectChanges();
@@ -201,5 +209,70 @@ describe('InspectoSchemaFormComponent', () => {
         expect(event.defaultPrevented).toBe(true); // otherwise the sr-only submit button fires
         expect(submits).toBe(0);
         expect(fixture.componentInstance.form.get('patterns')?.value).toEqual(['^CALL']);
+    });
+
+    describe('extraValidators (host-supplied domain rules)', () => {
+        /** Stands in for the Pipelines measure grammar: rejects any entry containing `!`. */
+        const noBang: ValidatorFn = (c: AbstractControl) =>
+            (c.value as unknown[] | null)?.some((e) => String(e).includes('!'))
+                ? { message: 'Entries may not contain "!"' }
+                : null;
+
+        it('applies a host validator to the matching control and renders its message verbatim', () => {
+            const fixture = create(LIST_SPECS, undefined, { patterns: [noBang] });
+            const control = fixture.componentInstance.form.get('patterns')!;
+
+            control.setValue(['ok', 'bad!']);
+            expect(control.invalid).toBe(true);
+            // The generic keys can't phrase a domain rule, so `{message}` wins over the fallbacks.
+            expect(fixture.componentInstance.errorFor(LIST_SPECS[0])).toBe('Entries may not contain "!"');
+
+            control.setValue(['ok']);
+            expect(control.valid).toBe(true);
+        });
+
+        it('survives a spec reassignment — a spec swap rebuilds every control', () => {
+            const fixture = create(LIST_SPECS, undefined, { patterns: [noBang] });
+
+            fixture.componentInstance.specs = LIST_SPECS; // the collector/grammar-editor spec-swap path
+            fixture.detectChanges();
+
+            const control = fixture.componentInstance.form.get('patterns')!;
+            control.setValue(['bad!']);
+            expect(control.invalid).toBe(true);
+        });
+
+        it('RENDERS the message in the DOM, not just from errorFor()', async () => {
+            // The gap that let the real defect through: a `list` field's <input> is a draft, never bound
+            // with formControlName, so <mat-form-field> has no NgControl and its <mat-error> can never
+            // fire. errorFor() returned the right string while nothing reached the screen. Assert the
+            // rendered element, and that it announces.
+            const fixture = create(LIST_SPECS, undefined, { patterns: [noBang] });
+            const control = fixture.componentInstance.form.get('patterns')!;
+
+            control.setValue(['bad!']);
+            control.markAsTouched();
+            fixture.detectChanges();
+
+            const line = (fixture.nativeElement as HTMLElement).querySelector('[role="alert"]');
+            expect(line?.textContent?.trim()).toBe('Entries may not contain "!"');
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+
+        it('stays silent until the control is touched, matching Material', () => {
+            const fixture = create(LIST_SPECS, undefined, { patterns: [noBang] });
+
+            fixture.componentInstance.form.get('patterns')!.setValue(['bad!']); // untouched
+            fixture.detectChanges();
+
+            expect((fixture.nativeElement as HTMLElement).querySelector('[role="alert"]')).toBeNull();
+        });
+
+        it('ignores keys absent from the spec set, so one host map can cover several node types', () => {
+            const fixture = create(LIST_SPECS, undefined, { nosuchkey: [noBang], patterns: [noBang] });
+
+            expect(fixture.componentInstance.form.get('nosuchkey')).toBeNull();
+            expect(fixture.componentInstance.form.get('patterns')?.valid).toBe(true);
+        });
     });
 });

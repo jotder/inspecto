@@ -1,0 +1,3 @@
+{
+  "aggregations": [ "count", "countDistinct", "sum", "avg", "min", "max" ]
+}

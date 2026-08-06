@@ -405,7 +405,54 @@ recipe editor changes nothing there).
 > ⚠ **Still open:** §5.1's per-Step sample rows are **NOT** a UI task — `PipelineDocument.render` is pure by
 > design and S6a excluded them deliberately (a live dry-run is neither pure nor deterministic, and a
 > byte-wise golden-file test pins the format). Adding them is a backend change that trades away both.
-| **S7** | Table-entry collect + summarize cards | Phase 3 | Jobs nav retirement CANCELLED 2026-08-06 (Job un-banned) — table-entry cards ship additively; no `ACCESS_ACTION_NODES`/nav removal |
+| **S7** | Table-entry collect + summarize cards | Phase 3 | **SPLIT 2026-08-06** — summarize half SHIPPED (below); table-entry half remains S3-blocked. Jobs nav retirement CANCELLED 2026-08-06 (Job un-banned) — no `ACCESS_ACTION_NODES`/nav removal |
+
+#### S7 SPLIT 2026-08-06 — the summarize half shipped; table-entry `collect` is genuinely blocked
+
+Grounding S7 before building found the slice is **two independent halves with different gates**, and
+only one of them can be built. Recorded here so the next shift does not re-derive it.
+
+**Table-entry `collect` — NOT BUILT, and it should not be forced.** Its gate is the *deferred* Phase 3
+S3 of the amendment plan, which has a design of record but no implementation. Three independent
+blockers, all verified in source:
+1. No Signal a Dataset write publishes and no `collect` variant to bind to one — the design exists
+   (`elt-final-amendment-plan.md` §"Phase 3 S3 DESIGN"), the machinery does not.
+2. `PipelineConfigParser.java:129-130` requires `dirs.poll`/`dirs.database` **at parse time**. Unlike
+   `route`/`summarize`/`join` — which parse fine on an inactive draft and are refused only at arming —
+   a table-sourced draft would **fail to load at all**.
+3. There is no `table` mode in the published catalog and no such `CollectorMode`
+   (`collector-config.component.ts:17` is `'local' | 'connection'`).
+   Building the `Files | Table` toggle now would author config that is unloadable and corresponds to
+   nothing executable. The amendment plan's own word for that is *fictional*; §2.6's toggle stays unbuilt
+   until S3 lands.
+
+**Summarize — was already further along than §2.6 assumed.** §2.6's literal ask ("renders group-by (list
+type) + measures (list of expressions)") was **already satisfied**: `transform.summarize` is published
+server-side (`NodeAttributes.java:164-168`), the mock agrees *by construction* via
+`node-attributes.contract.json`, `RECIPE_VERBS` already offers the verb, and the generic
+`NodeConfigDialog` renders both fields through `<inspecto-schema-form>`. So the slice's remaining value
+was **not** another card — it was that **`measures` was validated nowhere**:
+`PipelineConfig.prepare()` refuses arming, so a pipeline never parses its measures, and the only reader
+of the `count | agg(field)` shorthand is `MaterializeTask.compileSpec` — a *separate* maintenance Job on
+its own schedule. `median(x)` saved clean and failed days later, elsewhere.
+
+**Shipped:** client-side measure validation with an inline error naming the six real aggregates
+(`measure-grammar.ts`), reached through a new generic `<inspecto-schema-form>` `[extraValidators]` input;
+the agg list is **contract-pinned** to `MeasureCompiler.AGGS` by `MeasureGrammarContractTest` +
+`measure-grammar.spec.ts` over the committed `measure-grammar.contract.json`, so neither side can add an
+aggregate alone. Deliberately stricter than the engine in one spot: `count()` is refused here though
+`MeasureCompiler` skips the field check for `count`.
+
+⚠ **A latent defect surfaced and was fixed:** a `type: 'list'` field's `<mat-error>` **could never
+fire** — the `<input>` is the draft, so `<mat-form-field>` has no `NgControl`. Every list error was
+invisible, **`required` included**. `listError()` + an explicit `role="alert"` line fixes it, and the
+preview proved it by newly surfacing a real "Group by is required". A unit test asserting `errorFor()`
+returns the string passed the whole time — assert the rendered element instead.
+
+**Still open in S7:** the table-entry half (S3-gated), and the per-measure structured builder (an
+agg dropdown + column autocomplete per row) which was considered and **not** taken — it risks drifting
+from the string grammar the backend actually parses. `group_by` entries are likewise unvalidated though
+`MeasureCompiler.safeIdent` constrains them; same-shaped follow-up, deliberately out of this scope.
 
 ## 5. Known traps to carry (from the skill, amendment-specific)
 
