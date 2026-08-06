@@ -37,9 +37,21 @@ final class ParameterResolver {
 
     private ParameterResolver() {}
 
-    /** Outcome: the resolved values, any {@code required} names that stayed unresolved, and any name whose
-     *  resolved value didn't parse as its declared {@link ParamType} (both ⇒ REJECTED). */
-    record Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType) {}
+    /** Outcome: the resolved values, any {@code required} names that stayed unresolved, any name whose
+     *  resolved value didn't parse as its declared {@link ParamType}, and any name whose {@code $}-value
+     *  named a token no provider declares (all three ⇒ REJECTED). */
+    record Resolution(Map<String, String> resolved, List<String> missingRequired, List<String> invalidType,
+                      List<String> unknownExpression) {}
+
+    /** One trip down the layer ladder: the value found ({@code null} ⇒ unresolved), or the unregistered
+     *  token that stopped it (§6.3) — an Expression nobody declares must fail the Run, never fall through
+     *  to the next layer, where it would surface as a confusing "missing required parameter". */
+    private record Layered(String value, String unknownExpr) {
+        static final Layered NONE = new Layered(null, null);
+        static Layered of(String value)     { return new Layered(value, null); }
+        static Layered unknown(String expr) { return new Layered(null, expr); }
+        boolean stops() { return value != null || unknownExpr != null; }
+    }
 
     static Resolution resolve(List<ParameterDecl> decls, Map<String, String> args,
                               Map<String, String> bind, Map<String, String> config,
@@ -47,8 +59,14 @@ final class ParameterResolver {
         Map<String, String> out = new LinkedHashMap<>();
         List<String> missing = new ArrayList<>();
         List<String> invalidType = new ArrayList<>();
+        List<String> unknown = new ArrayList<>();
         for (ParameterDecl d : decls) {
-            String v = value(d, args, bind, config, expressions, ctx);
+            Layered l = value(d, args, bind, config, expressions, ctx);
+            if (l.unknownExpr() != null) {
+                unknown.add(d.name() + " (unknown expression '" + l.unknownExpr() + "')");
+                continue;
+            }
+            String v = l.value();
             if (v == null) {
                 if (d.required()) missing.add(d.name());
                 continue;
@@ -59,7 +77,8 @@ final class ParameterResolver {
             }
             out.put(d.name(), v);
         }
-        return new Resolution(Map.copyOf(out), List.copyOf(missing), List.copyOf(invalidType));
+        return new Resolution(Map.copyOf(out), List.copyOf(missing), List.copyOf(invalidType),
+                List.copyOf(unknown));
     }
 
     /** Whether {@code v} parses as {@code type} (§7.1). {@code STRING}/{@code DATASET_REF} accept any
@@ -82,29 +101,42 @@ final class ParameterResolver {
         }
     }
 
-    /** First hit of: trigger args → signal bind → authored config → deduce → default. {@code null} ⇒ unresolved. */
-    private static String value(ParameterDecl d, Map<String, String> args,
-                                Map<String, String> bind, Map<String, String> config,
-                                ExpressionRegistry expressions, ExpressionContext ctx) {
+    /** First hit of: trigger args → signal bind → authored config → deduce → default. A layer holding an
+     *  Expression also stops the ladder when its token is unregistered (§6.3). */
+    private static Layered value(ParameterDecl d, Map<String, String> args,
+                                 Map<String, String> bind, Map<String, String> config,
+                                 ExpressionRegistry expressions, ExpressionContext ctx) {
         String a = args.get(d.name());
-        if (a != null && !a.isBlank()) return a;
+        if (a != null && !a.isBlank()) return Layered.of(a);            // evaluated from step 3
         String b = bind.get(d.name());
         if (b != null && !b.isBlank()) {
-            String bv = expressions.evaluate(b.trim(), ctx).orElse(null);
-            if (bv != null) return bv;
+            Layered bv = expression(b.trim(), expressions, ctx);
+            if (bv.stops()) return bv;
         }
         String c = config.get(d.name());
-        if (c != null && !c.isBlank()) return c;
+        if (c != null && !c.isBlank()) return Layered.of(c);            // evaluated from step 3
         // Tier 3 dual-read (vocabulary plan §4): the `pipeline` job parameter's pre-rename config key was
         // `flow` — read-only fallback for *_job.toon files that were never resaved under the new name.
         if ("pipeline".equals(d.name())) {
             String legacy = config.get("flow");
-            if (legacy != null && !legacy.isBlank()) return legacy;
+            if (legacy != null && !legacy.isBlank()) return Layered.of(legacy);
         }
         if (d.deduce() != null && !d.deduce().isBlank()) {
-            String dv = expressions.evaluate(d.deduce().trim(), ctx).orElse(null);
-            if (dv != null) return dv;
+            Layered dv = expression(d.deduce().trim(), expressions, ctx);
+            if (dv.stops()) return dv;
         }
-        return d.defaultValue();   // may be null
+        return Layered.of(d.defaultValue());   // may be null
+    }
+
+    /** Evaluate one authored {@code $}-value (§6.2/§6.3): the {@code $$} escape yields a literal
+     *  {@code $}; a registered token yields its value, or {@link Layered#NONE} when it has none in this
+     *  context (a bind to an absent {@code $signal.<field>} still falls through to the next layer); an
+     *  unregistered token fails the Run. A value that is not {@code $}-led can never name a token, so it
+     *  keeps its pre-registry behaviour of falling through. */
+    private static Layered expression(String raw, ExpressionRegistry expressions, ExpressionContext ctx) {
+        if (!ExpressionRegistry.isExpression(raw))
+            return raw.startsWith("$$") ? Layered.of(ExpressionRegistry.unescape(raw)) : Layered.NONE;
+        if (!expressions.declares(raw)) return Layered.unknown(raw);
+        return expressions.evaluate(raw, ctx).map(Layered::of).orElse(Layered.NONE);
     }
 }

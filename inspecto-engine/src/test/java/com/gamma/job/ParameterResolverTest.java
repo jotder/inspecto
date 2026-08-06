@@ -159,6 +159,54 @@ class ParameterResolverTest {
     }
 
     @Test
+    void anUnregisteredTokenFailsTheRunInsteadOfFallingThrough() {
+        // §6.3: $Yesterdy must be distinguishable from an unset field — the old switch returned null, so a
+        // typo surfaced (if at all) as a confusing "missing required parameter".
+        List<ParameterDecl> decls = List.of(decl("event_date", true, "$Yesterdy", "2026-01-01"));
+        var r = resolve(decls, Map.of(), ctx(Optional.empty()));
+
+        assertEquals(1, r.unknownExpression().size());
+        assertTrue(r.unknownExpression().get(0).contains("$Yesterdy"));
+        assertTrue(r.missingRequired().isEmpty(), "the typo is reported as itself, not as a missing value");
+        assertFalse(r.resolved().containsKey("event_date"), "and the declared default is NOT silently used");
+    }
+
+    @Test
+    void anUnregisteredTokenInABindAlsoFailsTheRun() {
+        List<ParameterDecl> decls = List.of(decl("scope", true, null, null));
+        var c = ctx(Optional.empty(), (j, n) -> Optional.empty(), Map.of("scope", "all"));
+        var r = ParameterResolver.resolve(decls,
+                Map.of(), Map.of("scope", "$signl.scope"), Map.of("scope", "fallback"), EXPR, c);
+
+        assertEquals(1, r.unknownExpression().size(), "a misspelled $signal prefix is not a silent fallback");
+        assertTrue(r.unknownExpression().get(0).contains("$signl.scope"));
+    }
+
+    @Test
+    void doubleDollarEscapesToALiteralDollar() {
+        // §6.2: must ship before authored values are evaluated (step 3), or a config holding a literal $
+        // breaks. In an expression position the escape is what makes a literal $ expressible at all.
+        List<ParameterDecl> decls = List.of(decl("prefix", true, "$$today", null));
+        var r = resolve(decls, Map.of(), ctx(Optional.empty()));
+
+        assertEquals("$today", r.resolved().get("prefix"), "$$today is the literal eight-char string");
+        assertTrue(r.unknownExpression().isEmpty(), "an escaped literal is not a token lookup");
+    }
+
+    @Test
+    void authoredConfigValuesAreStillLiteralsAtThisStep() {
+        // Step 2 deliberately leaves layers 1 and 3 unevaluated — step 3 is what routes them through the
+        // registry. Pinning it here so the change of behaviour is a visible edit to this test, not a
+        // surprise.
+        List<ParameterDecl> decls = List.of(decl("amount", true, null, null), decl("when", true, null, null));
+        var r = resolve(decls, Map.of("amount", "$100", "when", "$today"), ctx(Optional.empty()));
+
+        assertEquals("$100", r.resolved().get("amount"));
+        assertEquals("$today", r.resolved().get("when"), "not yet resolved — step 3");
+        assertTrue(r.unknownExpression().isEmpty(), "and an unevaluated layer cannot report an unknown token");
+    }
+
+    @Test
     void missingRequiredParameterIsReported() {
         List<ParameterDecl> decls = List.of(
                 decl("must_have", true, null, null),           // no config, no deduce, no default

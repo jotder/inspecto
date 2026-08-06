@@ -16,9 +16,9 @@ import java.util.Optional;
  * registration loudly, because a captured token would change what an authored {@code $}-value means
  * without any signal.
  *
- * <p>An <em>unknown</em> token is a different matter and still resolves to {@link Optional#empty()} here,
- * i.e. "fall through to the next parameter layer". Making it fail the Run is step 2, together with the
- * {@code $$} literal escape.
+ * <p>Owns the {@code $}-grammar too ({@link #isExpression}, {@link #unescape}, {@link #declares}), so the
+ * escape rule and the fail-closed unknown-token gate (§6.2/§6.3) are stated once rather than at each
+ * position an author can type a value.
  */
 final class ExpressionRegistry {
 
@@ -44,6 +44,25 @@ final class ExpressionRegistry {
         }
         decls.forEach(d -> routes.put(d.matchKey(), new Route(d, provider)));
         providers.add(provider);
+    }
+
+    /** Whether {@code raw} is meant as an Expression at all (§6.2/§6.3): {@code $}-led, but not the
+     *  {@code $$} literal escape. A value with no leading {@code $} can never name a token. */
+    static boolean isExpression(String raw) {
+        return raw.startsWith("$") && !raw.startsWith("$$");
+    }
+
+    /** Apply the {@code $$} literal escape: {@code $$today} is the eight-character string {@code $today},
+     *  so a value that genuinely starts with {@code $} (a shell string, a currency amount) stays
+     *  expressible once authored values are evaluated (§6.2). Anything else passes through unchanged. */
+    static String unescape(String raw) {
+        return raw.startsWith("$$") ? raw.substring(1) : raw;
+    }
+
+    /** Whether some provider declares a token matching {@code expr}. The fail-closed gate of §6.3: an
+     *  Expression nobody declares is a typo, not a value that should quietly fall through. */
+    boolean declares(String expr) {
+        return route(expr).isPresent();
     }
 
     /** Every registered declaration, in registration order — what the §4.3 catalog serves. */

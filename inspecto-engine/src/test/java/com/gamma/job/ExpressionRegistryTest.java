@@ -62,9 +62,25 @@ class ExpressionRegistryTest {
     }
 
     @Test
-    void anUnknownTokenIsUnresolvedNotAnError() {
-        // Step 1 preserves today's fall-through; failing the Run on an unknown token is step 2.
-        assertTrue(ExpressionRegistry.withBuiltins().evaluate("$Yesterdy", ctx()).isEmpty());
+    void anUnknownTokenIsUndeclaredAndUnresolvable() {
+        ExpressionRegistry r = ExpressionRegistry.withBuiltins();
+
+        assertFalse(r.declares("$Yesterdy"), "the fail-closed gate of §6.3");
+        assertTrue(r.evaluate("$Yesterdy", ctx()).isEmpty());
+        assertTrue(r.declares("$job.last_success_time"),
+                "declared-but-valueless is a different case from unknown — it still falls through");
+        assertTrue(r.evaluate("$job.last_success_time", ctx()).isEmpty());
+    }
+
+    @Test
+    void theGrammarSeparatesExpressionsFromEscapedLiterals() {
+        assertTrue(ExpressionRegistry.isExpression("$today"));
+        assertFalse(ExpressionRegistry.isExpression("$$today"), "$$ is the literal escape (§6.2)");
+        assertFalse(ExpressionRegistry.isExpression("100.00"), "a value with no leading $ names no token");
+
+        assertEquals("$today", ExpressionRegistry.unescape("$$today"));
+        assertEquals("$today", ExpressionRegistry.unescape("$today"), "unescaping a real token is a no-op");
+        assertEquals("plain", ExpressionRegistry.unescape("plain"));
     }
 
     @Test

@@ -774,17 +774,21 @@ public final class JobService implements AutoCloseable {
             ParameterResolver.Resolution pr = ParameterResolver.resolve(decls, args, bind, params, expressions,
                     new ExpressionContext(runId, Instant.now(), trigger, zone,
                             () -> ledger.lastSuccessEnd(name), this::upstreamArtifact, firing.signalPayload()));
-            if (!pr.missingRequired().isEmpty() || !pr.invalidType().isEmpty()) {
+            if (!pr.missingRequired().isEmpty() || !pr.invalidType().isEmpty()
+                    || !pr.unknownExpression().isEmpty()) {
                 List<String> reasons = new ArrayList<>();
                 if (!pr.missingRequired().isEmpty())
                     reasons.add("missing required parameter(s): " + String.join(", ", pr.missingRequired()));
                 if (!pr.invalidType().isEmpty())
                     reasons.add("invalid parameter(s): " + String.join(", ", pr.invalidType()));
+                if (!pr.unknownExpression().isEmpty())
+                    reasons.add("unknown expression(s): " + String.join(", ", pr.unknownExpression()));
                 String reason = String.join("; ", reasons);
                 ctx.log().error("run rejected: " + reason, null);
                 ctx.signals().emit("job.run.rejected", Severity.WARN,
                         Map.of("job", name, "run", runId, "missing", pr.missingRequired(),
-                                "invalidType", pr.invalidType()));
+                                "invalidType", pr.invalidType(),
+                                "unknownExpression", pr.unknownExpression()));
                 if (pipelineId != null) runningPipelines.remove(pipelineId);
                 record(new JobRun(runId, name, job.type(), trigger, start,
                         LocalDateTime.now().format(TS), "REJECTED", 0L, reason));

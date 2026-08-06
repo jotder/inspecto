@@ -245,6 +245,23 @@ machinery is already designed elsewhere:
 5. **Enforce in `ParameterResolver`, not only the browser.** The UI is not a gate; a violation joins
    the existing `invalidType()` path and fails `REJECTED` before user code runs.
 
+### 6-A. As built (step 2, 2026-08-07) — the three-way outcome §6.3 implies
+
+The fail-closed gate only works because **"unregistered token" and "declared token with no value here" are
+different outcomes**, and today's code conflated both as `null`:
+
+- `ExpressionRegistry` gained the `$`-grammar — `isExpression` (`$`-led and not `$$`), `unescape`,
+  `declares` — so the rule is stated once, not at each position an author can type a value.
+- `ParameterResolver.value()` now returns a private `Layered(value, unknownExpr)`: an unregistered token
+  **stops the ladder** and is reported, where a declared-but-absent `$signal.<field>` still falls through
+  (the existing `bindToAnAbsentSignalFieldFallsThroughToConfig` test is the guard on that distinction).
+  A `deduce:` typo therefore no longer silently uses the declaration's own `defaultValue`.
+- `Resolution` gained `unknownExpression`; `JobService` joins it into the REJECTED reason and the
+  `job.run.rejected` payload alongside `missing`/`invalidType`.
+- ⚠ The escape is live in **expression positions only** (`bind:`, `deduce:`) because layers 1 and 3 are
+  still literal. When step 3 evaluates them, an authored value of `$$x` starts unescaping to `$x` — that
+  is the intended §6.2 ordering, and the only value affected is one deliberately written as `$$`.
+
 ### 6.1 ⚠ Hazard — `$` namespace collision in `sql.template`
 
 `sql.template` already uses `$name` tokens **as its parameter contract**. ✎ Grounded 2026-08-06: the
@@ -403,7 +420,7 @@ resolution. No key/value row anywhere.
 |---|---|---|
 | 0 | ✅ **Done with this refinement (2026-08-06)** — un-ban recorded: GLOSSARY §6-A entry + §13 row, amendment-plan supersession note; INDEX link already present | docs consistent; `graphify update .` run |
 | 1 | ✅ **SHIPPED 2026-08-07** — `ExpressionDecl` / `ExpressionProvider` / `ExpressionContext` / `ExpressionRegistry` + `BuiltinExpressions` carrying the §2 tokens; `ParameterResolver.deduce()`'s switch deleted, the `pipeline`/`flow` shim kept verbatim in `value()`; GLOSSARY §6-A gained **Expression** | `mvn -o -pl inspecto-engine test` → 989 tests, 0 failures (`ExpressionRegistryTest` 5, `ParameterResolverTest` 12); every §2 token resolves exactly as before |
-| 2 | `$$` literal escape + unknown-token `REJECTED` | Unit tests; existing configs unaffected |
+| 2 | ✅ **SHIPPED 2026-08-07** — `$$` literal escape + unknown-token `REJECTED` (`Resolution.unknownExpression`, reported by `JobService`'s reject path and the `job.run.rejected` Signal) | `mvn -o -pl inspecto-engine test` → 994 tests, 0 failures; existing configs unaffected — layers 1/3 still literal (pinned by `authoredConfigValuesAreStillLiteralsAtThisStep`) |
 | 3 | Evaluate expressions in layers 1 + 3 through the registry | A `$today` typed as a config param resolves at fire time |
 | 4 | Resolve the §6.1 `sql.template` collision (recommended: scoped evaluation) | Decision recorded; `sql.template` tests green under the chosen rule |
 | 5 | ServiceLoader + Job Pack expression providers; **collisions fail-closed in all three load paths** (§4.2) | A pack contributes a token; a colliding provider load fails loudly |
