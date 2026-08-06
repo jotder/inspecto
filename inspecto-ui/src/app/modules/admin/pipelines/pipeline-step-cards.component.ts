@@ -1,9 +1,13 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthoredNode } from 'app/inspecto/api';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import {
     NodeStatus,
+    RECIPE_VERBS,
     StepRow,
     categoryLabel,
     nodeConfigEntries,
@@ -14,19 +18,36 @@ import {
 } from './pipeline-graph';
 
 /**
- * The read-only recipe view (ELT amendment UI plan §1, S1): one card per Step in chain order, a
- * `route` Step's branches nested and indented beneath it. Purely presentational — the host computes
- * {@link rows} ({@link flattenStepChain} over {@link detectStepChain}'s tree), the category label per
- * node type, and each node's status (it alone holds the registry-refs/test-outcome state that needs).
- * Editing (S2) and the Guarantees panel land in later slices; this view only shows the chain.
+ * The recipe view (ELT amendment UI plan §1, S1 read-only + S2 editing): one card per Step in chain
+ * order, a `route` Step's branches nested and indented beneath it. Purely presentational — the host
+ * computes {@link rows} ({@link flattenStepChain} over {@link detectStepChain}'s tree), the category
+ * label per node type, and each node's status (it alone holds the registry-refs/test-outcome state
+ * that needs). With {@link editable} the cards gain: click/Configure → {@link open} (the host routes
+ * it to the EXISTING dialogs — no new dialog kinds), an Add-Step affordance between trunk cards
+ * offering the {@link RECIPE_VERBS} (→ {@link insertStep}), remove (→ {@link remove}) and
+ * move up/down (→ {@link move}). Branch rows (depth > 0) stay read-only cards except Configure —
+ * trunk-only editing is S2's deliberate scope; the branch editor is S3.
  */
 @Component({
     selector: 'app-pipeline-step-cards',
     standalone: true,
-    imports: [MatIconModule, ChipComponent],
+    imports: [MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule, ChipComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <ol class="flex flex-col gap-2 p-3" aria-label="Pipeline Steps">
+        <ol class="flex flex-col gap-1 p-3" aria-label="Pipeline Steps">
+            @if (editable) {
+                <li class="flex justify-center">
+                    <button
+                        mat-icon-button
+                        [matMenuTriggerFor]="verbMenu"
+                        (click)="insertAfterId = null"
+                        matTooltip="Add a Step at the start"
+                        aria-label="Add a Step at the start"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
+                    </button>
+                </li>
+            }
             @for (row of rows; track row.rowId) {
                 @if (row.kind === 'node') {
                     <li
@@ -52,6 +73,44 @@ import {
                                     {{ statusLabel(statusOf(row.node)) }}
                                 </span>
                             }
+                            @if (editable) {
+                                <span class="flex shrink-0 items-center" [class.ml-auto]="!statusOf">
+                                    <button
+                                        mat-icon-button
+                                        (click)="open.emit(row.node)"
+                                        [matTooltip]="'Configure ' + row.node.id"
+                                        [attr.aria-label]="'Configure ' + row.node.id"
+                                    >
+                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                                    </button>
+                                    @if (row.depth === 0) {
+                                        <button
+                                            mat-icon-button
+                                            (click)="move.emit({ id: row.node.id, dir: 'up' })"
+                                            [matTooltip]="'Move ' + row.node.id + ' up'"
+                                            [attr.aria-label]="'Move ' + row.node.id + ' up'"
+                                        >
+                                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-up"></mat-icon>
+                                        </button>
+                                        <button
+                                            mat-icon-button
+                                            (click)="move.emit({ id: row.node.id, dir: 'down' })"
+                                            [matTooltip]="'Move ' + row.node.id + ' down'"
+                                            [attr.aria-label]="'Move ' + row.node.id + ' down'"
+                                        >
+                                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                                        </button>
+                                        <button
+                                            mat-icon-button
+                                            (click)="remove.emit(row.node.id)"
+                                            [matTooltip]="'Remove ' + row.node.id"
+                                            [attr.aria-label]="'Remove ' + row.node.id"
+                                        >
+                                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
+                                        </button>
+                                    }
+                                </span>
+                            }
                         </div>
                         @if (row.node.description) {
                             <p class="truncate text-xs opacity-70">{{ row.node.description }}</p>
@@ -66,6 +125,19 @@ import {
                             }
                         }
                     </li>
+                    @if (editable && row.depth === 0) {
+                        <li class="flex justify-center">
+                            <button
+                                mat-icon-button
+                                [matMenuTriggerFor]="verbMenu"
+                                (click)="insertAfterId = row.node.id"
+                                [matTooltip]="'Add a Step after ' + row.node.id"
+                                [attr.aria-label]="'Add a Step after ' + row.node.id"
+                            >
+                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:plus"></mat-icon>
+                            </button>
+                        </li>
+                    }
                 } @else {
                     <li
                         class="flex items-center gap-2 pt-1 text-xs font-semibold uppercase tracking-wide opacity-60"
@@ -83,6 +155,15 @@ import {
                 }
             }
         </ol>
+
+        <mat-menu #verbMenu="matMenu">
+            @for (v of verbs; track v.verb) {
+                <button mat-menu-item (click)="insertStep.emit({ type: v.type, afterId: insertAfterId })">
+                    <mat-icon [svgIcon]="paletteHeroIcon(typeCat.get(v.type) ?? '')"></mat-icon>
+                    <span>{{ v.label }}</span>
+                </button>
+            }
+        </mat-menu>
     `,
 })
 export class PipelineStepCardsComponent {
@@ -90,7 +171,22 @@ export class PipelineStepCardsComponent {
     @Input({ required: true }) typeCat!: Map<string, string>;
     /** Optional — omitted when the host has no registry-refs/test-outcome state loaded yet. */
     @Input() statusOf?: (node: AuthoredNode) => NodeStatus;
+    /** S2: reveal the editing affordances. The host still gates every mutation on canAuthor(). */
+    @Input() editable = false;
 
+    /** Open the Step's config dialog (the host routes parse → GrammarEditorDialog, rest → NodeConfigDialog). */
+    @Output() readonly open = new EventEmitter<AuthoredNode>();
+    /** Insert a new Step of `type` after the trunk node `afterId` (`null` = as the new entry). */
+    @Output() readonly insertStep = new EventEmitter<{ type: string; afterId: string | null }>();
+    /** Remove a trunk Step by node id. */
+    @Output() readonly remove = new EventEmitter<string>();
+    /** Move a trunk Step one place up/down the chain. */
+    @Output() readonly move = new EventEmitter<{ id: string; dir: 'up' | 'down' }>();
+
+    /** Where the open verb menu will insert (set by the clicked "+" before the menu opens). */
+    insertAfterId: string | null = null;
+
+    readonly verbs = RECIPE_VERBS;
     readonly categoryLabel = categoryLabel;
     readonly paletteHeroIcon = paletteHeroIcon;
     readonly statusIcon = statusIcon;

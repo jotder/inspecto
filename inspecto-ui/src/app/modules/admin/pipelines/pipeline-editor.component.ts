@@ -47,6 +47,7 @@ import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component
 import { PipelineEditorGraphComponent } from './pipeline-editor-graph.component';
 import { PipelineInspectorComponent } from './pipeline-inspector.component';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
+import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.component';
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
@@ -77,6 +78,9 @@ import {
     findingTint,
     flattenStepChain,
     groupByCategory,
+    insertStepAfter,
+    moveStepInChain,
+    removeStepFromChain,
     nodeConfigEntries,
     nodeLastRunTotal,
     provenanceCounts,
@@ -117,6 +121,7 @@ import {
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
         PipelinePaletteComponent,
+        PipelineGuaranteesPanelComponent,
         PipelineStepCardsComponent,
         InspectoEmptyStateComponent,
         InspectoSplitDirective,
@@ -331,6 +336,50 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Whether the preference is Recipe but the open graph forced a Canvas fallback — drives the alert. */
     readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
+
+    // ── Recipe editing (S2) — pure reducers over the same model; Save is the unchanged PUT ─────────
+
+    /** Insert a new Step of `type` after `afterId` (null = new entry), then open its config dialog. */
+    onRecipeInsert(e: { type: string; afterId: string | null }): void {
+        if (!this.canAuthor()) return; // defense in depth, not just the hidden affordance
+        const m = this.model();
+        if (!m) return;
+        const node: AuthoredNode = { id: uniqueNodeId(m, e.type), type: e.type };
+        const next = insertStepAfter(m, node, e.afterId);
+        if (!next) {
+            this.toast.warning('Cannot insert here — this Step is wired beyond the linear chain. Use the Canvas.');
+            return;
+        }
+        this.model.set(next);
+        this.dirty.set(true);
+        this.openNodeConfig(node);
+    }
+
+    /** Remove a trunk Step, reconnecting its neighbours. */
+    onRecipeRemove(id: string): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        if (!m) return;
+        const next = removeStepFromChain(m, id);
+        if (!next) {
+            this.toast.warning('Cannot remove here — this Step is wired beyond the linear chain. Use the Canvas.');
+            return;
+        }
+        this.model.set(next);
+        this.clearSelection();
+        this.dirty.set(true);
+    }
+
+    /** Swap a trunk Step with its neighbour. A refused move (chain end / non-linear) is a silent no-op. */
+    onRecipeMove(e: { id: string; dir: 'up' | 'down' }): void {
+        if (!this.canAuthor()) return;
+        const m = this.model();
+        if (!m) return;
+        const next = moveStepInChain(m, e.id, e.dir);
+        if (!next) return;
+        this.model.set(next);
+        this.dirty.set(true);
+    }
 
     /** The selected node's last-run output (T17), or `null` when that run recorded nothing for it. */
     selectedNodeLastRun(): { rowCount: number; runTs: string } | null {

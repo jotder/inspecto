@@ -494,13 +494,24 @@ export interface StepBranch {
 }
 
 /**
+ * Guarantee side-relationships (§2.4/§2.6): a `gap`/`unmatched` edge to a LEAF node is housekeeping
+ * hanging off the trunk (the gap-watch node, the quarantine sink) — never a Step, never a branch.
+ * The chain walk skips these (the Guarantees panel renders them instead), and {@link insertStepAfter}
+ * rewires around them.
+ */
+function isGuaranteeSideEdge(e: AuthoredEdge, outBy: Map<string, AuthoredEdge[]>): boolean {
+    return (e.rel === 'gap' || e.rel === 'unmatched') && (outBy.get(e.to) ?? []).length === 0;
+}
+
+/**
  * Detect the linear-chain/tree shape the recipe view renders (UI plan §1): walk from the single entry
  * node (no incoming edges) via `data` edges; a node whose only outgoing edges are all named
  * `route:<key>` branches into one {@link StepBranch} per edge — the one user-visible branching
- * construct (§2.6). Returns `null` when the graph is not expressible this way: no single entry, a node
- * with more than one incoming edge (fan-in / `merge`), or a node whose outgoing edges are anything else
- * (an exotic control edge, or a fan-out mixing `data` with other relationships) — the recipe view then
- * falls back to Canvas mode with an explanatory alert, per the amendment's "no dual model" rule.
+ * construct (§2.6). Guarantee side-nodes (a `gap`/`unmatched` edge to a leaf — gap watch, the
+ * quarantine sink) are tolerated and skipped: they are housekeeping, not Steps, and forcing Canvas
+ * over them would contradict the Guarantees doctrine (§2.4). Returns `null` when the graph is
+ * genuinely not expressible: no single entry, fan-in (`merge`), or a fan-out mixing `data` with other
+ * relationships — the recipe view then falls back to Canvas mode with an explanatory alert.
  */
 export function detectStepChain(model: AuthoredPipeline): StepChain | null {
     const nodeById = new Map(model.nodes.map((n) => [n.id, n]));
@@ -512,7 +523,11 @@ export function detectStepChain(model: AuthoredPipeline): StepChain | null {
         outBy.set(e.from, [...(outBy.get(e.from) ?? []), e]);
         inCount.set(e.to, (inCount.get(e.to) ?? 0) + 1);
     }
-    const roots = model.nodes.filter((n) => (inCount.get(n.id) ?? 0) === 0);
+    // guarantee side-nodes are not entry candidates and never part of the walk
+    const sideNodes = new Set<string>();
+    for (const edges of outBy.values())
+        for (const e of edges) if (isGuaranteeSideEdge(e, outBy)) sideNodes.add(e.to);
+    const roots = model.nodes.filter((n) => (inCount.get(n.id) ?? 0) === 0 && !sideNodes.has(n.id));
     if (roots.length !== 1) return null;
     return walkStepChain(roots[0], nodeById, outBy, inCount, new Set());
 }
@@ -530,7 +545,7 @@ function walkStepChain(
         if (seen.has(cur.id)) return null; // a cycle — defensive; inCount already rules out most shapes
         seen.add(cur.id);
         trunk.push(cur);
-        const outs = outBy.get(cur.id) ?? [];
+        const outs = (outBy.get(cur.id) ?? []).filter((e) => !isGuaranteeSideEdge(e, outBy));
         if (outs.length === 0) return { trunk };
         if (outs.length === 1 && outs[0].rel === 'data') {
             const next = nodeById.get(outs[0].to);
@@ -555,6 +570,113 @@ function walkStepChain(
         return null; // mixed / unrecognized fan-out — not recipe-expressible
     }
     return { trunk };
+}
+
+/**
+ * The recipe verbs the Add-Step palette offers, mapped client-side onto the lowerable node types
+ * (UI plan §2.1). DELETED when the server serves `GET /pipelines/step-types` (S4) — this table is the
+ * documented interim, not a second vocabulary. `route` is deliberately absent until S3's branch UI:
+ * inserting a branch point without a branch editor strands the chain in a shape S2 cannot edit.
+ */
+export const RECIPE_VERBS: readonly { verb: string; type: string; label: string }[] = [
+    { verb: 'collect', type: 'acquisition', label: 'Collect' },
+    { verb: 'parse', type: 'parser', label: 'Parse' },
+    { verb: 'map', type: 'transform.map', label: 'Map' },
+    { verb: 'dedup', type: 'transform.dedup', label: 'Dedup' },
+    { verb: 'transform', type: 'transform.filter', label: 'Transform (filter)' },
+    { verb: 'summarize', type: 'transform.summarize', label: 'Summarize' },
+    { verb: 'sink', type: 'sink.persistent', label: 'Sink' },
+];
+
+/**
+ * Splice a new node into the trunk after `afterId` (or as the new entry when `null`), rewiring the
+ * `data` edges: `after → next` becomes `after → node → next`. Returns `null` when `afterId` names a
+ * node with anything other than exactly one outgoing `data` edge (a route/branch point — S2 edits the
+ * trunk only) — the caller treats that as "not insertable here", never a silent no-op.
+ */
+export function insertStepAfter(model: AuthoredPipeline, node: AuthoredNode, afterId: string | null): AuthoredPipeline | null {
+    if (model.nodes.some((n) => n.id === node.id)) return null;
+    const outBy = new Map<string, AuthoredEdge[]>();
+    for (const e of model.edges) outBy.set(e.from, [...(outBy.get(e.from) ?? []), e]);
+    if (afterId === null) {
+        const inCount = new Map<string, number>();
+        for (const e of model.edges) inCount.set(e.to, (inCount.get(e.to) ?? 0) + 1);
+        const entry = model.nodes.find((n) => (inCount.get(n.id) ?? 0) === 0);
+        return {
+            ...model,
+            nodes: [node, ...model.nodes],
+            edges: entry ? [{ from: node.id, rel: 'data', to: entry.id }, ...model.edges] : [...model.edges],
+        };
+    }
+    // guarantee side-edges (gap watch / quarantine hanging off this node) stay attached where they are
+    const outs = (outBy.get(afterId) ?? []).filter((e) => !isGuaranteeSideEdge(e, outBy));
+    if (outs.length > 1 || (outs.length === 1 && outs[0].rel !== 'data')) return null;
+    const next = outs[0]?.to;
+    return {
+        ...model,
+        nodes: [...model.nodes, node],
+        edges: [
+            ...model.edges.filter((e) => !(e.from === afterId && e.rel === 'data')),
+            { from: afterId, rel: 'data', to: node.id },
+            ...(next ? [{ from: node.id, rel: 'data', to: next }] : []),
+        ],
+    };
+}
+
+/**
+ * Remove a trunk node, reconnecting its predecessor to its successor with a `data` edge. Returns
+ * `null` when the node is a branch point or branch target (more than one edge in either direction,
+ * or a non-`data` edge touches it) — removing those is canvas work, not a recipe-card action.
+ */
+export function removeStepFromChain(model: AuthoredPipeline, id: string): AuthoredPipeline | null {
+    const ins = model.edges.filter((e) => e.to === id);
+    const outs = model.edges.filter((e) => e.from === id);
+    if (ins.length > 1 || outs.length > 1) return null;
+    if (ins.some((e) => e.rel !== 'data') || outs.some((e) => e.rel !== 'data')) return null;
+    const prev = ins[0]?.from;
+    const next = outs[0]?.to;
+    return {
+        ...model,
+        nodes: model.nodes.filter((n) => n.id !== id),
+        edges: [
+            ...model.edges.filter((e) => e.from !== id && e.to !== id),
+            ...(prev && next ? [{ from: prev, rel: 'data', to: next }] : []),
+        ],
+    };
+}
+
+/**
+ * Swap a trunk node with its `data`-edge neighbour (`up` = with its predecessor). Returns `null`
+ * when either node is not strictly linear (branch points and branch targets don't reorder) or the
+ * node is already at that end of the trunk.
+ */
+export function moveStepInChain(model: AuthoredPipeline, id: string, dir: 'up' | 'down'): AuthoredPipeline | null {
+    const target = dir === 'up'
+        ? model.edges.find((e) => e.to === id && e.rel === 'data')?.from
+        : model.edges.find((e) => e.from === id && e.rel === 'data')?.to;
+    if (!target) return null;
+    const first = dir === 'up' ? target : id;
+    const second = dir === 'up' ? id : target;
+    // both must be strictly linear: exactly the edges the swap rewrites, nothing else touching them
+    for (const n of [first, second]) {
+        if (model.edges.filter((e) => e.from === n).length > 1) return null;
+        if (model.edges.filter((e) => e.to === n).length > 1) return null;
+        if (model.edges.some((e) => (e.from === n || e.to === n) && e.rel !== 'data')) return null;
+    }
+    const before = model.edges.find((e) => e.to === first)?.from;   // may be undefined (entry)
+    const after = model.edges.find((e) => e.from === second)?.to;   // may be undefined (tail)
+    const untouched = model.edges.filter(
+        (e) => e.from !== first && e.to !== first && e.from !== second && e.to !== second,
+    );
+    return {
+        ...model,
+        edges: [
+            ...untouched,
+            ...(before ? [{ from: before, rel: 'data', to: second }] : []),
+            { from: second, rel: 'data', to: first },
+            ...(after ? [{ from: first, rel: 'data', to: after }] : []),
+        ],
+    };
 }
 
 /** One row of a flattened {@link StepChain} for a simple indented list render (no recursive component). */

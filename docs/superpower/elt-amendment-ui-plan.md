@@ -151,6 +151,28 @@ recipe editor changes nothing there).
 > public; and an OnPush spec must flip inputs via `fixture.componentRef.setInput`, never by assigning
 > the field.
 | **S2** | Recipe editing: card dialogs wired, add/remove/reorder Step, Guarantees panel (legacy-key projection) | no | round-trip: recipe edit → save → `graph/raw` reload byte-stable on untouched sections |
+
+> **S2 SHIPPED 2026-08-06.** Card click/Configure routes to the EXISTING dialogs through the host's
+> `openNodeConfig` (parse → GrammarEditorDialog automatically — no new dialog kinds, per §2.1); the
+> Add-Step "+" between trunk cards offers `RECIPE_VERBS` (the 7-verb → lowerable-node-type table in
+> `pipeline-graph.ts`, deleted when S4's `step-types` lands; `route` deliberately absent until S3's
+> branch UI); remove/move are pure reducers (`insertStepAfter`/`removeStepFromChain`/
+> `moveStepInChain`) that return `null` rather than guess when a node is wired beyond the linear
+> trunk — the host toasts toward the Canvas. **Trunk-only editing is the S2 scope**; branch-row cards
+> configure but don't splice. The Guarantees panel is a fixed checklist (never draggable) projecting
+> file dedup / gap watch / markers / quarantine / backup out of the keys the LIFTED GRAPH carries
+> (acquisition `duplicate`, the `gap` node, the marker node, the quarantine sink, sink `backup`);
+> Edit opens the OWNING node's existing dialog, so the panel has no write path of its own. Keys the
+> graph doesn't model (`processing.retention_days`, a node-less `dirs.quarantine`) are preserved by
+> lower's ownership rules and deliberately NOT shown — a value the panel can't edit would lie about
+> what Edit does. **Grounding correction ridden in:** the server/mock lift hangs gap watch off the
+> acquisition node via a `gap`-rel edge, so S1's detector forced Canvas for ANY pipeline with gap
+> detection — contradicting §2.4 (gap watch is a Guarantee, not a Step). `detectStepChain` and
+> `insertStepAfter` now tolerate `gap`/`unmatched` side-edges to leaf nodes as housekeeping
+> attachments; a genuinely exotic control edge (e.g. `failure`) still forces Canvas. Gate held:
+> the round-trip test drives insertStepAfter → the mock `lowerGraph` (which mirrors the server) →
+> re-`liftConfig`, asserting untouched sections (`collector`, `parsing`, `dirs.quarantine`)
+> byte-stable while the edit lands. lint:tokens + build + test:ci green (2087 passed, exit 0).
 | **S3** | Route branch UI + "Step" vocabulary sweep | no | branch add/remove/default rules match `PipelineValidator` refusals (mock parity spec) |
 | **S4** | `step-types` palette + 7-verb specs, dual-read fallback | main plan Phase 5 endpoint | contract JSON byte-compare (extend `NodeAttributesContractTest` pattern) |
 | **S5** | Schema/Mapping grid editors + compatibility findings | Phase 1 gate + CSV kinds | ag-Grid editing module registered explicitly; cell-findings a11y (`role=alert` summary) |

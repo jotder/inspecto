@@ -16,10 +16,13 @@ import {
     encodeEdgeId,
     flattenStepChain,
     groupByCategory,
+    insertStepAfter,
+    moveStepInChain,
     nodeConfigEntries,
     nodeDisplayLabel,
     nodeLastRunTotal,
     provenanceCounts,
+    removeStepFromChain,
     removeEdgeFromModel,
     removeNodeFromModel,
     resolveNodeIcon,
@@ -466,14 +469,16 @@ describe('detectStepChain', () => {
         expect(detectStepChain(model)).toBeNull();
     });
 
-    it('returns null for a mixed fan-out (data alongside a non-route relationship)', () => {
+    it('returns null for a mixed fan-out (data alongside a non-route, non-guarantee relationship)', () => {
+        // `failure` is a control edge with no Guarantee semantics — unlike `gap`/`unmatched`
+        // (which S2 tolerates as housekeeping side-nodes), this stays Canvas-only.
         const model: AuthoredPipeline = {
             name: 'p',
             active: false,
             nodes: [an('a'), an('b'), an('c')],
             edges: [
                 { from: 'a', rel: 'data', to: 'b' },
-                { from: 'a', rel: 'gap', to: 'c' },
+                { from: 'a', rel: 'failure', to: 'c' },
             ],
         };
         expect(detectStepChain(model)).toBeNull();
@@ -485,6 +490,23 @@ describe('detectStepChain', () => {
 });
 
 describe('flattenStepChain', () => {
+    it('tolerates guarantee side-nodes (gap watch) instead of forcing Canvas', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('acq', 'acquisition'), an('gap', 'gap'), an('parse', 'parser'), an('sink', 'sink.persistent')],
+            edges: [
+                { from: 'acq', rel: 'gap', to: 'gap' },
+                { from: 'acq', rel: 'data', to: 'parse' },
+                { from: 'parse', rel: 'data', to: 'sink' },
+            ],
+        };
+        const chain = detectStepChain(model);
+        expect(chain).not.toBeNull();
+        expect(chain!.trunk.map((n) => n.id)).toEqual(['acq', 'parse', 'sink'],
+        );
+    });
+
     it('flattens a linear trunk with depth 0 throughout', () => {
         const chain = detectStepChain(linearPipeline())!;
         const rows = flattenStepChain(chain);
@@ -510,5 +532,136 @@ describe('flattenStepChain', () => {
             expect(emeaHeader.depth).toBe(0);
         }
         expect(rows[2].depth).toBe(1); // sink-emea, one level under its branch header
+    });
+});
+
+// ── Recipe editing reducers (UI plan S2) ───────────────────────────────────────────────────────────
+
+describe('insertStepAfter', () => {
+    it('splices a node into the trunk, rewiring after → node → next', () => {
+        const next = insertStepAfter(linearPipeline(), an('dedup-1', 'transform.dedup'), 'parse-1')!;
+        expect(next).not.toBeNull();
+        expect(detectStepChain(next)!.trunk.map((n) => n.id))
+            .toEqual(['collect-1', 'parse-1', 'dedup-1', 'sink-1']);
+    });
+
+    it('inserts as the new entry when afterId is null', () => {
+        const next = insertStepAfter(linearPipeline(), an('collect-0', 'acquisition'), null)!;
+        expect(detectStepChain(next)!.trunk.map((n) => n.id))
+            .toEqual(['collect-0', 'collect-1', 'parse-1', 'sink-1']);
+    });
+
+    it('appends after the tail (no next edge to rewire)', () => {
+        const next = insertStepAfter(linearPipeline(), an('sink-2', 'sink.persistent'), 'sink-1')!;
+        expect(detectStepChain(next)!.trunk.map((n) => n.id))
+            .toEqual(['collect-1', 'parse-1', 'sink-1', 'sink-2']);
+    });
+
+    it('ignores guarantee side-edges when rewiring (gap watch stays on the collect node)', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('acq', 'acquisition'), an('gap', 'gap'), an('sink', 'sink.persistent')],
+            edges: [
+                { from: 'acq', rel: 'gap', to: 'gap' },
+                { from: 'acq', rel: 'data', to: 'sink' },
+            ],
+        };
+        const next = insertStepAfter(model, an('parse', 'parser'), 'acq')!;
+        expect(next).not.toBeNull();
+        expect(next.edges).toContainEqual({ from: 'acq', rel: 'gap', to: 'gap' });
+        expect(detectStepChain(next)!.trunk.map((n) => n.id)).toEqual(['acq', 'parse', 'sink']);
+    });
+
+    it('refuses to insert after a branch point and on a duplicate id', () => {
+        const routed: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('r', 'transform.route'), an('a', 'sink.persistent'), an('b', 'sink.persistent')],
+            edges: [
+                { from: 'r', rel: 'route:a', to: 'a' },
+                { from: 'r', rel: 'route:b', to: 'b' },
+            ],
+        };
+        expect(insertStepAfter(routed, an('x'), 'r')).toBeNull();
+        expect(insertStepAfter(linearPipeline(), an('parse-1'), 'collect-1')).toBeNull();
+    });
+});
+
+describe('removeStepFromChain', () => {
+    it('removes a mid-chain node and reconnects its neighbours', () => {
+        const next = removeStepFromChain(linearPipeline(), 'parse-1')!;
+        expect(detectStepChain(next)!.trunk.map((n) => n.id)).toEqual(['collect-1', 'sink-1']);
+    });
+
+    it('removes the entry and the tail without fabricating edges', () => {
+        expect(detectStepChain(removeStepFromChain(linearPipeline(), 'collect-1')!)!
+            .trunk.map((n) => n.id)).toEqual(['parse-1', 'sink-1']);
+        expect(detectStepChain(removeStepFromChain(linearPipeline(), 'sink-1')!)!
+            .trunk.map((n) => n.id)).toEqual(['collect-1', 'parse-1']);
+    });
+
+    it('refuses a node wired beyond the trunk (branch point / non-data edges)', () => {
+        const model: AuthoredPipeline = {
+            name: 'p',
+            active: false,
+            nodes: [an('acq', 'acquisition'), an('gap', 'gap'), an('sink', 'sink.persistent')],
+            edges: [
+                { from: 'acq', rel: 'gap', to: 'gap' },
+                { from: 'acq', rel: 'data', to: 'sink' },
+            ],
+        };
+        expect(removeStepFromChain(model, 'acq')).toBeNull();
+    });
+});
+
+describe('moveStepInChain', () => {
+    it('swaps a node with its predecessor / successor, keeping the chain intact', () => {
+        const up = moveStepInChain(linearPipeline(), 'parse-1', 'up')!;
+        expect(detectStepChain(up)!.trunk.map((n) => n.id)).toEqual(['parse-1', 'collect-1', 'sink-1']);
+
+        const down = moveStepInChain(linearPipeline(), 'parse-1', 'down')!;
+        expect(detectStepChain(down)!.trunk.map((n) => n.id)).toEqual(['collect-1', 'sink-1', 'parse-1']);
+    });
+
+    it('refuses at the ends of the trunk', () => {
+        expect(moveStepInChain(linearPipeline(), 'collect-1', 'up')).toBeNull();
+        expect(moveStepInChain(linearPipeline(), 'sink-1', 'down')).toBeNull();
+    });
+});
+
+// ── S2 gate: recipe edit → lower → re-lift, byte-stable on untouched sections ──────────────────────
+
+describe('recipe edit round trip (over the mock lift/lower, which mirrors the server)', () => {
+    it('an inserted Step survives lower → lift, and untouched sections stay byte-stable', async () => {
+        const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');
+        const cfg = {
+            name: 'orders',
+            active: false,
+            collector: { id: 'SRC', duplicate: { mode: 'checksum' } },
+            dirs: { poll: '/in', database: '/db', quarantine: '/db/q' },
+            parsing: { grammar: 'grammar/pipe', header: true },
+            processing: { file_pattern: 'glob:**/*.csv' },
+            output: { format: 'PARQUET' },
+        } as Record<string, unknown>;
+
+        const lifted = liftConfig(structuredClone(cfg));
+        const edited = insertStepAfter(lifted, { id: 'flt', type: 'transform.filter', config: { where: 'AMT > 0' } }, 'parse')!;
+        expect(edited).not.toBeNull();
+
+        const lowered = lowerGraph(edited, structuredClone(cfg), false);
+        expect('config' in lowered, JSON.stringify(lowered)).toBe(true);
+        const out = (lowered as { config: Record<string, unknown> }).config;
+
+        // untouched sections byte-stable (the S2 gate)
+        expect(out['collector']).toEqual(cfg['collector']);
+        expect(out['parsing']).toEqual(cfg['parsing']);
+        expect((out['dirs'] as Record<string, unknown>)['quarantine']).toBe('/db/q');
+        // the edit itself landed
+        expect(((out['processing'] as Record<string, unknown>)['csv_settings'] as Record<string, unknown>)['where'])
+            .toBe('AMT > 0');
+        // and the round trip re-lifts to a chain carrying the new Step
+        const relifted = detectStepChain(liftConfig(out));
+        expect(relifted!.trunk.some((n) => n.type === 'transform.filter')).toBe(true);
     });
 });

@@ -375,7 +375,19 @@
                         [rows]="stepRows()"
                         [typeCat]="typeCat()"
                         [statusOf]="boundStatusOf"
+                        [editable]="canAuthor()"
+                        (open)="openNodeConfig($event)"
+                        (insertStep)="onRecipeInsert($event)"
+                        (remove)="onRecipeRemove($event)"
+                        (move)="onRecipeMove($event)"
                     ></app-pipeline-step-cards>
+                    <div class="px-3 pb-3">
+                        <app-pipeline-guarantees-panel
+                            [model]="model()"
+                            [editable]="canAuthor()"
+                            (edit)="openNodeConfig($event)"
+                        ></app-pipeline-guarantees-panel>
+                    </div>
                 } @else {
                     <app-pipeline-editor-graph
                         class="absolute inset-0"

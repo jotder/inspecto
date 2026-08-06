@@ -70,4 +70,43 @@ describe('PipelineStepCardsComponent', () => {
         expect(fixture.nativeElement.querySelectorAll('li')).toHaveLength(0);
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    it('S2: editable cards emit open / remove / move, and branch rows stay trunk-only', async () => {
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 },
+            { kind: 'node', rowId: 'deep', node: { id: 'deep', type: 'sink.persistent' }, depth: 1 },
+        ];
+        const typeCat = new Map([['acquisition', 'SOURCE'], ['sink.persistent', 'SINK']]);
+        const { fixture, c } = create({ rows, typeCat, editable: true });
+        const opened: unknown[] = [];
+        const removed: string[] = [];
+        const moved: unknown[] = [];
+        c.open.subscribe((n) => opened.push(n));
+        c.remove.subscribe((id) => removed.push(id));
+        c.move.subscribe((m) => moved.push(m));
+
+        const el = fixture.nativeElement as HTMLElement;
+        const btn = (label: string): HTMLButtonElement | undefined =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label);
+
+        btn('Configure collect-1')!.click();
+        expect(opened).toEqual([COLLECT]);
+        btn('Remove collect-1')!.click();
+        expect(removed).toEqual(['collect-1']);
+        btn('Move collect-1 up')!.click();
+        expect(moved).toEqual([{ id: 'collect-1', dir: 'up' }]);
+
+        // trunk-only editing (S2 scope): the depth-1 card configures, but never removes/moves
+        expect(btn('Configure deep')).toBeTruthy();
+        expect(btn('Remove deep')).toBeUndefined();
+        expect(btn('Move deep up')).toBeUndefined();
+
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('S2: hides every editing affordance when not editable', () => {
+        const rows: StepRow[] = [{ kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 }];
+        const { fixture } = create({ rows, typeCat: new Map([['acquisition', 'SOURCE']]), editable: false });
+        expect((fixture.nativeElement as HTMLElement).querySelectorAll('button')).toHaveLength(0);
+    });
 });
