@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
 import type { AttributeSpec } from 'app/inspecto/component-model/attribute-spec';
@@ -299,6 +299,27 @@ export class PipelinesService {
     /** The recipe-verb palette (Phase 5). 404 on an old server — callers fall back to the client verb map. */
     stepTypes(): Observable<RecipeStepType[]> {
         return this.http.get<RecipeStepType[]>(apiUrl('/pipelines/step-types'));
+    }
+
+    /**
+     * The Pipeline Document (ELT amendment §5.1) — a Markdown projection of the pipeline's config for
+     * business verification and sign-off, regenerated on demand and never stored.
+     *
+     * Returns the whole {@link HttpResponse} rather than the body alone because the sign-off
+     * fingerprint rides the `X-Config-Fingerprint` header — a Markdown blob has nowhere else to carry
+     * it. This is the only call in the app that needs `observe: 'response'`; read `res.body` for the
+     * document and {@link documentFingerprint} for the hash.
+     */
+    document(name: string): Observable<HttpResponse<Blob>> {
+        return this.http.get(apiUrl(`/pipelines/${encodeURIComponent(name)}/document`), {
+            observe: 'response',
+            responseType: 'blob',
+        });
+    }
+
+    /** The config fingerprint a {@link document} response was stamped with, if the server sent one. */
+    documentFingerprint(res: HttpResponse<Blob>): string | null {
+        return res.headers.get('X-Config-Fingerprint');
     }
 
     /** The combined pipeline+job topology — every pipeline joined at the shared store nodes (T24). */

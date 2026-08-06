@@ -13,18 +13,21 @@ import com.gamma.event.EventType;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineCodec;
+import com.gamma.pipeline.PipelineDocument;
 import com.gamma.pipeline.PipelineCompileException;
 import com.gamma.pipeline.PipelineEditable;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineProjection;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineValidator;
+import com.gamma.pipeline.RecipeConverter;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.service.CollectorService;
 import com.gamma.service.DbStatusStore;
 import com.gamma.service.SpaceRoot;
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.MappingCsv;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,6 +78,9 @@ final class PipelineRoutes implements RouteModule {
         // pipelines.service.ts, mock-only today) and must never fire a production run.
         api.post("/pipelines/authored/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> runPipeline(api, e, ApiContext.name(m))));
         api.get("/pipelines/([^/]+)/graph", (e, m) -> graphForPipeline(api, ApiContext.name(m)));
+        // The Pipeline Document (ELT amendment §5.1): a read-only Markdown projection of config for
+        // business verification and sign-off. A read, not an authoring action — no capability gate.
+        api.get("/pipelines/([^/]+)/document", (e, m) -> document(api, e, ApiContext.name(m)));
         // W5 (plan U-A): the editable round-trip over the canonical *_pipeline.toon.
         api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, ApiContext.name(m)));
         api.put("/pipelines/([^/]+)/graph", ApiContext.withCapability("canAuthorWorkbench",
@@ -129,6 +135,116 @@ final class PipelineRoutes implements RouteModule {
         PipelineConfig c = api.service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
         return PipelineProjection.graph(PipelineLift.lift(c));
+    }
+
+    /**
+     * {@code GET /pipelines/{name}/document} — the <b>Pipeline Document</b> (ELT amendment §5.1):
+     * the pipeline's configuration projected to Markdown for business verification and sign-off.
+     * Regenerated on demand and <b>never stored as truth</b>; the header table and the
+     * {@code X-Config-Fingerprint} response header carry a hash over the recipe plus every resolved
+     * component, so an approved document is verifiably tied to the config that produced it.
+     *
+     * <p>Reads the same registered file {@link #editableGraph} does, then projects it through
+     * {@link RecipeConverter#toRecipe} — the document describes the Steps a user authored, not the
+     * lowered graph. 404 if no such registered pipeline.
+     */
+    private Object document(ApiContext api, HttpExchange ex, String name) throws IOException {
+        PipelineConfig cfg = api.service().configFor(name)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+        Path file = api.service().pathFor(name)
+                .orElseThrow(() -> new ApiException(404, "no config file for pipeline '" + name + "'"));
+
+        Map<String, Object> recipe = RecipeConverter.toRecipe(ConfigLoader.filesystem().decode(file.toString()));
+        Map<String, Map<String, Object>> components = resolveDocumentRefs(api, cfg, recipe);
+
+        Map<String, Object> hashed = new LinkedHashMap<>();
+        hashed.put("recipe", recipe);
+        hashed.put("components", components);
+        String fingerprint = ContentHash.of(hashed);
+
+        ex.getResponseHeaders().set("X-Config-Fingerprint", fingerprint);
+        return ApiContext.respondText(ex,
+                PipelineDocument.render(cfg.identity().pipelineName(), recipe, components, fingerprint),
+                "text/markdown; charset=utf-8");
+    }
+
+    /**
+     * Resolve every component the recipe's document-bearing keys name, keyed by the ref exactly as the
+     * recipe spells it. Two spellings resolve, mirroring {@link RecipeConverter}'s own distinction:
+     * a <b>registry ref</b> ({@code schemas/foo}) through the {@link ComponentStore}, and a
+     * <b>plain path</b> (the legacy pre-Phase-1 {@code schema_file}) only when the pipeline's own
+     * {@link PipelineConfig#referencedFiles()} declares it — never an arbitrary path off the config,
+     * so a document can't be used to read files the engine doesn't already parse for this pipeline.
+     * Anything unresolved maps to an empty map: the document reports it rather than failing, and it
+     * still participates in the fingerprint so a ref that later resolves changes the hash.
+     *
+     * <p><b>{@code connections/*} is deliberately never resolved</b>: a Connection component holds
+     * credentials, and neither the document nor the fingerprint has any business loading them. The
+     * collect Step's connection ref still renders, and secret-shaped keys mask in
+     * {@link PipelineDocument}.
+     */
+    private Map<String, Map<String, Object>> resolveDocumentRefs(ApiContext api, PipelineConfig cfg,
+                                                                Map<String, Object> recipe) {
+        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+        collectRefs(recipe.get("steps"), out);
+        if (out.isEmpty()) return out;
+
+        Path root = api.writeRoot();
+        ComponentStore store = root == null ? null : new ComponentStore(root.resolve("registry"));
+        Map<String, Path> declared = new LinkedHashMap<>();
+        for (Path p : cfg.referencedFiles()) declared.put(p.toAbsolutePath().normalize().toString(), p);
+
+        for (Map.Entry<String, Map<String, Object>> e : out.entrySet()) {
+            String ref = e.getKey();
+            int slash = ref.indexOf('/');
+            String dir = slash < 0 ? "" : ref.substring(0, slash);
+            String type = COMPONENT_DIRS.get(dir);
+            try {
+                if (type != null) {
+                    if (store != null) store.get(type, ref.substring(slash + 1))
+                            .ifPresent(c -> e.setValue(c.content() == null ? Map.of() : c.content()));
+                } else {
+                    Path p = declared.get(Path.of(ref).toAbsolutePath().normalize().toString());
+                    if (p != null && Files.isRegularFile(p)) e.setValue(decodeReferenced(p));
+                }
+            } catch (RuntimeException | IOException ignored) {
+                // an unreadable or malformed component is reported as unresolved, never a failed document
+            }
+        }
+        return out;
+    }
+
+    /** Decode a declared referenced file by suffix — mapping CSV rows, or an ordinary TOON component. */
+    private static Map<String, Object> decodeReferenced(Path p) throws IOException {
+        if (p.getFileName().toString().endsWith(".csv")) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("rules", MappingCsv.parse(Files.readString(p, StandardCharsets.UTF_8), p.toString()));
+            return m;
+        }
+        return ConfigLoader.filesystem().decode(p.toString());
+    }
+
+    /** Recipe ref dir → component type. A value not starting with one of these is a plain path, not a ref. */
+    private static final Map<String, String> COMPONENT_DIRS = Map.of(
+            "grammars", "grammar", "schemas", "schema", "mappings", "mapping", "references", "reference");
+
+    /** Recipe keys whose value the document renders a component from. */
+    private static final Set<String> DOCUMENT_REF_KEYS = Set.of("grammar", "schema", "mapping", "join");
+
+    /** Walk the Step list (through {@code route} branches) collecting every renderable component ref. */
+    private void collectRefs(Object steps, Map<String, Map<String, Object>> out) {
+        if (!(steps instanceof List<?> list)) return;
+        for (Object s : list) {
+            if (!(s instanceof Map<?, ?> step)) continue;
+            for (Map.Entry<?, ?> verb : step.entrySet()) {
+                if (!(verb.getValue() instanceof Map<?, ?> cfg)) continue;
+                for (String key : DOCUMENT_REF_KEYS)
+                    if (cfg.get(key) instanceof String ref && !ref.isBlank()) out.putIfAbsent(ref, Map.of());
+                if (cfg.get("branches") instanceof Map<?, ?> branches)
+                    for (Object b : branches.values())
+                        if (b instanceof Map<?, ?> branch) collectRefs(branch.get("steps"), out);
+            }
+        }
     }
 
     private Path pipelinesRootOrNull(ApiContext api) {

@@ -270,6 +270,53 @@ recipe editor changes nothing there).
 > (`schema-config`) in separate stores, so a demo-seeded schema bypassed the gate; writes now diff
 > against and mirror into both. Pinned in `onboarding.handler.spec.ts` + `schema-editor.dialog.spec.ts`.
 | **S6** | Pipeline Document export + mapping import loop | Phase 5 generator | diff preview renders the dry-run sample; fingerprint shown |
+
+> **S6 GROUNDED 2026-08-06 — the premise was wrong: this is not a UI slice.** §2.5 is written as if the
+> Phase 5 backend had landed. It has not — **all three** surfaces it calls are absent from the code:
+> (1) no `GET /pipelines/{id}/document` and no document-generator class of any name; (2) no
+> validate-without-write route for `mapping` (unlike `transform`/`grammar`/`sink`, which each have a
+> `.../test`) — a bad mapping upload only fails as a side effect of `ComponentStore.encode`, surfacing
+> as a bare 422 string, **not** the per-cell `findings[]` §2.5 cites as its precedent; (3)
+> `POST /pipelines/authored/{id}/dry-run` exists but runs the **persisted** graph and takes no draft
+> body, so it cannot produce "old vs new" anything. S6 therefore splits, and each half ships backend
+> + UI together the way S4 did:
+> **S6a** = document export (below). **S6b** = the import loop, which additionally needs a dry-run that
+> accepts a *candidate* config — the real cost §2.5 hides.
+
+> **S6a SHIPPED 2026-08-06.** `PipelineDocument` (inspecto-engine, pure — no I/O, no clock) renders a
+> recipe as the §5.1 Markdown: header + fingerprint, a chain-overview table, one section per Step with
+> §5.1's per-kind content, the `map` **field table** (mapping `rules[]` joined to schema `fields[]` by
+> field name; an unmapped schema field still lists, so the reviewer sees the whole output shape),
+> `route` branch tables + nested per-branch chains, then Guarantees and a referenced-components table.
+> It renders the **recipe**, not the lowered graph — `RecipeConverter.toRecipe` already produces the
+> ordered verb chain §5.1's contents table is written against, and it had **zero production callers**
+> before this (only its own parity test), so S6a is its first live use.
+> **Three deliberate calls.** (1) **No generation timestamp** — the document is bound to config by the
+> fingerprint, and a clock would break both that binding and the determinism gate; a golden-file test
+> (`-Dpipeline.document.write=true` to regenerate, the step-types/node-attributes idiom) pins the
+> format byte-wise. (2) **Nothing is silently dropped** — every step key without a dedicated table
+> still renders as a Setting row, because a sign-off document that quietly omits config is worse than
+> none; secret-shaped keys mask instead. (3) **Sample rows per Step (§5.1's "worked examples") are NOT
+> here** — they need a live dry-run, which is neither pure nor deterministic; they belong to S6b, which
+> needs that seam anyway.
+> **Route:** `GET /pipelines/{name}/document` → `text/markdown`, un-gated (a read; a Business-lens
+> reviewer is exactly the audience). Fingerprint = `ContentHash.of({recipe, components})` on the
+> `X-Config-Fingerprint` header — a Markdown blob has nowhere else to carry it — which needed
+> `Access-Control-Expose-Headers` widened (it listed only `Correlation-ID`). Ref resolution mirrors
+> `RecipeConverter`'s own registry-ref-vs-plain-path split: registry refs via `ComponentStore`, a legacy
+> plain path **only when the pipeline's own `referencedFiles()` declares it** — so a document can never
+> read a file the engine doesn't already parse for that pipeline. `connections/*` is deliberately never
+> resolved (credentials). **Trap hit:** the first cut split any value containing `/` as `dir/name`, so
+> the fixture's absolute `schema_file` (`C:/…`) resolved as component type `C:` and 500'd — caught only
+> by the real-HTTP test, not by the unit tests.
+> **UI:** "Export document" in the editor's overflow menu → blob download + a toast carrying the
+> fingerprint's first 12 chars. `PipelinesService.document()` is the app's **only** `observe: 'response'`
+> call (the header is the point); the v1 interceptor already passes blobs through untouched.
+> A read failure deliberately does **not** go through `onWriteError`, which would wrongly latch the
+> editor read-only. **`/document` is deliberately NOT mocked**, matching the existing blob-route
+> precedent (`spaces` export isn't either): `MockResponse` carries no headers and v1-wraps every 2xx
+> body, so mocking it would need shared mock-infra surgery — and not mocking cannot violate the
+> mock-strictness rule, since a mock that doesn't exist can't be more lenient than the server.
 | **S7** | Table-entry collect + summarize cards; Jobs nav retirement | Phase 3 / Phase 6 | nav retirement = 3 edits incl. `ACCESS_ACTION_NODES`; `access-catalog.spec` green |
 
 ## 5. Known traps to carry (from the skill, amendment-specific)

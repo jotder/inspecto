@@ -42,6 +42,8 @@ describe('PipelineEditorComponent', () => {
         provenance: ReturnType<typeof vi.fn>;
         saveAsTemplate: ReturnType<typeof vi.fn>;
         label: ReturnType<typeof vi.fn>;
+        document: ReturnType<typeof vi.fn>;
+        documentFingerprint: ReturnType<typeof vi.fn>;
     };
     let config: { write: ReturnType<typeof vi.fn>; registerPipeline: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
     let dialog: { open: ReturnType<typeof vi.fn> };
@@ -71,6 +73,8 @@ describe('PipelineEditorComponent', () => {
             label: vi.fn().mockReturnValue(
                 of({ written: true, path: 'demo_pipeline.toon', id: 'demo', name: 'Demo (EU)', stampedId: true }),
             ),
+            document: vi.fn().mockReturnValue(of({ body: new Blob(['# Pipeline: demo']) })),
+            documentFingerprint: vi.fn().mockReturnValue('0123456789abcdef0123'),
         };
         config = {
             write: vi.fn().mockReturnValue(of({ written: true, path: 'x_pipeline.toon', name: 'x' })),
@@ -114,6 +118,74 @@ describe('PipelineEditorComponent', () => {
             c.select('demo');
             c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'legacy', type: 'adapter', config: {} }] }));
             expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['legacy']);
+        });
+    });
+
+    /**
+     * The Pipeline Document export (ELT amendment §5.1, S6a). What matters here is that the sign-off
+     * fingerprint actually reaches the operator, and that a READ failing never latches the editor into
+     * the writes-disabled state a WRITE failure sets — they take different error paths for that reason.
+     */
+    describe('export document', () => {
+        function stubDownload() {
+            URL.createObjectURL = vi.fn().mockReturnValue('blob:doc');
+            URL.revokeObjectURL = vi.fn();
+            // spyOn a prototype method returns the SAME spy across tests in this file — clear it, or
+            // one test sees the clicks of the ones before it.
+            const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+            click.mockClear();
+            return click;
+        }
+
+        it('downloads the markdown and reports the config fingerprint that binds it', () => {
+            const click = stubDownload();
+            const c = make();
+            c.select('demo');
+            c.exportDocument();
+
+            expect(api.document).toHaveBeenCalledWith('demo');
+            expect(click).toHaveBeenCalled();
+            expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:doc');
+            expect(toast.success).toHaveBeenCalledWith(
+                "Exported 'demo.md' — config fingerprint 0123456789ab",
+            );
+            expect(c.exportingDocument()).toBe(false);
+        });
+
+        it('exports nothing when no pipeline is selected', () => {
+            const c = make();
+            c.exportDocument();
+            expect(api.document).not.toHaveBeenCalled();
+        });
+
+        it('a server that sends no fingerprint still exports, without inventing one', () => {
+            stubDownload();
+            api.documentFingerprint.mockReturnValue(null);
+            const c = make();
+            c.select('demo');
+            c.exportDocument();
+            expect(toast.success).toHaveBeenCalledWith("Exported 'demo.md'");
+        });
+
+        it('an empty body is an error, not a zero-byte download', () => {
+            const click = stubDownload();
+            api.document.mockReturnValue(of({ body: null }));
+            const c = make();
+            c.select('demo');
+            c.exportDocument();
+            expect(click).not.toHaveBeenCalled();
+            expect(toast.error).toHaveBeenCalledWith('The server returned an empty document');
+        });
+
+        it('a failed export toasts but must NOT mark the editor read-only — it is a read', () => {
+            api.document.mockReturnValue(throwError(() => ({ status: 503 })));
+            const c = make();
+            c.select('demo');
+            c.exportDocument();
+
+            expect(toast.error).toHaveBeenCalled();
+            expect(c.unavailable()).toBe(false);
+            expect(c.exportingDocument()).toBe(false);
         });
     });
 

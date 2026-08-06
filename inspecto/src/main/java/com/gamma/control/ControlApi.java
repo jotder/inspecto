@@ -705,7 +705,10 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         h.set("Access-Control-Allow-Origin", corsOrigin);
         h.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
         h.set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Api-Token, Correlation-ID");
-        h.set("Access-Control-Expose-Headers", "Correlation-ID");
+        // X-Config-Fingerprint rides GET /pipelines/{name}/document (§5.1): the body is a Markdown
+        // blob, so the sign-off fingerprint has nowhere else to go and the browser cannot read a
+        // response header cross-origin unless it is exposed here.
+        h.set("Access-Control-Expose-Headers", "Correlation-ID, X-Config-Fingerprint");
         h.set("Access-Control-Max-Age", "600");
         if (!"*".equals(corsOrigin)) h.set("Vary", "Origin");
     }

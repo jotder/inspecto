@@ -194,6 +194,8 @@ export class PipelineEditorComponent implements OnInit {
     /** Configurable processor icons/colours (empty until loaded → fall back to the per-kind glyph). */
     readonly iconMap = signal<IconMap>({});
     readonly selectedId = signal<string | null>(null);
+    /** In-flight guard for the Pipeline Document export — the generator re-reads config on every call. */
+    readonly exportingDocument = signal(false);
     readonly model = signal<AuthoredPipeline | null>(null);
 
     /** The list row for the selected pipeline — carries the `template` flag and the display name. */
@@ -918,6 +920,51 @@ export class PipelineEditorComponent implements OnInit {
                     error: (err) => this.onWriteError(err, 'Could not create the template'),
                 });
             });
+    }
+
+    /**
+     * Export the selected pipeline's **Pipeline Document** (ELT amendment §5.1) as a Markdown file, and
+     * report the config fingerprint it was stamped with — that hash is what ties a business sign-off to
+     * the configuration that produced it.
+     *
+     * A read, not an authoring action: it is deliberately NOT gated on `canAuthorWorkbench()` (a
+     * Business-lens reviewer is exactly who needs it), and a failure goes through a plain toast rather
+     * than {@link onWriteError}, which would wrongly latch the editor into its writes-disabled state.
+     */
+    exportDocument(): void {
+        const id = this.selectedId();
+        if (!id || this.exportingDocument()) return;
+        this.exportingDocument.set(true);
+        this.api.document(id).subscribe({
+            next: (res) => {
+                this.exportingDocument.set(false);
+                if (!res.body) {
+                    this.toast.error('The server returned an empty document');
+                    return;
+                }
+                this.downloadBlob(res.body, `${id}.md`);
+                const fingerprint = this.api.documentFingerprint(res);
+                this.toast.success(
+                    fingerprint
+                        ? `Exported '${id}.md' — config fingerprint ${fingerprint.slice(0, 12)}`
+                        : `Exported '${id}.md'`,
+                );
+            },
+            error: (err) => {
+                this.exportingDocument.set(false);
+                this.toast.error(apiErrorMessage(err, 'Could not export the document'));
+            },
+        });
+    }
+
+    /** Trigger a browser download for a fetched blob (object URL, revoked after the click). */
+    private downloadBlob(blob: Blob, filename: string): void {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     /**
