@@ -430,31 +430,52 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
-- 🔴 **BUILD-1 — the offline reactor build is BROKEN, and the recorded test baseline is unverified
-  (found 2026-08-06).** `mvn -o clean test` cannot complete: (a) `asn-parser/asn-decoders/pom.xml`
-  pinned surefire **3.5.3**, of which `.m2` holds only the plugin jar and none of its runtime deps
-  (`maven-surefire-common:3.5.3` absent), so `asn-core` dies at mojo load — **before any `inspecto-*`
-  module builds, and `-DskipTests` does not help** (the plugin realm loads before the skip check);
-  (b) past that, `asn-core`'s tests need `junit-platform-launcher:1.12.2` and `com.gamma.asn:legacy-code`
-  needs `jackson-annotations:2.17.1` + `postgresql:42.7.2` — none cached, all unreachable offline.
-  `inspecto-engine` hard-depends on `com.gamma.asn:asn-facade`, itself only obtainable by building that
-  same sub-reactor. **Workaround that works today:** `mvn -o -pl inspecto -am install -DskipTests`
-  (note `-DskipTests`, *not* `-Dmaven.test.skip`, or the `inspecto-etl` test-jar is missing), after
-  which `-pl inspecto` / `-pl inspecto-engine` run standalone. An **uncommitted** local retarget of that
-  pin to the cached 3.5.2 is what got the reactor past (a) — keep or drop, but the underlying `.m2` gap
-  is real and the rest of the repo pins **3.2.5**, so 3.5.3 is an unexplained outlier.
-  ⚠ **Consequence:** `SESSION_STATUS`'s three "full reactor, BUILD SUCCESS" passes of 2026-08-06 could
-  not be reproduced and could not be reconciled — the `.m2` gap looks months old, yet the tests it names
-  live in modules that need `asn-facade` to compile. **Treat that baseline as unverified** until someone
-  reproduces it; per-module runs (`inspecto-engine` 982, `inspecto` 681, 0 failures) are what is actually
-  confirmed.
-- **VOCAB-1 — the vocabulary guard is red on `master`, and silently under-reports.**
-  `docs/superpower/job-parameter-contract-plan.md:66` uses banned *Source* as an acquisition entity
-  (a table header). Separately, `node tools/check-vocabulary.mjs` **skips its TOON and source passes and
-  exits 0** whenever git cannot read the checkout — which is the default for any operator whose Windows
-  profile differs from the checkout owner. Run it as
-  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=<repo> node tools/check-vocabulary.mjs`
-  to get the real verdict (exit 1, 1 violation as of 2026-08-06).
+- ~~🔴 BUILD-1 — the offline reactor build is BROKEN~~ **CLOSED 2026-08-06 — NOT A BUILD DEFECT. The
+  diagnosis was an artifact of running as the wrong Windows profile.** `mvn -o clean test` completes
+  the full **23-module reactor: BUILD SUCCESS, 2799 tests, 0 failures, 0 errors, 6 skipped** (3m32s),
+  offline, with the committed surefire **3.5.3** pin left exactly as-is.
+  **Root cause:** the shift that filed BUILD-1 ran as Windows user `User`, so Maven read
+  `C:\Users\User\.m2` — a near-empty cache. Every artifact it reported "absent" is present and a real
+  jar in the checkout owner's `C:\Users\jotder\.m2`: `maven-surefire-common:3.5.3`,
+  `junit-platform-launcher:1.12.2`, `jackson-annotations:2.17.1`, `postgresql:42.7.2`. There is **no
+  `.m2` gap** and the "months old" framing was the same illusion.
+  ⚠ **Retraction:** the uncommitted local retarget of that pin to 3.5.2 was **never needed** and has
+  been **reverted**. The 3.5.3-vs-3.2.5 outlier is a cosmetic inconsistency, *not* a build blocker —
+  do not "fix" it to chase a failure that does not exist.
+  ✅ **The earlier "full reactor, BUILD SUCCESS ×3" baseline is REINSTATED** — it was always correct;
+  it simply could not be reproduced from a profile with no dependency cache.
+  **Lesson (the reusable part):** on this shared sandbox, `whoami` before trusting any build or git
+  verdict. A wrong profile silently swaps `~/.m2`, `~/.claude`, and git's ownership check at once, and
+  every symptom it produces looks like a repo defect. `mvn -o -pl inspecto -am install -DskipTests`
+  remains a valid fast path, but it is a convenience now, not a workaround.
+- ~~VOCAB-1 — the vocabulary guard is red on `master`, and silently under-reports.~~ **CLOSED
+  2026-08-06 — both halves fixed; the guard is green and can no longer pass vacuously.**
+  (a) The violation is gone: the offending table header in `job-parameter-contract-plan.md` meant *where
+  the value came from*, not an acquisition entity, so the column is now **Origin** — the banned word was
+  never load-bearing there. (b) The silent under-reporting is fixed in `tools/check-vocabulary.mjs`:
+  `git ls-files` failing has two causes and only one is benign, so the guard now probes git **once, up
+  front**, and distinguishes a source tarball with no `.git` (skip the git-backed passes, as designed)
+  from git refusing to read a real checkout (**exit 2** with the `safe.directory` fix spelled out).
+  A third pass was worse than recorded: `treeDocs` used `?? []`, so `docs/{okf,superpower}` silently
+  scanned **zero** files without even printing "skipped" — the summary now names that scope too.
+  Verified both ways: green run reports real counts (9 user-facing + 151 tree + 143 TOON + 1399 source);
+  the previously-silent failure mode now exits 2 instead of 0. **No `GIT_CONFIG_*` incantation is needed
+  any more** — just run `node tools/check-vocabulary.mjs`, and believe it when it is green.
+- **GRAPHIFY-1 — `graphify-out/` was rebuilt on a newer tool; keep the two in step (2026-08-06).**
+  `graphify update .` refusing to run was **tool-version skew, not a corrupt graph**: the artifacts were
+  written by a 0.9.x release whose stat-index entries carry `hashes: {path: sha}`, while this machine had
+  **graphifyy 0.8.44**, whose `cache.py` reads `entry["hash"]` → `KeyError: 'hash'`. The earlier
+  "26567 vs 29841 nodes" fail-closed was the same skew: a downlevel tool re-extracting a newer graph.
+  **Resolved** (operator-approved): upgraded to **0.9.34**, re-synced the skill, `graphify update .`
+  exit 0 → **26646 nodes, 69607 edges, 979 communities**; queries verified working and doc-derived nodes
+  present. `graphify-out/` is gitignored, so nothing about this is committed.
+  ⚠ **Two things to know.** (1) `graphify install` writes the skill to **`~/.claude/skills/graphify/`**,
+  which this repo's `CLAUDE.md` forbids as the source of truth — the repo copy under
+  `.claude/skills/graphify/` was re-synced by hand and **is the one that must be committed**. Re-sync it
+  after every `graphify install`. (2) `graphify update .` is **AST-only**; the semantic/doc pass needs
+  `GEMINI_API_KEY` (not set here), so don't read a node-count drop after a code-only update as loss.
+  Optional cleanups it reported, neither blocking: `pip install "graphifyy[sql]"` for the 2 skipped
+  `.sql` files, and 97 `.json` files that yield zero nodes (upstream #1666).
 - **Build → Test → Run authoring journey — G1–G5 SHIPPED 2026-08-02; only "test against real data"
   remains.** Plan of record:
   [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md).
