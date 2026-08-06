@@ -25,8 +25,9 @@ import java.util.Map;
  * engine field by driving it through the editor's real save path.
  *
  * <p>A node type absent from this table has no schema and falls back to the dialog's free-form key/value
- * editor. Types are left absent deliberately rather than guessed — the remaining {@code transform.*}
- * shapes are not specced, and a best-guess table that looks authoritative is what the plan was cleaning up.
+ * editor. Types are left absent deliberately rather than guessed — {@code parser} is authored by the
+ * Grammar editor and {@code transform.map} by the mapping-CSV surface (ELT UI plan S5), so neither
+ * gets a scalar spec here; a best-guess table that looks authoritative is what the plan was cleaning up.
  */
 public final class NodeAttributes {
 
@@ -144,10 +145,45 @@ public final class NodeAttributes {
                     .options("case", "case (exclusive)", "clone", "clone (fan-out)")
                     .help("Named routes and their predicates are edited on the canvas edges."));
 
+    /**
+     * {@code transform.dedup} (record-grain, → {@code processing.dedup}) — the QUALIFY the engine
+     * applies before the partitioned write ({@code BatchIngestStrategy}). Distinct from the
+     * file-level duplicate Guarantees (marker / fingerprint), which are never Steps.
+     * Keys proven by {@code NodeConfigNameContractTest} (keys / order_by reach {@code cfg.dedup()}).
+     */
+    public static final List<NodeAttribute> TRANSFORM_DEDUP = List.of(
+            NodeAttribute.of("keys", "Dedup keys", "list", "required").placeholder("call_id")
+                    .help("Rows sharing these column values are duplicates; the first (per \"Order by\") is kept."),
+            NodeAttribute.of("order_by", "Order by", "string", "optional").placeholder("event_ts DESC")
+                    .help("Which duplicate wins — SQL ordering over the typed columns; blank = input order."));
+
+    /**
+     * {@code transform.summarize} (→ {@code processing.summarize}) — the group-by rollup, authoring-only
+     * until the branch-aware executor arms it. Keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_SUMMARIZE = List.of(
+            NodeAttribute.of("group_by", "Group by", "list", "required").placeholder("region")
+                    .help("Grouping columns of the rollup."),
+            NodeAttribute.of("measures", "Measures", "list", "required").placeholder("sum(amount)")
+                    .help("Aggregate expressions computed per group."));
+
+    /**
+     * {@code transform.join} (→ {@code processing.join}, D-4) — the reference join, authoring-only.
+     * {@code reference} names a registered Reference component ({@code reference/<id>}), so the UI
+     * renders it as an autocomplete over the registry. Keys proven by {@code NodeConfigNameContractTest}.
+     */
+    public static final List<NodeAttribute> TRANSFORM_JOIN = List.of(
+            NodeAttribute.of("reference", "Reference", "autocomplete", "required")
+                    .placeholder("reference/rates")
+                    .help("The registered Reference component joined onto the row set."),
+            NodeAttribute.of("on", "Join keys", "list", "required").placeholder("currency")
+                    .help("Column(s) equated between the rows and the Reference."));
+
     private static final Map<String, List<NodeAttribute>> BY_TYPE = byType();
 
     private static Map<String, List<NodeAttribute>> byType() {
-        for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, SINK_PERSISTENT, TRANSFORM_FILTER, TRANSFORM_ROUTE))
+        for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, SINK_PERSISTENT, TRANSFORM_FILTER,
+                TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -155,6 +191,9 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.ACQUISITION.type(), COLLECTOR);
         m.put(BuiltinNodeType.TRANSFORM_FILTER.type(), TRANSFORM_FILTER);
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
+        m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
+        m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
+        m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);
         m.put(BuiltinNodeType.SINK_MATERIALIZED.type(), OUTPUT);
         m.put(BuiltinNodeType.SINK_VIEW.type(), OUTPUT);

@@ -42,6 +42,7 @@ function build() {
     const stub = {
         list: () => of([{ name: 'cdr_etl', active: true, nodeCount: 1, edgeCount: 0, produces: [], consumes: [] }]),
         nodeTypes: () => of(TYPES),
+        stepTypes: () => of([]),
         provenanceBatches: () => of([]),
         combined: () => {
             combinedCalls++;

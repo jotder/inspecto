@@ -408,6 +408,11 @@ registry's *vocabulary and guarantees* — subjects, versions, compatibility cla
 
 ## 5. Control plane & UI
 
+> **Phase 5 progress (2026-08-06):** `step-types` endpoint SHIPPED (with the dedup/summarize/join
+> specs and the `step-types.contract.json` gate) alongside UI slices S1–S4 of the companion UI plan
+> (recipe view, editing, route branches, dual-read palette). Remaining in Phase 5: the Pipeline
+> Document generator + mapping import loop (§5.1) and its UI (S6); grid editors are S5 (unblocked).
+
 - **API.** `/pipelines` CRUD unchanged. `GET /pipelines/node-types` → **`GET /pipelines/step-types`**:
   seven verbs + discovered plugins, each with served `AttributeSpec[]` — the config-key contract
   (attribute key = config key, `__` = nesting) is kept verbatim; specs must reach **all** seven verbs

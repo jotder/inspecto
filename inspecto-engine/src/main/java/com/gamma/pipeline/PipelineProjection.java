@@ -57,6 +57,52 @@ public final class PipelineProjection {
         return out;
     }
 
+    /**
+     * The recipe-verb palette (ELT amendment §5, Phase 5): the seven verbs + {@code route} in pipeline
+     * order, each carrying the node type it authors as plus that type's served attribute specs — the
+     * server-published version of the verb table the UI carried as its documented interim
+     * ({@code RECIPE_VERBS}). {@code map} authors a {@code transform.map} node in the GRAPH editor even
+     * though the recipe compiler folds it into parse — the verb exists either way, only its persistence
+     * home differs. Plugin-contributed node types (anything beyond the builtins) are appended after the
+     * verbs, keyed by their own type, so a deployment's custom Steps show up without a UI release.
+     */
+    public static List<Map<String, Object>> stepCatalog() {
+        Map<String, PipelineNodeType> byType = new LinkedHashMap<>();
+        for (PipelineNodeType t : PipelineNodeTypes.catalog()) byType.put(t.type(), t);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String[] v : RECIPE_VERBS) out.add(stepEntry(v[0], v[1], byType.get(v[1])));
+        Set<String> builtin = new LinkedHashSet<>();
+        for (BuiltinNodeType b : BuiltinNodeType.values()) builtin.add(b.type());
+        for (PipelineNodeType t : byType.values())
+            if (!builtin.contains(t.type())) out.add(stepEntry(t.type(), t.type(), t));
+        return out;
+    }
+
+    /** verb → the node type it authors as, in pipeline order (collect first, sink last). */
+    private static final List<String[]> RECIPE_VERBS = List.of(
+            new String[] {"collect", BuiltinNodeType.ACQUISITION.type()},
+            new String[] {"parse", BuiltinNodeType.PARSER.type()},
+            new String[] {"map", BuiltinNodeType.TRANSFORM_MAP.type()},
+            new String[] {"dedup", BuiltinNodeType.TRANSFORM_DEDUP.type()},
+            new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
+            new String[] {"summarize", BuiltinNodeType.TRANSFORM_SUMMARIZE.type()},
+            new String[] {"route", BuiltinNodeType.TRANSFORM_ROUTE.type()},
+            new String[] {"sink", BuiltinNodeType.SINK_PERSISTENT.type()});
+
+    private static Map<String, Object> stepEntry(String verb, String type, PipelineNodeType t) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("verb", verb);
+        m.put("type", type);
+        m.put("category", t == null ? NodeCategory.TRANSFORM.name() : t.category().name());
+        m.put("label", t == null ? type : t.label());
+        m.put("description", t == null ? "" : t.description());
+        m.put("lowerable", PipelineEditable.isLowerable(type));
+        List<Map<String, Object>> attributes = new ArrayList<>();
+        for (NodeAttribute a : NodeAttributes.forType(type)) attributes.add(a.toMap());
+        m.put("attributes", attributes);
+        return m;
+    }
+
     /** A flow's full topology for the G6 renderer: nodes + relationship-typed edges + store endpoints. */
     public static Map<String, Object> graph(PipelineGraph g) {
         Map<String, Object> out = new LinkedHashMap<>();

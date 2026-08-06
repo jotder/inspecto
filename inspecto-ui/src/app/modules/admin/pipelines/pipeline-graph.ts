@@ -576,9 +576,12 @@ function walkStepChain(
 
 /**
  * The recipe verbs the Add-Step palette offers, mapped client-side onto the lowerable node types
- * (UI plan §2.1). DELETED when the server serves `GET /pipelines/step-types` (S4) — this table is the
- * documented interim, not a second vocabulary. `route` (S3) inserts via {@link insertRouteAfter},
- * not {@link insertStepAfter}: a branch point rewires its downstream edge as its first branch.
+ * (UI plan §2.1). Since S4 the server publishes this same table on `GET /pipelines/step-types`
+ * (`PipelineProjection.stepCatalog()`, pinned to `step-types.contract.json`) and the editor
+ * dual-reads: served palette when available, this map as the old-server fallback — never a second
+ * vocabulary, and a drift between the two fails the contract spec. `route` (S3) inserts via
+ * {@link insertRouteAfter}, not {@link insertStepAfter}: a branch point rewires its downstream
+ * edge as its first branch.
  */
 export const RECIPE_VERBS: readonly { verb: string; type: string; label: string }[] = [
     { verb: 'collect', type: 'acquisition', label: 'Collect' },

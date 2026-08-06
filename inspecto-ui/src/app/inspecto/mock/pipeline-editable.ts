@@ -405,6 +405,8 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     if (quarantine) setOrDel(dirs, 'quarantine', quarantine.config?.['dir']);
 
     if (Object.keys(collector).length === 0) delete out[colKey];
+    // A file with no output: block must not gain an empty one (mirrors PipelineEditable.lower).
+    if (Object.keys(output).length === 0) delete out['output'];
     return { config: out };
 }
 

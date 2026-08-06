@@ -1,6 +1,6 @@
 import { inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ComponentsService, ConnectionsService, DbBrowserService, DecisionRulesService, JobsService, RunsService } from 'app/inspecto/api';
+import { CatalogService, ComponentsService, ConnectionsService, DbBrowserService, DecisionRulesService, JobsService, RunsService } from 'app/inspecto/api';
 import { AttributeOption } from 'app/inspecto/component-model';
 import { AttributeOptionLoader } from './schema-form.component';
 
@@ -47,6 +47,15 @@ export function columnOptionLoader(sourceKey: string): AttributeOptionLoader {
         const res = await firstValueFrom(db.table({ name, limit: 1 }));
         return res.columns.map((c) => ({ value: c.name, label: c.type ? `${c.name} (${c.type.toLowerCase()})` : c.name }));
     };
+}
+
+/** The Catalog's References, in the `reference/<name>` form the engine's `processing.join` expects. */
+export function referenceOptionLoader(): AttributeOptionLoader {
+    const catalog = inject(CatalogService);
+    return async () =>
+        (await firstValueFrom(catalog.references()))
+            .map((r) => ({ value: `reference/${r.label}`, label: `reference/${r.label}` }))
+            .sort((a, b) => a.value.localeCompare(b.value));
 }
 
 /** Saved Connection profiles (by id) — the collector's `connection:` reference. */

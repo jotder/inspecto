@@ -237,6 +237,8 @@ export class PipelineStepCardsComponent {
     @Input() statusOf?: (node: AuthoredNode) => NodeStatus;
     /** S2: reveal the editing affordances. The host still gates every mutation on canAuthor(). */
     @Input() editable = false;
+    /** S4: the Add-Step verb palette — served step-types when the host has them, else the client map. */
+    @Input() verbs: readonly { verb: string; type: string; label: string }[] = RECIPE_VERBS;
 
     /** Open the Step's config dialog (the host routes parse → GrammarEditorDialog, rest → NodeConfigDialog). */
     @Output() readonly open = new EventEmitter<AuthoredNode>();
@@ -260,7 +262,6 @@ export class PipelineStepCardsComponent {
     /** Where the open verb menu will insert (set by the clicked "+" before the menu opens). */
     insertAfterId: string | null = null;
 
-    readonly verbs = RECIPE_VERBS;
     readonly categoryLabel = categoryLabel;
     readonly paletteHeroIcon = paletteHeroIcon;
     readonly statusIcon = statusIcon;

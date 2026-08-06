@@ -200,6 +200,28 @@ recipe editor changes nothing there).
 > "node" deliberately (its graph mixes Steps with synthetic store nodes). One stale spec pinned the
 > old "Drag a processor" copy and was updated with the sweep.
 | **S4** | `step-types` palette + 7-verb specs, dual-read fallback | main plan Phase 5 endpoint | contract JSON byte-compare (extend `NodeAttributesContractTest` pattern) |
+
+> **S4 SHIPPED 2026-08-06** (backend endpoint + UI in one slice). Backend:
+> `GET /pipelines/step-types` (`PipelineProjection.stepCatalog()`) serves the 8 palette entries
+> (7 verbs + `route`) in pipeline order — verb, the node type it authors as, category/label/
+> description, `lowerable`, and the type's served `AttributeSpec[]` — with plugin node types
+> appended after, keyed by their own type. `NodeAttributes` gained the three missing verb specs
+> (`transform.dedup` keys/order_by, `transform.summarize` group_by/measures, `transform.join`
+> reference/on — all keys already proven by `NodeConfigNameContractTest`); `parse` and `map` stay
+> deliberately spec-less (Grammar editor / mapping-CSV are their editors — pinned by
+> `StepTypesContractTest.specsReachEveryVerbExceptTheDedicatedEditorSurfaces`). The catalog is
+> pinned byte-wise to `step-types.contract.json` exactly like node-attributes (regenerate with
+> `-Dstep.types.write=true`), and `node-attributes.contract.json` was regenerated for the three
+> new types (TS table extended to match). UI: `PipelinesService.stepTypes()`; the editor
+> dual-reads — served palette (lowerable entries only; an empty list is treated as "not served"),
+> `RECIPE_VERBS` as the old-server fallback, which therefore STAYS (re-documented, not deleted) —
+> and a spec pins the fallback map entry-by-entry against the served contract so neither
+> vocabulary can drift alone. The cards take the verbs as an input. The mock serves the contract
+> JSON verbatim. `transform.join`'s `reference` renders as an autocomplete over the Catalog's
+> References (`referenceOptionLoader`, new; note `MetadataNode` carries `label`, not `name`).
+> **Bug fixed en route:** `PipelineEditable.lower` fabricated an empty `output={}` on files with
+> no `output:` block (`getOrNew` speculation) — caught by the fixture round-trip gate over a live
+> scratch pipeline; fixed server-side + mock mirror.
 | **S5** | Schema/Mapping grid editors + compatibility findings | Phase 1 gate + CSV kinds | ag-Grid editing module registered explicitly; cell-findings a11y (`role=alert` summary) |
 | **S6** | Pipeline Document export + mapping import loop | Phase 5 generator | diff preview renders the dry-run sample; fingerprint shown |
 | **S7** | Table-entry collect + summarize cards; Jobs nav retirement | Phase 3 / Phase 6 | nav retirement = 3 edits incl. `ACCESS_ACTION_NODES`; `access-catalog.spec` green |

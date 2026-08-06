@@ -774,6 +774,18 @@ describe('insertRouteAfter', () => {
     });
 });
 
+describe('RECIPE_VERBS fallback vs the served step-types contract (S4 dual-read)', () => {
+    it('every client verb maps to the same node type the server publishes, in the same order', async () => {
+        const contract = (await import('app/inspecto/mock/step-types.contract.json'))
+            .default as { verb: string; type: string; lowerable: boolean }[];
+        const { RECIPE_VERBS } = await import('./pipeline-graph');
+        // the served builtins are exactly the fallback map — a drift here means one side changed alone
+        expect(contract.map((c) => ({ verb: c.verb, type: c.type })))
+            .toEqual(RECIPE_VERBS.map((v) => ({ verb: v.verb, type: v.type })));
+        for (const c of contract) expect(c.lowerable, `${c.verb} must be saveable`).toBe(true);
+    });
+});
+
 describe('route parity round trip (mock lift/lower mirrors PipelineEditable/PipelineLift)', () => {
     it('a route: block lifts to branches, an added branch lowers back with its database stamped', async () => {
         const { liftConfig, lowerGraph } = await import('app/inspecto/mock/pipeline-editable');

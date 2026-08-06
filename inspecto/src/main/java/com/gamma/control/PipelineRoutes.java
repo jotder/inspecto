@@ -58,6 +58,9 @@ final class PipelineRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/pipelines", (e, m) -> pipelineSummaries(api));
         api.get("/pipelines/node-types", (e, m) -> PipelineProjection.catalog());
+        // The recipe-verb palette (ELT amendment Phase 5): seven verbs + route + discovered plugins,
+        // each with served attribute specs. node-types stays for the canvas + old-server fallback.
+        api.get("/pipelines/step-types", (e, m) -> PipelineProjection.stepCatalog());
         api.get("/pipelines/combined", (e, m) -> combinedPipelines(api));
         // *_flow.toon is GRANDFATHERED (W5, plan U-A): existing files stay readable / runnable /
         // deletable, but are never newly written — the authoring write routes are gone; the graph

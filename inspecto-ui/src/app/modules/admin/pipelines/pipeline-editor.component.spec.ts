@@ -35,6 +35,7 @@ describe('PipelineEditorComponent', () => {
     let api: {
         list: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
+        stepTypes: ReturnType<typeof vi.fn>;
         pipelineGraphRaw: ReturnType<typeof vi.fn>;
         savePipelineGraph: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
@@ -58,6 +59,8 @@ describe('PipelineEditorComponent', () => {
                     { type: 'adapter', category: 'TRANSFORM', label: 'Adapter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false, lowerable: false },
                 ]),
             ),
+            // S4 dual-read: an "old server" by default — the editor must fall back to RECIPE_VERBS.
+            stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             savePipelineGraph: vi.fn().mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
@@ -521,7 +524,7 @@ describe('PipelineEditorComponent', () => {
 });
 
 describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
-    let api: { list: ReturnType<typeof vi.fn>; nodeTypes: ReturnType<typeof vi.fn>; pipelineGraphRaw: ReturnType<typeof vi.fn>; provenanceBatches: ReturnType<typeof vi.fn>; provenance: ReturnType<typeof vi.fn> };
+    let api: { list: ReturnType<typeof vi.fn>; nodeTypes: ReturnType<typeof vi.fn>; stepTypes: ReturnType<typeof vi.fn>; pipelineGraphRaw: ReturnType<typeof vi.fn>; provenanceBatches: ReturnType<typeof vi.fn>; provenance: ReturnType<typeof vi.fn> };
 
     beforeEach(() => {
         localStorage.removeItem('inspecto.currentLens');
@@ -529,6 +532,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
         api = {
             list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(of([])),
+            stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),

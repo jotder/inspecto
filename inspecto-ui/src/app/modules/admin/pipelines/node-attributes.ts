@@ -106,6 +106,21 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     'transform.route': [
         { key: 'mode', label: 'Route mode', type: 'select', tier: 'required', default: 'case', options: [{ value: 'case', label: 'case (exclusive)' }, { value: 'clone', label: 'clone (fan-out)' }], help: 'Named routes and their predicates are edited on the canvas edges.' },
     ],
+    // Record-grain dedup (→ processing.dedup) — distinct from the file-level duplicate Guarantees.
+    'transform.dedup': [
+        { key: 'keys', label: 'Dedup keys', type: 'list', tier: 'required', help: 'Rows sharing these column values are duplicates; the first (per "Order by") is kept.', placeholder: 'call_id' },
+        { key: 'order_by', label: 'Order by', type: 'string', tier: 'optional', help: 'Which duplicate wins — SQL ordering over the typed columns; blank = input order.', placeholder: 'event_ts DESC' },
+    ],
+    // Group-by rollup (→ processing.summarize) — authoring-only until the branch-aware executor arms it.
+    'transform.summarize': [
+        { key: 'group_by', label: 'Group by', type: 'list', tier: 'required', help: 'Grouping columns of the rollup.', placeholder: 'region' },
+        { key: 'measures', label: 'Measures', type: 'list', tier: 'required', help: 'Aggregate expressions computed per group.', placeholder: 'sum(amount)' },
+    ],
+    // Reference join (→ processing.join, D-4) — `reference` names a registered Reference component.
+    'transform.join': [
+        { key: 'reference', label: 'Reference', type: 'autocomplete', tier: 'required', help: 'The registered Reference component joined onto the row set.', placeholder: 'reference/rates' },
+        { key: 'on', label: 'Join keys', type: 'list', tier: 'required', help: 'Column(s) equated between the rows and the Reference.', placeholder: 'currency' },
+    ],
 };
 
 /**

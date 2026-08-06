@@ -376,6 +376,7 @@
                         [typeCat]="typeCat()"
                         [statusOf]="boundStatusOf"
                         [editable]="canAuthor()"
+                        [verbs]="recipeVerbs()"
                         (open)="openNodeConfig($event)"
                         (insertStep)="onRecipeInsert($event)"
                         (remove)="onRecipeRemove($event)"

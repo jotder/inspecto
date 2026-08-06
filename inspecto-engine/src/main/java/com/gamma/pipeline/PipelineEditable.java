@@ -400,6 +400,9 @@ public final class PipelineEditable {
         if (quarantineSink != null) replaceOrRemove(dirs, "quarantine", quarantineSink.cfg("dir"));
 
         if (collector.isEmpty()) out.remove(colKey);
+        // A file with no output: block must not gain an empty one — getOrNew created the section
+        // speculatively, and an unconfigured sink writes nothing into it (fixture round-trip gate).
+        if (output.isEmpty()) out.remove("output");
         return out;
     }
 

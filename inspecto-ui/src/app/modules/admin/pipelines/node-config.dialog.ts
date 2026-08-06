@@ -26,7 +26,7 @@ import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
-import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
@@ -193,7 +193,7 @@ export interface NodeConfigResult {
                 } @else if (specs().length) {
                     <!-- Schema-driven config for known node types (required up front, rest behind disclosure). -->
                     <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Config</div>
-                    <inspecto-schema-form [specs]="specs()" [initial]="schemaInitial"></inspecto-schema-form>
+                    <inspecto-schema-form [specs]="specs()" [initial]="schemaInitial" [optionLoaders]="configLoaders"></inspecto-schema-form>
                 }
 
                 <!-- Additional / free-form config: the primary editor for unknown types, else a collapsed
@@ -295,6 +295,9 @@ export class NodeConfigDialog {
     readonly isEnrichment = this.data.node.type === 'enrichment';
     readonly wiringSpecs = ENRICHMENT_WIRING_ATTRIBUTES;
     readonly wiringLoaders = { triggers__on_pipeline: pipelineOptionLoader() };
+
+    /** Loaders for the schema-driven config form's entity-reference keys (join's Reference picker). */
+    readonly configLoaders = { reference: referenceOptionLoader() };
     /** The bound companion config: `'loading'` while reading, `null` = authoring fresh. */
     readonly enrichSource = signal<'loading' | Record<string, unknown> | null>(null);
     /** A hand-authored `transform_file` config must not be overwritten with inline SQL. */

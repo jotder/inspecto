@@ -120,6 +120,25 @@ class ControlApiPipelinesTest {
         }
     }
 
+    /** ELT amendment Phase 5: the recipe-verb palette is served beside node-types (S4 dual-read). */
+    @Test
+    void stepTypesCatalogServesTheRecipeVerbs(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            JsonNode arr = V1Body.of(get(c.port, "/pipelines/step-types").body());
+            assertTrue(arr.isArray());
+            java.util.List<String> verbs = new java.util.ArrayList<>();
+            for (JsonNode t : arr) {
+                verbs.add(t.get("verb").asText());
+                assertTrue(t.get("lowerable").asBoolean(), t.get("verb").asText() + " must author a saveable type");
+            }
+            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "summarize", "route", "sink"), verbs);
+            // dedup serves its specs (§5: specs reach the verbs, not just the raw node-type catalog)
+            for (JsonNode t : arr)
+                if ("dedup".equals(t.get("verb").asText()))
+                    assertEquals("keys", t.get("attributes").get(0).get("key").asText());
+        }
+    }
+
     @Test
     void flowGraphProjectionRendersNodesAndEdges(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

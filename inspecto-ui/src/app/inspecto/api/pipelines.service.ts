@@ -85,6 +85,22 @@ export interface PipelineNodeType {
     attributes?: AttributeSpec[];
 }
 
+/**
+ * One recipe-verb palette entry (GET /pipelines/step-types, ELT amendment Phase 5): the seven verbs +
+ * `route` in pipeline order, each carrying the node type it authors as + that type's served specs;
+ * plugin-contributed types follow, keyed by their own type. The served version of the client verb map
+ * (`RECIPE_VERBS`), which stays only as the old-server fallback.
+ */
+export interface RecipeStepType {
+    verb: string;
+    type: string;
+    category: PipelineNodeCategory;
+    label: string;
+    description: string;
+    lowerable: boolean;
+    attributes: AttributeSpec[];
+}
+
 /** A node in the combined topology: a pipeline node (with its owning `flow`) or a synthetic `STORE` join node. */
 export interface CombinedNode extends PipelineNode {
     flow?: string;   // the owning flow (absent on synthetic store nodes)
@@ -278,6 +294,11 @@ export class PipelinesService {
     /** The node-type catalog for the palette. */
     nodeTypes(): Observable<PipelineNodeType[]> {
         return this.http.get<PipelineNodeType[]>(apiUrl('/pipelines/node-types'));
+    }
+
+    /** The recipe-verb palette (Phase 5). 404 on an old server — callers fall back to the client verb map. */
+    stepTypes(): Observable<RecipeStepType[]> {
+        return this.http.get<RecipeStepType[]>(apiUrl('/pipelines/step-types'));
     }
 
     /** The combined pipeline+job topology — every pipeline joined at the shared store nodes (T24). */

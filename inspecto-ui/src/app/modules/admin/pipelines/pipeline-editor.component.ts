@@ -78,6 +78,7 @@ import {
     findingTint,
     flattenStepChain,
     groupByCategory,
+    RECIPE_VERBS,
     addRouteBranch,
     insertRouteAfter,
     insertStepAfter,
@@ -342,6 +343,14 @@ export class PipelineEditorComponent implements OnInit {
     /** Whether the preference is Recipe but the open graph forced a Canvas fallback — drives the alert. */
     readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
 
+    /** The served recipe-verb palette (S4), `null` until it loads / on an old server. */
+    private readonly servedVerbs = signal<{ verb: string; type: string; label: string }[] | null>(null);
+
+    /** What the Add-Step menu offers: the served step-types, else the client verb map (dual-read). */
+    readonly recipeVerbs = computed<readonly { verb: string; type: string; label: string }[]>(
+        () => this.servedVerbs() ?? RECIPE_VERBS,
+    );
+
     // ── Recipe editing (S2) — pure reducers over the same model; Save is the unchanged PUT ─────────
 
     /** Insert a new Step of `type` after `afterId` (null = new entry), then open its config dialog. */
@@ -547,6 +556,16 @@ export class PipelineEditorComponent implements OnInit {
                     ts.filter((t) => t.attributes !== undefined).map((t) => [t.type, t.attributes!])));
             },
             error: () => this.paletteGroups.set([]),
+        });
+        // S4 dual-read: the served recipe-verb palette, falling back to the client verb map
+        // (RECIPE_VERBS) on an old server — mirroring how typeAttributes tolerates one.
+        this.api.stepTypes().subscribe({
+            next: (sts) => {
+                const verbs = sts.filter((s) => s.lowerable).map((s) => ({ verb: s.verb, type: s.type, label: s.label }));
+                // an empty palette is never what a real server means — treat it as "not served"
+                this.servedVerbs.set(verbs.length ? verbs : null);
+            },
+            error: () => this.servedVerbs.set(null),
         });
         this.loadComponentRefs();
         this.iconMapApi.get().subscribe({

@@ -1,5 +1,11 @@
-{
-  "acquisition" : [ {
+[ {
+  "verb" : "collect",
+  "type" : "acquisition",
+  "category" : "SOURCE",
+  "label" : "Acquisition",
+  "description" : "Collects files from a source (poll/listing); the pipeline entry.",
+  "lowerable" : true,
+  "attributes" : [ {
     "key" : "connection",
     "label" : "Connection",
     "type" : "autocomplete",
@@ -122,8 +128,53 @@
     "type" : "string",
     "tier" : "advanced",
     "help" : "Target directory when \"After success\" is Move."
-  } ],
-  "transform.filter" : [ {
+  } ]
+}, {
+  "verb" : "parse",
+  "type" : "parser",
+  "category" : "PARSE",
+  "label" : "Parser",
+  "description" : "Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "map",
+  "type" : "transform.map",
+  "category" : "TRANSFORM",
+  "label" : "Map",
+  "description" : "Maps raw fields onto the canonical schema.",
+  "lowerable" : true,
+  "attributes" : [ ]
+}, {
+  "verb" : "dedup",
+  "type" : "transform.dedup",
+  "category" : "TRANSFORM",
+  "label" : "Dedup (record)",
+  "description" : "Record-grain dedup by business key (QUALIFY); duplicates are a counted reject stream.",
+  "lowerable" : true,
+  "attributes" : [ {
+    "key" : "keys",
+    "label" : "Dedup keys",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Rows sharing these column values are duplicates; the first (per \"Order by\") is kept.",
+    "placeholder" : "call_id"
+  }, {
+    "key" : "order_by",
+    "label" : "Order by",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Which duplicate wins — SQL ordering over the typed columns; blank = input order.",
+    "placeholder" : "event_ts DESC"
+  } ]
+}, {
+  "verb" : "transform",
+  "type" : "transform.filter",
+  "category" : "TRANSFORM",
+  "label" : "Filter",
+  "description" : "Keeps/drops rows by predicate; index-anchored CSV row-filter (G1).",
+  "lowerable" : true,
+  "attributes" : [ {
     "key" : "where",
     "label" : "Row predicate (after parsing)",
     "type" : "string",
@@ -164,38 +215,15 @@
     "tier" : "advanced",
     "min" : 0.0,
     "help" : "Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate."
-  } ],
-  "transform.route" : [ {
-    "key" : "mode",
-    "label" : "Route mode",
-    "type" : "select",
-    "tier" : "required",
-    "default" : "case",
-    "options" : [ {
-      "value" : "case",
-      "label" : "case (exclusive)"
-    }, {
-      "value" : "clone",
-      "label" : "clone (fan-out)"
-    } ],
-    "help" : "Named routes and their predicates are edited on the canvas edges."
-  } ],
-  "transform.dedup" : [ {
-    "key" : "keys",
-    "label" : "Dedup keys",
-    "type" : "list",
-    "tier" : "required",
-    "help" : "Rows sharing these column values are duplicates; the first (per \"Order by\") is kept.",
-    "placeholder" : "call_id"
-  }, {
-    "key" : "order_by",
-    "label" : "Order by",
-    "type" : "string",
-    "tier" : "optional",
-    "help" : "Which duplicate wins — SQL ordering over the typed columns; blank = input order.",
-    "placeholder" : "event_ts DESC"
-  } ],
-  "transform.summarize" : [ {
+  } ]
+}, {
+  "verb" : "summarize",
+  "type" : "transform.summarize",
+  "category" : "TRANSFORM",
+  "label" : "Summarize",
+  "description" : "Group-by rollup with algebraically-composable measures.",
+  "lowerable" : true,
+  "attributes" : [ {
     "key" : "group_by",
     "label" : "Group by",
     "type" : "list",
@@ -209,23 +237,37 @@
     "tier" : "required",
     "help" : "Aggregate expressions computed per group.",
     "placeholder" : "sum(amount)"
-  } ],
-  "transform.join" : [ {
-    "key" : "reference",
-    "label" : "Reference",
-    "type" : "autocomplete",
+  } ]
+}, {
+  "verb" : "route",
+  "type" : "transform.route",
+  "category" : "TRANSFORM",
+  "label" : "Route",
+  "description" : "Content-based routing into operator-defined branches (case / clone).",
+  "lowerable" : true,
+  "attributes" : [ {
+    "key" : "mode",
+    "label" : "Route mode",
+    "type" : "select",
     "tier" : "required",
-    "help" : "The registered Reference component joined onto the row set.",
-    "placeholder" : "reference/rates"
-  }, {
-    "key" : "on",
-    "label" : "Join keys",
-    "type" : "list",
-    "tier" : "required",
-    "help" : "Column(s) equated between the rows and the Reference.",
-    "placeholder" : "currency"
-  } ],
-  "sink.persistent" : [ {
+    "default" : "case",
+    "options" : [ {
+      "value" : "case",
+      "label" : "case (exclusive)"
+    }, {
+      "value" : "clone",
+      "label" : "clone (fan-out)"
+    } ],
+    "help" : "Named routes and their predicates are edited on the canvas edges."
+  } ]
+}, {
+  "verb" : "sink",
+  "type" : "sink.persistent",
+  "category" : "SINK",
+  "label" : "Sink (persistent)",
+  "description" : "Writes the batch to a resting store — a Parquet file / DuckDB table.",
+  "lowerable" : true,
+  "attributes" : [ {
     "key" : "database",
     "label" : "Database directory",
     "type" : "string",
@@ -255,51 +297,5 @@
     "tier" : "optional",
     "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
     "placeholder" : "snappy"
-  } ],
-  "sink.materialized" : [ {
-    "key" : "format",
-    "label" : "Output format",
-    "type" : "select",
-    "tier" : "required",
-    "required" : false,
-    "default" : "CSV",
-    "options" : [ {
-      "value" : "CSV",
-      "label" : "CSV"
-    }, {
-      "value" : "PARQUET",
-      "label" : "Parquet"
-    } ],
-    "help" : "Stage-1 output file format; absent = CSV (the engine default)."
-  }, {
-    "key" : "compression",
-    "label" : "Compression",
-    "type" : "string",
-    "tier" : "optional",
-    "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
-    "placeholder" : "snappy"
-  } ],
-  "sink.view" : [ {
-    "key" : "format",
-    "label" : "Output format",
-    "type" : "select",
-    "tier" : "required",
-    "required" : false,
-    "default" : "CSV",
-    "options" : [ {
-      "value" : "CSV",
-      "label" : "CSV"
-    }, {
-      "value" : "PARQUET",
-      "label" : "Parquet"
-    } ],
-    "help" : "Stage-1 output file format; absent = CSV (the engine default)."
-  }, {
-    "key" : "compression",
-    "label" : "Compression",
-    "type" : "string",
-    "tier" : "optional",
-    "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
-    "placeholder" : "snappy"
   } ]
-}
+} ]

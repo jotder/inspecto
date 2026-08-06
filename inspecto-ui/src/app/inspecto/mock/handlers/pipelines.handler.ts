@@ -13,6 +13,7 @@ import type { PipelineViewData, PipelineViewSummary } from '../../api/views.serv
 import type { IconMap } from '../../api/icon-map.service';
 import type { AttributeSpec } from '../../component-model/attribute-spec';
 import NODE_ATTRIBUTE_CONTRACT from '../node-attributes.contract.json';
+import STEP_TYPES_CONTRACT from '../step-types.contract.json';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest, MockResponse } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -96,6 +97,7 @@ export const PIPELINES_COLL = 'authored-pipeline';
 
 const FLOWS = /\/pipelines$/;
 const NODE_TYPES_RE = /\/pipelines\/node-types$/;
+const STEP_TYPES_RE = /\/pipelines\/step-types$/;
 const COMBINED = /\/pipelines\/combined$/;
 const AUTHORED = /\/pipelines\/authored$/;
 const AUTHORED_RAW = /\/pipelines\/authored\/([^/]+)\/raw$/;
@@ -128,6 +130,10 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
         let m: string[] | null;
 
         if (method === 'GET' && NODE_TYPES_RE.test(url)) return json(NODE_TYPES);
+        // The recipe-verb palette — served straight from the committed contract JSON, which
+        // StepTypesContractTest pins byte-wise to the real PipelineProjection.stepCatalog(), so the
+        // offline preview cannot drift from what the server publishes.
+        if (method === 'GET' && STEP_TYPES_RE.test(url)) return json(STEP_TYPES_CONTRACT);
         if (method === 'GET' && COMBINED.test(url)) return json(combined(configs().map((r) => liftConfig(r.config))));
         // GET /pipelines/authored* — grandfathered flow reads only (writes retired with W5).
         if (method === 'GET' && AUTHORED.test(url)) return json(all().map(summaryOf));
