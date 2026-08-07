@@ -23,17 +23,42 @@ final class JobTypeRegistry {
 
     private final Map<String, JobTypeProvider> providers = new LinkedHashMap<>();
     private final Map<String, String> owners = new LinkedHashMap<>();   // id -> owner (null = permanent)
+    private final Map<String, String> sources = new LinkedHashMap<>();  // id -> builtin | classpath | pack:<owner>
 
-    /** Register a permanent (built-in / classpath) provider — never deregistered. */
+    /** Where a registered type came from — {@code builtin} \| {@code classpath} \| {@code pack:<owner>} —
+     *  and which class implements it (§7.3). Answers "what is this job, where did it come from", which is
+     *  unanswerable from the UI today. Provenance lives here rather than on {@link JobTypeDescriptor}
+     *  because a provider cannot know its own: the pack owner is the registry's knowledge, not the
+     *  descriptor author's. */
+    record Provenance(String implClass, String source) {}
+
+    /** Register a permanent built-in provider — never deregistered. */
     void register(JobTypeProvider provider) {
-        register(provider, null);
+        register(provider, null, "builtin");
+    }
+
+    /** Register a permanent provider discovered on the classpath (an optional Maven module, §12.4). */
+    void registerClasspath(JobTypeProvider provider) {
+        register(provider, null, "classpath");
     }
 
     /** Register a provider owned by {@code owner} (a Job Pack key, or {@code null} for permanent). */
     void register(JobTypeProvider provider, String owner) {
+        register(provider, owner, owner == null ? "builtin" : "pack:" + owner);
+    }
+
+    private void register(JobTypeProvider provider, String owner, String source) {
         if (providers.putIfAbsent(provider.id(), provider) != null)
             throw new IllegalStateException("duplicate job type id '" + provider.id() + "'");
         owners.put(provider.id(), owner);
+        sources.put(provider.id(), source);
+    }
+
+    /** One type's provenance, if registered. */
+    Optional<Provenance> provenanceOf(String id) {
+        JobTypeProvider p = providers.get(id == null ? "" : id.toLowerCase(Locale.ROOT));
+        return p == null ? Optional.empty()
+                : Optional.of(new Provenance(p.implClass(), sources.get(p.id())));
     }
 
     /** Remove every type owned by {@code owner} (Job Pack unload/reload); returns the ids removed. */
@@ -43,6 +68,7 @@ final class JobTypeRegistry {
             var e = it.next();
             if (java.util.Objects.equals(owner, e.getValue())) {
                 providers.remove(e.getKey());
+                sources.remove(e.getKey());
                 removed.add(e.getKey());
                 it.remove();
             }

@@ -6,7 +6,6 @@ import com.gamma.job.DbJobRunStore;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
-import com.gamma.job.JobTypeDescriptor;
 import com.gamma.job.RunArtifact;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
@@ -18,6 +17,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Config-driven job routes ({@code /jobs*}, v2.8.0) plus the data-plane provenance reads
@@ -51,9 +51,10 @@ final class JobRoutes implements RouteModule {
         // Job Type registry (R3, job-framework P2a): list + per-type descriptor (params/emits/artifacts)
         // that drives authoring forms. Fixed sub-paths under /jobs/, registered before the /jobs/{name}
         // regex routes (two segments; "types" never collides with a job name's /runs route).
-        api.get("/jobs/types", (e, m) -> jobs(api).jobTypes().stream().map(JobTypeDescriptor::toMap).toList());
-        api.get("/jobs/types/([^/]+)", (e, m) -> jobs(api).jobType(ApiContext.name(m))
-                .map(JobTypeDescriptor::toMap)
+        // Each view is the descriptor plus provenance — implClass / source (builtin | classpath |
+        // pack:<owner>) / version (§7.3), so "what is this job, where did it come from" is answerable.
+        api.get("/jobs/types", (e, m) -> jobs(api).jobTypeViews());
+        api.get("/jobs/types/([^/]+)", (e, m) -> jobs(api).jobTypeView(ApiContext.name(m))
                 .orElseThrow(() -> new ApiException(404, "no job type '" + ApiContext.name(m) + "'")));
         // Expression catalog (job-parameter-contract §4.3): the registered $-token vocabulary that drives
         // the authoring form's token picker, generated from the ExpressionRegistry so it stays correct as
@@ -146,9 +147,32 @@ final class JobRoutes implements RouteModule {
         return args;
     }
 
-    /** {@code GET /jobs/{name}} — one job's full config (the Scheduler detail page); 404 if unknown. */
+    /** {@code GET /jobs/{name}} — one job's full config (the Scheduler detail page); 404 if unknown.
+     *
+     *  <p>Parameters the Job Type declares {@code secret} are masked here, at the response boundary, and
+     *  deliberately NOT inside {@code JobConfig.toMap()} — that map also feeds bundle export/import
+     *  ({@code BundleRoutes}), where masking would corrupt the exported config. House precedent for the
+     *  shape is {@code ConnectionProfile}: an inline literal secret becomes {@code ***}, while a
+     *  {@code ${ENV:…}} reference stays visible, because the reference is not itself sensitive and hiding
+     *  it would leave an operator unable to see how the secret is wired. */
     private Object jobDetail(ApiContext api, String name) {
-        return existingJob(api, name).toMap();
+        JobConfig cfg = existingJob(api, name);
+        return maskSecrets(cfg.toMap(), jobs(api).secretParams(cfg));
+    }
+
+    /** Mask the {@code secret}-declared parameters of one {@code JobConfig.toMap()} view. That view is the
+     *  <b>flat</b> {@code job:} section content — {@code params} are flattened in beside {@code name}/
+     *  {@code type}/{@code cron} — so masking matches parameter names at the top level. Package-private and
+     *  pure so the rule is testable without a Job Type that happens to declare a secret. */
+    static Map<String, Object> maskSecrets(Map<String, Object> view, Set<String> secrets) {
+        if (secrets.isEmpty()) return view;
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> en : view.entrySet()) {
+            Object v = en.getValue();
+            boolean mask = secrets.contains(en.getKey()) && v instanceof String s && !s.startsWith("${");
+            out.put(en.getKey(), mask ? "***" : v);
+        }
+        return out;
     }
 
     /** {@code GET /jobs/{name}/runs/{runId}/logs} — the Run Log re-shaped for the UI's live-tail panel:

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
@@ -126,6 +127,13 @@ final class JobPackManager implements AutoCloseable {
     }
 
     boolean enabled() { return dir != null; }
+
+    /** The loaded pack's manifest version, by owner key (jar filename) — the {@code version} a pack-owned
+     *  Job Type reports as provenance (§7.3). Empty for an owner that is not a currently loaded pack. */
+    Optional<String> versionOf(String owner) {
+        LoadedPack pack = owner == null ? null : loaded.get(owner);
+        return Optional.ofNullable(pack).map(LoadedPack::version);
+    }
 
     /** Load the packs already present at startup (before Jobs are built). No-op when the feature is off. */
     void scanAtStartup() {

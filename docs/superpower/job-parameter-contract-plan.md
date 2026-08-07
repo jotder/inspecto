@@ -448,6 +448,29 @@ server-published specs 422 (`attribute-spec.ts:26-29` documents the coupling). v
 `options` + `multi` together (a multi-select) has no renderer support and no declared consumer —
 rejected at descriptor registration for now, honestly, rather than half-rendered.
 
+### 7.5 As built (steps 8 + 9, 2026-08-07)
+
+- **One validation path, not "pre + post".** The delivery row said "pre + post resolution"; at fire time
+  that collapses to a single check on the value the Run will use, which is what makes a literal and an
+  Expression result provably subject to the same contract. The §6.4 *pre*-resolution check — does the
+  token's `yields` suit the field — is deliberately **not** in the resolver: it could only reject values
+  post-resolution validation already judges on the evidence (a `STRING`-yielding `$signal.<field>`
+  legitimately carries a date). It earns its keep at *author* time, in the picker and a dry-validate route.
+- **`multi` is CSV**, the house convention for list-valued job params (`objects.analytics`'s `types`).
+  Every item is validated, and an empty item is a violation rather than a silently dropped blank.
+- ⚠ **Provenance cannot live on `JobTypeDescriptor`.** §7.3 proposed adding `implClass`/`version`/`source`
+  as components, but a descriptor is authored by the provider and **a provider cannot know its own
+  provenance** — the pack owner is the registry's knowledge. So `JobTypeRegistry` records the source at
+  registration (`register` / `registerClasspath` / `register(_, owner)`) and `JobService.jobTypeView(id)`
+  assembles descriptor + provenance. The descriptor record is unchanged, and no provider had to be touched.
+- **`implClass` for a built-in reports the registering class, not the anonymous wrapper.** Every built-in
+  goes through `JobTypeProvider.of(...)`, whose anonymous class name is the *same useless string* for all
+  nine; the lambda's declaring class (`com.gamma.job.JobService`) is the honest answer. A real provider
+  class or a pack's reports itself, which is the case that matters.
+- ⚠ **`JobConfig.toMap()` is FLAT** — `params` are flattened in beside `name`/`type`/`cron`, there is no
+  `job:` wrapper key. The masking pass was first written against a wrapped shape and would have masked
+  **nothing**; its test caught it. Anyone touching this view should check the shape rather than assume.
+
 ## 8. UI changes
 
 1. `paramDeclToSpec` becomes the **§7.4 table** — every guess deleted.
@@ -504,8 +527,8 @@ opt-in interpolation is designed.
 | 5 | ✅ **SHIPPED 2026-08-07** — ServiceLoader (`JobService.registerBuiltins`) + Job Pack (`JobPackManager.load`/`unload`) expression providers; owner-tagged registration + `deregister(owner)`; collisions fail-closed in all three paths | `JobPackManagerTest` 6/6 — a real compiled pack jar contributes `$tenant.id` and unload takes it back; a pack declaring `$today` is rejected whole. Engine 1001, 0 failures |
 | 6 | ✅ **SHIPPED 2026-08-07** — `GET /jobs/expressions` (`JobRoutes`, fixed sub-path before the `/jobs/{name}` regex) + `contextFree` previews via `ExpressionRegistry.catalog(ctx)` / `JobService.expressionCatalog()` | `ControlApiJobExpressionsTest` 4/4 real-HTTP; `mvn -o -pl inspecto test` → 685, 0 failures. Previews equal evaluator output by construction |
 | 7 | ✅ **SHIPPED 2026-08-07** — `ParamType.TEXT`/`EMAIL`; all eleven `ParameterDecl` components + `of(name,type)….build()`; `JobTypeDescriptor.toMap()` serves them | Built-ins compiled untouched (a 6-arg delegating constructor keeps all 16 raw call sites); `ParameterDeclContractTest` 5/5; engine 999, `inspecto` 685, 0 failures |
-| 8 | `ParameterResolver` enforces pattern/min/max/options/multi (per item), pre + post resolution | Each violation ⇒ `REJECTED`; expression re-validated after resolution |
-| 9 | `JobTypeDescriptor` provenance + `toMap()`; `secret` masking at the `GET /jobs/{name}` boundary (never in `JobConfig.toMap()` — §7.2) | `GET /jobs/types/{id}` returns provenance; detail route masks; bundle export unchanged |
+| 8 | ✅ **SHIPPED 2026-08-07** — `ParameterResolver` enforces `options`/`pattern`/`min`/`max` and `multi` per item, on the resolved value | Each violation ⇒ `REJECTED`; an expression's *result* is held to the contract (`anExpressionResultIsHeldToTheSameContract`); `ParameterResolverTest` 23/23, engine 1008 |
+| 9 | ✅ **SHIPPED 2026-08-07** — provenance (`implClass`/`source`/`version`) served by `GET /jobs/types[/{id}]` from the registry, not the descriptor; `secret` masking in `JobRoutes.maskSecrets` at the response boundary | `ControlApiJobProvenanceTest` 5/5; `JobConfig.toMap()` untouched ⇒ bundle export unchanged; `inspecto` 690, 0 failures |
 | 10 | Widen the `JobParameterDecl` mirror (`app/inspecto/api/jobs.service.ts:27-37`); rewrite `paramDeclToSpec` per §7.4 (incl. DATE/INSTANT presets, DATASET_REF autocomplete) | UI unit tests: one case per §7.4 row |
 | 11 | Renderer extensions: `group` headings, `secret` input, per-item `list` validation (+ `FindingsSpec.TYPES` widened in the same change) | schema-form specs; axe-core green |
 | 12 | Type picker from catalog; description + provenance panel | A type absent from the old hardcoded list is selectable and self-describing |

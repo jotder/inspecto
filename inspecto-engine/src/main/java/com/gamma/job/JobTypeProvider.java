@@ -27,11 +27,20 @@ public interface JobTypeProvider {
     /** The registry key — the descriptor's id. */
     default String id() { return descriptor().id(); }
 
+    /** The class behind this type, for {@code GET /jobs/types/{id}}'s provenance (§7.3). Defaults to the
+     *  provider's own class, which is the useful answer for a real provider class or a pack's. */
+    default String implClass() { return getClass().getName(); }
+
     /** A provider from a descriptor + a factory function (how the built-ins register). */
     static JobTypeProvider of(JobTypeDescriptor descriptor, Function<JobConfig, Job> factory) {
         return new JobTypeProvider() {
             @Override public JobTypeDescriptor descriptor() { return descriptor; }
             @Override public Job create(JobConfig config) { return factory.apply(config); }
+            /** The anonymous wrapper's own name would be the same useless string for every built-in, so
+             *  report the class that registered the factory — the honest answer to "where is this from". */
+            @Override public String implClass() {
+                return factory.getClass().getName().split("\\$\\$Lambda")[0];
+            }
         };
     }
 }

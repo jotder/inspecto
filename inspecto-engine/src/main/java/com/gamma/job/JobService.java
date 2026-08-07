@@ -322,7 +322,7 @@ public final class JobService implements AutoCloseable {
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
         for (JobTypeProvider provider : ServiceLoader.load(JobTypeProvider.class)) {
             try {
-                registry.register(provider);
+                registry.registerClasspath(provider);
             } catch (RuntimeException e) {
                 log.warn("job type provider {} rejected: {}", provider.getClass().getName(), e.getMessage());
             }
@@ -1015,6 +1015,34 @@ public final class JobService implements AutoCloseable {
     /** One Job Type's descriptor by id (R3, {@code GET /jobs/types/{id}}), if registered. */
     public Optional<JobTypeDescriptor> jobType(String id) {
         return registry.descriptor(id);
+    }
+
+    /** Every Job Type as the catalog route serves it: the descriptor plus its provenance (§7.3). */
+    public List<Map<String, Object>> jobTypeViews() {
+        return jobTypes().stream().map(d -> jobTypeView(d.id()).orElseThrow()).toList();
+    }
+
+    /** One Job Type's descriptor + provenance — {@code implClass}, {@code source}
+     *  ({@code builtin} | {@code classpath} | {@code pack:<owner>}) and, for a pack type, the pack's
+     *  {@code version}. Answers "what is this job, where did it come from", which the UI cannot ask today. */
+    public Optional<Map<String, Object>> jobTypeView(String id) {
+        return registry.descriptor(id).map(d -> {
+            Map<String, Object> m = new LinkedHashMap<>(d.toMap());
+            registry.provenanceOf(id).ifPresent(p -> {
+                m.put("implClass", p.implClass());
+                m.put("source", p.source());
+            });
+            m.put("version", registry.ownerOf(id).flatMap(packs::versionOf).orElse(""));
+            return m;
+        });
+    }
+
+    /** The parameter names a Job's type declares {@code secret} — the route boundary masks these on read
+     *  (§7.2). Never masked in {@link JobConfig#toMap()}, which also feeds bundle export/import. */
+    public Set<String> secretParams(JobConfig cfg) {
+        return registry.parameters(cfg.type(), cfg).stream()
+                .filter(ParameterDecl::secret).map(ParameterDecl::name)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     /** The Expression vocabulary as the authoring UI sees it ({@code GET /jobs/expressions},
