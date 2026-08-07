@@ -239,6 +239,49 @@ class ParameterResolverTest {
     }
 
     @Test
+    void theDeclarationsContractIsEnforcedNotJustRendered() {
+        // §7.2/§6.5: the UI is not a gate — every declared constraint fails the Run REJECTED here.
+        var options = List.of(ParameterDecl.of("mode", ParamType.STRING).required().options("full", "delta").build());
+        assertEquals(1, resolve(options, Map.of("mode", "partial"), ctx(Optional.empty())).invalidType().size());
+        assertTrue(resolve(options, Map.of("mode", "delta"), ctx(Optional.empty())).invalidType().isEmpty());
+
+        var bounded = List.of(ParameterDecl.of("days", ParamType.INTEGER).required().min(1).max(90).build());
+        assertEquals(1, resolve(bounded, Map.of("days", "0"), ctx(Optional.empty())).invalidType().size());
+        assertEquals(1, resolve(bounded, Map.of("days", "91"), ctx(Optional.empty())).invalidType().size());
+        assertTrue(resolve(bounded, Map.of("days", "90"), ctx(Optional.empty())).invalidType().isEmpty(),
+                "bounds are inclusive");
+
+        var patterned = List.of(ParameterDecl.of("code", ParamType.STRING).required().pattern("[A-Z]{3}").build());
+        assertEquals(1, resolve(patterned, Map.of("code", "ab"), ctx(Optional.empty())).invalidType().size());
+        assertTrue(resolve(patterned, Map.of("code", "XYZ"), ctx(Optional.empty())).invalidType().isEmpty());
+    }
+
+    @Test
+    void multiValidatesEveryItemNotJustTheFirst() {
+        var decls = List.of(ParameterDecl.of("to", ParamType.EMAIL).required().multi().build());
+
+        assertTrue(resolve(decls, Map.of("to", "a@x.com, b@y.com"), ctx(Optional.empty())).invalidType().isEmpty(),
+                "CSV is the house convention for list-valued job params; items are trimmed");
+        var r = resolve(decls, Map.of("to", "a@x.com, nope"), ctx(Optional.empty()));
+        assertEquals(1, r.invalidType().size(), "a bad item fails the Run rather than being dropped");
+        assertTrue(r.invalidType().get(0).contains("nope"));
+        assertEquals(1, resolve(decls, Map.of("to", "a@x.com,,b@y.com"), ctx(Optional.empty())).invalidType().size(),
+                "an empty item is a violation, not an ignorable blank");
+    }
+
+    @Test
+    void anExpressionResultIsHeldToTheSameContract() {
+        // §6.4: the contract is re-validated AFTER resolution, so an expression cannot smuggle a value past
+        // constraints a literal would have to satisfy.
+        var decls = List.of(ParameterDecl.of("mode", ParamType.STRING).required().options("full", "delta").build());
+        var c = ctx(Optional.empty(), (j, n) -> Optional.empty(), Map.of("mode", "sideways"));
+        var r = ParameterResolver.resolve(decls, Map.of(), Map.of("mode", "$signal.mode"), Map.of(), EXPR, c);
+
+        assertEquals(1, r.invalidType().size(), "the resolved value, not the token, is what must satisfy options");
+        assertTrue(r.invalidType().get(0).contains("sideways"));
+    }
+
+    @Test
     void anUnknownTokenInAnAuthoredValueFailsTheRun() {
         List<ParameterDecl> decls = List.of(decl("when", true, null, null));
         var r = resolve(decls, Map.of("when", "$Yesterdy"), ctx(Optional.empty()));

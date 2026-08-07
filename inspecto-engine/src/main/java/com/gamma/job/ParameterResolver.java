@@ -77,14 +77,60 @@ final class ParameterResolver {
                 if (d.required()) missing.add(d.name());
                 continue;
             }
-            if (!matchesType(d.type(), v)) {
-                invalidType.add(d.name() + " (expected " + d.type() + ", got '" + v + "')");
+            String violation = violation(d, v);
+            if (violation != null) {
+                invalidType.add(d.name() + " " + violation);
                 continue;
             }
             out.put(d.name(), v);
         }
         return new Resolution(Map.copyOf(out), List.copyOf(missing), List.copyOf(invalidType),
                 List.copyOf(unknown));
+    }
+
+    /** Check a resolved value against the declaration's full contract (§7.2, step 8) — type, then
+     *  {@code options}, {@code pattern} and {@code min}/{@code max}. Returns {@code null} when it holds, or
+     *  the reason it doesn't.
+     *
+     *  <p>This runs on the value the Run will actually use, so it enforces the contract identically whether
+     *  the value was authored literally or produced by an Expression — §6.4's "re-validate after
+     *  resolution", with no separate path to drift. A <em>pre</em>-resolution check that an Expression's
+     *  declared {@code yields} suits the field is deliberately <b>not</b> done here: at fire time it could
+     *  only reject values that post-resolution validation already accepts or refuses on the evidence (a
+     *  {@code STRING}-yielding {@code $signal.<field>} legitimately carries a date). That check earns its
+     *  keep at <em>author</em> time, in the picker and a dry-validate route, not in the resolver. */
+    private static String violation(ParameterDecl d, String v) {
+        if (!d.multi()) return itemViolation(d, v);
+        // multi: CSV, the house convention for list-valued job params (e.g. objects.analytics `types`).
+        // Every item is checked, so one bad entry fails the Run rather than being silently dropped.
+        String[] items = v.split(",", -1);
+        for (String raw : items) {
+            String item = raw.trim();
+            if (item.isEmpty()) return "(empty item in list '" + v + "')";
+            String bad = itemViolation(d, item);
+            if (bad != null) return bad;
+        }
+        return null;
+    }
+
+    /** One value — or one item of a {@code multi} list — against type + options + pattern + bounds. */
+    private static String itemViolation(ParameterDecl d, String v) {
+        if (!matchesType(d.type(), v)) return "(expected " + d.type() + ", got '" + v + "')";
+        if (!d.options().isEmpty() && !d.options().contains(v))
+            return "(expected one of " + d.options() + ", got '" + v + "')";
+        if (d.pattern() != null && !v.matches(d.pattern()))
+            return "(does not match " + d.pattern() + ", got '" + v + "')";
+        if (d.min() != null || d.max() != null) {
+            double n;
+            try {
+                n = Double.parseDouble(v);
+            } catch (NumberFormatException notNumeric) {
+                return "(bounded parameter is not numeric, got '" + v + "')";
+            }
+            if (d.min() != null && n < d.min()) return "(below minimum " + d.min() + ", got '" + v + "')";
+            if (d.max() != null && n > d.max()) return "(above maximum " + d.max() + ", got '" + v + "')";
+        }
+        return null;
     }
 
     /** Whether {@code v} parses as {@code type} (§7.1). {@code STRING}/{@code TEXT}/{@code DATASET_REF}
