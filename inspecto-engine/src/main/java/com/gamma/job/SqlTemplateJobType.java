@@ -14,7 +14,12 @@ final class SqlTemplateJobType implements JobTypeProvider {
 
     static final JobTypeDescriptor DESCRIPTOR = new JobTypeDescriptor("sql.template", "Templated SQL",
             "Runs an authored SQL template over source Datasets and materializes the result as a queryable Dataset.",
-            List.of(ParameterDecl.required("sql", ParamType.STRING, "SQL SELECT template; its $name tokens are the runtime parameters"),
+            // expressions: false — the SQL body owns its own $-namespace (its $name tokens ARE this Job's
+            // parameter contract, scanned below), so it is exempt from Expression evaluation
+            // (job-parameter-contract §6.1, scoped evaluation). Runtime Expressions reach the SQL through
+            // the *values* of those template parameters: `WHERE dt = $from` with `params: {from: $yesterday}`.
+            List.of(ParameterDecl.of("sql", ParamType.TEXT).required().noExpressions()
+                            .description("SQL SELECT template; its $name tokens are the runtime parameters").build(),
                     ParameterDecl.required("sink_dataset", ParamType.STRING, "Output Dataset (store dir under the data root)"),
                     ParameterDecl.optional("sources", ParamType.STRING, null, "CSV of source store names to register as views")),
             List.of("job.dataset.produced"),

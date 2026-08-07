@@ -194,16 +194,57 @@ class ParameterResolverTest {
     }
 
     @Test
-    void authoredConfigValuesAreStillLiteralsAtThisStep() {
-        // Step 2 deliberately leaves layers 1 and 3 unevaluated — step 3 is what routes them through the
-        // registry. Pinning it here so the change of behaviour is a visible edit to this test, not a
-        // surprise.
+    void authoredConfigValuesAreEvaluatedAsExpressions() {
+        // Step 3: the whole point — a $-token typed into a parameter field in the UI now resolves at fire
+        // time. (This test replaced step 2's assertion that layer 3 was still literal; it was written to
+        // make exactly this flip a visible edit.)
         List<ParameterDecl> decls = List.of(decl("amount", true, null, null), decl("when", true, null, null));
         var r = resolve(decls, Map.of("amount", "$100", "when", "$today"), ctx(Optional.empty()));
 
-        assertEquals("$100", r.resolved().get("amount"));
-        assertEquals("$today", r.resolved().get("when"), "not yet resolved — step 3");
-        assertTrue(r.unknownExpression().isEmpty(), "and an unevaluated layer cannot report an unknown token");
+        assertEquals("2026-07-08", r.resolved().get("when"), "an authored $today resolves at fire time");
+        assertEquals("$100", r.resolved().get("amount"),
+                "$ + digit is not a token shape — a currency amount needs no escape");
+    }
+
+    @Test
+    void triggerArgsAreEvaluatedToo() {
+        // Layer 1: the manual POST /jobs/{name}/trigger body's params.
+        List<ParameterDecl> decls = List.of(decl("day", true, null, null));
+        var r = ParameterResolver.resolve(decls, Map.of("day", "$yesterday"), Map.of(), Map.of(),
+                EXPR, ctx(Optional.empty()));
+
+        assertEquals("2026-07-07", r.resolved().get("day"));
+    }
+
+    @Test
+    void anAuthoredLiteralDollarSurvivesTheEscapeAndTheOtherDollarConventions() {
+        List<ParameterDecl> decls = List.of(decl("token", true, null, null), decl("secret", true, null, null));
+        var r = resolve(decls, Map.of("token", "$$today", "secret", "${ENV:PW}"), ctx(Optional.empty()));
+
+        assertEquals("$today", r.resolved().get("token"), "§6.2: the escape makes a literal $ expressible");
+        assertEquals("${ENV:PW}", r.resolved().get("secret"),
+                "a secret reference is the codebase's other $ convention, not an unknown token");
+        assertTrue(r.unknownExpression().isEmpty());
+    }
+
+    @Test
+    void aDeclarationCanOptOutOfExpressionsEntirely() {
+        // §6.1's scoped evaluation, made concrete: this is what keeps a sql.template body verbatim.
+        List<ParameterDecl> decls = List.of(
+                ParameterDecl.of("sql", ParamType.TEXT).required().noExpressions().build());
+        var r = resolve(decls, Map.of("sql", "$today"), ctx(Optional.empty()));
+
+        assertEquals("$today", r.resolved().get("sql"), "taken verbatim, not resolved");
+        assertTrue(r.unknownExpression().isEmpty());
+    }
+
+    @Test
+    void anUnknownTokenInAnAuthoredValueFailsTheRun() {
+        List<ParameterDecl> decls = List.of(decl("when", true, null, null));
+        var r = resolve(decls, Map.of("when", "$Yesterdy"), ctx(Optional.empty()));
+
+        assertEquals(1, r.unknownExpression().size(),
+                "the fail-closed gate now covers the layer authors actually type into");
     }
 
     @Test

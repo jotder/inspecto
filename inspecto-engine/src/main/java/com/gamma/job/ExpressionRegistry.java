@@ -72,10 +72,15 @@ final class ExpressionRegistry {
         return removed;
     }
 
-    /** Whether {@code raw} is meant as an Expression at all (§6.2/§6.3): {@code $}-led, but not the
-     *  {@code $$} literal escape. A value with no leading {@code $} can never name a token. */
+    /** Whether {@code raw} is meant as an Expression at all (§6.2/§6.3): the <b>whole value</b> must be a
+     *  token — {@code $} followed by a token-start character. Three things are therefore literals, not
+     *  typos: the {@code $$} escape, a {@code ${ENV:…}} secret reference (the other {@code $} convention in
+     *  this codebase), and a value like {@code $100}. Matching the whole value rather than a substring is
+     *  also what keeps a {@code sql.template} body's own {@code $name} parameters out of the Expression
+     *  namespace (§6.1, scoped evaluation). */
     static boolean isExpression(String raw) {
-        return raw.startsWith("$") && !raw.startsWith("$$");
+        return raw.length() > 1 && raw.charAt(0) == '$'
+                && (Character.isLetter(raw.charAt(1)) || raw.charAt(1) == '_');
     }
 
     /** Apply the {@code $$} literal escape: {@code $$today} is the eight-character string {@code $today},

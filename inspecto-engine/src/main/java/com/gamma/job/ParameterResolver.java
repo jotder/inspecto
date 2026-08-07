@@ -115,19 +115,28 @@ final class ParameterResolver {
                                  Map<String, String> bind, Map<String, String> config,
                                  ExpressionRegistry expressions, ExpressionContext ctx) {
         String a = args.get(d.name());
-        if (a != null && !a.isBlank()) return Layered.of(a);            // evaluated from step 3
+        if (a != null && !a.isBlank()) {
+            Layered av = authored(d, a.trim(), expressions, ctx);
+            if (av.stops()) return av;
+        }
         String b = bind.get(d.name());
         if (b != null && !b.isBlank()) {
             Layered bv = expression(b.trim(), expressions, ctx);
             if (bv.stops()) return bv;
         }
         String c = config.get(d.name());
-        if (c != null && !c.isBlank()) return Layered.of(c);            // evaluated from step 3
+        if (c != null && !c.isBlank()) {
+            Layered cv = authored(d, c.trim(), expressions, ctx);
+            if (cv.stops()) return cv;
+        }
         // Tier 3 dual-read (vocabulary plan §4): the `pipeline` job parameter's pre-rename config key was
         // `flow` — read-only fallback for *_job.toon files that were never resaved under the new name.
         if ("pipeline".equals(d.name())) {
             String legacy = config.get("flow");
-            if (legacy != null && !legacy.isBlank()) return Layered.of(legacy);
+            if (legacy != null && !legacy.isBlank()) {
+                Layered lv = authored(d, legacy.trim(), expressions, ctx);
+                if (lv.stops()) return lv;
+            }
         }
         if (d.deduce() != null && !d.deduce().isBlank()) {
             Layered dv = expression(d.deduce().trim(), expressions, ctx);
@@ -136,7 +145,21 @@ final class ParameterResolver {
         return Layered.of(d.defaultValue());   // may be null
     }
 
-    /** Evaluate one authored {@code $}-value (§6.2/§6.3): the {@code $$} escape yields a literal
+    /** An author-typed value — trigger {@code args} (layer 1) or the {@code params:} block (layer 3), the
+     *  two places the UI writes (§6.1). Unlike {@code bind:}/{@code deduce:}, whose whole purpose is to hold
+     *  an Expression, these layers are <em>usually</em> literals: anything that is not a whole-value token
+     *  stops the ladder as itself. A declaration may opt out entirely with {@code expressions: false}, which
+     *  is how the {@code sql.template} body stays verbatim. */
+    private static Layered authored(ParameterDecl d, String raw, ExpressionRegistry expressions,
+                                    ExpressionContext ctx) {
+        if (!d.expressions()) return Layered.of(raw);
+        if (raw.startsWith("$$")) return Layered.of(ExpressionRegistry.unescape(raw));
+        if (!ExpressionRegistry.isExpression(raw)) return Layered.of(raw);
+        if (!expressions.declares(raw)) return Layered.unknown(raw);
+        return expressions.evaluate(raw, ctx).map(Layered::of).orElse(Layered.NONE);
+    }
+
+    /** Evaluate one {@code bind:}/{@code deduce:} value (§6.2/§6.3): the {@code $$} escape yields a literal
      *  {@code $}; a registered token yields its value, or {@link Layered#NONE} when it has none in this
      *  context (a bind to an absent {@code $signal.<field>} still falls through to the next layer); an
      *  unregistered token fails the Run. A value that is not {@code $}-led can never name a token, so it

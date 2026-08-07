@@ -329,7 +329,27 @@ Options:
   parameter), zero migration, no capture hazard — and the token picker works where the contract
   lives, on the parameter fields.
 
-Final call recorded at step 4, jointly with the Event Day plan, since they share the use case.
+**FINAL CALL 2026-08-07 — scoped evaluation, forced by the shipped code, not chosen on taste.** Grounding
+the collision before building step 3 refuted the framing above: the choice was never between three live
+options, because **the SQL body is itself a declared parameter value** (`ParameterDecl.required("sql", …)`,
+`SqlTemplateJobType:17`) fed from layer 3. So "exempt the SQL body" can only mean one thing mechanically —
+**evaluate a whole value that IS a token, never a substring**:
+
+- Substring interpolation is **refuted**, not merely dispreferred. Combined with step 2's fail-closed rule
+  it would REJECT every existing `sql.template` Job: the body's `$name` tokens are template parameters, not
+  registered Expressions. `spaces/demo/config/jobs/orders_summary_sql_job.toon` (`WHERE STATUS = $status`)
+  is a live instance that would break on the next Run.
+- The exemption is also stated **in the declaration itself** — `sql` now carries `expressions: false` (and
+  `TEXT`, retiring the name-sniff for the same field) — so the rule is visible where the contract lives
+  rather than implied by evaluator internals.
+- The token grammar tightened to `$` + letter/underscore, which makes three things literals rather than
+  typos: `$$today` (escape), `${ENV:…}` (this codebase's *other* `$` convention — a secret reference), and
+  `$100` (a currency amount needs no escape after all).
+
+⚠ **Cost, and it is a real one:** §9's worked example — typing `Daily report for $yesterday` into a Subject
+field — **does not work** and is not scheduled. Interpolation inside a longer string is a separate feature;
+if it is ever wanted it must be **per-declaration opt-in**, never blanket, or it re-opens exactly the
+capture hazard this decision closes. Tracked in `docs/BACKLOG.md`.
 
 ## 7. The declaration contract
 
@@ -463,9 +483,14 @@ new JobTypeDescriptor("mail.send", "Send Mail",
 ```
 
 Renders as a draft form: **Recipients** (To — required email chips; Cc — optional) then **Message**
-(Subject; Body as a textarea). An author may type `Daily report for $yesterday` into Subject and have
-it resolve per Run; `to: $signal.recipient` is accepted at author time and email-validated after
-resolution. No key/value row anywhere.
+(Subject; Body as a textarea). `to: $signal.recipient` is accepted at author time and email-validated
+after resolution. No key/value row anywhere.
+
+⚠ **Corrected 2026-08-07:** this example previously claimed an author could type
+`Daily report for $yesterday` into Subject and have it resolve per Run. **That does not work** —
+step 4 settled on whole-value evaluation (§6.1), so a `$`-token inside a longer string stays literal.
+A per-Run subject must be a whole-value parameter (`subject_date: $yesterday`) composed by the Job, until
+opt-in interpolation is designed.
 
 ## 10. Delivery
 
@@ -474,8 +499,8 @@ resolution. No key/value row anywhere.
 | 0 | ✅ **Done with this refinement (2026-08-06)** — un-ban recorded: GLOSSARY §6-A entry + §13 row, amendment-plan supersession note; INDEX link already present | docs consistent; `graphify update .` run |
 | 1 | ✅ **SHIPPED 2026-08-07** — `ExpressionDecl` / `ExpressionProvider` / `ExpressionContext` / `ExpressionRegistry` + `BuiltinExpressions` carrying the §2 tokens; `ParameterResolver.deduce()`'s switch deleted, the `pipeline`/`flow` shim kept verbatim in `value()`; GLOSSARY §6-A gained **Expression** | `mvn -o -pl inspecto-engine test` → 989 tests, 0 failures (`ExpressionRegistryTest` 5, `ParameterResolverTest` 12); every §2 token resolves exactly as before |
 | 2 | ✅ **SHIPPED 2026-08-07** — `$$` literal escape + unknown-token `REJECTED` (`Resolution.unknownExpression`, reported by `JobService`'s reject path and the `job.run.rejected` Signal) | `mvn -o -pl inspecto-engine test` → 994 tests, 0 failures; existing configs unaffected — layers 1/3 still literal (pinned by `authoredConfigValuesAreStillLiteralsAtThisStep`) |
-| 3 | Evaluate expressions in layers 1 + 3 through the registry | A `$today` typed as a config param resolves at fire time |
-| 4 | Resolve the §6.1 `sql.template` collision (recommended: scoped evaluation) | Decision recorded; `sql.template` tests green under the chosen rule |
+| 3 | ✅ **SHIPPED 2026-08-07** — layers 1 (trigger `args`) + 3 (authored `config`, incl. the `flow` legacy read) evaluate through the registry, honouring `expressions: false` | `$today` typed as a config param resolves at fire time; `ParameterResolverTest` 20/20; engine 1005, `inspecto` 685, 0 failures |
+| 4 | ✅ **DECIDED + SHIPPED 2026-08-07 — scoped evaluation, and it is no longer a judgement call** (§6.1) | `sql.template` tests green under the rule: `SqlParamScannerTest` 4/4, `SqlTemplateJobTest` 4/4 |
 | 5 | ✅ **SHIPPED 2026-08-07** — ServiceLoader (`JobService.registerBuiltins`) + Job Pack (`JobPackManager.load`/`unload`) expression providers; owner-tagged registration + `deregister(owner)`; collisions fail-closed in all three paths | `JobPackManagerTest` 6/6 — a real compiled pack jar contributes `$tenant.id` and unload takes it back; a pack declaring `$today` is rejected whole. Engine 1001, 0 failures |
 | 6 | ✅ **SHIPPED 2026-08-07** — `GET /jobs/expressions` (`JobRoutes`, fixed sub-path before the `/jobs/{name}` regex) + `contextFree` previews via `ExpressionRegistry.catalog(ctx)` / `JobService.expressionCatalog()` | `ControlApiJobExpressionsTest` 4/4 real-HTTP; `mvn -o -pl inspecto test` → 685, 0 failures. Previews equal evaluator output by construction |
 | 7 | ✅ **SHIPPED 2026-08-07** — `ParamType.TEXT`/`EMAIL`; all eleven `ParameterDecl` components + `of(name,type)….build()`; `JobTypeDescriptor.toMap()` serves them | Built-ins compiled untouched (a 6-arg delegating constructor keeps all 16 raw call sites); `ParameterDeclContractTest` 5/5; engine 999, `inspecto` 685, 0 failures |
