@@ -1004,6 +1004,16 @@ public final class JobService implements AutoCloseable {
         return registry.descriptor(id);
     }
 
+    /** The Expression vocabulary as the authoring UI sees it ({@code GET /jobs/expressions},
+     *  job-parameter-contract §4.3): every registered declaration, each {@code contextFree} one carrying a
+     *  preview evaluated <em>now</em> by the Run-time evaluator itself. The preview context is a
+     *  request-time one — {@code fireTime} is now, and the Run-bound suppliers are empty because no Run is
+     *  firing; only {@code contextFree} tokens are previewed, so none of them is ever consulted. */
+    public List<Map<String, Object>> expressionCatalog() {
+        return expressions.catalog(new ExpressionContext("preview", Instant.now(), "preview", zone,
+                Optional::empty, (job, artifact) -> Optional.empty(), Map.of()));
+    }
+
     /** The one type catalog spanning every registered Job Type's declared {@code emits} (§4.3, S1) — the
      *  single source {@code MaintenanceJob.schedulerAudit} (or any future producer-side auditor) reads to
      *  flag a Job Type emitting a signal type it never declared. */

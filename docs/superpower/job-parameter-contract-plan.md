@@ -188,6 +188,26 @@ construction. This is what makes the token picker (§8.5) possible and keeps it 
    token still falls through to the next parameter layer — that is step 2's change, and step 1 deliberately
    preserved it so this slice is behaviour-neutral.
 
+### 4.5 As built (step 6, 2026-08-07) — and a step-1 defect it exposed
+
+- ⚠ **Three tokens were wrongly marked `contextFree` in step 1** and are now corrected: `$run.id`,
+  `$run.actor` and `$job.last_success_time` need a firing Run/Job. Building the catalog is what surfaced
+  it — a "live preview" for `$run.actor` would have shown the author `preview` (the request-time context's
+  actor), i.e. a value their Job will never see. Only `$run.fire_time` stays context-free among the
+  Run-shaped tokens, because it *is* fire time. The rule the catalog enforces: **no preview is better than
+  a fabricated one**; context-bound entries serve their declared worked sample.
+- **A FUNCTION token cannot preview itself.** `$day(n)` is a shape, not an expression — `ExpressionDecl`
+  gained `sampleExpression()` (a literal's own token, a shaped token's typeable `example`) so the preview
+  evaluates `$day(-1)`. This also fixes the meaning of `example`: for PREFIX/FUNCTION it is what an author
+  types, for a LITERAL it is what the token resolves to. Both answer the picker's one question; the record's
+  javadoc now says so instead of leaving it to be inferred.
+- **The preview context is honest about being a preview**: `runId`/`actor` are literally `"preview"` and the
+  Run-bound suppliers are empty — safe precisely because only `contextFree` tokens are ever evaluated, so
+  none of those components is reachable.
+- The route is a plain read (no write root, no payload, no path input), so the `endpoint` skill's write
+  gates don't apply; what *does* apply is registration order — `/jobs/expressions` must precede the
+  single-segment `/jobs/{name}` regex, and a test asserts the 200 rather than trusting the ordering comment.
+
 ## 5. Event Day — deferred, scoped here
 
 **Deferred to its own plan** (decided 2026-08-06). Recorded now so the SPI in §4 is shaped to
@@ -424,7 +444,7 @@ resolution. No key/value row anywhere.
 | 3 | Evaluate expressions in layers 1 + 3 through the registry | A `$today` typed as a config param resolves at fire time |
 | 4 | Resolve the §6.1 `sql.template` collision (recommended: scoped evaluation) | Decision recorded; `sql.template` tests green under the chosen rule |
 | 5 | ServiceLoader + Job Pack expression providers; **collisions fail-closed in all three load paths** (§4.2) | A pack contributes a token; a colliding provider load fails loudly |
-| 6 | `GET /jobs/expressions` catalog + `contextFree` previews | Real-HTTP test; previews equal evaluator output by construction |
+| 6 | ✅ **SHIPPED 2026-08-07** — `GET /jobs/expressions` (`JobRoutes`, fixed sub-path before the `/jobs/{name}` regex) + `contextFree` previews via `ExpressionRegistry.catalog(ctx)` / `JobService.expressionCatalog()` | `ControlApiJobExpressionsTest` 4/4 real-HTTP; `mvn -o -pl inspecto test` → 685, 0 failures. Previews equal evaluator output by construction |
 | 7 | `ParamType.TEXT`/`EMAIL`; `ParameterDecl` components + builder (precedent: `EventQuery` et al.) | Built-ins compile untouched |
 | 8 | `ParameterResolver` enforces pattern/min/max/options/multi (per item), pre + post resolution | Each violation ⇒ `REJECTED`; expression re-validated after resolution |
 | 9 | `JobTypeDescriptor` provenance + `toMap()`; `secret` masking at the `GET /jobs/{name}` boundary (never in `JobConfig.toMap()` — §7.2) | `GET /jobs/types/{id}` returns provenance; detail route masks; bundle export unchanged |

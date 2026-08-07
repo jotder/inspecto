@@ -55,6 +55,11 @@ final class JobRoutes implements RouteModule {
         api.get("/jobs/types/([^/]+)", (e, m) -> jobs(api).jobType(ApiContext.name(m))
                 .map(JobTypeDescriptor::toMap)
                 .orElseThrow(() -> new ApiException(404, "no job type '" + ApiContext.name(m) + "'")));
+        // Expression catalog (job-parameter-contract §4.3): the registered $-token vocabulary that drives
+        // the authoring form's token picker, generated from the ExpressionRegistry so it stays correct as
+        // Job Packs load. Context-free tokens carry a preview evaluated by the engine's own evaluator, so
+        // the UI never re-implements resolution. Fixed sub-path, registered before the /jobs/{name} regex.
+        api.get("/jobs/expressions", (e, m) -> jobs(api).expressionCatalog());
         // Job Pack inventory + explicit rescan (R8, job-framework P2c, §12/§14). Fixed sub-paths under
         // /jobs/, registered before the /jobs/{name} regex routes. Rescan is a canOperateRuns write
         // (reconciles the packs dir now instead of waiting on the watcher); every transition is audited

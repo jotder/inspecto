@@ -70,6 +70,20 @@ final class ExpressionRegistry {
         return providers.stream().flatMap(p -> p.declarations().stream()).toList();
     }
 
+    /** The catalog {@code GET /jobs/expressions} serves (§4.3), <b>generated from the registry</b> — never a
+     *  parallel hand-maintained list, so it stays correct as packs load. A {@code contextFree} entry's
+     *  {@code preview} is evaluated here, by the same evaluator a Run uses, which is what makes the UI's
+     *  preview correct by construction instead of a second implementation. Context-bound entries fall back
+     *  to their declared worked sample: there is no firing Run at request time, and inventing one would
+     *  show the author a value that is not what their Job will see. */
+    List<Map<String, Object>> catalog(ExpressionContext previewCtx) {
+        return declarations().stream()
+                .map(d -> d.toMap(d.contextFree()
+                        ? evaluate(d.sampleExpression(), previewCtx).orElse(d.example())
+                        : d.example()))
+                .toList();
+    }
+
     /** Evaluate one Expression: route it to its declaring provider, or empty when no token matches
      *  (unknown) or the declared token has no value in this context. */
     Optional<String> evaluate(String expr, ExpressionContext ctx) {

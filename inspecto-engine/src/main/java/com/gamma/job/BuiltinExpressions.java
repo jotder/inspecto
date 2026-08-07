@@ -33,10 +33,12 @@ final class BuiltinExpressions implements ExpressionProvider {
             literal("$now", ParamType.INSTANT, "The fire-time instant", "2026-08-07T06:00:00Z"),
             literal("$now.epoch_seconds", ParamType.INTEGER, "Fire time as epoch seconds", "1785045600"),
             literal("$now.epoch_millis", ParamType.INTEGER, "Fire time as epoch milliseconds", "1785045600000"),
-            literal("$run.id", ParamType.STRING, "This Run's id", "run-20260807-060000-1"),
+            // These three are NOT contextFree: they need a firing Run/Job, so the catalog must show their
+            // worked sample rather than fabricate a live preview from a request-time context.
+            runBound("$run.id", ParamType.STRING, "This Run's id", "run-20260807-060000-1"),
             literal("$run.fire_time", ParamType.INSTANT, "When this Run fired", "2026-08-07T06:00:00Z"),
-            literal("$run.actor", ParamType.STRING, "Who or what triggered this Run", "cron"),
-            literal("$job.last_success_time", ParamType.INSTANT,
+            runBound("$run.actor", ParamType.STRING, "Who or what triggered this Run", "cron"),
+            runBound("$job.last_success_time", ParamType.INSTANT,
                     "This Job's success watermark — the incremental-window anchor; unset before the first success",
                     "2026-08-06T06:00:04Z"),
             new ExpressionDecl("$signal.", PREFIX, ParamType.STRING,
@@ -47,6 +49,12 @@ final class BuiltinExpressions implements ExpressionProvider {
                     "An attribute (ref | rows | bytes | watermark | time_range) of a predecessor Job's "
                             + "latest Run Artifact",
                     "$upstream(loader).artifact(output).ref", ExpressionDecl.ANY_TRIGGER, false));
+
+    /** A literal token available on any Trigger but needing a firing Run/Job — no live preview. */
+    private static ExpressionDecl runBound(String token, ParamType yields, String description, String example) {
+        return new ExpressionDecl(token, ExpressionDecl.Form.LITERAL, yields, description, example,
+                ExpressionDecl.ANY_TRIGGER, false);
+    }
 
     private static ExpressionDecl dateFn(String unit, String plural) {
         return new ExpressionDecl("$" + unit + "(n)", FUNCTION, ParamType.DATE,
