@@ -974,7 +974,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     `defaultValue` is now rejected until corrected (job-parameter-contract §6.3; the whole point is that
     the old behaviour hid the typo). No shipped built-in is affected — every built-in `deduce:` value
     resolves through `BuiltinExpressions`. Release notes must also mention the `$$` escape: in a
-    `deduce:`/`bind:` position `$$x` now yields the literal `$x`.
+    `deduce:`/`bind:` position `$$x` now yields the literal `$x`. **A sixth landed 2026-08-07**:
+    `8504b782` `feat(jobs)!` — authored Job parameter values (trigger `args` and the `params:` block) are
+    now **evaluated**: a value that is a whole `$`-token resolves at fire time instead of passing through
+    literally, and one naming an unregistered token fails the Run REJECTED. Values that merely *contain* a
+    `$` are unaffected, and `$$`/`${ENV:…}`/`$100` are literals by grammar. Release notes should pair this
+    with the `$$` note above — they are one story for an operator.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
