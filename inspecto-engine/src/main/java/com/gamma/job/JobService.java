@@ -216,7 +216,7 @@ public final class JobService implements AutoCloseable {
         registerBuiltins();
         // Job Packs (P2c): load hot-deployable types BEFORE building Jobs, so a Job authored against a
         // pack type resolves at construction. Startup-scan signals no-op until the event log is wired.
-        this.packs = new JobPackManager(System.getProperty("jobs.packs.dir"), registry,
+        this.packs = new JobPackManager(System.getProperty("jobs.packs.dir"), registry, expressions,
                 (type, sev, payload) -> emitSignal(type, sev, null, Ref.of("job-pack", "job.packs"), payload),
                 this::onPackUnloaded);
         this.packs.scanAtStartup();
@@ -325,6 +325,19 @@ public final class JobService implements AutoCloseable {
                 registry.register(provider);
             } catch (RuntimeException e) {
                 log.warn("job type provider {} rejected: {}", provider.getClass().getName(), e.getMessage());
+            }
+        }
+        // Classpath Expression providers (job-parameter-contract §4.2, step 5). Deliberately NOT the
+        // warn-and-skip posture of the Job Type loop above: a colliding token means the deployment's
+        // $-vocabulary is ambiguous, and an authored $-value would resolve differently depending on which
+        // provider won. Startup fails loudly instead — a mis-packaged plugin is a deployment error, not a
+        // condition to run through. ServiceLoader finds none in the base build.
+        for (ExpressionProvider provider : ServiceLoader.load(ExpressionProvider.class)) {
+            try {
+                expressions.register(provider);
+            } catch (RuntimeException e) {
+                throw new IllegalStateException("expression provider " + provider.getClass().getName()
+                        + " rejected: " + e.getMessage(), e);
             }
         }
     }

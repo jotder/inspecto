@@ -47,8 +47,9 @@ class JobPackManagerTest {
                 "GreetType", "acme-greet", "1.0.0");
 
         JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
-        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, sink)) {
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
 
             assertTrue(registry.has("acme.greet"), "pack type registered");
@@ -81,8 +82,9 @@ class JobPackManagerTest {
                 "GreetType", "acme-greet", "1.0.0");
 
         JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
-        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, sink)) {
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
             Job job = registry.create("acme.greet", jobConfig("g1", "acme.greet"));
 
@@ -114,13 +116,14 @@ class JobPackManagerTest {
         buildPackJar(work, packsDir.resolve("dupe-1.jar"), "report", "report", "DupeType", "dupe", "1.0.0");
 
         JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         JobTypeProvider builtin = JobTypeProvider.of(
                 new JobTypeDescriptor("report", "Report", "built-in", List.of(), List.of(), List.of()),
                 c -> { throw new UnsupportedOperationException(); });
         registry.register(builtin);   // permanent, owner=null
 
         Sink sink = new Sink();
-        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, sink)) {
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
             assertTrue(registry.has("report"));
             // The built-in still owns 'report' — its factory throws; the pack's would have returned a Job.
@@ -140,13 +143,90 @@ class JobPackManagerTest {
         buildPackJar(work, packsDir.resolve("mismatch-1.jar"), "real.id", "meta.id", "MismatchType", "mm", "1.0.0");
 
         JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
-        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, sink)) {
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
             assertFalse(registry.has("real.id"));
             assertFalse(registry.has("meta.id"));
             assertTrue(sink.types.contains("job.pack.rejected"));
         }
+    }
+
+    @Test
+    void aPackContributesAnExpressionTokenAndTakesItBackOnUnload(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        Path jar = buildExpressionPackJar(work, packsDir.resolve("tenant-1.jar"), "$tenant.id", "TenantExpr", "tenant");
+
+        JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
+        Sink sink = new Sink();
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
+            mgr.scanAtStartup();
+
+            // §0 working as intended: new vocabulary with no engine edit. A pack carrying only tokens and
+            // no Job Type is a valid pack.
+            assertEquals("acme", expressions.evaluate("$tenant.id", ctx()).orElse(null));
+            assertTrue(expressions.declarations().stream().anyMatch(d -> d.token().equals("$tenant.id")));
+            assertTrue(sink.types.contains("job.pack.loaded"));
+
+            Files.delete(jar);
+            mgr.rescan();
+
+            assertFalse(expressions.declares("$tenant.id"), "unload takes the pack's tokens back with it");
+            assertTrue(expressions.declares("$today"), "and leaves the built-ins alone");
+        }
+    }
+
+    @Test
+    void aPackWhoseTokenCollidesWithABuiltInIsRejectedWhole(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null);
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        // A captured token would change what an authored $-value means with no signal — §4.2's hazard.
+        buildExpressionPackJar(work, packsDir.resolve("shadow-1.jar"), "$today", "ShadowExpr", "shadow");
+
+        JobTypeRegistry registry = new JobTypeRegistry();
+        ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
+        Sink sink = new Sink();
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
+            mgr.scanAtStartup();
+
+            assertTrue(sink.types.contains("job.pack.rejected"), "rejected loudly, not skipped quietly");
+            assertNotEquals("acme", expressions.evaluate("$today", ctx()).orElse(null),
+                    "the built-in $today still owns its token");
+            assertEquals(java.time.LocalDate.now().toString(), expressions.evaluate("$today", ctx()).orElse(null));
+        }
+    }
+
+    private static ExpressionContext ctx() {
+        return new ExpressionContext("run-1", java.time.Instant.now(), "cron", java.time.ZoneId.systemDefault(),
+                java.util.Optional::empty, (j, n) -> java.util.Optional.empty(), Map.of());
+    }
+
+    /** Compile an {@link ExpressionProvider} declaring {@code token} (and nothing else) into a real pack
+     *  jar — the "a plugin adds vocabulary" case, with no Job Type in the pack at all. */
+    private static Path buildExpressionPackJar(Path work, Path jar, String token, String cls, String packId)
+            throws Exception {
+        String fqcn = "com.acme.pack." + cls;
+        String src = """
+                package com.acme.pack;
+                import com.gamma.job.*;
+                import java.util.List;
+                import java.util.Optional;
+                public class %s implements ExpressionProvider {
+                    public List<ExpressionDecl> declarations() {
+                        return List.of(ExpressionDecl.literal("%s", ParamType.STRING, "the tenant", "acme"));
+                    }
+                    public Optional<String> evaluate(String expr, ExpressionContext ctx) {
+                        return Optional.of("acme");
+                    }
+                }
+                """.formatted(cls, token);
+
+        Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
+        writeJar(jar, classes, packId, Map.of("com.gamma.job.ExpressionProvider", fqcn));
+        return jar;
     }
 
     // ── fixture: compile a provider + Job and package them into a real jar off the test classpath ──
@@ -183,14 +263,20 @@ class JobPackManagerTest {
                 }
                 """.formatted(metaId, cls, descriptorId, descriptorId);
 
+        Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
+        writeJar(jar, classes, packId, version, Map.of("com.gamma.job.JobTypeProvider", fqcn));
+        return jar;
+    }
+
+    /** Compile one source file against the real {@code com.gamma.job} code-source location (robust under
+     *  Maven surefire, where {@code java.class.path} is just the booter jar); returns the classes dir. */
+    private static Path compile(Path work, String relPath, String src) throws Exception {
         Path stage = Files.createTempDirectory(work, "stage-");
-        Path srcFile = stage.resolve("com/acme/pack/" + cls + ".java");
+        Path srcFile = stage.resolve(relPath);
         Files.createDirectories(srcFile.getParent());
         Files.writeString(srcFile, src);
         Path classes = Files.createDirectories(stage.resolve("classes"));
 
-        // The pack imports only com.gamma.job.* — compile against that API's real code-source location
-        // (robust under Maven surefire, where java.class.path is just the booter jar).
         String apiCp = Path.of(JobTypeProvider.class.getProtectionDomain().getCodeSource().getLocation().toURI())
                 .toString();
         JavaCompiler jc = ToolProvider.getSystemJavaCompiler();
@@ -200,7 +286,18 @@ class JobPackManagerTest {
                     fm.getJavaFileObjects(srcFile.toFile())).call();
             assertTrue(ok, "pack source compiled");
         }
+        return classes;
+    }
 
+    private static void writeJar(Path jar, Path classes, String packId, Map<String, String> services)
+            throws Exception {
+        writeJar(jar, classes, packId, "1.0.0", services);
+    }
+
+    /** Package compiled classes with the {@code Pack-Id}/{@code Pack-Version} manifest and one
+     *  {@code META-INF/services} entry per {@code (SPI → impl)}. */
+    private static void writeJar(Path jar, Path classes, String packId, String version,
+                                 Map<String, String> services) throws Exception {
         Manifest mf = new Manifest();
         mf.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
         mf.getMainAttributes().putValue("Pack-Id", packId);
@@ -212,11 +309,12 @@ class JobPackManagerTest {
                 Files.copy(p, jos);
                 jos.closeEntry();
             }
-            jos.putNextEntry(new JarEntry("META-INF/services/com.gamma.job.JobTypeProvider"));
-            writeUtf8(jos, fqcn + "\n");
-            jos.closeEntry();
+            for (var e : services.entrySet()) {
+                jos.putNextEntry(new JarEntry("META-INF/services/" + e.getKey()));
+                writeUtf8(jos, e.getValue() + "\n");
+                jos.closeEntry();
+            }
         }
-        return jar;
     }
 
     private static void writeUtf8(OutputStream os, String s) throws Exception {

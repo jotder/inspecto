@@ -161,6 +161,21 @@ ServiceLoader path merely `log.warn`s and skips that provider (`JobService.java:
 provider's load loudly — built-in, classpath, or pack. Packs' isolated classloader and
 unload-quiesce machinery is inherited unchanged.
 
+#### 4.2-A As built (step 5, 2026-08-07)
+
+- **"Loudly" for a classpath provider means startup fails.** The Job Type loop's warn-and-skip was
+  deliberately *not* copied: a colliding token leaves the deployment's `$`-vocabulary ambiguous, and an
+  authored value would resolve differently depending on which provider won. `JobService` construction
+  throws with the offending provider named. ⚠ A mis-packaged expression plugin therefore prevents boot —
+  taken on purpose, and consistent with the built-in path, which has always thrown.
+- **A pack may contribute only tokens.** The "no `JobTypeProvider` in `META-INF/services`" rejection now
+  spans both SPIs, so a pure-vocabulary pack is valid rather than blocked by an incidental requirement.
+- **Atomicity spans both registries**: pack tokens register under the same owner as its types, the reject
+  path deregisters both, and unload takes tokens back with the types. A pack whose token clashes is
+  rejected whole, never half-in.
+- The convenience `JobPackManager` constructor was **not** given a default `ExpressionRegistry.withBuiltins()`
+  — a throwaway second registry would silently diverge from the one Runs resolve against. Callers pass it.
+
 ### 4.3 Catalog
 
 `GET /jobs/expressions` serves the registry — **generated from it, never a parallel hand-maintained
@@ -461,7 +476,7 @@ resolution. No key/value row anywhere.
 | 2 | ✅ **SHIPPED 2026-08-07** — `$$` literal escape + unknown-token `REJECTED` (`Resolution.unknownExpression`, reported by `JobService`'s reject path and the `job.run.rejected` Signal) | `mvn -o -pl inspecto-engine test` → 994 tests, 0 failures; existing configs unaffected — layers 1/3 still literal (pinned by `authoredConfigValuesAreStillLiteralsAtThisStep`) |
 | 3 | Evaluate expressions in layers 1 + 3 through the registry | A `$today` typed as a config param resolves at fire time |
 | 4 | Resolve the §6.1 `sql.template` collision (recommended: scoped evaluation) | Decision recorded; `sql.template` tests green under the chosen rule |
-| 5 | ServiceLoader + Job Pack expression providers; **collisions fail-closed in all three load paths** (§4.2) | A pack contributes a token; a colliding provider load fails loudly |
+| 5 | ✅ **SHIPPED 2026-08-07** — ServiceLoader (`JobService.registerBuiltins`) + Job Pack (`JobPackManager.load`/`unload`) expression providers; owner-tagged registration + `deregister(owner)`; collisions fail-closed in all three paths | `JobPackManagerTest` 6/6 — a real compiled pack jar contributes `$tenant.id` and unload takes it back; a pack declaring `$today` is rejected whole. Engine 1001, 0 failures |
 | 6 | ✅ **SHIPPED 2026-08-07** — `GET /jobs/expressions` (`JobRoutes`, fixed sub-path before the `/jobs/{name}` regex) + `contextFree` previews via `ExpressionRegistry.catalog(ctx)` / `JobService.expressionCatalog()` | `ControlApiJobExpressionsTest` 4/4 real-HTTP; `mvn -o -pl inspecto test` → 685, 0 failures. Previews equal evaluator output by construction |
 | 7 | ✅ **SHIPPED 2026-08-07** — `ParamType.TEXT`/`EMAIL`; all eleven `ParameterDecl` components + `of(name,type)….build()`; `JobTypeDescriptor.toMap()` serves them | Built-ins compiled untouched (a 6-arg delegating constructor keeps all 16 raw call sites); `ParameterDeclContractTest` 5/5; engine 999, `inspecto` 685, 0 failures |
 | 8 | `ParameterResolver` enforces pattern/min/max/options/multi (per item), pre + post resolution | Each violation ⇒ `REJECTED`; expression re-validated after resolution |

@@ -27,16 +27,23 @@ final class ExpressionRegistry {
 
     private final List<ExpressionProvider> providers = new ArrayList<>();
     private final Map<String, Route> routes = new LinkedHashMap<>();   // matchKey -> route
+    private final Map<ExpressionProvider, String> owners = new LinkedHashMap<>();   // provider -> owner (null = permanent)
 
-    /** The engine's own vocabulary (§2) — the only registration until step 5 wires the open paths. */
+    /** The engine's own vocabulary (§2). Classpath providers and Job Packs register on top. */
     static ExpressionRegistry withBuiltins() {
         ExpressionRegistry r = new ExpressionRegistry();
-        r.register(new BuiltinExpressions());
+        r.register(new BuiltinExpressions(), null);
         return r;
     }
 
-    /** Register a provider. Atomic: a collision on any one token leaves the registry untouched. */
+    /** Register a permanent (built-in / classpath) provider — never deregistered. */
     void register(ExpressionProvider provider) {
+        register(provider, null);
+    }
+
+    /** Register a provider owned by {@code owner} (a Job Pack key, or {@code null} for permanent).
+     *  Atomic: a collision on any one token leaves the registry untouched. */
+    void register(ExpressionProvider provider, String owner) {
         List<ExpressionDecl> decls = provider.declarations();
         for (ExpressionDecl d : decls) {
             if (routes.containsKey(d.matchKey()))
@@ -44,6 +51,25 @@ final class ExpressionRegistry {
         }
         decls.forEach(d -> routes.put(d.matchKey(), new Route(d, provider)));
         providers.add(provider);
+        owners.put(provider, owner);
+    }
+
+    /** Remove every provider owned by {@code owner} (Job Pack unload/reload); returns the tokens removed.
+     *  A pack can never displace a built-in — its token collides and is rejected at registration — so this
+     *  only ever takes back what that pack itself added. */
+    List<String> deregister(String owner) {
+        List<String> removed = new ArrayList<>();
+        for (var it = owners.entrySet().iterator(); it.hasNext(); ) {
+            var e = it.next();
+            if (!java.util.Objects.equals(owner, e.getValue())) continue;
+            for (ExpressionDecl d : e.getKey().declarations()) {
+                routes.remove(d.matchKey());
+                removed.add(d.token());
+            }
+            providers.remove(e.getKey());
+            it.remove();
+        }
+        return removed;
     }
 
     /** Whether {@code raw} is meant as an Expression at all (§6.2/§6.3): {@code $}-led, but not the

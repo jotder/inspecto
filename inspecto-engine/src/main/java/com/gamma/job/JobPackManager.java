@@ -91,6 +91,7 @@ final class JobPackManager implements AutoCloseable {
 
     private final Path dir;                         // null ⇒ feature off
     private final JobTypeRegistry registry;
+    private final ExpressionRegistry expressions;
     private final SignalSink signals;
     private final UnloadListener unloadListener;      // nullable — no-op when not wired
     private final boolean requireSignature;
@@ -108,13 +109,16 @@ final class JobPackManager implements AutoCloseable {
     private Thread watchThread;
     private Path stagingDir;                         // lazily created; holds the locked copies we load from
 
-    JobPackManager(String packsDir, JobTypeRegistry registry, SignalSink signals) {
-        this(packsDir, registry, signals, null);
+    JobPackManager(String packsDir, JobTypeRegistry registry, ExpressionRegistry expressions,
+                   SignalSink signals) {
+        this(packsDir, registry, expressions, signals, null);
     }
 
-    JobPackManager(String packsDir, JobTypeRegistry registry, SignalSink signals, UnloadListener unloadListener) {
+    JobPackManager(String packsDir, JobTypeRegistry registry, ExpressionRegistry expressions,
+                   SignalSink signals, UnloadListener unloadListener) {
         this.dir = (packsDir == null || packsDir.isBlank()) ? null : Path.of(packsDir).toAbsolutePath().normalize();
         this.registry = registry;
+        this.expressions = expressions;
         this.signals = signals;
         this.unloadListener = unloadListener;
         this.requireSignature = Boolean.getBoolean("jobs.packs.requireSignature");
@@ -182,8 +186,15 @@ final class JobPackManager implements AutoCloseable {
             List<JobTypeProvider> providers = new ArrayList<>();
             for (JobTypeProvider p : ServiceLoader.load(JobTypeProvider.class, loader))
                 if (p.getClass().getClassLoader() == loader) providers.add(p);   // only this pack's own types
-            if (providers.isEmpty())
-                throw new IllegalStateException("no JobTypeProvider in META-INF/services");
+            // A pack may also contribute Expression tokens (job-parameter-contract §4.2, step 5) — and may
+            // contribute *only* tokens, so the "empty" check below spans both kinds rather than demanding a
+            // Job Type from a pack whose whole purpose is vocabulary.
+            List<ExpressionProvider> exprProviders = new ArrayList<>();
+            for (ExpressionProvider p : ServiceLoader.load(ExpressionProvider.class, loader))
+                if (p.getClass().getClassLoader() == loader) exprProviders.add(p);
+            if (providers.isEmpty() && exprProviders.isEmpty())
+                throw new IllegalStateException(
+                        "no JobTypeProvider or ExpressionProvider in META-INF/services");
 
             List<String> ids = new ArrayList<>();
             for (JobTypeProvider p : providers) {
@@ -199,6 +210,10 @@ final class JobPackManager implements AutoCloseable {
                 ids.add(id);
             }
             for (JobTypeProvider p : providers) registry.register(p, name);   // owner = jar filename
+            // Expression tokens register under the same owner, so an unload takes them back with the types.
+            // ExpressionRegistry.register is itself fail-closed on a colliding token, and the catch below
+            // deregisters both registries — so a pack whose token clashes is rejected whole, never half-in.
+            for (ExpressionProvider p : exprProviders) expressions.register(p, name);
 
             String[] mf = manifest(jar);
             LoadedPack pack = new LoadedPack(mf[0] != null ? mf[0] : name, mf[1] != null ? mf[1] : "?",
@@ -209,6 +224,7 @@ final class JobPackManager implements AutoCloseable {
             return true;
         } catch (Exception | ServiceConfigurationError ex) {   // Error: a provider that fails to instantiate
             registry.deregister(name);                                  // roll back any partial registration
+            expressions.deregister(name);                               // both registries, or the pack half-loads
             if (loader != null) try { loader.close(); } catch (IOException ignore) { /* best effort */ }
             if (staged != null) try { Files.deleteIfExists(staged); } catch (IOException ignore) { /* best effort */ }
             log.warn("[PACKS] rejected {}: {}", name, ex.toString());
@@ -224,7 +240,9 @@ final class JobPackManager implements AutoCloseable {
         LoadedPack pack = loaded.remove(name);
         if (pack == null) return;
         List<String> removed = registry.deregister(name);
-        log.info("[PACKS] unloaded {} ({}): {}", pack.id(), name, removed);
+        List<String> removedTokens = expressions.deregister(name);
+        log.info("[PACKS] unloaded {} ({}): {}{}", pack.id(), name, removed,
+                removedTokens.isEmpty() ? "" : " + tokens " + removedTokens);
         signals.emit("job.pack.unloaded", Severity.INFO, packPayload(pack));
         if (unloadListener != null) unloadListener.onUnload(name);
         closeOrDefer(name, pack);
