@@ -53,6 +53,12 @@ final class ParameterResolver {
         boolean stops() { return value != null || unknownExpr != null; }
     }
 
+    /** Deliberately permissive: {@code local@domain.tld} with no spaces. An address is only truly validated
+     *  by delivering to it, and a stricter regex rejects valid addresses — this catches the typo class the
+     *  declaration is for, and nothing more. */
+    private static final java.util.regex.Pattern EMAIL =
+            java.util.regex.Pattern.compile("[^@\\s]+@[^@\\s]+\\.[^@\\s]+");
+
     static Resolution resolve(List<ParameterDecl> decls, Map<String, String> args,
                               Map<String, String> bind, Map<String, String> config,
                               ExpressionRegistry expressions, ExpressionContext ctx) {
@@ -81,9 +87,9 @@ final class ParameterResolver {
                 List.copyOf(unknown));
     }
 
-    /** Whether {@code v} parses as {@code type} (§7.1). {@code STRING}/{@code DATASET_REF} accept any
-     *  non-blank string — a dataset reference's *existence* is a different, later concern, not a parse
-     *  format. {@code null}/blank never reaches here (see {@link #value}, which already excludes it). */
+    /** Whether {@code v} parses as {@code type} (§7.1). {@code STRING}/{@code TEXT}/{@code DATASET_REF}
+     *  accept any non-blank string — a dataset reference's *existence* is a different, later concern, not a
+     *  parse format. {@code null}/blank never reaches here (see {@link #value}, which already excludes it). */
     private static boolean matchesType(ParamType type, String v) {
         try {
             switch (type) {
@@ -92,7 +98,9 @@ final class ParameterResolver {
                 case BOOLEAN: return "true".equalsIgnoreCase(v) || "false".equalsIgnoreCase(v);
                 case DATE: LocalDate.parse(v); return true;
                 case INSTANT: Instant.parse(v); return true;
+                case EMAIL: return EMAIL.matcher(v).matches();
                 case STRING:
+                case TEXT:
                 case DATASET_REF:
                 default: return true;
             }

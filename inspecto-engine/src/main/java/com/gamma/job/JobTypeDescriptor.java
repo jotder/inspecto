@@ -39,6 +39,20 @@ public record JobTypeDescriptor(String id, String title, String description,
             pm.put("deduce", p.deduce() == null ? "" : p.deduce());
             pm.put("default", p.defaultValue() == null ? "" : p.defaultValue());
             pm.put("description", p.description() == null ? "" : p.description());
+            // The rendering + validation contract (job-parameter-contract §7.2). Empty string / empty list
+            // for "unset", matching the keys above, so the UI's mirror needs no null handling. min/max stay
+            // null when unbounded: 0 is a meaningful bound and must not be confused with "no bound".
+            pm.put("label", p.label() == null ? "" : p.label());
+            pm.put("tier", p.tier().name());
+            pm.put("options", p.options());
+            pm.put("pattern", p.pattern() == null ? "" : p.pattern());
+            pm.put("min", p.min());
+            pm.put("max", p.max());
+            pm.put("placeholder", p.placeholder() == null ? "" : p.placeholder());
+            pm.put("group", p.group() == null ? "" : p.group());
+            pm.put("multi", p.multi());
+            pm.put("secret", p.secret());
+            pm.put("expressions", p.expressions());
             return pm;
         }).toList());
         m.put("emits", emits);

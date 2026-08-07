@@ -359,6 +359,24 @@ established pattern for many-optional-component records: `EventQuery`, `Event` (
 `optional(...)` factories as-is. (Today a decl with `deduce` set can only be built through the raw
 6-arg constructor — e.g. `ConsignmentProcessJobType.java:83` — the builder retires that wart too.)
 
+#### 7.2-A As built (step 7, 2026-08-07)
+
+- **The 6-arg constructor is the compatibility seam.** Widening the record changes the canonical
+  constructor's arity, so a 6-component delegating constructor was added and all 16 raw call sites — plus
+  `required(...)`/`optional(...)` — compile and behave unchanged. That is what made "built-ins compile
+  untouched" true rather than aspirational.
+- **`tier(REQUIRED)` also sets `required`.** Two components that must agree are one fact; letting a
+  declaration say `tier(REQUIRED)` without `required()` would have created a state where the form demands a
+  value the resolver does not.
+- **`min`/`max` stay `null` when unbounded, over the wire too** — `0` is a meaningful bound, so the
+  empty-string-for-unset convention the other keys use would have been a bug here.
+- **The multi-select constraint is enforced at construction**, not at descriptor registration as §7.4
+  suggested: it is the earliest point, needs no registry involvement, and a declaration that cannot render
+  should not exist. `ParameterDeclContractTest` pins the message.
+- **`EMAIL` is enforced in `matchesType`, not deferred to step 8's pattern work.** It is a *type*, so it
+  belongs beside `DATE`/`INSTANT`; the regex is deliberately permissive (`local@domain.tld`, no spaces)
+  because only delivery truly validates an address and a strict regex rejects valid ones.
+
 ### 7.3 `JobTypeDescriptor` — expose provenance
 
 Today: `id, title, description, parameters, emits, artifacts` (`JobTypeDescriptor.java:13-15`;
@@ -445,7 +463,7 @@ resolution. No key/value row anywhere.
 | 4 | Resolve the §6.1 `sql.template` collision (recommended: scoped evaluation) | Decision recorded; `sql.template` tests green under the chosen rule |
 | 5 | ServiceLoader + Job Pack expression providers; **collisions fail-closed in all three load paths** (§4.2) | A pack contributes a token; a colliding provider load fails loudly |
 | 6 | ✅ **SHIPPED 2026-08-07** — `GET /jobs/expressions` (`JobRoutes`, fixed sub-path before the `/jobs/{name}` regex) + `contextFree` previews via `ExpressionRegistry.catalog(ctx)` / `JobService.expressionCatalog()` | `ControlApiJobExpressionsTest` 4/4 real-HTTP; `mvn -o -pl inspecto test` → 685, 0 failures. Previews equal evaluator output by construction |
-| 7 | `ParamType.TEXT`/`EMAIL`; `ParameterDecl` components + builder (precedent: `EventQuery` et al.) | Built-ins compile untouched |
+| 7 | ✅ **SHIPPED 2026-08-07** — `ParamType.TEXT`/`EMAIL`; all eleven `ParameterDecl` components + `of(name,type)….build()`; `JobTypeDescriptor.toMap()` serves them | Built-ins compiled untouched (a 6-arg delegating constructor keeps all 16 raw call sites); `ParameterDeclContractTest` 5/5; engine 999, `inspecto` 685, 0 failures |
 | 8 | `ParameterResolver` enforces pattern/min/max/options/multi (per item), pre + post resolution | Each violation ⇒ `REJECTED`; expression re-validated after resolution |
 | 9 | `JobTypeDescriptor` provenance + `toMap()`; `secret` masking at the `GET /jobs/{name}` boundary (never in `JobConfig.toMap()` — §7.2) | `GET /jobs/types/{id}` returns provenance; detail route masks; bundle export unchanged |
 | 10 | Widen the `JobParameterDecl` mirror (`app/inspecto/api/jobs.service.ts:27-37`); rewrite `paramDeclToSpec` per §7.4 (incl. DATE/INSTANT presets, DATASET_REF autocomplete) | UI unit tests: one case per §7.4 row |
