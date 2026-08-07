@@ -1,0 +1,9 @@
+job:
+  name: orders_weekly_compact
+  type: maintenance
+  task: compact
+  cron: "0 2 * * 0"
+  enabled: true
+  dir: data/orders
+  min_age_days: 7
+  min_files: 2

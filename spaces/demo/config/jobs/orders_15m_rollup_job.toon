@@ -1,0 +1,8 @@
+job:
+  name: orders_15m_rollup
+  type: sql.template
+  enabled: true
+  sources: orders
+  sink_dataset: orders_15m_rollup
+  sql: "SELECT time_bucket(INTERVAL '15 minutes', CAST(ORDER_TS AS TIMESTAMP)) AS BUCKET_START, date_trunc('hour', CAST(ORDER_TS AS TIMESTAMP)) AS SUMMARY_HOUR, REGION, COUNT(*) AS ORDER_COUNT, ROUND(SUM(GROSS), 2) AS REVENUE, ROUND(AVG(GROSS), 2) AS AVG_ORDER FROM orders WHERE CAST(ORDER_TS AS DATE) = $event_date GROUP BY 1, 2, 3 ORDER BY 1, 3"
+  event_date: "$yesterday"

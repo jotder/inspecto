@@ -147,6 +147,9 @@ public final class JobService implements AutoCloseable {
     /** This space's Object Engine, wired post-construction ({@link #objects(com.gamma.ops.ObjectService)}) so
      *  the {@code recon.run} built-in can promote a breach to an Incident; {@code null} until wired. */
     private volatile com.gamma.ops.ObjectService objects;
+    /** This space's Alert engine, wired post-construction ({@link #alerts(com.gamma.alert.AlertService)}) so
+     *  the {@code alert.evaluate} built-in can run the authored rules on a cron; {@code null} until wired. */
+    private volatile com.gamma.alert.AlertService alerts;
     /** One coalescer per on-signal Job, so a burst of matching signals folds into one follow-up Run (§8.4). */
     private final Map<String, TriggerCoalescer> signalCoalescers = new ConcurrentHashMap<>();
     /** Loop cut: a signal-triggered Run beyond this chain depth does not fire (§8.4) — {@code -Djobs.signal.maxChainDepth}. */
@@ -267,6 +270,11 @@ public final class JobService implements AutoCloseable {
                         ParameterDecl.optional("target_dir", ParamType.STRING, null, "restore: destination directory"),
                         ParameterDecl.optional("overwrite", ParamType.BOOLEAN, "false", "restore: replace existing files instead of blocking on conflicts"),
                         ParameterDecl.optional("min_age_days", ParamType.INTEGER, "1", "compact / file_repository_audit: quiet window in days"),
+                        // Read by PartitionCompactor:59 but never declared until now — an authoring form
+                        // could not offer it, and the resolver could not bound it.
+                        ParameterDecl.of("min_files", ParamType.INTEGER).min(2).defaultValue("4")
+                                .description("compact: only merge a partition directory holding at least N files")
+                                .build(),
                         ParameterDecl.optional("source", ParamType.STRING, null, "ledger_prune: scope to one Source"),
                         ParameterDecl.optional("store", ParamType.STRING, null, "Store(s) a delete task targets (fenced)")),
                 List.of("maintenance.storage.threshold", "maintenance.storage.trend",
@@ -317,6 +325,46 @@ public final class JobService implements AutoCloseable {
                                 "Forget samples older than N days (0 = keep forever)")),
                 List.of("objects.analytics.completed"), List.of()),
                 c -> new ObjectsAnalyticsJob(c, dataDir, () -> this.objects)));
+        // sample.hello — the inert reference Job (see SampleHelloJob). Its declaration is deliberately a
+        // tour of the parameter contract (job-parameter-contract §7.2): every tier, a group, options, a
+        // multi list, bounds, a secret, and a deduced date. Authors read this to learn the form.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor("sample.hello", "Hello World (sample)",
+                "Does no work. Echoes its resolved parameters and raises one Alert — a safe Job to schedule, "
+                        + "trigger and read while learning the authoring form.",
+                List.of(
+                        ParameterDecl.of("greeting", ParamType.STRING).label("Greeting").group("Message")
+                                .defaultValue("Hello").placeholder("Hello").build(),
+                        ParameterDecl.of("audience", ParamType.STRING).label("Audience").group("Message")
+                                .defaultValue("world")
+                                .description("Try an Expression here, e.g. $run.actor").build(),
+                        ParameterDecl.of("note", ParamType.TEXT).label("Note").group("Message")
+                                .placeholder("Free text carried onto the Alert").build(),
+                        ParameterDecl.of("run_date", ParamType.DATE).label("Run date").group("Message")
+                                .deduce("$today").description("Defaults to the fire date when unset").build(),
+                        ParameterDecl.of("severity", ParamType.STRING).label("Alert severity").group("Alert")
+                                .options("INFO", "WARNING", "ERROR").defaultValue("INFO").build(),
+                        ParameterDecl.of("raise_alert", ParamType.BOOLEAN).label("Raise an Alert")
+                                .group("Alert").defaultValue("true").build(),
+                        ParameterDecl.of("tags", ParamType.STRING).label("Tags").group("Alert").multi()
+                                .description("Comma-separated; copied onto the Alert's attributes").build(),
+                        ParameterDecl.of("notify", ParamType.EMAIL).label("Notify").group("Alert").multi()
+                                .description("Validated per address — nothing is sent, this is a sample").build(),
+                        ParameterDecl.of("retries", ParamType.INTEGER).label("Retries")
+                                .tier(ParameterDecl.Tier.ADVANCED).min(0).max(5).defaultValue("0").build(),
+                        ParameterDecl.of("api_token", ParamType.STRING).label("API token")
+                                .tier(ParameterDecl.Tier.ADVANCED).secret()
+                                .description("Masked on read — demonstrates the secret contract").build()),
+                List.of("sample.hello.completed"), List.of()),
+                c -> new SampleHelloJob(c, () -> this.objects)));
+        // alert.evaluate — puts the shipped Alert engine on a cron (see AlertEvaluateJob). Detection,
+        // severity and Alert→Incident promotion stay in AlertService; this Job only supplies the clock.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor("alert.evaluate", "Evaluate Alert Rules",
+                "Evaluates this space's Alert Rules on a schedule. A breaching error/critical rule opens an "
+                        + "Incident (AlertService promotes it); lower severities stay Alerts.",
+                List.of(ParameterDecl.of("rule", ParamType.STRING).label("Only this rule")
+                        .description("Evaluate a single Alert Rule by name; every rule when unset").build()),
+                List.of("alert.evaluate.completed"), List.of()),
+                c -> new AlertEvaluateJob(c, () -> this.alerts)));
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds
         // none in the base build; a provider whose id collides with a built-in (registered first) is
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
@@ -422,6 +470,14 @@ public final class JobService implements AutoCloseable {
      *  Optional; read live by the built-in through a supplier, so ordering vs construction doesn't matter. */
     public void objects(com.gamma.ops.ObjectService objects) {
         this.objects = objects;
+    }
+
+    /** Bind this service to its space's Alert engine so {@code alert.evaluate} can run the authored Alert
+     *  Rules on a cron. Same supplier-read shape as {@link #objects}: wiring order does not matter, and a
+     *  host that never wires one simply cannot run that Job Type (it fails the Run closed, since evaluating
+     *  nothing would report health that was never checked). */
+    public void alerts(com.gamma.alert.AlertService alerts) {
+        this.alerts = alerts;
     }
 
     /**

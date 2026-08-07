@@ -1,0 +1,8 @@
+alert:
+  name: orders_stream_failures
+  metric: rejected_files
+  comparator: gt
+  threshold: 3
+  window: 1h
+  onPipeline: orders_rollup_flow
+  severity: CRITICAL

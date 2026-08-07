@@ -1,0 +1,14 @@
+job:
+  name: sample_hello
+  type: sample.hello
+  cron: "0 * * * *"
+  enabled: true
+  greeting: "Good hour"
+  audience: "$run.actor"
+  note: "Nothing was processed. This Job exists to be read, triggered and deleted."
+  run_date: "$today"
+  severity: INFO
+  raise_alert: true
+  tags: "sample, hello, docs"
+  notify: "ops@example.com, oncall@example.com"
+  retries: 0

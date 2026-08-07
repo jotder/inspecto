@@ -108,6 +108,27 @@ up: 8 incidents across the priority ladder (the shipped tag rule auto-tags the C
 2 cases with linked members, and one `incident_burst` case-rule evaluation (a rule-raised case).
 Durable across restarts only with `-Dobjects.backend=db`.
 
+## Four starter Jobs (read these first)
+
+Four authored Jobs covering the shapes most people need. Two need no engine feature at all — that is
+the point: a rich Job Type plus a good parameter contract covers a lot without new code.
+
+| File | Type | Schedule | What it shows |
+|---|---|---|---|
+| `jobs/sample_hello_job.toon` | `sample.hello` | hourly | **Does nothing on purpose.** Echoes its resolved parameters and raises one Alert. Its declaration is a tour of the whole authoring contract — grouped fields, a select (`severity`), list chips (`tags`, `notify`), bounds (`retries` 0–5), an ADVANCED tier, a masked `api_token`, and `run_date` deduced from `$today`. Safe to schedule, trigger and delete. |
+| `jobs/stream_failure_watch_job.toon` + `orders/orders_stream_failures_alert.toon` | `alert.evaluate` | hourly (`5 * * * *`) | **File-processing failures for one stream, within the hour → Incident.** The *rule* does the detecting (`rejected_files > 3`, `window: 1h`, `onPipeline: orders_rollup_flow`); the Job only supplies the clock. `severity: CRITICAL` is what promotes the Alert to a managed **Incident** — a lower severity stays an Alert. Both are deduped, so an unresolved breach is not re-raised every hour. |
+| `jobs/orders_weekly_compact_job.toon` | `maintenance` (`task: compact`) | weekly (Sun 02:00) | **Small-file merge, no new code.** Merges each partition directory's small parquet files via DuckDB, touching only files older than `min_age_days: 7` — i.e. last week's, leaving the current week's writers alone. Crash-safe (journal + atomic move). Point `dir` at the dataset's store directory. |
+| `jobs/orders_15m_rollup_job.toon` | `sql.template` | **none — on demand** | **15-minute buckets rolled up per hour, over yesterday.** No `cron:`, so it runs only when triggered. The SQL's `$event_date` is a *template parameter*, and its value `"$yesterday"` is an **Expression** resolved at fire time — so each run targets the previous day with nothing to edit. |
+
+Two things worth knowing before you copy these:
+
+- **`$yesterday`, not `$event_day`.** A true *event date* (the business date a run is *for*, overridable
+  for backfills) is designed but not built. Every shipped token derives from **fire time**, so a
+  re-run tomorrow of the `orders_15m_rollup` Job re-reads *its own* yesterday, not the original day.
+  For a fixed backfill, trigger it with an explicit `event_date` parameter instead.
+- **A `$`-value must be the whole value.** `event_date: "$yesterday"` resolves; `"data for $yesterday"`
+  stays literal. Write `$$` for a literal `$`, and `${ENV:…}` secret references are left alone.
+
 ## Not represented here (by design)
 
 - **Notification channels (webhook/SMTP)** are JVM flags, not config files:

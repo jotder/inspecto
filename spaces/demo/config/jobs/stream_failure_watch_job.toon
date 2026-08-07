@@ -1,0 +1,6 @@
+job:
+  name: stream_failure_watch
+  type: alert.evaluate
+  cron: "5 * * * *"
+  enabled: true
+  rule: orders_stream_failures
