@@ -269,8 +269,8 @@ SPI, declared grain `RECORD | FILE | BATCH`). ⛔ *Node* (user-facing) → **Ste
 (`acquisition` / `adapter`), `parser`, the TRANSFORM family (`transform.*` + `enrichment`), the three
 `sink.*` kinds, and the CONTROL trio (`gap` / `alert` / `event`) — remains the **compile-target set** the
 verbs lower onto; it leaves the user surface at the amendment's Phase 5 but is still the served palette
-until then. ⚠ **The closure is superseded (D0-B, 2026-08-09, `superpower/platform-services-plan.md`
-§5.2):** the enumeration was closed on purpose, but its real guarantee is compiler **totality** — *a
+until then. ⚠ **The closure is superseded (D0-B, 2026-08-09, `archived-documents/plans-archive/platform-services-plan.md`
+§5.2; as-built: `okf/backend/control-plane/platform-services.md`):** the enumeration was closed on purpose, but its real guarantee is compiler **totality** — *a
 pipeline that parses is a pipeline that runs* — and that guarantee survives an open **Step-kind registry**:
 every registered Step kind must carry an execution mode (**`LOWERED`** — contributes SQL lowering — or
 **`EXECUTED`** — imperative Java, stage 2), and a node whose type has neither is refused fail-closed at
@@ -375,7 +375,7 @@ canonical; **Expression** is. Canonical style is **lowercase-dotted** (`$event_d
 *(Not to be confused with the `$name` tokens inside a `sql.template` Job's SQL body — those are that Job's own
 declared **Parameters**. How the two `$` namespaces coexist is settled at step 4 of the plan.)*
 
-**Platform Service** *(added 2026-08-09, D0, `superpower/platform-services-plan.md`)* — An engine facility
+**Platform Service** *(added 2026-08-09, D0; as-built in `okf/backend/control-plane/platform-services.md`)* — An engine facility
 exposed to Jobs, packs and (stage 2) executable Steps through the `PlatformServices` typed lookup, granted
 by a declared `requires:` list that **fails closed at registration** (unknown or build-absent service id
 refuses the type/pack). v1 menu: `notifications` · `incidents` · `schema` · `consignment-status`. Every

@@ -49,7 +49,8 @@ former root reference docs** (each index lists them):
     system (incl. data-table + tree-table), the feature screens, services.
   - [`okf/backend/`](okf/backend/index.md) — the Java backend: engine (incl. Stage-1 architecture,
     DB/persistence layer, plugins), acquisition (incl. the full framework doc), control plane (`/api/v1`,
-    API-stability policy, queries, jobs + Job Framework, the Job-vs-Step capability boundary, metadata
+    API-stability policy, queries, jobs + Job Framework, the Job-vs-Step capability boundary,
+    Platform Services & the plugin envelope, metadata
     bundle, multi-space), pipeline-graph
     (incl. the full design doc), components, config (incl. the configuration + parsing-options
     references), editions & security, agent, modules (incl. the Maven reactor & module-extraction
@@ -74,17 +75,6 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/platform-services-plan.md`](superpower/platform-services-plan.md) — **v1.1
-  2026-08-09, approved to proceed; S1-0 + S1-1 shipped — Platform Services & the plugin envelope.**
-  D6: services are **open by default** — a plugin is restricted only on recorded necessity. The named seam
-  (`PlatformServices`, ⛔ not "capability" — that's RBAC's word) granting engine facilities to
-  plugins by declared `requires:`: v1 services `notifications` · `incidents` · `schema` ·
-  `consignment-status`; one envelope, three mounts (Job pack / ConsignmentProcessor / stage-2
-  executable Step). Opens the Step-kind registry (`LOWERED`/`EXECUTED` modes, supersedes the
-  "closed on purpose" note; totality preserved by fail-closed arming) and stage-3 pack-contributed
-  services. Ships `tools/scaffold.mjs` + `PackTestHarness` (new job/step/service/processor
-  skeletons, offline-buildable). Fulfils the `JobServices` façade named-but-never-built in
-  `JobContext`'s javadoc.
 - [`superpower/consignment-addressing-plan.md`](superpower/consignment-addressing-plan.md) —
   **v1.1 DRAFT 2026-08-09, not approved — the addressing layer: naming a set of Consignments as one
   relation.** Thesis: in-motion and at-rest are the *same type* here (both a DuckDB relation), so the
@@ -411,6 +401,16 @@ api-contract-design, component-model, the vocabulary renames, and ~60 more),
 [`superpower-reviews/`](archived-documents/superpower-reviews/) (all 37 screen review sheets, incl.
 `user-guide-audit.md`), the `consolidated-2026-06-13/` stakeholder snapshot, and the pre-4.x planning sets.
 Move a doc back up and re-list it here if it becomes current again.
+
+Archived 2026-08-10: [`plans-archive/platform-services-plan.md`](archived-documents/plans-archive/platform-services-plan.md)
+— **Stage 1 COMPLETE (S1-0…S1-8, 2026-08-09/10)**: the `PlatformServices` seam, `requires:` grants
+validated at registration, the whole v1 menu (`notifications` · `incidents` · `schema` ·
+`consignment-status`) with the engine as first consumer, `sample.hello` migrated onto a grant with its
+injection dropped, and the pack scaffolder + `PackTestHarness`. As-built distilled into
+[`okf/backend/control-plane/platform-services.md`](okf/backend/control-plane/platform-services.md);
+Stage 2 (open Step-kind registry, gated on the branch-aware executor) and Stage 3 (contributed
+services) moved to [`BACKLOG.md`](BACKLOG.md) §4. Retained as the record of the D0–D8 decisions and
+the S1/S2/S3 phasing.
 
 Archived 2026-07-25: [`plans-archive/embedded-intelligence-plan.md`](archived-documents/plans-archive/embedded-intelligence-plan.md)
 — AGT-5 P0–P5 COMPLETE (2026-07-21 + polish); as-built distilled into

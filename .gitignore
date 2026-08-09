@@ -35,6 +35,10 @@
 *.iml
 /inspecto/.idea/
 
+# Scaffolded pack projects (tools/scaffold.mjs) — a pack is developed and versioned in its own
+# repo, never inside the engine's. The templates it is generated from ARE tracked, under tools/.
+/packs-dev/
+
 # Local build / deploy artifacts and ad-hoc run output
 /file-processor-deploy.zip
 /file-processor-deploy-linux.zip

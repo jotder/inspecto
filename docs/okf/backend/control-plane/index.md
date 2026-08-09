@@ -20,6 +20,12 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
 * [Signal backbone](signal-backbone.md) - the canonical `Signal` envelope (`Ref`, 6-level `Severity`), projected to notification templating, AG-UI streaming, A2UI artifacts, agent context tools, and the gated agentic write path (`invoke` confirm-then-apply).
 * [Jobs](jobs.md) - `JobService` cron/event/manual scheduling, the off-bus trigger handoff, and the
   v1 async run model (202 + `runId`).
+* [Job vs Pipeline Step — capability boundary](job-vs-step.md) - the full capability comparison behind the
+  binding in-motion/at-rest rule: what the two genuinely share, where they diverge, the four things that
+  blur the line, and the as-built gaps in a Job Pack's reach.
+* [Platform Services — the plugin envelope](platform-services.md) - the named seam a plugin is granted
+  engine facilities through: a flat typed lookup filtered by a declared `requires:` list, validated at
+  registration and substituted under a dry run, plus the pack scaffolder and `PackTestHarness`.
 * [Multi-space](multi-space.md) - `SpaceManager`/`SpaceContext`/`SpaceMigrator` and the MDC-based singleton isolation.
 * [Exchange — cross-space sharing](exchange-sharing.md) - grant-mediated, read-only Dataset/Widget sharing across Spaces; offer/request/approve ledger, snapshot/live delivery, version pin + drift.
 * [API stability policy](api-stability.md) - the Java `@PublicApi` surface contract (the HTTP counterpart is [api-v1](api-v1.md)).

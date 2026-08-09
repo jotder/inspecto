@@ -409,7 +409,7 @@ Named here so the boundary is visible, with the hook each will use when its own 
 | **Warehouse** | compaction + `generation` swap; `MaterializeTask` as the rollup primitive | depends on the catalog landing first |
 | **Compaction transactionality** | `generation` + `state` columns already present | promote to Tier 1 the moment compaction runs against live queries |
 | **Dataset API** | would replace `Path.of(dataDir).resolve(name)` (`SqlTemplateJob.java:82`) | should follow the Selector, not precede it |
-| **Capability seam / Controller Services** | `job-vs-step.md` §6 gaps | now owned by [`platform-services-plan.md`](platform-services-plan.md) (2026-08-09) — named **Platform Services** there (D0) |
+| **Capability seam / Controller Services** | `job-vs-step.md` §6 gaps | ✔ **Stage 1 SHIPPED 2026-08-10** — named **Platform Services** (D0); as-built in [`platform-services.md`](../okf/backend/control-plane/platform-services.md), plan archived |
 
 ### 6.1 The cadence tension, and compaction's promotion trigger
 

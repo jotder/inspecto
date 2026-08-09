@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Parentless on purpose: a pack is built OUTSIDE the engine reactor, offline
+         (`mvn -o package`), against the engine version it was scaffolded from. Every plugin
+         version is pinned so the build never reaches the network to resolve one. -->
+    <groupId>{{packageName}}</groupId>
+    <artifactId>{{artifactId}}</artifactId>
+    <version>1.0.0</version>
+    <name>{{name}}</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>{{javaRelease}}</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <!-- The engine supplies the SPI at run time, so this stays `provided` and the pack jar
+             ships only your own classes. Do NOT bundle it: a pack that carries its own copy of the
+             engine classes loads them in its isolated classloader and the grant lookup fails. -->
+        <dependency>
+            <groupId>{{engineGroupId}}</groupId>
+            <artifactId>{{engineArtifactId}}</artifactId>
+            <version>{{engineVersion}}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>{{junitVersion}}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>{{compilerPluginVersion}}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>{{surefirePluginVersion}}</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <!-- Pinned to the version Maven 3.9.x binds by default, so it is already in the
+                     local repository (`-o` never resolves it) and the build emits no
+                     missing-version warning. -->
+                <version>3.4.1</version>
+                <configuration>
+                    <archive>
+                        <manifestEntries>
+                            <!-- Read by the engine's pack loader; shown in the packs inventory. -->
+                            <Pack-Id>{{id}}</Pack-Id>
+                            <Pack-Version>${project.version}</Pack-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

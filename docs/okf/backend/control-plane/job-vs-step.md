@@ -21,9 +21,8 @@ that rule, verified against source 2026-08-07.
 Java — you implement `Job.run(ctx)` and ship a class. A Step is *today* declarative config lowered into
 DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by `BatchGraphRunner`: no `run()` a Step author
 implements, no service façade a Step sees. As built, the extension models are opposites — you **author** a
-Step, you **write** a Job. The platform-services plan's stage 2
-([`platform-services-plan.md`](../../../superpower/platform-services-plan.md) §5.2) narrows that second
-half: a Step *may* become a program via the Step SPI (`EXECUTED` mode) — without changing what a Step
+Step, you **write** a Job. [Platform Services](platform-services.md) stage 2 (still unbuilt) narrows that
+second half: a Step *may* become a program via the Step SPI (`EXECUTED` mode) — without changing what a Step
 **is**: a node producing batch counters inside someone else's Run, never an Executable.
 
 ## 1. What each one is
@@ -137,15 +136,15 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
   `ParameterDecl` gained in the job-parameter-contract work. → *Fulfilled by* stage 2's widened
   `StepTypeProvider` descriptor (**S2-1**).
 
-> ⚠ **The §6 gaps have an owner plan (2026-08-09):**
-> [`superpower/platform-services-plan.md`](../../../superpower/platform-services-plan.md) — the
-> Platform Services seam (grants via `requires:`), the open Step-kind registry (`LOWERED`/`EXECUTED`),
-> contributed services, and the pack scaffolder. **Stage 1 is shipped through S1-7 (2026-08-09); only
-> S1-8 (scaffolder + `PackTestHarness`) remains**, so the ✔ pointers above are as-built, not planned.
-> Stage 2 (Step kinds) stays gated on the branch-aware executor's armed path — every §6 gap still
-> marked *Fulfilled by* an `S2-*` step is therefore still open. The seam's durable operating rules live
-> in [`PROJECT_NOTES.md`](../../../PROJECT_NOTES.md) §5; this page's §0 wording came from **S1-0**.
+> ⚠ **The §6 gaps have an owner: [Platform Services](platform-services.md).** **Stage 1 is COMPLETE
+> (S1-0…S1-8, 2026-08-09/10)** — the seam (grants via `requires:`), the v1 service menu, and the pack
+> scaffolder + `PackTestHarness` — so the ✔ pointers above are as-built, not planned. Stage 2 (the open
+> Step-kind registry, `LOWERED`/`EXECUTED`) stays gated on the branch-aware executor's armed path, so
+> every §6 gap still marked *Fulfilled by* an `S2-*` step is open; it and stage 3 are tracked in
+> [`BACKLOG.md`](../../../BACKLOG.md) §4. The seam's durable operating rules live in
+> [`PROJECT_NOTES.md`](../../../PROJECT_NOTES.md) §5; this page's §0 wording came from **S1-0**, and the
+> plan itself is archived at
+> [`plans-archive/platform-services-plan.md`](../../../archived-documents/plans-archive/platform-services-plan.md).
 
 Related: [Jobs & Scheduling](jobs.md) · [Pipeline graph design](../pipeline-graph/pipeline-graph-design.md)
-· [Signal backbone](signal-backbone.md) ·
-[Platform Services plan](../../../superpower/platform-services-plan.md)
+· [Signal backbone](signal-backbone.md) · [Platform Services](platform-services.md)
