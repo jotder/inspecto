@@ -393,6 +393,8 @@ public final class CollectorService implements AutoCloseable {
                 n -> notificationService().notify(n));
         platformServices.register("incidents", com.gamma.ops.IncidentAccess.class,
                 com.gamma.ops.IncidentAccess.over(this::objects));
+        platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,
+                com.gamma.pipeline.SchemaAccess.over(this::schemaRegistry));
         this.jobs              = jobConfigs.isEmpty()
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
@@ -531,6 +533,24 @@ public final class CollectorService implements AutoCloseable {
      *  (admin CRUD), read live from {@code <write-root>/registry} — this space's config dir, else the global
      *  {@code -Dassist.write.root} (the same root the channel routes write to). Best-effort: no write root, an
      *  unreadable registry, or a malformed entry yields no (that) destination, never an exception. */
+    /** A live scan of this space's component registry for the read-only {@code schema} Platform
+     *  Service (S1-5) — same root resolution as {@link #persistedChannels()}, invoked per call so
+     *  operator edits are visible without a restart. Best-effort: no write root or an unreadable
+     *  registry yields an empty registry, never an exception. */
+    private com.gamma.pipeline.ComponentRegistry schemaRegistry() {
+        java.nio.file.Path writeRoot = root.config();
+        if (writeRoot == null) {
+            String wr = System.getProperty("assist.write.root");
+            writeRoot = (wr == null || wr.isBlank()) ? null : java.nio.file.Path.of(wr);
+        }
+        if (writeRoot == null) return com.gamma.pipeline.ComponentRegistry.empty();
+        try {
+            return com.gamma.pipeline.ComponentRegistry.scan(writeRoot.resolve("registry"));
+        } catch (RuntimeException unreadable) {
+            return com.gamma.pipeline.ComponentRegistry.empty();
+        }
+    }
+
     private java.util.List<com.gamma.notify.ChannelConfig> persistedChannels() {
         java.nio.file.Path writeRoot = root.config();
         if (writeRoot == null) {
