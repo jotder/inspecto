@@ -1,6 +1,9 @@
 # Consignment Addressing — plan
 
-**Status: v1.1 DRAFT (2026-08-09) — not approved. Grounded against source 2026-08-09; every
+**Status: v1.1 DRAFT (2026-08-09) — not approved. ⚠ Step 1 (measure rung A) is DONE 2026-08-10 and
+its number contradicts the plan's performance premise: catalog pruning cuts rows scanned 29–88× but
+wall-clock only 1.3–2.6×, so the Consignment Selector is a **correctness** feature, not a speed one,
+and rungs C–F are optimizing a non-problem. Read §5.4 before approving anything here.** Grounded against source 2026-08-09; every
 "already exists" claim below carries a `file:line` ref and was verified, not assumed. v1.1
 (2026-08-09, operator-accepted review) folds in four amendments: `producer` on the catalog row +
 the per-stream watermark (§3.1, §3.6, D4) · the stable-name overwrite fix promoted into delivery
@@ -358,9 +361,56 @@ plus an active-object guard that will not open a second ALERT while one is open
 | **E** | **Continuous sliding** via `RANGE BETWEEN INTERVAL`. Exact, no boundary loss, no derived state. | hopping approximation is unacceptable — **requires lifting `ExpressionGuard`'s frame-clause ban** (`ExpressionGuard.java:20-28`) |
 | **F** | **Decayed velocity counters.** Per-entity counter with decay; O(entities) state, no windows, no completeness question. | detection quality matters more than exact window semantics |
 
-**Rung A is the baseline nobody has measured.** The mandated first action is: commit one Consignment,
-rescan its dirty windows through a catalog-pruned file list, record wall-clock. That number decides
-everything below it. DuckDB aggregates Parquet at GB/s; rungs C–F may be optimizing a non-problem.
+~~**Rung A is the baseline nobody has measured.**~~ **MEASURED 2026-08-10 (step 1). It was indeed a
+non-problem, and the measurement also refutes this section's own reason for wanting a file list.**
+
+Harness: `inspecto-engine/src/test/java/com/gamma/consignment/RescanBenchmark.java`, opt-in
+(`-Dbench.run=true`, skipped in the normal suite). It lays down an event-time-partitioned Parquet
+corpus, lands one more Consignment covering 30 minutes, then recomputes the 9 hopping windows
+(size 60 m, hop 10 m) that Consignment dirtied — once over an explicit `read_parquet([...])` list of
+the overlapping files, once over the `**/*.parquet` glob `DatasetRelation` builds today. Both sides
+return **identical groups and breaches**, so pruning is semantically transparent.
+
+| corpus | days | files | glob rows | pruned rows | pruned | glob | speed-up |
+|---|---|---|---|---|---|---|---|
+| 20 M | 30 | 33 | 20.0 M | 0.68 M | **36 ms** | **46 ms** | 1.3× |
+| 20 M, row order shuffled | 30 | 33 | 20.0 M | 0.68 M | 29 ms | 44 ms | 1.5× |
+| 20 M | 90 | 93 | 20.0 M | 0.23 M | 17 ms | 43 ms | 2.6× |
+| **200 M** | **90** | **93** | **200.0 M** | **2.27 M** | **145 ms** | **239 ms** | **1.6×** |
+
+*(1 M subscribers as the group key; 200 M rows = 1.4 GB of snappy Parquet; best of 3 timed passes
+after a warm-up; one Windows workstation, warm page cache.)*
+
+**The number: 145 ms pruned / 239 ms glob to rescan the dirty windows against 90 days of history.**
+
+Four conclusions, each of which changes what is worth building:
+
+1. **Rungs C–F are optimizing a non-problem.** Rung A answers in a fifth of a second against 90 days
+   of history. Panes, sketches and decayed counters would add derived state, a backfill obligation
+   and a second copy of the data to save ~100 ms. ⛔ Do not build them on latency grounds; the
+   escalation trigger in the table above is not met and is not close to being met.
+2. **⚠ Catalog pruning is a correctness feature, not a performance one — this section had it
+   wrong.** Naming the files cuts rows scanned by **29–88×** but wall-clock by only **1.3–2.6×**,
+   because DuckDB skips row groups on `event_time` statistics and reads what survives at GB/s. That
+   holds even with row order shuffled so every row group spans its whole day (the pessimal case for
+   statistics). So the Selector (step 7) must be justified by what a glob genuinely cannot do —
+   **generation pinning and excluding `SUPERSEDED`/`COMPACTED_AWAY` files** — not by scan speed. §1's
+   "the one mechanical change" framing should be read as a correctness change throughout.
+3. **Glob cost tracks row volume, not file count.** Holding the file set at 93 and raising rows 10×
+   moved the glob from 43 ms to 239 ms (5.6×), while holding rows at 20 M and tripling files barely
+   moved it. So **compaction (§6.3) needs its own justification too** — small-file count is not what
+   makes a rescan slow here.
+4. **Where rung A will actually break is cardinality, not retention.** The 200 M-row pass built
+   **787 k `(window, subscriber)` groups**; that GROUP BY, not the scan, is the cost that grows with
+   subscriber count and with `size/hop` fan-out. Re-measure when a real rule's group key is known —
+   and note §5.4's own cardinality hazard was about rung C's *storage*, while this is rung A's
+   *compute*.
+
+Caveats worth carrying: synthetic uniform event times and a hash-scattered key (real CDR is skewed,
+and skew moves aggregate cost); pruning is **day-granular** here because the corpus partitions by day
+and `consignment_outputs` has no event-time bounds until step 3 — real per-file bounds would prune
+harder, but conclusion 2 says that headroom is not where the time goes; and the monotonic threshold
+never fired at 1 M subscribers, so the reported cost is the aggregate, which is the part that matters.
 
 Two hazards to record now:
 
@@ -427,7 +477,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 
 | # | Step | Verify |
 |---|---|---|
-| 1 | **Measure rung A.** Commit one Consignment; rescan its dirty windows over an explicit file list; record wall-clock and rows scanned. Publish the number in this doc. | a number in §5.4, not an estimate |
+| 1 | ✔ **DONE 2026-08-10 — rung A measured**, harness `RescanBenchmark` (opt-in, `-Dbench.run=true`). **145 ms pruned / 239 ms glob** against 90 days = 200 M rows = 1.4 GB. ⚠ It refuted this plan's performance premise: pruning cuts rows 29–88× but wall-clock only 1.3–2.6×, so the Selector is a **correctness** feature (generation pinning, excluding superseded files), not a speed one — see §5.4 | ✔ a number in §5.4, not an estimate |
 | 2 | **Make `role: temporal` load-bearing.** `DatasetRelation` resolves the declared temporal column; reject a dataset that declares two. | unit test: dataset with `role: temporal` resolves; duplicate rejected |
 | 3 | **Capture event-time bounds + `producer` at write.** `min()/max()/spread` in the existing `PartitionWriter` COPY connection → `ConsignmentOutputs.build` → four new `consignment_outputs` columns (§3.1). | ingest a file with known bounds; assert the catalog row carries bounds and producer |
 | 4 | **Per-stream watermark** (§3.6), derived from the catalog; decision D4 recorded. | seeded catalog, two producers: a window reports complete only when *both* have passed `hi + allowed_lateness` |
@@ -438,9 +488,13 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
 | 10 | **Retire `record_day`** — populate from real bounds, mark deprecated. | existing readers unaffected |
 
-Steps 1–2 are independent and can run in parallel. Nothing after step 3 is worth starting before
-step 1's number exists. Step 6 must land **before step 7 exposes a Selector to any consumer** —
-generation pinning cannot protect a path whose bytes are replaced in place.
+Steps 1–2 are independent and can run in parallel. ~~Nothing after step 3 is worth starting before
+step 1's number exists.~~ **That gate is cleared (2026-08-10) — and it moved step 7.** With rung A
+answering in 145 ms, the Selector can no longer be sold on scan speed, so **step 7 must be re-argued
+on correctness before it is built**: what an explicit list gives that a glob cannot is generation
+pinning and the exclusion of `SUPERSEDED`/`COMPACTED_AWAY` files. Step 6 must still land **before**
+step 7 exposes a Selector to any consumer — generation pinning cannot protect a path whose bytes are
+replaced in place — and on the measured evidence step 6 is now the *load-bearing* half of the pair.
 
 ---
 
