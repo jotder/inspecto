@@ -7,8 +7,8 @@ import java.util.Map;
 /**
  * Everything one {@link Job} run may read. A narrow façade the framework populates per Run and
  * passes to {@link Job#run(JobContext)} — never the whole hosting service. Introduced in the P0
- * job-framework refactor ({@code docs/job-framework-design.md} §6.2); the {@code JobServices}
- * data-plane façade arrives with the {@code sql.template} Job Type (P3).
+ * job-framework refactor ({@code docs/job-framework-design.md} §6.2); the data-plane façade that
+ * design named {@code JobServices} is {@link #services()} (platform-services plan, 2026-08-09).
  */
 public interface JobContext {
 
@@ -49,5 +49,14 @@ public interface JobContext {
      */
     default boolean dryRun() {
         return false;
+    }
+
+    /**
+     * The {@link PlatformServices} granted to this Run (platform-services plan §3): a typed lookup
+     * filtered to the Job Type's declared {@code requires:} list — a service that exists but was not
+     * declared is invisible here. Empty until grant declaration lands (plan S1-2).
+     */
+    default PlatformServices services() {
+        return PlatformServices.none();
     }
 }

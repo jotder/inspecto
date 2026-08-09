@@ -146,6 +146,11 @@ public final class CollectorService implements AutoCloseable {
     private final ReportService reports = new ReportService(this);
     /** Config-driven cron/event jobs (v2.8.0); null when none are registered. */
     private volatile JobService jobs;
+    /** This space's boot-built Platform Service registry (platform-services plan S1-1) — the one
+     *  place engine facilities are bound to grantable service ids. The v1 built-in services
+     *  (notifications / incidents / schema / consignment-status) register here at S1-3…S1-6. */
+    private final com.gamma.job.PlatformServiceRegistry platformServices =
+            new com.gamma.job.PlatformServiceRegistry();
     private final MetricsService metrics =
             new MetricsService(this, com.gamma.metrics.MetricRegistry.global());
     /** Pipeline names an operator has paused; the poll cycle skips them (Control API, M3). */
@@ -390,6 +395,7 @@ public final class CollectorService implements AutoCloseable {
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
+            this.jobs.platform(platformServices);           // S1-1: the space's Platform Service registry
         }
         this.semanticModels    = List.copyOf(semanticModels);
         // Invalidate the catalog whenever configs are (re)indexed — the registry is now the
@@ -1159,6 +1165,7 @@ public final class CollectorService implements AutoCloseable {
             created.spaceId(spaceId);
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
+            created.platform(platformServices);                    // S1-1: the space's Platform Service registry
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
             this.alertService().ifPresent(created::alerts);         // alert.evaluate runs the rules on a cron

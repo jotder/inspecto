@@ -118,6 +118,10 @@ public final class JobService implements AutoCloseable {
     /** The Expression vocabulary authored {@code $}-values and {@code deduce:}/{@code bind:} resolve
      *  against (job-parameter-contract §4.2). Built-ins only until the open load paths land. */
     private final ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
+    /** The host's boot-built Platform Service registry (platform-services plan S1-1), wired
+     *  post-construction like {@link #objects}; {@code null} (bare test constructors) leaves every
+     *  Run on the empty grant. Grants resolve per Job Type once {@code requires:} lands (S1-2). */
+    private volatile PlatformServiceRegistry platform;
 
     /** Hot-deployable Job Packs (P2c, §12) — off unless {@code -Djobs.packs.dir} is set. */
     private final JobPackManager packs;
@@ -478,6 +482,14 @@ public final class JobService implements AutoCloseable {
      *  nothing would report health that was never checked). */
     public void alerts(com.gamma.alert.AlertService alerts) {
         this.alerts = alerts;
+    }
+
+    /** Bind this service to the host's boot-built Platform Service registry (platform-services plan
+     *  S1-1). Same post-construction shape as {@link #objects}; until {@code requires:} declaration
+     *  lands (S1-2), every Run receives the empty grant — a service being registered does not make it
+     *  reachable, which is the plan's R4 honesty property. */
+    public void platform(PlatformServiceRegistry platform) {
+        this.platform = platform;
     }
 
     /**
@@ -865,6 +877,9 @@ public final class JobService implements AutoCloseable {
             }
             ctx.params(pr.resolved());
             ctx.dryRun(firing.dryRun());
+            // S1-1: the empty grant, through the real registry when wired — S1-2 supplies the
+            // Job Type's declared requires: set here.
+            if (platform != null) ctx.services(platform.grant(Set.of()));
             ctx.log().info("run started", "trigger", trigger, "params", pr.resolved(),
                     "dryRun", firing.dryRun());   // resolved Parameter Context (R2/R5)
             ctx.signals().emit("job.run.started", Severity.INFO,
