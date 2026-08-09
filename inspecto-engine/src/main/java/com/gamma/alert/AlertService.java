@@ -150,6 +150,19 @@ public final class AlertService {
 
     /** Evaluate every rule against every (matching) pipeline — backs {@code POST /alerts/evaluate}. */
     public List<Map<String, Object>> evaluateAll() {
+        return evaluateRules().stream().map(Alert::toMap).toList();
+    }
+
+    /**
+     * The typed form of {@link #evaluateAll()} — what the {@code alerts} Platform Service hands a Job
+     * ({@link AlertAccess}). {@code evaluateAll}'s map shape stays the JSON projection the route needs;
+     * a plugin binds to {@link Alert} instead of to string keys.
+     *
+     * <p>⚠ Evaluating <b>mutates</b>: a breached rule fires an Alert, advances that rule's cooldown and
+     * (at error/critical) promotes to an Incident. There is no preview form — see {@link AlertAccess}'s
+     * dry-run contract.
+     */
+    public List<Alert> evaluateRules() {
         return evaluate(null, System.currentTimeMillis());
     }
 
@@ -157,8 +170,8 @@ public final class AlertService {
      * Evaluate rules; {@code pipelineFilter} (a pipeline's display or normalized name) restricts to
      * one pipeline's ledger, {@code null} sweeps all. Returns the alerts fired by this pass.
      */
-    synchronized List<Map<String, Object>> evaluate(String pipelineFilter, long nowMs) {
-        List<Map<String, Object>> out = new ArrayList<>();
+    synchronized List<Alert> evaluate(String pipelineFilter, long nowMs) {
+        List<Alert> out = new ArrayList<>();
 
         // Measure rules (BI-5) are dataset-scoped, not pipeline-scoped: any sweep (a terminal batch may
         // have changed the data, or the manual POST /alerts/evaluate) re-reads the current value; the
@@ -195,7 +208,7 @@ public final class AlertService {
 
     /** Fire one breached rule for a scope (a pipeline, or a measure rule's dataset), cooldown-guarded. */
     private void fire(AlertRule rule, String display, String cooldownScope, double value, long nowMs,
-                      List<Map<String, Object>> out) {
+                      List<Alert> out) {
         String key = rule.name() + "|" + cooldownScope;
         Long last = lastFired.get(key);
         if (last != null && nowMs - last < cooldownMs(rule)) return;   // still in cooldown
@@ -203,7 +216,7 @@ public final class AlertService {
         Alert alert = Alert.of(rule, display, value, nowMs);
         fired.addFirst(alert);
         while (fired.size() > capacity) fired.removeLast();
-        out.add(alert.toMap());
+        out.add(alert);
         log.warn("[ALERT] {}", alert.message());
         // Phase-1↔2 tie: a fired alert is also a structured operational event, so the Event
         // Viewer shows it inline with the batch facts that triggered it (correlate via pipeline).

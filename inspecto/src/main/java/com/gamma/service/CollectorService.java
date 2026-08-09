@@ -398,6 +398,10 @@ public final class CollectorService implements AutoCloseable {
         platformServices.register("consignment-status",
                 com.gamma.consignment.ConsignmentStatusAccess.class,
                 com.gamma.consignment.ConsignmentStatusAccess.over(this::loadedPipelines));
+        // D7: the evaluator the alert.evaluate built-in used to receive by injection. Bound through the
+        // accessor, so it resolves the engine at call time rather than capturing a not-yet-assigned field.
+        platformServices.register("alerts", com.gamma.alert.AlertAccess.class,
+                com.gamma.alert.AlertAccess.over(() -> alertService().orElse(null)));
         this.jobs              = jobConfigs.isEmpty()
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
@@ -442,9 +446,6 @@ public final class CollectorService implements AutoCloseable {
         // Give the Job engine this space's Object Engine so the recon.run built-in can promote a breach to
         // an Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
         if (this.jobs != null) this.jobs.objects(this.objects);
-        // Same for the Alert engine, so the alert.evaluate built-in can run the authored rules on a cron
-        // (detection and Alert -> Incident promotion stay in AlertService; the Job only supplies the clock).
-        if (this.jobs != null) this.alertService().ifPresent(this.jobs::alerts);
         // Phase D2: promote selected domain events to managed objects (SEQUENCE_GAP → ALERT) via an EventLog
         // subscriber. Registered unconditionally (independent of *_alert.toon rules — a gap is not a batch
         // metric) and de-registered in close() so repeated service instances don't accumulate listeners.
@@ -1199,7 +1200,6 @@ public final class CollectorService implements AutoCloseable {
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
-            this.alertService().ifPresent(created::alerts);         // alert.evaluate runs the rules on a cron
             created.start();
             jobs = created;
         }

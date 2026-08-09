@@ -77,15 +77,94 @@ class SampleJobTypesTest {
         assertEquals(3, r.invalidType().size(), "options, bounds and per-item email all enforced");
     }
 
-    @Test
-    void alertEvaluateFailsClosedWithoutTheAlertEngine() {
-        // Evaluating nothing would report health that was never checked, so a missing engine is an error
-        // rather than a quiet success.
-        JobConfig cfg = JobConfig.fromMap(Map.of("job", Map.of("name", "watch", "type", "alert.evaluate")));
-        Job job = new AlertEvaluateJob(cfg, () -> null);
+    // ── alert.evaluate: owns no detection of its own, reaches the evaluator only through its grant ──
 
-        assertEquals("alert.evaluate", job.type());
-        var boom = assertThrows(IllegalStateException.class, () -> job.run(null));
-        assertTrue(boom.getMessage().contains("Alert engine"));
+    private static Job alertEvaluate() {
+        return new AlertEvaluateJob(
+                JobConfig.fromMap(Map.of("job", Map.of("name", "watch", "type", "alert.evaluate"))));
+    }
+
+    private static com.gamma.alert.Alert breach(String rule) {
+        return new com.gamma.alert.Alert(rule, "error", "orders", "failed_batches", 5, ">", 3, "1h",
+                0L, rule + " breached");
+    }
+
+    @Test
+    void alertEvaluateFailsClosedWithoutTheAlertsService() {
+        // Evaluating nothing would report health that was never checked, so an ungranted/absent service
+        // is an error rather than a quiet success (D8: a host-less registry leaves the grant empty).
+        StubContext ctx = new StubContext(false, PlatformServices.none());
+
+        var boom = assertThrows(IllegalStateException.class, () -> alertEvaluate().run(ctx));
+
+        assertTrue(boom.getMessage().contains("alerts"), boom.getMessage());
+    }
+
+    @Test
+    void alertEvaluateReportsWhatBreachedThroughItsGrant() throws Exception {
+        StubContext ctx = new StubContext(false, grantOf(() -> List.of(breach("error_rate"))));
+
+        JobResult r = alertEvaluate().run(ctx);
+
+        assertTrue(r.success());
+        assertTrue(r.message().contains("error_rate"), r.message());
+        assertEquals(1, ctx.signals.size(), "one completion Signal");
+    }
+
+    /** MNT-1: evaluation IS the action (it fires Alerts and opens Incidents), so it has no preview form. */
+    @Test
+    void alertEvaluateDoesNotEvaluateUnderADryRun() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
+        StubContext ctx = new StubContext(true, grantOf(() -> {
+            calls.incrementAndGet();
+            return List.of(breach("error_rate"));
+        }));
+
+        JobResult r = alertEvaluate().run(ctx);
+
+        assertTrue(r.success());
+        assertEquals(0, calls.get(), "a dry run must not evaluate");
+        assertTrue(r.message().contains("nothing evaluated"), r.message());
+        assertTrue(ctx.log.stream().anyMatch(l -> l.contains("NOT evaluated")), ctx.log.toString());
+    }
+
+    private static PlatformServices grantOf(com.gamma.alert.AlertAccess alerts) {
+        PlatformServiceRegistry registry = new PlatformServiceRegistry();
+        registry.register("alerts", com.gamma.alert.AlertAccess.class, alerts);
+        return registry.grant(java.util.Set.of("alerts"));
+    }
+
+    /** The narrowest {@link JobContext} these three cases need: a grant, a dry-run flag, and capture. */
+    private static final class StubContext implements JobContext {
+        private final boolean dryRun;
+        private final PlatformServices services;
+        final List<String> log = new java.util.ArrayList<>();
+        final List<String> signals = new java.util.ArrayList<>();
+
+        StubContext(boolean dryRun, PlatformServices services) {
+            this.dryRun = dryRun;
+            this.services = services;
+        }
+
+        @Override public String runId()                 { return "run-1"; }
+        @Override public String spaceId()               { return "default"; }
+        @Override public TriggerInfo trigger()          { return TriggerInfo.parse("manual"); }
+        @Override public Map<String, String> config()   { return Map.of(); }
+        @Override public Map<String, String> params()   { return Map.of(); }
+        @Override public boolean dryRun()               { return dryRun; }
+        @Override public PlatformServices services()    { return services; }
+        @Override public com.gamma.signal.SignalEmitter signals() {
+            return (type, severity, payload) -> signals.add(type);
+        }
+        @Override public ArtifactRecorder artifacts() {
+            throw new UnsupportedOperationException("alert.evaluate records no artifacts");
+        }
+        @Override public RunLog log() {
+            return new RunLog() {
+                @Override public void info(String m, Object... kv)  { log.add(m); }
+                @Override public void warn(String m, Object... kv)  { log.add(m); }
+                @Override public void error(String m, Throwable t, Object... kv) { log.add(m); }
+            };
+        }
     }
 }

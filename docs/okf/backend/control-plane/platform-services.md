@@ -71,6 +71,7 @@ Interfaces live beside their engine facility and carry `@PublicApi`.
 | `incidents` | `IncidentAccess.openIncident(…, dedupeAttribute)` | `ObjectService`; honours the active-object convention via a caller-named dedupe attribute. `AlertService.promoteToIncident` opens through it | reports the would-be Incident, opens nothing |
 | `schema` | `SchemaAccess.list/get/fingerprint` | `registry/schemas/*.toon` via a per-call `ComponentRegistry.scan`; the fingerprint is the same `CanonicalHash.sha256` pinned into manifests | n/a — read-only |
 | `consignment-status` | `ConsignmentStatusAccess.consignment/latestFor/outputs/fileStages` | the loaded pipelines' manifests, plus the two default-off registries | n/a — read-only |
+| `alerts` | `AlertAccess.evaluateRules()` → `List<Alert>` | `AlertService`'s evaluator; `alert.evaluate` is the only consumer (added 2026-08-10 on D7's demand — see §6) | ⚠ **cannot be previewed**: logs the would-be evaluation and returns empty, and a consumer must report that nothing was *checked* |
 
 **The engine is the seam's first consumer** — the CONTROL trio's dispatch was rewired through
 `NotificationAccess`/`IncidentAccess` before any plugin could bind to them, which is how the
@@ -137,9 +138,10 @@ not write Datasets or send outbound mail).
   pruning and generation-pinning built in. It becomes the seam's flagship service.
 - **Outbound mail/webhook send** — belongs to the `mail.send` reference Job Type and to notification
   *dispatch* config, not to a grant.
-- **`AlertService`** — not withheld as policy: its public surface is rule CRUD plus evaluation, with
-  no plugin-shaped "raise" entry, and no consumer has demanded the evaluator. An `alerts` service
-  joins the menu on the first real demand — see §6.
+- **Alert Rule CRUD** — the `alerts` service carries the **evaluator only** (`evaluateRules()`), which
+  is what its one consumer demanded. Rule authoring stays a control-plane concern; a plugin that wants
+  to *raise* something directly wants `IncidentAccess` or a Signal, not this. That is the menu-by-demand
+  rule working as intended, not a withheld capability.
 
 ## 6. Grounding that refuted the plan (do not re-derive)
 
@@ -148,13 +150,16 @@ not write Datasets or send outbound mail).
    *are* the "engine dispatch" that was rewired through the services.
 2. **`consignment-status` needs no `StatusStore`** — the manifest already carries per-member status —
    and **`JobRunLedger` is unrelated** (it is a package-private Job-run audit).
-3. **`alert.evaluate` cannot migrate to `incidents`.** It depends on the *evaluator*
-   (`AlertService.evaluateAll()`), which is deliberately outside the v1 menu; the Incidents it causes
-   are opened inside `AlertService` through its own `IncidentAccess`. Declaring the grant would be
-   **decorative** — remove it and Incidents still open — which contradicts the rule that a
-   declaration is what enables the reach. It stays injection-wired and is the first real demand for
-   an `alerts` service; the honest migration is "add `alerts` to the menu", a separate slice, not a
-   relabel.
+3. **`alert.evaluate` could not migrate to `incidents`** (D7). It depends on the *evaluator*, not the
+   Incident opener — the Incidents it causes are opened inside `AlertService` through its own
+   `IncidentAccess`. Declaring `requires: [incidents]` would have been **decorative**: remove it and
+   Incidents still open, which contradicts the rule that a declaration is what enables the reach.
+   ✔ **Resolved 2026-08-10 the honest way** — `alerts` joined the menu and `alert.evaluate` now
+   declares it, so its `Supplier<AlertService>` injection is gone (with `JobService`'s `alerts` field
+   and setter, and both `CollectorService` wiring sites) and **no built-in Job reaches the engine by
+   constructor injection for its own work any more**. The migration also fixed a live MNT-1 violation
+   it exposed: `alert.evaluate` previously ignored `dryRun()`, so a preview fire really evaluated and
+   really opened Incidents. It now does nothing and says so, because evaluation *is* the action.
 
 ## 7. What is still open
 

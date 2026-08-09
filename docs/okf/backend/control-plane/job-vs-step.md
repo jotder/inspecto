@@ -117,8 +117,9 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
   `requires:` set from the boot `PlatformServiceRegistry` — v1 ids `notifications`, `incidents`, `schema`,
   `consignment-status`. `sample.hello` was migrated onto its grant and **its constructor injection removed**,
   so it is now pack-shippable, and a pack jar compiled inside `JobPackManagerTest` declares *and* consumes a
-  grant, loads, and completes a Run — the evidence above is inverted. Two as-built limits: `alert.evaluate`
-  is **not** migrated (it needs the *evaluator*, which is deliberately outside the v1 menu — plan D7), and
+  grant, loads, and completes a Run — the evidence above is inverted. `alert.evaluate` followed on
+  2026-08-10 once the `alerts` service joined the menu (D7's honest resolution), so **no built-in Job
+  reaches the engine by constructor injection for its own work any more**. One as-built limit remains:
   `dataDir`-style Dataset reach is still injection-only (next bullet).
 - **There is no Dataset API to hand anyone.** `SqlTemplateJob`/`ObjectsAnalyticsJob` resolve
   `Path.of(dataDir).resolve(name)` and open raw DuckDB. Dataset access is a filesystem convention, not an

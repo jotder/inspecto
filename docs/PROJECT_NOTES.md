@@ -277,13 +277,21 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   validates `requires:` fail-closed). A Job Type declares `requires: [<id>]` on its `JobTypeDescriptor`;
   `JobService.runJob` grants exactly that set into `JobContext.services()`, so an **undeclared service stays
   invisible even when it exists** (that honesty is what makes the declaration a security statement, not a
-  label). v1 ids: `notifications`, `incidents`, `schema`, `consignment-status`. Mutating services are
+  label). Ids: `notifications`, `incidents`, `schema`, `consignment-status`, `alerts`. Mutating services are
   substituted by `DryRunServices` under a dry run (log the would-be effect, act on nothing) — **every new
   mutating service must be added there**, or `dryRun()` becomes a lie the moment a Job calls it. Two rules
   worth keeping: a **built-in** may declare a grant even when no registry is wired (lean/embedded
   `JobService`, e.g. an engine unit test — the service ships in the same build), while packs and classpath
   providers are always strict; and a grant is only worth declaring if the code **looks it up** — the reach
-  `AlertService` has via its own `IncidentAccess` is not `alert.evaluate`'s grant to claim (plan D7).
+  `AlertService` has via its own `IncidentAccess` was never `alert.evaluate`'s grant to claim (D7), which
+  is why that Job waited for an `alerts` service (shipped 2026-08-10) instead of taking a decorative one.
+- **A service whose call cannot be previewed still needs the dry-run treatment — a stand-in is not enough.**
+  `alerts` evaluation *is* the action (a breach fires an Alert, advances a cooldown, may open an Incident),
+  so `DryRunServices` returns empty AND the consuming Job reports "nothing was evaluated". Returning empty
+  alone would let a caller print "no rule breached", which is a worse lie than the one MNT-1 forbids.
+  `alert.evaluate` shipped with exactly that bug for three days: it ignored `dryRun()` entirely, so a
+  preview fire really evaluated. **When you grant a Job a mutating service, check the Job honours the flag
+  too** — the substitution protects the store, not the Job's own reporting.
 - **A boot lambda must not capture a `final` field that is assigned later in the same constructor** — it is a
   `variable might not have been initialized` compile error, not a runtime NPE, and it will greet anyone
   registering a service beside the `notifications`/`incidents` block in `CollectorService`. Bind through the

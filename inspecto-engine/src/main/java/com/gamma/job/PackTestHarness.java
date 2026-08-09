@@ -38,9 +38,12 @@ import java.util.UUID;
  * <p><b>Mutating services are recorded, not real.</b> {@code notifications} and {@code incidents}
  * are bound to in-memory stand-ins that honour their documented contracts — the feed's
  * dedupe-collapse and the Incident active-object convention — so a Job that relies on either
- * behaves here as it will in production. Anything else a Job Type declares must be supplied with
- * {@link #service} <em>before</em> the providers load, because {@code requires:} resolves at
- * registration; an undeclared id refuses the type exactly as the engine's registry does.
+ * behaves here as it will in production. Anything else a Job Type declares — {@code schema},
+ * {@code consignment-status}, {@code alerts} — must be supplied with {@link #service} <em>before</em>
+ * the providers load, because {@code requires:} resolves at registration; an unbound id refuses the
+ * type exactly as the engine's registry does, naming what is available. {@code alerts} is deliberately
+ * not pre-bound: there is no honest default for "what breached", so a pack testing alert evaluation
+ * must state what it expects.
  *
  * <p>Lives in main scope rather than a test-jar deliberately: {@code inspecto-engine} publishes no
  * test-jar (see its {@code pom.xml}), and a pack already depends on the engine to compile against

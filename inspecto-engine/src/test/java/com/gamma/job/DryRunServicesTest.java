@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.alert.Alert;
+import com.gamma.alert.AlertAccess;
 import com.gamma.notify.InMemoryNotificationStore;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
@@ -41,45 +43,57 @@ class DryRunServicesTest {
         @Override public void error(String message, Throwable t, Object... kv) { info(message, kv); }
     }
 
-    private static PlatformServices granted(NotificationStore feed, ObjectService objects) {
+    private static PlatformServices granted(NotificationStore feed, ObjectService objects,
+                                            List<String> evaluations) {
         PlatformServiceRegistry registry = new PlatformServiceRegistry();
         registry.register("notifications", NotificationAccess.class, n -> {
             feed.add(n);
             return Optional.of(n);
         });
         registry.register("incidents", IncidentAccess.class, IncidentAccess.over(() -> objects));
+        registry.register("alerts", AlertAccess.class, () -> {
+            evaluations.add("evaluated");
+            return List.of(new Alert("r1", "error", "orders", "failed_batches", 5, ">", 3, "1h", 0L, "m"));
+        });
         registry.register("clock", Clock.class, () -> 42L);
-        return registry.grant(Set.of("notifications", "incidents", "clock"));
+        return registry.grant(Set.of("notifications", "incidents", "alerts", "clock"));
     }
 
     @Test
     void mutatingServicesRecordInsteadOfActUnderDryRun() {
         NotificationStore feed = new InMemoryNotificationStore();
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        List<String> evaluations = new ArrayList<>();
         CapturingLog log = new CapturingLog();
-        PlatformServices dry = DryRunServices.wrap(granted(feed, objects), log);
+        PlatformServices dry = DryRunServices.wrap(granted(feed, objects, evaluations), log);
 
         Optional<Notification> emitted = dry.get(NotificationAccess.class)
                 .notify(Notification.create("job", "JOB_RUN", "run:1", "Breach", "b", "k1"));
         Optional<?> opened = dry.get(IncidentAccess.class)
                 .openIncident("t", "m", "critical", "orders", Map.of("rule", "r1"), "rule");
+        // Evaluating is not a read — it fires Alerts and advances cooldowns — so the stand-in must not
+        // reach the real evaluator at all, and its empty result must not be read as "nothing breached".
+        List<Alert> fired = dry.get(AlertAccess.class).evaluateRules();
 
-        assertTrue(emitted.isEmpty() && opened.isEmpty(), "stand-ins act on nothing");
+        assertTrue(emitted.isEmpty() && opened.isEmpty() && fired.isEmpty(), "stand-ins act on nothing");
         assertEquals(0, feed.recent(10).size(), "dry run stores no notification");
         assertEquals(0, objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).size(),
                 "dry run opens no incident");
+        assertEquals(List.of(), evaluations, "dry run never reaches the real evaluator");
         assertTrue(log.lines.stream().anyMatch(l -> l.contains("would emit notification") && l.contains("title=Breach")));
         assertTrue(log.lines.stream().anyMatch(l -> l.contains("would open incident") && l.contains("scope=orders")));
+        assertTrue(log.lines.stream().anyMatch(l -> l.contains("would evaluate this space's Alert Rules")));
     }
 
     @Test
     void readOnlyServicesPassThroughAndGrantsStayHonest() {
         PlatformServices dry = DryRunServices.wrap(
-                granted(new InMemoryNotificationStore(), new ObjectService(new InMemoryObjectStore())),
+                granted(new InMemoryNotificationStore(), new ObjectService(new InMemoryObjectStore()),
+                        new ArrayList<>()),
                 new CapturingLog());
 
         assertEquals(42L, dry.get(Clock.class).now(), "read-only service is the real one");
-        assertEquals(3, dry.granted().size());
+        assertEquals(4, dry.granted().size());
 
         PlatformServices narrow = DryRunServices.wrap(
                 new PlatformServiceRegistry().grant(Set.of()), new CapturingLog());

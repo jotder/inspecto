@@ -155,9 +155,6 @@ public final class JobService implements AutoCloseable {
     /** This space's Object Engine, wired post-construction ({@link #objects(com.gamma.ops.ObjectService)}) so
      *  the {@code recon.run} built-in can promote a breach to an Incident; {@code null} until wired. */
     private volatile com.gamma.ops.ObjectService objects;
-    /** This space's Alert engine, wired post-construction ({@link #alerts(com.gamma.alert.AlertService)}) so
-     *  the {@code alert.evaluate} built-in can run the authored rules on a cron; {@code null} until wired. */
-    private volatile com.gamma.alert.AlertService alerts;
     /** One coalescer per on-signal Job, so a burst of matching signals folds into one follow-up Run (§8.4). */
     private final Map<String, TriggerCoalescer> signalCoalescers = new ConcurrentHashMap<>();
     /** Loop cut: a signal-triggered Run beyond this chain depth does not fire (§8.4) — {@code -Djobs.signal.maxChainDepth}. */
@@ -388,8 +385,8 @@ public final class JobService implements AutoCloseable {
                         + "Incident (AlertService promotes it); lower severities stay Alerts.",
                 List.of(ParameterDecl.of("rule", ParamType.STRING).label("Only this rule")
                         .description("Evaluate a single Alert Rule by name; every rule when unset").build()),
-                List.of("alert.evaluate.completed"), List.of()),
-                c -> new AlertEvaluateJob(c, () -> this.alerts)));
+                List.of("alert.evaluate.completed"), List.of(), List.of("alerts")),
+                c -> new AlertEvaluateJob(c)));
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds
         // none in the base build; a provider whose id collides with a built-in (registered first) is
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
@@ -495,14 +492,6 @@ public final class JobService implements AutoCloseable {
      *  Optional; read live by the built-in through a supplier, so ordering vs construction doesn't matter. */
     public void objects(com.gamma.ops.ObjectService objects) {
         this.objects = objects;
-    }
-
-    /** Bind this service to its space's Alert engine so {@code alert.evaluate} can run the authored Alert
-     *  Rules on a cron. Same supplier-read shape as {@link #objects}: wiring order does not matter, and a
-     *  host that never wires one simply cannot run that Job Type (it fails the Run closed, since evaluating
-     *  nothing would report health that was never checked). */
-    public void alerts(com.gamma.alert.AlertService alerts) {
-        this.alerts = alerts;
     }
 
     /**

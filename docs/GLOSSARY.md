@@ -378,7 +378,8 @@ declared **Parameters**. How the two `$` namespaces coexist is settled at step 4
 **Platform Service** *(added 2026-08-09, D0; as-built in `okf/backend/control-plane/platform-services.md`)* — An engine facility
 exposed to Jobs, packs and (stage 2) executable Steps through the `PlatformServices` typed lookup, granted
 by a declared `requires:` list that **fails closed at registration** (unknown or build-absent service id
-refuses the type/pack). v1 menu: `notifications` · `incidents` · `schema` · `consignment-status`. Every
+refuses the type/pack). Menu: `notifications` · `incidents` · `schema` · `consignment-status` ·
+`alerts` *(added 2026-08-10)*. The menu grows **by demand**, never speculatively. Every
 mutating service defines its dry-run behaviour (record, don't act — MNT-1 extended). ⛔ not *capability* —
 that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
 Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.

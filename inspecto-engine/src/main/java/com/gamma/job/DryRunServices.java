@@ -1,10 +1,13 @@
 package com.gamma.job;
 
+import com.gamma.alert.Alert;
+import com.gamma.alert.AlertAccess;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.ops.IncidentAccess;
 import com.gamma.ops.OperationalObject;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -50,6 +53,15 @@ final class DryRunServices implements PlatformServices {
                 log.info("dry run: would open incident", "title", title, "severity", severity,
                         "scope", scope, "dedupeAttribute", dedupeAttribute);
                 return Optional.<OperationalObject>empty();
+            });
+        }
+        if (type == AlertAccess.class) {
+            // Evaluation is not a read: a breach fires an Alert, advances its cooldown and may open an
+            // Incident. So a dry run must not evaluate at all — and a consumer that reports the empty
+            // result as "nothing breached" would be lying, which is why AlertAccess says so in its javadoc.
+            return Optional.of((T) (AlertAccess) () -> {
+                log.info("dry run: would evaluate this space's Alert Rules — nothing was checked");
+                return List.<Alert>of();
             });
         }
         return real;   // read-only services are unaffected by a dry run
