@@ -49,7 +49,8 @@ former root reference docs** (each index lists them):
     system (incl. data-table + tree-table), the feature screens, services.
   - [`okf/backend/`](okf/backend/index.md) — the Java backend: engine (incl. Stage-1 architecture,
     DB/persistence layer, plugins), acquisition (incl. the full framework doc), control plane (`/api/v1`,
-    API-stability policy, queries, jobs + Job Framework, metadata bundle, multi-space), pipeline-graph
+    API-stability policy, queries, jobs + Job Framework, the Job-vs-Step capability boundary, metadata
+    bundle, multi-space), pipeline-graph
     (incl. the full design doc), components, config (incl. the configuration + parsing-options
     references), editions & security, agent, modules (incl. the Maven reactor & module-extraction
     playbook, new 2026-07-21), build-run (incl. operations reference, troubleshooting,
@@ -72,6 +73,36 @@ former root reference docs** (each index lists them):
 - [`roadmap/`](roadmap/) — stakeholder overview, roadmap (Now/Next/Later), presentation decks.
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
+
+- [`superpower/platform-services-plan.md`](superpower/platform-services-plan.md) — **v1.0 DRAFT
+  2026-08-09, not approved — Platform Services & the plugin envelope.** The named seam
+  (`PlatformServices`, ⛔ not "capability" — that's RBAC's word) granting engine facilities to
+  plugins by declared `requires:`: v1 services `notifications` · `incidents` · `schema` ·
+  `consignment-status`; one envelope, three mounts (Job pack / ConsignmentProcessor / stage-2
+  executable Step). Opens the Step-kind registry (`LOWERED`/`EXECUTED` modes, supersedes the
+  "closed on purpose" note; totality preserved by fail-closed arming) and stage-3 pack-contributed
+  services. Ships `tools/scaffold.mjs` + `PackTestHarness` (new job/step/service/processor
+  skeletons, offline-buildable). Fulfils the `JobServices` façade named-but-never-built in
+  `JobContext`'s javadoc.
+- [`superpower/consignment-addressing-plan.md`](superpower/consignment-addressing-plan.md) —
+  **v1.1 DRAFT 2026-08-09, not approved — the addressing layer: naming a set of Consignments as one
+  relation.** Thesis: in-motion and at-rest are the *same type* here (both a DuckDB relation), so the
+  Job/Step boundary is **selection, not data state** — which replaces the in-motion/at-rest framing in
+  `okf/backend/control-plane/job-vs-step.md`. The one mechanical change: reads become a
+  **catalog-pruned explicit file list** instead of a `**/*.parquet` glob. Grounding (verified
+  2026-08-09) reshaped the plan: the catalog is **80% built and switched off** —
+  `consignment_outputs` already carries `path`/`row_count`/`bytes`/**`generation`**/`state` but is
+  gated behind `-Dconsignment.outputs.backend`; **no event-time min/max is persisted anywhere**
+  (`record_day` is a write-time approximation its own javadoc calls silently divergent;
+  `RunArtifact.timeRange` is always null); dataset `role: temporal` exists in config but
+  `DatasetRelation` never reads it; and **no windowed scan of ingested data exists at all** — alert
+  `window: 1h` filters the *batch audit ledger* by wall-clock, so content rules are new capability,
+  not an extension. §5 is a **strategy framework, not a design**: pinned hopping-window vocabulary
+  (size/hop/pane/dirty window), a T1–T3 rule tier test, firing discipline (monotonic thresholds fire
+  on crossing — no completeness wait), a six-rung evaluation ladder (A catalog-pruned rescan → F
+  decayed counters) with escalation triggers, and a per-source instantiation template. Scope guard
+  (operator): BI, RA, Warehouse and Fraud are **deferred** to §6 extension points. 10-step delivery
+  table; step 1 is *measure rung A* and nothing past step 3 should start before that number exists.
 
 - [`superpower/job-parameter-contract-plan.md`](superpower/job-parameter-contract-plan.md) —
   **REFINED + GROUNDED 2026-08-06 (UI + backend) — the Job authoring contract + extensible runtime
