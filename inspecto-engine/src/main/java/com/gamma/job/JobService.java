@@ -890,8 +890,12 @@ public final class JobService implements AutoCloseable {
             // S1-2: grant exactly the type's declared requires: — registration already validated the
             // ids, so this cannot throw for a registered type. Grants are honest (R4): a service that
             // exists but was not declared stays invisible to the Run.
-            if (platform != null) ctx.services(platform.grant(Set.copyOf(
-                    registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of()))));
+            if (platform != null) {
+                PlatformServices granted = platform.grant(Set.copyOf(
+                        registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of())));
+                // S1-3/S1-4 dry-run contract (§3.4): mutating services record instead of act.
+                ctx.services(firing.dryRun() ? DryRunServices.wrap(granted, ctx.log()) : granted);
+            }
             ctx.log().info("run started", "trigger", trigger, "params", pr.resolved(),
                     "dryRun", firing.dryRun());   // resolved Parameter Context (R2/R5)
             ctx.signals().emit("job.run.started", Severity.INFO,

@@ -61,6 +61,9 @@ public final class AlertService {
     private final StatusStore status;
     /** Object store for persisting fired alerts as managed objects (Phase 2); {@code null} = events-only. */
     private final ObjectService objects;
+    /** The {@code incidents} Platform Service view over {@link #objects} (S1-4) — high-severity
+     *  promotion opens through the same interface a granted Run uses; {@code null} = events-only. */
+    private final com.gamma.ops.IncidentAccess incidents;
     private final Deque<Alert> fired = new ArrayDeque<>();
     private final int capacity;
     private final Map<String, Long> lastFired = new ConcurrentHashMap<>();
@@ -91,6 +94,7 @@ public final class AlertService {
         this.configs = configs;
         this.status = status;
         this.objects = objects;
+        this.incidents = objects == null ? null : com.gamma.ops.IncidentAccess.over(() -> objects);
         this.capacity = Math.max(1, capacity);
     }
 
@@ -286,11 +290,11 @@ public final class AlertService {
      */
     private void promoteToIncident(AlertRule rule, Alert alert, String pipeline, Map<String, String> attrs) {
         if (!isHighSeverity(rule.severity())) return;
-        boolean active = objects.active(ObjectType.INCIDENT, pipeline).stream()
-                .anyMatch(o -> rule.name().equals(o.attributes().get("rule")));
-        if (active) return;
-        objects.open(ObjectType.INCIDENT, rule.name() + " on " + pipeline, alert.message(),
-                rule.severity(), pipeline, new LinkedHashMap<>(attrs));
+        // S1-4: promote through the incidents Platform Service — the same interface a granted Run
+        // uses. The service enforces the active-object convention (one active INCIDENT per
+        // rule+pipeline) via the "rule" dedupe attribute already present in attrs.
+        incidents.openIncident(rule.name() + " on " + pipeline, alert.message(),
+                rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule");
     }
 
     /** Whether a rule severity warrants an Incident (critical / error) rather than staying an alert. */

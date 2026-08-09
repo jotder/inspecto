@@ -1,7 +1,8 @@
 # Platform Services & the Plugin Envelope — plan
 
-**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0 + S1-1
-shipped (`1b138e52`, `3318c7f7`). v1.1 adds D6 (operator): services are open by default — a plugin
+**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0…S1-4
+shipped (`1b138e52`, `3318c7f7`, `48cadc35`, + the S1-3/S1-4 commit): the seam, `requires:` grants,
+and the first two services (`notifications`, `incidents`) with the engine as first consumer. v1.1 adds D6 (operator): services are open by default — a plugin
 is only restricted from a service when absolutely necessary, with the necessity recorded. Grounded
 against source 2026-08-09; every "already exists" claim carries a `file:line` ref. Items that need
 re-verification at coding time are marked ⏲ (they cite grounded sibling docs, not fresh reads).**
@@ -86,8 +87,11 @@ the P3 design (`JobServices`) and the narrowing discipline was already invented 
 - **The Step-side precedent**: the CONTROL trio — `ALERT`, `GAP`, `EVENT` node kinds
   (`BuiltinNodeType.java:107-116`) are *declared nodes whose semantics the engine executes* ("Raises
   an alert…", "Emits a notification / event"). "A Step uses a service" already exists in exactly the
-  form §5.1 generalises: declaratively, engine-invoked. ⏲ locate the trio's engine-side dispatch at
-  S1-3.
+  form §5.1 generalises: declaratively, engine-invoked. ✔ Grounded at S1-3: there is **no per-node
+  dispatch** — the trio's semantics run event-driven, as `EventLog`/bus subscribers wired in
+  `CollectorService` (`NotificationService.dispatch`, `AlertService.persistAlertObject`/
+  `promoteToIncident`, `EventObjectBridge`); those subscribers are the "engine dispatch" S1-3/S1-4
+  rewired through the services.
 - **The facilities to wrap** (v1 menu): `NotificationStore` (`notify` pkg), `ObjectService`
   (`com.gamma.ops` — the Incident/Object authority), schema components + fingerprints
   (`CanonicalHash`, `schema_fingerprint` pinned in manifest + `consignment_outputs` — addressing

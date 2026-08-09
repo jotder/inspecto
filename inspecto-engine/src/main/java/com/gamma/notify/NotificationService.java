@@ -32,7 +32,7 @@ import java.util.function.Supplier;
  *
  * @since 4.4.0
  */
-public final class NotificationService implements AutoCloseable {
+public final class NotificationService implements NotificationAccess, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
 
@@ -167,6 +167,23 @@ public final class NotificationService implements AutoCloseable {
         if (closer != null) streamClosers.remove(closer);
     }
 
+    /**
+     * The in-app emit — dedupe-collapse, store, push to live listeners — and the {@code notifications}
+     * Platform Service (S1-3): a granted Run and the event dispatcher's in-app leg store through this
+     * one path. Serialized so the dedupe check and the add are atomic across concurrent callers.
+     */
+    @Override
+    public synchronized java.util.Optional<Notification> notify(Notification n) {
+        if (store.hasActiveDuplicate(n.dedupeKey())) return java.util.Optional.empty();
+        Notification stored = store.add(n);
+        for (Consumer<Notification> l : listeners) {
+            try { l.accept(stored); } catch (RuntimeException ex) {
+                log.debug("notification listener failed: {}", ex.getMessage());
+            }
+        }
+        return java.util.Optional.of(stored);
+    }
+
     /** Render → dedup → store → notify, off the emitting thread. Serialized so the dedup check and the
      *  add are atomic across concurrent workers (the feed is low-volume; the executor exists to get off
      *  the emit thread, not for parallelism). */
@@ -175,15 +192,10 @@ public final class NotificationService implements AutoCloseable {
             Notification n = rule.render(e);
             if (store.hasActiveDuplicate(n.dedupeKey())) return;   // collapse identical unread alerts
             if (!rateLimiter.allow(n.dedupeKey())) return;          // cap identical alerts per rolling hour
-            // In-app (intrinsic): add to the feed + push to live listeners, unless the user opted out of
-            // in-app for this category (critical categories are always delivered — preferences bypass).
+            // In-app (intrinsic): the S1-3 service path (dedupe + store + listeners), unless the user
+            // opted out of in-app for this category (critical categories are always delivered — bypass).
             if (prefs.enabled(n.category(), NotificationPreferences.IN_APP)) {
-                Notification stored = store.add(n);
-                for (Consumer<Notification> l : listeners) {
-                    try { l.accept(stored); } catch (RuntimeException ex) {
-                        log.debug("notification listener failed: {}", ex.getMessage());
-                    }
-                }
+                notify(n);
             }
             // External SPI channels configured from notify.* flags: delivered only when enabled for this category.
             for (NotificationChannel ch : channels) {

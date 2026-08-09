@@ -385,6 +385,14 @@ public final class CollectorService implements AutoCloseable {
         // enrichment via POST /enrichment without a restart. Live pipeline view: the method ref
         // defers the registry read to recompute time.
         this.enrichment        = new EnrichmentService(enrichJobs, bus, scheduler, this::loadedPipelines);
+        // Platform Services v1 (S1-3/S1-4): registered BEFORE the Job engine constructs so a pack's
+        // requires: can validate fail-closed at registration. Lazily bound — the backing engines
+        // (notificationService, objects) are built later in this constructor; a service call only
+        // happens once boot has completed.
+        platformServices.register("notifications", com.gamma.notify.NotificationAccess.class,
+                n -> notificationService().notify(n));
+        platformServices.register("incidents", com.gamma.ops.IncidentAccess.class,
+                com.gamma.ops.IncidentAccess.over(this::objects));
         this.jobs              = jobConfigs.isEmpty()
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
