@@ -1,9 +1,12 @@
 # Platform Services & the Plugin Envelope — plan
 
-**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0…S1-6
-shipped (`1b138e52`, `3318c7f7`, `48cadc35`, `92f6bfcd`, `6cd58d1c`, + the S1-6 commit): the seam,
-`requires:` grants, `notifications` + `incidents` (engine as first consumer), and the read-only
-`schema` + `consignment-status` services — the whole v1 service menu is live. v1.1 adds D6 (operator): services are open by default — a plugin
+**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0…S1-7
+shipped (`1b138e52`, `3318c7f7`, `48cadc35`, `92f6bfcd`, `6cd58d1c`, `d7d2a000`, + the S1-7 commit):
+the seam, `requires:` grants, the whole v1 service menu (`notifications`, `incidents`, `schema`,
+`consignment-status`) with the engine as first consumer, and `sample.hello` migrated onto a grant
+with a real pack jar proving a pack can do the same. Only **S1-8** (scaffolder + `PackTestHarness`)
+remains in Stage 1. New decisions from delivery: **D7** (`alert.evaluate` does not migrate — it needs
+the evaluator, not `incidents`) and **D8** (a bare registry still accepts a built-in's declaration). v1.1 adds D6 (operator): services are open by default — a plugin
 is only restricted from a service when absolutely necessary, with the necessity recorded. Grounded
 against source 2026-08-09; every "already exists" claim carries a `file:line` ref. Items that need
 re-verification at coding time are marked ⏲ (they cite grounded sibling docs, not fresh reads).**
@@ -284,7 +287,7 @@ pointer** until S2-3 unlocks it (honest, not aspirational); `new service` likewi
 | S1-4 | `IncidentAccess` over `ObjectService` (active-object convention); rewire the `alert` node dispatch | an open Incident per scope is not duplicated; dry-run reports would-open |
 | S1-5 | `SchemaAccess` (read-only) | list/get/fingerprint against seeded schema components |
 | S1-6 | `ConsignmentStatusAccess` (read-only) | seeded manifest + outputs answer status/files/outputs |
-| S1-7 | Migrate `sample.hello` → `notifications`, `alert.evaluate` → `incidents`; ship one of them as a **real pack jar in a test** | the pack loads, `requires:` grants resolve, the Run succeeds — the "could not have shipped as a pack" evidence inverted |
+| S1-7 | ✔ `sample.hello` migrated → `requires: [notifications]`, consumed via `ctx.services()`, **its `ObjectService` injection dropped** (it is now pack-shippable); real pack jar in a test declares + consumes a grant. ⛔ `alert.evaluate` → `incidents` **REFUTED** (see D7) | the pack loads, `requires:` grants resolve, the Run succeeds — the "could not have shipped as a pack" evidence inverted. Plus: a pack declaring an unavailable id is rejected whole, and a bare (host-less) registry still registers a built-in's declaration |
 | S1-8 | `tools/scaffold.mjs` (`new job`, `new processor`) + `PackTestHarness` + templates | scaffold → `mvn -o package` in a temp dir → harness test green → pack loads into a scratch `JobService` |
 
 **Stage 2 — the open Step-kind registry** (gated: branch-aware executor armed path)
@@ -330,6 +333,22 @@ scanned.
   the fused query) and the stage-2 Step data-path ceiling (§3.3 — a mid-flight node must not write
   datasets or send outbound mail). Everything else is menu-by-demand: absent from v1 means
   "no consumer yet", not "forbidden".
+- **D7 — `alert.evaluate` does NOT migrate to `incidents` (grounded at S1-7, 2026-08-09)**: the plan's
+  S1-7 line assumed it could. It cannot honestly: `AlertEvaluateJob` depends on the **evaluator**
+  (`AlertService.evaluateAll()`), which §4 deliberately keeps out of the v1 menu. The Incidents it
+  causes are opened *inside* `AlertService` through its own `IncidentAccess` (S1-4) — so declaring
+  `requires: [incidents]` on the Job would be a **decorative grant it never looks up**: remove the
+  grant and Incidents still open. That contradicts R4 (a declaration means the lookup is what
+  enables the reach). `alert.evaluate` therefore stays injection-wired and becomes §4's *first real
+  demand* for an `alerts` service — the honest migration is "add `alerts` to the menu", a separate
+  slice, not a relabel. Its `requires:` stays empty until then.
+- **D8 — a bare registry still registers a built-in's `requires:` (S1-7)**: `JobTypeRegistry` with no
+  `PlatformServiceRegistry` wired (a lean/embedded `JobService`, e.g. an engine unit test) refuses any
+  *third-party* declaration but accepts a **built-in's** — the service ships in the same build, so the
+  id is not unknown; only host wiring is absent, and the built-in tolerates the empty lookup. Without
+  this, the first built-in to declare a grant would have failed every host-less construction. Packs
+  and classpath providers stay strict, and with a registry present built-ins are validated too (so a
+  typo still fails boot — pinned by the real-HTTP `sample.hello` grant test).
 - **R1 — no timeout/cancellation anywhere** (`job-vs-step.md` §2). Hardest for `EXECUTED` Steps
   (stalls a poll cycle); the S2-3 watchdog is mandatory scope, and a Job-side watchdog is a
   recorded gap beyond this plan.

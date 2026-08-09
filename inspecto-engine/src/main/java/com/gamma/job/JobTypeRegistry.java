@@ -26,7 +26,8 @@ final class JobTypeRegistry {
     private final Map<String, String> sources = new LinkedHashMap<>();  // id -> builtin | classpath | pack:<owner>
     /** The host's Platform Service registry, against which a descriptor's {@code requires:} ids are
      *  validated fail-closed at registration (plan S1-2); {@code null} (bare test registries) means no
-     *  service is available, so any {@code requires:} refuses — never "accept and hope". */
+     *  service is available, so any third-party {@code requires:} refuses — never "accept and hope".
+     *  Built-ins are the one exception when it is {@code null} (see {@link #register}). */
     private final PlatformServiceRegistry platform;
 
     JobTypeRegistry() {
@@ -62,7 +63,15 @@ final class JobTypeRegistry {
     private void register(JobTypeProvider provider, String owner, String source) {
         // requires: resolves fail-closed at registration (S1-2): an unknown or build-absent service id
         // refuses the type here, pack-atomically — never an empty lookup at fire time.
+        //
+        // One exception, for BUILT-INS only (S1-7): when no Platform Service registry is wired at all
+        // (`platform == null` — a lean/embedded JobService, e.g. an engine unit test), a built-in still
+        // registers. Its service ships in the same build, so the id is not "unknown"; only the host
+        // wiring is absent, and a built-in that declares a grant must tolerate an empty lookup anyway.
+        // Third-party types stay strict: with no registry wired, any requires: refuses.
+        boolean lenient = "builtin".equals(source) && platform == null;
         for (String req : provider.descriptor().requires()) {
+            if (lenient) continue;
             if (platform == null || !platform.has(req))
                 throw new IllegalStateException("job type '" + provider.id()
                         + "' requires unavailable Platform Service '" + req + "' (available: "

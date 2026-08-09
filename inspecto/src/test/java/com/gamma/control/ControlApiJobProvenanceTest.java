@@ -66,7 +66,13 @@ class ControlApiJobProvenanceTest {
         try (Ctx c = open(dir)) {
             JsonNode one = json(get(c.port, "/jobs/types/sql.template"));
             assertTrue(one.get("requires").isArray(), "requires: is part of the served contract");
-            assertTrue(one.get("requires").isEmpty(), "no built-in declares a Platform Service grant yet");
+            assertTrue(one.get("requires").isEmpty(), "sql.template needs no Platform Service");
+
+            // S1-7: sample.hello is the migrated reference — it reaches the feed only through its grant.
+            // Its presence here also proves the real boot registry satisfied that grant: registration
+            // fails closed, so an unsatisfiable declaration would have failed the service's construction.
+            JsonNode hello = json(get(c.port, "/jobs/types/sample.hello"));
+            assertEquals("notifications", hello.get("requires").get(0).asText());
 
             for (JsonNode t : json(get(c.port, "/jobs/types")))
                 assertTrue(t.has("requires"), t.get("id").asText() + " serves its grants row");

@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
@@ -197,6 +198,134 @@ class JobPackManagerTest {
                     "the built-in $today still owns its token");
             assertEquals(java.time.LocalDate.now().toString(), expressions.evaluate("$today", ctx()).orElse(null));
         }
+    }
+
+    // ── S1-7: a pack that declares and consumes a Platform Service ────────────────────────────
+
+    @Test
+    void aPackDeclaringAServiceLoadsAndItsRunConsumesTheGrant(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildServicePackJar(work, packsDir.resolve("notify-1.jar"), "acme.notify", "NotifyType",
+                "acme-notify", "\"notifications\"");
+
+        // The host's service registry, exactly as CollectorService builds it at boot.
+        List<com.gamma.notify.Notification> feed = new CopyOnWriteArrayList<>();
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("notifications", com.gamma.notify.NotificationAccess.class, n -> {
+            feed.add(n);
+            return java.util.Optional.of(n);
+        });
+        JobTypeRegistry registry = new JobTypeRegistry(platform);
+
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            mgr.scanAtStartup();
+
+            assertTrue(registry.has("acme.notify"), "the pack's type registered — its grant resolved");
+            assertEquals(List.of("notifications"), registry.descriptor("acme.notify").orElseThrow().requires(),
+                    "the declared grant travelled from inside the jar");
+
+            // Grant exactly what the descriptor declares — the same step JobService.runJob performs.
+            Job job = registry.create("acme.notify", jobConfig("n1", "acme.notify"));
+            assertNotSame(getClass().getClassLoader(), job.getClass().getClassLoader(),
+                    "pack Job runs from the pack's own classloader");
+            JobResult res = job.run(new GrantedContext(platform.grant(Set.of("notifications"))));
+
+            assertEquals("SUCCESS", res.status(), "the Run succeeds using only a declared grant");
+            assertEquals(1, feed.size(), "the pack reached the real feed through the service");
+            assertEquals("from the pack", feed.get(0).title());
+        }
+    }
+
+    @Test
+    void aPackDeclaringAnUnavailableServiceIsRefusedWholeAtLoad(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildServicePackJar(work, packsDir.resolve("greedy-1.jar"), "acme.greedy", "GreedyType",
+                "acme-greedy", "\"notifications\", \"nonexistent\"");
+
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("notifications", com.gamma.notify.NotificationAccess.class,
+                n -> java.util.Optional.of(n));
+        JobTypeRegistry registry = new JobTypeRegistry(platform);
+        Sink sink = new Sink();
+
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
+                ExpressionRegistry.withBuiltins(), sink)) {
+            mgr.scanAtStartup();
+
+            assertFalse(registry.has("acme.greedy"), "an undeclarable grant refuses the type");
+            assertTrue(mgr.inventory().isEmpty(), "and the whole pack is rejected, not partially loaded");
+            assertTrue(sink.types.contains("job.pack.rejected"));
+        }
+    }
+
+    /** A {@link JobContext} carrying a pre-granted {@link PlatformServices} — everything else is inert,
+     *  because what is under test is the grant a pack Job receives. */
+    private record GrantedContext(PlatformServices services) implements JobContext {
+        @Override public String runId()   { return "run-1"; }
+        @Override public String spaceId() { return "default"; }
+        @Override public TriggerInfo trigger() { return TriggerInfo.parse("manual"); }
+        @Override public Map<String, String> config() { return Map.of(); }
+        @Override public Map<String, String> params() { return Map.of(); }
+        @Override public RunLog log() {
+            return new RunLog() {
+                @Override public void info(String m, Object... kv) {}
+                @Override public void warn(String m, Object... kv) {}
+                @Override public void error(String m, Throwable t, Object... kv) {}
+            };
+        }
+        @Override public com.gamma.signal.SignalEmitter signals() {
+            return (type, sev, payload) -> {};
+        }
+        @Override public ArtifactRecorder artifacts() {
+            return new ArtifactRecorder() {
+                @Override public void dataset(String n, String ref, ResultSetMeta m, long rows,
+                                              java.time.Instant w) {}
+                @Override public void file(String n, Path p, long bytes) {}
+            };
+        }
+    }
+
+    /**
+     * Compile a {@link JobTypeProvider} whose descriptor declares {@code requires: [<requiresLiteral>]} and
+     * whose Job emits through {@code ctx.services()} — a pack that owns no engine object, only a grant.
+     */
+    private static Path buildServicePackJar(Path work, Path jar, String typeId, String cls, String packId,
+                                            String requiresLiteral) throws Exception {
+        String fqcn = "com.acme.pack." + cls;
+        String src = """
+                package com.acme.pack;
+                import com.gamma.job.*;
+                import com.gamma.notify.Notification;
+                import com.gamma.notify.NotificationAccess;
+                import java.util.List;
+                @JobTypeMeta(id = "%s", title = "Notify")
+                public class %s implements JobTypeProvider {
+                    public JobTypeDescriptor descriptor() {
+                        return new JobTypeDescriptor("%s", "Notify", "emits through a granted service",
+                                List.of(), List.of(), List.of(), List.of(%s));
+                    }
+                    public Job create(JobConfig config) {
+                        return new Job() {
+                            public String name() { return config.name(); }
+                            public String type() { return "%s"; }
+                            public JobResult run() { return JobResult.ok("no context", 0L); }
+                            public JobResult run(JobContext ctx) {
+                                NotificationAccess feed = ctx.services().get(NotificationAccess.class);
+                                feed.notify(Notification.create("job", "JOB_RUN", ctx.runId(),
+                                        "from the pack", "emitted via a declared grant", "pack:" + name()));
+                                return JobResult.ok("notified", 0L);
+                            }
+                        };
+                    }
+                }
+                """.formatted(typeId, cls, typeId, requiresLiteral, typeId);
+
+        Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
+        writeJar(jar, classes, packId, "1.0.0", Map.of("com.gamma.job.JobTypeProvider", fqcn));
+        return jar;
     }
 
     private static ExpressionContext ctx() {

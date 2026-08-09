@@ -351,8 +351,9 @@ public final class JobService implements AutoCloseable {
         // tour of the parameter contract (job-parameter-contract §7.2): every tier, a group, options, a
         // multi list, bounds, a secret, and a deduced date. Authors read this to learn the form.
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("sample.hello", "Hello World (sample)",
-                "Does no work. Echoes its resolved parameters and raises one Alert — a safe Job to schedule, "
-                        + "trigger and read while learning the authoring form.",
+                "Does no work. Echoes its resolved parameters and emits one notification — a safe Job to "
+                        + "schedule, trigger and read while learning the authoring form. Also the reference "
+                        + "for using a Platform Service: it reaches the feed only through its declared grant.",
                 List.of(
                         ParameterDecl.of("greeting", ParamType.STRING).label("Greeting").group("Message")
                                 .defaultValue("Hello").placeholder("Hello").build(),
@@ -360,24 +361,26 @@ public final class JobService implements AutoCloseable {
                                 .defaultValue("world")
                                 .description("Try an Expression here, e.g. $run.actor").build(),
                         ParameterDecl.of("note", ParamType.TEXT).label("Note").group("Message")
-                                .placeholder("Free text carried onto the Alert").build(),
+                                .placeholder("Free text carried onto the notification").build(),
                         ParameterDecl.of("run_date", ParamType.DATE).label("Run date").group("Message")
                                 .deduce("$today").description("Defaults to the fire date when unset").build(),
-                        ParameterDecl.of("severity", ParamType.STRING).label("Alert severity").group("Alert")
+                        ParameterDecl.of("severity", ParamType.STRING).label("Severity").group("Notification")
                                 .options("INFO", "WARNING", "ERROR").defaultValue("INFO").build(),
-                        ParameterDecl.of("raise_alert", ParamType.BOOLEAN).label("Raise an Alert")
-                                .group("Alert").defaultValue("true").build(),
-                        ParameterDecl.of("tags", ParamType.STRING).label("Tags").group("Alert").multi()
-                                .description("Comma-separated; copied onto the Alert's attributes").build(),
-                        ParameterDecl.of("notify", ParamType.EMAIL).label("Notify").group("Alert").multi()
+                        // Key kept for config compatibility with already-authored sample jobs; what it
+                        // gates is now the notification, not an Alert object.
+                        ParameterDecl.of("raise_alert", ParamType.BOOLEAN).label("Emit a notification")
+                                .group("Notification").defaultValue("true").build(),
+                        ParameterDecl.of("tags", ParamType.STRING).label("Tags").group("Notification").multi()
+                                .description("Comma-separated; echoed in the notification body").build(),
+                        ParameterDecl.of("notify", ParamType.EMAIL).label("Notify").group("Notification").multi()
                                 .description("Validated per address — nothing is sent, this is a sample").build(),
                         ParameterDecl.of("retries", ParamType.INTEGER).label("Retries")
                                 .tier(ParameterDecl.Tier.ADVANCED).min(0).max(5).defaultValue("0").build(),
                         ParameterDecl.of("api_token", ParamType.STRING).label("API token")
                                 .tier(ParameterDecl.Tier.ADVANCED).secret()
                                 .description("Masked on read — demonstrates the secret contract").build()),
-                List.of("sample.hello.completed"), List.of()),
-                c -> new SampleHelloJob(c, () -> this.objects)));
+                List.of("sample.hello.completed"), List.of(), List.of("notifications")),
+                c -> new SampleHelloJob(c)));
         // alert.evaluate — puts the shipped Alert engine on a cron (see AlertEvaluateJob). Detection,
         // severity and Alert→Incident promotion stay in AlertService; this Job only supplies the clock.
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("alert.evaluate", "Evaluate Alert Rules",

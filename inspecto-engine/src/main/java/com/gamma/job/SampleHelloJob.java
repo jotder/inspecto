@@ -1,36 +1,37 @@
 package com.gamma.job;
 
-import com.gamma.ops.ObjectService;
-import com.gamma.ops.ObjectType;
+import com.gamma.notify.Notification;
+import com.gamma.notify.NotificationAccess;
 import com.gamma.signal.Severity;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Supplier;
 
 /**
  * The {@code sample.hello} Job Type — a deliberately inert reference Job. It does no work: it accepts a
  * parameter of every shape the declaration contract can express (job-parameter-contract §7.2), echoes what
- * it resolved into its Run Log, and opens one {@link ObjectType#ALERT} carrying those values.
+ * it resolved into its Run Log, and emits one notification carrying those values.
  *
  * <p>Its purpose is to be <em>read</em>. An author wiring up their first Job can see, in one place, how a
  * declared {@code tier}/{@code group}/{@code options}/{@code multi}/{@code secret} parameter renders, and
- * can type a {@code $}-Expression into any field and watch it resolve at fire time — the Alert's attributes
- * show the resolved values, so {@code $today} and friends are observable rather than theoretical.
+ * can type a {@code $}-Expression into any field and watch it resolve at fire time — the notification body
+ * shows the resolved values, so {@code $today} and friends are observable rather than theoretical.
+ *
+ * <p>It is also the reference for <b>using a Platform Service</b> (platform-services S1-7): its Job Type
+ * declares {@code requires: [notifications]} and it reaches the feed only through
+ * {@link JobContext#services()} — no privileged engine object is injected into it, which is precisely what
+ * lets a Job like this ship from a pack jar. An absent grant is not fatal: the Run still succeeds, so the
+ * sample stays safe wherever it is dropped.
  *
  * <p>Because it changes nothing, it is safe to schedule, trigger by hand, and delete. The one visible
- * effect is the Alert, which is also what makes a successful Run obvious in the UI.
+ * effect is the notification, which is also what makes a successful Run obvious in the UI.
  */
 final class SampleHelloJob implements Job {
 
     private final JobConfig cfg;
-    /** Live view of this space's Object Engine (wired post-construction); {@code null} ⇒ no Alert, and the
-     *  Run still succeeds — a sample must not fail closed on an optional dependency. */
-    private final Supplier<ObjectService> objects;
 
-    SampleHelloJob(JobConfig cfg, Supplier<ObjectService> objects) {
+    SampleHelloJob(JobConfig cfg) {
         this.cfg = cfg;
-        this.objects = objects;
     }
 
     @Override public String name() { return cfg.name(); }
@@ -55,22 +56,22 @@ final class SampleHelloJob implements Job {
         String audience = p.getOrDefault("audience", "world");
         String title = greeting + ", " + audience + "!";
 
-        boolean raised = false;
-        ObjectService svc = objects == null ? null : objects.get();
-        if (svc != null && !"false".equalsIgnoreCase(p.getOrDefault("raise_alert", "true"))) {
-            Map<String, String> attrs = new LinkedHashMap<>();
-            shown.forEach((k, v) -> attrs.put(k, String.valueOf(v)));
-            attrs.put("job", cfg.name());
-            attrs.put("run", ctx.runId());
-            // correlationId = the job name, so repeat fires group under one subject in the Alerts feed.
-            svc.open(ObjectType.ALERT, title, "Raised by the sample.hello Job — no work was performed.",
-                    p.getOrDefault("severity", "INFO"), cfg.name(), attrs);
-            raised = true;
+        // The one visible effect, through the granted `notifications` Platform Service. An ungranted
+        // build (or a dry run, where the framework substitutes a recording stand-in) simply emits
+        // nothing — a sample must not fail closed on its own demonstration.
+        boolean emitted = false;
+        if (!"false".equalsIgnoreCase(p.getOrDefault("raise_alert", "true"))) {
+            emitted = ctx.services().find(NotificationAccess.class)
+                    // dedupeKey = the job name, so repeat fires collapse into one unread entry.
+                    .flatMap(feed -> feed.notify(Notification.create("job", "JOB_RUN", ctx.runId(), title,
+                            "Emitted by the sample.hello Job — no work was performed. Resolved: " + shown,
+                            "sample.hello:" + cfg.name())))
+                    .isPresent();
         }
 
         ctx.signals().emit("sample.hello.completed", Severity.INFO,
-                Map.of("job", cfg.name(), "run", ctx.runId(), "alert", raised));
-        return JobResult.ok(title + (raised ? " (alert raised)" : " (no Object Engine — alert skipped)"),
+                Map.of("job", cfg.name(), "run", ctx.runId(), "notified", emitted));
+        return JobResult.ok(title + (emitted ? " (notification emitted)" : " (no notification emitted)"),
                 (System.nanoTime() - t0) / 1_000_000L);
     }
 }
