@@ -1,15 +1,23 @@
 # Platform Services & the Plugin Envelope — plan
 
-**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0…S1-7
-shipped (`1b138e52`, `3318c7f7`, `48cadc35`, `92f6bfcd`, `6cd58d1c`, `d7d2a000`, + the S1-7 commit):
-the seam, `requires:` grants, the whole v1 service menu (`notifications`, `incidents`, `schema`,
-`consignment-status`) with the engine as first consumer, and `sample.hello` migrated onto a grant
-with a real pack jar proving a pack can do the same. Only **S1-8** (scaffolder + `PackTestHarness`)
-remains in Stage 1. New decisions from delivery: **D7** (`alert.evaluate` does not migrate — it needs
-the evaluator, not `incidents`) and **D8** (a bare registry still accepts a built-in's declaration). v1.1 adds D6 (operator): services are open by default — a plugin
-is only restricted from a service when absolutely necessary, with the necessity recorded. Grounded
-against source 2026-08-09; every "already exists" claim carries a `file:line` ref. Items that need
-re-verification at coding time are marked ⏲ (they cite grounded sibling docs, not fresh reads).**
+**Status: ARCHIVED 2026-08-10 — STAGE 1 COMPLETE (S1-0…S1-8).** Shipped: the seam, `requires:`
+grants validated at registration, the whole v1 service menu (`notifications`, `incidents`, `schema`,
+`consignment-status`) with the engine as first consumer, `sample.hello` migrated onto a grant with
+its injection dropped (a real pack jar proves a pack can do the same), and the pack scaffolder
+(`tools/scaffold.mjs` + templates) with `PackTestHarness`. **As-built lives in
+[`okf/backend/control-plane/platform-services.md`](../okf/backend/control-plane/platform-services.md);
+Stage 2 and Stage 3 and the other open items moved to [`BACKLOG.md`](../BACKLOG.md) §4.** This file is
+retained as the record of the D0–D8 decisions and the S1/S2/S3 phasing — it is history, not current
+guidance.
+
+Decisions taken during delivery: **D6** (operator) services are open by default — a plugin is only
+restricted when absolutely necessary, with the necessity recorded; **D7** `alert.evaluate` does not
+migrate (it needs the evaluator, not `incidents`); **D8** a bare registry still accepts a built-in's
+declaration. ⚠ **D7 was resolved after this plan closed** (2026-08-10, `ee9f34cc`): the operator
+added an `alerts` service to the menu, `alert.evaluate` declares it, and its injection is gone — so
+§9's "stays injection-wired" is the historical record, not current truth. The archive is not
+maintained; `okf/backend/control-plane/platform-services.md` is. Grounded against source 2026-08-09; every "already exists" claim carries a `file:line`
+ref. Items marked ⏲ cited grounded sibling docs rather than fresh reads.
 
 > **Operator scope (2026-08-09):** built-in services that Steps and Jobs can *use* (Notification,
 > Alert, Schema Registry, file/Consignment Status, …), openness to **new Step kinds** that do not
@@ -288,7 +296,7 @@ pointer** until S2-3 unlocks it (honest, not aspirational); `new service` likewi
 | S1-5 | `SchemaAccess` (read-only) | list/get/fingerprint against seeded schema components |
 | S1-6 | `ConsignmentStatusAccess` (read-only) | seeded manifest + outputs answer status/files/outputs |
 | S1-7 | ✔ `sample.hello` migrated → `requires: [notifications]`, consumed via `ctx.services()`, **its `ObjectService` injection dropped** (it is now pack-shippable); real pack jar in a test declares + consumes a grant. ⛔ `alert.evaluate` → `incidents` **REFUTED** (see D7) | the pack loads, `requires:` grants resolve, the Run succeeds — the "could not have shipped as a pack" evidence inverted. Plus: a pack declaring an unavailable id is rejected whole, and a bare (host-less) registry still registers a built-in's declaration |
-| S1-8 | `tools/scaffold.mjs` (`new job`, `new processor`) + `PackTestHarness` + templates | scaffold → `mvn -o package` in a temp dir → harness test green → pack loads into a scratch `JobService` |
+| S1-8 | ✔ `tools/scaffold.mjs` (`new job`, `new processor`; `new step`/`new service` refuse with a pointer) + `tools/templates/` + `PackTestHarness` in engine **main** scope — ⚠ not a test-jar, because `inspecto-engine` publishes none and a pack already depends on the engine to compile. Tokens are `{{name}}`, not `${name}`, so a generated pom's own `${project.version}` survives stamping | ✔ scaffolded → `mvn -o package` offline in `packs-dev/` → 3 harness tests green, jar produced (both kinds, no warnings). `ScaffoldTemplatesTest` additionally stamps + compiles every template source (generated test included), jars it and loads it through `JobPackManager` into a scratch registry — offline, no Node, no Maven |
 
 **Stage 2 — the open Step-kind registry** (gated: branch-aware executor armed path)
 
