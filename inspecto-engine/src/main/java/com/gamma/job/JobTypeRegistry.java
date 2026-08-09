@@ -24,6 +24,18 @@ final class JobTypeRegistry {
     private final Map<String, JobTypeProvider> providers = new LinkedHashMap<>();
     private final Map<String, String> owners = new LinkedHashMap<>();   // id -> owner (null = permanent)
     private final Map<String, String> sources = new LinkedHashMap<>();  // id -> builtin | classpath | pack:<owner>
+    /** The host's Platform Service registry, against which a descriptor's {@code requires:} ids are
+     *  validated fail-closed at registration (plan S1-2); {@code null} (bare test registries) means no
+     *  service is available, so any {@code requires:} refuses — never "accept and hope". */
+    private final PlatformServiceRegistry platform;
+
+    JobTypeRegistry() {
+        this(null);
+    }
+
+    JobTypeRegistry(PlatformServiceRegistry platform) {
+        this.platform = platform;
+    }
 
     /** Where a registered type came from — {@code builtin} \| {@code classpath} \| {@code pack:<owner>} —
      *  and which class implements it (§7.3). Answers "what is this job, where did it come from", which is
@@ -48,6 +60,14 @@ final class JobTypeRegistry {
     }
 
     private void register(JobTypeProvider provider, String owner, String source) {
+        // requires: resolves fail-closed at registration (S1-2): an unknown or build-absent service id
+        // refuses the type here, pack-atomically — never an empty lookup at fire time.
+        for (String req : provider.descriptor().requires()) {
+            if (platform == null || !platform.has(req))
+                throw new IllegalStateException("job type '" + provider.id()
+                        + "' requires unavailable Platform Service '" + req + "' (available: "
+                        + (platform == null ? Set.of() : platform.ids()) + ")");
+        }
         if (providers.putIfAbsent(provider.id(), provider) != null)
             throw new IllegalStateException("duplicate job type id '" + provider.id() + "'");
         owners.put(provider.id(), owner);

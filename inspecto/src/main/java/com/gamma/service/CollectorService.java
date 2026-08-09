@@ -389,13 +389,13 @@ public final class CollectorService implements AutoCloseable {
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
                         System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                        pipelineStore, System.getProperty("data.dir", root.dataDir()), ServiceStores.openProvenanceStore(root));
+                        pipelineStore, System.getProperty("data.dir", root.dataDir()), ServiceStores.openProvenanceStore(root),
+                        platformServices);   // S1-2: ctor-injected so requires: validates at registration
         if (this.jobs != null) {
             this.jobs.deletionGuard(this::checkDeletion);   // T25: fence delete jobs
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
-            this.jobs.platform(platformServices);           // S1-1: the space's Platform Service registry
         }
         this.semanticModels    = List.copyOf(semanticModels);
         // Invalidate the catalog whenever configs are (re)indexed — the registry is now the
@@ -1160,12 +1160,12 @@ public final class CollectorService implements AutoCloseable {
         if (jobs == null) {
             JobService created = new JobService(List.of(), bus, scheduler, reports,
                     System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                    pipelineStore, System.getProperty("data.dir", root.dataDir()), null);
+                    pipelineStore, System.getProperty("data.dir", root.dataDir()), null,
+                    platformServices);   // S1-2: ctor-injected so requires: validates at registration
             created.deletionGuard(this::checkDeletion);
             created.spaceId(spaceId);
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
-            created.platform(platformServices);                    // S1-1: the space's Platform Service registry
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
             this.alertService().ifPresent(created::alerts);         // alert.evaluate runs the rules on a cron

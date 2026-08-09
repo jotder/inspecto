@@ -11,6 +11,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, JobDetail, JobsService, JobType, JobUpsert } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
@@ -65,6 +66,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        ChipComponent,
         InspectoSchemaFormComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -105,6 +107,8 @@ export class JobFormDialog implements AfterViewInit {
 
     /** The selected Job Type's declared parameters (R3), rendered as a typed form (P3c). */
     readonly paramSpecs = signal<AttributeSpec[]>([]);
+    /** The type's declared Platform Service grants (`requires:`, S1-2) — its reach, shown before arming. */
+    readonly typeRequires = signal<string[]>([]);
     /** Existing values for the declared parameters (edit) — patched over the schema-form defaults. */
     readonly paramInitial = signal<Record<string, unknown> | undefined>(undefined);
 
@@ -161,12 +165,14 @@ export class JobFormDialog implements AfterViewInit {
         if (!typeId) {
             this.paramSpecs.set([]);
             this.paramInitial.set(undefined);
+            this.typeRequires.set([]);
             return;
         }
         this.api.describeType(typeId).subscribe({
             next: (d) => {
                 const specs = paramDeclsToSpecs(d.parameters);
                 this.paramSpecs.set(specs);
+                this.typeRequires.set(d.requires ?? []);
                 const init: Record<string, unknown> = {};
                 for (const s of specs) {
                     const v = this.data.job?.params?.[s.key];
@@ -183,6 +189,7 @@ export class JobFormDialog implements AfterViewInit {
                 // Unknown type / no descriptor (e.g. a legacy type or 404) → free key/value editor only.
                 this.paramSpecs.set([]);
                 this.paramInitial.set(undefined);
+                this.typeRequires.set([]);
             },
         });
     }

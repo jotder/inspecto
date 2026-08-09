@@ -113,15 +113,19 @@ public final class JobService implements AutoCloseable {
     private final LockingRunner runner = new LockingRunner();
     private final AtomicLong seq = new AtomicLong();
     /** Open Job Type registry (job-framework P0) — replaced the compiled-in {@link JobType} switch; the four
-     *  built-ins register here in {@link #registerBuiltins()} and {@link #build} delegates to it. */
-    private final JobTypeRegistry registry = new JobTypeRegistry();
+     *  built-ins register here in {@link #registerBuiltins()} and {@link #build} delegates to it.
+     *  Constructed against {@link #platform} so every registration's {@code requires:} validates
+     *  fail-closed (S1-2). */
+    private final JobTypeRegistry registry;
     /** The Expression vocabulary authored {@code $}-values and {@code deduce:}/{@code bind:} resolve
      *  against (job-parameter-contract §4.2). Built-ins only until the open load paths land. */
     private final ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
-    /** The host's boot-built Platform Service registry (platform-services plan S1-1), wired
-     *  post-construction like {@link #objects}; {@code null} (bare test constructors) leaves every
-     *  Run on the empty grant. Grants resolve per Job Type once {@code requires:} lands (S1-2). */
-    private volatile PlatformServiceRegistry platform;
+    /** The host's boot-built Platform Service registry (platform-services plan S1-1/S1-2),
+     *  constructor-injected so it exists before {@link #registerBuiltins()} and the startup pack scan —
+     *  a {@code requires:} must be validatable at registration time. {@code null} (bare test
+     *  constructors) = no service available: types without grants run on the empty grant, a type
+     *  declaring {@code requires:} is refused at registration. */
+    private final PlatformServiceRegistry platform;
 
     /** Hot-deployable Job Packs (P2c, §12) — off unless {@code -Djobs.packs.dir} is set. */
     private final JobPackManager packs;
@@ -208,6 +212,20 @@ public final class JobService implements AutoCloseable {
                       ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
                       PipelineStore pipelineStore, String dataDir,
                       com.gamma.pipeline.exec.DbProvenanceStore provenanceStore) {
+        this(configs, bus, scheduler, reports, auditDir, jobRunStore, pipelineStore, dataDir,
+                provenanceStore, null);
+    }
+
+    /** As the full constructor, plus the host's Platform Service registry (plan S1-2) — injected
+     *  rather than wired post-construction because {@link #registerBuiltins()} and the startup pack
+     *  scan below must be able to validate a {@code requires:} declaration fail-closed. */
+    public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
+                      ReportRunner reports, String auditDir, DbJobRunStore jobRunStore,
+                      PipelineStore pipelineStore, String dataDir,
+                      com.gamma.pipeline.exec.DbProvenanceStore provenanceStore,
+                      PlatformServiceRegistry platform) {
+        this.platform  = platform;
+        this.registry  = new JobTypeRegistry(platform);
         this.configs   = new CopyOnWriteArrayList<>(configs);
         this.bus       = bus;
         this.scheduler = scheduler;
@@ -482,14 +500,6 @@ public final class JobService implements AutoCloseable {
      *  nothing would report health that was never checked). */
     public void alerts(com.gamma.alert.AlertService alerts) {
         this.alerts = alerts;
-    }
-
-    /** Bind this service to the host's boot-built Platform Service registry (platform-services plan
-     *  S1-1). Same post-construction shape as {@link #objects}; until {@code requires:} declaration
-     *  lands (S1-2), every Run receives the empty grant — a service being registered does not make it
-     *  reachable, which is the plan's R4 honesty property. */
-    public void platform(PlatformServiceRegistry platform) {
-        this.platform = platform;
     }
 
     /**
@@ -877,9 +887,11 @@ public final class JobService implements AutoCloseable {
             }
             ctx.params(pr.resolved());
             ctx.dryRun(firing.dryRun());
-            // S1-1: the empty grant, through the real registry when wired — S1-2 supplies the
-            // Job Type's declared requires: set here.
-            if (platform != null) ctx.services(platform.grant(Set.of()));
+            // S1-2: grant exactly the type's declared requires: — registration already validated the
+            // ids, so this cannot throw for a registered type. Grants are honest (R4): a service that
+            // exists but was not declared stays invisible to the Run.
+            if (platform != null) ctx.services(platform.grant(Set.copyOf(
+                    registry.descriptor(job.type()).map(JobTypeDescriptor::requires).orElse(List.of()))));
             ctx.log().info("run started", "trigger", trigger, "params", pr.resolved(),
                     "dryRun", firing.dryRun());   // resolved Parameter Context (R2/R5)
             ctx.signals().emit("job.run.started", Severity.INFO,

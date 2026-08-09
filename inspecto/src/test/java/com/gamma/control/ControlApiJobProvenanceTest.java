@@ -61,6 +61,19 @@ class ControlApiJobProvenanceTest {
     }
 
     @Test
+    void typeViewCarriesItsDeclaredServiceGrants(@TempDir Path dir) throws Exception {
+        // platform-services plan S1-2: the operator sees a type's reach before arming anything.
+        try (Ctx c = open(dir)) {
+            JsonNode one = json(get(c.port, "/jobs/types/sql.template"));
+            assertTrue(one.get("requires").isArray(), "requires: is part of the served contract");
+            assertTrue(one.get("requires").isEmpty(), "no built-in declares a Platform Service grant yet");
+
+            for (JsonNode t : json(get(c.port, "/jobs/types")))
+                assertTrue(t.has("requires"), t.get("id").asText() + " serves its grants row");
+        }
+    }
+
+    @Test
     void unknownTypeStill404s(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             assertEquals(404, get(c.port, "/jobs/types/no.such.type").statusCode());

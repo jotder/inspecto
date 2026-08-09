@@ -44,6 +44,7 @@ const JOB_TYPE_DESCRIPTORS = [
         description: 'Runs a Stage-2 enrichment once (full recompute) and publishes a chain commit.',
         parameters: [{ name: 'config', type: 'STRING', required: true, deduce: '', default: '', description: 'Path to the enrichment .toon' }],
         emits: ['pipeline.commit'], artifacts: [],
+        requires: [],
     },
     {
         id: 'report', title: 'Report',
@@ -55,6 +56,7 @@ const JOB_TYPE_DESCRIPTORS = [
             { name: 'dataset', type: 'DATASET_REF', required: false, deduce: '', default: '', description: 'Dataset id (scope=dataset)' },
         ],
         emits: [], artifacts: [{ name: 'report', kind: 'report' }],
+        requires: [],
     },
     {
         id: 'maintenance', title: 'Maintenance',
@@ -66,6 +68,7 @@ const JOB_TYPE_DESCRIPTORS = [
             { name: 'store', type: 'STRING', required: false, deduce: '', default: '', description: 'Store(s) a delete task targets (fenced)' },
         ],
         emits: [], artifacts: [],
+        requires: [],
     },
     {
         id: 'pipeline', title: 'Pipeline',
@@ -75,6 +78,7 @@ const JOB_TYPE_DESCRIPTORS = [
             { name: 'incremental_column', type: 'STRING', required: false, deduce: '', default: '', description: 'Watermark column for incremental runs' },
         ],
         emits: ['pipeline.commit'], artifacts: [],
+        requires: [],
     },
     {
         id: 'sql.template', title: 'Templated SQL',
@@ -85,6 +89,7 @@ const JOB_TYPE_DESCRIPTORS = [
             { name: 'sources', type: 'STRING', required: false, deduce: '', default: '', description: 'CSV of source store names to register as views' },
         ],
         emits: ['job.dataset.produced'], artifacts: [{ name: 'output', kind: 'dataset' }],
+        requires: [],
     },
 ];
 

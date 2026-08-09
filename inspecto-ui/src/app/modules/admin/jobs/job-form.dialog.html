@@ -31,6 +31,16 @@
             <inspecto-schema-form #pf [specs]="paramSpecs()" [initial]="paramInitial()" (submitted)="save()"></inspecto-schema-form>
         }
 
+        <!-- Platform Service grants (S1-2): the type's declared reach — what it may touch beyond its Run. -->
+        @if (typeRequires().length) {
+            <div class="mt-4 text-secondary text-xs font-semibold uppercase tracking-wider">Uses services</div>
+            <div class="mt-1 flex flex-wrap gap-1" role="list" aria-label="Platform Services this type uses">
+                @for (s of typeRequires(); track s) {
+                    <inspecto-chip variant="soft" tone="neutral" role="listitem">{{ s }}</inspecto-chip>
+                }
+            </div>
+        }
+
         <!-- Additional params (bespoke key/value array) — anything not declared by the type. -->
         <div class="mt-4 text-secondary text-xs font-semibold uppercase tracking-wider">Additional parameters</div>
         <form [formGroup]="paramsForm">

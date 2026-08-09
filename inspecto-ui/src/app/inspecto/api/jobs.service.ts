@@ -44,6 +44,8 @@ export interface JobTypeDescriptor {
   parameters: JobParameterDecl[];
   emits: string[];
   artifacts: { name: string; kind: string }[];
+  /** Platform Service ids this type is granted (`requires:`, platform-services S1-2); [] for most types. */
+  requires: string[];
 }
 
 /** One log line for a job run (GET /jobs/{name}/runs/{runId}/logs). */

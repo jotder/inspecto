@@ -9,7 +9,7 @@ import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobFormData, JobFormDialog } from './job-form.dialog';
 
-const noParams = () => of({ id: 'x', title: '', description: '', parameters: [], emits: [], artifacts: [] });
+const noParams = () => of({ id: 'x', title: '', description: '', parameters: [], emits: [], artifacts: [], requires: [] });
 
 function create(data: JobFormData, save = vi.fn(() => of({ name: 'x' })), describeType = vi.fn(noParams)) {
     const ref = { close: vi.fn() };
@@ -88,7 +88,7 @@ describe('JobFormDialog', () => {
             of({
                 id: 'sql.template', title: 'Templated SQL', description: '',
                 parameters: [{ name: 'sink_dataset', type: 'STRING', required: true, deduce: '', default: '', description: 'Output Dataset' }],
-                emits: [], artifacts: [],
+                emits: [], artifacts: [], requires: [],
             }),
         );
         const { c, fixture, save } = create({}, undefined, describeType);
@@ -102,6 +102,26 @@ describe('JobFormDialog', () => {
         c.saveForm.patchValue({ name: 'rollup' });
         c.save();
         expect(save).toHaveBeenCalledWith(expect.objectContaining({ params: expect.objectContaining({ sink_dataset: 'txn_rollup' }) }));
+    });
+
+    it("shows the type's declared Platform Service grants as chips (requires:, S1-2)", async () => {
+        const describeType = vi.fn(() =>
+            of({
+                id: 'acme.notify', title: 'Acme Notify', description: '',
+                parameters: [], emits: [], artifacts: [], requires: ['notifications', 'schema'],
+            }),
+        );
+        const { c, fixture } = create({}, undefined, describeType);
+        await Promise.resolve(); // flush the queued loadParams microtask
+        fixture.detectChanges();
+
+        expect(c.typeRequires()).toEqual(['notifications', 'schema']);
+        const chips = Array.from(fixture.nativeElement.querySelectorAll('inspecto-chip')).map((el) =>
+            (el as HTMLElement).textContent?.trim(),
+        );
+        expect(chips).toContain('notifications');
+        expect(chips).toContain('schema');
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('renders with no a11y violations', async () => {
