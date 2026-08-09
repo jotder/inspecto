@@ -105,7 +105,7 @@ rename. The base name decides Consignment granularity, and it is **inconsistent*
 
 - CSV ingest, single-file batch → source filename stem; a re-ingest **overwrites** the prior file.
 - CSV ingest, multi-file batch → `batchId`; genuinely one file-set per Consignment.
-- Flow/graph sink → `<jobName>` + `_<batchId>` **only when incremental**; a full recompute keeps a
+- Pipeline/graph sink → `<jobName>` + `_<batchId>` **only when incremental**; a full recompute keeps a
   stable name and overwrites (`PipelineJobRunner.java:164-166`).
 
 **Consequence for this plan:** the filesystem cannot be the source of truth for "which Consignment
@@ -432,7 +432,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 3 | **Capture event-time bounds + `producer` at write.** `min()/max()/spread` in the existing `PartitionWriter` COPY connection → `ConsignmentOutputs.build` → four new `consignment_outputs` columns (§3.1). | ingest a file with known bounds; assert the catalog row carries bounds and producer |
 | 4 | **Per-stream watermark** (§3.6), derived from the catalog; decision D4 recorded. | seeded catalog, two producers: a window reports complete only when *both* have passed `hi + allowed_lateness` |
 | 5 | **Catalog on by default** (decision D1) + migration for existing installs. | fresh space records rows with no `-D` flag |
-| 6 | **End stable-name overwrites** (R1 promoted): a flow-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
+| 6 | **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
 | 7 | **The Consignment Selector.** Config shape + resolver emitting an explicit `read_parquet([...])` list, generation-pinned. | test: selector over a seeded catalog names exactly the overlapping files |
 | 8 | **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
 | 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |

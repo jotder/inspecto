@@ -1,10 +1,10 @@
 ---
 type: Concept
 title: Job vs Pipeline Step — capability boundary
-description: The full capability comparison between a Job (at-rest Executable, Java, open registry) and a Pipeline Step (in-motion graph node, compiled to SQL, closed vocabulary), with the binding boundary rule and the traps that blur it.
+description: The full capability comparison between a Job (at-rest Executable, Java, open registry) and a Pipeline Step (in-motion graph node, compiled to SQL; Step-kind registry opening per D0-B), with the binding boundary rule and the traps that blur it.
 resource: inspecto-engine/src/main/java/com/gamma/job/JobContext.java
 tags: [control-plane, jobs, pipeline-graph, steps, executables, boundary, plugins]
-timestamp: 2026-08-07T00:00:00Z
+timestamp: 2026-08-09T00:00:00Z
 ---
 
 # Job vs Pipeline Step — capability boundary
@@ -17,11 +17,14 @@ that rule, verified against source 2026-08-07.
 
 ## 0. The one-line difference
 
-**A Step is not a program.** A Job is imperative Java — you implement `Job.run(ctx)` and ship a class.
-A Step is declarative config lowered into DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by
-`BatchGraphRunner`. There is no `run()` a Step author implements and no service façade a Step ever sees.
-They are not "two similar things with different invokers" — their extension models are opposites: you
-**author** a Step, you **write** a Job.
+**A Step is not an *Executable*** — the Pipeline is; a Step is a node inside it. A Job is imperative
+Java — you implement `Job.run(ctx)` and ship a class. A Step is *today* declarative config lowered into
+DuckDB SQL by `RowShaper`/`TransformCompiler` and executed by `BatchGraphRunner`: no `run()` a Step author
+implements, no service façade a Step sees. As built, the extension models are opposites — you **author** a
+Step, you **write** a Job. The platform-services plan's stage 2
+([`platform-services-plan.md`](../../../superpower/platform-services-plan.md) §5.2) narrows that second
+half: a Step *may* become a program via the Step SPI (`EXECUTED` mode) — without changing what a Step
+**is**: a node producing batch counters inside someone else's Run, never an Executable.
 
 ## 1. What each one is
 
@@ -111,21 +114,28 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
   `ServiceLoader` and can receive none of it. A hot-deployed pack can log, emit a Signal and record
   artifact metadata — nothing else. Both sample Job Types added 2026-08-07 (`sample.hello`,
   `alert.evaluate`) required engine edits and **could not have shipped as packs**.
+  → *Fulfilled by* platform-services **S1-1…S1-7** (the `PlatformServices` seam, `requires:` grants,
+  `notifications`/`incidents`/`schema`/`consignment-status`, sample-Job migration + a real pack-jar test).
 - **There is no Dataset API to hand anyone.** `SqlTemplateJob`/`ObjectsAnalyticsJob` resolve
   `Path.of(dataDir).resolve(name)` and open raw DuckDB. Dataset access is a filesystem convention, not an
   interface — it must exist before it can be granted to plugins.
+  → *Deferred by design*: `DatasetAccess` follows the Consignment Selector
+  ([`consignment-addressing-plan.md`](../../../superpower/consignment-addressing-plan.md) §6), then joins
+  the seam as its flagship service.
 - **No Job authors Notifications.** `NotificationStore.add(...)` exists; the only Job touching it is
-  `maintenance` *pruning*.
+  `maintenance` *pruning*. → *Fulfilled by* **S1-3** (`NotificationAccess`).
 - **No per-node metrics** — pipeline-level only.
-- **No timeout or cancellation on either side.**
+- **No timeout or cancellation on either side.** → *Partially owned*: the **S2-3** watchdog covers
+  `EXECUTED` Steps (plan R1); the Job-side watchdog stays a recorded gap beyond that plan.
 - **`NodeAttribute` lacks `secret`, `pattern`, `group`, `multi` and expression support** that
-  `ParameterDecl` gained in the job-parameter-contract work.
+  `ParameterDecl` gained in the job-parameter-contract work. → *Fulfilled by* stage 2's widened
+  `StepTypeProvider` descriptor (**S2-1**).
 
 > ⚠ **The §6 gaps have an owner plan (2026-08-09):**
 > [`superpower/platform-services-plan.md`](../../../superpower/platform-services-plan.md) — the
 > Platform Services seam (grants via `requires:`), the open Step-kind registry (`LOWERED`/`EXECUTED`),
-> contributed services, and the pack scaffolder. Its S1-0 updates this page's §0/§6 wording when
-> stage 1 lands.
+> contributed services, and the pack scaffolder. The per-gap *Fulfilled by* pointers above and this
+> page's §0 wording were updated by its **S1-0** (2026-08-09).
 
 Related: [Jobs & Scheduling](jobs.md) · [Pipeline graph design](../pipeline-graph/pipeline-graph-design.md)
 · [Signal backbone](signal-backbone.md) ·

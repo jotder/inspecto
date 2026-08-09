@@ -269,7 +269,13 @@ SPI, declared grain `RECORD | FILE | BATCH`). ⛔ *Node* (user-facing) → **Ste
 (`acquisition` / `adapter`), `parser`, the TRANSFORM family (`transform.*` + `enrichment`), the three
 `sink.*` kinds, and the CONTROL trio (`gap` / `alert` / `event`) — remains the **compile-target set** the
 verbs lower onto; it leaves the user surface at the amendment's Phase 5 but is still the served palette
-until then. ⚠ Closed on purpose — contrast **Job types**, which are an *open* registry (`JobTypeProvider`).
+until then. ⚠ **The closure is superseded (D0-B, 2026-08-09, `superpower/platform-services-plan.md`
+§5.2):** the enumeration was closed on purpose, but its real guarantee is compiler **totality** — *a
+pipeline that parses is a pipeline that runs* — and that guarantee survives an open **Step-kind registry**:
+every registered Step kind must carry an execution mode (**`LOWERED`** — contributes SQL lowering — or
+**`EXECUTED`** — imperative Java, stage 2), and a node whose type has neither is refused fail-closed at
+arming. Until that plan's S2-1 lands, `BuiltinNodeType` remains the de-facto compile-target set; Steps then
+follow the same open-registry posture **Job types** already have (`JobTypeProvider`).
 
 > ⚠ **An embedded Job and a sub-Pipeline are NOT Steps** *(corrected 2026-08-02 — this entry asserted they
 > were; no `job` or sub-pipeline id has ever existed in `BuiltinNodeType`).* This is not an oversight:
@@ -279,6 +285,11 @@ until then. ⚠ Closed on purpose — contrast **Job types**, which are an *open
 > fires on the Pipeline's `on_commit`, or binds by store name to a `sink.view` (the designated hand-off —
 > `BuiltinNodeType` SINK_VIEW). The reverse — a `pipeline`-type Job re-running an authored Pipeline over data
 > at rest — makes the Job the *outer* Executable, which is composition, not embedding.
+
+**Step kind** *(added 2026-08-09, D0-B)* — The registered **type** of a Step — the Type/Instance rule:
+*Step kind* is the template, *Step* is the node instance in a Pipeline. Today the kinds are the
+`BuiltinNodeType` set; the platform-services plan's stage 2 opens them to registration
+(`StepTypeProvider`, execution modes `LOWERED` / `EXECUTED`).
 
 **Parser** — Reads a raw file of a given format (CSV, fixed-width, XML, JSON, EDI, ASN.1, …) into rows/columns
 — or, for tree-shaped formats, into records that must be flattened before they load into Tables. Two engines
@@ -363,6 +374,14 @@ fire time** against the Run's context: `$today` · `$run.actor` · `$signal.<pat
 canonical; **Expression** is. Canonical style is **lowercase-dotted** (`$event_day`, never `$EventDay`).
 *(Not to be confused with the `$name` tokens inside a `sql.template` Job's SQL body — those are that Job's own
 declared **Parameters**. How the two `$` namespaces coexist is settled at step 4 of the plan.)*
+
+**Platform Service** *(added 2026-08-09, D0, `superpower/platform-services-plan.md`)* — An engine facility
+exposed to Jobs, packs and (stage 2) executable Steps through the `PlatformServices` typed lookup, granted
+by a declared `requires:` list that **fails closed at registration** (unknown or build-absent service id
+refuses the type/pack). v1 menu: `notifications` · `incidents` · `schema` · `consignment-status`. Every
+mutating service defines its dry-run behaviour (record, don't act — MNT-1 extended). ⛔ not *capability* —
+that word is RBAC's (`CapabilityManifest` route gates → `Roles.KNOWN_CAPABILITIES`); ⛔ not *Controller
+Service* — NiFi's term implies user-instantiated enable/disable resources, deliberately that plan's stage 3.
 
 ---
 
