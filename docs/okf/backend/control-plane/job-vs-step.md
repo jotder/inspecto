@@ -114,8 +114,13 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
   `ServiceLoader` and can receive none of it. A hot-deployed pack can log, emit a Signal and record
   artifact metadata — nothing else. Both sample Job Types added 2026-08-07 (`sample.hello`,
   `alert.evaluate`) required engine edits and **could not have shipped as packs**.
-  → *Fulfilled by* platform-services **S1-1…S1-7** (the `PlatformServices` seam, `requires:` grants,
-  `notifications`/`incidents`/`schema`/`consignment-status`, sample-Job migration + a real pack-jar test).
+  → ✔ **CLOSED by platform-services S1-1…S1-7 (2026-08-09)**: `JobContext.services()` grants the declared
+  `requires:` set from the boot `PlatformServiceRegistry` — v1 ids `notifications`, `incidents`, `schema`,
+  `consignment-status`. `sample.hello` was migrated onto its grant and **its constructor injection removed**,
+  so it is now pack-shippable, and a pack jar compiled inside `JobPackManagerTest` declares *and* consumes a
+  grant, loads, and completes a Run — the evidence above is inverted. Two as-built limits: `alert.evaluate`
+  is **not** migrated (it needs the *evaluator*, which is deliberately outside the v1 menu — plan D7), and
+  `dataDir`-style Dataset reach is still injection-only (next bullet).
 - **There is no Dataset API to hand anyone.** `SqlTemplateJob`/`ObjectsAnalyticsJob` resolve
   `Path.of(dataDir).resolve(name)` and open raw DuckDB. Dataset access is a filesystem convention, not an
   interface — it must exist before it can be granted to plugins.
@@ -123,7 +128,8 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
   ([`consignment-addressing-plan.md`](../../../superpower/consignment-addressing-plan.md) §6), then joins
   the seam as its flagship service.
 - **No Job authors Notifications.** `NotificationStore.add(...)` exists; the only Job touching it is
-  `maintenance` *pruning*. → *Fulfilled by* **S1-3** (`NotificationAccess`).
+  `maintenance` *pruning*. → ✔ **CLOSED by S1-3** (`NotificationAccess`, dedupe-collapse honoured;
+  `sample.hello` is the reference consumer). The prune task is untouched.
 - **No per-node metrics** — pipeline-level only.
 - **No timeout or cancellation on either side.** → *Partially owned*: the **S2-3** watchdog covers
   `EXECUTED` Steps (plan R1); the Job-side watchdog stays a recorded gap beyond that plan.
@@ -134,8 +140,11 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 > ⚠ **The §6 gaps have an owner plan (2026-08-09):**
 > [`superpower/platform-services-plan.md`](../../../superpower/platform-services-plan.md) — the
 > Platform Services seam (grants via `requires:`), the open Step-kind registry (`LOWERED`/`EXECUTED`),
-> contributed services, and the pack scaffolder. The per-gap *Fulfilled by* pointers above and this
-> page's §0 wording were updated by its **S1-0** (2026-08-09).
+> contributed services, and the pack scaffolder. **Stage 1 is shipped through S1-7 (2026-08-09); only
+> S1-8 (scaffolder + `PackTestHarness`) remains**, so the ✔ pointers above are as-built, not planned.
+> Stage 2 (Step kinds) stays gated on the branch-aware executor's armed path — every §6 gap still
+> marked *Fulfilled by* an `S2-*` step is therefore still open. The seam's durable operating rules live
+> in [`PROJECT_NOTES.md`](../../../PROJECT_NOTES.md) §5; this page's §0 wording came from **S1-0**.
 
 Related: [Jobs & Scheduling](jobs.md) · [Pipeline graph design](../pipeline-graph/pipeline-graph-design.md)
 · [Signal backbone](signal-backbone.md) ·

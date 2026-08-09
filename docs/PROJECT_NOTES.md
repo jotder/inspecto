@@ -271,6 +271,29 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   multi-file partitioned `COPY` reports none): ingest sums `LineageCollector`'s per-`(srcId, partition)` counts,
   while enrichment and sinks use `ConsignmentOutputs.countByPartition` (needs no `__src_id`).
   → [`db-layer.md`](okf/backend/engine/db-layer.md) §3.9.
+- **Platform Services — the one way a Job reaches an engine facility** (2026-08-09, plan Stage 1 S1-1…S1-7).
+  `PlatformServiceRegistry` is built at boot in `CollectorService` and **must be populated before
+  `JobService` is constructed** (its constructor registers built-ins and scans packs, and registration
+  validates `requires:` fail-closed). A Job Type declares `requires: [<id>]` on its `JobTypeDescriptor`;
+  `JobService.runJob` grants exactly that set into `JobContext.services()`, so an **undeclared service stays
+  invisible even when it exists** (that honesty is what makes the declaration a security statement, not a
+  label). v1 ids: `notifications`, `incidents`, `schema`, `consignment-status`. Mutating services are
+  substituted by `DryRunServices` under a dry run (log the would-be effect, act on nothing) — **every new
+  mutating service must be added there**, or `dryRun()` becomes a lie the moment a Job calls it. Two rules
+  worth keeping: a **built-in** may declare a grant even when no registry is wired (lean/embedded
+  `JobService`, e.g. an engine unit test — the service ships in the same build), while packs and classpath
+  providers are always strict; and a grant is only worth declaring if the code **looks it up** — the reach
+  `AlertService` has via its own `IncidentAccess` is not `alert.evaluate`'s grant to claim (plan D7).
+- **A boot lambda must not capture a `final` field that is assigned later in the same constructor** — it is a
+  `variable might not have been initialized` compile error, not a runtime NPE, and it will greet anyone
+  registering a service beside the `notifications`/`incidents` block in `CollectorService`. Bind through the
+  existing accessor instead (`n -> notificationService().notify(n)`, `IncidentAccess.over(this::objects)`),
+  which also gets the live per-space value rather than a boot-time snapshot.
+- **An `INCIDENT` does not start `OPEN` and `resolve` is fenced.** Its workflow is
+  `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED` with **only `ARCHIVED` terminal**, and `resolve` throws
+  `IllegalState … missing: timeline, cause analysis, corrective actions, SLA` until the postmortem is
+  complete (`ObjectService.java:1292`). A test that wants a *terminal* Incident should `archive` (legal
+  straight from `IDENTIFIED`), not `resolve`. `ALERT` is the one that starts `OPEN` with `RESOLVED` terminal.
 - **`com.gamma.util` CLI cluster** (~11 `main()` tools: `MainApp`, `TarExtractor`, …) sits at low coverage and is
   **kept by decision** (self-contained; `MainApp` is wired into `package.ps1`/ops). Tested engine+control-plane
   is ~86%. Long-term: extract the CLI cluster to its own module. → [`performance.md`](okf/backend/build-run/performance.md).
