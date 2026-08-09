@@ -194,6 +194,13 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   high-severity breach enters the triage workflow, not only the alert feed. Lower severities stay
   alerts. Reuses the `ExpectationRoutes` signal→Incident dedup+open pattern (`active(INCIDENT, corr)`
   then `open(INCIDENT, …)`) — see also `jobs.md` (recon breaches) and `decision-rules.md` (`create-alert`).
+  Since 2026-08-10 the promoted Incident also carries an **`ESCALATED_FROM` link to the ALERT object**
+  that raised it (actor `alert-rule:<name>`, mirroring the Case Rules auto-linker), so the correlation is
+  traversable in the `OBJECT_LINK` graph rather than only implied by the shared `rule`/`causedByEvent`
+  attributes — matching what operator-created Incidents (`POST /objects`, ≥1 link mandatory) always had.
+  ⚠ A *suppressed* promotion adds no edge: if the earlier ALERT was resolved while its INCIDENT is still
+  open, the re-fire's fresh ALERT stays unlinked, because `IncidentAccess` reports suppressed and dry-run
+  alike as an empty result. Gate coverage: `AlertServiceTest.thePromotedIncidentIsLinkedEscalatedFromItsAlert`.
 
 The matching UI surfaces are the [events](../../frontend/features/events.md) and
 [dashboard](../../frontend/features/dashboard.md) screens in the frontend bundle.

@@ -10,6 +10,8 @@ import com.gamma.ops.InMemoryObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectType;
+import com.gamma.ops.OperationalObject;
+import com.gamma.ops.link.ObjectLink;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.etl.StatusStore;
@@ -217,6 +219,32 @@ class AlertServiceTest {
         assertEquals(1, svc.evaluateAll().size(), "the critical rule breaches");
         assertEquals(1, count(objects, ObjectType.ALERT), "the ALERT object is still recorded");
         assertEquals(1, count(objects, ObjectType.INCIDENT), "a critical breach also opens an Incident");
+    }
+
+    @Test
+    void thePromotedIncidentIsLinkedEscalatedFromItsAlert(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        List<Map<String, String>> ledger = List.of(
+                row("FAILED", 10, 0, 0, 100, LocalDateTime.now().minusMinutes(5)));
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        AlertRule critical = new AlertRule("r-crit", "failed_batches", "gte", 1, "1h", "critical", "MINI_ETL");
+        new AlertService(List.of(critical), configs(cfg), store(ledger), objects).evaluateAll();
+
+        OperationalObject alert = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).build()).get(0);
+        OperationalObject incident =
+                objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()).get(0);
+
+        // The correlation is a real edge in the object graph, not merely matching attributes: an operator
+        // opening the Incident can pivot to the Alert that raised it (and back).
+        List<ObjectLink> edges = objects.linksOf(incident.id());
+        assertEquals(1, edges.size(), "exactly one correlation edge");
+        ObjectLink edge = edges.get(0);
+        assertEquals(incident.id(), edge.fromId());
+        assertEquals(ObjectType.INCIDENT, edge.fromType());
+        assertEquals(alert.id(), edge.toId(), "Incident ESCALATED_FROM the ALERT that raised it");
+        assertEquals(ObjectType.ALERT, edge.toType());
+        assertEquals("ESCALATED_FROM", edge.relationship());
+        assertEquals(edges, objects.linksOf(alert.id()), "traversable from the Alert end too");
     }
 
     @Test

@@ -9,6 +9,8 @@ import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectType;
+import com.gamma.ops.OperationalObject;
+import com.gamma.ops.link.LinkRelationship;
 import com.gamma.etl.StatusStore;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
@@ -285,9 +287,9 @@ public final class AlertService {
             if (rule.window() != null) attrs.put("window", rule.window());
             attrs.put("value", String.valueOf(value));
             if (eventId != null) attrs.put("causedByEvent", eventId);
-            objects.open(ObjectType.ALERT, rule.name() + " on " + pipeline, alert.message(),
-                    rule.severity(), pipeline, attrs);
-            promoteToIncident(rule, alert, pipeline, attrs);
+            OperationalObject alertObject = objects.open(ObjectType.ALERT,
+                    rule.name() + " on " + pipeline, alert.message(), rule.severity(), pipeline, attrs);
+            promoteToIncident(rule, alert, pipeline, attrs, alertObject.id());
         } catch (RuntimeException e) {
             log.warn("could not persist alert object for rule {}: {}", rule.name(), e.getMessage());
         }
@@ -300,14 +302,27 @@ public final class AlertService {
      * severities stay alerts. Deduped across windows exactly like the ALERT object above (one active
      * INCIDENT per rule+pipeline), carrying the same breach attributes. Best-effort within the enclosing
      * try — a promotion failure never disturbs evaluation.
+     *
+     * <p>The opened Incident is correlated to the ALERT that raised it with an
+     * {@link LinkRelationship#ESCALATED_FROM} edge ({@code Incident ESCALATED_FROM Alert}), so the
+     * correlation is traversable in the object graph rather than only implied by matching attributes —
+     * matching what the operator-facing {@code POST /objects} create path has always required. ⚠ No edge
+     * is added when the promotion is <em>suppressed</em> as a duplicate: a re-fire whose earlier ALERT was
+     * resolved but whose INCIDENT is still being handled opens a fresh ALERT that stays unlinked. Wiring
+     * that case needs "link to the active Incident instead", which the {@code IncidentAccess} contract
+     * cannot express today (it reports suppressed and dry-run alike as an empty result).
      */
-    private void promoteToIncident(AlertRule rule, Alert alert, String pipeline, Map<String, String> attrs) {
+    private void promoteToIncident(AlertRule rule, Alert alert, String pipeline, Map<String, String> attrs,
+                                   String alertObjectId) {
         if (!isHighSeverity(rule.severity())) return;
         // S1-4: promote through the incidents Platform Service — the same interface a granted Run
         // uses. The service enforces the active-object convention (one active INCIDENT per
         // rule+pipeline) via the "rule" dedupe attribute already present in attrs.
         incidents.openIncident(rule.name() + " on " + pipeline, alert.message(),
-                rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule");
+                        rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule")
+                // Machine actor, mirroring the Case Rules auto-linker's `case-rule:<name>` convention.
+                .ifPresent(incident -> objects.link(incident.id(), alertObjectId,
+                        LinkRelationship.ESCALATED_FROM, "alert-rule:" + rule.name()));
     }
 
     /** Whether a rule severity warrants an Incident (critical / error) rather than staying an alert. */
