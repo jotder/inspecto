@@ -1,9 +1,9 @@
 # Platform Services & the Plugin Envelope — plan
 
-**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0…S1-5
-shipped (`1b138e52`, `3318c7f7`, `48cadc35`, `92f6bfcd`, + the S1-5 commit): the seam, `requires:`
-grants, `notifications` + `incidents` (engine as first consumer), and the read-only `schema`
-service over the component registry. v1.1 adds D6 (operator): services are open by default — a plugin
+**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0…S1-6
+shipped (`1b138e52`, `3318c7f7`, `48cadc35`, `92f6bfcd`, `6cd58d1c`, + the S1-6 commit): the seam,
+`requires:` grants, `notifications` + `incidents` (engine as first consumer), and the read-only
+`schema` + `consignment-status` services — the whole v1 service menu is live. v1.1 adds D6 (operator): services are open by default — a plugin
 is only restricted from a service when absolutely necessary, with the necessity recorded. Grounded
 against source 2026-08-09; every "already exists" claim carries a `file:line` ref. Items that need
 re-verification at coding time are marked ⏲ (they cite grounded sibling docs, not fresh reads).**
@@ -170,7 +170,7 @@ stamped `@PublicApi`.
 | `notifications` | `NotificationAccess.notify(severity, title, body, dedupeKey)` — honours the collapse contract via `hasActiveDuplicate` | `NotificationStore.add(...)` (`NotificationStore.java:26-40`) | log-only, reports suppressed-by-dedupe |
 | `incidents` | `IncidentAccess.open(kind, dedupeKey, attributes)` (+ `comment(id, text)`) | `ObjectService` (`com.gamma.ops`) — the ALERT/INCIDENT `OperationalObject` creation path; respects the active-object convention (no second open ALERT per scope — `AlertService.java:254-277` precedent ⏲) | reports the would-be Incident, creates nothing |
 | `schema` | `SchemaAccess.list()` / `get(name)` / `fingerprint(name)` — **read-only** | schema components + `CanonicalHash` fingerprints (addressing plan §2.1 ⏲) | n/a (read-only) |
-| `consignment-status` | `ConsignmentStatusAccess.consignment(id)` → status, files, outputs; `latestFor(pipeline)` — **read-only** | `ManifestStore` + `StatusStore` (`FileStatusStore`/`DbStatusStore`) + `DbConsignmentOutputStore` + `JobRunLedger` ⏲ | n/a (read-only) |
+| `consignment-status` | `ConsignmentStatusAccess.consignment(id)` → status, files, outputs; `latestFor(pipeline)`; `outputs(id)`; `fileStages(sourceId, relPath)` — **read-only** | ✔ S1-6 as built: `ManifestStore` (authoritative — the manifest already carries per-member status, so **no `StatusStore` read is needed**) + `DbConsignmentOutputStore` via `ConsignmentOutputStores` + `FileStages`, both default-off ⇒ empty. **`JobRunLedger` refuted**: package-private Job-run audit, nothing to do with Consignments | n/a (read-only) |
 
 Explicitly **not** in v1:
 

@@ -395,6 +395,9 @@ public final class CollectorService implements AutoCloseable {
                 com.gamma.ops.IncidentAccess.over(this::objects));
         platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,
                 com.gamma.pipeline.SchemaAccess.over(this::schemaRegistry));
+        platformServices.register("consignment-status",
+                com.gamma.consignment.ConsignmentStatusAccess.class,
+                com.gamma.consignment.ConsignmentStatusAccess.over(this::loadedPipelines));
         this.jobs              = jobConfigs.isEmpty()
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
