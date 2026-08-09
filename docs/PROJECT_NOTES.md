@@ -112,6 +112,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- **`git mv` stages the rename from the INDEX, not the working tree.** Edit a doc and *then*
+  `git mv` it, and the edits stay **unstaged** — `git status` shows `RM` (renamed + modified), which
+  is easy to skim past, and the commit ships the file's *pre-edit* content at its new path. This bites
+  the documentation lifecycle directly (root `CLAUDE.md`: rewrite a plan's status header, then archive
+  it), and it did: the platform-services plan landed in `archived-documents/` still claiming work
+  remained. **Either `git add` the new path explicitly after the move, or verify with
+  `git show HEAD:<newpath>`.**
+
 - **TOON schema serialization** — `ConfigCodec.toToon(map)` does **not** emit tabular-array format. A schema
   whose `fields`/`rules` are Java-constructed `List<Map>` round-trips as nested maps, and the TOON parser then
   throws `Array length mismatch: declared N, found 0`. In any test that writes a schema file for TOON loading,
