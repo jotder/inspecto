@@ -74,8 +74,9 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/platform-services-plan.md`](superpower/platform-services-plan.md) — **v1.0 DRAFT
-  2026-08-09, not approved — Platform Services & the plugin envelope.** The named seam
+- [`superpower/platform-services-plan.md`](superpower/platform-services-plan.md) — **v1.1
+  2026-08-09, approved to proceed; S1-0 + S1-1 shipped — Platform Services & the plugin envelope.**
+  D6: services are **open by default** — a plugin is restricted only on recorded necessity. The named seam
   (`PlatformServices`, ⛔ not "capability" — that's RBAC's word) granting engine facilities to
   plugins by declared `requires:`: v1 services `notifications` · `incidents` · `schema` ·
   `consignment-status`; one envelope, three mounts (Job pack / ConsignmentProcessor / stage-2

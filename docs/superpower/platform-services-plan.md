@@ -1,8 +1,10 @@
 # Platform Services & the Plugin Envelope — plan
 
-**Status: v1.0 DRAFT (2026-08-09) — not approved. Grounded against source 2026-08-09; every
-"already exists" claim carries a `file:line` ref. Items that need re-verification at coding time are
-marked ⏲ (they cite grounded sibling docs, not fresh reads).**
+**Status: v1.1 (2026-08-09) — approved to proceed (operator, "proceed as planned"); S1-0 + S1-1
+shipped (`1b138e52`, `3318c7f7`). v1.1 adds D6 (operator): services are open by default — a plugin
+is only restricted from a service when absolutely necessary, with the necessity recorded. Grounded
+against source 2026-08-09; every "already exists" claim carries a `file:line` ref. Items that need
+re-verification at coding time are marked ⏲ (they cite grounded sibling docs, not fresh reads).**
 
 > **Operator scope (2026-08-09):** built-in services that Steps and Jobs can *use* (Notification,
 > Alert, Schema Registry, file/Consignment Status, …), openness to **new Step kinds** that do not
@@ -172,8 +174,10 @@ Explicitly **not** in v1:
   generation-pinning built in, and becomes the seam's flagship service.
 - **Outbound mail/webhook send** — belongs to the `mail.send` reference Job Type
   (job-parameter-contract §9) and notification *dispatch* config, not to a v1 grant.
-- **`AlertService` itself** — its public surface is rule CRUD + evaluation (`AlertService.java:98-148`);
-  plugins get `incidents` + `signals`, never the evaluator.
+- **`AlertService` itself** — not withheld as policy (see **D6**): it is simply not in the v1 menu
+  because its public surface is rule CRUD + evaluation (`AlertService.java:98-148`) — there is no
+  plugin-shaped raise entry, and no consumer has demanded the evaluator. `incidents` + `signals`
+  cover the known cases today; an `alerts` service joins the menu on the first real demand.
 
 ## 5. Steps and services
 
@@ -313,6 +317,14 @@ scanned.
 - **D5 — interface home**: engine packages + `@PublicApi` marker (existing convention). Extracting
   a thin compile-against devkit jar is future work; revisit when the first *external* pack author
   appears.
+- **D6 — services are open by default (operator, 2026-08-09)**: *"let's not restrict any plugin
+  from any service unless absolutely necessary."* Withholding a facility from the grantable menu
+  requires a **recorded necessity** (integrity/security), never a default posture — the `requires:`
+  declaration + operator-visible grants (R4) are the governance, not a curated allow-list. The
+  restrictions that stay, each with its necessity: third-party `LOWERED` SQL (R2 — injection into
+  the fused query) and the stage-2 Step data-path ceiling (§3.3 — a mid-flight node must not write
+  datasets or send outbound mail). Everything else is menu-by-demand: absent from v1 means
+  "no consumer yet", not "forbidden".
 - **R1 — no timeout/cancellation anywhere** (`job-vs-step.md` §2). Hardest for `EXECUTED` Steps
   (stalls a poll cycle); the S2-3 watchdog is mandatory scope, and a Job-side watchdog is a
   recorded gap beyond this plan.
