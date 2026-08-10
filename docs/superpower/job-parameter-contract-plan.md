@@ -104,7 +104,7 @@ prefix, two function families). Any plan must extend this set, not duplicate it:
 | `$job.last_success_time` | literal | success watermark — the incremental-window anchor |
 | `$signal.<dotted.path>` | prefix | a field of the firing Signal's payload |
 | `$day(n)` · `$month(n)` · `$year(n)` | function | fire-time date ± `n` (negative = past) |
-| `$upstream(<job>).artifact(<name>).<attr>` | function | `ref` \| `rows` \| `bytes` \| `watermark` \| `time_range` |
+| `$upstream(<job>).artifact(<name>).<attr>` | function | `ref` \| `rows` \| `bytes` \| `watermark` \| `time_range` ⚠ **`time_range` is dead — always `null`, and unconsumable even if filled; see §5-B** |
 
 **The requested tokens mostly already exist under different names:** `$SysDate` ≈ `$today`,
 `$User` ≈ `$run.actor`, `$EventDayMinus1` ≈ `$day(-1)`. The one genuinely new concept is **Event Day**
@@ -261,6 +261,56 @@ machinery is already designed elsewhere:
   Minimal form: signal id + optional `when:`. A `bind:` editor is unnecessary once step 3 ships —
   authored params evaluate `$signal.*` directly (`bind:` stays supported in TOON).
 - Out of scope: publishing `dataset.write` itself (amendment S3a, its own thread).
+
+## 5-B. `time_range` — the attr is dead; replace it with two typed scalars (settled 2026-08-10)
+
+Inherited from the consignment-addressing thread, whose **step 8 is hereby closed as specified**. That plan
+(archived, §7-B) framed the open question as *where should the range be stored* — a `RunArtifact` field, or a
+Consignment-scoped accessor. **Both options are wrong, because the value has no consumer either way.**
+
+**Grounded 2026-08-10, against source:**
+
+| Claim | Evidence |
+|---|---|
+| The attr is **always `null`** in every real run | `RunArtifact.timeRange` is written at exactly two production sites, `RunContext.java:81-82` and `:86-87`, both a literal `null`. `ArtifactRecorder.dataset(...)` (`ArtifactRecorder.java:20`) has **no parameter** through which a caller could supply one |
+| Its format is fixed only by a **test fixture** | `"<min>..<max>"`, e.g. `"2026-07-01..2026-07-07"` — `ParameterResolverTest.java:74,84-85`. Nothing in `main/` defines or documents it |
+| **Nothing splits on `..`** | The only SQL consumer, `SqlParamScanner.substitute` (`:45-56`), wraps the *entire* resolved string in one single-quoted literal. `WHERE event_time >= $time_range` yields `>= '2026-07-01..2026-07-07'` — not a valid DuckDB literal |
+| It is **rejected** by the types that would want it | `ParameterResolver.matchesType` (`:139-152`) requires `LocalDate.parse`/`Instant.parse` to succeed on the whole string, so a `DATE`/`INSTANT` param refuses it. Only `STRING`/`TEXT`/`DATASET_REF` accept it — the types that cannot use it |
+| **Zero live consumers** | Repo-wide, `time_range` appears in 3 code files (2 main, 1 test) and docs. No `spaces/**` config, no UI, no user guide references it. Changing it breaks nothing |
+
+**Decision — the attr splits into two scalars, resolved live:**
+
+1. **`event_time_min` / `event_time_max` replace `time_range`.** Two scalars, each typing cleanly as `INSTANT`
+   and substituting into SQL directly — which is what an incremental window actually needs, and what the
+   opaque `"a..b"` string can never be. Non-breaking (row 5 above). `time_range` is **removed**, not aliased:
+   one concept, one word (§3, `CLAUDE.md`).
+2. **Resolve from the Consignment registry at read time — never from a stored field.** Reuse
+   `producerHighWater`'s predicate verbatim, `WHERE table_name = ? AND coalesce(state,'LIVE') <> 'SUPERSEDED'`
+   (`DbConsignmentOutputStore.java:229`), folding `min(event_time_min)`/`max(event_time_max)`. No such
+   aggregate exists yet — `producerHighWater` (`:226-247`) exposes the **max half only**.
+   ⛔ **A stored snapshot is the rejected design.** Addressing step 6 shipped revisions +
+   `supersedeOtherRevisions`, so a recompute produces a new revision with different bounds and any frozen
+   copy then describes a **superseded** one — the stale-inclusion class that thread spent itself eliminating
+   on the read path, reintroduced on the metadata path. A stored field also costs a signature change to
+   `ArtifactRecorder.dataset(...)` across its 4 call sites, and can never serve ingest (below).
+3. **Key on the sink `store` name**, which requires `PipelineJobRunner` to record a `RunArtifact` per sink
+   with `ref = store`. It records **none at all** today; the identifier is already in scope via
+   `PipelineStores.produced(g)` (`PipelineJobRunner.java:234`) and is the same string `PartitionSinkWriter`
+   uses as the registry `table_name` (`:92`, the sink node's `store` config key).
+   ⚠ **This is the only namespace where `RunArtifact.ref` and `consignment_outputs.table_name` coincide.**
+   Of the 4 existing recorders, 3 write synthetic catalog labels (`"maintenance_backups"`,
+   `"maintenance_storage"`, `"ops_analytics"`) and the 4th writes a job-authored `sink_dataset`; more
+   decisively, **none of the four writes registry rows at all**, so there is nothing to join against. They
+   return `null` honestly. ⛔ Do **not** bridge the gap with a store→dataset reverse lookup — it is ambiguous
+   by construction (`putIfAbsent`, first-scan-wins) and is already a documented rejected design
+   (`okf/backend/engine/consignment-addressing.md:41-44`).
+4. **Ingest stays out.** `BatchProcessor`/`BatchIngestStrategy` live in `com.gamma.inspector` with no
+   `JobContext` in scope — the `runId` it stamps into the registry is `null` structurally, not by oversight.
+   A Consignment-scoped accessor for ingest bounds is **deferred until a consumer demands one**; adding a
+   second surface now would leave two tokens for one concept.
+
+**Why this lands here and not in the addressing thread:** the `$upstream` attr set is this plan's §2 surface
+and the SPI in §4 owns it. The addressing plan is archived; its BACKLOG row and OKF concept point here.
 
 ## 6. Expression evaluation — behaviour
 
@@ -536,11 +586,14 @@ opt-in interpolation is designed.
 | 14 | Free key/value demoted to the explicit descriptor-missing fallback + warning | axe-core + a11y gate green; dirty-guard holds |
 | 15 | `mail.send` as the reference plugin exercising the whole contract | Renders as §9 without UI changes |
 | 16 | `on_signal` trigger authoring in UI + `JobUpsert` widening; refresh the stale `JobService` class javadoc (omits `on_signal` — `JobService.java:49-55`) | A signal-triggered Job authorable end-to-end |
+| 17 | **§5-B** — drop the `time_range` attr and `RunArtifact.timeRange`; add `event_time_min`/`event_time_max` resolving through a new min/max aggregate on `DbConsignmentOutputStore` (reusing the `:229` predicate); `PipelineJobRunner` records a `RunArtifact` per sink with `ref` = the sink's `store` | A pipeline Job's sink bounds resolve as two `INSTANT`-typed params that substitute into SQL; a recompute changes the resolved value (proving it is not a snapshot); a superseded revision is excluded; the 4 non-registry recorders still yield `null` |
 
 Steps 1–9 are backend-only and ship independently of 10–15 (the UI tolerates unknown fields).
 Step 16 depends only on step 3 (for `$signal.*` in params) and is otherwise independent. Ordering
 constraints: step 1 precedes everything (it is the seam); step 2 precedes step 3 (evaluating authored
 values without an escape breaks existing configs); step 4 precedes step 3 *shipping to users*.
+Step 17 is backend-only and independent of 10–16 — its only precondition (step 1's registry) shipped
+2026-08-07; it is a `feat:` on `master` (the consignment registry it reads does not exist on `4.x`).
 
 ## 11. Non-goals
 
