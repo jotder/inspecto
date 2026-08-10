@@ -1,7 +1,16 @@
 # Consignment Addressing — plan
 
-**Status: v1.1 — APPROVED by the operator 2026-08-10. Delivery complete: steps 1–7 and 10 shipped, step 8
-blocked on a scope decision (§7-B), step 9 refuted and not built (§7-C).**
+**Status: CLOSED / ARCHIVED 2026-08-10.** v1.1 was approved by the operator and delivered the same day:
+**steps 1–7 and 10 shipped**, step 8 **blocked on a scope decision** (§7-B), step 9 **refuted and not built**
+(§7-C). This document is kept for provenance and is **no longer maintained**.
+
+> **Read the as-built instead:** [`okf/backend/engine/consignment-addressing.md`](../../okf/backend/engine/consignment-addressing.md)
+> (the architecture as it actually landed) · [`okf/backend/engine/db-layer.md`](../../okf/backend/engine/db-layer.md) §3.9
+> (the catalog's DDL and its readers) · [`BACKLOG.md`](../../BACKLOG.md) §4 *Consignment addressing* (every
+> still-open item, including step 8's scope decision and the refutation of step 9).
+>
+> ⚠ Delivery contradicted this plan in **ten** places. The correction boxes below are the accurate record;
+> the surrounding prose is the original proposal and is wrong in the places they name.
 
 > ⚠ **Read before building anything further.** Step 1's measurement **contradicts this plan's performance
 > premise**: catalog pruning cuts rows scanned 29–88× but wall-clock only 1.3–2.6×, so the Selector is a
