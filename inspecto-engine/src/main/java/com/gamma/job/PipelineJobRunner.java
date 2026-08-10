@@ -7,6 +7,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
+import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
@@ -44,6 +45,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * <b>T32 Phase A — run an authored {@code *_flow.toon} flow for real, as a {@link JobType#PIPELINE} job.</b>
@@ -95,6 +97,7 @@ public final class PipelineJobRunner implements Job {
     private final String dataDir;
     private final String auditDir;
     private final DbProvenanceStore provenance;   // T21 — nullable; default-off unless -Dprovenance.backend set
+    private final Supplier<ComponentRegistry> registry;   // nullable — no registry means no `use:` resolution
 
     /** As {@link #PipelineJobRunner(JobConfig, BatchEventBus, PipelineStore, String, String, DbProvenanceStore)} with no provenance store. */
     public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
@@ -112,12 +115,26 @@ public final class PipelineJobRunner implements Job {
      */
     public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance) {
+        this(cfg, bus, pipelineStore, dataDir, auditDir, provenance, null);
+    }
+
+    /**
+     * As above, plus the component registry this run resolves its {@code use:} bindings against.
+     *
+     * @param registry supplies the registry to resolve against, or {@code null} to resolve nothing. Supplied
+     *                 rather than held so each run scans live (a component edited between two runs takes
+     *                 effect on the second) — the same per-call scan the dry-run route does.
+     */
+    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+                         String dataDir, String auditDir, DbProvenanceStore provenance,
+                         Supplier<ComponentRegistry> registry) {
         this.cfg = cfg;
         this.bus = bus;
         this.pipelineStore = pipelineStore;
         this.dataDir = dataDir;
         this.auditDir = auditDir;
         this.provenance = provenance;
+        this.registry = registry;
     }
 
     @Override public String name() { return cfg.name(); }
@@ -148,6 +165,13 @@ public final class PipelineJobRunner implements Job {
         final String pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
         PipelineGraph g = pipelineStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
                 "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
+        // Resolve `use:` bindings before anything reads the graph. PipelineStore.get returns the graph as
+        // authored — local config only — so a node that references a component (a mapping's rules, a
+        // grammar) would otherwise run with those keys simply absent, silently producing nothing rather
+        // than failing. The dry-run route has always resolved, which is why a binding could preview
+        // correctly and then no-op in the real run. An unresolvable reference is left as-is here (the save
+        // route already refuses one with UNKNOWN_USE_REF).
+        if (registry != null) g = registry.get().effectiveGraph(g);
         String dir = cfg.opt("data_dir", dataDir);
         requireTopLevelSinks(g, dir);
         String batchId = cfg.opt("batch_id", cfg.name().toLowerCase().replace(' ', '_')

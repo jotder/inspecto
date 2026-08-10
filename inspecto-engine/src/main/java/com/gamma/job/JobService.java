@@ -100,6 +100,11 @@ public final class JobService implements AutoCloseable {
     private volatile com.gamma.notify.DeliveryReceiptStore deliveryReceiptStore;
     /** Authored-flow store for {@link JobType#PIPELINE} jobs (T32); {@code null} when no write root is configured. */
     private final PipelineStore pipelineStore;
+    /** This space's component registry, for resolving a pipeline's {@code use:} bindings before it runs.
+     *  Supplied (not held) so each run scans live, exactly as the dry-run route does — a component edited
+     *  between two runs takes effect on the second. Null until wired: the run then resolves nothing, which
+     *  is the behaviour every run had before this was added. */
+    private volatile java.util.function.Supplier<com.gamma.pipeline.ComponentRegistry> componentRegistry;
     /** Data root under which each store is a sub-directory — a flow job reads/writes {@code <dataDir>/<store>} (T32). */
     private final String dataDir;
     /** Optional deletion fence (T25): consulted before a {@code maintenance} job that declares a {@code store:}
@@ -567,7 +572,13 @@ public final class JobService implements AutoCloseable {
         if (pipelineStore == null)
             throw new IllegalStateException("flow job '" + c.name()
                     + "' needs an authored-flow store; set -Dassist.write.root so authored flows can be loaded");
-        return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore);
+        return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore, componentRegistry);
+    }
+
+    /** Wire this space's component registry so a pipeline run resolves its {@code use:} bindings (like
+     *  {@link #knownPipelines}, set by the hosting service). Without it a run sees only local config. */
+    public void componentRegistry(java.util.function.Supplier<com.gamma.pipeline.ComponentRegistry> supplier) {
+        this.componentRegistry = supplier;
     }
 
     private void onBatchEvent(BatchEvent event) {

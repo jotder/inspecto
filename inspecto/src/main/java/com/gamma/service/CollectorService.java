@@ -399,7 +399,7 @@ public final class CollectorService implements AutoCloseable {
         platformServices.register("incidents", com.gamma.ops.IncidentAccess.class,
                 com.gamma.ops.IncidentAccess.over(this::objects));
         platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,
-                com.gamma.pipeline.SchemaAccess.over(this::schemaRegistry));
+                com.gamma.pipeline.SchemaAccess.over(this::componentRegistry));
         platformServices.register("consignment-status",
                 com.gamma.consignment.ConsignmentStatusAccess.class,
                 com.gamma.consignment.ConsignmentStatusAccess.over(this::loadedPipelines));
@@ -418,6 +418,7 @@ public final class CollectorService implements AutoCloseable {
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
+            this.jobs.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
         }
         this.semanticModels    = List.copyOf(semanticModels);
         // Invalidate the catalog whenever configs are (re)indexed — the registry is now the
@@ -542,11 +543,11 @@ public final class CollectorService implements AutoCloseable {
      *  (admin CRUD), read live from {@code <write-root>/registry} — this space's config dir, else the global
      *  {@code -Dassist.write.root} (the same root the channel routes write to). Best-effort: no write root, an
      *  unreadable registry, or a malformed entry yields no (that) destination, never an exception. */
-    /** A live scan of this space's component registry for the read-only {@code schema} Platform
-     *  Service (S1-5) — same root resolution as {@link #persistedChannels()}, invoked per call so
-     *  operator edits are visible without a restart. Best-effort: no write root or an unreadable
-     *  registry yields an empty registry, never an exception. */
-    private com.gamma.pipeline.ComponentRegistry schemaRegistry() {
+    /** A live scan of this space's component registry — same root resolution as {@link #persistedChannels()},
+     *  invoked per call so operator edits are visible without a restart. Best-effort: no write root or an
+     *  unreadable registry yields an empty registry, never an exception. Serves the read-only {@code schema}
+     *  Platform Service (S1-5) and the {@code use:} resolution a pipeline run needs before it executes. */
+    private com.gamma.pipeline.ComponentRegistry componentRegistry() {
         java.nio.file.Path writeRoot = root.config();
         if (writeRoot == null) {
             String wr = System.getProperty("assist.write.root");
@@ -1203,6 +1204,7 @@ public final class CollectorService implements AutoCloseable {
             created.spaceId(spaceId);
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
+            created.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
             created.start();

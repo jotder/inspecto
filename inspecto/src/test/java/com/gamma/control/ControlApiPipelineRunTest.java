@@ -45,6 +45,15 @@ class ControlApiPipelineRunTest {
                   {"id":"out","type":"sink.persistent","config":{"store":"rollup"}}],
          "edges":[{"from":"src","rel":"data","to":"flt"},{"from":"flt","rel":"data","to":"out"}]}""";
 
+    /** The same flow, except the filter carries no {@code where} of its own — it lives in the {@code transform}
+     *  component the node binds with {@code use:}. Runnable only if the run path resolves that binding. */
+    private static final String FLOW_VIA_COMPONENT = """
+        {"name":"evt_rollup","active":false,
+         "nodes":[{"id":"src","type":"acquisition","config":{"source_store":"events"}},
+                  {"id":"flt","type":"transform.filter","use":"transform/high_value"},
+                  {"id":"out","type":"sink.persistent","config":{"store":"rollup"}}],
+         "edges":[{"from":"src","rel":"data","to":"flt"},{"from":"flt","rel":"data","to":"out"}]}""";
+
     /** Unlike the CRUD harness, the properties are set BEFORE the service is constructed (the boot order
      *  of a real deployment) and held until {@link Ctx#close()}: the run path resolves the service's own
      *  flow store / data root ({@code jobServiceOrCreate}), which are wired at construction/request time —
@@ -114,6 +123,35 @@ class ControlApiPipelineRunTest {
         }
     }
 
+    /**
+     * A {@code use:} binding is resolved on the real run path, not only in preview. Until 2026-08-11 the
+     * runner executed the graph exactly as {@link com.gamma.pipeline.PipelineStore} returned it — local
+     * config only — so the {@code where} living in the referenced component was invisible: this flow ran
+     * a filter with no predicate and the whole run died {@code FAILED "missing predicate"}. How an
+     * unresolved binding shows up is node-dependent (a {@code transform.map} whose rules live in a
+     * mapping component projects nothing instead of failing), so the row count is asserted too — a
+     * resolved graph filters, it does not merely run.
+     */
+    @Test
+    void adhocRunResolvesAUseBinding(@TempDir Path dir) throws Exception {
+        Path dataDir = dir.resolve("data");
+        Path writeRoot = dir.resolve("wr");
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        seedComponent(writeRoot, "transforms", "high_value.toon",
+                "name: high_value\nwhere: \"amt >= 100\"\n");
+        seedFlow(writeRoot, FLOW_VIA_COMPONENT);
+        try (Ctx c = open(dir, writeRoot, dataDir)) {
+
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/evt_rollup/trigger", null);
+            assertEquals(202, r.statusCode(), r.body());
+            JsonNode run = awaitTerminal(c.port, json(r).get("runId").asText());
+            assertEquals("SUCCESS", run.get("status").asText(), run.toString());
+
+            assertEquals(2, sinkRowCount(dataDir, "rollup"),
+                    "the component's `where` filtered the run — an unresolved binding would keep all 3 rows");
+        }
+    }
+
     @Test
     void runIsGatedOnTheWriteRoot(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null, null)) {
@@ -149,6 +187,26 @@ class ControlApiPipelineRunTest {
         try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
             st.execute("COPY (SELECT * FROM (VALUES " + valuesSql + ") t(id,amt)) TO '"
                     + d.resolve("seed.parquet").toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** Write a component straight into {@code <write-root>/registry/<typeDir>/} (ComponentRegistry's layout). */
+    private static void seedComponent(Path writeRoot, String typeDir, String file, String toon) throws Exception {
+        Path d = writeRoot.resolve("registry").resolve(typeDir);
+        Files.createDirectories(d);
+        Files.writeString(d.resolve(file), toon);
+    }
+
+    /** Rows across every Parquet file a sink store wrote. */
+    private static long sinkRowCount(Path dataDir, String store) throws Exception {
+        File db = DuckDbUtil.tempDbFile("count_");
+        try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
+            var rs = st.executeQuery("SELECT count(*) FROM read_parquet('"
+                    + dataDir.resolve(store).toString().replace("\\", "/") + "/**/*.parquet')");
+            rs.next();
+            return rs.getLong(1);
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
