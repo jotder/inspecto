@@ -260,6 +260,33 @@ public final class ConsignmentOutputs {
      * (partitioning on the event-time date in the pinned zone) and diverge silently otherwise, so when §10.1's
      * load-time record-day lands it must <b>replace</b> this derivation rather than fall back to it.
      */
+    /**
+     * The event-time day a file's rows belong to — <b>from the file's real event-time bounds when it has them</b>
+     * (addressing step 10, 2026-08-10), else from the {@code year}/{@code month}/{@code day} partition segments.
+     *
+     * <p>This is §10.1's replacement for the write-time approximation below, and it lands only where it is
+     * unambiguous: <b>when {@code min} and {@code max} fall on the same day</b>. Then the bounds are strictly more
+     * truthful than the partition key — they are the rows' actual event time, not a partition value that may have
+     * been cut in a different timezone or derived from a different column. When a file straddles two days there
+     * is no single record day to state, so the partition derivation stands (and may itself be {@code null}).
+     *
+     * <p>⚠ <b>Read {@code bounds}, not this.</b> {@code record_day} is one day per file where bounds are a real
+     * interval, so it cannot express a straddling file at all. It is kept because it is in the schema and cheap,
+     * not because anything should prefer it — nothing in the engine reads it today.
+     */
+    static String recordDay(String partitionKey, EventTimeBounds bounds) {
+        String fromBounds = sameDay(bounds);
+        return fromBounds != null ? fromBounds : recordDay(partitionKey);
+    }
+
+    /** The shared day of {@code bounds}, or {@code null} when absent, unparseable, or straddling two days. */
+    private static String sameDay(EventTimeBounds bounds) {
+        if (bounds == null || bounds.min() == null || bounds.max() == null) return null;
+        if (bounds.min().length() < 10 || bounds.max().length() < 10) return null;
+        String day = bounds.min().substring(0, 10);
+        return day.equals(bounds.max().substring(0, 10)) ? day : null;
+    }
+
     static String recordDay(String partitionKey) {
         if (partitionKey == null || partitionKey.isBlank()) return null;
         String year = null, month = null, day = null;
@@ -306,7 +333,8 @@ public final class ConsignmentOutputs {
         List<ConsignmentOutput> registry = new ArrayList<>(outputs.size());
         for (PartitionOutput o : outputs)
             registry.add(new ConsignmentOutput(consignmentId, runId, tableName, o.partition(),
-                    recordDay(o.partition()), o.outputFile(), rows.applyAsLong(o), o.bytes(),
+                    recordDay(o.partition(), bounds == null ? null : bounds.get(o.outputFile())),
+                    o.outputFile(), rows.applyAsLong(o), o.bytes(),
                     writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint,
                     bounds == null ? null : bounds.get(o.outputFile()), producer));
         return registry;
