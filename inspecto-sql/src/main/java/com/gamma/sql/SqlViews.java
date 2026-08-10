@@ -42,14 +42,16 @@ public final class SqlViews {
      * A DuckDB table-function reading {@code pathOrGlob} in the given {@code format}.
      *
      * @param format     {@code "PARQUET"} or {@code "CSV"}
-     * @param pathOrGlob the file or glob to read (back-slashes are normalised to forward slashes)
+     * @param pathOrGlob the file or glob to read (back-slashes are normalised to forward slashes; an
+     *                   embedded {@code '} is doubled, as {@link #pathList} already did — a store under a
+     *                   directory like {@code O'Brien} otherwise renders a broken SQL literal)
      * @param hive       when {@code true}, enable {@code hive_partitioning} (with VARCHAR partition
      *                   values via {@code hive_types_autocast=0})
      * @return a {@code read_parquet(...)} / {@code read_csv(...)} expression
      * @throws IllegalArgumentException for an unsupported format
      */
     public static String reader(String format, String pathOrGlob, boolean hive) {
-        return over(format, "'" + pathOrGlob.replace("\\", "/") + "'", hive);
+        return over(format, "'" + pathOrGlob.replace("\\", "/").replace("'", "''") + "'", hive);
     }
 
     /**

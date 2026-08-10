@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.sql.SqlViews;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +143,7 @@ public final class ReferenceCompactor {
         else keep = "__refc_rn = 1 AND __op != 'delete'";         // winners only; a winning tombstone goes
         String sql = "CREATE TABLE __retained AS WITH __v AS (SELECT *, "
                 + "row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC) AS __refc_rn "
-                + "FROM read_parquet('" + glob(root) + "', hive_partitioning=true, hive_types_autocast=0)) "
+                + "FROM " + storeReader(root) + ") "
                 + "SELECT * FROM __v WHERE " + keep;
         try (Statement st = conn.createStatement()) {
             st.execute(sql);
@@ -293,8 +294,14 @@ public final class ReferenceCompactor {
         return p.resolveSibling(p.getFileName().toString() + suffix);
     }
 
-    private static String glob(Path root) {
-        return sqlPath(root) + "/**/*.parquet";
+    /**
+     * The whole-store read, rendered by the same {@link SqlViews#reader} every other store read goes through.
+     * Hand-rolling it here left out {@code union_by_name=true}, so a store whose later batches gained a column
+     * (a Decision Rule's {@code __tags}, say) read fine everywhere else and failed only under compaction.
+     * {@code SqlViews.reader} does its own quoting and escaping, so this passes the raw absolute path.
+     */
+    private static String storeReader(Path root) {
+        return SqlViews.reader("PARQUET", root.toAbsolutePath() + "/**/*.parquet", true);
     }
 
     private static String sqlPath(Path p) {
