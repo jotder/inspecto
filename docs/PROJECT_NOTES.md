@@ -125,6 +125,23 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `mvn -o clean test -Pedition-enterprise`** — that profile is the only one that pulls every module in.
   Grepping `*/pom.xml` for the old name finds these two instantly; the reactor never will.
 
+- **A change to a SERVED catalog is not verifiable from the module that computes it**, and
+  `mvn -o test -pl <module>` cannot be trusted on its own. Proved 2026-08-10: adding a second
+  `transform` entry to `PipelineProjection.RECIPE_VERBS` (inspecto-engine) was verified with
+  `-pl inspecto-engine`, where `StepTypesContractTest` lives — and left `master` RED for four commits,
+  because the *same* catalog is asserted again one module up by `ControlApiPipelinesTest` at the route
+  level. Route-level contracts live in the module that **serves** them, so a catalog change needs a
+  reactor-wide run. Two mechanical traps make module-scoped runs worse than useless here:
+  **(a)** `-pl inspecto` alone fails with `NoClassDefFoundError: com.gamma.notify.MailAccess` — it
+  resolves siblings from stale installed jars, so it needs `-am`; **(b)** with `-am` **and** `-Dtest=`,
+  the run dies on the first upstream module with *"No tests matching pattern"* unless you add
+  `-Dsurefire.failIfNoSpecifiedTests=false` (`-DfailIfNoTests=false` does **not** cover it — that flag
+  is for "no tests at all", not "the filter matched nothing in this module").
+  ⚠ **Read a reactor summary for SKIPPED, not just for FAILURE.** A fail-fast abort marks downstream
+  modules `SKIPPED`, and "25 modules" in a summary means *listed*, not *built* — a run reported as
+  "25 modules, 3017 tests, 0 failures" on 2026-08-10 had in fact failed one module and skipped six,
+  `inspecto-security` and `inspecto-policy` among them.
+
 - **`git mv` stages the rename from the INDEX, not the working tree.** Edit a doc and *then*
   `git mv` it, and the edits stay **unstaged** — `git status` shows `RM` (renamed + modified), which
   is easy to skim past, and the commit ships the file's *pre-edit* content at its new path. This bites
