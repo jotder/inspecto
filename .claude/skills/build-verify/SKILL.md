@@ -11,7 +11,7 @@ description: >
 
 # Build / Test / Package / Run
 
-Inspecto — Java 26 build (`release=24`), Maven reactor `file-processor-parent`. UI is Angular
+Inspecto — Java 26 build (`release=24`), Maven reactor `inspecto-parent`. UI is Angular
 (`inspecto-ui/`, **not** in the Maven reactor). Toolchain: JDK `C:\.jdks\openjdk-26.0.1`, Maven
 `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Always build offline (`-o`).**
 
@@ -22,8 +22,11 @@ Inspecto — Java 26 build (`release=24`), Maven reactor `file-processor-parent`
 
 ```powershell
 mvn -o clean test                # full reactor, offline. This is what "verified" means.
-mvn -o clean package -q          # → inspecto/target/file-processor-*.jar  (skip tests)
+mvn -o clean package -q          # → inspecto/target/inspecto-processor-*.jar  (skip tests)
 ```
+⚠ **`file-processor-*` is no longer a reactor artifact** (artifactIds renamed to `inspecto-*` on
+2026-08-10, `a1da65f5`). It survives ONLY as the deployment surface `package.ps1` copies to —
+`file-processor.jar` inside `file-processor-deploy/`. A `target/file-processor-*.jar` glob matches nothing.
 **Every JVM launch needs `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI) — including test runs.
 Tests stand up a real `SourceService`/`ControlApi` on an ephemeral port and exercise the HTTP surface.
 

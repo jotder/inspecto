@@ -12,9 +12,10 @@
     </parent>
 
     <!-- The lean, deployable ETL engine + control plane (the "core" of the v3 split).
-         artifactId kept as "file-processor" so the fat-JAR name, CI, and release flow
-         are unchanged. Stays zero-new-dependency; the optional agent lives in a sibling
-         module (file-processor-agent). -->
+         Renamed from "file-processor" on 2026-08-10; the DEPLOYMENT name is unchanged
+         because package.ps1 copies this module's shaded jar to "file-processor.jar"
+         inside the bundle, so CI and the release flow still see that filename. Stays
+         zero-new-dependency; the optional agent lives in a sibling module (inspecto-agent). -->
     <artifactId>inspecto-processor</artifactId>
 
     <!-- Compiler/encoding/argLine properties and the compiler + surefire plugin config are

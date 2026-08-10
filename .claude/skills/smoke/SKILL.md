@@ -13,11 +13,13 @@ Prove the built artifact actually serves, not just that tests pass.
 
 ## Steps
 
-1. **Ensure the JAR exists** — `mvn -o clean package -q` if `inspecto/target/file-processor-*.jar`
+1. **Ensure the JAR exists** — `mvn -o clean package -q` if `inspecto/target/inspecto-processor-*.jar`
    is missing/stale (delegate to the `verify-runner` agent if a full build is needed).
+   ⚠ The reactor jar is `inspecto-processor-*.jar`, **not** `file-processor-*.jar` (artifactIds renamed
+   2026-08-10, `a1da65f5`); `file-processor.jar` exists only inside a `package.ps1` deployment bundle.
 2. **Launch** (auth-free core — no token):
    ```powershell
-   java --enable-native-access=ALL-UNNAMED -Dspaces.root=spaces -cp inspecto\target\file-processor-*.jar `
+   java --enable-native-access=ALL-UNNAMED -Dspaces.root=spaces -cp inspecto\target\inspecto-processor-*.jar `
         com.gamma.control.ControlApi
    ```
    Run in the background; default port :8080.
