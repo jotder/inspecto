@@ -65,6 +65,84 @@ class PipelineJobRunnerTest {
         assertEquals(List.of(1, 3), readIds(dataDir, "rollup"), "amt>=100 keeps id1(150) + id3(200), drops id2(50)");
     }
 
+    /**
+     * §5-B — this runner recorded no Run Artifact at all until 2026-08-10, so
+     * {@code $upstream(<pipelineJob>).artifact(...)} could never resolve. One per store it wrote bytes to,
+     * {@code ref}'d by the store name, because that string is also the Consignment registry's key.
+     */
+    @Test
+    void recordsOneRunArtifactPerStoreItWroteRefdByTheStoreName() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt_split", new PipelineGraph("evt_split", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        PipelineNode.of("big", "transform.filter", Map.of("where", "amt >= 100")),
+                        PipelineNode.of("small", "transform.filter", Map.of("where", "amt < 100")),
+                        new PipelineNode("hi", "sink.persistent", "High", null, Map.of("store", "high"), null),
+                        new PipelineNode("lo", "sink.persistent", "Low", null, Map.of("store", "low"), null)),
+                List.of(PipelineEdge.data("src", "big"), PipelineEdge.data("big", "hi"),
+                        PipelineEdge.data("src", "small"), PipelineEdge.data("small", "lo"))));
+
+        JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline", "evt_split", "data_dir", dataDir));
+        RecordingContext ctx = new RecordingContext();
+        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir, auditDir).run(ctx);
+
+        assertTrue(res.success(), res.message());
+        assertEquals(Map.of("high", 2L, "low", 1L), ctx.rows,
+                "one artifact per store, each reporting the rows THAT store received — not the run total");
+        assertEquals(ctx.rows.keySet(), ctx.refs.keySet());
+        assertEquals("high", ctx.refs.get("high"),
+                "ref must be the store name — it is the Consignment registry's table_name, which is what "
+                        + "the event-time attrs key off");
+    }
+
+    /** The no-arg {@code run()} keeps working and records nothing — every other test in this file uses it. */
+    @Test
+    void theLegacyNoArgRunRecordsNoArtifacts() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        seedParquet(dataDir, "events", "(1,150)");
+        PipelineStore store = new PipelineStore(tmp.resolve("flows"));
+        store.write("evt", new PipelineGraph("evt", true,
+                List.of(PipelineNode.of("src", "acquisition", Map.of("source_store", "events")),
+                        new PipelineNode("out", "sink.persistent", "Out", null, Map.of("store", "rollup"), null)),
+                List.of(PipelineEdge.data("src", "out"))));
+        JobConfig cfg = new JobConfig("nightly", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline", "evt", "data_dir", dataDir));
+
+        assertTrue(new PipelineJobRunner(cfg, new BatchEventBus(), store, dataDir,
+                tmp.resolve("audit").toString()).run().success());
+    }
+
+    /** A {@link JobContext} that only captures what the runner records — the rest is never touched here. */
+    private static final class RecordingContext implements JobContext {
+        private final Map<String, Long> rows = new java.util.LinkedHashMap<>();
+        private final Map<String, String> refs = new java.util.LinkedHashMap<>();
+
+        @Override public ArtifactRecorder artifacts() {
+            return new ArtifactRecorder() {
+                @Override public void dataset(String name, String ref, ResultSetMeta meta, long r,
+                                              java.time.Instant watermark) {
+                    rows.put(name, r);
+                    refs.put(name, ref);
+                }
+                @Override public void file(String name, Path path, long bytes) {
+                    throw new AssertionError("a pipeline sink is a dataset, not a file artifact");
+                }
+            };
+        }
+
+        @Override public String runId() { return "run-1"; }
+        @Override public String spaceId() { return "default"; }
+        @Override public TriggerInfo trigger() { return null; }
+        @Override public Map<String, String> config() { return Map.of(); }
+        @Override public Map<String, String> params() { return Map.of(); }
+        @Override public RunLog log() { return null; }
+        @Override public com.gamma.signal.SignalEmitter signals() { return null; }
+    }
+
     @Test
     void runsFlowWithTheCanonicalPipelineKeyNotJustTheLegacyFlowKey() throws Exception {
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is the canonical *_job.toon key going

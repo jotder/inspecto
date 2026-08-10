@@ -104,7 +104,7 @@ prefix, two function families). Any plan must extend this set, not duplicate it:
 | `$job.last_success_time` | literal | success watermark — the incremental-window anchor |
 | `$signal.<dotted.path>` | prefix | a field of the firing Signal's payload |
 | `$day(n)` · `$month(n)` · `$year(n)` | function | fire-time date ± `n` (negative = past) |
-| `$upstream(<job>).artifact(<name>).<attr>` | function | `ref` \| `rows` \| `bytes` \| `watermark` \| `time_range` ⚠ **`time_range` is dead — always `null`, and unconsumable even if filled; see §5-B** |
+| `$upstream(<job>).artifact(<name>).<attr>` | function | `ref` \| `rows` \| `bytes` \| `watermark` \| `event_time_min` \| `event_time_max` — the last two resolved **live** from the Consignment registry (§5-B, shipped 2026-08-10; they replaced a dead `time_range`) |
 
 **The requested tokens mostly already exist under different names:** `$SysDate` ≈ `$today`,
 `$User` ≈ `$run.actor`, `$EventDayMinus1` ≈ `$day(-1)`. The one genuinely new concept is **Event Day**
@@ -280,10 +280,18 @@ Consignment-scoped accessor. **Both options are wrong, because the value has no 
 
 **Decision — the attr splits into two scalars, resolved live:**
 
-1. **`event_time_min` / `event_time_max` replace `time_range`.** Two scalars, each typing cleanly as `INSTANT`
-   and substituting into SQL directly — which is what an incremental window actually needs, and what the
-   opaque `"a..b"` string can never be. Non-breaking (row 5 above). `time_range` is **removed**, not aliased:
-   one concept, one word (§3, `CLAUDE.md`).
+1. **`event_time_min` / `event_time_max` replace `time_range`.** Two scalars, each substituting into SQL
+   directly — which is what an incremental window actually needs, and what the opaque `"a..b"` string can
+   never be. Non-breaking (row 5 above). `time_range` is **removed**, not aliased: one concept, one word
+   (§3, `CLAUDE.md`).
+   ⚠ **Correction, found while building (2026-08-10): they yield `STRING`, not `INSTANT`.** This section
+   first claimed each end "types cleanly as `INSTANT`". It does not. `EventTimeBounds.min`/`max` are
+   deliberately **zone-less** ISO local date-times (`2026-08-04T00:12:30`) — the registry refuses to stamp a
+   zone it does not know — so `Instant.parse` fails on them and `ParameterResolver.matchesType` would reject
+   an `INSTANT`-typed parameter. `DATE` fails too (it is not a bare date). What actually matters is unchanged
+   and is now pinned by a test: each end is a valid **SQL timestamp literal** in the single-quoted form
+   `SqlParamScanner` produces, ISO `T` separator and all. Converting to a real instant would mean asserting a
+   zone, which is the one thing this layer must not do.
 2. **Resolve from the Consignment registry at read time — never from a stored field.** Reuse
    `producerHighWater`'s predicate verbatim, `WHERE table_name = ? AND coalesce(state,'LIVE') <> 'SUPERSEDED'`
    (`DbConsignmentOutputStore.java:229`), folding `min(event_time_min)`/`max(event_time_max)`. No such
@@ -586,7 +594,7 @@ opt-in interpolation is designed.
 | 14 | Free key/value demoted to the explicit descriptor-missing fallback + warning | axe-core + a11y gate green; dirty-guard holds |
 | 15 | `mail.send` as the reference plugin exercising the whole contract | Renders as §9 without UI changes |
 | 16 | `on_signal` trigger authoring in UI + `JobUpsert` widening; refresh the stale `JobService` class javadoc (omits `on_signal` — `JobService.java:49-55`) | A signal-triggered Job authorable end-to-end |
-| 17 | **§5-B** — drop the `time_range` attr and `RunArtifact.timeRange`; add `event_time_min`/`event_time_max` resolving through a new min/max aggregate on `DbConsignmentOutputStore` (reusing the `:229` predicate); `PipelineJobRunner` records a `RunArtifact` per sink with `ref` = the sink's `store` | A pipeline Job's sink bounds resolve as two `INSTANT`-typed params that substitute into SQL; a recompute changes the resolved value (proving it is not a snapshot); a superseded revision is excluded; the 4 non-registry recorders still yield `null` |
+| 17 | ✅ **SHIPPED 2026-08-10** — §5-B built as decided: `time_range` and `RunArtifact.timeRange` removed; `DbConsignmentOutputStore.bounds(table)` folds min/max over the `:229` predicate; `ConsignmentOutputStores.bounds` is the fail-open static read; `ExpressionContext` gained a `bounds` lookup (plus a 7-arg delegating constructor, so the 10 pre-existing call sites were untouched); `PipelineJobRunner` overrides `run(JobContext)` and records one artifact per store it wrote, `ref` = the store. Two things grounding forced: the attrs yield **`STRING`, not `INSTANT`** (§5-B correction), and `RunArtifactStore`'s mapper now ignores unknown properties — Jackson's default would have failed every artifact file written while `timeRange` existed | Full reactor `mvn -o clean test`: **23 modules SUCCESS, 0 failures** (engine 1119 → 1122). `eventTimeBoundsResolveLiveSoARecomputeMovesThem` proves the value follows the registry, which a stored field could not; `boundsExcludeSupersededButKeepCompactedAway`; `eachEndSubstitutesIntoSqlAsATimestampLiteral` casts both ends in real DuckDB; `recordsOneRunArtifactPerStoreItWroteRefdByTheStoreName` pins per-store rows across two sinks |
 
 Steps 1–9 are backend-only and ship independently of 10–15 (the UI tolerates unknown fields).
 Step 16 depends only on step 3 (for `$signal.*` in params) and is otherwise independent. Ordering

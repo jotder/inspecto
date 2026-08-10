@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.gamma.consignment.EventTimeBounds;
 import com.gamma.util.DottedPath;
 
 /**
@@ -46,8 +47,8 @@ final class BuiltinExpressions implements ExpressionProvider {
                     Set.of(ON_SIGNAL), false),
             dateFn("day", "days"), dateFn("month", "months"), dateFn("year", "years"),
             new ExpressionDecl("$upstream(<job>).artifact(<name>).<attr>", FUNCTION, ParamType.STRING,
-                    "An attribute (ref | rows | bytes | watermark | time_range) of a predecessor Job's "
-                            + "latest Run Artifact",
+                    "An attribute (ref | rows | bytes | watermark | event_time_min | event_time_max) of a "
+                            + "predecessor Job's latest Run Artifact",
                     "$upstream(loader).artifact(output).ref", ExpressionDecl.ANY_TRIGGER, false));
 
     /** A literal token available on any Trigger but needing a firing Run/Job — no live preview. */
@@ -108,15 +109,30 @@ final class BuiltinExpressions implements ExpressionProvider {
         return LocalDate.ofInstant(ctx.fireTime(), ctx.zone());
     }
 
-    /** {@code $upstream(<job>).artifact(<name>).<attr>} — an attr of a predecessor's latest artifact (§10). */
+    /**
+     * {@code $upstream(<job>).artifact(<name>).<attr>} — an attr of a predecessor's latest artifact (§10).
+     *
+     * <p>The two event-time attrs are <b>resolved live</b> against the Consignment output registry, keyed by
+     * the artifact's own {@code ref} (§5-B), rather than read off a stored field. They replaced a single
+     * {@code time_range} attr that no consumer could use: it yielded one opaque {@code "<min>..<max>"} string,
+     * {@code SqlParamScanner} substitutes a resolved value as one whole SQL literal, and nothing anywhere
+     * split it — so the only way to bind a window was two scalars.
+     */
     private static String upstreamAttr(ExpressionContext ctx, String job, String artifact, String attr) {
         return ctx.upstream().apply(job, artifact).map(a -> switch (attr) {
-            case "ref"        -> a.ref();
-            case "rows"       -> String.valueOf(a.rows());
-            case "bytes"      -> String.valueOf(a.bytes());
-            case "watermark"  -> a.watermark();
-            case "time_range" -> a.timeRange();
-            default           -> null;
+            case "ref"             -> a.ref();
+            case "rows"            -> String.valueOf(a.rows());
+            case "bytes"           -> String.valueOf(a.bytes());
+            case "watermark"       -> a.watermark();
+            case "event_time_min"  -> bound(ctx, a, EventTimeBounds::min);
+            case "event_time_max"  -> bound(ctx, a, EventTimeBounds::max);
+            default                -> null;
         }).orElse(null);
+    }
+
+    /** One end of the artifact's live event-time range, or {@code null} when the range is unknown. */
+    private static String bound(ExpressionContext ctx, RunArtifact a,
+                                java.util.function.Function<EventTimeBounds, String> end) {
+        return ctx.bounds().apply(a.ref()).map(end).orElse(null);
     }
 }

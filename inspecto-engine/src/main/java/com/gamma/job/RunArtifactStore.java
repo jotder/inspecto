@@ -22,7 +22,15 @@ import java.util.List;
 final class RunArtifactStore {
 
     private static final Logger log = LoggerFactory.getLogger(RunArtifactStore.class);
-    private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * Unknown properties are ignored, because this is an append-only log whose record has already lost a
+     * field: every line written before {@code timeRange} was dropped (§5-B) still carries the key, and
+     * Jackson's default would fail the whole read of any run that recorded an artifact back then. A reader
+     * of durable history must tolerate the shapes history actually contains.
+     */
+    private static final ObjectMapper JSON = new ObjectMapper()
+            .configure(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final Path dir;
 

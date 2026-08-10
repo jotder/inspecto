@@ -79,6 +79,18 @@ public final class ConsignmentOutputStores {
     }
 
     /**
+     * The live event-time range of one stream in the calling space, or empty when no registry is registered —
+     * the read-side counterpart of {@link #record}, so an Expression can resolve bounds without a store being
+     * threaded to it. Absence reads as <em>unknown</em>, exactly as it does for the watermark: a deployment
+     * with no registry answers nothing rather than answering zero.
+     */
+    public static java.util.Optional<EventTimeBounds> bounds(String tableName) {
+        if (tableName == null || tableName.isBlank()) return java.util.Optional.empty();
+        DbConsignmentOutputStore store = shared();
+        return store == null ? java.util.Optional.empty() : store.bounds(tableName);
+    }
+
+    /**
      * Flip {@code paths} to {@code COMPACTED_AWAY} in the calling space's registry, or do nothing when none is
      * registered — the compaction-side twin of {@link #record}, so {@code PartitionCompactor} stays static and
      * unaware of whether a registry exists.

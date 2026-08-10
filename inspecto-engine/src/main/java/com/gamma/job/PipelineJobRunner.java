@@ -125,6 +125,23 @@ public final class PipelineJobRunner implements Job {
 
     @Override
     public JobResult run() throws Exception {
+        return execute(null);
+    }
+
+    /**
+     * The entry point {@link JobService} invokes — identical work, plus one Run Artifact per store this run
+     * produced (§5-B). Until 2026-08-10 this runner recorded <b>none</b>, which is why
+     * {@code $upstream(<pipelineJob>).artifact(<store>)} resolved to nothing at all: the artifact is the
+     * handle, and its {@code ref} — the sink's declared {@code store} — is the one identifier that is also the
+     * Consignment registry's {@code table_name}, so the event-time attrs can key off it.
+     */
+    @Override
+    public JobResult run(JobContext ctx) throws Exception {
+        return execute(ctx == null ? null : ctx.artifacts());
+    }
+
+    /** @param artifacts where to record this run's produced stores, or {@code null} to record none. */
+    private JobResult execute(ArtifactRecorder artifacts) throws Exception {
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
         // read only, kept for existing *_job.toon files that were never resaved.
         String pipelineIdOpt = cfg.opt("pipeline", null);
@@ -200,6 +217,7 @@ public final class PipelineJobRunner implements Job {
             List<String> parts = writer.outputs().stream().map(PartitionOutput::partition).distinct().toList();
             List<String> srcStores = seeds.stream().map(Seed::store).toList();
             registerViews(g, pipelineId, srcStores, dir);              // T32 Phase C — sink.view → durable definition
+            recordStoreArtifacts(artifacts, g, writer.rowsByStore());
             bus.publish(new BatchEvent(cfg.name(), batchId, "SUCCESS", parts, writer.totalRows(), ms, 0));
             log.info("[FLOWJOB] {} ran flow '{}' (source_store(s) {}): {} file(s), {} row(s) → {}",
                     cfg.name(), pipelineId, srcStores, writer.outputs().size(), writer.totalRows(),
@@ -212,6 +230,28 @@ public final class PipelineJobRunner implements Job {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Record one dataset Run Artifact per store this run wrote bytes to, named and {@code ref}'d by the store
+     * (§5-B) so {@code $upstream(<job>).artifact(<store>).event_time_min|event_time_max} resolves against the
+     * Consignment registry, which keys on that same string.
+     *
+     * <p>Only stores that actually received rows are recorded — {@code sink.view} nodes rest no bytes, so the
+     * registry holds nothing to range over and an artifact for one would name a stream that does not exist.
+     * The {@link ResultSetMeta} is {@code null}: this runner writes files through {@code PartitionWriter} and
+     * never holds a result set to describe, and inventing a shape here would be a claim about columns nothing
+     * checked. The watermark is the record time, as every other recorder passes — it is when the artifact was
+     * written, not a statement about event time, which is precisely what the registry answers instead.
+     */
+    private static void recordStoreArtifacts(ArtifactRecorder artifacts, PipelineGraph g,
+                                             Map<String, Long> rowsByStore) {
+        if (artifacts == null) return;
+        for (String store : PipelineStores.produced(g)) {
+            Long rows = rowsByStore.get(store);
+            if (rows == null) continue;
+            artifacts.dataset(store, store, null, rows, Instant.now());
+        }
+    }
 
     /**
      * After a successful <b>full recompute</b>, mark every earlier revision of the stores it produced

@@ -313,6 +313,88 @@ class DbConsignmentOutputStoreTest {
                 .findFirst().orElseThrow(() -> new AssertionError("no group for producer " + producer));
     }
 
+    /** As {@link #by} but with both ends of the range explicit — {@code bounds()} folds min as well as max. */
+    private static ConsignmentOutput ranged(String path, String min, String max, State state) {
+        return new ConsignmentOutput("c-" + path, "run-1", "cdr", "dt=2026-08-10", "2026-08-10", path,
+                1, 100, "2026-08-10T12:00:00Z", 0, state, null, new EventTimeBounds(min, max, 0), "north");
+    }
+
+    /**
+     * §5-B — the min half {@code producerHighWater} does not expose, folded across every live file so a
+     * downstream Job can bind the window its predecessor actually wrote.
+     */
+    @Test
+    void boundsFoldTheWholeLiveRangeOfOneStream() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    ranged("/w/a.parquet", "2026-08-10T04:00:00", "2026-08-10T06:00:00", State.LIVE),
+                    ranged("/w/b.parquet", "2026-08-10T02:00:00", "2026-08-10T05:00:00", State.LIVE),
+                    ranged("/w/c.parquet", "2026-08-10T07:00:00", "2026-08-10T09:00:00", State.LIVE)));
+
+            EventTimeBounds b = db.bounds("cdr").orElseThrow();
+            assertEquals("2026-08-10T02:00:00", b.min(), "the earliest min across files, not the first row's");
+            assertEquals("2026-08-10T09:00:00", b.max());
+            assertEquals(7 * 3_600_000L, b.spreadMs(), "spread spans the fold, not any single file");
+            assertTrue(db.bounds("other_table").isEmpty(), "the range is per stream");
+        }
+    }
+
+    /**
+     * The point of returning two scalars instead of one {@code "<min>..<max>"} string: each end is a value
+     * {@code SqlParamScanner} can substitute straight into a predicate. It wraps a resolved value in one SQL
+     * string literal, so what matters is that the engine accepts <em>that literal</em> where a timestamp is
+     * expected — which it does, ISO {@code T} separator and all. The old composite could not: nothing split
+     * it, so it substituted whole and produced a malformed literal.
+     */
+    @Test
+    void eachEndSubstitutesIntoSqlAsATimestampLiteral() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    ranged("/w/a.parquet", "2026-08-10T02:00:00", "2026-08-10T09:00:00", State.LIVE)));
+            EventTimeBounds b = db.bounds("cdr").orElseThrow();
+
+            try (Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+                 Statement st = c.createStatement()) {
+                // exactly the shape SqlParamScanner produces: the resolved value inside single quotes
+                var rs = st.executeQuery("SELECT CAST('" + b.min() + "' AS TIMESTAMP) < CAST('" + b.max()
+                        + "' AS TIMESTAMP) AS ok");
+                assertTrue(rs.next());
+                assertTrue(rs.getBoolean("ok"), "both ends must cast, and min must precede max");
+            }
+        }
+    }
+
+    /** The same predicate {@code producerHighWater} uses, and for the same reasons — pinned so it stays that way. */
+    @Test
+    void boundsExcludeSupersededButKeepCompactedAway() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    ranged("/w/live.parquet", "2026-08-10T04:00:00", "2026-08-10T06:00:00", State.LIVE),
+                    ranged("/w/merged.parquet", "2026-08-10T07:00:00", "2026-08-10T09:00:00",
+                            State.COMPACTED_AWAY),
+                    ranged("/w/old.parquet", "2026-08-01T00:00:00", "2026-08-01T23:00:00", State.SUPERSEDED)));
+
+            EventTimeBounds b = db.bounds("cdr").orElseThrow();
+            assertEquals("2026-08-10T04:00:00", b.min(),
+                    "a superseded revision must not widen the window — its rows were replaced");
+            assertEquals("2026-08-10T09:00:00", b.max(),
+                    "compacted rows were genuinely delivered and still count");
+        }
+    }
+
+    /** Empty rather than half a window: a caller given one end would silently scan to the epoch. */
+    @Test
+    void boundsAreEmptyWhenNoLiveFileCarriesThem() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    by("north", "/w/n1.parquet", null, "2026-08-10T07:00:00Z", State.LIVE),
+                    ranged("/w/old.parquet", "2026-08-01T00:00:00", "2026-08-01T23:00:00", State.SUPERSEDED)));
+
+            assertTrue(db.bounds("cdr").isEmpty(), "no live bounds ⇒ unknown, not a range from the superseded row");
+            assertTrue(db.bounds("never_written").isEmpty());
+        }
+    }
+
     @Test
     void producerHighWaterGroupsByProducerAndKeepsTheirNewestEventTime() throws Exception {
         try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
