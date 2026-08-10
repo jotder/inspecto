@@ -92,15 +92,25 @@ final class ServiceStores {
      * {@code -Dconsignment.outputs.backend}: {@code duckdb} (the bundled default engine),
      * {@code postgres}/{@code postgresql} (resolves {@code -Dconsignment.outputs.db.url}, which must be a
      * {@code jdbc:postgresql://…} URL with the PG driver on the classpath), or a raw {@code jdbc:} URL. Any
-     * other value ⇒ {@code null} ⇒ no per-output-file registry is kept. Mirrors {@link #openProvenanceStore(SpaceRoot)}.
+     * other value — including an explicit {@code none} — ⇒ {@code null} ⇒ no per-output-file registry is kept.
      *
-     * <p><b>Absence is not degraded correctness.</b> Output files are still revealed and still recorded in the
-     * per-Consignment JSON manifest, which stays the artifact of record for <em>existence</em>; this registry
-     * adds the queryable per-file index with lifecycle <em>state</em>. That split is what makes fail-open safe
-     * here — see {@link com.gamma.consignment.DbConsignmentOutputStore}.
+     * <p><b>This is the one store that defaults to {@code duckdb}</b> (addressing plan D1, 2026-08-10), and the
+     * reason is a shipped bug rather than the addressing work it was built for. {@code ReprocessCommand} refuses
+     * to reprocess a Consignment whose output a compaction merged away, because re-ingesting rows that still
+     * exist inside the merged file <b>duplicates them silently</b> — and that refusal is only decidable from this
+     * registry's {@code COMPACTED_AWAY} rows. Default-off meant the fix shipped switched off in every
+     * deployment. Turning it on cannot change what any reader sees: every read is still a filesystem glob, and
+     * this table is consulted only where the alternative is guessing.
+     *
+     * <p><b>Absence is still not degraded correctness</b>, and must stay that way — {@code -Dconsignment.outputs.backend=none}
+     * remains supported, and a failed open degrades to {@code null}. Output files are still revealed and still
+     * recorded in the per-Consignment JSON manifest, which stays the artifact of record for <em>existence</em>;
+     * this registry adds the queryable per-file index with lifecycle <em>state</em>. A store that can
+     * legitimately be absent may never become the only record that a file exists — see
+     * {@link com.gamma.consignment.DbConsignmentOutputStore}.
      */
     static com.gamma.consignment.DbConsignmentOutputStore openConsignmentOutputStore(SpaceRoot root) {
-        String backend = System.getProperty("consignment.outputs.backend", "none").trim().toLowerCase();
+        String backend = System.getProperty("consignment.outputs.backend", "duckdb").trim().toLowerCase();
         boolean pg = "postgres".equals(backend) || "postgresql".equals(backend);
         if (!"duckdb".equals(backend) && !pg && !backend.startsWith("jdbc:")) return null;
         String url = backend.startsWith("jdbc:")

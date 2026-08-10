@@ -41,8 +41,9 @@ public final class ReprocessCommand {
             if (!Files.deleteIfExists(Paths.get(o.outputFile())))
                 log.warn("[REPROCESS] {} — output already absent, nothing to delete: {}. If it was merged by "
                                 + "the compact job rather than removed by hand, re-ingest will DUPLICATE its "
-                                + "rows; enable the consignment-outputs registry "
-                                + "(-Dconsignment.outputs.backend) so this can be detected instead of guessed.",
+                                + "rows. The consignment-outputs registry detects that instead of guessing and "
+                                + "is on by default; this batch got past the guard, so it is either off "
+                                + "(-Dconsignment.outputs.backend=none) or predates the registry.",
                         batchId, o.outputFile());
         }
         // 2. delete markers
@@ -84,8 +85,10 @@ public final class ReprocessCommand {
      *
      * <p>The §11.3 registry makes it decidable, so a refusal replaces the duplication. Removing the rows safely
      * means rewriting the whole partition (§6.2), which this command does not do — so it stops rather than
-     * pretending. When the registry is off (the default) nothing is decidable and nothing is blocked; the
-     * per-file warning in step 1 is all that can honestly be said.
+     * pretending. <b>This guard is why the registry became default-on</b> (addressing D1, 2026-08-10): the fix
+     * had shipped switched off in every deployment. Where it is explicitly disabled, or for Consignments that
+     * predate the registry, nothing is decidable and nothing is blocked — the per-file warning in step 1 is all
+     * that can honestly be said.
      */
     private static void guardAgainstCompactedOutputs(String batchId, BatchManifest m) {
         DbConsignmentOutputStore registry = ConsignmentOutputStores.shared();

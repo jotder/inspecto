@@ -22,11 +22,19 @@ import java.util.List;
  * JDBC over the bundled DuckDB engine (no new dependency), a single shared {@link Connection} (low-volume,
  * JDBC connections aren't thread-safe), schema created on open, every mutator {@code synchronized}.
  *
- * <p><b>Default-off</b>, activated by {@code -Dconsignment.outputs.backend}. When absent, nothing about the
- * live write path changes — outputs are still revealed and still recorded in the JSON manifest, exactly as
- * today. That fail-open contract is why the manifest stays authoritative for <em>existence</em> while this
- * table is authoritative for <em>state</em>: a store that can legitimately be absent must never be the only
- * record that a file exists.
+ * <p><b>On by default since 2026-08-10</b> (addressing plan D1) — {@code -Dconsignment.outputs.backend=duckdb}
+ * unless set otherwise, and {@code none} still turns it off. It was flipped for a shipped bug, not for the
+ * addressing work: {@code ReprocessCommand}'s refusal to reprocess a Consignment whose output was compacted
+ * away — the alternative being silent row duplication — is decidable only from this table's
+ * {@code COMPACTED_AWAY} rows, so default-off meant that fix was switched off everywhere.
+ *
+ * <p><b>Being optional is still part of the contract.</b> A configured {@code none}, and any failed open,
+ * degrade to no registry — and when absent nothing about the live write path changes: outputs are still
+ * revealed and still recorded in the JSON manifest. That fail-open contract is why the manifest stays
+ * authoritative for <em>existence</em> while this table is authoritative for <em>state</em>: a store that can
+ * legitimately be absent must never be the only record that a file exists. Any future reader must therefore
+ * <b>filter</b> a list it obtained elsewhere, never <em>produce</em> the list — a file with no row here is
+ * unknown, never absent.
  *
  * <p><b>State transitions.</b> {@link #supersede} and {@link #markCompactedAway} arrived with their call sites
  * ({@code ReprocessCommand}, {@code PartitionCompactor}) rather than ahead of them. Both are <b>path- or

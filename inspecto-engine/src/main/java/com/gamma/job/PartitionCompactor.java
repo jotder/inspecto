@@ -35,14 +35,14 @@ import java.util.stream.Stream;
  *       restores the hidden originals (it was not), so a killed run never loses or duplicates rows.</li>
  * </ul>
  *
- * <p><b>Known trade-off, now detectable</b>: {@code reprocess} of a batch whose output file was compacted away
- * degrades to a no-op delete + re-ingest (its manifest's {@code outputFile} no longer exists), which would
- * duplicate its rows. Step 6 below flips those paths to {@code COMPACTED_AWAY} in the §11.3
+ * <p><b>Known trade-off, now detected by default</b>: {@code reprocess} of a batch whose output file was
+ * compacted away degrades to a no-op delete + re-ingest (its manifest's {@code outputFile} no longer exists),
+ * which would duplicate its rows. Step 6 below flips those paths to {@code COMPACTED_AWAY} in the §11.3
  * {@code consignment_outputs} registry, which lets {@link com.gamma.inspector.ReprocessCommand} <em>refuse</em>
- * rather than duplicate. That only applies where the registry is enabled
- * ({@code -Dconsignment.outputs.backend}); it is default-off, so {@code min_age_days} beyond the operational
- * reprocess horizon remains the mitigation everywhere else. Recorded in {@code docs/REQUIREMENTS.md} (PIP-7)
- * and the job-library example.
+ * rather than duplicate. That registry is <b>on by default since 2026-08-10</b> (addressing D1) — this bug is
+ * why it was flipped. Where it is explicitly disabled ({@code -Dconsignment.outputs.backend=none}) nothing is
+ * decidable and {@code min_age_days} beyond the operational reprocess horizon remains the only mitigation.
+ * Recorded in {@code docs/REQUIREMENTS.md} (PIP-7) and the job-library example.
  */
 final class PartitionCompactor {
 

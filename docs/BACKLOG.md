@@ -980,7 +980,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     now **evaluated**: a value that is a whole `$`-token resolves at fire time instead of passing through
     literally, and one naming an unregistered token fails the Run REJECTED. Values that merely *contain* a
     `$` are unaffected, and `$$`/`${ENV:…}`/`$100` are literals by grammar. Release notes should pair this
-    with the `$$` note above — they are one story for an operator.
+    with the `$$` note above — they are one story for an operator. **A seventh landed 2026-08-10**:
+    `feat(consignment)` — `consignment.outputs.backend` now defaults to `duckdb` (addressing D1). Not
+    breaking by config (`none` still honoured, and every space just gains a small DuckDB file), but
+    **operator-visible**: `ReprocessCommand` now *refuses* to reprocess a Consignment whose output a
+    compaction merged away. That reprocess previously succeeded **while silently duplicating rows**, so the
+    refusal is the fix — but an operator who has been doing it will see a new failure. Release notes must
+    say what to do instead: rewrite the whole partition (§6.2), or set `min_age_days` beyond the reprocess
+    horizon so compaction never overtakes it.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already

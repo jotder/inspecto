@@ -543,7 +543,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 2 | ✔ **DONE 2026-08-10** — `DatasetRelation.temporalColumn(config)` → `Optional<String>`. Absent degrades to empty (D3), two declarations throw, and the name is identifier-checked because step 3 embeds it in `min()/max()` SQL. ⚠ Note the plan's framing was off: `role` did **not** exist anywhere in the Java backend — it was a **UI-only** concept (`dataset-types.ts:13-24`), so this added the backend's first reader of `columns[]`, it did not switch on an ignored one | ✔ `DatasetRelationTest` — resolves, degrades, duplicate rejected, name fails closed |
 | 3 | ✔ **DONE 2026-08-10** — four columns land on the **ingest path**, keyed per output file. ⚠ Built differently from the sketch below, which did not survive grounding twice: there is **no live connection** at `finalizeSource` (the seam is `BatchIngestStrategy.writeAndTrace`), and the written relation **has no aggregatable event-time column** — so a coerced `__event_time` is now materialised in `DataTransformer` and excluded from output. See the correction box in §3.1 | ✔ `ConsignmentOutputRegistrationTest` — bounds + spread + producer per file; no-event-time degrades to null bounds; `__event_time` absent from written output |
 | 4 | ✔ **DONE 2026-08-10** — `StreamWatermark.of(producerHighWater, horizon, now)` → `Optional<LocalDateTime>`, plus `windowComplete(wm, hi, lateness)`; the per-producer aggregation is `DbConsignmentOutputStore.producerHighWater(table)`. **D4 resolved: observed-within-horizon**, default 24 h, overridable per call site (see §8). Derived on read — no table, no update path. ⚠ Three corrections in the §3.6 box: no `COMMITTED` state (it is `SUPERSEDED`-excluded / `COMPACTED_AWAY`-**included**), the stream key is `table_name`, and unattributed writes suppress the watermark rather than being skipped | ✔ `StreamWatermarkTest` (11) — lagging producer wins, stale drops out, unknown suppresses, and the seeded-catalog two-producer window closes only when both pass `hi + lateness`; `DbConsignmentOutputStoreTest` (+5) — grouping, state filter, chronological last-seen |
-| 5 | **Catalog on by default** (decision D1) + migration for existing installs. | fresh space records rows with no `-D` flag |
+| 5 | ✔ **DONE 2026-08-10** — default flipped to `duckdb` (`none` still honoured), and the store wired into `db_maintenance`. ⚠ Justified by a **shipped bug**, not by addressing: `ReprocessCommand`'s refusal to reprocess a compacted-away Consignment (the alternative is silent row duplication) was decidable only from this registry, so the fix was switched off everywhere. **The "migration for existing installs" was dropped, not deferred** — §7-A's filter contract means pre-registry files need no backfill; they read as unknown, not absent | ✔ `ServiceStoresDefaultsTest` — absent property ⇒ a store is opened; `none` ⇒ none |
 | 6 | ⛔ **BLOCKED ON STEP 7 — do not build this first** (grounded 2026-08-10; see the ordering box below). **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
 | 7 | **The Consignment Selector.** Config shape + resolver emitting an explicit `read_parquet([...])` list, generation-pinned. | test: selector over a seeded catalog names exactly the overlapping files |
 | 8 | **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
@@ -582,12 +582,77 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
 > flush chunk* (`DuckDbRecordSink.java:272`), which is a different concept entirely. A recompute generation
 > needs its own spelling, or the two become indistinguishable on disk.
 
+### 7-A. The 5–6–7 knot, resolved (2026-08-10)
+
+Steps 5, 6 and 7 read as three sequential steps. They are one knot: 7 gates 6 (readers must pin before a
+writer may leave two generations), 6 needs 5's catalog for its generation counter, and 7 lost its own
+justification when rung A came in. Pulled on, the knot has a single root.
+
+**The root: the plan asks the catalog to be authoritative for reads, and the catalog is contractually
+optional.** §1 says a read becomes "an explicit, catalog-pruned file list" — the catalog *produces* the list.
+But `DbConsignmentOutputStore` is fail-open by construction and says so in its own javadoc: *a store that can
+legitimately be absent must never be the only record that a file exists.* An optional index cannot be an
+existence oracle. Every downstream difficulty in the knot is that contradiction surfacing: a Selector that
+produces the list needs the catalog always-on and retroactively complete, which is why step 5 grew a migration
+problem it cannot solve (no backfill exists for files written before the registry) and why step 6 could not be
+ordered anywhere safe.
+
+**The resolution: the Selector filters the glob; it never replaces it.**
+
+```
+resolve(root, window) = glob(root)                              -- still the authority for existence
+                        MINUS rows the catalog marks SUPERSEDED / COMPACTED_AWAY
+                        MINUS rows whose bounds provably miss [lo, hi)
+```
+
+A file with **no** catalog row stays in the list. That is the same rule already written for null bounds
+(D3, `ConsignmentOutput#bounds`): unknown is a possible match, never an exclusion. Applied to the file list
+rather than just to the bounds, it dissolves the knot:
+
+| | Before | After |
+|---|---|---|
+| Catalog absent / `none` | Selector cannot resolve | list == glob, byte-for-byte today's behaviour |
+| Pre-registry files | need a backfill nobody has written | read normally — they are unknown, not absent |
+| Step 5's "migration" | unsolved | **does not exist**; turning the catalog on can only ever exclude a file a writer already marked dead |
+| Step 6 | corrupts glob readers | safe once readers exclude `SUPERSEDED` — which is exactly what this gives them |
+| Rung A's verdict | Selector had no case | this *is* the correctness case: exclusion, not pruning speed |
+
+It also costs nothing that rung A did not already price in. The glob still runs (145 ms over 90 days), and
+pruning was never where the time went.
+
+**Revised order — `7′ → 5 → 6`**, where `7′` is the Selector reshaped as a filter. Step 5 is independent of
+both and went first, because grounding turned up a better reason for it than this plan ever gave (below).
+Step 7's config surface and the `SELECTOR_REF` seam (§3.3, §4) are unchanged; only the resolver's contract
+moves — from *producing* a list to *subtracting* from one.
+
+**⚠ What this forecloses.** Generation *pinning* in the strong sense — a reader holding a consistent snapshot
+across a concurrent recompute — is not achievable by subtraction alone, because the glob is evaluated at read
+time and a file revealed mid-read is already in it. Subtraction fixes *stale inclusion*, not *torn reads*.
+Torn multi-file reads across a recompute are a real defect today and remain one after step 6; closing them
+needs the reader to capture a file list once and reuse it, which is a separate change to every call site in
+the ordering box above. Do not let step 7 claim it.
+
 ---
 
 ## 8. Decisions and risks
 
-- **D1 — flip `consignment_outputs` to on by default.** Addressing depends on it. It is a local DuckDB
-  file, so cost is small, but it is a default change on a shipped flag and needs an explicit call.
+- **D1 — flip `consignment_outputs` to on by default. ✔ RESOLVED 2026-08-10: flipped** to `duckdb`
+  (`ServiceStores.java:103`), `none` still honoured. ⚠ **Not for the reason recorded here.** "Addressing
+  depends on it" is a promise about unbuilt work, and would not have justified changing a shipped default.
+  The real reason was already in the tree: `ReprocessCommand.guardAgainstCompactedOutputs` refuses to
+  reprocess a Consignment whose output a compaction merged away — the alternative being **silent row
+  duplication** — and that refusal is decidable only from this table's `COMPACTED_AWAY` rows. Default-off
+  meant a fix for a live data-corruption bug shipped switched off in every deployment
+  (`ReprocessCommand.java:76-93`, `PartitionCompactor.java:38-45`). Turning it on changes nothing a reader
+  sees; every read is still a glob.
+  **Behaviour change to note in release notes:** a reprocess that used to succeed while duplicating rows now
+  fails with a refusal. That is the fix working, but it is visible.
+  Also landed with it: the store is now CHECKPOINT/VACUUMed by `db_maintenance`
+  (`MaintenanceJob.java:640`) — it had a `maintenance()` nobody called, which was survivable for an
+  opt-in store and not for a default-on one. **No retention purge was added**: one ~200-byte row per output
+  file is not a growth problem yet, and a purge with no policy behind it would be speculative. When one is
+  needed the rule is *never purge a non-`LIVE` row whose file is still on disk* — that row is the only thing
+  excluding it from a glob.
 - **D2 — bounds granularity: per output file, or per Consignment?** Per file prunes better; per
   Consignment is cheaper and simpler. Recommend **per file** (the catalog is already per file).
 - **D3 — what happens to a Consignment whose dataset declares no temporal column?** Recommend:

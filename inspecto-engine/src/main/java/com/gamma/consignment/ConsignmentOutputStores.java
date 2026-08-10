@@ -20,8 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * registers the result.
  * Two resolvers for one toggle is how a default-off store silently becomes on.
  *
- * <p><b>Absent by default, and that is not degraded correctness.</b> With no store registered — every existing
- * deployment and test — {@link #record} is a no-op: output files are still revealed and still recorded in the
+ * <p><b>Optional, and absence is not degraded correctness.</b> The store is on by default since 2026-08-10
+ * (D1), but every test and any deployment configuring {@code none} still has none registered — and with none,
+ * {@link #record} is a no-op: output files are still revealed and still recorded in the
  * per-Consignment JSON manifest, which stays authoritative for <em>existence</em> while this registry is
  * authoritative for <em>state</em>. That split is what makes recording fail-open safe, so no caller needs a null
  * check and none should treat a missing row as proof a file does not exist.

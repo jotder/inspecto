@@ -81,11 +81,13 @@ former root reference docs** (each index lists them):
   Job/Step boundary is **selection, not data state** — which replaces the in-motion/at-rest framing in
   `okf/backend/control-plane/job-vs-step.md`. The one mechanical change: reads become a
   **catalog-pruned explicit file list** instead of a `**/*.parquet` glob. Grounding (verified
-  2026-08-09) reshaped the plan: the catalog is **80% built and switched off** —
-  `consignment_outputs` already carries `path`/`row_count`/`bytes`/**`generation`**/`state` but is
-  gated behind `-Dconsignment.outputs.backend`; **no event-time min/max is persisted anywhere**
-  (`record_day` is a write-time approximation its own javadoc calls silently divergent;
-  `RunArtifact.timeRange` is always null); dataset `role: temporal` exists in config but
+  2026-08-09) reshaped the plan: the catalog was **80% built and switched off** —
+  `consignment_outputs` already carries `path`/`row_count`/`bytes`/**`generation`**/`state`.
+  *(Steps 1–5 shipped 2026-08-10: event-time bounds + `producer` are now written per output file, the
+  per-stream `StreamWatermark` is derived from them, and the registry is **on by default** — flipped for
+  `ReprocessCommand`'s compacted-away guard, not for addressing. `generation` is still a dead field and
+  `RunArtifact.timeRange` is still always null; `record_day` remains the write-time approximation its own
+  javadoc calls silently divergent.)* dataset `role: temporal` exists in config but
   `DatasetRelation` never reads it; and **no windowed scan of ingested data exists at all** — alert
   `window: 1h` filters the *batch audit ledger* by wall-clock, so content rules are new capability,
   not an extension. §5 is a **strategy framework, not a design**: pinned hopping-window vocabulary
@@ -210,7 +212,7 @@ former root reference docs** (each index lists them):
 - [`superpower/consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) —
   **IN FLIGHT (opened 2026-08-03) — three sections are now CLOSED, the rest is still design (2026-08-04).**
   **§11.3 `consignment_outputs`** is complete: `DbConsignmentOutputStore` behind
-  `-Dconsignment.outputs.backend` (default-off), production callers on all three write paths — ingest
+  `-Dconsignment.outputs.backend` (**default `duckdb` since 2026-08-10**; `none` still honoured), production callers on all three write paths — ingest
   (`BatchProcessor.finalizeSource`), enrichment, Pipeline sinks — each with a real per-file `row_count` asserting
   §7.2 reconciliation; `supersede`/`markCompactedAway` wired to `ReprocessCommand` + `PartitionCompactor`, which
   turns the §11.3(a) silent row-duplication bug into a refusal; and the `batch_id` → `consignment_id` rename for

@@ -64,7 +64,7 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 | Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |
 | Pipeline-run provenance (per-edge counts) | *(class is the API)* | [`DbProvenanceStore`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/exec/DbProvenanceStore.java) | `provenance.backend=none\|duckdb\|postgres` | `none` |
 | Acquisition / dedup ledger + export watermark | `acquire/AcquisitionLedger` | [`DbAcquisitionLedger`](../../../../inspecto-acquire/src/main/java/com/gamma/acquire/DbAcquisitionLedger.java) | `acquire.ledger.backend=memory\|db` *(via `AcquisitionLedgers`, not `ServiceStores`)* | `memory` |
-| Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | `none` |
+| Consignment output-file registry | *(class is the API)* | [`DbConsignmentOutputStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbConsignmentOutputStore.java) | `consignment.outputs.backend=none\|duckdb\|postgres` | **`duckdb`** — the only default-on store; see below |
 | Per-file stage-progression registry (Phase 4 §2.4) | *(class is the API)* | [`DbFileStageStore`](../../../../inspecto-engine/src/main/java/com/gamma/consignment/DbFileStageStore.java) | `file.stages.backend=none\|duckdb\|postgres` | `none` |
 | Ops escalation queues | `ops/queue/QueueStore` | **none** — in-memory only | — | — |
 | Pipeline execution watermarks | `pipeline/exec/PipelineWatermarkStore` | **none** — in-memory/file only | — | — |
@@ -75,6 +75,20 @@ implementations are **plain JDBC over a single shared `Connection`**, with hand-
 
 Every backend **degrades gracefully**: a failed DB open falls back to in-memory/file and logs a
 warning rather than blocking startup.
+
+> **Why exactly one store defaults on** *(2026-08-10, addressing D1)*. `consignment_outputs` is the only
+> row above that opens without being asked, and the reason is a bug, not the addressing feature it was
+> built for. [`ReprocessCommand`](../../../../inspecto-engine/src/main/java/com/gamma/inspector/ReprocessCommand.java)
+> refuses to reprocess a Consignment whose output a compaction merged away — re-ingesting rows that still
+> exist inside the merged file **duplicates them silently** — and that refusal is decidable only from this
+> table's `COMPACTED_AWAY` rows. Default-off meant the fix was switched off in every deployment. Turning it
+> on changes nothing a reader sees: every read is still a filesystem glob, and the table is consulted only
+> where the alternative is guessing. `=none` remains supported and a failed open still degrades to no
+> registry — **optionality is part of the contract**, which is why any future reader must *filter* a file
+> list it obtained elsewhere rather than *produce* one. A file with no row here is unknown, never absent.
+>
+> Operator-visible consequence: a reprocess that used to succeed while duplicating rows now **fails** with a
+> refusal.
 
 ---
 
