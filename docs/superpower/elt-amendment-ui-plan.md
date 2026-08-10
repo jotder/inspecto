@@ -501,10 +501,16 @@ Shipped as a **second `transform` entry** (`transform.filter`, `transform.join`)
   from the recipe editor before this slice; shipping the palette entry without the refusal would have
   turned it into reachable silent data loss. Mirrored in the mock, per the never-more-lenient rule.
   ⚠ **`recordDedup`, `routeNode` and `summarizeNode` are the same single-slot shape and still
-  last-one-wins** — deliberately untouched here, on the backlog.
-- ⚠ **A join Step and a filter Step still render identically on a step card** (name-or-id + the
-  *category* chip "Transformer"), so once authored they are indistinguishable unless named. Not a
-  regression from this slice; on the backlog.
+  last-one-wins** — deliberately untouched here, on the backlog. **Their behaviour is now PINNED
+  (2026-08-10, `6e4d4be0`)**: a case per slot in `PipelineEditableTest` proves the discard is silent and
+  the LAST node wins, so flipping them to refuse is a decision with a measured before-state rather than
+  an unmeasured one. That same commit added the engine-level `MULTI_JOIN` test this slice never wrote —
+  it asserted the refusal only at the palette-contract level.
+- ~~⚠ **A join Step and a filter Step still render identically on a step card**~~ **FIXED 2026-08-10
+  (`f1ba6862`).** A card now captions the type's own label ("Join" / "Filter") via an optional
+  `[typeLabel]` input built from the served node-type catalog, which already carried `label` —
+  `typeCategoryMap` was discarding it. Falls back to the category label for a type the catalog gives no
+  label for, so a plugin node degrades rather than printing a raw `transform.bespoke`.
 
 Verified: `inspecto-engine` 1144 tests green · UI 2266 green / exit 0 · both tsconfigs · `lint:tokens` ·
 and in the offline preview end to end — the menu offers Filter and Join side by side, Join authors

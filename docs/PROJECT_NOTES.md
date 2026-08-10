@@ -142,6 +142,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   "25 modules, 3017 tests, 0 failures" on 2026-08-10 had in fact failed one module and skipped six,
   `inspecto-security` and `inspecto-policy` among them.
 
+- **A UI spec that RUNS green is not proof it typechecks — there are THREE tsconfigs and the root one
+  is a different gate, not a superset.** Proved 2026-08-11 (`842a3a77`): a spec asserting `toHaveLength`
+  on an element list passed `npm run test:ci`, passed the production `npm run build`, and passed **both**
+  `tsconfig.app.json` and `tsconfig.spec.json` — while failing `npx tsc -p tsconfig.json --noEmit`. The
+  root config sets no `types`, so every `@types/*` is ambient and **`@types/jasmine` supplies the global
+  `expect`**; only `tsconfig.spec.json` names `vitest/globals`, and the root config does not extend it.
+  The fix is importing `{ describe, expect, it }` from `vitest` in the spec (307 of 319 already do) —
+  **never** editing the tsconfigs to paper over it. Commands + rationale: `angular-ui` skill §12 step 2b.
+
 - **`git mv` stages the rename from the INDEX, not the working tree.** Edit a doc and *then*
   `git mv` it, and the edits stay **unstaged** — `git status` shows `RM` (renamed + modified), which
   is easy to skim past, and the commit ships the file's *pre-edit* content at its new path. This bites
