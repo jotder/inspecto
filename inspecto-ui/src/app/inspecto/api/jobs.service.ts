@@ -1,39 +1,117 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import { JobRun, JobType, JobView } from './models';
 
 /** A single scheduled job with its full config (GET /jobs/{name}) — the list `JobView` plus the type-specific
- *  `params` and the catch-up flag. (List endpoint omits these; they're shown on the detail page.) */
+ *  `params`, the trigger guard and the catch-up flag. (List endpoint omits these; they're shown on the
+ *  detail page.) This is the UI-facing shape; `jobFromWire` maps the server's own shape onto it. */
 export interface JobDetail extends JobView {
   params?: Record<string, unknown>;
   catchUp?: boolean;
+  /** Guard expression over the firing Signal's payload; only meaningful with `onSignal`. */
+  when?: string | null;
 }
 
 /** The editable shape for create (POST /jobs) and edit (PUT /jobs/{name}). A job is cron-scheduled, event-driven
- *  (`onPipeline`), or manual (neither). */
+ *  (`onPipeline`), signal-driven (`onSignal`, optionally narrowed by `when`), or manual (none of them). */
 export interface JobUpsert {
   name: string;
   type: JobType;
   cron?: string | null;
   onPipeline?: string | null;
+  onSignal?: string | null;
+  when?: string | null;
   enabled: boolean;
   catchUp?: boolean;
   params?: Record<string, unknown>;
 }
 
-/** One declared parameter of a Job Type (GET /jobs/types/{id}, R3) — drives the authoring form. */
+/** The job keys the server recognises as config rather than as a type-specific parameter — `JobConfig.fromMap`'s
+ *  known-key set. Anything else at the top level of a job body IS a parameter. */
+const JOB_WIRE_KEYS = ['name', 'type', 'cron', 'on_pipeline', 'on_signal', 'when', 'enabled', 'catch_up', 'args', 'bind'];
+
+/**
+ * A `JobUpsert` as the write endpoints actually accept it (`POST /jobs`, `PUT /jobs/{name}`).
+ *
+ * The body **is** the `job:` TOON section in JSON, so it is **flat** (parameters sit alongside the config
+ * keys, not nested under `params`) and **snake_case**. This matters more than it looks: the server sweeps
+ * every unrecognised top-level key into the job's parameters instead of rejecting it, so a camelCase
+ * `onPipeline` is silently absorbed as an inert parameter and the job ends up with no trigger at all.
+ * Pinned server-side by `ControlApiJobCrudTest`.
+ */
+export function jobToWire(u: JobUpsert): Record<string, unknown> {
+  const body: Record<string, unknown> = { name: u.name, type: u.type, enabled: u.enabled };
+  if (u.cron) body['cron'] = u.cron;
+  if (u.onPipeline) body['on_pipeline'] = u.onPipeline;
+  if (u.onSignal) body['on_signal'] = u.onSignal;
+  if (u.when) body['when'] = u.when;
+  if (u.catchUp) body['catch_up'] = true;
+  // Parameters are flattened in beside the config keys — never nested, and never shadowing one.
+  for (const [k, v] of Object.entries(u.params ?? {})) {
+    if (!JOB_WIRE_KEYS.includes(k) && v !== null && v !== undefined && v !== '') body[k] = v;
+  }
+  return body;
+}
+
+/** The inverse: the flat `job:` section the detail/enable/disable/reschedule endpoints return, mapped onto
+ *  the UI-facing `JobDetail`. Every key the server does not treat as config is a type-specific parameter. */
+export function jobFromWire(raw: Record<string, unknown>): JobDetail {
+  const params: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw ?? {})) if (!JOB_WIRE_KEYS.includes(k)) params[k] = v;
+  return {
+    name: String(raw?.['name'] ?? ''),
+    type: String(raw?.['type'] ?? '') as JobType,
+    cron: (raw?.['cron'] as string) ?? null,
+    onPipeline: (raw?.['on_pipeline'] as string) ?? null,
+    onSignal: (raw?.['on_signal'] as string) ?? null,
+    when: (raw?.['when'] as string) ?? null,
+    enabled: raw?.['enabled'] !== false,
+    catchUp: raw?.['catch_up'] === true || raw?.['catch_up'] === 'true',
+    params,
+  };
+}
+
+/**
+ * One declared parameter of a Job Type (GET /jobs/types/{id}, R3) — drives the authoring form.
+ *
+ * Mirrors `ParameterDecl.toMap()`. The rendering + validation contract (job-parameter-contract §7.2)
+ * is declared **optional here even though a current server always sends it**: this client also talks to
+ * servers predating that contract, and every consumer already defaults the absent value to the
+ * pre-contract behaviour. Unset strings/lists arrive as `''`/`[]`, never null — except `min`/`max`,
+ * which stay null when unbounded because `0` is a meaningful bound.
+ */
 export interface JobParameterDecl {
   name: string;
-  /** STRING | INTEGER | DECIMAL | BOOLEAN | DATE | INSTANT | DATASET_REF */
+  /** STRING | TEXT | EMAIL | INTEGER | DECIMAL | BOOLEAN | DATE | INSTANT | DATASET_REF */
   type: string;
   required: boolean;
   /** $-expression the platform deduces when unbound (e.g. `$day(-1)`); '' when none. */
   deduce: string;
-  /** Literal fallback; '' when none. */
+  /** Literal fallback; '' when none. For a `multi` parameter this is CSV, matching the resolver. */
   default: string;
   description: string;
+  /** Human field label; '' ⇒ the humanised `name`. */
+  label?: string;
+  /** REQUIRED | OPTIONAL | ADVANCED — disclosure, deliberately decoupled from `required`. */
+  tier?: string;
+  /** Allowed values ⇒ renders a choice; `[]` when unconstrained. */
+  options?: string[];
+  /** Regex the value must fully match; '' when none. Under `multi`, applies per item. */
+  pattern?: string;
+  /** Inclusive numeric bounds; null when unbounded. */
+  min?: number | null;
+  max?: number | null;
+  placeholder?: string;
+  /** Section heading that orders the form; '' when none. */
+  group?: string;
+  /** The value is a list of `type` (CSV on the wire), validated per item. */
+  multi?: boolean;
+  /** Mask on input; the server masks it in API reads at the response boundary. */
+  secret?: boolean;
+  /** Whether `$`-tokens are accepted here; false forces a literal. Defaults to true. */
+  expressions?: boolean;
 }
 
 /** One Job Type's catalog metadata (GET /jobs/types[/{id}]) — the descriptor that drives authoring. */
@@ -144,24 +222,32 @@ export class JobsService {
     return this.http.post<{ runId: string }>(apiUrl(`/jobs/${encodeURIComponent(name)}/trigger`), {});
   }
 
-  // ── single job + management (mock-served until the real Java endpoints land — see the plan) ──
+  // ── single job + management ──
+  // These five all carry the server's flat `job:` section, so they go through `jobFromWire`/`jobToWire`
+  // rather than being typed straight onto `JobDetail` — see those functions for why.
   get(name: string): Observable<JobDetail> {
-    return this.http.get<JobDetail>(apiUrl(`/jobs/${encodeURIComponent(name)}`));
+    return this.http.get<Record<string, unknown>>(apiUrl(`/jobs/${encodeURIComponent(name)}`)).pipe(map(jobFromWire));
   }
   create(body: JobUpsert): Observable<JobDetail> {
-    return this.http.post<JobDetail>(apiUrl('/jobs'), body);
+    return this.http.post<Record<string, unknown>>(apiUrl('/jobs'), jobToWire(body)).pipe(map(jobFromWire));
   }
   update(name: string, body: JobUpsert): Observable<JobDetail> {
-    return this.http.put<JobDetail>(apiUrl(`/jobs/${encodeURIComponent(name)}`), body);
+    return this.http
+      .put<Record<string, unknown>>(apiUrl(`/jobs/${encodeURIComponent(name)}`), jobToWire(body))
+      .pipe(map(jobFromWire));
   }
   remove(name: string): Observable<unknown> {
     return this.http.delete(apiUrl(`/jobs/${encodeURIComponent(name)}`));
   }
   setEnabled(name: string, enabled: boolean): Observable<JobDetail> {
-    return this.http.post<JobDetail>(apiUrl(`/jobs/${encodeURIComponent(name)}/${enabled ? 'enable' : 'disable'}`), {});
+    return this.http
+      .post<Record<string, unknown>>(apiUrl(`/jobs/${encodeURIComponent(name)}/${enabled ? 'enable' : 'disable'}`), {})
+      .pipe(map(jobFromWire));
   }
   reschedule(name: string, cron: string): Observable<JobDetail> {
-    return this.http.post<JobDetail>(apiUrl(`/jobs/${encodeURIComponent(name)}/reschedule`), { cron });
+    return this.http
+      .post<Record<string, unknown>>(apiUrl(`/jobs/${encodeURIComponent(name)}/reschedule`), { cron })
+      .pipe(map(jobFromWire));
   }
   runLogs(name: string, runId: string): Observable<JobRunLogs> {
     return this.http.get<JobRunLogs>(apiUrl(`/jobs/${encodeURIComponent(name)}/runs/${encodeURIComponent(runId)}/logs`));

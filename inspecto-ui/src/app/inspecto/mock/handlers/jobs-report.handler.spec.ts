@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { JobDetail, JobUpsert, ReportArtifact } from '../../api/jobs.service';
+import type { ReportArtifact } from '../../api/jobs.service';
+import type { JobView } from '../../api/models';
 import { MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
 import { seedDefaultSpace } from '../seeds/default-space.seed';
@@ -27,14 +28,27 @@ function seededStore(): MockStore {
     return store;
 }
 
-/** Scheduled export ⇒ a `type:'report'` job (C6, no new entity). */
-const REPORT_JOB: JobUpsert = {
+/**
+ * Scheduled export ⇒ a `type:'report'` job (C6, no new entity), in the shape a job write endpoint
+ * actually accepts: the flat `job:` section, with the type-specific parameters alongside the config
+ * keys rather than nested under `params`.
+ */
+const REPORT_JOB: Record<string, unknown> = {
     name: 'daily_cdr_export',
     type: 'report',
     cron: '0 0 6 * * *',
     enabled: true,
-    params: { reportKind: 'dashboard', dashboardId: 'cdr_sample', format: 'csv', recipients: ['ops@x.com'] },
+    reportKind: 'dashboard',
+    dashboardId: 'cdr_sample',
+    format: 'csv',
+    recipients: ['ops@x.com'],
 };
+
+/** Run state lives on the list projection, never on the detail — the detail is the config section. */
+function lastStatusOf(handler: ReturnType<typeof jobsHandler>, store: MockStore, name: string): string | undefined {
+    const list = handler(req('GET', '/api/jobs'), store)?.body as JobView[];
+    return list.find((j) => j.name === name)?.lastStatus;
+}
 
 describe('jobsHandler — scheduled report exports (C6)', () => {
     const handler = jobsHandler({ mockJobs: true, mockOps: true, mockStudio: true });
@@ -46,8 +60,7 @@ describe('jobsHandler — scheduled report exports (C6)', () => {
         const result = handler(req('POST', '/api/jobs/daily_cdr_export/trigger'), store)?.body as { runId: string };
         expect(result.runId).toBeTruthy(); // v1 async contract: the trigger answers with the run id
 
-        const job = handler(req('GET', '/api/jobs/daily_cdr_export'), store)?.body as JobDetail;
-        expect(job.lastStatus).toBe('SUCCESS');
+        expect(lastStatusOf(handler, store, 'daily_cdr_export')).toBe('SUCCESS');
 
         const runs = handler(req('GET', '/api/jobs/daily_cdr_export/runs'), store)?.body as { runId: string }[];
         expect(runs.length).toBe(1);
@@ -66,7 +79,7 @@ describe('jobsHandler — scheduled report exports (C6)', () => {
 
     it('a PDF/PNG export produces a mock placeholder artifact with the right mime type', () => {
         const store = seededStore();
-        handler(req('POST', '/api/jobs', { ...REPORT_JOB, name: 'weekly_pdf', params: { ...REPORT_JOB.params, format: 'pdf' } }), store);
+        handler(req('POST', '/api/jobs', { ...REPORT_JOB, name: 'weekly_pdf', format: 'pdf' }), store);
         handler(req('POST', '/api/jobs/weekly_pdf/trigger'), store);
         const runs = handler(req('GET', '/api/jobs/weekly_pdf/runs'), store)?.body as { runId: string }[];
         const artifact = handler(req('GET', `/api/jobs/weekly_pdf/runs/${runs[0].runId}/artifact`), store)?.body as ReportArtifact;
@@ -76,19 +89,14 @@ describe('jobsHandler — scheduled report exports (C6)', () => {
 
     it('triggering against a deleted dashboard FAILs the run instead of raising', () => {
         const store = seededStore();
-        handler(
-            req('POST', '/api/jobs', { ...REPORT_JOB, name: 'orphaned_export', params: { ...REPORT_JOB.params, dashboardId: 'gone' } }),
-            store,
-        );
+        handler(req('POST', '/api/jobs', { ...REPORT_JOB, name: 'orphaned_export', dashboardId: 'gone' }), store);
         handler(req('POST', '/api/jobs/orphaned_export/trigger'), store);
-        const job = handler(req('GET', '/api/jobs/orphaned_export'), store)?.body as JobDetail;
-        expect(job.lastStatus).toBe('FAILED');
+        expect(lastStatusOf(handler, store, 'orphaned_export')).toBe('FAILED');
     });
 
     it('a plain (non-report) job trigger is unaffected — no artifact, existing MANUAL/SUCCESS behavior', () => {
         const store = seededStore();
         handler(req('POST', '/api/jobs/cdr_ingest_daily/trigger'), store);
-        const job = handler(req('GET', '/api/jobs/cdr_ingest_daily'), store)?.body as JobDetail;
-        expect(job.lastStatus).toBe('SUCCESS');
+        expect(lastStatusOf(handler, store, 'cdr_ingest_daily')).toBe('SUCCESS');
     });
 });

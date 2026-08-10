@@ -1,5 +1,5 @@
 import type { ComponentDef } from '../../api/components.service';
-import type { JobDetail, JobRunLogs, JobUpsert } from '../../api/jobs.service';
+import type { JobDetail, JobParameterDecl, JobRunLogs } from '../../api/jobs.service';
 import type { JobRun, JobView } from '../../api/models';
 import { componentCollection } from './components.handler';
 import { MockFlags } from '../mock-flags';
@@ -35,6 +35,39 @@ export interface ReportArtifact {
 const RESERVED = new Set(['metrics', 'runs', 'failures', 'types']); // /jobs/<reserved> are real routes, not job ids
 
 /**
+ * One parameter declaration in the EXACT shape `ParameterDecl.toMap()` serves: every key of the
+ * rendering + validation contract present, unset ones as `''` / `[]` / `null`.
+ *
+ * <p>⚠ It exists so this mock cannot drift into being a different contract from the server. The
+ * built-ins it mirrors all declare through `required(...)`/`optional(...)`, i.e. every rendering
+ * component at its default — so this helper supplies exactly those defaults and each descriptor below
+ * overrides only what the real declaration overrides. Do NOT enrich a parameter here (a `group`, an
+ * `options` list) unless the Java declaration grew one: a mock that renders a nicer form than the
+ * server can produce is the same failure as one that accepts more than the server accepts.
+ */
+function decl(p: Partial<JobParameterDecl> & { name: string; type: string }): JobParameterDecl {
+    const required = p.required ?? false;
+    return {
+        required,
+        deduce: '',
+        default: '',
+        description: '',
+        label: '',
+        tier: required ? 'REQUIRED' : 'OPTIONAL',
+        options: [],
+        pattern: '',
+        min: null,
+        max: null,
+        placeholder: '',
+        group: '',
+        multi: false,
+        secret: false,
+        expressions: true,
+        ...p,
+    };
+}
+
+/**
  * Job Type descriptors (R3, GET /jobs/types[/{id}]) — mirrors the backend registry so the authoring
  * form is descriptor-driven offline too. `type` values are the framework `ParamType` names.
  */
@@ -42,7 +75,7 @@ const JOB_TYPE_DESCRIPTORS = [
     {
         id: 'enrich', title: 'Enrichment',
         description: 'Runs a Stage-2 enrichment once (full recompute) and publishes a chain commit.',
-        parameters: [{ name: 'config', type: 'STRING', required: true, deduce: '', default: '', description: 'Path to the enrichment .toon' }],
+        parameters: [decl({ name: 'config', type: 'STRING', required: true, description: 'Path to the enrichment .toon' })],
         emits: ['pipeline.commit'], artifacts: [],
         requires: [],
     },
@@ -50,10 +83,10 @@ const JOB_TYPE_DESCRIPTORS = [
         id: 'report', title: 'Report',
         description: 'Computes a report (status / batch / dataset export) and optionally delivers it.',
         parameters: [
-            { name: 'scope', type: 'STRING', required: false, deduce: '', default: 'status', description: 'status | batch | dataset' },
-            { name: 'out_dir', type: 'STRING', required: false, deduce: '', default: '', description: 'Delivery directory (enables artifact + REPORT_READY)' },
-            { name: 'format', type: 'STRING', required: false, deduce: '', default: '', description: 'json | csv' },
-            { name: 'dataset', type: 'DATASET_REF', required: false, deduce: '', default: '', description: 'Dataset id (scope=dataset)' },
+            decl({ name: 'scope', type: 'STRING', default: 'status', description: 'status | batch | dataset' }),
+            decl({ name: 'out_dir', type: 'STRING', description: 'Delivery directory (enables artifact + REPORT_READY)' }),
+            decl({ name: 'format', type: 'STRING', description: 'json | csv' }),
+            decl({ name: 'dataset', type: 'DATASET_REF', description: 'Dataset id (scope=dataset)' }),
         ],
         emits: [], artifacts: [{ name: 'report', kind: 'report' }],
         requires: [],
@@ -62,10 +95,10 @@ const JOB_TYPE_DESCRIPTORS = [
         id: 'maintenance', title: 'Maintenance',
         description: 'Built-in housekeeping task (cleanup / ledger_prune / db_maintenance / compact / materialize).',
         parameters: [
-            { name: 'task', type: 'STRING', required: false, deduce: '', default: 'cleanup', description: 'Which maintenance task' },
-            { name: 'dir', type: 'STRING', required: false, deduce: '', default: '', description: 'Target directory (cleanup / compact)' },
-            { name: 'retention_days', type: 'INTEGER', required: false, deduce: '', default: '7', description: 'Age threshold in days' },
-            { name: 'store', type: 'STRING', required: false, deduce: '', default: '', description: 'Store(s) a delete task targets (fenced)' },
+            decl({ name: 'task', type: 'STRING', default: 'cleanup', description: 'Which maintenance task' }),
+            decl({ name: 'dir', type: 'STRING', description: 'Target directory (cleanup / compact)' }),
+            decl({ name: 'retention_days', type: 'INTEGER', default: '7', description: 'Age threshold in days' }),
+            decl({ name: 'store', type: 'STRING', description: 'Store(s) a delete task targets (fenced)' }),
         ],
         emits: [], artifacts: [],
         requires: [],
@@ -74,8 +107,8 @@ const JOB_TYPE_DESCRIPTORS = [
         id: 'pipeline', title: 'Pipeline',
         description: 'Runs an authored Pipeline over data at rest; emits a commit downstream jobs can chain on.',
         parameters: [
-            { name: 'flow', type: 'STRING', required: true, deduce: '', default: '', description: 'Authored Pipeline id to run' },
-            { name: 'incremental_column', type: 'STRING', required: false, deduce: '', default: '', description: 'Watermark column for incremental runs' },
+            decl({ name: 'flow', type: 'STRING', required: true, description: 'Authored Pipeline id to run' }),
+            decl({ name: 'incremental_column', type: 'STRING', description: 'Watermark column for incremental runs' }),
         ],
         emits: ['pipeline.commit'], artifacts: [],
         requires: [],
@@ -84,9 +117,11 @@ const JOB_TYPE_DESCRIPTORS = [
         id: 'sql.template', title: 'Templated SQL',
         description: 'Runs an authored SQL template over source Datasets and materializes the result as a queryable Dataset.',
         parameters: [
-            { name: 'sql', type: 'STRING', required: true, deduce: '', default: '', description: 'SQL SELECT template; its $name tokens are the runtime parameters' },
-            { name: 'sink_dataset', type: 'STRING', required: true, deduce: '', default: '', description: 'Output Dataset (store dir under the data root)' },
-            { name: 'sources', type: 'STRING', required: false, deduce: '', default: '', description: 'CSV of source store names to register as views' },
+            // TEXT + expressions:false, exactly as SqlTemplateJobType declares it — the SQL body owns its
+            // own $-namespace, and TEXT is what retires the old `name === 'sql'` multiline sniff.
+            decl({ name: 'sql', type: 'TEXT', required: true, expressions: false, description: 'SQL SELECT template; its $name tokens are the runtime parameters' }),
+            decl({ name: 'sink_dataset', type: 'STRING', required: true, description: 'Output Dataset (store dir under the data root)' }),
+            decl({ name: 'sources', type: 'STRING', description: 'CSV of source store names to register as views' }),
         ],
         emits: ['job.dataset.produced'], artifacts: [{ name: 'output', kind: 'dataset' }],
         requires: [],
@@ -146,15 +181,15 @@ export function jobsHandler(flags: MockFlags): MockHandler {
             return json(reschedule(store, space, m[1], (req.body as { cron?: string })?.cron ?? ''));
         }
         if (method === 'GET' && JOBS.test(url)) return json(store.list<JobDetail>(space, JOBS_COLL).map(toView));
-        if (method === 'POST' && JOBS.test(url)) return json(upsert(store, space, req.body as JobUpsert));
+        if (method === 'POST' && JOBS.test(url)) return json(upsert(store, space, req.body as Record<string, unknown>));
         if (method === 'PUT' && (m = match(url, JOB_ONE))) {
-            return json(upsert(store, space, { ...(req.body as JobUpsert), name: m[1] }));
+            return json(upsert(store, space, req.body as Record<string, unknown>, m[1]));
         }
         if (method === 'DELETE' && (m = match(url, JOB_ONE)) && store.has(space, JOBS_COLL, m[1])) {
             return json(deleteJob(store, space, m[1]));
         }
         if (method === 'GET' && (m = match(url, JOB_ONE)) && !RESERVED.has(m[1]) && store.has(space, JOBS_COLL, m[1])) {
-            return json(store.get<JobDetail>(space, JOBS_COLL, m[1]));
+            return json(storedToWire(store.get<JobDetail>(space, JOBS_COLL, m[1])!));
         }
         return undefined; // reporting endpoints + unknown job ids fall through to the real backend
     };
@@ -285,33 +320,76 @@ function runReportExport(store: MockStore, space: string, job: JobDetail): JobRu
     return run;
 }
 
-function setEnabled(store: MockStore, space: string, name: string, enabled: boolean): JobDetail | undefined {
+function setEnabled(store: MockStore, space: string, name: string, enabled: boolean): Record<string, unknown> | undefined {
     const job = store.get<JobDetail>(space, JOBS_COLL, name);
-    return job ? store.put(space, JOBS_COLL, name, { ...job, enabled }) : undefined;
+    return job ? storedToWire(store.put(space, JOBS_COLL, name, { ...job, enabled })) : undefined;
 }
 
-function reschedule(store: MockStore, space: string, name: string, cron: string): JobDetail | undefined {
+function reschedule(store: MockStore, space: string, name: string, cron: string): Record<string, unknown> | undefined {
     const job = store.get<JobDetail>(space, JOBS_COLL, name);
     if (!job) return undefined;
-    // A cron schedule supersedes an event trigger.
-    return store.put(space, JOBS_COLL, name, { ...job, cron, onPipeline: null, nextFire: nextFireFor(cron) });
+    // A cron schedule supersedes an event or signal trigger.
+    return storedToWire(
+        store.put(space, JOBS_COLL, name, { ...job, cron, onPipeline: null, onSignal: null, when: null, nextFire: nextFireFor(cron) }),
+    );
 }
 
-function upsert(store: MockStore, space: string, body: JobUpsert): JobDetail {
-    const existing = store.get<JobDetail>(space, JOBS_COLL, body.name);
+/**
+ * The job keys the server treats as config; everything else in a job body is a type-specific parameter.
+ * Mirrors `JobConfig.fromMap`'s known-key set.
+ */
+const WIRE_CONFIG_KEYS = new Set(['name', 'type', 'cron', 'on_pipeline', 'on_signal', 'when', 'enabled', 'catch_up', 'args', 'bind']);
+
+/**
+ * Parse a job write body exactly as `JobConfig.fromMap` does: keys are **snake_case**, parameters are
+ * **flat** alongside them, and an unrecognised key is swept into the parameters rather than rejected —
+ * so a camelCase `onPipeline` leaves the job with no trigger, offline just as in a deployment.
+ *
+ * ⚠ Deliberately NOT reusing the client's own `jobFromWire`/`jobToWire`: this stands in for the *server*,
+ * and a mock that speaks the client's adapter back to it would agree with any bug in that adapter and
+ * keep the preview green. It mirrors the Java, independently. Pinned by `jobs.handler.spec.ts` against
+ * the same cases as `ControlApiJobCrudTest`.
+ */
+function wireToStored(raw: Record<string, unknown>): Omit<JobDetail, 'lastStatus' | 'lastRunTime' | 'nextFire'> {
+    const params: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw ?? {})) if (!WIRE_CONFIG_KEYS.has(k)) params[k] = v;
+    return {
+        name: String(raw?.['name'] ?? ''),
+        type: String(raw?.['type'] ?? '') as JobDetail['type'],
+        cron: (raw?.['cron'] as string) || null,
+        onPipeline: (raw?.['on_pipeline'] as string) || null,
+        onSignal: (raw?.['on_signal'] as string) || null,
+        when: (raw?.['when'] as string) || null,
+        enabled: raw?.['enabled'] !== false,
+        catchUp: raw?.['catch_up'] === true || raw?.['catch_up'] === 'true',
+        params,
+    };
+}
+
+/** The inverse (`JobConfig.toMap`): the flat snake_case `job:` section the detail endpoint returns, with
+ *  parameters flattened in beside the config keys and blank/default optionals omitted. */
+function storedToWire(j: JobDetail): Record<string, unknown> {
+    const out: Record<string, unknown> = { name: j.name, type: j.type };
+    if (j.cron) out['cron'] = j.cron;
+    if (j.onPipeline) out['on_pipeline'] = j.onPipeline;
+    if (j.onSignal) out['on_signal'] = j.onSignal;
+    if (j.when) out['when'] = j.when;
+    out['enabled'] = j.enabled;
+    if (j.catchUp) out['catch_up'] = true;
+    for (const [k, v] of Object.entries(j.params ?? {})) if (!WIRE_CONFIG_KEYS.has(k)) out[k] = v;
+    return out;
+}
+
+function upsert(store: MockStore, space: string, body: Record<string, unknown>, name?: string): Record<string, unknown> {
+    const parsed = wireToStored(name ? { ...body, name } : body);
+    const existing = store.get<JobDetail>(space, JOBS_COLL, parsed.name);
     const job: JobDetail = {
-        name: body.name,
-        type: body.type,
-        cron: body.cron ?? null,
-        onPipeline: body.onPipeline ?? null,
-        enabled: body.enabled,
-        catchUp: body.catchUp,
-        params: body.params ?? {},
+        ...parsed,
         lastStatus: existing?.lastStatus,
         lastRunTime: existing?.lastRunTime,
-        nextFire: nextFireFor(body.cron),
+        nextFire: nextFireFor(parsed.cron),
     };
-    return store.put(space, JOBS_COLL, job.name, job);
+    return storedToWire(store.put(space, JOBS_COLL, job.name, job));
 }
 
 function deleteJob(store: MockStore, space: string, name: string): { deleted: boolean } {
@@ -323,9 +401,11 @@ function deleteJob(store: MockStore, space: string, name: string): { deleted: bo
     return { deleted: true };
 }
 
-/** Project the full record onto the list `JobView` (drop params/catchUp — the list endpoint omits them). */
+/** Project the full record onto the list `JobView` (drop params/catchUp/when — the list endpoint omits
+ *  them). Unlike the detail view this one IS camelCase: server-side it is a Java record, not the config
+ *  section, so `onSignal` keeps its camel spelling here. */
 function toView(j: JobDetail): JobView {
-    return { name: j.name, type: j.type, cron: j.cron, onPipeline: j.onPipeline, enabled: j.enabled, lastStatus: j.lastStatus, lastRunTime: j.lastRunTime, nextFire: j.nextFire };
+    return { name: j.name, type: j.type, cron: j.cron, onPipeline: j.onPipeline, onSignal: j.onSignal ?? null, enabled: j.enabled, lastStatus: j.lastStatus, lastRunTime: j.lastRunTime, nextFire: j.nextFire };
 }
 
 /** A plausible next-fire for a cron job (mock — the real backend uses CronExpression); null when not cron. */

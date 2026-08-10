@@ -12,13 +12,13 @@ import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, JobDetail, JobsService, JobType, JobUpsert } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
-import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { AttributeOptionLoader, InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { JOB_ATTRIBUTES } from './job-attributes';
-import { paramDeclsToSpecs } from './job-parameter-specs';
+import { paramDeclsToSpecs, paramValueToApi, paramValueToForm } from './job-parameter-specs';
 
 /** Dialog input: an existing job ⇒ edit; absent ⇒ create. `focusSchedule` opens with the schedule emphasized
  *  (the "Reschedule" action). */
@@ -32,13 +32,21 @@ export interface JobFormResult {
     saved?: JobDetail;
 }
 
-type ScheduleMode = 'cron' | 'event' | 'manual';
+type ScheduleMode = 'cron' | 'event' | 'signal' | 'manual';
 const CRON_PRESETS: { label: string; cron: string }[] = [
     { label: 'Every hour', cron: '0 0 * * * *' },
     { label: 'Daily 06:00', cron: '0 0 6 * * *' },
     { label: 'Weekly (Sun 02:00)', cron: '0 0 2 * * 0' },
     { label: 'Monthly (1st 01:00)', cron: '0 0 1 1 * *' },
 ];
+
+/** Which trigger a saved job is using. Cron wins over an event trigger, which wins over a signal one —
+ *  the same precedence the reschedule action applies (a cron supersedes an event trigger). */
+export function triggerModeOf(job: { cron?: string | null; onPipeline?: string | null; onSignal?: string | null }): ScheduleMode {
+    if (job.cron) return 'cron';
+    if (job.onPipeline) return 'event';
+    return job.onSignal ? 'signal' : 'manual';
+}
 
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
@@ -117,9 +125,11 @@ export class JobFormDialog implements AfterViewInit {
         ? {
               name: this.data.job.name,
               type: this.data.job.type,
-              scheduleMode: (this.data.job.cron ? 'cron' : this.data.job.onPipeline ? 'event' : 'manual') as ScheduleMode,
+              scheduleMode: triggerModeOf(this.data.job),
               cron: this.data.job.cron ?? '0 0 6 * * *',
               onPipeline: this.data.job.onPipeline ?? '',
+              onSignal: this.data.job.onSignal ?? '',
+              when: this.data.job.when ?? '',
               enabled: this.data.job.enabled,
               catchUp: !!this.data.job.catchUp,
           }
@@ -145,6 +155,10 @@ export class JobFormDialog implements AfterViewInit {
     /** Suggestion source for the on-signal trigger's pipeline. */
     readonly optionLoaders = { onPipeline: pipelineOptionLoader() };
 
+    /** Suggestion sources for the DECLARED parameters — built per descriptor, because the keys are the
+     *  Job Type's own (a `DATASET_REF` renders as an autocomplete and would otherwise offer nothing). */
+    readonly paramOptionLoaders = signal<Record<string, AttributeOptionLoader>>({});
+
     constructor() {
         for (const [key, value] of Object.entries(this.data.job?.params ?? {})) this.addParam(key, String(value));
     }
@@ -165,6 +179,7 @@ export class JobFormDialog implements AfterViewInit {
         if (!typeId) {
             this.paramSpecs.set([]);
             this.paramInitial.set(undefined);
+            this.paramOptionLoaders.set({});
             this.typeRequires.set([]);
             return;
         }
@@ -173,10 +188,16 @@ export class JobFormDialog implements AfterViewInit {
                 const specs = paramDeclsToSpecs(d.parameters);
                 this.paramSpecs.set(specs);
                 this.typeRequires.set(d.requires ?? []);
+                // A declared DATASET_REF maps to an autocomplete; give each one the dataset suggestions.
+                const loaders: Record<string, AttributeOptionLoader> = {};
+                for (const decl of d.parameters ?? []) {
+                    if (decl.type === 'DATASET_REF') loaders[decl.name] = datasetOptionLoader();
+                }
+                this.paramOptionLoaders.set(loaders);
                 const init: Record<string, unknown> = {};
                 for (const s of specs) {
                     const v = this.data.job?.params?.[s.key];
-                    if (v !== undefined) init[s.key] = v;
+                    if (v !== undefined) init[s.key] = paramValueToForm(s, v);
                 }
                 this.paramInitial.set(Object.keys(init).length ? init : undefined);
                 // Declared params own their typed field — drop any duplicate from the free key/value editor.
@@ -189,6 +210,7 @@ export class JobFormDialog implements AfterViewInit {
                 // Unknown type / no descriptor (e.g. a legacy type or 404) → free key/value editor only.
                 this.paramSpecs.set([]);
                 this.paramInitial.set(undefined);
+                this.paramOptionLoaders.set({});
                 this.typeRequires.set([]);
             },
         });
@@ -204,11 +226,14 @@ export class JobFormDialog implements AfterViewInit {
         this.schemaForm.form.get('cron')?.setValue(cron);
     }
 
-    /** The suggested job id: `<type>_<pipeline>` for an on-signal trigger, else just `<type>`. */
+    /** The suggested job id: `<type>_<trigger>` when the trigger names something, else just `<type>`. */
     suggestedName(): string {
-        const v = this.schemaForm.value() as { type?: string; scheduleMode?: ScheduleMode; onPipeline?: string };
-        const base = v.scheduleMode === 'event' && v.onPipeline ? `${v.type}_${v.onPipeline}` : String(v.type ?? 'job');
-        return base.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[^A-Za-z0-9]+/, '');
+        const v = this.schemaForm.value() as { type?: string; scheduleMode?: ScheduleMode; onPipeline?: string; onSignal?: string };
+        let base = String(v.type ?? 'job');
+        if (v.scheduleMode === 'event' && v.onPipeline) base = `${v.type}_${v.onPipeline}`;
+        // A signal id is dotted (`dataset.write`) and a glob ends in `.*` — both get sanitised below.
+        else if (v.scheduleMode === 'signal' && v.onSignal) base = `${v.type}_${v.onSignal}`;
+        return base.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[^A-Za-z0-9]+/, '').replace(/[^A-Za-z0-9]+$/, '');
     }
 
     /** Create flow only: leave the save step back to the config step (the id is kept). */
@@ -234,6 +259,8 @@ export class JobFormDialog implements AfterViewInit {
             scheduleMode: ScheduleMode;
             cron?: string;
             onPipeline?: string;
+            onSignal?: string;
+            when?: string;
             enabled?: boolean;
             catchUp?: boolean;
         };
@@ -241,7 +268,9 @@ export class JobFormDialog implements AfterViewInit {
         // Declared (descriptor-driven) parameters first — blank optionals are omitted.
         if (this.paramForm) {
             for (const [k, val] of Object.entries(this.paramForm.value())) {
-                if (val !== null && val !== undefined && val !== '') params[k] = val;
+                // A cleared chip list is already null (the renderer writes null, not []), so it is
+                // omitted here like any other blank optional.
+                if (val !== null && val !== undefined && val !== '') params[k] = paramValueToApi(val);
             }
         }
         // Then any additional key/value params the author added by hand (never overriding a declared one).
@@ -254,6 +283,9 @@ export class JobFormDialog implements AfterViewInit {
             type: v.type,
             cron: v.scheduleMode === 'cron' ? String(v.cron ?? '').trim() : null,
             onPipeline: v.scheduleMode === 'event' ? String(v.onPipeline ?? '').trim() : null,
+            onSignal: v.scheduleMode === 'signal' ? String(v.onSignal ?? '').trim() : null,
+            // The guard only travels with the signal trigger it narrows — switching away drops it.
+            when: v.scheduleMode === 'signal' ? String(v.when ?? '').trim() || null : null,
             enabled: v.enabled !== false,
             catchUp: !!v.catchUp,
             params,

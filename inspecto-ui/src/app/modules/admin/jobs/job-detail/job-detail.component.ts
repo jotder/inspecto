@@ -211,7 +211,9 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         if (!j) return;
         this.api.setEnabled(j.name, !j.enabled).subscribe({
             next: (updated) => {
-                this.job.set(updated);
+                // The response is the job's CONFIG section — it carries no run state, so merge rather
+                // than replace or the last-run/next-fire panel blanks out on a toggle.
+                this.job.set({ ...j, ...updated });
                 this.toastr.success(`${j.name} ${j.enabled ? 'disabled' : 'enabled'}`);
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not update ${j.name}`)),

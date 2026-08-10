@@ -4,6 +4,9 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  * The Job kind's attribute declarations (W2 pilot) — drives `<inspecto-schema-form>` in
  * {@link JobFormDialog}. Tier assignments per the attribute audit: identity + trigger are required,
  * arming is optional, `catchUp` is advanced (it was silently missing from the old hand-built form).
+ *
+ * Keys here are the UI's own (camelCase); `jobToWire` maps them onto the server's snake_case job
+ * section — never send these names to the API directly.
  */
 // 'name' (the job id) is asked at save time (ui-design-review R9 — name-at-save), not declared here;
 // see JobFormDialog's `saveForm`.
@@ -25,6 +28,7 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
         options: [
             { value: 'cron', label: 'Cron schedule' },
             { value: 'event', label: 'On pipeline (event-driven)' },
+            { value: 'signal', label: 'On signal' },
             { value: 'manual', label: 'Manual only' },
         ],
     },
@@ -41,6 +45,20 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
         dependsOn: { key: 'scheduleMode', equals: 'event' },
         placeholder: 'e.g. cdr_ingest',
         help: 'Runs when this pipeline commits a batch.',
+    },
+    {
+        key: 'onSignal', label: 'On signal', type: 'string', tier: 'required',
+        dependsOn: { key: 'scheduleMode', equals: 'signal' },
+        placeholder: 'e.g. dataset.write',
+        // `Signals.matchesType`: exact (case-insensitive) or a `prefix.*` glob. Free text on purpose —
+        // there is no signal-type catalog endpoint, and a job may be armed for a signal not yet emitted.
+        help: 'The signal type to fire on — exact (dataset.write) or a prefix glob (dataset.*).',
+    },
+    {
+        key: 'when', label: 'Only when', type: 'string', tier: 'optional',
+        dependsOn: { key: 'scheduleMode', equals: 'signal' },
+        placeholder: "e.g. $signal.dataset == 'premium_cdr_view'",
+        help: "Optional guard over the firing signal's payload; the job runs only when it holds. Leave blank to run on every match.",
     },
     { key: 'enabled', label: 'Enabled (armed)', type: 'boolean', tier: 'optional', default: true },
     {

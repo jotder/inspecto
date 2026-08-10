@@ -112,6 +112,8 @@ export interface JobView {
   type: JobType;
   cron?: string | null;
   onPipeline?: string | null;
+  /** Signal-type trigger (exact id or a `prefix.*` match); the `when` guard is detail-only. */
+  onSignal?: string | null;
   enabled: boolean;
   lastStatus?: string;
   lastRunTime?: string;

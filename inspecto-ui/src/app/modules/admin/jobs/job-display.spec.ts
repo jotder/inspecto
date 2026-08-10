@@ -20,9 +20,12 @@ describe('job-display', () => {
         expect(whatScheduled({ type: 'ingest' })).toBe('Ingest');
     });
 
-    it('scheduleSummary covers cron / event / manual', () => {
+    it('scheduleSummary covers cron / event / signal / manual', () => {
         expect(scheduleSummary({ cron: '0 0 6 * * *' })).toBe('0 0 6 * * *');
         expect(scheduleSummary({ onPipeline: 'cdr_ingest' })).toBe('on cdr_ingest');
+        expect(scheduleSummary({ onSignal: 'dataset.write' })).toBe('on signal dataset.write');
         expect(scheduleSummary({})).toBe('manual');
+        // a signal-triggered job must never read as manual — it is armed and will fire
+        expect(scheduleSummary({ onSignal: 'dataset.*' })).not.toBe('manual');
     });
 });

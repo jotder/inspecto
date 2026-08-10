@@ -124,8 +124,57 @@ describe('JobFormDialog', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('authors a signal trigger: the id, the optional guard, and a suggested name from both', () => {
+        const { c, save } = create({});
+        c.schemaForm.form.patchValue({
+            type: 'maintenance',
+            scheduleMode: 'signal',
+            onSignal: 'dataset.write',
+            when: "$signal.dataset == 'premium_cdr_view'",
+        });
+        c.save(); // config valid ⇒ save step, with the id pre-filled from the trigger
+        expect(c.step()).toBe('save');
+        expect(c.saveForm.get('name')?.value).toBe('maintenance_dataset.write');
+
+        c.save();
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                onSignal: 'dataset.write',
+                when: "$signal.dataset == 'premium_cdr_view'",
+                cron: null,
+                onPipeline: null,
+            }),
+        );
+    });
+
+    it('sends the guard only with the trigger it narrows, and clears the trigger when the mode changes', () => {
+        const { c, save } = create({});
+        c.schemaForm.form.patchValue({ scheduleMode: 'signal', onSignal: 'dataset.write', when: '$signal.rows > 0' });
+        c.schemaForm.form.patchValue({ scheduleMode: 'manual' }); // author changes their mind
+        c.save();
+        c.saveForm.patchValue({ name: 'manual_job' });
+        c.save();
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ onSignal: null, when: null }));
+    });
+
+    it('seeds the signal trigger back from a saved job (edit)', () => {
+        const { c } = create({
+            job: { name: 'j2', type: 'maintenance', cron: null, onPipeline: null, onSignal: 'dataset.*', when: '$signal.rows > 0', enabled: true },
+        });
+        expect(c.schemaForm.form.get('scheduleMode')?.value).toBe('signal');
+        expect(c.schemaForm.form.get('onSignal')?.value).toBe('dataset.*');
+        expect(c.schemaForm.form.get('when')?.value).toBe('$signal.rows > 0');
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('renders the signal trigger fields with no a11y violations', async () => {
+        const { c, fixture } = create({});
+        c.schemaForm.form.patchValue({ scheduleMode: 'signal', onSignal: 'dataset.write' });
+        fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });
