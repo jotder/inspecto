@@ -57,7 +57,80 @@ class EnrichmentConfigTest {
         assertEquals("reports/events_daily", cfg.output().database());
         assertEquals("snappy", cfg.output().compression());
         assertEquals(java.util.List.of("event_type", "day"), cfg.output().partitions());
+        assertNull(cfg.output().eventTimeSource(),
+                "bare-string partitions declare no event time — the shape every enrichment had before the key");
         assertTrue(cfg.transformSql().startsWith("SELECT event_type, day"));
+    }
+
+    /**
+     * An {@code output.partitions} entry may be the sink's {@code {column, source}} map instead of a bare
+     * name, which is how an enrichment declares its event time and so gets {@code event_time_min}/{@code max}
+     * on its Consignment output rows. The columns still read as plain names, so nothing downstream changes.
+     */
+    @Test
+    void partitionEntryMayDeclareTheEventTimeSource(@TempDir Path dir) throws Exception {
+        EnrichmentConfig cfg = EnrichmentConfig.load(writeWithPartitions(dir, """
+                  partitions[2]:
+                    - column: event_type
+                    - column: day
+                      source: event_ts
+                """).toString());
+
+        assertEquals(java.util.List.of("event_type", "day"), cfg.output().partitions(),
+                "a map entry contributes its column, exactly like a bare name");
+        assertEquals("event_ts", cfg.output().eventTimeSource());
+        assertTrue(cfg.output().hasEventTime());
+    }
+
+    /**
+     * Two entries naming DIFFERENT sources identify no one event time, so none is recorded — deliberately the
+     * same call {@code SinkPartitions.eventTimeSource} makes, so a sink and an enrichment treat an identical
+     * declaration identically rather than one of them guessing.
+     */
+    @Test
+    void disagreeingSourcesIdentifyNoEventTime(@TempDir Path dir) throws Exception {
+        EnrichmentConfig cfg = EnrichmentConfig.load(writeWithPartitions(dir, """
+                  partitions[2]:
+                    - column: event_type
+                      source: ingested_at
+                    - column: day
+                      source: event_ts
+                """).toString());
+
+        assertEquals(java.util.List.of("event_type", "day"), cfg.output().partitions());
+        assertNull(cfg.output().eventTimeSource());
+        assertFalse(cfg.output().hasEventTime());
+    }
+
+    /** A partition entry with no usable {@code column} is an error, not a silently dropped grain level. */
+    @Test
+    void partitionEntryWithoutAColumnIsRejected(@TempDir Path dir) throws Exception {
+        Path toon = writeWithPartitions(dir, """
+                  partitions[1]:
+                    - source: event_ts
+                """);
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> EnrichmentConfig.load(toon.toString()));
+        assertTrue(ex.getMessage().contains("output.partitions"), ex.getMessage());
+    }
+
+    /** A minimal enrichment whose {@code output.partitions} block is supplied verbatim. */
+    private static Path writeWithPartitions(Path dir, String partitionsBlock) throws Exception {
+        Path toon = dir.resolve("enrich.toon");
+        Files.writeString(toon, """
+                name: EVENTS_DAILY_KPI
+                version: 1
+                input:
+                  database: database/events
+                  format: PARQUET
+                  partitions[1]: day
+                output:
+                  database: reports/events_daily
+                  format: PARQUET
+                %s\
+                transform: "SELECT event_type, day FROM input"
+                """.formatted(partitionsBlock));
+        return toon;
     }
 
     @Test

@@ -93,8 +93,30 @@ public record EnrichmentConfig(String name,
         public boolean hasAsOf() { return asOf != null && !asOf.isBlank(); }
     }
 
-    /** Where and how enriched output is written, and at what partition grain. */
-    public record Output(String database, String format, String compression, List<String> partitions) {}
+    /**
+     * Where and how enriched output is written, and at what partition grain.
+     *
+     * <p>{@code partitions} is the list of partition COLUMNS. An entry may be authored either as a bare
+     * column name or as {@code {column: <col>, source: <col>}} — the same map-entry shape a pipeline sink
+     * accepts (see {@code SinkPartitions}) — where {@code source} names the column holding this row's event
+     * time. The parser folds the declared sources down to {@link #eventTimeSource}, so every existing
+     * consumer of {@code partitions()} keeps seeing plain column names.
+     *
+     * @param eventTimeSource the one column the entries agree identifies event time, or {@code null} when
+     *                        none is declared, two disagree, or it is not a plain identifier — the same
+     *                        four null cases {@code SinkPartitions.eventTimeSource} has. Null means this
+     *                        enrichment records no {@code event_time_min}/{@code max}, which is what it
+     *                        always did before the key existed.
+     */
+    public record Output(String database, String format, String compression, List<String> partitions,
+                         String eventTimeSource) {
+        /** Without an event-time source — CLI / programmatic use, and every pre-2026-08-11 caller. */
+        public Output(String database, String format, String compression, List<String> partitions) {
+            this(database, format, compression, partitions, null);
+        }
+        /** Whether this output identifies an event time to record bounds from. */
+        public boolean hasEventTime() { return eventTimeSource != null && !eventTimeSource.isBlank(); }
+    }
 
     /**
      * How this enrichment is scheduled by the service.
@@ -156,8 +178,10 @@ public record EnrichmentConfig(String name,
                 req(out, "database", "output.database"),
                 String.valueOf(out.getOrDefault("format", "PARQUET")).toUpperCase(),
                 (String) out.get("compression"),
-                strList(out.get("partitions"), "output.partitions"));
+                partitionColumns(out.get("partitions"), "output.partitions"),
+                eventTimeSourceOf(out.get("partitions")));
         output.partitions().forEach(c -> Identifiers.validate(c, "output.partitions"));
+        if (output.hasEventTime()) Identifiers.validate(output.eventTimeSource(), "output.partitions[].source");
 
         // references is a map of name → {path, format}. A map (not a tabular array)
         // because reference paths contain ':' (Windows drive letters), which JToon's
@@ -245,6 +269,48 @@ public record EnrichmentConfig(String name,
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * Partition columns from entries that may be a bare name or {@code {column: …, source: …}} — the sink
+     * map-entry shape. An entry carrying no usable {@code column} is an error rather than a skip: it would
+     * otherwise silently drop a partition level from the write grain.
+     */
+    private static List<String> partitionColumns(Object v, String where) {
+        if (!(v instanceof List<?> l)) return strList(v, where);
+        List<String> cols = new ArrayList<>();
+        for (Object o : l) {
+            if (o instanceof Map<?, ?> m) {
+                Object col = m.get("column");
+                if (col == null || col.toString().isBlank())
+                    throw new IllegalArgumentException("Partition entry needs a 'column' at " + where + ": " + o);
+                cols.add(col.toString().trim());
+            } else if (o != null && !o.toString().isBlank()) {
+                cols.add(o.toString().trim());
+            }
+        }
+        return cols;
+    }
+
+    /**
+     * The one {@code source} the partition entries agree on, or {@code null}. Deliberately the same four
+     * null cases as {@code SinkPartitions.eventTimeSource} — none declared, two that disagree, one that is
+     * blank, one that is not a plain identifier — so an enrichment and a sink treat an identical
+     * declaration identically. Null is not an error: it means no bounds are recorded, the behaviour every
+     * enrichment had before this key existed.
+     */
+    private static String eventTimeSourceOf(Object v) {
+        if (!(v instanceof List<?> l)) return null;
+        java.util.LinkedHashSet<String> declared = new java.util.LinkedHashSet<>();
+        for (Object o : l) {
+            if (o instanceof Map<?, ?> m && m.get("source") != null) declared.add(m.get("source").toString().trim());
+        }
+        if (declared.size() != 1) return null;
+        String source = declared.iterator().next();
+        return SAFE_COLUMN.matcher(source).matches() ? source : null;
+    }
+
+    /** A plain SQL identifier — the guard that lets {@code eventTimeSource} be embedded in a query. */
+    private static final java.util.regex.Pattern SAFE_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
     private static List<String> strList(Object v, String where) {
         if (v instanceof List<?> l) return (List<String>) l;
         if (v instanceof String s && !s.isBlank()) {

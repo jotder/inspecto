@@ -36,12 +36,13 @@ column is not evidence that it *is* event time:
 | Ingest (`BatchProcessor` → `DataTransformer`) | `__event_time`, coerced from the schema's date `PartitionDef` and **excluded from written output** | no date partition declared, or every row failed to parse |
 | Pipeline sink (`PartitionSinkWriter`) | `TRY_CAST(<source> AS TIMESTAMP)`, where `source` is a `partitions[]` entry's declared raw column | no entry declares one, entries disagree, or it is not a plain identifier |
 
-Enrichment and the Consignment processor **record a producer since 2026-08-10, and still no bounds** — and the
-two halves of that gap are different problems, so they are listed apart:
+Enrichment and the Consignment processor **record a producer since 2026-08-10**; enrichment records bounds
+since 2026-08-11, the processor still does not — the two halves were different problems, so they stay listed
+apart:
 
 | Writer | `producer` | `bounds` |
 |---|---|---|
-| Enrichment (`EnrichmentEngine`) | the enrichment's own `cfg.name()`, on the main **and** routed/quarantine writes | **open — needs a config-schema decision.** `EnrichmentConfig.Output.partitions` is a bare `List<String>`; it has no home for the `source:` key `SinkPartitions` reads, and giving it one is a public `.toon` change |
+| Enrichment (`EnrichmentEngine`) | the enrichment's own `cfg.name()`, on the main **and** routed/quarantine writes | **SHIPPED 2026-08-11.** An `output.partitions` entry may be the sink's `{column, source}` map instead of a bare name; the parser folds the declared sources to `Output.eventTimeSource` and `boundsOf` runs the same `TRY_CAST(<source> AS TIMESTAMP)` fold as the sink |
 | Consignment processor (`ConsignmentProcessJobType`) | the **processor id**, threaded through `SummaryWriter.write` | **open — a design call, possibly a won't-do.** A `SummaryRow` is pre-aggregated over an author-chosen `keys` grain with no enforced time key |
 
 ⚠ **Neither writer was ever missing its registry row** — both always called `ConsignmentOutputStores.record`; the
@@ -54,6 +55,12 @@ not the Job Type, because two processors can summarise one target and `producerH
 ⛔ **Do not close the summary-bounds gap by folding a `record_day` key into a range.** That describes the grain,
 not the events — and a wrong watermark is worse than a null, which a reader correctly treats as "cannot prune".
 Pinned as a deliberate null by `SummaryWriterTest#boundsStayNullBecauseASummaryRowHasNoEventTime`.
+
+⚠ **The enrichment and sink declarations are the same shape but NOT the same reader.** `EnrichmentConfig`
+folds its own copy (`eventTimeSourceOf`) because it parses `.toon` into a record at load time, while
+`SinkPartitions` reads a node config map at write time. They are kept behaviourally identical on purpose —
+same four null cases, same identifier guard — so an author who writes one declaration gets one answer. If a
+third writer ever wants it, extract the fold rather than adding a third copy.
 
 The sink declaration has **one reader**: `SinkPartitions` (`pipeline/exec`), shared by the writer that acts on
 it and the `ComponentPreview` that predicts what it will do. Keeping that rule in both files let them disagree

@@ -97,6 +97,76 @@ class EnrichmentEngineTest {
     private static final String DAILY_COUNT =
             "SELECT event_type, year, month, day, COUNT(*) AS event_count FROM input GROUP BY event_type, year, month, day";
 
+    /** As {@link #DAILY_COUNT}, plus a per-group event-time range an {@code output.partitions} source can name. */
+    private static final String DAILY_COUNT_WITH_TS =
+            "SELECT event_type, year, month, day, COUNT(*) AS event_count, "
+            + "MIN(year || '-' || month || '-' || day || ' 00:00:00') AS event_ts "
+            + "FROM input GROUP BY event_type, year, month, day";
+
+    /**
+     * An enrichment that DECLARES its event time records {@code event_time_min}/{@code max} on its
+     * Consignment output rows. Both were null for every enrichment until 2026-08-11 -- the columns existed
+     * and the producer was stamped, but nothing named the column to measure -- so
+     * {@code $upstream(job).artifact(name).event_time_min} resolved to nothing for an enrichment-fed job.
+     *
+     * <p>Asserts the values, not merely non-null: a bounds fold that silently measured the wrong column
+     * would still populate the row.
+     */
+    @Test
+    void declaredEventTimeSourceRecordsBoundsOnTheOutputRows(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        Path toon = dir.resolve("enrich.toon");
+        Files.writeString(toon, configToon(in, out, DAILY_COUNT_WITH_TS, "")
+                .replace("  partitions[4]: event_type, year, month, day\ntransform:",
+                         """
+                           partitions[4]:
+                             - column: event_type
+                             - column: year
+                             - column: month
+                             - column: day
+                               source: event_ts
+                         transform:"""));
+        EnrichmentConfig cfg = EnrichmentConfig.load(toon.toString());
+        assertEquals("event_ts", cfg.output().eventTimeSource(), "the fixture must declare a source");
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+
+            EnrichmentEngine.runResult(cfg, null, List.of(), List.of(), "enrich-bounds-1");
+
+            List<ConsignmentOutput> rows = store.outputs("enrich-bounds-1");
+            assertFalse(rows.isEmpty(), "the run must register output rows");
+            for (ConsignmentOutput o : rows) {
+                assertNotNull(o.bounds(), "bounds recorded for " + o.partitionKey());
+                assertNotNull(o.bounds().min(), "min recorded for " + o.partitionKey());
+                assertNotNull(o.bounds().max(), "max recorded for " + o.partitionKey());
+                // Each partition is one day, so its min and max are that day's midnight.
+                assertTrue(o.bounds().min().startsWith("2020-04-"),
+                        "measured the declared column, not some other timestamp: " + o.bounds().min());
+            }
+        }
+    }
+
+    /** Without a declared source the rows still register, with bounds left null -- the prior behaviour. */
+    @Test
+    void withoutADeclaredSourceBoundsStayNull(@TempDir Path dir) throws Exception {
+        Path in = dir.resolve("in"), out = dir.resolve("out");
+        seedInput(in);
+        EnrichmentConfig cfg = load(dir, in, out, DAILY_COUNT, "");
+        assertNull(cfg.output().eventTimeSource());
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            ConsignmentOutputStores.use(store);
+
+            EnrichmentEngine.runResult(cfg, null, List.of(), List.of(), "enrich-bounds-2");
+
+            List<ConsignmentOutput> rows = store.outputs("enrich-bounds-2");
+            assertFalse(rows.isEmpty());
+            for (ConsignmentOutput o : rows) assertNull(o.bounds(), "no declaration ⇒ no bounds");
+        }
+    }
+
     @Test
     void previewRunsTransformOverSampleWithoutPersisting(@TempDir Path dir) throws Exception {
         Path out = dir.resolve("should-stay-empty");

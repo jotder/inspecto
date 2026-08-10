@@ -2,6 +2,7 @@ package com.gamma.enrich;
 
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentOutputs;
+import com.gamma.consignment.EventTimeBounds;
 import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
@@ -158,7 +159,7 @@ public final class EnrichmentEngine {
                                     runId, null, dest, routed,
                                     ConsignmentOutputs.countByPartition(c, routedTable,
                                             cfg.output().partitions()),
-                                    null, cfg.name()));
+                                    boundsOf(c, routedTable, cfg), cfg.name()));
                         return new DecisionRuleApplier.Result(routed, List.of());
                     });
 
@@ -171,14 +172,14 @@ public final class EnrichmentEngine {
             // registered themselves, from their own relation). There is no lineage matrix on this path, so the
             // per-file count comes from a GROUP BY over the relation just written. `runId` is the unit of work
             // for a recompute; the run_id column stays null until §13's Run model gives it a distinct identity.
-            // ⚠ `bounds` stays null: it needs an event-time column the enrichment can DECLARE, and
-            // `output.partitions` is a bare List<String> with no home for the sink's `source:` key —
-            // a public .toon schema change, deliberately not smuggled in here (BACKLOG §4).
+            // `bounds` is recorded when the output DECLARES its event time, which `output.partitions` can
+            // now carry as the sink's `{column, source}` map entry (2026-08-11). Null without one, exactly
+            // as before the key existed.
             if (runId != null)
                 ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
                         runId, null, cfg.name(), outputs,
                         ConsignmentOutputs.countByPartition(conn, "__enriched", cfg.output().partitions()),
-                        null, cfg.name()));
+                        boundsOf(conn, "__enriched", cfg), cfg.name()));
 
             if (!applied.outputs().isEmpty()) {
                 List<PartitionOutput> all = new ArrayList<>(applied.outputs());
@@ -285,6 +286,25 @@ public final class EnrichmentEngine {
      * as-is; a by-name {@code ref} resolves to the declaring {@code produces: reference} pipeline's
      * Hive-partitioned Stage-1 output (its {@code dirs.database} glob, its output format).
      */
+    /**
+     * Event-time bounds for a relation about to be registered, or {@code null} when the output declares no
+     * event time. Mirrors {@code PartitionSinkWriter.boundsFor} deliberately — same {@code TRY_CAST(… AS
+     * TIMESTAMP)} fold, same best-effort contract: a relation whose declared source cannot be measured
+     * (wrong type, column absent from a routed projection) records no bounds rather than failing the write.
+     * The source is validated as a plain identifier at parse time, which is what makes it safe to embed.
+     */
+    private static Map<String, EventTimeBounds> boundsOf(Connection conn, String table, EnrichmentConfig cfg) {
+        if (!cfg.output().hasEventTime()) return null;
+        try {
+            return ConsignmentOutputs.boundsByPartition(conn, table, cfg.output().partitions(),
+                    "TRY_CAST(\"" + cfg.output().eventTimeSource() + "\" AS TIMESTAMP)");
+        } catch (Exception unmeasurable) {
+            log.debug("enrichment '{}': no event-time bounds from '{}' on {}: {}",
+                    cfg.name(), cfg.output().eventTimeSource(), table, unmeasurable.getMessage());
+            return null;
+        }
+    }
+
     private static String referenceReader(EnrichmentConfig.Reference r, List<PipelineConfig> pipelines) {
         if (!r.byName()) return SqlViews.reader(r.format(), r.path(), false);   // as_of rejected at parse
         PipelineConfig p = (pipelines == null ? List.<PipelineConfig>of() : pipelines).stream()
