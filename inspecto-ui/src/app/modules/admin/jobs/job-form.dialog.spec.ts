@@ -215,7 +215,9 @@ describe('JobFormDialog', () => {
             expect(text).toContain('pack:acme');
             expect(text).toContain('2.1.0');
             expect(text).toContain('com.acme.ThingType');
-            expect(c.artifactSummary(CATALOG[1])).toBe('out (dataset)');
+            // Zero-arg: the summaries are computeds over `selectedType()`, not helpers taking a descriptor.
+            expect(c.artifactSummary()).toBe('out (dataset)');
+            expect(c.emitsSummary()).toBe('acme.done');
         });
     });
 

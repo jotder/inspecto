@@ -98,7 +98,12 @@ export class JobFormDialog implements AfterViewInit {
     readonly cronPresets = CRON_PRESETS;
     /** A signal, not the const: the `type` picker's options are replaced by the server's catalog (§8.2). */
     readonly attributes = signal<AttributeSpec[]>(JOB_ATTRIBUTES);
-    /** Every registered Job Type (`GET /jobs/types`) — the picker's options and the "what this does" panel. */
+    /**
+     * Every registered Job Type (`GET /jobs/types`) — the picker's options, and the descriptor source.
+     * The catalog route serves the SAME descriptor + provenance as `GET /jobs/types/{id}`
+     * (`JobService.jobTypeViews()` maps each type through `jobTypeView(id)`), so once this has arrived a
+     * type switch needs no second round trip.
+     */
     readonly typeCatalog = signal<JobTypeDescriptor[]>([]);
     /** The selected type's full descriptor, for the panel. Set alongside its parameters. */
     readonly selectedType = signal<JobTypeDescriptor | undefined>(undefined);
@@ -111,9 +116,11 @@ export class JobFormDialog implements AfterViewInit {
     readonly selectedTypeId = signal('');
 
     /** `name (kind)` per declared Run Artifact — what a run of this type records. */
-    artifactSummary(t: JobTypeDescriptor): string {
-        return (t.artifacts ?? []).map((a) => `${a.name} (${a.kind})`).join(', ');
-    }
+    readonly artifactSummary = computed(() =>
+        (this.selectedType()?.artifacts ?? []).map((a) => `${a.name} (${a.kind})`).join(', '),
+    );
+    /** The Event Types a run of this type publishes. */
+    readonly emitsSummary = computed(() => (this.selectedType()?.emits ?? []).join(', '));
 
     /** Create flow: `config` (type + trigger + params) → `save` (the job id, asked last). Edit stays on `config`. */
     readonly step = signal<'config' | 'save'>('config');
@@ -192,20 +199,14 @@ export class JobFormDialog implements AfterViewInit {
         this.schemaForm.form.valueChanges
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((v) => {
+                // The group emits on every field's keystroke, not just the picker's. `selectedTypeId`
+                // already records the type whose descriptor is rendered, so it is the dedupe key.
                 const t = String((v as { type?: unknown })?.type ?? '');
-                if (t === this.lastType) return;
-                this.lastType = t;
-                this.loadParams(t);
+                if (t !== this.selectedTypeId()) this.loadParams(t);
             });
-        queueMicrotask(() => {
-            this.lastType = String(this.schemaForm.form.get('type')?.value ?? '');
-            this.loadParams(this.lastType);
-        });
+        queueMicrotask(() => this.loadParams(String(this.schemaForm.form.get('type')?.value ?? '')));
         this.loadTypeCatalog();
     }
-
-    /** The type whose parameters are currently rendered — guards the valueChanges re-entry above. */
-    private lastType = '';
 
     /**
      * Replace the hardcoded type list with the server's registry (§8.2). Deployed plugins and Job Packs
@@ -235,51 +236,61 @@ export class JobFormDialog implements AfterViewInit {
         });
     }
 
-    /** Fetch the type's descriptor and render its parameters; prune declared keys from the free editor. */
+    /** Render the selected type's declared parameters, from the catalog when it has arrived and from
+     *  `GET /jobs/types/{id}` for a type the registry did not list. */
     private loadParams(typeId: string): void {
         this.selectedTypeId.set(typeId);
         if (!typeId) {
-            this.paramSpecs.set([]);
-            this.paramInitial.set(undefined);
-            this.paramOptionLoaders.set({});
-            this.typeRequires.set([]);
-            this.selectedType.set(undefined);
+            this.clearDescriptor();
+            return;
+        }
+        const known = this.typeCatalog().find((d) => d.id === typeId);
+        if (known) {
+            // Applied asynchronously even from cache: `paramSpecs` feeds the schema-form's `specs` input,
+            // and mutating it inside this change-detection pass is what the deferral above avoids.
+            queueMicrotask(() => this.applyDescriptor(known));
             return;
         }
         this.api.describeType(typeId).subscribe({
-            next: (d) => {
-                const specs = paramDeclsToSpecs(d.parameters);
-                this.paramSpecs.set(specs);
-                this.selectedType.set(d);
-                this.typeRequires.set(d.requires ?? []);
-                // A declared DATASET_REF maps to an autocomplete; give each one the dataset suggestions.
-                const loaders: Record<string, AttributeOptionLoader> = {};
-                for (const decl of d.parameters ?? []) {
-                    if (decl.type === 'DATASET_REF') loaders[decl.name] = datasetOptionLoader();
-                }
-                this.paramOptionLoaders.set(loaders);
-                const init: Record<string, unknown> = {};
-                for (const s of specs) {
-                    const v = this.data.job?.params?.[s.key];
-                    if (v !== undefined) init[s.key] = paramValueToForm(s, v);
-                }
-                this.paramInitial.set(Object.keys(init).length ? init : undefined);
-                // Declared params own their typed field — drop any duplicate from the free key/value editor.
-                const declared = new Set(specs.map((s) => s.key));
-                for (let i = this.paramsArray.length - 1; i >= 0; i--) {
-                    if (declared.has(String(this.paramsArray.at(i).value.key ?? '').trim())) this.paramsArray.removeAt(i);
-                }
-            },
-            error: () => {
-                // Unknown type / no descriptor (e.g. a legacy type or 404) → free key/value editor only,
-                // and `descriptorMissing()` surfaces that as a warning rather than letting it look normal.
-                this.paramSpecs.set([]);
-                this.paramInitial.set(undefined);
-                this.paramOptionLoaders.set({});
-                this.typeRequires.set([]);
-                this.selectedType.set(undefined);
-            },
+            next: (d) => this.applyDescriptor(d),
+            // Unknown type / no descriptor (e.g. a legacy type or 404) → free key/value editor only,
+            // and `descriptorMissing()` surfaces that as a warning rather than letting it look normal.
+            error: () => this.clearDescriptor(),
         });
+    }
+
+    /** Everything a descriptor drives: typed params, declared grants, suggestions, the "what this does" panel. */
+    private applyDescriptor(d: JobTypeDescriptor): void {
+        const specs = paramDeclsToSpecs(d.parameters);
+        this.paramSpecs.set(specs);
+        this.selectedType.set(d);
+        this.typeRequires.set(d.requires ?? []);
+        // A declared DATASET_REF maps to an autocomplete; give each one the dataset suggestions.
+        const loaders: Record<string, AttributeOptionLoader> = {};
+        for (const decl of d.parameters ?? []) {
+            if (decl.type === 'DATASET_REF') loaders[decl.name] = datasetOptionLoader();
+        }
+        this.paramOptionLoaders.set(loaders);
+        const init: Record<string, unknown> = {};
+        for (const s of specs) {
+            const v = this.data.job?.params?.[s.key];
+            if (v !== undefined) init[s.key] = paramValueToForm(s, v);
+        }
+        this.paramInitial.set(Object.keys(init).length ? init : undefined);
+        // Declared params own their typed field — drop any duplicate from the free key/value editor.
+        const declared = new Set(specs.map((s) => s.key));
+        for (let i = this.paramsArray.length - 1; i >= 0; i--) {
+            if (declared.has(String(this.paramsArray.at(i).value.key ?? '').trim())) this.paramsArray.removeAt(i);
+        }
+    }
+
+    /** No descriptor for the selected type: no typed params, no declared grants, no panel. */
+    private clearDescriptor(): void {
+        this.paramSpecs.set([]);
+        this.paramInitial.set(undefined);
+        this.paramOptionLoaders.set({});
+        this.typeRequires.set([]);
+        this.selectedType.set(undefined);
     }
 
     addParam(key = '', value = ''): void {

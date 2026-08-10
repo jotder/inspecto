@@ -24,11 +24,11 @@
                 <dl class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs">
                     @if (t.emits?.length) {
                         <div><dt class="text-secondary inline">Emits:</dt>
-                            <dd class="ml-1 inline font-mono">{{ t.emits.join(', ') }}</dd></div>
+                            <dd class="ml-1 inline font-mono">{{ emitsSummary() }}</dd></div>
                     }
                     @if (t.artifacts?.length) {
                         <div><dt class="text-secondary inline">Records:</dt>
-                            <dd class="ml-1 inline font-mono">{{ artifactSummary(t) }}</dd></div>
+                            <dd class="ml-1 inline font-mono">{{ artifactSummary() }}</dd></div>
                     }
                     @if (t.source) {
                         <div><dt class="text-secondary inline">Source:</dt>
@@ -82,22 +82,22 @@
             }
             <div class="mt-4 text-secondary text-xs font-semibold uppercase tracking-wider">Additional parameters</div>
             <form [formGroup]="paramsForm">
-            <div formArrayName="params" class="flex flex-col gap-2">
-                @for (p of paramsArray.controls; track $index; let i = $index) {
-                    <div [formGroupName]="i" class="flex items-center gap-2">
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Key</mat-label>
-                            <input matInput formControlName="key" />
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Value</mat-label>
-                            <input matInput formControlName="value" />
-                        </mat-form-field>
-                        <button mat-icon-button type="button" (click)="removeParam(i)" matTooltip="Remove" aria-label="Remove parameter">
-                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:x-mark"></mat-icon>
-                        </button>
-                    </div>
-                }
+                <div formArrayName="params" class="flex flex-col gap-2">
+                    @for (p of paramsArray.controls; track $index; let i = $index) {
+                        <div [formGroupName]="i" class="flex items-center gap-2">
+                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                                <mat-label>Key</mat-label>
+                                <input matInput formControlName="key" />
+                            </mat-form-field>
+                            <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                                <mat-label>Value</mat-label>
+                                <input matInput formControlName="value" />
+                            </mat-form-field>
+                            <button mat-icon-button type="button" (click)="removeParam(i)" matTooltip="Remove" aria-label="Remove parameter">
+                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                            </button>
+                        </div>
+                    }
                     <button mat-stroked-button type="button" class="self-start" (click)="addParam()">
                         <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
                         <span class="ml-1">Add parameter</span>
