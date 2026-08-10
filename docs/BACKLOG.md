@@ -1003,6 +1003,18 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     declaration at authoring time, alongside new warnings for a partition `source` that names no column,
     is blank, is not a plain identifier, or disagrees between entries — each of which silently costs the
     store its event-time bounds.
+    **A tenth landed 2026-08-10**: `feat(jobs)` — the job-parameter-contract §5-B / step 17 change.
+    Two operator-visible edges, both small: the `GET /jobs/{name}/runs/{runId}/artifacts` and
+    `…/artifacts/latest` responses **no longer carry a `timeRange` key**, and the Expression attr
+    `$upstream(<job>).artifact(<name>).time_range` is **gone**, replaced by `event_time_min` and
+    `event_time_max`. Release notes can be brief and should say why nobody is affected in practice: the
+    field was written as a literal `null` at every recording site since it shipped, and the attr could
+    never be bound to anything — one opaque `"<min>..<max>"` string that the SQL substituter inserts
+    whole and nothing split. The replacements resolve **live** from the Consignment output registry, so
+    they answer for the current revision rather than a frozen one, and they yield **strings** (the
+    registry stores zone-less local date-times, valid as SQL timestamp literals but rejected by an
+    `INSTANT`-typed parameter). Only a pipeline Job's sinks report a range; the other Job Types write no
+    registry rows and answer unknown, which is honest rather than a gap.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
