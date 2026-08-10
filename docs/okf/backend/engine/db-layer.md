@@ -277,6 +277,12 @@ carried `__event_time` — the coerced event-time column `DataTransformer` mater
 every row written before these columns existed all read back `NULL`. A consumer that prunes on bounds must
 therefore treat a null-bounds row as a **possible match**, or it will silently drop data.
 
+**Two readers, and a rule they share.** `unreadablePaths()` returns every path marked `SUPERSEDED` or
+`COMPACTED_AWAY` for `ConsignmentSelector` to subtract from a glob — but **never a path that also has a
+`LIVE` row**. Output naming is not one-file-per-Consignment: a full recompute rewrites a stable path in
+place, so one path legitimately owns an old dead row and a current live one, and returning it would drop live
+data from every read. Row state is per-registration; readability is per-path.
+
 **The two non-live states are opposites to a reader that aggregates.** `producerHighWater(table)` — the
 per-producer `max(event_time_max)` the §3.6 Watermark folds — filters `state <> 'SUPERSEDED'` but keeps
 `COMPACTED_AWAY`: compacted rows describe data that was genuinely delivered and still exists inside the merged

@@ -172,6 +172,37 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     /**
+     * Every path this registry says is <b>no longer readable</b> — {@code SUPERSEDED} or {@code COMPACTED_AWAY},
+     * across every stream — for {@link ConsignmentSelector} to subtract from a glob (addressing §7-A).
+     *
+     * <p><b>A path with any {@code LIVE} row is never returned, whatever else it carries.</b> Output naming is
+     * not one-file-per-Consignment (§2.4): a full recompute rewrites a stable path in place, so the same path
+     * legitimately owns an old {@code SUPERSEDED} row and a current {@code LIVE} one. Returning it because a
+     * dead row mentions it would exclude live data from every read — the failure this method exists to prevent,
+     * inverted. Row state is per-registration; readability is per-path, and only the latter belongs here.
+     *
+     * <p>Not filtered by stream or by directory, deliberately: the caller intersects these against the files a
+     * glob actually matched, so a path that belongs to a different store simply never meets one. Adding a
+     * {@code table_name} filter would mean mapping a glob root back to a logical table, which nothing can do
+     * reliably.
+     */
+    public synchronized List<String> unreadablePaths() {
+        String sql = "SELECT DISTINCT t.path FROM " + T + " t WHERE coalesce(t.state, 'LIVE') <> 'LIVE' "
+                + "AND NOT EXISTS (SELECT 1 FROM " + T + " l WHERE l.path = t.path "
+                + "AND coalesce(l.state, 'LIVE') = 'LIVE')";
+        List<String> out = new ArrayList<>();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                String path = rs.getString(1);
+                if (path != null) out.add(path);
+            }
+        } catch (SQLException e) {
+            log.warn("consignment-outputs unreadable-path query failed: {}", e.getMessage());
+        }
+        return out;
+    }
+
+    /**
      * Per-producer high water for one stream — the aggregation {@link StreamWatermark} folds into a watermark
      * (consignment addressing §3.6). One row per distinct {@code producer} that has written to {@code tableName},
      * including the unattributed group (see {@link ProducerHighWater#producer()}).
@@ -291,7 +322,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * cwd would resolve to a different file. Storing the caller's own spelling keeps the row durable; widening
      * happens at compare time, where being wrong costs a missed match rather than a bad path.
      */
-    private static String norm(String path) {
+    static String norm(String path) {
         if (path == null) return null;
         try {
             return java.nio.file.Path.of(path).toAbsolutePath().normalize().toString();

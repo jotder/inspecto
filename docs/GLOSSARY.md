@@ -423,6 +423,13 @@ screen. ⛔ "Cube" stays a *verb* (the Transform action that produces it), never
 **Store / Storage** — The **physical** backend that holds the Parquet/partition files. Reserve this word for the
 backend only — it is never a Dataset.
 
+**Consignment Selector** *(added 2026-08-10 — consignment addressing §7-A, `ConsignmentSelector.java`)* —
+The resolver that decides **which files a read actually names**. It **filters** a store's glob, subtracting
+paths the Consignment catalog marks `SUPERSEDED`/`COMPACTED_AWAY`; it never *produces* the list, because the
+catalog is optional and an optional index cannot say what exists. A file with no catalog row **stays in** —
+unknown is a possible match, never an exclusion. ⛔ Not a query planner, not a pruner (bounds-based pruning is
+deliberately unbuilt), and ⛔ never "generation pinning": it does not give a read a consistent snapshot.
+
 **Watermark** *(added 2026-08-10 — consignment addressing §3.6, `StreamWatermark.java`)* — **Event-time
 completeness for one stream**: `min over producers of max(event_time_max)` over the Consignment catalog's
 non-superseded rows. It is the only thing that can answer *"has this window closed"* — a window `[lo, hi)` is

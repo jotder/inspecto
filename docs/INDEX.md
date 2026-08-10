@@ -83,9 +83,10 @@ former root reference docs** (each index lists them):
   **catalog-pruned explicit file list** instead of a `**/*.parquet` glob. Grounding (verified
   2026-08-09) reshaped the plan: the catalog was **80% built and switched off** —
   `consignment_outputs` already carries `path`/`row_count`/`bytes`/**`generation`**/`state`.
-  *(Steps 1–5 shipped 2026-08-10: event-time bounds + `producer` are now written per output file, the
-  per-stream `StreamWatermark` is derived from them, and the registry is **on by default** — flipped for
-  `ReprocessCommand`'s compacted-away guard, not for addressing. `generation` is still a dead field and
+  *(**Plan APPROVED 2026-08-10**; steps 1–5 and 7′ shipped the same day: event-time bounds + `producer` are
+  now written per output file, the per-stream `StreamWatermark` is derived from them, the registry is **on by
+  default** — flipped for `ReprocessCommand`'s compacted-away guard, not for addressing — and
+  `ConsignmentSelector` subtracts unreadable files from a store's glob. `generation` is still a dead field and
   `RunArtifact.timeRange` is still always null; `record_day` remains the write-time approximation its own
   javadoc calls silently divergent.)* dataset `role: temporal` exists in config but
   `DatasetRelation` never reads it; and **no windowed scan of ingested data exists at all** — alert

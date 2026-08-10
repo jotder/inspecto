@@ -49,13 +49,43 @@ public final class SqlViews {
      * @throws IllegalArgumentException for an unsupported format
      */
     public static String reader(String format, String pathOrGlob, boolean hive) {
-        String p = pathOrGlob.replace("\\", "/");
+        return over(format, "'" + pathOrGlob.replace("\\", "/") + "'", hive);
+    }
+
+    /**
+     * The same reader over an <b>explicit file list</b> rather than a glob — what {@code ConsignmentSelector}
+     * emits once the catalog has a file to exclude (consignment addressing §7-A). Every other option matches
+     * {@link #reader(String, String, boolean)} exactly, so a selected read and a globbed read differ only in
+     * which files they name.
+     *
+     * <p>An <b>empty</b> list renders as a glob that cannot match anything rather than as
+     * {@code read_parquet([])}. A store with no readable files is not a new state — a glob over an empty store
+     * already fails with DuckDB's "No files found" — so an empty selection is made to fail the same way rather
+     * than introducing a second, differently-shaped error for callers to learn.
+     */
+    public static String reader(String format, java.util.List<String> paths, boolean hive) {
+        if (paths == null || paths.isEmpty()) return reader(format, NO_FILES_GLOB, hive);
+        StringBuilder list = new StringBuilder("[");
+        for (int i = 0; i < paths.size(); i++) {
+            if (i > 0) list.append(", ");
+            list.append('\'').append(paths.get(i).replace("\\", "/").replace("'", "''")).append('\'');
+        }
+        return over(format, list.append(']').toString(), hive);
+    }
+
+    /** A pattern no output file can match — the empty-selection rendering (see the list overload). */
+    private static final String NO_FILES_GLOB = "__no_readable_files__/*";
+
+    /** Both overloads' shared body. {@code source} is already a SQL literal — one quoted path, or a bracketed
+     *  list of them — so the read options below are written once and cannot drift between a globbed read and a
+     *  selected one. */
+    private static String over(String format, String source, boolean hive) {
         return switch (format) {
             // union_by_name: a store's files may gain additive columns over time (e.g. a Decision
             // Rule's tag consequence adds __tags from some batch onward) — align by name, not position.
-            case "PARQUET" -> "read_parquet('" + p + "', union_by_name=true"
+            case "PARQUET" -> "read_parquet(" + source + ", union_by_name=true"
                     + (hive ? ", hive_partitioning=true, hive_types_autocast=0" : "") + ")";
-            case "CSV" -> "read_csv('" + p + "', header=true, all_varchar=true, union_by_name=true"
+            case "CSV" -> "read_csv(" + source + ", header=true, all_varchar=true, union_by_name=true"
                     + (hive ? ", hive_partitioning=true, hive_types_autocast=0" : "") + ")";
             default -> throw new IllegalArgumentException("Unsupported format: " + format);
         };

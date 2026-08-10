@@ -49,9 +49,13 @@ public final class SourceStoreReader {
         String glob = SqlViews.storeReadRoot(dataDir.replace("\\", "/") + "/" + store)
                 + "/**/*." + SqlViews.ext(format);
         String where = wherePredicate == null || wherePredicate.isBlank() ? "" : " WHERE " + wherePredicate;
+        // Addressing §7-A: the catalog subtracts files it has marked unreadable, and hands the glob straight
+        // back when it has nothing to say. The live case this closes is a reprocess whose delete failed (a
+        // Windows lock is enough): ReprocessCommand supersedes the row either way, so without this the file
+        // stays on disk, stays in the glob, and its rows are counted twice after the re-ingest.
+        String read = com.gamma.consignment.ConsignmentSelector.resolve(conn, format, glob, true);
         try (Statement st = conn.createStatement()) {
-            st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT * FROM "
-                    + SqlViews.reader(format, glob, true) + where);
+            st.execute("CREATE VIEW \"" + viewName + "\" AS SELECT * FROM " + read + where);
         }
     }
 }

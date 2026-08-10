@@ -1,14 +1,22 @@
 # Consignment Addressing — plan
 
-**Status: v1.1 DRAFT (2026-08-09) — not approved. ⚠ Step 1 (measure rung A) is DONE 2026-08-10 and
-its number contradicts the plan's performance premise: catalog pruning cuts rows scanned 29–88× but
-wall-clock only 1.3–2.6×, so the Consignment Selector is a **correctness** feature, not a speed one,
-and rungs C–F are optimizing a non-problem. Read §5.4 before approving anything here.** Grounded against source 2026-08-09; every
-"already exists" claim below carries a `file:line` ref and was verified, not assumed. v1.1
-(2026-08-09, operator-accepted review) folds in four amendments: `producer` on the catalog row +
-the per-stream watermark (§3.1, §3.6, D4) · the stable-name overwrite fix promoted into delivery
-(step 6 ← R1) · window-token provenance + the `SELECTOR_REF` seam (§3.3, §4) · the
-cadence/compaction tension with an explicit promotion trigger (§6.1).**
+**Status: v1.1 — APPROVED by the operator 2026-08-10** (approved with steps 1–5 and 7′ already shipped and
+their corrections folded in; steps 6, 8, 9, 10 remain open).
+
+> ⚠ **Read before building anything further.** Step 1's measurement **contradicts this plan's performance
+> premise**: catalog pruning cuts rows scanned 29–88× but wall-clock only 1.3–2.6×, so the Selector is a
+> **correctness** feature, not a speed one, and rungs C–F optimise a non-problem (§5.4). Delivery also found
+> the plan wrong about the code in eight places — `role: temporal` was UI-only, there is no live connection
+> at `finalizeSource`, the written relation had no aggregatable event-time column, there is no `COMMITTED`
+> state, the glossary carried none of the three watermark meanings, D1's stated justification was not the
+> real one, and the 6-before-7 ordering was backwards (§7-A). Every step row below carries its correction;
+> **trust the rows over the prose.**
+
+Grounded against source 2026-08-09; every "already exists" claim below carries a `file:line` ref and was
+verified, not assumed. v1.1 (2026-08-09, operator-accepted review) folds in four amendments: `producer` on
+the catalog row + the per-stream watermark (§3.1, §3.6, D4) · the stable-name overwrite fix promoted into
+delivery (step 6 ← R1) · window-token provenance + the `SELECTOR_REF` seam (§3.3, §4) · the
+cadence/compaction tension with an explicit promotion trigger (§6.1).
 
 > **Scope guard (operator, 2026-08-09):** *"let's not complicate addressing all BI, RA, Warehouse and
 > Fraud requirement together."* This plan builds **one thing**: the addressing layer that lets any
@@ -545,7 +553,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 4 | ✔ **DONE 2026-08-10** — `StreamWatermark.of(producerHighWater, horizon, now)` → `Optional<LocalDateTime>`, plus `windowComplete(wm, hi, lateness)`; the per-producer aggregation is `DbConsignmentOutputStore.producerHighWater(table)`. **D4 resolved: observed-within-horizon**, default 24 h, overridable per call site (see §8). Derived on read — no table, no update path. ⚠ Three corrections in the §3.6 box: no `COMMITTED` state (it is `SUPERSEDED`-excluded / `COMPACTED_AWAY`-**included**), the stream key is `table_name`, and unattributed writes suppress the watermark rather than being skipped | ✔ `StreamWatermarkTest` (11) — lagging producer wins, stale drops out, unknown suppresses, and the seeded-catalog two-producer window closes only when both pass `hi + lateness`; `DbConsignmentOutputStoreTest` (+5) — grouping, state filter, chronological last-seen |
 | 5 | ✔ **DONE 2026-08-10** — default flipped to `duckdb` (`none` still honoured), and the store wired into `db_maintenance`. ⚠ Justified by a **shipped bug**, not by addressing: `ReprocessCommand`'s refusal to reprocess a compacted-away Consignment (the alternative is silent row duplication) was decidable only from this registry, so the fix was switched off everywhere. **The "migration for existing installs" was dropped, not deferred** — §7-A's filter contract means pre-registry files need no backfill; they read as unknown, not absent | ✔ `ServiceStoresDefaultsTest` — absent property ⇒ a store is opened; `none` ⇒ none |
 | 6 | ⛔ **BLOCKED ON STEP 7 — do not build this first** (grounded 2026-08-10; see the ordering box below). **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
-| 7 | **The Consignment Selector.** Config shape + resolver emitting an explicit `read_parquet([...])` list, generation-pinned. | test: selector over a seeded catalog names exactly the overlapping files |
+| 7 | ✔ **DONE 2026-08-10 as 7′ (exclusion only)** — `ConsignmentSelector.resolve(conn, format, glob, hive)` subtracts `SUPERSEDED`/`COMPACTED_AWAY` paths from the glob and hands the caller's own expression back, byte for byte, when it has nothing to say. Wired into `SourceStoreReader`; the other five glob sites are listed below. ⚠ **No config shape, no generation pinning, and no bounds pruning** — see the scope box | ✔ `ConsignmentSelectorTest` (8) — subtracts both dead states, unknown files stay in, a path with any LIVE row survives a dead one, relative/absolute spellings still match, excluding everything fails like an empty store, an unusable connection falls back to the glob |
 | 8 | **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
 | 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
 | 10 | **Retire `record_day`** — populate from real bounds, mark deprecated. | existing readers unaffected |
@@ -625,6 +633,36 @@ both and went first, because grounding turned up a better reason for it than thi
 Step 7's config surface and the `SELECTOR_REF` seam (§3.3, §4) are unchanged; only the resolver's contract
 moves — from *producing* a list to *subtracting* from one.
 
+**What 7′ shipped, and what it deliberately left out (2026-08-10).** Only the **exclusion** half of the
+resolve rule above is built. The `MINUS rows whose bounds provably miss [lo, hi)` half was **not built, on
+purpose**: a file whose bounds miss the window contains no matching rows, so the query's own predicate already
+excludes them — the results are identical either way. Bounds pruning is therefore a **pure performance
+optimisation**, and step 1 measured its ceiling at 1.3–2.6× wall-clock. This plan's own rule applies to its own
+step: ⛔ *do not build the Selector for performance without a new number.* Exclusion is the half that changes an
+answer, so exclusion is the half that shipped.
+
+Nor is there a **config shape**. There is nothing to configure: the filter is unconditional, costs a
+`glob()` when the catalog has an exclusion and nothing at all when it does not, and degrades to today's
+expression in every failure mode. A toggle would only let an operator turn off a correctness fix.
+
+**Five glob sites remain unwired, and only one of them is mechanical.** `SourceStoreReader.registerView` was
+wirable because it *takes* a `Connection` — and checking the rest showed that is the exception, not the rule:
+
+| Site | Enclosing signature | Wirable? |
+|---|---|---|
+| `EnrichmentEngine.java:129` | inside `run(EnrichmentConfig)`, with a live `conn`/`st` in scope | ✔ mechanical |
+| `EnrichmentEngine.java:295` | `referenceReader(Reference, List<PipelineConfig>)` | ✗ no connection |
+| `BatchIngestStrategy.java:308` | `existingStoreReader(String dbDir, String format)` | ✗ |
+| `PipelineJobRunner.java:339` | `deriveViewSql(PipelineGraph, String, String)` | ✗ |
+| `ReferenceCompactor.java:297` | `glob(Path root)` | ✗ |
+| `DatasetRelation.java:76` | config→SQL builder | ✗ |
+
+⚠ So the connection-taking `resolve(conn, …)` signature fits **one** of the seven readers in the product.
+The other five are pure config→SQL string builders, and wiring them is a design decision, not a copy-paste:
+either thread a connection down to each (invasive, and `DatasetRelation` reaches the query layer), or give the
+selector a **connection-free enumeration path** — a filesystem walk, which then has to agree with DuckDB's glob
+semantics exactly or the two disagree about what exists. Decide that once, before touching any of them.
+
 **⚠ What this forecloses.** Generation *pinning* in the strong sense — a reader holding a consistent snapshot
 across a concurrent recompute — is not achievable by subtraction alone, because the glob is evaluated at read
 time and a file revealed mid-read is already in it. Subtraction fixes *stale inclusion*, not *torn reads*.
@@ -685,8 +723,11 @@ the ordering box above. Do not let step 7 claim it.
 ## 9. Glossary additions required
 
 `GLOSSARY.md` and `docs/INDEX.md` must be updated in the same change that lands step 7:
-**Consignment Selector**, **hopping window**, **size**, **hop**, **pane**, **dirty window**, and a
-ban on bare *sliding window* for the hopping case.
+✔ **Consignment Selector landed with 7′** (`GLOSSARY.md` §6-B, 2026-08-10), defined as what was actually
+built — a *filter* over the glob, with explicit bans on reading it as a pruner or as generation pinning.
+Still owed, and deliberately not written ahead of the code: **hopping window**, **size**, **hop**, **pane**,
+**dirty window**, and a ban on bare *sliding window* for the hopping case. Those belong to §5's windowing
+framework, which is unbuilt — naming concepts that do not exist yet is how a glossary starts lying.
 
 ✔ **The watermark split landed with step 4** (`GLOSSARY.md` §6-B, 2026-08-10): **Watermark** now means the §3.6
 per-stream event-time completeness, with *incremental cursor* / *acquisition high-watermark*
