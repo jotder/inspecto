@@ -3,6 +3,7 @@ package com.gamma.consignment;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.LineageRow;
 import com.gamma.etl.PartitionOutput;
+import com.gamma.etl.TransformCompiler;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -62,6 +63,24 @@ public final class ConsignmentOutputs {
     public static List<ConsignmentOutput> fromLineage(String consignmentId, String runId, String tableName,
                                                       List<PartitionOutput> outputs, List<LineageRow> lineage,
                                                       String schemaFingerprint) {
+        return fromLineage(consignmentId, runId, tableName, outputs, lineage, schemaFingerprint, null, null);
+    }
+
+    /**
+     * {@link #fromLineage(String, String, String, List, List, String)} with §3.1's addressing columns: the
+     * event-time {@code bounds} <b>keyed by output file</b>, and the {@code producer} that wrote it.
+     *
+     * <p><b>Why by file and not by partition</b>, when {@link #boundsByPartition} produces partition keys: a
+     * Consignment's outputs are not all written from the same relation. Decision-rule routing writes rejected
+     * rows to their own destination, and those files can land under a partition key the main write also used —
+     * so a partition-keyed lookup would hand a routed file the main relation's event-time range. The caller
+     * joins bounds onto only the outputs of the relation it measured; anything else is simply absent here,
+     * which reads as "unknown" rather than as a range that is quietly wrong.
+     */
+    public static List<ConsignmentOutput> fromLineage(String consignmentId, String runId, String tableName,
+                                                      List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                                      String schemaFingerprint,
+                                                      Map<String, EventTimeBounds> bounds, String producer) {
         Map<String, Long> byPath = new HashMap<>();
         if (lineage != null)
             for (LineageRow r : lineage) {
@@ -69,7 +88,7 @@ public final class ConsignmentOutputs {
                 byPath.merge(r.outputFile(), r.rowCount(), Long::sum);
             }
         return build(consignmentId, runId, tableName, outputs,
-                o -> byPath.getOrDefault(o.outputFile(), 0L), schemaFingerprint);
+                o -> byPath.getOrDefault(o.outputFile(), 0L), schemaFingerprint, bounds, producer);
     }
 
     /**
@@ -83,7 +102,7 @@ public final class ConsignmentOutputs {
         // No fingerprint on this path: enrichment and Pipeline sinks derive their output from a query, not a
         // declared schema — their derived output schema arrives with the per-Step type flow (Phase 2 S2).
         return build(consignmentId, runId, tableName, outputs,
-                o -> counts.getOrDefault(o.partition(), 0L), null);
+                o -> counts.getOrDefault(o.partition(), 0L), null, null, null);
     }
 
     /**
@@ -121,6 +140,65 @@ public final class ConsignmentOutputs {
             }
         }
         return counts;
+    }
+
+    /**
+     * Per-partition {@link EventTimeBounds} over {@code table}'s {@code __event_time} column, keyed exactly as
+     * {@link #countByPartition} keys its counts so the two join onto the same {@link PartitionOutput}
+     * (consignment addressing §3.1).
+     *
+     * <p><b>Returns an empty map when the relation has no {@code __event_time} column</b> — the enrichment and
+     * Pipeline-sink paths write a caller-authored relation that never went through {@code DataTransformer}, and
+     * decision D3 says addressing degrades rather than breaks. A partition whose event times are all NULL (the
+     * schema declared no date partition, or every row failed to parse) contributes no entry for the same reason:
+     * an absent bound is honest, a zero-width bound at the epoch is not.
+     *
+     * <p>Bounds are formatted and differenced <b>in SQL</b>, not through JDBC temporal types: {@code strftime}
+     * yields the exact ISO-8601 local text {@link EventTimeBounds} documents, with none of the default-timezone
+     * reinterpretation a {@code java.sql.Timestamp} round-trip would introduce.
+     */
+    public static Map<String, EventTimeBounds> boundsByPartition(Connection conn, String table,
+                                                                 List<String> partCols) throws SQLException {
+        if (!hasEventTime(conn, table)) return Map.of();
+        String col = "\"" + TransformCompiler.EVENT_TIME_COL + "\"";
+        String agg = "strftime(min(" + col + "), '%Y-%m-%dT%H:%M:%S'), "
+                + "strftime(max(" + col + "), '%Y-%m-%dT%H:%M:%S'), "
+                + "datediff('millisecond', min(" + col + "), max(" + col + "))";
+
+        StringBuilder sql = new StringBuilder("SELECT ");
+        for (String c : partCols == null ? List.<String>of() : partCols)
+            sql.append('"').append(c).append("\", ");
+        sql.append(agg).append(" FROM \"").append(table).append('"');
+        int nKeys = partCols == null ? 0 : partCols.size();
+        for (int i = 0; i < nKeys; i++) sql.append(i == 0 ? " GROUP BY 1" : ", " + (i + 1));
+
+        Map<String, EventTimeBounds> bounds = new HashMap<>();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql.toString())) {
+            while (rs.next()) {
+                String min = rs.getString(nKeys + 1);
+                String max = rs.getString(nKeys + 2);
+                if (min == null || max == null) continue;   // all-NULL partition — no honest bound
+                StringBuilder key = new StringBuilder();
+                for (int i = 0; i < nKeys; i++) {
+                    if (i > 0) key.append('/');
+                    key.append(partCols.get(i)).append('=').append(rs.getString(i + 1));
+                }
+                bounds.put(key.toString(), new EventTimeBounds(min, max, rs.getLong(nKeys + 3)));
+            }
+        }
+        return bounds;
+    }
+
+    /** Whether {@code table} carries the internal {@code __event_time} column (only relations built by
+     *  {@code DataTransformer} do). */
+    private static boolean hasEventTime(Connection conn, String table) throws SQLException {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + table + "\" LIMIT 0")) {
+            var md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++)
+                if (TransformCompiler.EVENT_TIME_COL.equals(md.getColumnName(i))) return true;
+            return false;
+        }
     }
 
     /**
@@ -173,14 +251,16 @@ public final class ConsignmentOutputs {
     private static List<ConsignmentOutput> build(String consignmentId, String runId, String tableName,
                                                  List<PartitionOutput> outputs,
                                                  ToLongFunction<PartitionOutput> rows,
-                                                 String schemaFingerprint) {
+                                                 String schemaFingerprint,
+                                                 Map<String, EventTimeBounds> bounds, String producer) {
         if (outputs == null || outputs.isEmpty()) return List.of();
         String writtenAt = Instant.now().toString();
         List<ConsignmentOutput> registry = new ArrayList<>(outputs.size());
         for (PartitionOutput o : outputs)
             registry.add(new ConsignmentOutput(consignmentId, runId, tableName, o.partition(),
                     recordDay(o.partition()), o.outputFile(), rows.applyAsLong(o), o.bytes(),
-                    writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint));
+                    writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint,
+                    bounds == null ? null : bounds.get(o.outputFile()), producer));
         return registry;
     }
 }

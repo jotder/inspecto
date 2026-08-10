@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.*;
 import com.gamma.util.DuckDbUtil;
 import org.slf4j.Logger;
@@ -59,6 +60,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
         long totalInputRows = 0;
         List<PartitionOutput> outputs = List.of();
         List<LineageRow>      lineage = List.of();
+        Map<String, EventTimeBounds> bounds = Map.of();
 
         File tempDb = null;
         try {
@@ -159,6 +161,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                             batch.batchId(), srcIdToFile);
                     outputs = written.outputs();
                     lineage = written.lineage();
+                    bounds  = written.bounds();
                 }
             }
         } catch (Exception e) {
@@ -170,7 +173,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
         }
 
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
-                outputs, lineage, totalInputRows, batch.schemaName());
+                outputs, lineage, totalInputRows, batch.schemaName(), bounds);
     }
 
 }

@@ -45,7 +45,8 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      *  the spelling in {@code inspecto_pipeline_provenance} and the {@code lineage} CSV. */
     private static final String COLS =
             "consignment_id, run_id, table_name, partition_key, record_day, "
-                    + "path, row_count, bytes, written_at, generation, state, schema_fingerprint";
+                    + "path, row_count, bytes, written_at, generation, state, schema_fingerprint, "
+                    + "event_time_min, event_time_max, event_time_spread_ms, producer";
 
     private final Connection conn;
 
@@ -72,10 +73,19 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                     + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
                     + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
                     + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
-                    + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR)");
+                    + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR, "
+                    + "event_time_min VARCHAR, event_time_max VARCHAR, "
+                    + "event_time_spread_ms BIGINT, producer VARCHAR)");
             // §3.4.3 additive migration: CREATE TABLE IF NOT EXISTS never widens a pre-existing table, so a
             // registry created before the column existed gets it added here; existing rows read back NULL.
             st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS schema_fingerprint VARCHAR");
+            // §3.1 addressing columns, same additive rule. A pre-existing registry keeps every row it has and
+            // reads NULL bounds for them — which the Selector must read as "unknown, cannot prune", never as
+            // "no rows in range" (see ConsignmentOutput#bounds).
+            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_min VARCHAR");
+            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_max VARCHAR");
+            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_spread_ms BIGINT");
+            st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS producer VARCHAR");
         } catch (SQLException e) {
             throw new IllegalStateException("Could not initialise consignment-outputs schema", e);
         }
@@ -101,8 +111,9 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     public synchronized void record(List<ConsignmentOutput> outputs) {
         if (outputs == null || outputs.isEmpty()) return;
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")) {
+                "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
             for (ConsignmentOutput o : outputs) {
+                EventTimeBounds b = o.bounds();
                 ps.setString(1, o.consignmentId());
                 ps.setString(2, o.runId());
                 ps.setString(3, o.tableName());
@@ -115,6 +126,12 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 ps.setInt(10, o.generation());
                 ps.setString(11, o.state().name());
                 ps.setString(12, o.schemaFingerprint());
+                ps.setString(13, b == null ? null : b.min());
+                ps.setString(14, b == null ? null : b.max());
+                // null, not 0: a spread of 0 is a real value (one event time in the file), so an absent
+                // bound has to read back as absent rather than as an instantaneous file.
+                if (b == null) ps.setNull(15, java.sql.Types.BIGINT); else ps.setLong(15, b.spreadMs());
+                ps.setString(16, o.producer());
                 ps.addBatch();
             }
             ps.executeBatch();
@@ -256,7 +273,18 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 rs.getString("written_at"),
                 rs.getInt("generation"),
                 state(rs.getString("state")),
-                rs.getString("schema_fingerprint"));
+                rs.getString("schema_fingerprint"),
+                bounds(rs),
+                rs.getString("producer"));
+    }
+
+    /** §3.1 bounds, or {@code null} when this row carries none — a row written before the columns existed, or a
+     *  write path that established no event time. Keyed off {@code event_time_min}: the three are written
+     *  together, so a null there means the whole triple is absent rather than partially populated. */
+    private static EventTimeBounds bounds(ResultSet rs) throws SQLException {
+        String min = rs.getString("event_time_min");
+        if (min == null) return null;
+        return new EventTimeBounds(min, rs.getString("event_time_max"), rs.getLong("event_time_spread_ms"));
     }
 
     /** Unknown state text degrades to {@code LIVE} rather than throwing: a row written by a newer build must

@@ -1,5 +1,7 @@
 package com.gamma.inspector;
 
+import com.gamma.consignment.ConsignmentOutputs;
+import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.Batch;
 import com.gamma.etl.CsvIngester;
 import com.gamma.query.DecisionRuleApplier;
@@ -72,8 +74,16 @@ interface BatchIngestStrategy {
         return defs.isEmpty() ? List.of("year", "month", "day") : PartitionDef.columnNames(defs);
     }
 
-    /** The result of one partitioned write: output files plus their lineage matrix. */
-    record Written(List<PartitionOutput> outputs, List<LineageRow> lineage) {}
+    /**
+     * The result of one partitioned write: output files, their lineage matrix, and each file's event-time
+     * bounds.
+     *
+     * @param bounds §3.1 event-time range per output file. Covers only the files written from the measured
+     *               relation — decision-rule routed files write different rows and carry no entry — and is
+     *               empty whenever the relation has no {@code __event_time} column at all.
+     */
+    record Written(List<PartitionOutput> outputs, List<LineageRow> lineage,
+                   Map<String, EventTimeBounds> bounds) {}
 
     /**
      * The shared tail of every ingest path: apply the pipeline's Decision Rules to {@code table}
@@ -134,14 +144,26 @@ interface BatchIngestStrategy {
                 ? Paths.get(cfg.dirs().database()).relativize(Paths.get(dbDir)) : null;
         List<PartitionOutput> outputs = new java.util.ArrayList<>(applied.outputs());
         List<LineageRow> lineage = new java.util.ArrayList<>(applied.lineage());
+
+        // §3.1: one GROUP BY over the relation being written, before the fan-out — the same event-time range
+        // applies to every destination, since each writes the identical rows. Empty for a relation with no
+        // __event_time (nothing downstream requires bounds).
+        Map<String, EventTimeBounds> byPartition = ConsignmentOutputs.boundsByPartition(conn, writeTable, partCols);
+        Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
+
         for (PipelineConfig.Sink dest : sinks) {
             String destDir = fanOut ? Paths.get(dest.database()).resolve(rel).toString() : dbDir;
             List<PartitionOutput> outs = PartitionWriter.write(conn, writeTable, destDir,
                     dest.format(), dest.compression(), writeBase, partCols);
             outputs.addAll(outs);
             lineage.addAll(LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols));
+            // Re-key onto files, and only these files: applied.outputs() came from a different relation.
+            for (PartitionOutput o : outs) {
+                EventTimeBounds b = byPartition.get(o.partition());
+                if (b != null) bounds.put(o.outputFile(), b);
+            }
         }
-        return new Written(outputs, lineage);
+        return new Written(outputs, lineage, bounds);
     }
 
     /**

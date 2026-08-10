@@ -5,10 +5,15 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -68,10 +73,32 @@ public final class PartitionWriter {
                                               String compression, String baseName,
                                               List<String> partitionColumns)
             throws Exception {
-        // CSV/plugin ingest path: the materialized table carries the internal
-        // __src_id lineage tag, which must be excluded from written output.
-        return write(conn, table, databaseDir, outputFormat, compression, baseName,
-                partitionColumns, List.of("__src_id"));
+        // CSV/plugin ingest path: the materialized table carries the internal __src_id lineage tag and
+        // __event_time (§3.1's coerced event time, used for write-time bounds), neither of which belongs in
+        // written output. Both are filtered to what the relation actually has: this overload is a general
+        // entry point, also called on relations that never went through DataTransformer, and DuckDB's
+        // EXCLUDE is a binder error — not a no-op — when it names an absent column.
+        return write(conn, table, databaseDir, outputFormat, compression, baseName, partitionColumns,
+                internalColumnsPresent(conn, table, "__src_id", TransformCompiler.EVENT_TIME_COL));
+    }
+
+    /**
+     * Which of {@code candidates} {@code table} actually has, in the order given — so the caller can name the
+     * internal columns it wants stripped without asserting they are all present.
+     *
+     * <p>Deliberately not applied to the full overload below: a caller that names an exclusion explicitly
+     * should still get a hard error for a typo, and only the internal tags this class chooses itself are
+     * filtered.
+     */
+    private static List<String> internalColumnsPresent(Connection conn, String table, String... candidates)
+            throws Exception {
+        Set<String> present = new HashSet<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM " + table + " LIMIT 0")) {
+            ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) present.add(md.getColumnName(i));
+        }
+        return Arrays.stream(candidates).filter(present::contains).toList();
     }
 
     /**

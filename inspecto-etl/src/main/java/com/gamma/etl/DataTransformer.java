@@ -117,6 +117,16 @@ public final class DataTransformer {
             }
         }
 
+        // ── event time (consignment addressing §3.1) ──────────────────────────
+        // The same coerced expression year/month/day are cut from, kept whole, so a write-time min()/max()
+        // over this relation is exact. Always emitted — NULL when the schema declares no date partition, or
+        // when its date defs disagree on a source column — so PartitionWriter's EXCLUDE can be unconditional
+        // and the written output schema never depends on the schema's partition shape.
+        select.append(", ").append(PartitionDef.eventTimeDef(partDefs)
+                        .map(pd -> TransformCompiler.eventTimeColumn(pd, sourceTable, fieldTypes, cfg.csv()))
+                        .orElse("CAST(NULL AS TIMESTAMP)"))
+                .append(" AS ").append(TransformCompiler.EVENT_TIME_COL);
+
         // ── lineage tag ───────────────────────────────────────────────────────
         select.append(", \"").append(sourceTable).append("\".\"__src_id\" AS __src_id");
         select.append(" FROM \"").append(sourceTable).append('"');

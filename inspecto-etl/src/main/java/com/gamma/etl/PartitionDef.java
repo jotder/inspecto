@@ -2,6 +2,7 @@ package com.gamma.etl;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * One declared partition column: the output Hive-directory segment name, the raw-table
@@ -104,5 +105,28 @@ public record PartitionDef(String column, String source, Type type) {
     /** Extract just the column names in declaration order. */
     public static List<String> columnNames(List<PartitionDef> defs) {
         return defs.stream().map(PartitionDef::column).toList();
+    }
+
+    /** The date-typed defs — the ones {@code year}/{@code month}/{@code day} are cut from. */
+    private boolean isDate() {
+        return type == Type.DATE_YEAR || type == Type.DATE_MONTH || type == Type.DATE_DAY;
+    }
+
+    /**
+     * The def whose {@link #source} column is this schema's <b>event time</b> — the raw column the
+     * {@code DATE_*} partition components are all cut from (consignment addressing §3.1).
+     *
+     * <p>Empty when the schema declares no date-typed partition, and <b>also empty when the date defs
+     * disagree on their source column</b>: {@code year} from one column and {@code day} from another is a
+     * partition scheme with no single event time, and guessing one would put bounds in the catalog that the
+     * partitioning itself contradicts. Degrade to no bounds, never to wrong ones.
+     */
+    public static Optional<PartitionDef> eventTimeDef(List<PartitionDef> defs) {
+        if (defs == null) return Optional.empty();
+        List<PartitionDef> dates = defs.stream().filter(PartitionDef::isDate).toList();
+        if (dates.isEmpty()) return Optional.empty();
+        return dates.stream().map(PartitionDef::source).distinct().count() == 1
+                ? Optional.of(dates.get(0))
+                : Optional.empty();
     }
 }

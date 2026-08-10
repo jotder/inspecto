@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.consignment.EventTimeBounds;
 
 import static com.gamma.inspector.BatchIngestStrategy.consolidatedBaseName;
 import static com.gamma.inspector.BatchIngestStrategy.databaseDir;
@@ -137,7 +138,8 @@ final class NativeCsvStreamingEngine {
                 batch.batchId(), srcIdToFile);
 
         return new IngestOutcome(batchStart, "SUCCESS", "", survivors, memberAudits,
-                written.outputs(), written.lineage(), totalInputRows, batch.schemaName());
+                written.outputs(), written.lineage(), totalInputRows, batch.schemaName(),
+                written.bounds());
     }
 
     private static void dropView(Connection conn, String view) {
@@ -182,7 +184,7 @@ final class NativeCsvStreamingEngine {
             return empty(batch, batchStart, MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
         }
         return finishSingle(batch, m, cfg, batchStart, mStart, s.parsed(), s.rejects(),
-                s.outputs(), s.lineage());
+                s.outputs(), s.lineage(), s.bounds());
     }
 
     /**
@@ -210,6 +212,7 @@ final class NativeCsvStreamingEngine {
         long parsedTotal = 0, rejectTotal = 0;
         List<PartitionOutput> outputs = new ArrayList<>();
         List<LineageRow>      lineage = new ArrayList<>();
+        Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
         int chunkCount = 0;
 
         try (FileChunker chunker = new FileChunker(m.file(), cfg, chunkDir)) {
@@ -226,6 +229,7 @@ final class NativeCsvStreamingEngine {
                     rejectTotal += s.rejects();
                     outputs.addAll(s.outputs());
                     lineage.addAll(s.lineage());
+                    bounds.putAll(s.bounds());
                 } finally {
                     Files.deleteIfExists(chunk.toPath());
                 }
@@ -235,7 +239,8 @@ final class NativeCsvStreamingEngine {
         log.info("[INGEST] [{}] streamed {} chunk(s): {} rows{}", m.file().getName(), chunkCount,
                 String.format("%,d", parsedTotal), rejectTotal > 0 ? "  rejected=" + rejectTotal : "");
 
-        return finishSingle(batch, m, cfg, batchStart, mStart, parsedTotal, rejectTotal, outputs, lineage);
+        return finishSingle(batch, m, cfg, batchStart, mStart, parsedTotal, rejectTotal, outputs, lineage,
+                bounds);
     }
 
     /**
@@ -259,19 +264,20 @@ final class NativeCsvStreamingEngine {
         long rejects = DuckDbCsvIngester.drainRejects(conn, physical, cfg);
         if (parsed == 0) {
             dropTable(conn, "transformed");
-            return new Streamed(0, rejects, List.of(), List.of());
+            return new Streamed(0, rejects, List.of(), List.of(), Map.of());
         }
         var written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
                 batchId, Map.of(srcId, lineageName));
         dropTable(conn, "transformed");
-        return new Streamed(parsed, rejects, written.outputs(), written.lineage());
+        return new Streamed(parsed, rejects, written.outputs(), written.lineage(), written.bounds());
     }
 
     /** Apply the shared empty/quarantine/success decision for a single-member outcome. */
     private static IngestOutcome finishSingle(Batch batch, Batch.Member m, PipelineConfig cfg,
                                               LocalDateTime batchStart, LocalDateTime mStart,
                                               long parsed, long rejects,
-                                              List<PartitionOutput> outputs, List<LineageRow> lineage)
+                                              List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                              Map<String, EventTimeBounds> bounds)
             throws Exception {
         if (parsed == 0 && rejects > 0) {
             QuarantineManager.quarantine(m.file(), "field_mismatch", true, cfg);
@@ -288,7 +294,7 @@ final class NativeCsvStreamingEngine {
 
         return new IngestOutcome(batchStart, "SUCCESS", "", List.of(m),
                 List.of(MemberAudit.accepted(m, parsed, rejects, mStart)),
-                outputs, lineage, parsed, batch.schemaName());
+                outputs, lineage, parsed, batch.schemaName(), bounds);
     }
 
     private static IngestOutcome empty(Batch batch, LocalDateTime batchStart, MemberAudit memberAudit) {
@@ -298,7 +304,8 @@ final class NativeCsvStreamingEngine {
 
     /** Per-unit streaming result aggregated by {@link #chunkedIngest}. */
     private record Streamed(long parsed, long rejects,
-                            List<PartitionOutput> outputs, List<LineageRow> lineage) {}
+                            List<PartitionOutput> outputs, List<LineageRow> lineage,
+                            Map<String, EventTimeBounds> bounds) {}
 
     private static long countRows(Connection conn, String table) throws java.sql.SQLException {
         try (Statement st = conn.createStatement();

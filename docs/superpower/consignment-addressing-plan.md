@@ -184,6 +184,35 @@ vocabulary.
 `min()/max()` of the temporal column in the same connection and hand them to `ConsignmentOutputs.build`.
 No extra read of the data.
 
+> ⚠ **Correction (2026-08-10, step 3 as built).** The two sentences above are wrong in three ways, each
+> found by grounding rather than by review. **(1) The dataset's `role: temporal` is unreachable here.**
+> The write path holds no `ComponentRegistry` (`scan` is called only from control-plane code), and the
+> store→dataset reverse lookup is *ambiguous by construction* — nothing stops two datasets sharing a
+> `physicalRef`, and `DbBrowserRoutes:119` resolves the clash with `putIfAbsent`, first-scan-wins. Bounds
+> chosen that way would depend on directory scan order. **(2) There is no live connection where the bounds
+> are recorded.** `finalizeSource` takes no `Connection`; the DuckDB connection lives inside
+> `strategy.ingest(...)` and is closed before the registry is written. The real seam is
+> `BatchIngestStrategy.writeAndTrace`, which holds `conn`, the write relation and `partCols`, and covers all
+> four ingest call sites — bounds ride out to `finalizeSource` the way `lineage` already does. **(3) The
+> written relation has no column to aggregate.** It carries mapped columns under their *target* names plus
+> `year`/`month`/`day`; `PartitionDef.source` is a *raw* column, generally absent, and where it is `VARCHAR`
+> the correct parse needs the declared field type and the pipeline's format lists. Only `year/month/day`
+> were both present and correctly coerced — day granularity, i.e. exactly what `record_day` already gives.
+>
+> **As built:** `DataTransformer` materialises `__event_time`, the same coerced expression `year/month/day`
+> are cut from, kept whole as a `TIMESTAMP`; `PartitionWriter` excludes it so **written output is
+> byte-identical**, and `TypeFlow.sinkColumns` drops it so the declared sink schema stays in lockstep.
+> `ConsignmentOutputs.boundsByPartition` then aggregates it in one `GROUP BY` on the live connection.
+> Consequences worth carrying forward: bounds are keyed **by output file, not by partition** (decision-rule
+> routing writes different rows that can land under a partition key the main write also used — a
+> partition-keyed join would hand a routed file the main relation's range); `producer` is
+> `cfg.identity().pipelineName()`, the only reliably non-null identity at that scope, and `run_id` stays
+> `null` as it already was; and the enrichment / Pipeline-sink paths materialise no event time, so they
+> register **null bounds** — which every consumer must read as *unknown*, never as *no rows in range*.
+> `PartitionWriter`'s exclusion also had to become presence-filtered: its 7-arg overload is a general entry
+> point applied to relations that never went through `DataTransformer`, and DuckDB's `EXCLUDE` is a binder
+> error, not a no-op, when it names an absent column.
+
 **Retire `record_day`** in favour of the real bounds. Keep the column populated for one release for
 compatibility; its javadoc already concedes it is wrong.
 
@@ -489,7 +518,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 |---|---|---|
 | 1 | ✔ **DONE 2026-08-10 — rung A measured**, harness `RescanBenchmark` (opt-in, `-Dbench.run=true`). **145 ms pruned / 239 ms glob** against 90 days = 200 M rows = 1.4 GB. ⚠ It refuted this plan's performance premise: pruning cuts rows 29–88× but wall-clock only 1.3–2.6×, so the Selector is a **correctness** feature (generation pinning, excluding superseded files), not a speed one — see §5.4 | ✔ a number in §5.4, not an estimate |
 | 2 | ✔ **DONE 2026-08-10** — `DatasetRelation.temporalColumn(config)` → `Optional<String>`. Absent degrades to empty (D3), two declarations throw, and the name is identifier-checked because step 3 embeds it in `min()/max()` SQL. ⚠ Note the plan's framing was off: `role` did **not** exist anywhere in the Java backend — it was a **UI-only** concept (`dataset-types.ts:13-24`), so this added the backend's first reader of `columns[]`, it did not switch on an ignored one | ✔ `DatasetRelationTest` — resolves, degrades, duplicate rejected, name fails closed |
-| 3 | **Capture event-time bounds + `producer` at write.** `min()/max()/spread` in the existing `PartitionWriter` COPY connection → `ConsignmentOutputs.build` → four new `consignment_outputs` columns (§3.1). | ingest a file with known bounds; assert the catalog row carries bounds and producer |
+| 3 | ✔ **DONE 2026-08-10** — four columns land on the **ingest path**, keyed per output file. ⚠ Built differently from the sketch below, which did not survive grounding twice: there is **no live connection** at `finalizeSource` (the seam is `BatchIngestStrategy.writeAndTrace`), and the written relation **has no aggregatable event-time column** — so a coerced `__event_time` is now materialised in `DataTransformer` and excluded from output. See the correction box in §3.1 | ✔ `ConsignmentOutputRegistrationTest` — bounds + spread + producer per file; no-event-time degrades to null bounds; `__event_time` absent from written output |
 | 4 | **Per-stream watermark** (§3.6), derived from the catalog; decision D4 recorded. | seeded catalog, two producers: a window reports complete only when *both* have passed `hi + allowed_lateness` |
 | 5 | **Catalog on by default** (decision D1) + migration for existing installs. | fresh space records rows with no `-D` flag |
 | 6 | **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |

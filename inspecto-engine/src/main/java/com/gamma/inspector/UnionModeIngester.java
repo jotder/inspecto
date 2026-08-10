@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import com.gamma.consignment.EventTimeBounds;
 
 import static com.gamma.inspector.BatchIngestStrategy.*;
 
@@ -43,6 +44,7 @@ final class UnionModeIngester {
         List<MemberAudit>  memberAudits = new ArrayList<>();
         List<PartitionOutput> allOutputs = new ArrayList<>();
         List<LineageRow>      allLineage = new ArrayList<>();
+        Map<String, EventTimeBounds> allBounds = new java.util.HashMap<>();
         long totalInputRows = 0;
 
         Map<Integer, String> srcIdToFile = new LinkedHashMap<>();
@@ -146,6 +148,7 @@ final class UnionModeIngester {
 
                         allOutputs.addAll(written.outputs());
                         allLineage.addAll(written.lineage());
+                        allBounds.putAll(written.bounds());
 
                         dropView(conn, unionTable);
                         for (String mt : memberTables) dropTable(conn, mt);
@@ -163,7 +166,7 @@ final class UnionModeIngester {
 
         String schemaNames = String.join(",", cfg.schemas().segments().keySet());
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
-                allOutputs, allLineage, totalInputRows, schemaNames);
+                allOutputs, allLineage, totalInputRows, schemaNames, allBounds);
     }
 
     private static StreamingFileIngester instantiate(PipelineConfig cfg) {

@@ -5,6 +5,7 @@ import com.gamma.acquire.AcquisitionLedgers;
 import com.gamma.acquire.LedgerEntry;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentOutputs;
+import com.gamma.consignment.EventTimeBounds;
 import com.gamma.consignment.FileStage;
 import com.gamma.consignment.FileStageRecord;
 import com.gamma.consignment.FileStages;
@@ -65,7 +66,8 @@ public final class BatchProcessor {
 
         if ("SUCCESS".equals(status)) {
             try {
-                commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage());
+                commit(batch, cfg, outcome.survivors(), outcome.outputs(), outcome.lineage(),
+                        outcome.bounds());
             } catch (Exception e) {
                 // Output was written, but a side effect (backup/manifest/markers) failed. Demote
                 // to FAILED so the batch stays visible to audit/lineage/recovery instead of
@@ -85,14 +87,15 @@ public final class BatchProcessor {
     // ── commit: register, manifest, markers, backup ────────────────────────────
 
     private static void commit(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
-                               List<PartitionOutput> outputs, List<LineageRow> lineage)
+                               List<PartitionOutput> outputs, List<LineageRow> lineage,
+                               Map<String, EventTimeBounds> bounds)
             throws IOException {
         // lineage is persisted by writeAudit (from the outcome); it is passed on here too because it is the
         // only place a per-output-file row count exists (§11.3). The durable side effects —
         // register → manifest → backup → markers LAST → ledger / watermark — live in finalizeSource, which
         // the branch-aware graph path (BatchGraphRunner's SourceFinalizer) reuses once every sink branch is
         // committed (Stage A), so both drivers share this one crash-ordered sequence.
-        finalizeSource(batch, cfg, survivors, outputs, lineage);
+        finalizeSource(batch, cfg, survivors, outputs, lineage, bounds);
     }
 
     /**
@@ -109,6 +112,14 @@ public final class BatchProcessor {
      */
     static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
                                List<PartitionOutput> outputs, List<LineageRow> lineage) throws IOException {
+        finalizeSource(batch, cfg, survivors, outputs, lineage, Map.of());
+    }
+
+    /** {@link #finalizeSource(Batch, PipelineConfig, List, List, List)} with §3.1's per-output-file
+     *  event-time bounds for the output registry. */
+    static void finalizeSource(Batch batch, PipelineConfig cfg, List<Batch.Member> survivors,
+                               List<PartitionOutput> outputs, List<LineageRow> lineage,
+                               Map<String, EventTimeBounds> bounds) throws IOException {
 
         // ── ordering rationale ────────────────────────────────────────────────
         // Markers signal "already processed; skip on next poll." If a crash leaves
@@ -208,7 +219,8 @@ public final class BatchProcessor {
         // registered for this space, record() is a no-op and nothing about this sequence changes.
         if (lineage != null && !lineage.isEmpty()) {
             ConsignmentOutputStores.record(ConsignmentOutputs.fromLineage(
-                    batch.batchId(), null, batch.table(), outputs, lineage, schemaFingerprint));
+                    batch.batchId(), null, batch.table(), outputs, lineage, schemaFingerprint,
+                    bounds, cfg.identity().pipelineName()));
             recordStages(stageSourceId, batchIdForStages, survivors, cfg, FileStage.OUTPUT_REGISTERED);
         }
 

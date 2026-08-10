@@ -63,16 +63,20 @@ public final class TypeFlow {
     }
 
     /**
-     * The derived <b>sink</b> schema: {@link #transformedColumns} minus the internal {@code __src_id} tag,
-     * mirroring {@code PartitionWriter}'s {@code EXCLUDE(__src_id)} projection. This is the written table's
-     * full shape (Dataset auto-registration's view). Note the Parquet <em>file footer</em> carries these
-     * columns minus the partition columns — Hive {@code PARTITION_BY} encodes those as directories, not
-     * file columns — which is how the footer-parity gate compares (see {@code TypeFlowTest}).
+     * The derived <b>sink</b> schema: {@link #transformedColumns} minus the internal {@code __src_id} tag and
+     * {@code __event_time}, mirroring {@code PartitionWriter}'s {@code EXCLUDE} projection exactly. This is the
+     * written table's full shape (Dataset auto-registration's view). Note the Parquet <em>file footer</em>
+     * carries these columns minus the partition columns — Hive {@code PARTITION_BY} encodes those as
+     * directories, not file columns — which is how the footer-parity gate compares (see {@code TypeFlowTest}).
+     *
+     * <p>The two filters must stay in lockstep with that projection: an internal column dropped here but not
+     * there (or the reverse) is exactly the drift the footer-parity gate exists to catch.
      */
     public static List<Column> sinkColumns(Map<String, Object> schemaConfig, PipelineConfig cfg,
                                            boolean typedSource) {
         return transformedColumns(schemaConfig, cfg, typedSource).stream()
-                .filter(c -> !"__src_id".equals(c.name())).toList();
+                .filter(c -> !"__src_id".equals(c.name()))
+                .filter(c -> !TransformCompiler.EVENT_TIME_COL.equals(c.name())).toList();
     }
 
     /** Empty scratch table shaped like the raw ingest table: field columns + the {@code __src_id} tag. */

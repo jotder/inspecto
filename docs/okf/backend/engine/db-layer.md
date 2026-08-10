@@ -244,13 +244,24 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
   written_at     VARCHAR,
   generation     INTEGER,
   state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY
-  schema_fingerprint VARCHAR  -- §3.4.3 CanonicalHash of the schema that wrote the file; NULL pre-column / no-schema paths
+  schema_fingerprint VARCHAR,  -- §3.4.3 CanonicalHash of the schema that wrote the file; NULL pre-column / no-schema paths
+  event_time_min VARCHAR,      -- addressing §3.1: ISO-8601 LOCAL, no zone offset
+  event_time_max VARCHAR,
+  event_time_spread_ms BIGINT, -- max - min; NULL (not 0) when bounds are unknown
+  producer       VARCHAR       -- the pipeline that wrote the file, for the §3.6 per-stream watermark
 );
 ```
 
-`initSchema()` follows the CREATE with `ALTER TABLE consignment_outputs ADD COLUMN IF NOT EXISTS
-schema_fingerprint VARCHAR` — the additive migration for registries created before the column existed
-(CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows read back `NULL`.
+`initSchema()` follows the CREATE with `ALTER TABLE consignment_outputs ADD COLUMN IF NOT EXISTS` for
+`schema_fingerprint` and for each of the four addressing columns — the additive migration for registries
+created before they existed (CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows
+read back `NULL`.
+
+**Null bounds mean *unknown*, never *empty*.** A file gets bounds only when the relation that produced it
+carried `__event_time` — the coerced event-time column `DataTransformer` materialises on the ingest path
+(and excludes from written output). Enrichment and Pipeline-sink writes, schemas with no date partition, and
+every row written before these columns existed all read back `NULL`. A consumer that prunes on bounds must
+therefore treat a null-bounds row as a **possible match**, or it will silently drop data.
 
 The durable output registry from the
 [consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §11.3 — the catalog substitute

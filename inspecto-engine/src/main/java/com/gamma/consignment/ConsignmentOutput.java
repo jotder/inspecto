@@ -40,6 +40,16 @@ import com.gamma.api.PublicApi;
  *                      included — that wrote the file (ELT amendment §3.4.3: data carries its schema
  *                      identity). {@code null} for rows written before the column existed and for write
  *                      paths that carry no pipeline schema (enrichment, Pipeline sinks) — never required.
+ * @param bounds        the event-time range of this file's rows (consignment addressing §3.1), or {@code null}
+ *                      when none could be established — the write path materialises no event time (enrichment,
+ *                      Pipeline sinks), the schema declares no date partition, or every row's event time failed
+ *                      to parse. <b>Null means "unknown", never "empty"</b>: a selector that prunes on bounds
+ *                      must therefore treat a null-bounds file as a possible match, or it will silently drop
+ *                      data. See decision D3 — addressing degrades, it does not break.
+ * @param producer      the pipeline that wrote the file, for the per-stream watermark (§3.6): parallel
+ *                      producers into one table are the normal CDR case, so "has every producer passed
+ *                      {@code hi}" is not answerable from the rows alone. {@code null} on write paths with no
+ *                      pipeline identity in scope.
  */
 @PublicApi(since = "5.0.0")
 public record ConsignmentOutput(
@@ -54,7 +64,9 @@ public record ConsignmentOutput(
         String writtenAt,
         int generation,
         State state,
-        String schemaFingerprint) {
+        String schemaFingerprint,
+        EventTimeBounds bounds,
+        String producer) {
 
     /** Fingerprint-less form — pre-§3.4.3 call sites and write paths with no pipeline schema. */
     public ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey,
@@ -62,6 +74,14 @@ public record ConsignmentOutput(
                              int generation, State state) {
         this(consignmentId, runId, tableName, partitionKey, recordDay, path, rows, bytes, writtenAt,
                 generation, state, null);
+    }
+
+    /** Pre-§3.1 form — no event-time bounds and no producer. */
+    public ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey,
+                             String recordDay, String path, long rows, long bytes, String writtenAt,
+                             int generation, State state, String schemaFingerprint) {
+        this(consignmentId, runId, tableName, partitionKey, recordDay, path, rows, bytes, writtenAt,
+                generation, state, schemaFingerprint, null, null);
     }
 
     /**
