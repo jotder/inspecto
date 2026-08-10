@@ -54,7 +54,12 @@ class ControlApiPipelineCrudTest {
     }
 
     private Ctx open(Path dir, Path writeRoot) throws Exception {
-        Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
+        return open(dir, writeRoot, TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write());
+    }
+
+    /** As {@link #open(Path, Path)} but registering a config the caller placed — so a test can control
+     *  WHERE the pipeline is registered from, which is what decides the save target. */
+    private Ctx open(Path dir, Path writeRoot, Path toon) throws Exception {
         CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
         String prior = System.getProperty("assist.write.root");
         // the safety gate is evaluated per request — allow the temp dir for the Ctx's lifetime
@@ -113,6 +118,53 @@ class ControlApiPipelineCrudTest {
             assertTrue(cfg.active(), "active travelled through the round-trip");
 
             assertEquals(404, send(c.port, "GET", "/pipelines/ghost/graph/raw", null).statusCode());
+        }
+    }
+
+    /**
+     * A save overwrites the pipeline's REGISTERED file, never a guessed canonical name — the regression
+     * test for `eff45bb2`, which had none.
+     *
+     * <p>⚠ The failure this pins is not a bad write, it is a <b>silent split-brain that takes the whole
+     * space down later</b>. {@code saveGraph} used to hardcode {@code <name>_pipeline.toon} at the write
+     * root. For a pipeline registered from any other path under that root, every save created a SECOND
+     * file: the response said {@code written: true} and the new file carried the edit, but the running
+     * pipeline stayed bound to its original file and kept serving stale content — and on the next restart
+     * the loader found two files claiming one pipeline id and dropped the entire space, swallowed into a
+     * WARN by {@code SpaceManager.bootQuietly}, so {@code GET /spaces} just silently lost an entry.
+     *
+     * <p>⚠ The sibling round-trip test above does NOT cover this: its fixture is registered from
+     * {@code dir}, OUTSIDE the write root, so it exercises the deliberate canonical-name FALLBACK. Only a
+     * config registered at a non-canonical path INSIDE the write root reaches the branch that broke —
+     * hence the nested directory here, and {@code TestConfigs} names its file {@code pipeline_<hash>.toon},
+     * which is already non-canonical.
+     */
+    @Test
+    void aSaveOverwritesTheRegisteredFileRatherThanCreatingAShadow(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Path nested = wr.resolve("subscriber");
+        Path registered = TestConfigs.csv(nested, PipelineConfigBatchTest.miniSchema()).write();
+        assertTrue(registered.startsWith(wr), "the fixture must live INSIDE the write root to be the real case");
+
+        try (Ctx c = open(dir, wr, registered)) {
+            String name = json(send(c.port, "GET", "/pipelines", null)).get(0).get("name").asText();
+
+            JsonNode g = json(send(c.port, "GET", "/pipelines/" + name + "/graph/raw", null));
+            // a detectable edit: the fixture is active, so flipping it proves WHICH file received the save
+            // (an inactive draft may be partial, so this cannot trip the completeness gate)
+            ((com.fasterxml.jackson.databind.node.ObjectNode) g).put("active", false);
+
+            HttpResponse<String> put = send(c.port, "PUT", "/pipelines/" + name + "/graph", g.toString());
+            assertEquals(200, put.statusCode(), put.body());
+            assertTrue(json(put).get("written").asBoolean());
+
+            // the edit landed in the file the pipeline is actually bound to
+            assertFalse(PipelineConfig.load(registered.toString()).active(),
+                    "the registered file must carry the edit — it is what the engine reads");
+
+            // and no shadow was created under the name the old code guessed
+            assertFalse(Files.exists(wr.resolve(name + "_pipeline.toon")),
+                    "a second file claiming the same pipeline id is what took the space down on restart");
         }
     }
 
