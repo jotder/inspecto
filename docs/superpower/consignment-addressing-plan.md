@@ -554,7 +554,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 5 | ✔ **DONE 2026-08-10** — default flipped to `duckdb` (`none` still honoured), and the store wired into `db_maintenance`. ⚠ Justified by a **shipped bug**, not by addressing: `ReprocessCommand`'s refusal to reprocess a compacted-away Consignment (the alternative is silent row duplication) was decidable only from this registry, so the fix was switched off everywhere. **The "migration for existing installs" was dropped, not deferred** — §7-A's filter contract means pre-registry files need no backfill; they read as unknown, not absent | ✔ `ServiceStoresDefaultsTest` — absent property ⇒ a store is opened; `none` ⇒ none |
 | 6 | ✔ **DONE 2026-08-10, after 7′ unblocked it.** A full recompute's sink base name now always carries the **batch id** (`PipelineJobRunner.java:166`) — not a `<generation>` counter, which needed state the registry could not guarantee and a spelling `DuckDbRecordSink` already owns. The batch id needs no counter *and* preserves what the stable name was protecting: a same-batch-id replay still rewrites its own path, so it stays idempotent. `supersedeOtherRevisions(table, keep)` then marks earlier revisions dead (full recomputes only — an incremental run appends, so superseding there would discard every prior slice), and the new `retire_superseded` maintenance task deletes their bytes past an explicit `retention_days`. ⚠ Nothing deletes at flip time, on purpose | ✔ `DbConsignmentOutputStoreTest` (+3) — spares the revision that just landed, refuses a null keep, no-ops on a first revision; `MaintenanceLibraryTest` (+3) — aged bytes go, fresh ones stay, rows are kept, dry run previews, missing retention refused |
 | 7 | ✔ **DONE 2026-08-10 as 7′ (exclusion only)** — `ConsignmentSelector.resolve(conn, format, glob, hive)` subtracts `SUPERSEDED`/`COMPACTED_AWAY` paths from the glob and hands the caller's own expression back, byte for byte, when it has nothing to say. Wired into `SourceStoreReader`; the other five glob sites are listed below. ⚠ **No config shape, no generation pinning, and no bounds pruning** — see the scope box | ✔ `ConsignmentSelectorTest` (8) — subtracts both dead states, unknown files stay in, a path with any LIVE row survives a dead one, relative/absolute spellings still match, excluding everything fails like an empty store, an unusable connection falls back to the glob |
-| 8 | **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
+| 8 | ⛔ **BLOCKED — grounded 2026-08-10, see the box below.** There is no job that both records a dataset artifact and has catalog bounds to read, so "populate it from the catalog" has nothing to read. **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
 | 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
 | 10 | **Retire `record_day`** — populate from real bounds, mark deprecated. | existing readers unaffected |
 
@@ -594,6 +594,41 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
 > **`_g<N>_` is already taken**: `DuckDbRecordSink` writes `<stem>_g00001_out.parquet` for a *memory-bounded
 > flush chunk* (`DuckDbRecordSink.java:272`), which is a different concept entirely. A recompute generation
 > needs its own spelling, or the two become indistinguishable on disk.
+
+### 7-B. Why step 8 is blocked (2026-08-10)
+
+`$upstream(job).time_range` reads `RunArtifact.timeRange`, which `RunContext`'s recorder hard-codes to
+`null` at both construction sites (`RunContext.java:82,87` — the `dataset(...)` API has no parameter for it).
+Step 8 reads as a one-line fix: fill it from the catalog. It is not, because **the set of jobs that could
+supply it is empty**:
+
+| Job | records a dataset artifact | writes catalog rows | rows carry bounds |
+|---|---|---|---|
+| `SqlTemplateJob` (`:127`) | ✔ names its `sink` | ✗ plain `COPY` + `swapIn`, never touches the registry | — |
+| `BackupTask` (`:355`), `MaintenanceJob` (`:573`), `ObjectsAnalyticsJob` (`:134`) | ✔ but synthetic catalog names, no store behind them | ✗ | — |
+| `PipelineJobRunner` | ✗ **none at all** — no `artifacts()` call and no `ArtifactDecl` | ✔ via `PartitionSinkWriter` | ✗ `fromPartitionCounts` passes `null` |
+| ingest (`BatchProcessor`) | n/a — not a Job, so it has no Run to hang an artifact on | ✔ | ✔ **the only path that does** |
+
+The root is the deferral recorded after step 3: **only the ingest path materialises `__event_time`**, because
+only it runs through `DataTransformer`. Pipeline sinks and enrichment write a caller-authored relation and
+record bounds as `null`. So the one job that writes catalog rows has no bounds in them, and the one path with
+bounds is not a job.
+
+**What unblocking it actually requires** — pick one, then step 8 is small:
+
+1. **Give the Pipeline-sink path event-time bounds.** The principled source is the sink's target dataset
+   declaring `role: temporal`, which `DatasetRelation.temporalColumn` (step 2) already resolves — this is the
+   first use that would need it outside step 3's partition inference. The obstacle is scope: `PartitionSinkWriter`
+   holds the store *name*, not the dataset config, so something has to resolve one from the other.
+   ⛔ **Do not substitute a heuristic** such as "the relation's only TIMESTAMP column". A silently wrong
+   `time_range` is worse than a null one, because it feeds a downstream job's scheduling decision, whereas
+   `null` merely fails to.
+2. **Or accept that `time_range` describes ingest, not jobs**, and expose it somewhere other than
+   `$upstream(job)` — a Consignment-scoped accessor rather than a Run-artifact field. This is the smaller
+   change but it is a scope decision about what the token means, not an implementation detail.
+
+Until one is chosen, `RunArtifact.timeRange` stays `null` and `$upstream(...).time_range` keeps returning
+nothing — which is at least honest, and is the D3 posture.
 
 ### 7-A. The 5–6–7 knot, resolved (2026-08-10)
 
