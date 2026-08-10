@@ -3,6 +3,7 @@ package com.gamma.pipeline.exec;
 import com.gamma.api.PublicApi;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.ConsignmentOutputs;
+import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PartitionWriter;
 import com.gamma.pipeline.PipelineNode;
@@ -45,6 +46,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
     private final String dataDir;
     private final String baseName;
     private final String consignmentId;
+    private final String producer;
     private final List<PartitionOutput> outputs = new ArrayList<>();
     private long totalRows = 0L;
 
@@ -58,10 +60,22 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
      *                      graph path does not double-count. May be {@code null} — nothing is registered then.
      */
     public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId) {
+        this(conn, dataDir, baseName, consignmentId, null);
+    }
+
+    /**
+     * As above, with the {@code producer} recorded on every registry row this writer creates — the pipeline
+     * identity the §3.6 per-stream watermark needs. Without it a table written by this path has an
+     * <em>unattributed</em> producer, which suppresses its watermark entirely (and correctly: a stream
+     * receiving writes nobody owns cannot report completeness).
+     */
+    public PartitionSinkWriter(Connection conn, String dataDir, String baseName, String consignmentId,
+                               String producer) {
         this.conn = conn;
         this.dataDir = dataDir;
         this.baseName = baseName;
         this.consignmentId = consignmentId;
+        this.producer = producer;
     }
 
     @Override
@@ -91,7 +105,8 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         totalRows += rowsByPartition.values().stream().mapToLong(Long::longValue).sum();
         if (consignmentId != null)
             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
-                    consignmentId, null, store, outs, rowsByPartition));
+                    consignmentId, null, store, outs, rowsByPartition,
+                    boundsFor(sink, inputTable, partCols), producer));
         log.info("[FLOWJOB] sink '{}' → store '{}': {} file(s){}",
                 sink.id(), store, outs.size(), partCols.isEmpty() ? " (unpartitioned)" : " partitioned by " + partCols);
     }
@@ -125,6 +140,63 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
             default -> throw new IllegalArgumentException("Unsupported sink format: " + format);
         };
     }
+
+    /**
+     * Event-time bounds per partition for this sink branch, or an empty map when the sink declares nothing that
+     * identifies event time (addressing §3.1, extended to the Pipeline-sink path 2026-08-10).
+     *
+     * <p><b>The declaration is the {@code source} of a {@code partitions[]} entry</b> — the raw column a
+     * partition was derived from, exactly the word and meaning {@code PartitionDef.source} already carries on
+     * the ingest schema. One concept, one word; no new config key, since {@code partitions[]} has always
+     * accepted map entries. When entries are bare strings, or carry no {@code source}, there is nothing here to
+     * aggregate and bounds stay absent.
+     *
+     * <p><b>Nothing is inferred.</b> A relation's only {@code TIMESTAMP} column is not evidence that it is event
+     * time, and neither is a partition column that happens to be a date — that one merely restates the partition
+     * key, at exactly the resolution {@code record_day} already has. Bounds that are confidently wrong are worse
+     * than bounds that are absent, because a selector prunes on them and a watermark closes windows on them,
+     * whereas absent reads as "unknown" everywhere by construction (D3).
+     *
+     * <p>{@code TRY_CAST} rather than {@code CAST}: a {@code VARCHAR} source that does not parse yields NULL,
+     * which {@code min}/{@code max} skip, and a partition where every row failed contributes no entry at all —
+     * the same "no honest bound" rule {@link ConsignmentOutputs#boundsByPartition} already applies.
+     */
+    private Map<String, EventTimeBounds> boundsFor(PipelineNode sink, String inputTable, List<String> partCols) {
+        String source = declaredEventTimeSource(sink);
+        if (source == null) return Map.of();
+        try {
+            return ConsignmentOutputs.boundsByPartition(conn, inputTable, partCols,
+                    "TRY_CAST(\"" + source + "\" AS TIMESTAMP)");
+        } catch (Exception e) {
+            // Best-effort, like every other addressing column: a store that cannot be measured records no
+            // bounds rather than failing a write whose bytes have already landed.
+            log.warn("[FLOWJOB] could not measure event-time bounds over '{}' for sink '{}': {}",
+                    source, sink.id(), e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /**
+     * The single {@code source} column the sink's {@code partitions[]} entries agree on, or {@code null} when
+     * they declare none or disagree — mirroring {@code PartitionDef.eventTimeDef}'s rule on the ingest side,
+     * where two different sources mean no single event time is identified.
+     */
+    private static String declaredEventTimeSource(PipelineNode sink) {
+        if (!(sink.cfg("partitions") instanceof List<?> list)) return null;
+        String found = null;
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m) || m.get("source") == null) continue;
+            String source = m.get("source").toString().trim();
+            if (source.isEmpty() || !SAFE_COLUMN.matcher(source).matches()) return null;
+            if (found != null && !found.equals(source)) return null;   // two sources identify no one event time
+            found = source;
+        }
+        return found;
+    }
+
+    /** A partition {@code source} is embedded in {@code min()}/{@code max()} SQL, so it must be a plain
+     *  identifier — the same fail-closed check {@code DatasetRelation.temporalColumn} applies. */
+    private static final java.util.regex.Pattern SAFE_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /** The sink's {@code partitions} as an ordered column list ({@code []} when absent). */
     private static List<String> partitionColumns(PipelineNode sink) {

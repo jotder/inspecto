@@ -120,6 +120,23 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   remained. **Either `git add` the new path explicitly after the move, or verify with
   `git show HEAD:<newpath>`.**
 
+- **`ResultSet.wasNull()` reports on the most recent `get*`, not on a named column.** Read it *immediately*
+  after the getter whose nullness you care about, or it answers for whichever column you fetched last. Cost a
+  real bug in `DbConsignmentOutputStore.producerHighWater` (2026-08-10): an absent instant read back as
+  `1970-01-01`. The same trap applies to any nullable numeric — `getLong`/`getInt` return `0`, so the sentinel
+  is silent by construction.
+
+- **A write path must read a declaration it already holds — never resolve one by reverse lookup.** Going from a
+  *store name* back to the dataset that describes it is ambiguous by construction (the catalog builds that map
+  with `putIfAbsent`, so it is first-scan-wins and depends on directory order). Two write paths needed an
+  event-time column and both had to take the local route instead: ingest uses the schema's date `PartitionDef`,
+  Pipeline sinks use their own `partitions[].source`. This is why `DatasetRelation.temporalColumn` has **no
+  caller** despite being built for exactly that job — see
+  [`okf/backend/engine/consignment-addressing.md`](okf/backend/engine/consignment-addressing.md) §2.
+
+- **Surefire `-Dtest=A,B` wants commas.** The `+` form silently matches nothing and fails the run with
+  "No tests matching pattern … were executed", which reads like a missing class rather than a bad separator.
+
 - **TOON schema serialization** — `ConfigCodec.toToon(map)` does **not** emit tabular-array format. A schema
   whose `fields`/`rules` are Java-constructed `List<Map>` round-trips as nested maps, and the TOON parser then
   throws `Array length mismatch: declared N, found 0`. In any test that writes a schema file for TOON loading,

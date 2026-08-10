@@ -171,7 +171,10 @@ public final class PipelineJobRunner implements Job {
             // `_g<N>_` spelling the plan proposed, which DuckDbRecordSink already uses for a memory-bounded
             // flush chunk — a different concept that would have become indistinguishable on disk.
             String sinkBase = cfg.name().toLowerCase().replace(' ', '_') + "_" + safe(batchId);
-            PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase, batchId);
+            // The pipeline id is the producer stamped on this run's registry rows (§3.6): the id rather than the
+            // display name, because a watermark folds over producer identity and a renamed pipeline must stay
+            // the same producer.
+            PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase, batchId, pipelineId);
             BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(
                     Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
 

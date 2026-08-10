@@ -28,7 +28,12 @@ import com.gamma.api.PublicApi;
  * @param tableName     the logical target the rows landed in.
  * @param partitionKey  the partition the file sits under, as written (e.g. {@code dt=2026-08-04}).
  * @param recordDay     the event-time day this file's rows belong to, cut at load time with the <em>pinned</em>
- *                      timezone (§5.6, §10.1) — never recomputed from current config at read time.
+ *                      timezone (§5.6, §10.1) — never recomputed from current config at read time. Taken from
+ *                      {@link #bounds()} when the file's event times share a day (addressing step 10), else
+ *                      derived from the partition key. ⚠ <b>Superseded — read {@link #bounds()} instead.</b> One
+ *                      day per file cannot express a file that straddles two, which is exactly what an interval
+ *                      is for; this field survives because it is in the schema and cheap, not because anything
+ *                      should prefer it. Nothing in the engine reads it.
  * @param path          the revealed final path on disk.
  * @param rows          row count, summed across every lineage row sharing this output file.
  * @param bytes         file size as observed on disk after the atomic reveal.

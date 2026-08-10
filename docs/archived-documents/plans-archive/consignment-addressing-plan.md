@@ -1,7 +1,16 @@
 # Consignment Addressing — plan
 
-**Status: v1.1 — APPROVED by the operator 2026-08-10** (approved with steps 1–5 and 7′ already shipped and
-their corrections folded in; steps 6, 8, 9, 10 remain open).
+**Status: CLOSED / ARCHIVED 2026-08-10.** v1.1 was approved by the operator and delivered the same day:
+**steps 1–7 and 10 shipped**, step 8 **blocked on a scope decision** (§7-B), step 9 **refuted and not built**
+(§7-C). This document is kept for provenance and is **no longer maintained**.
+
+> **Read the as-built instead:** [`okf/backend/engine/consignment-addressing.md`](../../okf/backend/engine/consignment-addressing.md)
+> (the architecture as it actually landed) · [`okf/backend/engine/db-layer.md`](../../okf/backend/engine/db-layer.md) §3.9
+> (the catalog's DDL and its readers) · [`BACKLOG.md`](../../BACKLOG.md) §4 *Consignment addressing* (every
+> still-open item, including step 8's scope decision and the refutation of step 9).
+>
+> ⚠ Delivery contradicted this plan in **ten** places. The correction boxes below are the accurate record;
+> the surrounding prose is the original proposal and is wrong in the places they name.
 
 > ⚠ **Read before building anything further.** Step 1's measurement **contradicts this plan's performance
 > premise**: catalog pruning cuts rows scanned 29–88× but wall-clock only 1.3–2.6×, so the Selector is a
@@ -9,8 +18,9 @@ their corrections folded in; steps 6, 8, 9, 10 remain open).
 > the plan wrong about the code in eight places — `role: temporal` was UI-only, there is no live connection
 > at `finalizeSource`, the written relation had no aggregatable event-time column, there is no `COMMITTED`
 > state, the glossary carried none of the three watermark meanings, D1's stated justification was not the
-> real one, and the 6-before-7 ordering was backwards (§7-A). Every step row below carries its correction;
-> **trust the rows over the prose.**
+> real one, and the 6-before-7 ordering was backwards (§7-A). Two steps did not survive at all: **step 9's
+> premise is false** (§7-C) and **step 8 has no source to read from** (§7-B). Every step row below carries its
+> correction; **trust the rows over the prose.**
 
 Grounded against source 2026-08-09; every "already exists" claim below carries a `file:line` ref and was
 verified, not assumed. v1.1 (2026-08-09, operator-accepted review) folds in four amendments: `producer` on
@@ -272,10 +282,15 @@ Min/max pruning collapses when one Consignment spans a wide event-time range —
 09:00–11:00 forces every window in those hours to read it. Two cheap mitigations, both in scope:
 
 - Persist `event_time_spread_ms` so the planner (and an operator) can see which files are unhelpful.
-- **Segregate late arrivals at write time**: when a record's event time falls outside the
+- ~~**Segregate late arrivals at write time**: when a record's event time falls outside the
   Consignment's expected band, route it to a distinct late partition. The hot partition's bounds stay
   tight, and late data becomes explicitly addressable instead of poisoning the index. This is the
-  highest-value non-obvious item in the plan.
+  highest-value non-obvious item in the plan.~~
+  ⛔ **Refuted 2026-08-10 — see §7-C.** A date partition is computed *from* the event-time column and a
+  Consignment writes one file per partition, so a late record already lands in its own partition, in its own
+  file, with its own tight bounds. There is no index to poison. Where bounds *are* wide (unpartitioned stores,
+  or non-date partitions) the fix is for the author to declare a date partition — routing would write to a
+  partition nobody declared. The actionable half was the bullet above: persist the spread, which step 3 did.
 
 ### 3.6 The per-stream watermark — the completeness primitive
 
@@ -555,8 +570,8 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 6 | ✔ **DONE 2026-08-10, after 7′ unblocked it.** A full recompute's sink base name now always carries the **batch id** (`PipelineJobRunner.java:166`) — not a `<generation>` counter, which needed state the registry could not guarantee and a spelling `DuckDbRecordSink` already owns. The batch id needs no counter *and* preserves what the stable name was protecting: a same-batch-id replay still rewrites its own path, so it stays idempotent. `supersedeOtherRevisions(table, keep)` then marks earlier revisions dead (full recomputes only — an incremental run appends, so superseding there would discard every prior slice), and the new `retire_superseded` maintenance task deletes their bytes past an explicit `retention_days`. ⚠ Nothing deletes at flip time, on purpose | ✔ `DbConsignmentOutputStoreTest` (+3) — spares the revision that just landed, refuses a null keep, no-ops on a first revision; `MaintenanceLibraryTest` (+3) — aged bytes go, fresh ones stay, rows are kept, dry run previews, missing retention refused |
 | 7 | ✔ **DONE 2026-08-10 as 7′ (exclusion only)** — `ConsignmentSelector.resolve(conn, format, glob, hive)` subtracts `SUPERSEDED`/`COMPACTED_AWAY` paths from the glob and hands the caller's own expression back, byte for byte, when it has nothing to say. Wired into `SourceStoreReader`; the other five glob sites are listed below. ⚠ **No config shape, no generation pinning, and no bounds pruning** — see the scope box | ✔ `ConsignmentSelectorTest` (8) — subtracts both dead states, unknown files stay in, a path with any LIVE row survives a dead one, relative/absolute spellings still match, excluding everything fails like an empty store, an unusable connection falls back to the glob |
 | 8 | ⛔ **BLOCKED — grounded 2026-08-10, see the box below.** There is no job that both records a dataset artifact and has catalog bounds to read, so "populate it from the catalog" has nothing to read. **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
-| 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
-| 10 | **Retire `record_day`** — populate from real bounds, mark deprecated. | existing readers unaffected |
+| 9 | ⛔ **NOT BUILT — the premise does not hold** (grounded 2026-08-10; §7-C). Event-time partitioning already segregates late arrivals, so there is nothing to route and nothing being poisoned. **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
+| 10 | ✔ **DONE 2026-08-10** — `record_day` is now taken from the file's real bounds when its event times share a day, else from the partition key as before. ⚠ "Existing readers unaffected" was trivially true: **nothing in the engine reads `record_day`** — it is written by three paths and asserted only in tests. Rather than retire the column, its javadoc now says plainly that `bounds` supersedes it, because one day per file cannot express a file that straddles two | ✔ `ConsignmentOutputsTest` (+3) — bounds beat a disagreeing partition key, a straddling file falls back (and to null where no day is derivable), absent/malformed bounds leave the old derivation in charge |
 
 Steps 1–2 are independent and can run in parallel. ~~Nothing after step 3 is worth starting before
 step 1's number exists.~~ **That gate is cleared (2026-08-10) — and it moved step 7.** With rung A
@@ -595,6 +610,37 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
 > flush chunk* (`DuckDbRecordSink.java:272`), which is a different concept entirely. A recompute generation
 > needs its own spelling, or the two become indistinguishable on disk.
 
+### 7-C. Why step 9 was not built (2026-08-10)
+
+§3.5 calls late-arrival segregation *"the highest-value non-obvious item in the plan"*: route a record whose
+event time falls outside the Consignment's expected band to a distinct late partition, so *"the hot partition's
+bounds stay tight and late data becomes explicitly addressable instead of poisoning the index."* Grounded
+against the write path, **the poisoning it describes cannot happen on the path it targets**, and the mechanism
+is wrong for the paths where wide bounds do occur.
+
+**Event-time partitioning already segregates late arrivals.** A date partition is `DATE_YEAR`/`DATE_MONTH`/
+`DATE_DAY` computed from a declared `source` column (`PartitionDef`), so a record's partition is a *pure
+function of its own event time*. And `PartitionWriter.reveal()` renames every staged file of a partition onto
+one `<baseName>_out.<ext>`, so a Consignment writes **one file per partition**. A late record therefore already
+lands in its own older partition, in its own file, with its own tight bounds — and the hot partition's file
+never sees it. There is no index to poison and nothing to route.
+
+**Where bounds genuinely are wide, routing is the wrong fix.** Two cases: an unpartitioned store
+(`PartitionSinkWriter.writeUnpartitioned`), and one partitioned only on non-date columns. In both, a file
+legitimately spans the whole range — and "route the late rows elsewhere" would mean writing to a partition the
+author never declared, breaking the store-layout contract and surprising every reader of that store. The
+honest fix for a wide-spread store is for its author to **declare a date partition**, which is an authoring
+decision, not a write-time behaviour. `event_time_spread_ms` (step 3) already exists to make that visible —
+§3.5's own first bullet, and the half of it that was actionable.
+
+**The `allowed_lateness` half has no consumer either.** `StreamWatermark.windowComplete(wm, hi, lateness)`
+takes it as a parameter, and nothing calls that method yet. Declaring a per-stream value now would add a config
+key that changes no behaviour.
+
+⚠ **What is worth keeping from §3.5**: the *diagnostic*. A file whose spread is implausibly wide for its
+partition granularity is useless for pruning, and that is now measurable from the catalog. If this comes back,
+it should come back as a warning about partitioning, not as a write-time router.
+
 ### 7-B. Why step 8 is blocked (2026-08-10)
 
 `$upstream(job).time_range` reads `RunArtifact.timeRange`, which `RunContext`'s recorder hard-codes to
@@ -616,19 +662,28 @@ bounds is not a job.
 
 **What unblocking it actually requires** — pick one, then step 8 is small:
 
-1. **Give the Pipeline-sink path event-time bounds.** The principled source is the sink's target dataset
-   declaring `role: temporal`, which `DatasetRelation.temporalColumn` (step 2) already resolves — this is the
-   first use that would need it outside step 3's partition inference. The obstacle is scope: `PartitionSinkWriter`
-   holds the store *name*, not the dataset config, so something has to resolve one from the other.
-   ⛔ **Do not substitute a heuristic** such as "the relation's only TIMESTAMP column". A silently wrong
-   `time_range` is worse than a null one, because it feeds a downstream job's scheduling decision, whereas
-   `null` merely fails to.
+1. ✔ **DONE 2026-08-10 — the Pipeline-sink path now records bounds and `producer`.** Not from the target
+   dataset's `role: temporal`, which was the obvious idea and does not work: reaching a dataset from a store
+   name is the store→dataset reverse lookup step 3 already rejected as **ambiguous by construction**
+   (`putIfAbsent`, first-scan-wins), so the bounds would depend on directory scan order. The declaration used
+   instead is the **`source` of the sink's own `partitions[]` entry** — the raw column the partition was derived
+   from, which is exactly the word and meaning `PartitionDef.source` already carries on the ingest schema. One
+   concept, one word, and **no new config key**: `partitions[]` has always accepted map entries.
+   `PartitionSinkWriter` aggregates `TRY_CAST(<source> AS TIMESTAMP)` per partition, so the bounds land at the
+   source's own resolution rather than the partition's day granularity — which would merely restate
+   `record_day`. Absent, bare-string, disagreeing or unsafe declarations all record **no** bounds.
+   ⛔ The heuristic stayed banned: a relation's only TIMESTAMP column is *not* evidence of event time, and
+   `anUndeclaredTimestampColumnIsNotTreatedAsEventTime` pins that. A silently wrong `time_range` is worse than
+   a null one, because it feeds a downstream job's scheduling decision, whereas `null` merely fails to.
 2. **Or accept that `time_range` describes ingest, not jobs**, and expose it somewhere other than
    `$upstream(job)` — a Consignment-scoped accessor rather than a Run-artifact field. This is the smaller
    change but it is a scope decision about what the token means, not an implementation detail.
 
-Until one is chosen, `RunArtifact.timeRange` stays `null` and `$upstream(...).time_range` keeps returning
-nothing — which is at least honest, and is the D3 posture.
+**Step 8 is still not done**, and option 1 was only its *first* prerequisite. `PipelineJobRunner` records no
+`RunArtifact` at all, and `RunContext`'s `dataset(...)` API has no parameter to carry a range even if it did.
+What changed is that there is now something true to put in one. ⚠ Also note the ingest path — the *other*
+producer of bounds — is not a Job and has no Run to hang an artifact on, so option 2 remains live and may
+still be the more honest answer for that half.
 
 ### 7-A. The 5–6–7 knot, resolved (2026-08-10)
 

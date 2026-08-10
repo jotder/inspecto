@@ -183,4 +183,38 @@ class ConsignmentOutputsTest {
         assertNull(ConsignmentOutputs.recordDay("year=2026/month=JUL/day=01"));
         assertNull(ConsignmentOutputs.recordDay("year=/month=07/day=01"));
     }
+
+    // ── record_day from real bounds (addressing step 10) ─────────────────────────
+
+    private static EventTimeBounds bounds(String min, String max) {
+        return new EventTimeBounds(min, max, 0);
+    }
+
+    /** Real event times beat the partition value, which may have been cut in another timezone or off another
+     *  column — the silent divergence {@code recordDay}'s own javadoc has always warned about. */
+    @Test
+    void boundsWinOverThePartitionKeyWhenTheyDisagree() {
+        assertEquals("2026-07-02", ConsignmentOutputs.recordDay("year=2026/month=07/day=01",
+                bounds("2026-07-02T00:30:00", "2026-07-02T23:00:00")));
+    }
+
+    /** A file straddling two days has no single record day, so the partition derivation stands rather than
+     *  half the interval being promoted to the whole file's identity. */
+    @Test
+    void aStraddlingFileFallsBackToThePartitionKey() {
+        assertEquals("2026-07-01", ConsignmentOutputs.recordDay("year=2026/month=07/day=01",
+                bounds("2026-07-01T23:59:00", "2026-07-02T00:01:00")));
+        assertNull(ConsignmentOutputs.recordDay("dt=2026-07-01",
+                        bounds("2026-07-01T23:59:00", "2026-07-02T00:01:00")),
+                "and with no derivable partition day either, null — never a guess");
+    }
+
+    @Test
+    void absentOrMalformedBoundsLeaveThePartitionDerivationInCharge() {
+        assertEquals("2026-07-01", ConsignmentOutputs.recordDay("year=2026/month=07/day=01", null));
+        assertEquals("2026-07-01", ConsignmentOutputs.recordDay("year=2026/month=07/day=01",
+                bounds(null, null)));
+        assertEquals("2026-07-01", ConsignmentOutputs.recordDay("year=2026/month=07/day=01",
+                bounds("2026", "2026")), "too short to carry a date");
+    }
 }

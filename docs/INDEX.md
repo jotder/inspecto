@@ -75,29 +75,6 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/consignment-addressing-plan.md`](superpower/consignment-addressing-plan.md) —
-  **v1.1 DRAFT 2026-08-09, not approved — the addressing layer: naming a set of Consignments as one
-  relation.** Thesis: in-motion and at-rest are the *same type* here (both a DuckDB relation), so the
-  Job/Step boundary is **selection, not data state** — which replaces the in-motion/at-rest framing in
-  `okf/backend/control-plane/job-vs-step.md`. The one mechanical change: reads become a
-  **catalog-pruned explicit file list** instead of a `**/*.parquet` glob. Grounding (verified
-  2026-08-09) reshaped the plan: the catalog was **80% built and switched off** —
-  `consignment_outputs` already carries `path`/`row_count`/`bytes`/**`generation`**/`state`.
-  *(**Plan APPROVED 2026-08-10**; steps 1–5 and 7′ shipped the same day: event-time bounds + `producer` are
-  now written per output file, the per-stream `StreamWatermark` is derived from them, the registry is **on by
-  default** — flipped for `ReprocessCommand`'s compacted-away guard, not for addressing — and
-  `ConsignmentSelector` subtracts unreadable files from a store's glob. `generation` is still a dead field and
-  `RunArtifact.timeRange` is still always null; `record_day` remains the write-time approximation its own
-  javadoc calls silently divergent.)* dataset `role: temporal` exists in config but
-  `DatasetRelation` never reads it; and **no windowed scan of ingested data exists at all** — alert
-  `window: 1h` filters the *batch audit ledger* by wall-clock, so content rules are new capability,
-  not an extension. §5 is a **strategy framework, not a design**: pinned hopping-window vocabulary
-  (size/hop/pane/dirty window), a T1–T3 rule tier test, firing discipline (monotonic thresholds fire
-  on crossing — no completeness wait), a six-rung evaluation ladder (A catalog-pruned rescan → F
-  decayed counters) with escalation triggers, and a per-source instantiation template. Scope guard
-  (operator): BI, RA, Warehouse and Fraud are **deferred** to §6 extension points. 10-step delivery
-  table; step 1 is *measure rung A* and nothing past step 3 should start before that number exists.
-
 - [`superpower/job-parameter-contract-plan.md`](superpower/job-parameter-contract-plan.md) —
   **REFINED + GROUNDED 2026-08-06 (UI + backend) — the Job authoring contract + extensible runtime
   Expressions.** **§0-A: user-facing 'Job' un-banned** (operator decision, reverses the ELT
@@ -209,6 +186,17 @@ former root reference docs** (each index lists them):
   identifiers), `NodeConfigNameContractTest` (a declared key must reach its engine field), and
   `NodeAttributesContractTest` + the committed `node-attributes.contract.json` (the server publishes the node
   cfg vocabulary; client and server are byte-compared).
+
+- **Consignment addressing — DELIVERED + ARCHIVED 2026-08-10.** The addressing layer (naming a set of
+  Consignments as one relation) shipped steps 1–7 and 10 in a single stretch; step 8 is blocked on a scope
+  decision and step 9 was **refuted**. As-built:
+  [`okf/backend/engine/consignment-addressing.md`](okf/backend/engine/consignment-addressing.md) — the
+  Selector **filters** a glob rather than replacing it (an optional catalog cannot be an existence oracle),
+  event-time bounds per output file from a declaration each write path already holds, the batch-id revision
+  model that lets a recompute stop overwriting in place, and the per-stream **Watermark**. Open items in
+  [`BACKLOG.md`](BACKLOG.md) §4 *Consignment addressing*; the original proposal — wrong about the code in ten
+  places, each carrying a correction box — is at
+  [`archived-documents/plans-archive/consignment-addressing-plan.md`](archived-documents/plans-archive/consignment-addressing-plan.md).
 
 - [`superpower/consignment-elt-architecture.md`](superpower/consignment-elt-architecture.md) —
   **IN FLIGHT (opened 2026-08-03) — three sections are now CLOSED, the rest is still design (2026-08-04).**
