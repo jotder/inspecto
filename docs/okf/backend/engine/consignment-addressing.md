@@ -133,6 +133,26 @@ record an unattributed producer with no bounds.
 ⚠ **Vocabulary.** *Watermark* is reserved for this concept. `PipelineWatermarkStore` is an incremental
 **read cursor** and `$job.last_success_time` is **wall clock**; neither answers window close.
 
+## 5-A. Bounds are not readable by a Job yet
+
+Nothing outside the engine can ask a Job for the event-time range it produced. The `$upstream(<job>)`
+`.artifact(<name>).time_range` attr exists in the grammar but is **dead**: `RunArtifact.timeRange` is a
+literal `null` at both construction sites (`RunContext.java:81-82,86-87`) and `ArtifactRecorder.dataset(...)`
+has no parameter to carry one.
+
+Filling it would not help, which is why the addressing plan's step 8 was **closed rather than built**
+(2026-08-10). The value is a single opaque `"<min>..<max>"` string fixed only by a test fixture, and no
+consumer can use it: `SqlParamScanner.substitute` wraps the whole string in one SQL literal, nothing splits
+on `..`, and `ParameterResolver.matchesType` rejects it for exactly the `DATE`/`INSTANT` parameters that would
+want it. Repo-wide it has **zero live consumers** — no config, no UI, no guide.
+
+The settled replacement is two scalars (`event_time_min`/`event_time_max`) resolved **live from this
+registry** rather than stored, keyed on the sink `store` name — the one identifier where `RunArtifact.ref`
+and `consignment_outputs.table_name` coincide, and one that requires `PipelineJobRunner` to start recording a
+`RunArtifact` (it records none). A stored copy is rejected: §4's revisions mean a recompute would leave the
+snapshot describing a superseded revision. Ingest is structurally excluded — it is not a Job and has no Run.
+Design of record: [`superpower/job-parameter-contract-plan.md`](../../../superpower/job-parameter-contract-plan.md) §5-B, step 17.
+
 ## 6. Related
 
 [db-layer.md §3.9](db-layer.md) (the catalog's DDL and its two readers) ·
