@@ -154,6 +154,63 @@ Design of record (all phases + resolved decisions + TOON config gallery):
     has PII/ACL implications; these are aggregates) · no change to `GET /objects/analytics` or the mail UI ·
     no UI work at all.
 
+## The parameter contract & runtime Expressions (shipped 2026-08-07/10)
+
+Design of record (all 17 steps, with the wrong premises each one corrected):
+[`job-parameter-contract-plan.md`](../../../archived-documents/plans-archive/job-parameter-contract-plan.md).
+It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet above. Guiding principle:
+**versatility over built-ins** — capability arrives by *registration*, never by editing a `switch`.
+
+* **`ExpressionProvider` SPI + `ExpressionRegistry`.** `ParameterResolver.deduce()`'s switch is gone; the
+  fifteen built-in tokens are declarations in `BuiltinExpressions`. Providers register from `ServiceLoader`
+  **and** from Job Packs (owner-tagged, `deregister(owner)` on unload); a **collision fails closed in all
+  three paths** — a pack redeclaring `$today` is rejected whole rather than shadowing it.
+* **`ExpressionDecl` is the catalog entry**, not just an implementation detail: `token`, `form`
+  (LITERAL | PREFIX | FUNCTION), `yields` (a `ParamType`), `description`, `example`, `availableIn`
+  (Trigger kinds) and `contextFree`. ⚠ **`token` is not always typeable** — `$day(n)` is a *shape*;
+  `sampleExpression()` is the rule for what the registry can actually evaluate (a literal's own token, a
+  shaped token's `example`). A UI inserting the shape authors an unknown expression.
+* **Three-way resolution, not two.** "Unregistered token" and "declared token with no value here" are
+  different outcomes: an unregistered token stops the ladder and REJECTS the Run with
+  `Resolution.unknownExpression`, while a `bind:` to an absent `$signal.<field>` still falls through to the
+  next layer. Conflating them (both `null`) is what let a `deduce:` typo silently use the default instead.
+* **`$$` escapes a literal `$`**, and it had to ship *before* authored values evaluated, or every config
+  holding a literal `$` would have broken.
+* **Whole-value evaluation only** (§6.1, settled): a value is evaluated only when it *is* a token.
+  `report for $today` stays literal. This is the scoped-evaluation answer to the `sql.template` `$`
+  collision — the SQL body keeps its own parameter namespace (`expressions: false`), and a runtime window
+  is bound by indirection (`params: {from: "$event_day(-7)"}`), not by tokens inside SQL. ⚠ It also means a
+  `multi` (CSV) parameter resolves a token **only when the token is the entire value**: `authored()` sees
+  the whole raw string, and the CSV split happens later, in post-resolution *validation*.
+* **Validation runs on the resolved value**, so a literal and an Expression result are held to the same
+  contract (`options`/`pattern`/`min`/`max`, per item under `multi`). A *pre*-resolution `yields` check is
+  deliberately **not** done in the resolver — at fire time it could only refuse what post-resolution
+  validation already judges on the evidence (a STRING-yielding `$signal.<field>` legitimately carries a
+  date). That check earns its keep at **author** time, in the picker.
+* **`ParameterDecl` carries the whole rendering + validation contract** (eleven components: `label`,
+  `tier`, `options`, `pattern`, `min`/`max`, `placeholder`, `group`, `multi`, `secret`, `expressions`, …),
+  and `JobTypeDescriptor.toMap()` serves it. A 6-arg delegating constructor kept all 16 raw call sites
+  compiling. `secret` is masked at the **response boundary** (`JobRoutes.maskSecrets`), so `JobConfig.toMap()`
+  — and therefore bundle export — is untouched.
+* **Provenance is assembled by the REGISTRY, not the descriptor** (`implClass`/`source`/`version`): a
+  provider cannot know its own provenance.
+* **`GET /jobs/expressions`** serves the catalog **generated from the registry**, so it stays correct as
+  packs load. A `contextFree` entry's `preview` is evaluated by the same evaluator a Run uses — which is
+  what makes a client's preview correct *by construction* instead of a second implementation. Context-bound
+  entries fall back to their declared sample: there is no firing Run at request time, and inventing one
+  would show an author a value their Job will never see. ⚠ The route registers as a **fixed sub-path before
+  the single-segment `/jobs/{name}` regex**; registration order is load-bearing.
+* **`mail.send` + the `mail` Platform Service** are the reference generic Job Type (§9 verbatim): it
+  reuses the `NotificationChannel` seam rather than opening a second SMTP client, and declares
+  `requires: [mail]` because a Job that mails outward must declare that reach. ⚠ A built-in with an
+  unsatisfiable `requires` is **accepted** — only the pack/classpath paths refuse (S1-7). CC is deferred
+  (BACKLOG §4): the channel seam takes one recipient list.
+* **`$upstream(<job>).artifact(<name>).<attr>`** exposes a predecessor's latest artifact. Its two
+  event-time attrs resolve **live** against the Consignment output registry keyed by the artifact's `ref`,
+  which is why they replaced the single `time_range` attr no consumer could use — one opaque
+  `"<min>..<max>"` string that `SqlParamScanner` substitutes as one SQL literal and nothing split. See
+  [`consignment-addressing.md`](../engine/consignment-addressing.md).
+
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:

@@ -75,31 +75,21 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/job-parameter-contract-plan.md`](superpower/job-parameter-contract-plan.md) —
-  **REFINED + GROUNDED 2026-08-06 (UI + backend) — the Job authoring contract + extensible runtime
-  Expressions.** **§0-A: user-facing 'Job' un-banned** (operator decision, reverses the ELT
-  amendment's Phases 3/6 retirement — see `docs/GLOSSARY.md` §6-A/§13). Guiding principle:
-  **versatility over built-ins** — capability is added by *registration*, never by editing a
-  `switch`. Findings, verified against source: (1) `AttributeSpec` (UI) is strictly richer than
-  `ParameterDecl` (backend — 9 registered Job Types vs 5 hardcoded in the UI picker); (2)
-  **`ParameterResolver` evaluates `$`-expressions in only 2 of its 5 layers** (plus a 6th legacy
-  `pipeline`/`flow` shim) — authored `config` values (what the UI writes) and trigger `args` are
-  returned raw, so `$yesterday` typed in the UI reaches the Job as a literal string; (3) the
-  vocabulary is a hardcoded `switch` (10 tokens, confirmed exhaustive) — not extensible, not
-  discoverable, unknown tokens fall through silently. Plan: an `ExpressionProvider` SPI + registry
-  mirroring `JobTypeProvider`'s load order, `$$` literal escape, fail-closed unknown tokens (all
-  three load paths, not just Packs — the ServiceLoader path today only warns), `GET
-  /jobs/expressions` catalog with **server-evaluated previews**, a widened `ParameterDecl` +
-  **§7.4 decl→widget mapping table** (the generation contract), `JobTypeDescriptor` provenance,
-  `secret` masking at the route boundary (not `JobConfig.toMap()`, which also feeds bundle export),
-  and `on_signal` trigger authoring in the UI (new). Builder-on-record is confirmed house style
-  (`EventQuery`/`Event`/`ObjectQuery`), not a deviation. **§6.1 recommended resolution:** scoped
-  evaluation — `sql.template`'s SQL body stays `$`-as-template-parameter; expressions resolve in
-  parameter *values* via indirection (`params: {from: "$event_day(-7)"}`), serving the driving use
-  case with zero migration. **Event Day deferred** to its own plan; **dataset-triggered Jobs (§5-A)**
-  are pure configuration once the ELT amendment's `dataset.write` Signal (slice S3a) ships — no new
-  machinery here beyond `on_signal` UI authoring. 17-step delivery table (0–16); step 0 (vocabulary
-  docs) done with this refinement.
+- ~~`superpower/job-parameter-contract-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-10**
+  ([archive copy](archived-documents/plans-archive/job-parameter-contract-plan.md), provenance only).
+  All 17 steps: the Job authoring form is now generated **entirely** from a Job Type's declaration, and
+  the `$`-expression vocabulary is a registry that plugins and Job Packs extend rather than a `switch`.
+  As-built: [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) *§The parameter
+  contract & runtime Expressions* + [`okf/frontend/features/jobs.md`](okf/frontend/features/jobs.md).
+  Guiding principle held: **versatility over built-ins** — capability arrives by *registration*
+  (`mail.send` is the reference generic type). Also settled here: **§0-A un-banned user-facing 'Job'**
+  (reversing the ELT amendment's Phases 3/6 retirement, GLOSSARY §6-A/§13), **whole-value evaluation**
+  as the answer to the `sql.template` `$` collision (§6.1 — the SQL body keeps its own namespace; a
+  window binds by indirection), and **§5-B's two typed bounds** replacing the unconsumable `time_range`.
+  ⚠ Grounding refuted several of its own premises — most consequentially that a job's write body had
+  **always** been flat snake_case with unknown keys absorbed as parameters, so every UI-authored event
+  trigger was silently inert until step 16. Deferrals (no CC on `mail.send`; INTEGER tokens unreachable
+  from the UI because a native number input cannot display one) → [`BACKLOG.md`](BACKLOG.md) §4.
 
 - [`superpower/elt-final-amendment-plan.md`](superpower/elt-final-amendment-plan.md) —
   **APPROVED v1.0 (2026-08-05) — the ELT final amendment: one model, one vocabulary, one authoring

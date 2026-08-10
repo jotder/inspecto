@@ -1036,6 +1036,18 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     closing the gap means widening a `@PublicApi` SPI with a CC-aware overload, which is not worth doing for
     one caller until a second asks. **Do not "fix" this by having `mail.send` open its own SMTP connection**
     — one mail transport, one place.
+    **A thirteenth landed 2026-08-10**: `feat(jobs)` — every expression-accepting job parameter grows a
+    **token picker** listing the runtime vocabulary with each token's resolved preview, so `$`-tokens stop
+    being undiscoverable (job-parameter-contract step 13, plan §8.5). Release notes should say the preview
+    is the **server's** evaluation, not a client guess, and that a token replaces the field's *whole* value.
+    ⚠ **Deferred with it — an INTEGER/DECIMAL parameter has no reachable token.** `widgetFor` maps those to
+    a native `type="number"` input, which cannot display `$now.epoch_seconds`: the control would hold the
+    token while the field read as blank, so the picker is deliberately withheld there — and the token cannot
+    be typed in either, for the same reason. `$now.epoch_seconds` / `$now.epoch_millis` are therefore
+    UI-unreachable (still authorable in a config file). Closing it means a numeric widget that can hold a
+    token — a text input that validates numerically, plus a decision about what the spinner affordance
+    becomes — which is a renderer change, not a filter tweak. **Do not "fix" it by offering the picker on
+    the existing number widget**: that produces a field that looks empty and saves a token.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
