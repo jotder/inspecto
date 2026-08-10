@@ -856,7 +856,8 @@ public final class JobService implements AutoCloseable {
             Map<String, String> bind = cfg != null ? cfg.bind() : Map.of();
             ParameterResolver.Resolution pr = ParameterResolver.resolve(decls, args, bind, params, expressions,
                     new ExpressionContext(runId, Instant.now(), trigger, zone,
-                            () -> ledger.lastSuccessEnd(name), this::upstreamArtifact, firing.signalPayload()));
+                            () -> ledger.lastSuccessEnd(name), this::upstreamArtifact, firing.signalPayload(),
+                            com.gamma.consignment.ConsignmentOutputStores::bounds));
             if (!pr.missingRequired().isEmpty() || !pr.invalidType().isEmpty()
                     || !pr.unknownExpression().isEmpty()) {
                 List<String> reasons = new ArrayList<>();

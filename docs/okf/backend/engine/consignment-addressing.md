@@ -146,25 +146,35 @@ record an unattributed producer with no bounds.
 ⚠ **Vocabulary.** *Watermark* is reserved for this concept. `PipelineWatermarkStore` is an incremental
 **read cursor** and `$job.last_success_time` is **wall clock**; neither answers window close.
 
-## 5-A. Bounds are not readable by a Job yet
+## 5-A. Reading the range from a Job
 
-Nothing outside the engine can ask a Job for the event-time range it produced. The `$upstream(<job>)`
-`.artifact(<name>).time_range` attr exists in the grammar but is **dead**: `RunArtifact.timeRange` is a
-literal `null` at both construction sites (`RunContext.java:81-82,86-87`) and `ArtifactRecorder.dataset(...)`
-has no parameter to carry one.
+A downstream Job binds its window to what a predecessor produced through two Expression attrs, **resolved
+live against this registry** at fire time:
 
-Filling it would not help, which is why the addressing plan's step 8 was **closed rather than built**
-(2026-08-10). The value is a single opaque `"<min>..<max>"` string fixed only by a test fixture, and no
-consumer can use it: `SqlParamScanner.substitute` wraps the whole string in one SQL literal, nothing splits
-on `..`, and `ParameterResolver.matchesType` rejects it for exactly the `DATE`/`INSTANT` parameters that would
-want it. Repo-wide it has **zero live consumers** — no config, no UI, no guide.
+```
+$upstream(<job>).artifact(<store>).event_time_min | .event_time_max
+```
 
-The settled replacement is two scalars (`event_time_min`/`event_time_max`) resolved **live from this
-registry** rather than stored, keyed on the sink `store` name — the one identifier where `RunArtifact.ref`
-and `consignment_outputs.table_name` coincide, and one that requires `PipelineJobRunner` to start recording a
-`RunArtifact` (it records none). A stored copy is rejected: §4's revisions mean a recompute would leave the
-snapshot describing a superseded revision. Ingest is structurally excluded — it is not a Job and has no Run.
-Design of record: [`superpower/job-parameter-contract-plan.md`](../../../superpower/job-parameter-contract-plan.md) §5-B, step 17.
+`DbConsignmentOutputStore.bounds(table)` folds `min(event_time_min)`/`max(event_time_max)` over the same
+predicate the watermark uses — `SUPERSEDED` excluded, `COMPACTED_AWAY` included — and returns **empty rather
+than half a window**, because a caller handed one end would silently scan to the epoch.
+
+Three properties are deliberate:
+
+- **Derived, never stored.** §4's revisions mean a recompute writes a new revision and supersedes the old, so
+  a range copied onto the artifact at write time would go on describing superseded data. Reading it here
+  makes the answer move when the data does.
+- **Keyed on the sink `store` name**, the one identifier that is both `RunArtifact.ref` and this table's
+  `table_name`. `PipelineJobRunner` records one artifact per store it wrote for exactly this purpose; before
+  2026-08-10 it recorded none, so the accessor had no handle to key off.
+- **They yield strings, not instants.** The stored bounds are zone-less local date-times (§2), so an
+  `INSTANT`-typed parameter would reject them — but each end is a valid SQL timestamp literal in the
+  single-quoted form the substituter produces, which is what binding a window actually requires.
+
+⛔ **The retired `time_range` attr is not coming back.** It yielded one opaque `"<min>..<max>"` string that
+nothing split, so it could never be bound to a predicate; it was always `null` besides. Addressing step 8 was
+closed on that basis rather than built. As-built detail:
+[`superpower/job-parameter-contract-plan.md`](../../../superpower/job-parameter-contract-plan.md) §5-B, step 17.
 
 ## 6. Related
 

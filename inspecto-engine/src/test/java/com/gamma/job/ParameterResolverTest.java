@@ -69,11 +69,51 @@ class ParameterResolverTest {
         assertTrue(EXPR.evaluate("$job.last_success_time", ctx(Optional.empty())).isEmpty());
     }
 
+    /**
+     * §5-B — the event-time attrs read the registry at resolve time, keyed by the artifact's {@code ref}.
+     * The moving-value assertion is the point of the design: a range stored on the artifact could not track a
+     * recompute, and would go on describing a revision that has since been superseded.
+     */
+    @Test
+    void eventTimeBoundsResolveLiveSoARecomputeMovesThem() {
+        RunArtifact art = new RunArtifact("up-run-9", "loader", 1, "output", "dataset",
+                "txn_rollup", null, 4200L, 0L, "2026-07-07T06:00:04Z", "2026-07-08T06:00:00Z");
+        var live = new java.util.concurrent.atomic.AtomicReference<>(
+                new com.gamma.consignment.EventTimeBounds("2026-07-01T00:00:00", "2026-07-07T23:59:59", 0L));
+        var c = new ExpressionContext("run-1", FIRE, "cron", ZoneOffset.UTC, Optional::empty,
+                (job, name) -> "loader".equals(job) && "output".equals(name) ? Optional.of(art) : Optional.empty(),
+                Map.of(),
+                store -> "txn_rollup".equals(store) ? Optional.of(live.get()) : Optional.empty());
+
+        assertEquals("2026-07-01T00:00:00",
+                EXPR.evaluate("$upstream(loader).artifact(output).event_time_min", c).orElse(null));
+        assertEquals("2026-07-07T23:59:59",
+                EXPR.evaluate("$upstream(loader).artifact(output).event_time_max", c).orElse(null));
+
+        live.set(new com.gamma.consignment.EventTimeBounds("2026-07-02T00:00:00", "2026-07-09T12:00:00", 0L));
+        assertEquals("2026-07-09T12:00:00",
+                EXPR.evaluate("$upstream(loader).artifact(output).event_time_max", c).orElse(null),
+                "the resolved value follows the live registry — a stored field could not");
+    }
+
+    /** No registry (the default context) ⇒ unknown, which falls through the resolver's ladder. */
+    @Test
+    void eventTimeBoundsAreUnresolvedWithoutARegistry() {
+        RunArtifact art = new RunArtifact("up-run-9", "loader", 1, "output", "dataset",
+                "txn_rollup", null, 4200L, 0L, null, "2026-07-08T06:00:00Z");
+        var c = ctx(Optional.empty(),
+                (job, name) -> "loader".equals(job) && "output".equals(name) ? Optional.of(art) : Optional.empty());
+
+        assertTrue(EXPR.evaluate("$upstream(loader).artifact(output).event_time_min", c).isEmpty());
+        assertTrue(EXPR.evaluate("$upstream(loader).artifact(output).event_time_max", c).isEmpty());
+        assertNull(EXPR.evaluate("$upstream(loader).artifact(output).time_range", c).orElse(null),
+                "the retired attr is now simply an unknown attribute");
+    }
+
     @Test
     void resolvesUpstreamArtifactAttributes() {
         RunArtifact art = new RunArtifact("up-run-9", "loader", 1, "output", "dataset",
-                "txn_rollup", null, 4200L, 0L, "2026-07-07T06:00:04Z", "2026-07-01..2026-07-07",
-                "2026-07-08T06:00:00Z");
+                "txn_rollup", null, 4200L, 0L, "2026-07-07T06:00:04Z", "2026-07-08T06:00:00Z");
         var c = ctx(Optional.empty(),
                 (job, name) -> "loader".equals(job) && "output".equals(name) ? Optional.of(art) : Optional.empty());
 
@@ -81,8 +121,6 @@ class ParameterResolverTest {
         assertEquals("4200", EXPR.evaluate("$upstream(loader).artifact(output).rows", c).orElse(null));
         assertEquals("2026-07-07T06:00:04Z",
                 EXPR.evaluate("$upstream(loader).artifact(output).watermark", c).orElse(null));
-        assertEquals("2026-07-01..2026-07-07",
-                EXPR.evaluate("$upstream(loader).artifact(output).time_range", c).orElse(null));
         assertNull(EXPR.evaluate("$upstream(loader).artifact(missing).ref", c).orElse(null),
                 "an absent artifact resolves to null (⇒ REJECTED if the param is required)");
         assertNull(EXPR.evaluate("$upstream(loader).artifact(output).bogus_attr", c).orElse(null),

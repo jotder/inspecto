@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,6 +49,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
     private final String consignmentId;
     private final String producer;
     private final List<PartitionOutput> outputs = new ArrayList<>();
+    private final Map<String, Long> rowsByStore = new LinkedHashMap<>();
     private long totalRows = 0L;
 
     /**
@@ -109,7 +111,11 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         // Per-partition counts serve both purposes: they give every registry row a real row_count (§11.3 slice 2)
         // and they sum to the branch total this used to get from a separate COUNT(*) over the whole relation.
         Map<String, Long> rowsByPartition = ConsignmentOutputs.countByPartition(conn, inputTable, partCols);
-        totalRows += rowsByPartition.values().stream().mapToLong(Long::longValue).sum();
+        long branchRows = rowsByPartition.values().stream().mapToLong(Long::longValue).sum();
+        totalRows += branchRows;
+        // Per store, not per branch: two sinks may target one store, and a Run Artifact naming that store has
+        // to report what the store received rather than what one branch contributed.
+        rowsByStore.merge(store, branchRows, Long::sum);
         if (consignmentId != null)
             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
                     consignmentId, null, store, outs, rowsByPartition,
@@ -123,6 +129,9 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
 
     /** Total rows written across every sink branch. */
     public long totalRows() { return totalRows; }
+
+    /** Rows written per target store, in first-write order — what a per-store Run Artifact reports (§5-B). */
+    public Map<String, Long> rowsByStore() { return Map.copyOf(rowsByStore); }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
 

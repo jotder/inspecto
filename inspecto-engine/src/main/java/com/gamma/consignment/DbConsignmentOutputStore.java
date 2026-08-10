@@ -12,6 +12,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * <b>§11.3 — the durable output-file registry.</b> Persists one row per output file a Consignment writes, so
@@ -244,6 +245,51 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             log.warn("consignment-outputs producer high water failed for {}: {}", tableName, e.getMessage());
         }
         return out;
+    }
+
+    /**
+     * The event-time range of everything currently live in one stream — the {@code min} half
+     * {@link #producerHighWater} does not expose, folded across every file of {@code tableName} rather than
+     * grouped by producer. Backs {@code $upstream(<job>).artifact(<name>).event_time_min|event_time_max}
+     * (job-parameter-contract §5-B), which a downstream Job binds as an incremental window.
+     *
+     * <p><b>Derived on read, never stored</b>, and that is the whole point of the accessor. §4's revisions mean
+     * a full recompute writes a new revision and supersedes the old one, so any range copied into a Run
+     * Artifact at write time would go on describing a superseded revision. Reading it here means the answer
+     * moves when the data does.
+     *
+     * <p>Row selection is {@link #producerHighWater}'s predicate verbatim — {@code SUPERSEDED} excluded,
+     * {@code COMPACTED_AWAY} included — for the same reasons documented there: compacted rows were genuinely
+     * delivered and still exist inside a merged file, while superseded rows were replaced by a reprocess that
+     * wrote its own.
+     *
+     * <p>Empty when nothing is live, when no file carries bounds, or when the query fails — never a partial
+     * range. A half-known window is worse than none: the caller would silently scan from the epoch or to the
+     * end of time. {@code spreadMs} is computed rather than summed from the stored per-file spreads, which
+     * measure single files and do not compose.
+     */
+    public synchronized Optional<EventTimeBounds> bounds(String tableName) {
+        String sql = "SELECT min(event_time_min) AS lo, max(event_time_max) AS hi, "
+                + "epoch_ms(TRY_CAST(max(event_time_max) AS TIMESTAMP)) "
+                + "- epoch_ms(TRY_CAST(min(event_time_min) AS TIMESTAMP)) AS spread_ms FROM " + T
+                + " WHERE table_name = ? AND coalesce(state, 'LIVE') <> 'SUPERSEDED'";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return Optional.empty();
+                String lo = rs.getString("lo");
+                String hi = rs.getString("hi");
+                // wasNull() answers for the most recent get*, so the spread has to be read and tested here —
+                // asking after another column would report on that one and turn an unknown spread into 0.
+                long spread = rs.getLong("spread_ms");
+                long spreadMs = rs.wasNull() ? 0L : spread;
+                if (lo == null || hi == null) return Optional.empty();
+                return Optional.of(new EventTimeBounds(lo, hi, spreadMs));
+            }
+        } catch (SQLException e) {
+            log.warn("consignment-outputs bounds query failed for {}: {}", tableName, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

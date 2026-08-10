@@ -79,12 +79,12 @@ final class RunContext implements JobContext {
 
         @Override public void dataset(String name, String ref, ResultSetMeta meta, long rows, Instant watermark) {
             store.append(new RunArtifact(runId, job, seq.incrementAndGet(), name, "dataset", ref, meta,
-                    rows, 0L, watermark == null ? null : watermark.toString(), null, Instant.now().toString()));
+                    rows, 0L, watermark == null ? null : watermark.toString(), Instant.now().toString()));
         }
 
         @Override public void file(String name, java.nio.file.Path path, long bytes) {
             store.append(new RunArtifact(runId, job, seq.incrementAndGet(), name, "file",
-                    path == null ? null : path.toString(), null, 0L, bytes, null, null, Instant.now().toString()));
+                    path == null ? null : path.toString(), null, 0L, bytes, null, Instant.now().toString()));
         }
     }
 
