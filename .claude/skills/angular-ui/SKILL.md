@@ -500,7 +500,17 @@ src/app/
 
 1. `npm run lint:tokens` — design-system guard green.
 2. `npm run build` (production) — AOT type-check + budgets green.
-3. `npm run test:ci` — unit + a11y specs green. **Check the EXIT CODE, not just the pass count**: an
+2b. **Typecheck all THREE tsconfigs — `npm run build` covers only the app one.**
+   ```bash
+   npx tsc --noEmit -p tsconfig.app.json && npx tsc --noEmit -p tsconfig.spec.json && npx tsc -p tsconfig.json --noEmit
+   ```
+   ⚠ **The root `tsconfig.json` is a genuinely DIFFERENT gate, not a superset** (learned 2026-08-11,
+   `842a3a77`). It sets no `types`, so every `@types/*` is ambient and **`@types/jasmine` supplies the
+   global `expect`** — only `tsconfig.spec.json` names `vitest/globals`, and the root check does not
+   extend it. So a spec using a vitest-only matcher (`toHaveLength` on an element list) type-errors
+   under the root config while **passing `test:ci`, `npm run build`, and both other tsconfigs**. The fix
+   is to import `{ describe, expect, it }` from `vitest` in the spec, which 307 of 319 specs already do
+   — not to touch the tsconfigs. A spec that runs green is not proof it typechecks. **Check the EXIT CODE, not just the pass count**: an
    unhandled error (e.g. a G6/AntV or MapLibre canvas mounting in jsdom) makes vitest exit non-zero
    even with 0 test failures → CI red. `GraphViewComponent` only mounts a canvas when
    `data.nodes.length > 0`, so test graph-hosting components on the empty/no-graph path (`EMPTY_GRAPH`)
