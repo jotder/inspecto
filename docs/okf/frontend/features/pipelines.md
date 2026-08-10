@@ -344,3 +344,30 @@ One trap worth carrying forward from closing D3:
   produces a picker that calls `GET /components/connection`, a route that does not exist; connections have their
   own service. `bindKind` is only for the component registry (`grammar`/`transform`/`sink`). The picker lives in
   the shared `<inspecto-collector-config>` instead.
+
+### In the recipe palette, `type` is the unique key — a verb may name two shapes (2026-08-10)
+
+`GET /pipelines/step-types` publishes **nine** entries, not the seven verbs of the recipe grammar:
+`route` has its own, and **`transform` appears twice** — once for `transform.filter`, once for
+`transform.join`. The verb string stays the recipe's own word because `RecipeCompiler` has no `join`
+case (a join is `transform: {join: …}`, handled inside `transform()`), so a `verb: "join"` entry would
+advertise a vocabulary the compiler refuses. Consequences worth carrying:
+
+- ⚠ **Never key anything on `verb`.** The Add-Step menu's `@for` used `track v.verb`; duplicate track
+  keys are an Angular **runtime error**, so it now tracks `v.type`. A spec asserting the component's
+  `verbs` *input* passes either way — assert the rendered menu overlay.
+- ⚠ **A verb can serve a spec the palette never reaches.** `NodeAttributes` carried a `transform.join`
+  spec while `RECIPE_VERBS` mapped `transform` to filter alone, so join was authorable **only from the
+  demoted canvas** (which loads the full `node-types` catalog) from the day it began compiling. When a
+  node type gains a spec, check the *palette* serves it — a spec's existence is not reachability.
+- ⛔ **One polymorphic entry with a discriminator does not work here.** `PipelineEditable.lower`
+  dispatches on the node's **`type`**, never on config content, so one node type cannot author two
+  config blocks; a discriminator could only gate visibility and would still need a retype (which nothing
+  in the editor does today). The `putAll` on the filter branch would also leak the discriminator into
+  `processing.csv_settings` verbatim.
+- **`processing.join` is ONE block, so a second join is refused (`MULTI_JOIN`)** rather than silently
+  replacing the first. ⚠ `recordDedup`, `routeNode` and `summarizeNode` share that single-slot,
+  last-one-wins shape and are **not** yet guarded — see [BACKLOG](../../../BACKLOG.md) §4.
+- ⚠ **Step cards show the *category*, not the type**, so a join and a filter card are indistinguishable
+  unless the operator names them — and `uniqueNodeId` bakes the type into the id, which is what a card
+  falls back to. Any future retype affordance makes that id a lie.

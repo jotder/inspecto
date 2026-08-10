@@ -470,6 +470,47 @@ Two things worth carrying:
 agg dropdown + column autocomplete per row) which was considered and **not** taken — it risks drifting
 from the string grammar the backend actually parses.
 
+#### S4 follow-up SHIPPED 2026-08-10 — the join verb reaches the palette
+
+S4 shipped the dual-read palette; auditing Phase 5's "specs for all seven verbs" gate found the
+palette had been **offering no way to author a join** since Phase 3 S2 made one compile. `RECIPE_VERBS`
+(both sides) mapped `transform` → `transform.filter` alone, so `step-types` never served the
+`transform.join` spec that already existed in `NodeAttributes`. Join was reachable only from the
+**demoted canvas**, which loads the full `node-types` catalog — the new primary surface could not do
+what the surface it replaced could.
+
+Shipped as a **second `transform` entry** (`transform.filter`, `transform.join`), not a new verb:
+
+- ⚠ **`verb` is NOT an entry's unique key — `type` is.** `RecipeCompiler` has no `join` case (a join is
+  `transform: {join: …}`, handled inside `transform()`), so publishing `verb: "join"` would advertise a
+  vocabulary the compiler refuses. Two entries therefore share `verb: "transform"`.
+- ⚠ **This broke the Add-Step menu's `track` expression.** It was `track v.verb`; duplicate track keys
+  are an Angular **runtime error**, so the menu had to move to `track v.type`. A spec asserting the
+  component's `verbs` input would pass either way — the regression guard opens the menu and asserts the
+  rendered overlay items, since the panel is what has to be right.
+- ⛔ **A polymorphic single `transform` entry was considered and rejected.** `PipelineEditable.lower`
+  dispatches on the node's **`type`**, not on config content, so a `transform.filter`-typed node can
+  never lower into `processing.join` — a discriminator field could gate which controls *show* but could
+  not change what is authored, meaning it would still need a retype. It is a superset of this slice, not
+  an alternative: it also needs `NodeAttribute` widened with `dependsOn` (absent by deliberate choice),
+  every key on both tables gated, both contract JSONs re-pinned, and a discriminator kept out of config
+  — on the filter path `lower` does a wholesale `putAll`, so a stray key leaks verbatim into
+  `processing.csv_settings`.
+- **A second join is now refused, not silently dropped (`MULTI_JOIN`).** `processing.join` is one block
+  and `joinNode = n` meant last-one-wins, losing the first join's config with no refusal. Unreachable
+  from the recipe editor before this slice; shipping the palette entry without the refusal would have
+  turned it into reachable silent data loss. Mirrored in the mock, per the never-more-lenient rule.
+  ⚠ **`recordDedup`, `routeNode` and `summarizeNode` are the same single-slot shape and still
+  last-one-wins** — deliberately untouched here, on the backlog.
+- ⚠ **A join Step and a filter Step still render identically on a step card** (name-or-id + the
+  *category* chip "Transformer"), so once authored they are indistinguishable unless named. Not a
+  regression from this slice; on the backlog.
+
+Verified: `inspecto-engine` 1144 tests green · UI 2266 green / exit 0 · both tsconfigs · `lint:tokens` ·
+and in the offline preview end to end — the menu offers Filter and Join side by side, Join authors
+`transform_join_1` with `reference`/`on` from the served spec, and a second join refuses the save with
+*"a pipeline lowers one reference join; 'transform_join_1' already claims it"*.
+
 ## 5. Known traps to carry (from the skill, amendment-specific)
 
 - **Never read a shared component via `@ViewChild` in a template** — take `@Output`s (bit the

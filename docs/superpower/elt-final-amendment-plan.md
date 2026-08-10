@@ -408,10 +408,26 @@ registry's *vocabulary and guarantees* — subjects, versions, compatibility cla
 
 ## 5. Control plane & UI
 
-> **Phase 5 progress (2026-08-06):** `step-types` endpoint SHIPPED (with the dedup/summarize/join
-> specs and the `step-types.contract.json` gate) alongside UI slices S1–S4 of the companion UI plan
-> (recipe view, editing, route branches, dual-read palette). Remaining in Phase 5: the Pipeline
-> Document generator + mapping import loop (§5.1) and its UI (S6); grid editors are S5 (unblocked).
+> **Phase 5 progress (2026-08-10 — supersedes the 2026-08-06 note, which was stale):** `step-types`
+> endpoint + UI slices S1–S4 SHIPPED 2026-08-06, and **S5 (grid editors) and S6 (Pipeline Document +
+> mapping import loop, incl. the dry-run follow-up and UI wiring) shipped 2026-08-06 as well** — the
+> earlier note listed both as remaining. **Phase 5's verify gate is now met, with its "specs for all
+> seven verbs" clause read as follows (2026-08-10):**
+>
+> - `parse` and `map` serve `attributes: []` **deliberately** — each has a richer editor than a scalar
+>   form (Grammar dialog; the mapping-CSV surface), so a spec there would be a worse second way to
+>   author the same thing. ⚠ Until 2026-08-10 this reinterpretation of the gate lived **only** in a
+>   comment in `StepTypesContractTest`, nowhere in this plan; it is recorded here now because a reader
+>   checking the gate against §5's literal "all seven" would otherwise call Phase 5 unfinished.
+> - The palette publishes **nine** entries, not seven: `route` is its own entry (added S3/S4), and
+>   `transform` appears **twice** — once per shape it authors (`transform.filter`, `transform.join`).
+>   §1.2's "closed built-in Step set" describes the **recipe grammar**, which is unchanged; the palette
+>   is per SHAPE because one verb legitimately authors two node types.
+> - ⚠ **A join Step was unauthorable from the recipe editor until 2026-08-10.** Phase 3 S2 shipped join
+>   *compiling*, and `NodeAttributes` had a `transform.join` spec, but `RECIPE_VERBS` mapped the
+>   `transform` verb to `transform.filter` alone, so `step-types` never served the join spec and the
+>   Add-Step menu never offered it — authorable only from the **demoted** canvas, which loads the full
+>   `node-types` catalog. Closed by a second `transform` entry (below).
 
 - **API.** `/pipelines` CRUD unchanged. `GET /pipelines/node-types` → **`GET /pipelines/step-types`**:
   seven verbs + discovered plugins, each with served `AttributeSpec[]` — the config-key contract
@@ -1042,6 +1058,34 @@ real production call site in the first place, since none of the above matters wh
 it. This is new design across four different subsystems, not a slicing choice — left for the
 operator to schedule explicitly, per the same posture as the deferred Phase 3 S3 (Dataset-write
 Signal). **Phase 4 status: S1/S2/S3 shipped; S4 deferred (documented gap above).**
+
+#### The branch-aware lane is BLOCKED on output parity, not merely unscheduled (grounded 2026-08-10)
+
+S4's finding 2 above says `BatchGraphRunner` has no production call site. Asked directly how big
+wiring one is — because it gates S4 *and* Phase 6 — the answer is that **it is not a dispatch, it is
+an unscoped parity project.** Three findings, each read off the code:
+
+1. **The graph is constructible but not executable as lifted.** `PipelineLift.lift(cfg)` produces one
+   from any `PipelineConfig`, but the parser's `csv` settings stay on the parse node while
+   `RowShaper.columnsOf` reads them off the **map** node, so the map node throws. `PipelineDryRun.
+   withMappingContext` exists purely to patch this and says so: *"Without this, a dry-run of any
+   registered pipeline with a schema fails on its map node."* That rewrite lives only in the
+   dry-run/editor path; production would need its own.
+2. **`branchCommitLog` has no home.** `BatchGraphRunner.Input` wants a durable `Path`; there is no
+   config key, convention, or retention policy for it in the `BatchProcessor` lane, and the log is
+   append-only with nothing addressing growth. Both test harnesses pick a `@TempDir` path.
+3. ⚠ **The two lanes are independent implementations of the same concepts.** `writeAndTrace` applies
+   `DecisionRuleApplier` routing, record dedup, reference-version stamping, multi-destination fan-out,
+   and per-file `EventTimeBounds`. No code path connects `RowShaper`/`PipelineExecutor` to the first
+   three. So flipping `engages(g)` does not reroute a write — it substitutes a pipeline whose **output
+   parity with the current one is unknown**, over real operator data.
+
+⇒ **Reclassify: Phase 4 S4 and Phase 6 are BLOCKED, not deferred.** S4 cannot be built on a lane
+nothing runs (its own finding 2), and Phase 6 cannot delete the legacy path until the replacement is
+proven equivalent. The prerequisite for both is a **parity scope** — decide whether routing, dedup and
+reference versioning get graph-node equivalents or whether the gap is accepted — and that is a design
+question, not a slice. ⛔ Do not "just wire `engages()`": the scalar half of `Input` is trivial, which
+makes this look far smaller than it is.
 
 ---
 
