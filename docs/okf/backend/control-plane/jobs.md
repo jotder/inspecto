@@ -10,7 +10,7 @@ timestamp: 2026-07-07T00:00:00Z
 # Jobs & Scheduling
 
 `JobService` (`inspecto-engine/src/main/java/com/gamma/job/JobService.java`) hosts a registry of jobs and a
-virtual-thread `workers` executor. Three trigger modes:
+virtual-thread `workers` executor. Four trigger modes:
 
 * **Cron** — jobs with a `cron` field are armed on the shared `Scheduler`. **2026-07-20**: `Scheduler.cron()`
   now returns a `CronHandle`; `JobService.removeJob` cancels it, so a deleted/replaced job's self-re-arming
@@ -20,10 +20,21 @@ virtual-thread `workers` executor. Three trigger modes:
   status + pipeline name, then `submit()`s. This is the **deadlock-safe** path — `submit` hands work to
   `workers` and returns immediately, so the synchronous [event bus](events-metrics.md) never holds a
   `PipelineRunGuard` claim across a new run.
+* **Signal** — jobs with `on_signal` fire when a matching Signal is published: `Signals.matchesType` is an
+  exact (case-insensitive) match or a `prefix.*` glob, optionally narrowed by a `when:` guard over the
+  firing Signal's payload (`WhenGuard`, fail-closed on an unparsable expression — there is no
+  authoring-time validator). Self-loops are suppressed. **Authorable in the UI since 2026-08-10.**
 * **Manual** — `POST /jobs/{name}/trigger`. The legacy unversioned call stays **synchronous and unchanged**;
   the same route under `/api/v1` is **async** (W5): it returns `202` + `{runId, …}` + a `Location` header,
   the caller polls `GET /jobs/runs/{runId}`, and an `Idempotency-Key` header replays the cached response on
   retry. Pipeline triggers gained the identical async contract in W5b (poll `GET /runs/runs/{runId}`).
+
+⚠ **The write contract is the `job:` TOON section, not a DTO.** `POST /jobs` / `PUT /jobs/{name}` pass the
+body straight to `JobConfig.fromMap`, so keys are **snake_case** (`on_pipeline`, `on_signal`, `catch_up`)
+and type-specific parameters are **flat** alongside them. An unrecognised key is **absorbed as a parameter,
+never rejected** — so a misspelled trigger key yields a job with no trigger and no error anywhere. Pinned by
+`ControlApiJobCrudTest`; the full trap and the read side's deliberate asymmetry are in
+[`PROJECT_NOTES.md`](../../../PROJECT_NOTES.md) §4.
 
 `submit()` binds the `space` MDC (for non-default spaces — see [multi-space](multi-space.md)) and runs on a
 virtual thread. `runJob()` uses `runner.runExclusiveOrSkip(name, …)` for a non-overlap guarantee (a job
