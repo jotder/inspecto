@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { AbstractControl, ValidatorFn } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { describe, expect, it } from 'vitest';
 import { AttributeSpec, AttributeToken } from 'app/inspecto/component-model';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { InspectoSchemaFormComponent } from './schema-form.component';
