@@ -297,6 +297,10 @@ class ConsignmentProcessJobTypeTest {
             assertEquals(1, summaries.size(), "the summary file is registered (§11.3)");
             assertEquals(1L, summaries.get(0).rows(), "one summary row was written");
             assertEquals("2026-07-01", summaries.get(0).recordDay());
+            // the PROCESSOR is the producer, not this Job Type: two processors can summarise one target,
+            // and producerHighWater groups by producer. This is the end-to-end proof that the id the run
+            // resolved is the id that reaches the row — SummaryWriter's own test only proves it carries one.
+            assertEquals("daily-counter", summaries.get(0).producer(), "producer is the processor id");
         }
     }
 

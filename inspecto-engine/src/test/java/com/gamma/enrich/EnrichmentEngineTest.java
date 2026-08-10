@@ -358,6 +358,12 @@ class EnrichmentEngineTest {
                 assertEquals("EVENTS_DAILY_KPI", o.tableName());
                 assertEquals(ConsignmentOutput.State.LIVE, o.state());
                 assertTrue(Files.exists(Path.of(o.path())), "registered path must be the revealed file");
+                // the enrichment attributes its own rows — a null producer is an unattributed group in
+                // producerHighWater, indistinguishable from "nobody wrote this"
+                assertEquals("EVENTS_DAILY_KPI", o.producer(), "producer is the enrichment's own identity");
+                // ⚠ bounds stays null until output.partitions can DECLARE an event-time source (BACKLOG §4):
+                // this pins the gap rather than leaving it to be discovered as a silent null downstream
+                assertNull(o.bounds(), "no event-time column is declarable on an enrichment output yet");
             }
             assertEquals(List.of("2020-04-03", "2020-04-03", "2020-04-04"),
                     rows.stream().map(ConsignmentOutput::recordDay).sorted().toList(),

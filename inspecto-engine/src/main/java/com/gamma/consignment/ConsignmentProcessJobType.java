@@ -160,7 +160,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
                 if (result == null)
                     return JobResult.failed("processor '" + processorId + "' returned no result", ms(t0));
 
-                persistSummaries(ctx, consignmentId, summaries.emitted());
+                persistSummaries(ctx, consignmentId, summaries.emitted(), processorId);
                 return new JobResult(result.status(), result.message(), ms(t0));
             }
         }
@@ -175,8 +175,14 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
          * numbers are its output, so losing them silently would make a green Run a lie. It is deliberately the
          * opposite trade-off from {@code record()}, where the data had already landed.
          */
-        private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows)
-                throws Exception {
+        /**
+         * @param processorId the {@code producer} for these registry rows — the processor that emitted them, not
+         *                    this Job Type: two processors can summarise the same target, and
+         *                    {@code producerHighWater} groups by producer. ⚠ Event-time bounds stay null; see
+         *                    {@link SummaryWriter#write} for why a pre-aggregated summary row has none.
+         */
+        private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows,
+                                      String processorId) throws Exception {
             if (rows.isEmpty()) return;
             if (dataDir == null) {
                 ctx.log().warn("§7.3 summary persistence is off (no data root) — " + rows.size()
@@ -190,7 +196,7 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
             }
             try (java.sql.Connection scratch = com.gamma.util.JdbcDrivers.connect("jdbc:duckdb:")) {
                 List<ConsignmentOutput> written =
-                        SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, rows);
+                        SummaryWriter.write(scratch, summariesRoot(dataDir), consignmentId, rows, processorId);
                 ConsignmentOutputStores.record(written);
                 ctx.log().info("wrote " + written.size() + " summary file(s) from " + rows.size() + " row(s)",
                         "consignment_id", consignmentId);

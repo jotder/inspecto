@@ -79,9 +79,16 @@ public final class SummaryWriter {
      * @param summariesRoot the summary tree root, e.g. {@code <dataDir>/_summaries}
      * @param consignmentId the unit of work, which names each file and owns each registry row
      * @param rows          rows already validated by {@link GuardedSummaryEmitter}
+     * @param producer      what wrote these summaries (the Job's name), so the rows are attributable in
+     *                      {@code producerHighWater}; {@code null} is accepted and leaves them unattributed.
+     *                      ⚠ Event-time {@code bounds} is deliberately NOT a parameter — a {@link SummaryRow}
+     *                      is pre-aggregated over an author-chosen {@code keys} grain with no enforced time
+     *                      key, so there is no per-row timestamp to fold and no declaration to read one from
+     *                      (BACKLOG §4: it is a design call, not a wiring gap)
      */
     public static List<ConsignmentOutput> write(Connection conn, String summariesRoot,
-                                               String consignmentId, List<SummaryRow> rows) throws Exception {
+                                               String consignmentId, List<SummaryRow> rows,
+                                               String producer) throws Exception {
         if (rows == null || rows.isEmpty()) return List.of();
         requireSafe(consignmentId, "consignment id");
 
@@ -91,7 +98,8 @@ public final class SummaryWriter {
         List<ConsignmentOutput> out = new ArrayList<>();
         String writtenAt = Instant.now().toString();
         for (Map.Entry<String, List<SummaryRow>> e : byTarget.entrySet())
-            out.addAll(writeTarget(conn, summariesRoot, consignmentId, e.getKey(), e.getValue(), writtenAt));
+            out.addAll(writeTarget(conn, summariesRoot, consignmentId, e.getKey(), e.getValue(), writtenAt,
+                    producer));
         return out;
     }
 
@@ -99,7 +107,8 @@ public final class SummaryWriter {
 
     private static List<ConsignmentOutput> writeTarget(Connection conn, String summariesRoot,
                                                        String consignmentId, String target,
-                                                       List<SummaryRow> rows, String writtenAt) throws Exception {
+                                                       List<SummaryRow> rows, String writtenAt,
+                                                       String producer) throws Exception {
         requireSafe(target, "summary target");
 
         // Column sets are the UNION across the target's rows, in first-seen order: two processors (or two
@@ -146,7 +155,7 @@ public final class SummaryWriter {
 
             Map<String, Long> counts = ConsignmentOutputs.countByPartition(conn, scratch,
                     partitioned ? List.of(RECORD_DAY) : List.of());
-            return register(consignmentId, target, written, counts, writtenAt);
+            return register(consignmentId, target, written, counts, writtenAt, producer);
         } finally {
             try (Statement st = conn.createStatement()) {
                 st.execute("DROP TABLE IF EXISTS " + scratch);
@@ -256,13 +265,13 @@ public final class SummaryWriter {
      */
     private static List<ConsignmentOutput> register(String consignmentId, String target,
                                                     List<PartitionOutput> written, Map<String, Long> counts,
-                                                    String writtenAt) {
+                                                    String writtenAt, String producer) {
         List<ConsignmentOutput> out = new ArrayList<>(written.size());
         for (PartitionOutput p : written) {
             String partition = p.partition() == null ? "" : p.partition();
             out.add(new ConsignmentOutput(consignmentId, null, target + SUMMARY_SUFFIX, partition,
                     recordDayOf(partition), p.outputFile(), counts.getOrDefault(partition, 0L),
-                    p.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE));
+                    p.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE, null, null, producer));
         }
         return out;
     }

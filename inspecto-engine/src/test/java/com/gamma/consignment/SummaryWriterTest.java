@@ -31,8 +31,13 @@ class SummaryWriterTest {
 
     private static List<ConsignmentOutput> write(Path root, String consignmentId, List<SummaryRow> rows)
             throws Exception {
+        return write(root, consignmentId, rows, null);
+    }
+
+    private static List<ConsignmentOutput> write(Path root, String consignmentId, List<SummaryRow> rows,
+                                                 String producer) throws Exception {
         try (Connection c = JdbcDrivers.connect("jdbc:duckdb:")) {
-            return SummaryWriter.write(c, root.toString(), consignmentId, rows);
+            return SummaryWriter.write(c, root.toString(), consignmentId, rows, producer);
         }
     }
 
@@ -255,5 +260,36 @@ class SummaryWriterTest {
         assertEquals(List.of(), write(root, "c1", List.of()));
         assertEquals(List.of(), write(root, "c1", null));
         assertFalse(Files.exists(root.resolve("cdr")));
+    }
+
+    /**
+     * Every registered summary row carries its {@code producer}, so `producerHighWater` can attribute it.
+     * These rows used to come through with producer null — an unattributed group, which is indistinguishable
+     * from "nobody wrote this" for a per-producer watermark.
+     */
+    @Test
+    void everyRegisteredRowCarriesItsProducer(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1",
+                List.of(row("cdr", "2026-07-01", Measure.additive("count", 3)),
+                        row("cdr", "2026-07-02", Measure.additive("count", 4))),
+                "daily_rollup");
+
+        assertEquals(2, rows.size());
+        for (ConsignmentOutput o : rows) assertEquals("daily_rollup", o.producer(), o.path());
+    }
+
+    /**
+     * ⚠ Bounds stay null BY DESIGN, and this pins it so nobody "fixes" it by folding the record-day key into a
+     * range. A summary row is pre-aggregated over an author-chosen grain with no enforced time key, so a
+     * min/max over it would describe the grain, not the events — a wrong watermark is worse than none, which
+     * a reader treats as "cannot prune". Closing this properly is a design call (BACKLOG §4).
+     */
+    @Test
+    void boundsStayNullBecauseASummaryRowHasNoEventTime(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1",
+                List.of(row("cdr", "2026-07-01", Measure.additive("count", 3))), "daily_rollup");
+
+        assertEquals(1, rows.size());
+        assertNull(rows.get(0).bounds(), "a pre-aggregated summary row has no event-time range to record");
     }
 }
