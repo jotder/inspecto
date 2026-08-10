@@ -544,7 +544,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 3 | ✔ **DONE 2026-08-10** — four columns land on the **ingest path**, keyed per output file. ⚠ Built differently from the sketch below, which did not survive grounding twice: there is **no live connection** at `finalizeSource` (the seam is `BatchIngestStrategy.writeAndTrace`), and the written relation **has no aggregatable event-time column** — so a coerced `__event_time` is now materialised in `DataTransformer` and excluded from output. See the correction box in §3.1 | ✔ `ConsignmentOutputRegistrationTest` — bounds + spread + producer per file; no-event-time degrades to null bounds; `__event_time` absent from written output |
 | 4 | ✔ **DONE 2026-08-10** — `StreamWatermark.of(producerHighWater, horizon, now)` → `Optional<LocalDateTime>`, plus `windowComplete(wm, hi, lateness)`; the per-producer aggregation is `DbConsignmentOutputStore.producerHighWater(table)`. **D4 resolved: observed-within-horizon**, default 24 h, overridable per call site (see §8). Derived on read — no table, no update path. ⚠ Three corrections in the §3.6 box: no `COMMITTED` state (it is `SUPERSEDED`-excluded / `COMPACTED_AWAY`-**included**), the stream key is `table_name`, and unattributed writes suppress the watermark rather than being skipped | ✔ `StreamWatermarkTest` (11) — lagging producer wins, stale drops out, unknown suppresses, and the seeded-catalog two-producer window closes only when both pass `hi + lateness`; `DbConsignmentOutputStoreTest` (+5) — grouping, state filter, chronological last-seen |
 | 5 | **Catalog on by default** (decision D1) + migration for existing installs. | fresh space records rows with no `-D` flag |
-| 6 | **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
+| 6 | ⛔ **BLOCKED ON STEP 7 — do not build this first** (grounded 2026-08-10; see the ordering box below). **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
 | 7 | **The Consignment Selector.** Config shape + resolver emitting an explicit `read_parquet([...])` list, generation-pinned. | test: selector over a seeded catalog names exactly the overlapping files |
 | 8 | **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
 | 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
@@ -554,9 +554,33 @@ Steps 1–2 are independent and can run in parallel. ~~Nothing after step 3 is w
 step 1's number exists.~~ **That gate is cleared (2026-08-10) — and it moved step 7.** With rung A
 answering in 145 ms, the Selector can no longer be sold on scan speed, so **step 7 must be re-argued
 on correctness before it is built**: what an explicit list gives that a glob cannot is generation
-pinning and the exclusion of `SUPERSEDED`/`COMPACTED_AWAY` files. Step 6 must still land **before**
+pinning and the exclusion of `SUPERSEDED`/`COMPACTED_AWAY` files. ~~Step 6 must still land **before**
 step 7 exposes a Selector to any consumer — generation pinning cannot protect a path whose bytes are
-replaced in place — and on the measured evidence step 6 is now the *load-bearing* half of the pair.
+replaced in place — and on the measured evidence step 6 is now the *load-bearing* half of the pair.~~
+
+> ⛔ **Correction (2026-08-10, grounded): the 6-before-7 ordering is backwards, and following it would
+> corrupt reads.** Every reader in the repo resolves a store by **glob**, not by file list —
+> `SourceStoreReader.java:49`, `DatasetRelation.java:76`, `EnrichmentEngine.java:129,295`,
+> `BatchIngestStrategy.java:308`, `PipelineJobRunner.java:339`, `ReferenceCompactor.java:297`, all
+> `/**/*.<ext>`. None of them can exclude a superseded generation.
+>
+> Overwriting the stable name is therefore not the bug the plan takes it for — **it is the only thing
+> keeping glob readers correct.** A full recompute rewrites the same path atomically, so a concurrent read
+> sees exactly one file, old bytes or new. The moment a recompute writes `<name>_<gen+1>` *beside*
+> `<name>_<gen>`, every one of those six readers picks up **both**, and a full recompute recomputes the same
+> source data — so the result is exact row duplication in the live read path.
+>
+> There is no ordering of step 6 alone that avoids this. Unlinking the old generation after the flip
+> reintroduces the very window the step exists to close (and R1 already notes the open read handle makes the
+> *writer* fail on Windows). So the dependency runs **7 → 6**: readers must pin an explicit file list before
+> any writer may leave two generations on disk. Step 7's own re-argument is now the gate for both.
+>
+> Two more things a builder needs before touching this. **`generation` is a dead field** — `ConsignmentOutputs.build`
+> stamps every row `0` and nothing has ever read it back, so step 6 has to *invent* the counter, and with the
+> registry default-off (D1 unresolved) there is no durable place to read the current one from. And
+> **`_g<N>_` is already taken**: `DuckDbRecordSink` writes `<stem>_g00001_out.parquet` for a *memory-bounded
+> flush chunk* (`DuckDbRecordSink.java:272`), which is a different concept entirely. A recompute generation
+> needs its own spelling, or the two become indistinguishable on disk.
 
 ---
 
@@ -580,6 +604,9 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
   **Promoted to delivery step 6** — invalidation-by-`generation` alone cannot protect a path whose
   bytes are replaced in place (and on Windows the open read handle makes the *writer* fail instead);
   full recomputes must write a new path and flip `generation`.
+  ⚠ **Re-read 2026-08-10: the overwrite is currently a load-bearing safety property, not only a risk.**
+  All six readers glob, so the atomic same-path rewrite is what keeps them from seeing two generations at
+  once. R1 is real, but it cannot be fixed before the readers pin — see the ordering box under §7.
 - **R2 — `Batch` vs `Consignment` naming.** Code still says `Batch`. This plan adds columns and config
   using **Consignment** vocabulary against a class called `Batch`. That is the existing state
   (`GLOSSARY.md:162-166` records the rename as not rolled out); do not let this plan expand into the
