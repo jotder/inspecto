@@ -277,6 +277,13 @@ carried `__event_time` — the coerced event-time column `DataTransformer` mater
 every row written before these columns existed all read back `NULL`. A consumer that prunes on bounds must
 therefore treat a null-bounds row as a **possible match**, or it will silently drop data.
 
+**`supersedeOtherRevisions(table, keep)` is scoped the opposite way to `supersede(consignment)`**, and has to
+be: a full recompute invalidates work it did not do, spread across however many earlier runs wrote that store
+(addressing step 6). The `keep` argument is required, not optional — a call that omitted it would mark the
+recompute's own freshly written files stale and empty every read of the table. It flips state only; the bytes
+go later, via the `retire_superseded` maintenance task, so a read already in flight finishes on the revision
+it started with.
+
 **Two readers, and a rule they share.** `unreadablePaths()` returns every path marked `SUPERSEDED` or
 `COMPACTED_AWAY` for `ConsignmentSelector` to subtract from a glob — but **never a path that also has a
 `LIVE` row**. Output naming is not one-file-per-Consignment: a full recompute rewrites a stable path in

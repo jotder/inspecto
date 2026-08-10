@@ -263,6 +263,39 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     /**
+     * Mark every still-{@code LIVE} row for {@code tableName} that does <b>not</b> belong to
+     * {@code keepConsignmentId} as {@code SUPERSEDED} — the state flip a full recompute needs (addressing
+     * step 6). The recompute has just rewritten the whole table under its own path, so every earlier
+     * revision's files are stale the moment it lands, and {@link ConsignmentSelector} then excludes them.
+     *
+     * <p><b>Nothing is deleted.</b> The files stay on disk until a retirement pass removes them, precisely so a
+     * read that was already open finishes on the revision it started with. Deleting here would reintroduce the
+     * hazard superseding exists to close, and on Windows the reader's open handle would fail the <em>writer</em>
+     * instead.
+     *
+     * <p><b>Scoped to one table, not one consignment</b>, which is the opposite of {@link #supersede} — and it
+     * has to be: a recompute supersedes work it did not do, spread across however many earlier runs wrote this
+     * store. {@code keepConsignmentId} is required rather than optional, because a call that forgot it would
+     * mark the recompute's own freshly written files stale and empty every read of the table.
+     *
+     * @return how many rows changed state; {@code 0} is normal for a table's first recompute under the registry.
+     */
+    public synchronized int supersedeOtherRevisions(String tableName, String keepConsignmentId) {
+        if (tableName == null || keepConsignmentId == null)
+            throw new IllegalArgumentException("supersedeOtherRevisions needs both a table and the "
+                    + "consignment to keep — a null keep would supersede the revision that just landed");
+        try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T + " SET state = 'SUPERSEDED' "
+                + "WHERE table_name = ? AND consignment_id <> ? AND coalesce(state, 'LIVE') = 'LIVE'")) {
+            ps.setString(1, tableName);
+            ps.setString(2, keepConsignmentId);
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            log.warn("Could not supersede earlier revisions of {}: {}", tableName, e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
      * Mark the given output paths {@code COMPACTED_AWAY} — the files a compaction merged and unlinked.
      *
      * <p><b>No replacement row is inserted, deliberately.</b> A merged file holds rows from many Consignments,

@@ -46,6 +46,65 @@ class MaintenanceLibraryTest {
     @AfterEach
     void resetLedger() {
         AcquisitionLedgers.use(null);
+        com.gamma.consignment.ConsignmentOutputStores.use(null);
+    }
+
+    // ── retire_superseded (addressing step 6, the disk half) ─────────────────────
+
+    /** A file the catalog marks unreadable and that is past the window loses its bytes; its row is kept, since
+     *  the row is the only thing keeping a still-present file out of every reader's glob. */
+    @Test
+    void retireSupersededDeletesAgedBytesAndKeepsTheRow(@TempDir Path dir) throws Exception {
+        Path old = Files.writeString(dir.resolve("old.parquet"), "x");
+        Path fresh = Files.writeString(dir.resolve("fresh.parquet"), "x");
+        Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(Duration.ofDays(9))));
+
+        try (var db = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(superseded(old), superseded(fresh)));
+            com.gamma.consignment.ConsignmentOutputStores.use(db);
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "retire_superseded", "retention_days", "7"))).run();
+
+            assertFalse(Files.exists(old), "aged superseded bytes are gone");
+            assertTrue(Files.exists(fresh), "inside the window a read may still be finishing on it");
+            assertTrue(r.message().contains("retired 1"), r.message());
+            assertEquals(2, db.unreadablePaths().size(),
+                    "rows are kept — dropping the row of a file still on disk would let it back into every glob");
+        }
+    }
+
+    /** MNT-1: a dry run reports what it would delete and deletes nothing. */
+    @Test
+    void retireSupersededPreviewsWithoutDeleting(@TempDir Path dir) throws Exception {
+        Path old = Files.writeString(dir.resolve("old.parquet"), "x");
+        Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(Duration.ofDays(9))));
+
+        try (var db = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(superseded(old)));
+            com.gamma.consignment.ConsignmentOutputStores.use(db);
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "retire_superseded", "retention_days", "7")))
+                    .run(dryCtx(dir));
+
+            assertTrue(Files.exists(old), "a preview must not delete");
+            assertTrue(r.message().contains("would retire 1"), r.message());
+        }
+    }
+
+    @Test
+    void retireSupersededNeedsAnExplicitRetentionAndDegradesWithNoRegistry(@TempDir Path dir) throws Exception {
+        assertThrows(Exception.class,
+                () -> new MaintenanceJob(job(Map.of("task", "retire_superseded"))).run(),
+                "deleting data is deliberate — retention_days is required, as for ledger_prune");
+
+        JobResult r = new MaintenanceJob(job(Map.of("task", "retire_superseded", "retention_days", "7"))).run();
+        assertTrue(r.message().contains("no output registry"), r.message());
+    }
+
+    private static com.gamma.consignment.ConsignmentOutput superseded(Path file) {
+        return new com.gamma.consignment.ConsignmentOutput("c1", "run-1", "cdr", "", null,
+                file.toString(), 1, 1, "2026-08-01T10:00:00Z", 0,
+                com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED);
     }
 
     // ── notification_prune ───────────────────────────────────────────────────────

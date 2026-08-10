@@ -552,7 +552,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 3 | ✔ **DONE 2026-08-10** — four columns land on the **ingest path**, keyed per output file. ⚠ Built differently from the sketch below, which did not survive grounding twice: there is **no live connection** at `finalizeSource` (the seam is `BatchIngestStrategy.writeAndTrace`), and the written relation **has no aggregatable event-time column** — so a coerced `__event_time` is now materialised in `DataTransformer` and excluded from output. See the correction box in §3.1 | ✔ `ConsignmentOutputRegistrationTest` — bounds + spread + producer per file; no-event-time degrades to null bounds; `__event_time` absent from written output |
 | 4 | ✔ **DONE 2026-08-10** — `StreamWatermark.of(producerHighWater, horizon, now)` → `Optional<LocalDateTime>`, plus `windowComplete(wm, hi, lateness)`; the per-producer aggregation is `DbConsignmentOutputStore.producerHighWater(table)`. **D4 resolved: observed-within-horizon**, default 24 h, overridable per call site (see §8). Derived on read — no table, no update path. ⚠ Three corrections in the §3.6 box: no `COMMITTED` state (it is `SUPERSEDED`-excluded / `COMPACTED_AWAY`-**included**), the stream key is `table_name`, and unattributed writes suppress the watermark rather than being skipped | ✔ `StreamWatermarkTest` (11) — lagging producer wins, stale drops out, unknown suppresses, and the seeded-catalog two-producer window closes only when both pass `hi + lateness`; `DbConsignmentOutputStoreTest` (+5) — grouping, state filter, chronological last-seen |
 | 5 | ✔ **DONE 2026-08-10** — default flipped to `duckdb` (`none` still honoured), and the store wired into `db_maintenance`. ⚠ Justified by a **shipped bug**, not by addressing: `ReprocessCommand`'s refusal to reprocess a compacted-away Consignment (the alternative is silent row duplication) was decidable only from this registry, so the fix was switched off everywhere. **The "migration for existing installs" was dropped, not deferred** — §7-A's filter contract means pre-registry files need no backfill; they read as unknown, not absent | ✔ `ServiceStoresDefaultsTest` — absent property ⇒ a store is opened; `none` ⇒ none |
-| 6 | ⛔ **BLOCKED ON STEP 7 — do not build this first** (grounded 2026-08-10; see the ordering box below). **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
+| 6 | ✔ **DONE 2026-08-10, after 7′ unblocked it.** A full recompute's sink base name now always carries the **batch id** (`PipelineJobRunner.java:166`) — not a `<generation>` counter, which needed state the registry could not guarantee and a spelling `DuckDbRecordSink` already owns. The batch id needs no counter *and* preserves what the stable name was protecting: a same-batch-id replay still rewrites its own path, so it stays idempotent. `supersedeOtherRevisions(table, keep)` then marks earlier revisions dead (full recomputes only — an incremental run appends, so superseding there would discard every prior slice), and the new `retire_superseded` maintenance task deletes their bytes past an explicit `retention_days`. ⚠ Nothing deletes at flip time, on purpose | ✔ `DbConsignmentOutputStoreTest` (+3) — spares the revision that just landed, refuses a null keep, no-ops on a first revision; `MaintenanceLibraryTest` (+3) — aged bytes go, fresh ones stay, rows are kept, dry run previews, missing retention refused |
 | 7 | ✔ **DONE 2026-08-10 as 7′ (exclusion only)** — `ConsignmentSelector.resolve(conn, format, glob, hive)` subtracts `SUPERSEDED`/`COMPACTED_AWAY` paths from the glob and hands the caller's own expression back, byte for byte, when it has nothing to say. Wired into `SourceStoreReader`; the other five glob sites are listed below. ⚠ **No config shape, no generation pinning, and no bounds pruning** — see the scope box | ✔ `ConsignmentSelectorTest` (8) — subtracts both dead states, unknown files stay in, a path with any LIVE row survives a dead one, relative/absolute spellings still match, excluding everything fails like an empty store, an unusable connection falls back to the glob |
 | 8 | **Populate `RunArtifact.timeRange`** from the catalog; `$upstream(job).time_range` returns a real range. | expression test asserting non-null |
 | 9 | **Late-arrival segregation** at write time + declared allowed-lateness per stream. | inject a late record; assert it lands in the late partition and hot bounds stay tight |
@@ -582,6 +582,11 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
 > reintroduces the very window the step exists to close (and R1 already notes the open read handle makes the
 > *writer* fail on Windows). So the dependency runs **7 → 6**: readers must pin an explicit file list before
 > any writer may leave two generations on disk. Step 7's own re-argument is now the gate for both.
+>
+> ✔ **Both landed in that order on 2026-08-10.** 7′ shipped first, and its follow-on wired `DatasetRelation`
+> — which grounding showed is the *only* reader that sees a pipeline sink's output, and also the only one that
+> cannot take a `Connection` (13+ call sites in three modules), so the site step 6 depended on was the
+> hardest one. Step 6 then landed with the retirement pass the plan had no story for.
 >
 > Two more things a builder needs before touching this. **`generation` is a dead field** — `ConsignmentOutputs.build`
 > stamps every row `0` and nothing has ever read it back, so step 6 has to *invent* the counter, and with the
@@ -707,9 +712,13 @@ the ordering box above. Do not let step 7 claim it.
   **Promoted to delivery step 6** — invalidation-by-`generation` alone cannot protect a path whose
   bytes are replaced in place (and on Windows the open read handle makes the *writer* fail instead);
   full recomputes must write a new path and flip `generation`.
-  ⚠ **Re-read 2026-08-10: the overwrite is currently a load-bearing safety property, not only a risk.**
-  All six readers glob, so the atomic same-path rewrite is what keeps them from seeing two generations at
-  once. R1 is real, but it cannot be fixed before the readers pin — see the ordering box under §7.
+  ⚠ **Re-read 2026-08-10: the overwrite was a load-bearing safety property, not only a risk.**
+  All the readers glob, so the atomic same-path rewrite is what kept them from seeing two revisions at once.
+  ✔ **RESOLVED the same day**, in the order that grounding forced: 7′ gave `DatasetRelation` (the only reader
+  that sees a sink's output) the ability to exclude, *then* step 6 stopped the overwrite. The third piece the
+  plan never mentioned: a recompute that no longer overwrites leaves a whole extra revision on disk where the
+  old behaviour was O(1), so `retire_superseded` removes the bytes after a grace window. Superseding without
+  that would have traded a correctness bug for an out-of-disk one.
 - **R2 — `Batch` vs `Consignment` naming.** Code still says `Batch`. This plan adds columns and config
   using **Consignment** vocabulary against a class called `Batch`. That is the existing state
   (`GLOSSARY.md:162-166` records the rename as not rolled out); do not let this plan expand into the

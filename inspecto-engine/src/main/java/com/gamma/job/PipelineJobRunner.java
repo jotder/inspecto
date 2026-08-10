@@ -161,9 +161,16 @@ public final class PipelineJobRunner implements Job {
                 seedViews.put(seed.node(), view);
             }
 
-            // incremental runs append (a run-unique base name so each increment is its own file); a full
-            // recompute keeps a stable base name so a same-batch_id replay stays idempotent.
-            String sinkBase = cfg.name().toLowerCase().replace(' ', '_') + (incremental ? "_" + safe(batchId) : "");
+            // Every run gets a batch-unique base name (addressing step 6). Incremental runs always did — each
+            // increment is its own file — and a full recompute now does too, so it writes a new revision beside
+            // the old one instead of rewriting bytes a catalog row points at.
+            //
+            // This keeps the property the old stable name existed for. That name was chosen so a same-batch_id
+            // replay stayed idempotent; deriving the name FROM the batch id keeps exactly that (a replay writes
+            // its own path again) while giving each genuine recompute a path of its own. It also avoids the
+            // `_g<N>_` spelling the plan proposed, which DuckDbRecordSink already uses for a memory-bounded
+            // flush chunk — a different concept that would have become indistinguishable on disk.
+            String sinkBase = cfg.name().toLowerCase().replace(' ', '_') + "_" + safe(batchId);
             PartitionSinkWriter writer = new PartitionSinkWriter(conn, dir, sinkBase, batchId);
             BranchCommitCoordinator coordinator = new BranchCommitCoordinator(new BranchCommitLog(
                     Path.of(auditDir).resolve(safe(pipelineId) + "_branch_commit_" + safe(batchId) + ".csv").toString()));
@@ -184,6 +191,7 @@ public final class PipelineJobRunner implements Job {
             }
 
             if (incremental) advanceWatermarks(conn, watermarks, pipelineId, seeds, seedViews, incCol);
+            else supersedeEarlierRevisions(g, batchId);
 
             long ms = (System.nanoTime() - t0) / 1_000_000L;
             List<String> parts = writer.outputs().stream().map(PartitionOutput::partition).distinct().toList();
@@ -201,6 +209,33 @@ public final class PipelineJobRunner implements Job {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
+
+    /**
+     * After a successful <b>full recompute</b>, mark every earlier revision of the stores it produced
+     * {@code SUPERSEDED} (addressing step 6), so {@code ConsignmentSelector} stops naming their files. Nothing
+     * is deleted here — the bytes stay until a retirement pass removes them, so a read already in flight
+     * finishes on the revision it started with.
+     *
+     * <p><b>Full recomputes only, and that asymmetry is the whole point.</b> An incremental run <em>appends</em>
+     * a slice; superseding the earlier revisions there would discard every increment before it and leave the
+     * table holding only the newest slice. The caller's {@code if (incremental)} branch is what keeps these two
+     * apart, so the two must never be merged into one unconditional call.
+     *
+     * <p>A no-op when the registry is absent — the pre-step-6 behaviour, where a recompute overwrote in place,
+     * is what a deployment without a catalog still gets, and it is self-consistent: nothing recorded the old
+     * revision, so nothing needs to un-record it.
+     */
+    private static void supersedeEarlierRevisions(PipelineGraph g, String batchId) {
+        var registry = com.gamma.consignment.ConsignmentOutputStores.shared();
+        if (registry == null) return;
+        for (String store : PipelineStores.produced(g)) {
+            int superseded = registry.supersedeOtherRevisions(store, batchId);
+            if (superseded > 0)
+                log.info("[FLOWJOB] full recompute of '{}' superseded {} file(s) from earlier revision(s) — "
+                        + "readers stop naming them now; the bytes go with the next retirement pass",
+                        store, superseded);
+        }
+    }
 
     /**
      * The write-side store-layout contract (BACKLOG §1, decided 2026-07-18): a persistent store is a

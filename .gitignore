@@ -66,13 +66,18 @@
 # The UAT space is fully GENERATED (config cloned from spaces/demo by tools/seed-uat.ps1) — never commit it.
 /spaces/uat/
 
-# Stray root-level DuckDB files written by ad-hoc local backend runs (jobs_report, provenance, …).
-# The .db pair matters since the consignment-outputs registry became default-on (addressing D1): under the
-# legacy flat layout it lands in the module root, so a build now produces it without anyone asking.
+# Stray root-level DuckDB files written by ad-hoc local backend runs (jobs_report, provenance, …)
 /inspecto/*.duckdb
 /inspecto/*.duckdb.wal
 /inspecto/*.db
 /inspecto/*.db.wal
+
+# The consignment-outputs registry became default-on (addressing D1), so under the legacy flat layout it
+# lands in the working directory — which for a test run is whichever module is building. Matched by bare
+# name, at any depth: a build in ANY module now produces it without anyone asking. Real per-space copies
+# live under spaces/*/duckdb/, already ignored above.
+inspecto-consignment-outputs.db
+inspecto-consignment-outputs.db.wal
 
 # Dry-run and audit outputs produced by ad-hoc local runs in the module root
 /inspecto/available_files.csv*

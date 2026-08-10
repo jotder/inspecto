@@ -513,6 +513,25 @@ forgetting is a policy decision and a wrong default is silent data loss.
 | `notification_prune` | in-app notifications, whatever their read/archived state | |
 | `receipt_prune` | delivery receipts (D8) | the in-memory store's oldest-first cap at 5000 is a **backstop, not retention** |
 | `incident_purge` | **Archived Incidents and their notes, attachments, links and tag edges** | the only task that deletes operator business records — see below |
+| `retire_superseded` | the **bytes** of output files the Consignment catalog marks unreadable | ⚠ **the only retention task a correctness fix depends on** — see below |
+
+#### `retire_superseded` — the disk half of a safe recompute (addressing step 6)
+
+A full pipeline recompute used to rewrite its sink files in place. That was atomic per file, so a reader
+saw either the old bytes or the new — but it also meant a recompute could replace bytes underneath an
+in-flight read. Since 2026-08-10 a recompute writes a **new revision** (its base name carries the batch id)
+and marks the earlier revision `SUPERSEDED` in `consignment_outputs`; readers resolve through
+`ConsignmentSelector`, which stops naming those files.
+
+Nothing is deleted at that moment, deliberately — the grace period is what lets an already-open read finish
+on the revision it started with. **So without a `retire_superseded` job defined, every full recompute
+leaves a complete extra copy of its output on disk, forever.** That is the one case where "retention is
+never on by default" has a real cost: define this job with a `retention_days` longer than your longest
+query, or a recompute-heavy pipeline will grow without bound.
+
+It deletes files and **keeps their catalog rows**. A row for a deleted file is harmless; dropping the row
+of a file still on disk would let it back into every reader's glob. A file locked by an open reader is
+skipped with a warning and retried on the next pass.
 
 #### `incident_purge` — the retention tier for Archived Incidents (MNT-14)
 

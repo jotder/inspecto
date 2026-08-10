@@ -987,7 +987,13 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     compaction merged away. That reprocess previously succeeded **while silently duplicating rows**, so the
     refusal is the fix — but an operator who has been doing it will see a new failure. Release notes must
     say what to do instead: rewrite the whole partition (§6.2), or set `min_age_days` beyond the reprocess
-    horizon so compaction never overtakes it.
+    horizon so compaction never overtakes it. **An eighth landed 2026-08-10**: `feat(consignment)` —
+    addressing step 6. A full pipeline recompute's sink files are now named `<pipeline>_<batchId>` instead
+    of a stable `<pipeline>`, so **output file names change** for anyone who parsed them, and a recompute
+    writes a new revision rather than overwriting. Release notes must lead with the operational
+    consequence: **define a `retire_superseded` maintenance job**, or every full recompute leaves a
+    complete extra copy of its output on disk permanently (retention is never on by default here, and this
+    is the one retention task whose absence is a growth bug rather than just a longer history).
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already

@@ -380,6 +380,41 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    // ── step 6: a full recompute supersedes earlier revisions of one table ───────
+
+    @Test
+    void supersedeOtherRevisionsSparesTheRevisionThatJustLanded() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(by("north", "/w/rev1.parquet", null, "2026-08-09T10:00:00Z", State.LIVE)));
+            db.record(List.of(by("north", "/w/rev2.parquet", null, "2026-08-10T10:00:00Z", State.LIVE)));
+            // a different table's rows must not move
+            db.record(List.of(new ConsignmentOutput("c-other", "run-1", "sms", "", null, "/w/sms.parquet",
+                    1, 100, "2026-08-10T10:00:00Z", 0, State.LIVE)));
+
+            assertEquals(1, db.supersedeOtherRevisions("cdr", "c-/w/rev2.parquet"));
+            assertEquals(List.of("/w/rev1.parquet"), db.unreadablePaths());
+            assertEquals(State.LIVE, db.outputs("c-other").get(0).state(), "another table is untouched");
+        }
+    }
+
+    /** A null keep would mark the recompute's own freshly written files stale and empty every read. */
+    @Test
+    void supersedeOtherRevisionsRefusesToRunWithoutAConsignmentToKeep() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            assertThrows(IllegalArgumentException.class, () -> db.supersedeOtherRevisions("cdr", null));
+            assertThrows(IllegalArgumentException.class, () -> db.supersedeOtherRevisions(null, "c1"));
+        }
+    }
+
+    @Test
+    void supersedeOtherRevisionsIsANoOpOnATablesFirstRevision() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(by("north", "/w/rev1.parquet", null, "2026-08-10T10:00:00Z", State.LIVE)));
+            assertEquals(0, db.supersedeOtherRevisions("cdr", "c-/w/rev1.parquet"));
+            assertTrue(db.unreadablePaths().isEmpty());
+        }
+    }
+
     @Test
     void producerHighWaterIsBestEffortAndNeverThrows() throws Exception {
         DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:");
