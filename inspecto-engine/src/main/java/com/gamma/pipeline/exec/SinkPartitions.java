@@ -31,16 +31,43 @@ final class SinkPartitions {
      *  identifier — the same fail-closed check {@code DatasetRelation.temporalColumn} applies. */
     static final Pattern SAFE_COLUMN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
-    /** The declared partition columns in declaration order ({@code []} when absent or not a list). */
+    /**
+     * The declared partition columns in declaration order ({@code []} when absent or not a list). A map entry
+     * contributes its {@code column} and nothing else: entries carrying no usable one are left out here and
+     * reported by {@link #entriesWithoutColumn}, because stringifying the map — which is what this did until
+     * the caller checked — produced a partition directory literally named {@code {source=TXN_DATE}}.
+     */
     static List<String> columns(Object partitions) {
         List<String> cols = new ArrayList<>();
         if (partitions instanceof List<?> list) {
             for (Object o : list) {
-                if (o instanceof Map<?, ?> m && m.get("column") != null) cols.add(m.get("column").toString());
-                else if (o != null && !o.toString().isBlank()) cols.add(o.toString());
+                if (o instanceof Map<?, ?> m) {
+                    if (!isBlank(m.get("column"))) cols.add(m.get("column").toString());
+                } else if (o != null && !o.toString().isBlank()) cols.add(o.toString());
             }
         }
         return cols;
+    }
+
+    /**
+     * Map entries that declare no usable {@code column} — absent, or present and blank — rendered for an error
+     * message. There is no reading of such an entry that partitions anything, so the callers refuse it rather
+     * than interpret it: {@link PartitionSinkWriter} throws before writing a byte, and {@link ComponentPreview}
+     * warns while the author is still editing. Bare strings are not checked; a blank one has always been
+     * skipped, and that is long-standing behaviour rather than a defect to convert into a failure.
+     */
+    static List<String> entriesWithoutColumn(Object partitions) {
+        List<String> bad = new ArrayList<>();
+        if (partitions instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m && isBlank(m.get("column"))) bad.add(String.valueOf(o));
+            }
+        }
+        return bad;
+    }
+
+    private static boolean isBlank(Object v) {
+        return v == null || v.toString().isBlank();
     }
 
     /**

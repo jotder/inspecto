@@ -150,6 +150,24 @@ class PartitionSinkWriterBoundsTest {
         }
     }
 
+    /**
+     * The one partitions[] defect this path refuses outright rather than degrading past. Everything else here
+     * records no bounds and writes anyway; an entry with no {@code column} names no directory segment at all, so
+     * skipping it would silently write the store to a different layout than it declares.
+     */
+    @Test
+    void aPartitionEntryWithNoColumnRefusesToWrite(@TempDir Path dir) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:")) {
+            seed(conn);
+            PipelineNode noColumn = sink(List.of(Map.of("source", "call_ts")));
+
+            IllegalStateException e = assertThrows(IllegalStateException.class,
+                    () -> write(conn, dir, noColumn));
+            assertTrue(e.getMessage().contains("declaring no 'column'"), e.getMessage());
+            assertTrue(e.getMessage().contains("s1"), "names the sink that has to be fixed: " + e.getMessage());
+        }
+    }
+
     /** A source that does not parse contributes no bound — TRY_CAST, so the write still succeeds. */
     @Test
     void anUnparseableSourceDegradesRatherThanFailingTheWrite(@TempDir Path dir) throws Exception {
