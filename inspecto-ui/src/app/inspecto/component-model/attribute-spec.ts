@@ -59,6 +59,13 @@ export interface AttributeSpec {
     /** One-line helper text shown under the field. */
     help?: string;
     placeholder?: string;
+    /** Section heading this attribute sits under, WITHIN its tier — specs sharing a `group` render
+     *  beneath one heading in declaration order; ungrouped specs render bare, as before. Grouping never
+     *  crosses a tier: disclosure is the outer structure and a heading only organises what is shown. */
+    group?: string;
+    /** Mask the value on input (renders a password field). Presentation only — masking what the API
+     *  reads BACK is the server's job at the response boundary, never this flag's. */
+    secret?: boolean;
 }
 
 const IDENTIFIER_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
@@ -102,6 +109,21 @@ export function byTier(specs: AttributeSpec[]): Record<AttributeTier, AttributeS
 const isBlank = (v: unknown): boolean =>
     v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
 
+/**
+ * The first `list` entry that breaks the spec's `pattern`, phrased for display — or `null`.
+ *
+ * On a `list` the value IS the array, never one string, so `pattern` can only mean "every item must
+ * match". That is also why the whole-value `pattern` check at the end of {@link validateAttributes} is
+ * guarded on `typeof v === 'string'`: unguarded it would test the array's `toString()` (`"a,b"`) and
+ * pass or fail for reasons no author could predict from the declaration.
+ */
+export function listPatternViolation(spec: AttributeSpec, items: readonly string[]): string | null {
+    if (!spec.pattern) return null;
+    const re = new RegExp(`^(?:${spec.pattern})$`);
+    const bad = items.find((e) => !re.test(e));
+    return bad === undefined ? null : `${spec.label}: "${bad}" has an invalid format`;
+}
+
 /** Validate `value` against the visible specs — the spec-driven half of a kind's `config.validate`. */
 export function validateAttributes(specs: AttributeSpec[], value: Record<string, unknown>): ConfigFinding[] {
     const findings: ConfigFinding[] = [];
@@ -138,11 +160,15 @@ export function validateAttributes(specs: AttributeSpec[], value: Record<string,
                     findings.push({ severity: 'error', path: s.key, message: `${s.label} must be one of the listed options` });
                 }
                 break;
-            case 'list':
+            case 'list': {
                 if (!Array.isArray(v) || v.some((e) => typeof e !== 'string')) {
                     findings.push({ severity: 'error', path: s.key, message: `${s.label} must be a list of text values` });
+                    break;
                 }
+                const violation = listPatternViolation(s, v as string[]);
+                if (violation) findings.push({ severity: 'error', path: s.key, message: violation });
                 break;
+            }
             case 'identifier':
                 if (typeof v !== 'string' || !IDENTIFIER_RE.test(v)) {
                     findings.push({

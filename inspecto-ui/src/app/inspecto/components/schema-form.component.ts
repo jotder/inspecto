@@ -10,7 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AttributeOption, AttributeSpec, byTier, defaultsFor, dependsOnMatches, isRequired } from '../component-model';
+import { AttributeOption, AttributeSpec, byTier, defaultsFor, dependsOnMatches, isRequired, listPatternViolation } from '../component-model';
 import { ChipComponent } from './chip.component';
 
 /**
@@ -68,8 +68,13 @@ export type AttributeOptionLoader = (
                 </div>
             }
 
-            @for (spec of tiers().required; track spec.key; let i = $index) {
-                <ng-container *ngTemplateOutlet="field; context: { spec, first: i === 0 }"></ng-container>
+            @for (g of groupsOf(tiers().required); track g.name; let gi = $index) {
+                @if (g.name) {
+                    <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">{{ g.name }}</div>
+                }
+                @for (spec of g.specs; track spec.key; let i = $index) {
+                    <ng-container *ngTemplateOutlet="field; context: { spec, first: gi === 0 && i === 0 }"></ng-container>
+                }
             }
 
             @if (tiers().optional.length) {
@@ -83,16 +88,26 @@ export type AttributeOptionLoader = (
                     Optional settings ({{ tiers().optional.length }})
                 </button>
                 @if (showOptional()) {
-                    @for (spec of tiers().optional; track spec.key) {
-                        <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
+                    @for (g of groupsOf(tiers().optional); track g.name) {
+                        @if (g.name) {
+                            <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">{{ g.name }}</div>
+                        }
+                        @for (spec of g.specs; track spec.key) {
+                            <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
+                        }
                     }
                 }
             }
 
             @if (showAdvanced()) {
                 <div class="text-secondary py-1 text-sm font-medium" role="heading" aria-level="3">Advanced</div>
-                @for (spec of tiers().advanced; track spec.key) {
-                    <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
+                @for (g of groupsOf(tiers().advanced); track g.name) {
+                    @if (g.name) {
+                        <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="4">{{ g.name }}</div>
+                    }
+                    @for (spec of g.specs; track spec.key) {
+                        <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
+                    }
                 }
             }
 
@@ -209,11 +224,15 @@ export type AttributeOptionLoader = (
                             </mat-form-field>
                         }
                         @default {
+                            <!-- string / identifier. A secret spec masks the input; unlike the number
+                                 case above, a bound [type] is safe here because text and password
+                                 share Angular's DefaultValueAccessor, so no accessor is lost. -->
                             <mat-form-field class="w-full" subscriptSizing="dynamic">
                                 <mat-label>{{ spec.label }}</mat-label>
                                 <input
                                     matInput
-                                    type="text"
+                                    [type]="spec.secret ? 'password' : 'text'"
+                                    [attr.autocomplete]="spec.secret ? 'new-password' : null"
                                     [formControlName]="spec.key"
                                     [placeholder]="spec.placeholder ?? ''"
                                     [attr.cdkFocusInitial]="first ? '' : null"
@@ -367,6 +386,25 @@ export class InspectoSchemaFormComponent {
         });
     }
 
+    /**
+     * Specs bucketed into `group` sections within one tier, in first-appearance order; ungrouped specs
+     * fall into a single nameless section so an un-grouped spec set renders exactly as it did before.
+     *
+     * <p>Specs sharing a name coalesce even when declared apart — one heading per name is what an author
+     * means by naming a section twice, and it also keeps the `@for` track key unique, which repeating a
+     * heading would not.
+     */
+    groupsOf(specs: AttributeSpec[]): { name: string; specs: AttributeSpec[] }[] {
+        const byName = new Map<string, AttributeSpec[]>();
+        for (const s of specs) {
+            const name = s.group ?? '';
+            const bucket = byName.get(name);
+            if (bucket) bucket.push(s);
+            else byName.set(name, [s]);
+        }
+        return [...byName].map(([name, grouped]) => ({ name, specs: grouped }));
+    }
+
     /** True while `spec` should render (its `dependsOn` matches the current values). */
     isVisible(spec: AttributeSpec): boolean {
         return !spec.dependsOn || dependsOnMatches(spec.dependsOn, this.formValue());
@@ -425,7 +463,19 @@ export class InspectoSchemaFormComponent {
         const v: ValidatorFn[] = [];
         if (isRequired(s)) v.push(Validators.required);
         if (s.type === 'identifier') v.push(Validators.pattern(/^[A-Za-z][A-Za-z0-9_-]*$/));
-        if (s.pattern) v.push(Validators.pattern(`^(?:${s.pattern})$`));
+        // A `list` holds the array, so `pattern` means "every item" — Validators.pattern would test the
+        // array's toString() instead. Its message is phrased by listPatternViolation and named the
+        // offending entry, so it rides the `message` key errorFor() renders verbatim.
+        if (s.pattern && s.type === 'list') {
+            v.push((control: AbstractControl) => {
+                const items = control.value;
+                if (!Array.isArray(items)) return null;
+                const message = listPatternViolation(s, items.filter((e): e is string => typeof e === 'string'));
+                return message ? { message } : null;
+            });
+        } else if (s.pattern) {
+            v.push(Validators.pattern(`^(?:${s.pattern})$`));
+        }
         if (s.type === 'number') {
             if (s.min !== undefined) v.push(Validators.min(s.min));
             if (s.max !== undefined) v.push(Validators.max(s.max));

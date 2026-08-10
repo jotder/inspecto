@@ -275,4 +275,98 @@ describe('InspectoSchemaFormComponent', () => {
             expect(fixture.componentInstance.form.get('patterns')?.valid).toBe(true);
         });
     });
+
+    describe('group headings (job-parameter-contract §7.4)', () => {
+        const GROUPED: AttributeSpec[] = [
+            { key: 'to', label: 'To', type: 'string', tier: 'required', group: 'Recipients' },
+            { key: 'cc', label: 'Cc', type: 'string', tier: 'required', group: 'Recipients' },
+            { key: 'subject', label: 'Subject', type: 'string', tier: 'required', group: 'Message' },
+            { key: 'bare', label: 'Bare', type: 'string', tier: 'required' },
+        ];
+
+        const headings = (fixture: { nativeElement: HTMLElement }) =>
+            Array.from(fixture.nativeElement.querySelectorAll('[role="heading"]')).map((el) => el.textContent?.trim());
+
+        it('renders one heading per declared group, and none for ungrouped specs', () => {
+            const fixture = create(GROUPED);
+            expect(headings(fixture)).toEqual(['Recipients', 'Message']);
+        });
+
+        it('coalesces a group declared in two places into one heading', () => {
+            // Repeating a name means one section, not two — and a repeated @for track key would throw.
+            const fixture = create([...GROUPED, { key: 'bcc', label: 'Bcc', type: 'string', tier: 'required', group: 'Recipients' }]);
+            expect(headings(fixture)).toEqual(['Recipients', 'Message']);
+            expect(fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().required)
+                .find((g) => g.name === 'Recipients')!.specs.map((s) => s.key)).toEqual(['to', 'cc', 'bcc']);
+        });
+
+        it('does not group across tiers — disclosure is the outer structure', () => {
+            const fixture = create([
+                { key: 'a', label: 'A', type: 'string', tier: 'required', group: 'Shared' },
+                { key: 'b', label: 'B', type: 'string', tier: 'advanced', group: 'Shared' },
+            ]);
+            expect(fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().required).map((g) => g.name)).toEqual(['Shared']);
+            expect(fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().advanced).map((g) => g.name)).toEqual(['Shared']);
+        });
+
+        it('has no a11y violations with headings present', async () => {
+            const fixture = create(GROUPED);
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+    });
+
+    describe('secret fields', () => {
+        // NB: `formControlName` is a property binding here, so it never reflects to a DOM attribute —
+        // an `input[formcontrolname=…]` selector silently matches nothing. Each fixture below declares a
+        // single spec, so the sole rendered <input> is unambiguous.
+        const soleInput = (fixture: { nativeElement: HTMLElement }) =>
+            fixture.nativeElement.querySelector('input') as HTMLInputElement;
+
+        it('masks the input and keeps the value readable to the host', () => {
+            const fixture = create([{ key: 'token', label: 'Token', type: 'string', tier: 'required', secret: true }]);
+
+            expect(soleInput(fixture).type).toBe('password');
+            fixture.componentInstance.form.get('token')!.setValue('s3cret');
+            // Masking is presentation only — the host still reads the real value to save it.
+            expect(fixture.componentInstance.value()['token']).toBe('s3cret');
+        });
+
+        it('leaves a non-secret string field as a text input', () => {
+            const fixture = create([{ key: 'plain', label: 'Plain', type: 'string', tier: 'required' }]);
+            expect(soleInput(fixture).type).toBe('text');
+        });
+    });
+
+    describe('per-item list validation', () => {
+        const EMAILS: AttributeSpec[] = [
+            { key: 'to', label: 'To', type: 'list', tier: 'required', required: false, pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+' },
+        ];
+
+        it('applies `pattern` to each entry and names the offending one', () => {
+            const fixture = create(EMAILS);
+            const control = fixture.componentInstance.form.get('to')!;
+
+            control.setValue(['ops@example.com', 'nope']);
+            control.markAsTouched();
+            fixture.detectChanges();
+
+            const alert = fixture.nativeElement.querySelector('[role="alert"]');
+            expect(alert?.textContent).toContain('"nope"');
+            expect(control.valid).toBe(false);
+        });
+
+        it('accepts a list whose every entry matches', () => {
+            const fixture = create(EMAILS);
+            fixture.componentInstance.form.get('to')!.setValue(['a@x.io', 'b@x.io']);
+            expect(fixture.componentInstance.form.get('to')!.valid).toBe(true);
+        });
+
+        it('does not test the array as one joined string', () => {
+            // Validators.pattern on an array tests "a@x.io,b@x.io" — which fails an email pattern even
+            // though every entry is valid. This is that regression.
+            const fixture = create(EMAILS);
+            fixture.componentInstance.form.get('to')!.setValue(['a@x.io', 'b@x.io']);
+            expect(fixture.componentInstance.form.get('to')!.errors).toBeNull();
+        });
+    });
 });

@@ -94,6 +94,24 @@ describe('attribute-spec', () => {
         expect(validateAttributes(specs, { tags: [1, 2] }).map((f) => f.path)).toEqual(['tags']);
     });
 
+    /**
+     * `pattern` on a `list` means "every ITEM must match" — the value is the array, never one string.
+     * The framework-free validator and the renderer's `ValidatorFn` share `listPatternViolation` so the
+     * two cannot disagree about the same value.
+     */
+    it('applies pattern per list entry, naming the first offender', () => {
+        const specs: AttributeSpec[] = [
+            { key: 'to', label: 'To', type: 'list', tier: 'optional', pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+' },
+        ];
+
+        expect(validateAttributes(specs, { to: ['a@x.io', 'b@x.io'] })).toEqual([]);
+        expect(validateAttributes(specs, { to: ['a@x.io', 'nope'] }).map((f) => f.message)).toEqual([
+            'To: "nope" has an invalid format',
+        ]);
+        // Not the array's toString(): "a@x.io,b@x.io" fails an email pattern though every entry passes.
+        expect(validateAttributes(specs, { to: ['a@x.io', 'b@x.io'] }).length).toBe(0);
+    });
+
     it('accepts a fully valid config and wraps as a kind validator', () => {
         const validate = attributeValidator(SPECS);
         expect(validate({ name: 'daily_kpi', type: 'report', cron: '0 2 * * *', threads: 8, enabled: false })).toEqual([]);
