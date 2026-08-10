@@ -51,6 +51,9 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li><b>Cron</b> — jobs with a {@code cron} field are armed on the borrowed {@link Scheduler}.</li>
  *   <li><b>Event</b> — jobs with {@code on_pipeline} run when that pipeline (or upstream job)
  *       commits a batch, via the shared {@link BatchEventBus}.</li>
+ *   <li><b>Signal</b> — jobs with {@code on_signal} run when a matching Signal is published (exact id
+ *       or a {@code prefix.*} match), optionally narrowed by a {@code when:} guard over the firing
+ *       Signal's payload (P1c).</li>
  *   <li><b>Manual</b> — {@link #trigger(String)} runs a job once (Control API {@code POST}).</li>
  * </ul>
  *
@@ -177,8 +180,10 @@ public final class JobService implements AutoCloseable {
                 }
             });
 
-    /** A job's identity + state for the Control API listing. */
-    public record JobView(String name, String type, String cron, String onPipeline,
+    /** A job's identity + state for the Control API listing. {@code onSignal} carries the signal-type
+     *  trigger (P1c) so a signal-driven job is distinguishable from a manual one in the list; the
+     *  {@code when} guard is detail-only. */
+    public record JobView(String name, String type, String cron, String onPipeline, String onSignal,
                           boolean enabled, String lastStatus, String lastRunTime, String nextFire) {}
 
     public JobService(List<JobConfig> configs, BatchEventBus bus, Scheduler scheduler,
@@ -1044,7 +1049,7 @@ public final class JobService implements AutoCloseable {
                 CronExpression expr = crons.getOrDefault(c.name(), c.cronExpression());
                 nextFire = expr.next(now).format(TS);
             }
-            out.add(new JobView(c.name(), c.type(), c.cron(), c.onPipeline(), c.enabled(),
+            out.add(new JobView(c.name(), c.type(), c.cron(), c.onPipeline(), c.onSignal(), c.enabled(),
                     last == null ? "" : last.status(),
                     last == null ? "" : last.endTime(),
                     nextFire));
