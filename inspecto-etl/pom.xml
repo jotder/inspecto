@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -18,17 +18,17 @@
          → com.gamma.signal.PipelineBatchSignal via an injected sink), making etl a foundation leaf
          (out-degree 0 within the engine SCC). This module extracts that leaf below fp-engine —
          it depends only on api/util (plus the third-party libs etl itself uses), same as fp-sql. -->
-    <artifactId>file-processor-etl</artifactId>
+    <artifactId>inspecto-etl</artifactId>
     <name>Inspecto etl (pipeline-config + batch ingest)</name>
 
     <dependencies>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-util</artifactId>
+            <artifactId>inspecto-util</artifactId>
         </dependency>
 
         <!-- CSV parsing — etl.BoundaryScanner + etl.CsvIngester (parent-managed since WS-D). -->

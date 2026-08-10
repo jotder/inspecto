@@ -6,12 +6,12 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>file-processor-intelligence</artifactId>
+    <artifactId>inspecto-intelligence</artifactId>
     <packaging>jar</packaging>
 
     <name>Inspecto — Embedded Intelligence (optional)</name>
@@ -32,7 +32,7 @@
     <dependencies>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor</artifactId>
+            <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- S9: no longer depends on file-processor-agent. The pack's ModelProfile + LlmGateway are built

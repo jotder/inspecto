@@ -7,21 +7,21 @@ base and the per-item history.
 
 ## Reactor shape (2026-07-22, +WS-D increments 2–4: fp-etl, fp-event, fp-acquire)
 
-Build order (root `pom.xml`, parent `file-processor-parent`):
+Build order (root `pom.xml`, parent `inspecto-parent`):
 
 | # | Directory | artifactId | Role |
 |---|---|---|---|
-| 1 | `inspecto-api/` | `file-processor-api` | **Leaf, dependency-free**: only `com.gamma.api.PublicApi`, the stability-contract annotation. Behavior code never lives here. |
-| 2 | `inspecto-util/` | `file-processor-util` | **Leaf w.r.t. `com.gamma`** (imports nothing from other core packages): `com.gamma.util` — the DuckDB access point (`DuckDbUtil` + JDBC/summarize/schema helpers), CSV/TOON I/O, file movers/walkers, tar/gzip, bounded history, `DottedPath`. Deps: duckdb_jdbc + opencsv + univocity + commons-compress + commons-lang3 + gson + jtoon + jackson. (The `ura` CLI `MainApp` — the one class in the old `com.gamma.util` that reached into core — was relocated to `com.gamma.inspector.MainApp` so this stays a clean leaf; see playbook rule 6.) |
-| 3 | `inspecto-config/` | `file-processor-config` | `com.gamma.config` — spec / io (TOON codec) / safety. Deps: fp-api + jtoon + jackson. |
-| 4 | `inspecto-sql/` | `file-processor-sql` | **Foundational leaf**: `com.gamma.sql` — the read-only DuckDB SQL sandbox (`SqlSandbox`/`SqlSandboxPolicy`), `SqlOracle`, `SqlGuard`, `SqlViews`. Deps: fp-api + fp-config + fp-util only (no external deps; DuckDB via `util.DuckDbUtil`). |
-| 5 | `inspecto-etl/` | `file-processor-etl` | **Foundation leaf (WS-D increment 2, 2026-07-22)**: `com.gamma.etl` — `PipelineConfig`, the CSV/fixed-width ingesters, batch planning/commit/manifest, quarantine, lineage, partitioned Parquet output. Deps: fp-api + fp-util + univocity, duckdb, jtoon, jackson, slf4j, commons-compress, gson (no logback — etl doesn't own an appender). Publishes a **test-jar** (`com.gamma.etl.TestConfigs` + `PipelineConfigBatchTest`, the shared `PipelineConfig` builders). |
-| 6 | `inspecto-event/` | `file-processor-event` | **Leaf-pair (WS-D increment 3, 2026-07-22)**: `com.gamma.event` + `com.gamma.metrics` — the Operational-Intelligence event store (`EventLog`/`EventStore`/`EventStoreAppender`, `ParquetEventStore`, saved views, secret scrubbing) and the metric registry it depends on; mutually cyclic with each other, not with anything else. Deps: fp-api/util/sql/**etl** + duckdb, jackson, slf4j, **logback-classic**. Owns `logback.xml` + `EventStoreAppender`. |
-| 7 | `inspecto-acquire/` | `file-processor-acquire` | **Leaf (WS-D increment 4, 2026-07-22)**: `com.gamma.acquire` — connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate, gap detection, retry/circuit-breaker/rate-limit policies. No longer SCC-trapped once `etl` became a foundation leaf. Deps: fp-api/config/util/**etl**/**event**. |
-| 8 | `inspecto-engine/` | `file-processor-engine` | **The remaining engine cluster**: `signal`, `query`, `pipeline`, `inspector`, `ingester`, `ops`, `job`, `enrich`, `alert`, `notify`, `catalog`. Deps: fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire** + duckdb, jtoon, jackson, slf4j. Owns both `META-INF/services` files (`catalog.spi.DescriptionProvider`, `notify.NotificationChannel`). No longer owns logback-classic or a test-jar publish (both moved with event/etl). |
-| 9 | `inspecto/` | `file-processor` | The core / composition root: `service`, `control`, `report`, `assist`, `exchange`, `expectation`, `intelligence`, `model`; ships the shaded fat JAR. Depends DOWN on fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire**/**engine**. |
-| 10–13 | `inspecto-agent/`, `-agent-hosted/`, `-connectors/`, `-intelligence/` | `file-processor-*` | Siblings; each depends on core (and resolves the leaf/etl/event/acquire/engine modules transitively). |
-| (opt) | `inspecto-security/` | `file-processor-security` | Standard-edition only, behind `-Pedition-standard` — not in the default `<modules>`. |
+| 1 | `inspecto-api/` | `inspecto-api` | **Leaf, dependency-free**: only `com.gamma.api.PublicApi`, the stability-contract annotation. Behavior code never lives here. |
+| 2 | `inspecto-util/` | `inspecto-util` | **Leaf w.r.t. `com.gamma`** (imports nothing from other core packages): `com.gamma.util` — the DuckDB access point (`DuckDbUtil` + JDBC/summarize/schema helpers), CSV/TOON I/O, file movers/walkers, tar/gzip, bounded history, `DottedPath`. Deps: duckdb_jdbc + opencsv + univocity + commons-compress + commons-lang3 + gson + jtoon + jackson. (The `ura` CLI `MainApp` — the one class in the old `com.gamma.util` that reached into core — was relocated to `com.gamma.inspector.MainApp` so this stays a clean leaf; see playbook rule 6.) |
+| 3 | `inspecto-config/` | `inspecto-config` | `com.gamma.config` — spec / io (TOON codec) / safety. Deps: fp-api + jtoon + jackson. |
+| 4 | `inspecto-sql/` | `inspecto-sql` | **Foundational leaf**: `com.gamma.sql` — the read-only DuckDB SQL sandbox (`SqlSandbox`/`SqlSandboxPolicy`), `SqlOracle`, `SqlGuard`, `SqlViews`. Deps: fp-api + fp-config + fp-util only (no external deps; DuckDB via `util.DuckDbUtil`). |
+| 5 | `inspecto-etl/` | `inspecto-etl` | **Foundation leaf (WS-D increment 2, 2026-07-22)**: `com.gamma.etl` — `PipelineConfig`, the CSV/fixed-width ingesters, batch planning/commit/manifest, quarantine, lineage, partitioned Parquet output. Deps: fp-api + fp-util + univocity, duckdb, jtoon, jackson, slf4j, commons-compress, gson (no logback — etl doesn't own an appender). Publishes a **test-jar** (`com.gamma.etl.TestConfigs` + `PipelineConfigBatchTest`, the shared `PipelineConfig` builders). |
+| 6 | `inspecto-event/` | `inspecto-event` | **Leaf-pair (WS-D increment 3, 2026-07-22)**: `com.gamma.event` + `com.gamma.metrics` — the Operational-Intelligence event store (`EventLog`/`EventStore`/`EventStoreAppender`, `ParquetEventStore`, saved views, secret scrubbing) and the metric registry it depends on; mutually cyclic with each other, not with anything else. Deps: fp-api/util/sql/**etl** + duckdb, jackson, slf4j, **logback-classic**. Owns `logback.xml` + `EventStoreAppender`. |
+| 7 | `inspecto-acquire/` | `inspecto-acquire` | **Leaf (WS-D increment 4, 2026-07-22)**: `com.gamma.acquire` — connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate, gap detection, retry/circuit-breaker/rate-limit policies. No longer SCC-trapped once `etl` became a foundation leaf. Deps: fp-api/config/util/**etl**/**event**. |
+| 8 | `inspecto-engine/` | `inspecto-engine` | **The remaining engine cluster**: `signal`, `query`, `pipeline`, `inspector`, `ingester`, `ops`, `job`, `enrich`, `alert`, `notify`, `catalog`. Deps: fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire** + duckdb, jtoon, jackson, slf4j. Owns both `META-INF/services` files (`catalog.spi.DescriptionProvider`, `notify.NotificationChannel`). No longer owns logback-classic or a test-jar publish (both moved with event/etl). |
+| 9 | `inspecto/` | `inspecto-processor` | The core / composition root: `service`, `control`, `report`, `assist`, `exchange`, `expectation`, `intelligence`, `model`; ships the shaded fat JAR. Depends DOWN on fp-api/util/config/sql/**etl**(+test-jar)/**event**/**acquire**/**engine**. |
+| 10–13 | `inspecto-agent/`, `-agent-hosted/`, `-connectors/`, `-intelligence/` | `inspecto-*` | Siblings; each depends on core (and resolves the leaf/etl/event/acquire/engine modules transitively). |
+| (opt) | `inspecto-security/` | `inspecto-security` | Standard-edition only, behind `-Pedition-standard` — not in the default `<modules>`. |
 
 Binding constraints (unchanged by the split): framework-free (JDK HttpServer, manual DI,
 ServiceLoader SPI); **one deployable** — modularization is reactor-internal, the fat
@@ -34,8 +34,8 @@ Drift-prone shared external versions live ONCE in the parent `<dependencyManagem
 since WS-D `duckdb_jdbc` + `univocity-parsers` + `commons-compress` + `gson`); modules declare those
 artifacts version-free. `opencsv` stayed pinned in fp-util (single-owner after the split — no drift to
 prevent). `logback-classic` is single-owner (fp-engine, pinned 1.5.18). Reactor-internal deps
-(`file-processor-api`, `file-processor-util`, `file-processor-config`, `file-processor-sql`,
-`file-processor-engine` — the last also managed as a `test-jar` entry) are parent-managed at
+(`inspecto-api`, `inspecto-util`, `inspecto-config`, `inspecto-sql`,
+`inspecto-engine` — the last also managed as a `test-jar` entry) are parent-managed at
 `${project.version}`. Single-owner deps stay pinned in their one module. JaCoCo's `coverage` profile lives in the parent (`mvn -Pcoverage test`
 instruments every module).
 
@@ -125,7 +125,7 @@ is maintainability-only, **not** a split blocker.
   they moved to fp-engine and reach the fat JAR **transitively** through core→fp-engine. Core kept only
   the third-party it uses directly (jackson ×4, slf4j ×23, jtoon ×6) + the leaf modules.
 - **Fat JAR unchanged:** shade (in core) has no include-list, so fp-engine's classes/resources bundle
-  automatically. Verified in `file-processor-4.0.0-RC1.jar`: `Main-Class: com.gamma.inspector.CollectorProcessor`
+  automatically. Verified in `inspecto-processor-4.0.0-RC1.jar`: `Main-Class: com.gamma.inspector.CollectorProcessor`
   present, `logback.xml` at root, both service files present, engine + third-party classes bundled.
 
 ## Intra-engine structure (measured 2026-07-22) — why the sub-splits are NOT mechanical

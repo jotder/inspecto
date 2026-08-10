@@ -9,7 +9,7 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Security module (inspecto-security)
 
-The fifth Maven module (`file-processor-security`), shipped W6 (2026-07-06). It supplies the
+The fifth Maven module (`inspecto-security`), shipped W6 (2026-07-06). It supplies the
 **Standard/Enterprise** auth implementation; the common core stays auth-free.
 
 * **SPI seam (in core)** — `com.gamma.control.Authenticator` / `Subject` (id + capabilities) /

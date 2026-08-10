@@ -149,19 +149,15 @@ if (-not $NoUi -and (Test-Path (Join-Path $uiDir 'package.json'))) {
     Write-Host "  (no inspecto-ui/ project found — bundling API only; UI hosting will be inactive)" -ForegroundColor Yellow
 }
 
-# Discover the shaded JAR by pattern so we don't pin to a specific version number. Tries the
-# historical 'file-processor-*' artifactId first, then 'inspecto-processor-*' — an in-flight,
-# uncommitted rename of inspecto/pom.xml's artifactId was observed in this shared checkout
-# (2026-07-31); this is a compatibility shim to keep the build working through the transition,
-# not a decision about which name is correct. Narrow back to one pattern once the rename settles.
-$jarSrc = Get-ChildItem -Path $targetDir -Filter 'file-processor-*.jar' -ErrorAction SilentlyContinue |
+# Discover the shaded JAR by pattern so we don't pin to a specific version number. The
+# 'file-processor-*' → 'inspecto-*' artifactId rename settled on 2026-08-10, so the two-pattern
+# compatibility shim this line carried since 2026-07-31 is gone: one name, one glob. The BUNDLE
+# file name below stays 'file-processor.jar' deliberately — that is the deployment surface
+# (serve.sh, the run-example scripts, docs/EDITIONS.md), renamed separately or not at all.
+$jarSrc = Get-ChildItem -Path $targetDir -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
           Select-Object -First 1 -ExpandProperty FullName
-if (-not $jarSrc) {
-    $jarSrc = Get-ChildItem -Path $targetDir -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
-              Select-Object -First 1 -ExpandProperty FullName
-}
 if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
-    throw "JAR not found matching $targetDir\file-processor-*.jar or inspecto-processor-*.jar.  Run without -NoBuild or build manually first."
+    throw "JAR not found matching $targetDir\inspecto-processor-*.jar.  Run without -NoBuild or build manually first."
 }
 
 # ── step 1c: Standard/Enterprise editions — build the optional edition modules ─────────────────
@@ -183,17 +179,17 @@ if ($Edition -ne 'Personal') {
         Pop-Location
     }
     $securityTargetDir = Join-Path $sandboxRoot 'inspecto-security\target'
-    $securityJarSrc = Get-ChildItem -Path $securityTargetDir -Filter 'file-processor-security-*.jar' -ErrorAction SilentlyContinue |
+    $securityJarSrc = Get-ChildItem -Path $securityTargetDir -Filter 'inspecto-security-*.jar' -ErrorAction SilentlyContinue |
                        Select-Object -First 1 -ExpandProperty FullName
     if (-not $securityJarSrc -or -not (Test-Path $securityJarSrc)) {
-        throw "$Edition edition requested but no JAR found matching $securityTargetDir\file-processor-security-*.jar."
+        throw "$Edition edition requested but no JAR found matching $securityTargetDir\inspecto-security-*.jar."
     }
     if ($Edition -eq 'Enterprise') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
-        $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'file-processor-policy-*.jar' -ErrorAction SilentlyContinue |
+        $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'inspecto-policy-*.jar' -ErrorAction SilentlyContinue |
                          Select-Object -First 1 -ExpandProperty FullName
         if (-not $policyJarSrc -or -not (Test-Path $policyJarSrc)) {
-            throw "Enterprise edition requested but no JAR found matching $policyTargetDir\file-processor-policy-*.jar."
+            throw "Enterprise edition requested but no JAR found matching $policyTargetDir\inspecto-policy-*.jar."
         }
     }
 }

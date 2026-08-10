@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -21,25 +21,25 @@
          catalog) is imported back, so this is a clean one-way leaf below the rest of the engine.
          Owns logback.xml (the root logging config wiring EVENT_STORE -> EventStoreAppender) — it
          travels with the appender class per playbook rule 8. -->
-    <artifactId>file-processor-event</artifactId>
+    <artifactId>inspecto-event</artifactId>
     <name>Inspecto event (Operational-Intelligence event store + metrics)</name>
 
     <dependencies>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-util</artifactId>
+            <artifactId>inspecto-util</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-sql</artifactId>
+            <artifactId>inspecto-sql</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-etl</artifactId>
+            <artifactId>inspecto-etl</artifactId>
         </dependency>
 
         <!-- DuckDB for ParquetEventStore (parent-managed since WS-D, via util.DuckDbUtil). -->

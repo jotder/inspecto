@@ -16,7 +16,7 @@ is no token paste / guard / interceptor. The removed hand-rolled bearer-token pl
 
 **Standard re-adds auth via SPIs + the shipped `inspecto-security` module.** The core defines three SPIs in
 `com.gamma.control`: **`Authenticator`** (validates a request, yields a subject), **`Subject`** (a record of
-`id` + capabilities), and **`TokenRelay`**. `inspecto-security/` (artifactId `file-processor-security`, 41
+`id` + capabilities), and **`TokenRelay`**. `inspecto-security/` (artifactId `inspecto-security`, 41
 tests) implements them: `OidcAuthenticator` (Nimbus JOSE+JWT), `RoleMapper` (roles from IAM claims), and
 `OidcTokenRelay`. It joins the reactor **only under the `edition-standard` Maven profile** — the default
 build never compiles it (verify with `-Pedition-standard`); because it's a
@@ -100,7 +100,7 @@ server-side authorization system, all behind the existing SPIs (core stays auth-
 ## Enterprise ABAC — the Access Policy engine (`inspecto-policy`, workstream A)
 
 The `edition-enterprise` Maven profile = `edition-standard` + the new **`inspecto-policy`** module
-(artifactId `file-processor-policy`), which registers a `PolicyEngine` on the core's **`AccessDecider`** SPI
+(artifactId `inspecto-policy`), which registers a `PolicyEngine` on the core's **`AccessDecider`** SPI
 via `META-INF/services`. Personal/Standard never bundle it and behave byte-identically. Build/test with
 `mvn -o -Pedition-enterprise clean test` ([build & test](../build-run/build-test.md)).
 

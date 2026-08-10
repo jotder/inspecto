@@ -6,12 +6,12 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>file-processor-connectors</artifactId>
+    <artifactId>inspecto-connectors</artifactId>
     <packaging>jar</packaging>
 
     <name>Inspecto — remote source connectors (optional)</name>
@@ -42,7 +42,7 @@
         <!-- The core: the SourceConnector SPI, ConnectionProfile, SecretResolver, RetrievalPlan. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor</artifactId>
+            <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
         </dependency>
 

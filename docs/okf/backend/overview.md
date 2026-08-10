@@ -28,11 +28,11 @@ The directory names were renamed 2026-06-12; the Maven **artifactIds were not** 
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
-| `inspecto/` | engine + control plane (lean core) | `file-processor` / `file-processor.jar` |
-| `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB) — all network deps | `file-processor-connectors` |
-| `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `file-processor-agent` |
-| `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `file-processor-agent-hosted` |
-| `inspecto-security/` | Standard-only OIDC auth (reactor-gated: `edition-standard` profile) | `file-processor-security` |
+| `inspecto/` | engine + control plane (lean core) | `inspecto-processor` / `file-processor.jar` |
+| `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB) — all network deps | `inspecto-connectors` |
+| `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
+| `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
+| `inspecto-security/` | Standard-only OIDC auth (reactor-gated: `edition-standard` profile) | `inspecto-security` |
 | `inspecto-ui/` | Angular SPA (served by the engine) | — (npm) |
 
 See [Modules](./modules) for each one.

@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -16,6 +16,6 @@
          module's frozen surface is marked with. Extracted from the core so future module
          extractions (fp-config first) can depend on the annotation without depending on the
          whole core. Must stay dependency-free; behavior code never lives here. -->
-    <artifactId>file-processor-api</artifactId>
+    <artifactId>inspecto-api</artifactId>
     <name>Inspecto API (stability annotations)</name>
 </project>

@@ -6,12 +6,12 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>file-processor-agent-hosted</artifactId>
+    <artifactId>inspecto-agent-hosted</artifactId>
     <packaging>jar</packaging>
 
     <name>Inspecto — Assist Agent hosted providers (optional)</name>
@@ -35,7 +35,7 @@
              Lc4jChatGateway transport the providers ride. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-agent</artifactId>
+            <artifactId>inspecto-agent</artifactId>
             <version>${project.version}</version>
         </dependency>
 

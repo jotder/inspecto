@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -22,46 +22,46 @@
          increment 2: etl extracted below this one; increment 3: event+metrics extracted below that;
          increment 4: acquire — no longer SCC-trapped once etl became a foundation leaf — extracted
          below event. See fp-etl's/fp-event's/fp-acquire's poms for the rationale.) -->
-    <artifactId>file-processor-engine</artifactId>
+    <artifactId>inspecto-engine</artifactId>
 
     <dependencies>
         <!-- Extracted reactor leaves — version managed by the parent. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-config</artifactId>
+            <artifactId>inspecto-config</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-util</artifactId>
+            <artifactId>inspecto-util</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-sql</artifactId>
+            <artifactId>inspecto-sql</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-etl</artifactId>
+            <artifactId>inspecto-etl</artifactId>
         </dependency>
         <!-- fp-etl test-jar: reuses the shared fixtures com.gamma.etl.TestConfigs and
              PipelineConfigBatchTest (PipelineConfig builders) across the remaining engine test
              suites (job/pipeline/alert/catalog/inspector — ~20 files). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-etl</artifactId>
+            <artifactId>inspecto-etl</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-acquire</artifactId>
+            <artifactId>inspecto-acquire</artifactId>
         </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-event</artifactId>
+            <artifactId>inspecto-event</artifactId>
         </dependency>
 
         <!-- asn-facade (asn-parser/asn-decoders, a standalone reactor outside the root parent's

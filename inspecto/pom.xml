@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -15,7 +15,7 @@
          artifactId kept as "file-processor" so the fat-JAR name, CI, and release flow
          are unchanged. Stays zero-new-dependency; the optional agent lives in a sibling
          module (file-processor-agent). -->
-    <artifactId>file-processor</artifactId>
+    <artifactId>inspecto-processor</artifactId>
 
     <!-- Compiler/encoding/argLine properties and the compiler + surefire plugin config are
          inherited from the parent POM. Only the core-specific shade (fat-JAR) and the optional
@@ -26,14 +26,14 @@
              Version managed by the parent. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
 
         <!-- com.gamma.config — spec/codec/safety, extracted to its own module (S5 ②).
              Version managed by the parent. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-config</artifactId>
+            <artifactId>inspecto-config</artifactId>
         </dependency>
 
         <!-- com.gamma.util — DuckDB access point + CSV/file/tar helpers, extracted to its own
@@ -41,7 +41,7 @@
              other com.gamma.util import keep resolving through this dependency. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-util</artifactId>
+            <artifactId>inspecto-util</artifactId>
         </dependency>
 
         <!-- com.gamma.sql — sandboxed SQL (SqlSandbox/SqlOracle/SqlGuard/SqlViews), extracted to
@@ -49,7 +49,7 @@
              importing com.gamma.sql through this dependency. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-sql</artifactId>
+            <artifactId>inspecto-sql</artifactId>
         </dependency>
 
         <!-- com.gamma.{signal,query,pipeline,inspector,acquire,ingester,ops,job,enrich,alert,notify,
@@ -58,7 +58,7 @@
              DOWN onto it. duckdb reaches the fat-JAR transitively through this dependency. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-engine</artifactId>
+            <artifactId>inspecto-engine</artifactId>
         </dependency>
 
         <!-- com.gamma.etl (WS-D increment 2) — extracted below fp-engine once etl became a
@@ -67,14 +67,14 @@
              fat-JAR transitively through this dependency. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-etl</artifactId>
+            <artifactId>inspecto-etl</artifactId>
         </dependency>
         <!-- fp-etl test-jar: reuses the shared fixtures com.gamma.etl.TestConfigs/
              PipelineConfigBatchTest (PipelineConfig builders) in ~45 control/report/service tests.
              Test scope is not transitive, so this is declared explicitly. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-etl</artifactId>
+            <artifactId>inspecto-etl</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
@@ -85,14 +85,14 @@
              logback-classic reaches the fat-JAR transitively through this dependency. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-event</artifactId>
+            <artifactId>inspecto-event</artifactId>
         </dependency>
 
         <!-- com.gamma.acquire (WS-D increment 4) — extracted below fp-event once acquire was no
              longer SCC-trapped. Declared directly since ~6 core main-code files import it directly. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-acquire</artifactId>
+            <artifactId>inspecto-acquire</artifactId>
         </dependency>
 
         <!-- JToon for configuration serialisation (version managed by the parent — shared

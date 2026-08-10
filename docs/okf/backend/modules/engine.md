@@ -1,15 +1,15 @@
 ---
 type: Module
 title: Core Module (inspecto/)
-description: The composition root — control plane + application packages, ships the fat JAR. artifactId file-processor. The ingestion engine was extracted to sibling modules in the WS-D split.
+description: The composition root — control plane + application packages, ships the fat JAR. artifactId inspecto-processor. The ingestion engine was extracted to sibling modules in the WS-D split.
 resource: inspecto/
-tags: [module, core, composition-root, file-processor]
+tags: [module, core, composition-root, inspecto-processor]
 timestamp: 2026-07-22T00:00:00Z
 ---
 
 # Core Module (`inspecto/`)
 
-The **composition root** (artifactId `file-processor`, jar `file-processor.jar`) — the module that wires
+The **composition root** (artifactId `inspecto-processor`, jar `file-processor.jar`) — the module that wires
 the object graph together and shades the single deployable fat JAR. It keeps **zero network/AI
 dependencies**: remote protocols live in [connectors](connectors.md), hosted models in
 [agent-hosted](agent-hosted.md).
@@ -30,15 +30,15 @@ dependencies**: remote protocols live in [connectors](connectors.md), hosted mod
 
 The concept docs are unchanged by the move; only the home module changed:
 
-- **`inspecto-engine`** (`file-processor-engine`) — the engine cluster: `signal`, `query`,
+- **`inspecto-engine`** (`inspecto-engine`) — the engine cluster: `signal`, `query`,
   [`pipeline` / pipeline-graph](../pipeline-graph/design.md), `inspector` ([DuckDB](../engine/duckdb.md) sinks
   plus the fat-jar entry points `CollectorProcessor` and `MainApp`), `ingester`, `ops`,
   [`job`](../control-plane/jobs.md), `enrich`, `alert`, `notify`, `catalog`.
-- **`inspecto-etl`** (`file-processor-etl`) — [`etl`](../engine/ingestion.md): `PipelineConfig`, the
+- **`inspecto-etl`** (`inspecto-etl`) — [`etl`](../engine/ingestion.md): `PipelineConfig`, the
   ingesters, batch planning, quarantine, lineage, [partitioned Parquet output](../engine/output-sinks.md).
-- **`inspecto-event`** (`file-processor-event`) — [`event` + `metrics`](../control-plane/events-metrics.md):
+- **`inspecto-event`** (`inspecto-event`) — [`event` + `metrics`](../control-plane/events-metrics.md):
   the Operational-Intelligence event store + metric registry; owns `logback.xml`.
-- **`inspecto-acquire`** (`file-processor-acquire`) — the [acquisition framework](../acquisition/framework.md):
+- **`inspecto-acquire`** (`inspecto-acquire`) — the [acquisition framework](../acquisition/framework.md):
   connectors, connection profiles/registry/workbench, the fingerprint ledger, stability gate,
   retry/circuit-breaker/rate-limit policies.
 - Foundation leaves **`inspecto-api`** (`@PublicApi`), **`inspecto-util`** (DuckDB access + CSV/file/tar

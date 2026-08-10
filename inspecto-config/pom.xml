@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -18,14 +18,14 @@
          @PublicApi annotation) plus jtoon/jackson for the TOON codec. The core depends
          on this module, so pipeline/service/control code keeps importing
          com.gamma.config unchanged. -->
-    <artifactId>file-processor-config</artifactId>
+    <artifactId>inspecto-config</artifactId>
     <name>Inspecto config (spec + codec + safety)</name>
 
     <dependencies>
         <!-- @PublicApi stability annotation (version managed by the parent). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
 
         <!-- TOON serialisation for ConfigCodec (version managed by the parent — shared

@@ -81,8 +81,8 @@ Personal and Standard never bundle the module and behave byte-identically. Build
 **Shipped 2026-07-25 — the packaging flavor.** `package.ps1 -Edition Enterprise` now emits a deployable
 Enterprise bundle, closing the last gap between "the profile builds" and "an operator can ship it". It is
 a **superset of Standard** (mirroring the profile relation), so it builds `inspecto-security` *and*
-`inspecto-policy` under `-Pedition-enterprise` and bundles both `file-processor-security.jar` and
-`file-processor-policy.jar`. The generated `serve.sh`/`serve.bat` auto-detect edition from the bundle
+`inspecto-policy` under `-Pedition-enterprise` and bundles both `inspecto-security.jar` and
+`inspecto-policy.jar`. The generated `serve.sh`/`serve.bat` auto-detect edition from the bundle
 contents exactly as they already did for Standard: security jar ⇒ `Standard` (+ `-Dauth.mode=oidc`),
 plus policy jar ⇒ `Enterprise`. **No new runtime flag exists or is needed** — `inspecto-policy` is found
 solely through `META-INF/services/com.gamma.control.AccessDecider`, so the classpath entry *is* the

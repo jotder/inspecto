@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -20,7 +20,7 @@
          resolving unchanged. Prerequisite for extracting fp-acquire (which imports com.gamma.util);
          com.gamma.event + com.gamma.etl still block on cycle-breaking (they import
          sql/metrics/signal/query/pipeline, which stay in core). -->
-    <artifactId>file-processor-util</artifactId>
+    <artifactId>inspecto-util</artifactId>
     <name>Inspecto util (DuckDB access + CSV/file/tar helpers)</name>
 
     <dependencies>
@@ -28,7 +28,7 @@
              parent). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
 
         <!-- DuckDB JDBC — DuckDbUtil is the single DuckDB access point (version managed by the

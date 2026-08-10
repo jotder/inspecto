@@ -6,12 +6,12 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>file-processor-policy</artifactId>
+    <artifactId>inspecto-policy</artifactId>
     <packaging>jar</packaging>
 
     <name>Inspecto — policy engine (Enterprise edition, optional)</name>
@@ -30,14 +30,14 @@
         <!-- The core: the AccessDecider SPI, Subject, and the AccessPolicies document store. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor</artifactId>
+            <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <!-- The shared Conditions grammar (already transitive via the core; declared for direct use). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-util</artifactId>
+            <artifactId>inspecto-util</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -46,7 +46,7 @@
              as the core's control tests; test scope is not transitive, so declared explicitly). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-etl</artifactId>
+            <artifactId>inspecto-etl</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>

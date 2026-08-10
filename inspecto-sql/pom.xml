@@ -6,7 +6,7 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
@@ -21,27 +21,27 @@
          span every layer — expectation, event, enrich, pipeline, query, control all import it —
          making it foundational like fp-util. The core depends on this module, so those imports
          resolve com.gamma.sql unchanged. -->
-    <artifactId>file-processor-sql</artifactId>
+    <artifactId>inspecto-sql</artifactId>
     <name>Inspecto SQL (sandbox + oracle + guard)</name>
 
     <dependencies>
         <!-- @PublicApi stability annotation (version managed by the parent). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-api</artifactId>
+            <artifactId>inspecto-api</artifactId>
         </dependency>
 
         <!-- com.gamma.config — spec/safety consumed by the sandbox policy (parent-managed). -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-config</artifactId>
+            <artifactId>inspecto-config</artifactId>
         </dependency>
 
         <!-- com.gamma.util — DuckDbUtil is the connection/query access point (parent-managed);
              DuckDB itself resolves transitively through fp-util. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor-util</artifactId>
+            <artifactId>inspecto-util</artifactId>
         </dependency>
 
         <!-- JUnit 5 — unit tests (version managed by the parent, M1). -->

@@ -6,12 +6,12 @@
 
     <parent>
         <groupId>com.gamma.inspector</groupId>
-        <artifactId>file-processor-parent</artifactId>
+        <artifactId>inspecto-parent</artifactId>
         <version>4.0.0-RC1</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>file-processor-security</artifactId>
+    <artifactId>inspecto-security</artifactId>
     <packaging>jar</packaging>
 
     <name>Inspecto — security module (Standard edition, optional)</name>
@@ -35,7 +35,7 @@
         <!-- The core: the Authenticator SPI + Subject. -->
         <dependency>
             <groupId>com.gamma.inspector</groupId>
-            <artifactId>file-processor</artifactId>
+            <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
         </dependency>
 

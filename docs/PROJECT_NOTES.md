@@ -31,21 +31,21 @@ Authoritative shape, version management, and the module-extraction playbook:
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
-| `inspecto-api/` | dependency-free leaf: the `@PublicApi` annotation | `file-processor-api` |
-| `inspecto-util/` | leaf: DuckDB access + CSV/file/tar helpers + `CronExpression` | `file-processor-util` |
-| `inspecto-config/` | config spec / codec (TOON) / safety | `file-processor-config` |
-| `inspecto-sql/` | sandboxed DuckDB SQL (`SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews`) | `file-processor-sql` |
-| `inspecto-etl/` | `com.gamma.etl` — pipeline config + batch ingest (foundation leaf below engine) | `file-processor-etl` |
-| `inspecto-event/` | `com.gamma.event`+`metrics` — Operational-Intelligence event store + metrics | `file-processor-event` |
-| `inspecto-acquire/` | `com.gamma.acquire` — file/remote acquisition, ledger, stability/gap/retry | `file-processor-acquire` |
-| `inspecto-engine/` | the remaining engine cluster (`pipeline`/`job`/`inspector`/… ) below core | `file-processor-engine` |
-| `inspecto/` | control plane + composition root (lean core), ships the fat JAR | `file-processor` / `file-processor.jar` |
-| `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB), all network deps | `file-processor-connectors` |
-| `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `file-processor-agent` |
-| `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `file-processor-agent-hosted` |
-| `inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `file-processor-intelligence` |
-| `inspecto-security/` | Standard/Enterprise OIDC auth, `-Pedition-standard` only (not in default `<modules>`) | `file-processor-security` |
-| `inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= standard + this) | `file-processor-policy` |
+| `inspecto-api/` | dependency-free leaf: the `@PublicApi` annotation | `inspecto-api` |
+| `inspecto-util/` | leaf: DuckDB access + CSV/file/tar helpers + `CronExpression` | `inspecto-util` |
+| `inspecto-config/` | config spec / codec (TOON) / safety | `inspecto-config` |
+| `inspecto-sql/` | sandboxed DuckDB SQL (`SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews`) | `inspecto-sql` |
+| `inspecto-etl/` | `com.gamma.etl` — pipeline config + batch ingest (foundation leaf below engine) | `inspecto-etl` |
+| `inspecto-event/` | `com.gamma.event`+`metrics` — Operational-Intelligence event store + metrics | `inspecto-event` |
+| `inspecto-acquire/` | `com.gamma.acquire` — file/remote acquisition, ledger, stability/gap/retry | `inspecto-acquire` |
+| `inspecto-engine/` | the remaining engine cluster (`pipeline`/`job`/`inspector`/… ) below core | `inspecto-engine` |
+| `inspecto/` | control plane + composition root (lean core), ships the fat JAR | `inspecto-processor` / `file-processor.jar` |
+| `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB), all network deps | `inspecto-connectors` |
+| `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
+| `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
+| `inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
+| `inspecto-security/` | Standard/Enterprise OIDC auth, `-Pedition-standard` only (not in default `<modules>`) | `inspecto-security` |
+| `inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-enterprise` only (= standard + this) | `inspecto-policy` |
 | `inspecto-ui/` | Angular SPA (gamma/Fuse template), serves from the engine | — (npm; dev :4204) |
 
 agent-kernel is GONE (discontinued upstream, replaced 2026-07-07): its reasoning layer is vendored at
@@ -186,7 +186,7 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   with `NoClassDefFoundError: javax/mail/Message`. Derive the list from
   `mvn -o dependency:build-classpath -pl inspecto -am` (9 modules today) rather than globbing `*/target/classes`,
   and put the module `target/classes` **ahead** of the `.m2` jars so fresh code shadows the stale installed
-  `file-processor-*` artifacts (that ordering also silences the duplicate-`logback.xml` warning).
+  `inspecto-*` artifacts (that ordering also silences the duplicate-`logback.xml` warning).
 - **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push:
   `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs, **plus banned KEYS in the committed
   TOON config corpus** since 2026-08-04 — it reads `git ls-files`, not the working tree, so local matches
