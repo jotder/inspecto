@@ -391,6 +391,11 @@ public final class CollectorService implements AutoCloseable {
         // happens once boot has completed.
         platformServices.register("notifications", com.gamma.notify.NotificationAccess.class,
                 n -> notificationService().notify(n));
+        // `mail` is deliberately NOT `notifications`: that one puts an item in the in-app feed and lets the
+        // user's preferences decide who sees it, while this one addresses recipients a Job's author named.
+        // Delivery still goes through the configured email NotificationChannel, so SMTP lives in one place.
+        platformServices.register("mail", com.gamma.notify.MailAccess.class,
+                com.gamma.notify.MailAccess.overChannels());
         platformServices.register("incidents", com.gamma.ops.IncidentAccess.class,
                 com.gamma.ops.IncidentAccess.over(this::objects));
         platformServices.register("schema", com.gamma.pipeline.SchemaAccess.class,

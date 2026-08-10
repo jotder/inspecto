@@ -378,6 +378,10 @@ public final class JobService implements AutoCloseable {
                                 .description("Masked on read — demonstrates the secret contract").build()),
                 List.of("sample.hello.completed"), List.of(), List.of("notifications")),
                 c -> new SampleHelloJob(c)));
+        // mail.send — the reference consumer of the declaration contract (job-parameter-contract §9). Its
+        // own class holds the descriptor, because that descriptor IS the worked example and is asserted
+        // against §9 verbatim by MailSendJobTypeTest.
+        registry.register(new MailSendJobType());
         // alert.evaluate — puts the shipped Alert engine on a cron (see AlertEvaluateJob). Detection,
         // severity and Alert→Incident promotion stay in AlertService; this Job only supplies the clock.
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("alert.evaluate", "Evaluate Alert Rules",
