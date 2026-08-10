@@ -1025,6 +1025,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     `inspecto/target/` is now `inspecto-processor-<version>.jar`. Release notes should carry the coordinate
     table for downstream poms. Renaming the bundle itself is a **separate, unmade decision** — do not treat
     it as leftover work.
+    **A twelfth landed 2026-08-10**: `feat(jobs)` — a new built-in Job Type **`mail.send`** appears in the
+    type picker, and a new Platform Service id **`mail`**. Operators can now schedule an email to named
+    recipients; it sends through the existing `notify.smtp.*` channel, so a deployment with no SMTP
+    configured gets a Job that reports "no email channel configured — nothing sent" rather than failing.
+    Release notes should say that plainly, because "SUCCESS, nothing sent" is otherwise a surprising read.
+    ⚠ **Deferred with it — `mail.send` has no true CC.** `NotificationChannel.deliver(n, target)` takes one
+    recipient list, so `cc` addresses are appended to it and arrive as ordinary addressees (visible to
+    everyone in To). The declaration keeps `cc` because the field is real and the §9 contract demo needs it;
+    closing the gap means widening a `@PublicApi` SPI with a CC-aware overload, which is not worth doing for
+    one caller until a second asks. **Do not "fix" this by having `mail.send` open its own SMTP connection**
+    — one mail transport, one place.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
