@@ -254,9 +254,10 @@ public final class PipelineEditable {
             // transform.map + enrichment: derived / companion-persisted — nothing to lower
         }
         // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4).
-        // Row-routing to distinct destinations can't reach here: a transform.route/derive node is not
-        // LOWERABLE, so it already fails UNSUPPORTED_NODE above; every sink here is a data/schema-dispatch
-        // fan-out, which sinks: (replicate-per-destination) represents faithfully.
+        // Row-routing to distinct destinations does NOT come through here: transform.route lowers to its
+        // own route: key (with the branch↔sink pairing stamped from the edges), and transform.derive is
+        // not LOWERABLE so it fails UNSUPPORTED_NODE above. Every sink reaching this map is therefore a
+        // data/schema-dispatch fan-out, which sinks: (replicate-per-destination) represents faithfully.
 
         if (strict) {
             if (acq == null) refusals.add(new PipelineCompileException.Refusal(NO_ACQUISITION, null,

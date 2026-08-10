@@ -67,6 +67,89 @@ class PipelineEditableTest {
         assertEquals("d1", ex.refusals().get(0).nodeId());
     }
 
+    // ── the four single-slot node kinds ────────────────────────────────────────────────
+    // `lower` keeps ONE node per scalar slot. Only transform.join refuses a second (MULTI_JOIN);
+    // dedup/route/summarize are still last-one-wins and silently discard the earlier node.
+    //
+    // The three "silently discarded" cases below PIN that behaviour, they do not endorse it. Guarding
+    // them the way join is guarded would newly REFUSE a graph that saves today, so it needs an
+    // operator call — and until these tests existed the blast radius was unmeasured (BACKLOG §4
+    // "Pipeline graph" (a)). What they establish: the discard is real, it is silent, and it is the
+    // LAST node that survives in all three cases.
+
+    /** A second {@code transform.dedup} silently wins; the first node's keys are lost. */
+    @Test
+    void secondDedupNodeSilentlyDiscardsTheFirst() {
+        Map<String, Object> lowered = lowerWithDuplicates(
+                node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))),
+                node("dd2", "transform.dedup", Map.of("keys", List.of("imsi"))));
+
+        Map<?, ?> dedup = (Map<?, ?>) ((Map<?, ?>) lowered.get("processing")).get("dedup");
+        assertEquals(List.of("imsi"), dedup.get("keys"),
+                "last-one-wins: dd2 claimed the single processing.dedup slot and dd1 vanished");
+    }
+
+    /** A second {@code transform.route} silently wins — {@code lower} writes ONE {@code route} key. */
+    @Test
+    void secondRouteNodeSilentlyDiscardsTheFirst() {
+        Map<String, Object> lowered = lowerWithDuplicates(
+                node("r1", "transform.route", Map.of("on", "first")),
+                node("r2", "transform.route", Map.of("on", "second")));
+
+        Map<?, ?> route = (Map<?, ?>) lowered.get("route");
+        assertEquals("second", route.get("on"),
+                "last-one-wins: r2 claimed the single route: key and r1 vanished");
+    }
+
+    /** A second {@code transform.summarize} silently wins; the first node's grain is lost. */
+    @Test
+    void secondSummarizeNodeSilentlyDiscardsTheFirst() {
+        Map<String, Object> lowered = lowerWithDuplicates(
+                node("s1", "transform.summarize", Map.of("group_by", List.of("day"))),
+                node("s2", "transform.summarize", Map.of("group_by", List.of("cell"))));
+
+        Map<?, ?> summarize = (Map<?, ?>) ((Map<?, ?>) lowered.get("processing")).get("summarize");
+        assertEquals(List.of("cell"), summarize.get("group_by"),
+                "last-one-wins: s2 claimed the single processing.summarize slot and s1 vanished");
+    }
+
+    /**
+     * The contrast case, and the only one of the four that is guarded: a second {@code transform.join}
+     * REFUSES with {@code MULTI_JOIN} rather than discarding. The guard shipped with the join verb but
+     * had no engine-level test — the join slice asserted it only at the palette contract level.
+     */
+    @Test
+    void secondJoinNodeRefusesInsteadOfDiscarding() {
+        PipelineGraph g = graphWith(
+                node("j1", "transform.join", Map.of("reference", "sites")),
+                node("j2", "transform.join", Map.of("reference", "cells")));
+
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+
+        assertEquals(1, ex.refusals().size());
+        assertEquals(PipelineEditable.MULTI_JOIN, ex.refusals().get(0).code());
+        assertEquals("j2", ex.refusals().get(0).nodeId(),
+                "the SECOND join is named as the offender; the first keeps the slot");
+        assertTrue(ex.refusals().get(0).message().contains("j1"),
+                "the message points at the node already holding the slot");
+    }
+
+    /** A minimal strict-lowerable graph (acquisition + parser + persistent sink) plus {@code extra}. */
+    private static PipelineGraph graphWith(PipelineNode... extra) {
+        List<PipelineNode> nodes = new java.util.ArrayList<>(List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of("schema_file", "s.toon")),
+                node("sink", "sink.persistent", Map.of("database", "db"))));
+        nodes.addAll(List.of(extra));
+        return new PipelineGraph("dup", true, nodes, List.of());
+    }
+
+    /** Strict-lower a minimal graph carrying {@code extra}; fails the test if it refuses. */
+    private static Map<String, Object> lowerWithDuplicates(PipelineNode... extra) {
+        return PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);
+    }
+
     /**
      * A pipeline authored by the Onboarding Parsing stage carries its parse options in the top-level
      * {@code parsing:} block — the design-of-record spelling, which {@code PipelineConfigParser}
