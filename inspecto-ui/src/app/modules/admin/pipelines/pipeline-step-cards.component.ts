@@ -234,9 +234,9 @@ export class PipelineStepCardsComponent {
     @Input({ required: true }) rows: StepRow[] = [];
     @Input({ required: true }) typeCat!: Map<string, string>;
     /**
-     * node-type → per-type label ('Join'), used for the card's kind caption. Optional: a host that has
-     * no served catalog leaves it empty and every card falls back to its CATEGORY label, which is what
-     * every card showed before — so a join and a filter read identically ('Transformer'). That fallback
+     * node-type → per-type label ('Join'), used for the card's kind caption. Optional: a host with no
+     * served catalog leaves it empty and every card falls back to its CATEGORY label — which is what
+     * every card showed before, so a join and a filter read identically ('Transformer'). That fallback
      * is the degraded path, not the intent.
      */
     @Input() typeLabel: Map<string, string> = new Map();
@@ -244,9 +244,8 @@ export class PipelineStepCardsComponent {
     @Input() statusOf?: (node: AuthoredNode) => NodeStatus;
     /** S2: reveal the editing affordances. The host still gates every mutation on canAuthor(). */
     @Input() editable = false;
-    /** S4: the Add-Step verb palette — served step-types when the host has them, else the client map.
-     *  ⚠ Keyed on `type`, never `verb`: `transform` names two shapes (filter, join). */
-    @Input() verbs: readonly { verb: string; type: string; label: string }[] = RECIPE_VERBS;
+    /** S4: the Add-Step verb palette — served step-types when the host has them, else the client map. */
+    @Input() verbs: readonly { type: string; label: string }[] = RECIPE_VERBS;
 
     /** Open the Step's config dialog (the host routes parse → GrammarEditorDialog, rest → NodeConfigDialog). */
     @Output() readonly open = new EventEmitter<AuthoredNode>();
@@ -272,7 +271,7 @@ export class PipelineStepCardsComponent {
 
     /** What KIND of Step this card is: the type's own label, else its category group. */
     stepTypeLabel(type: string): string {
-        return this.typeLabel.get(type) ?? categoryLabel(this.typeCat.get(type) ?? '');
+        return this.typeLabel.get(type) || categoryLabel(this.typeCat.get(type) ?? '');
     }
     readonly paletteHeroIcon = paletteHeroIcon;
     readonly statusIcon = statusIcon;

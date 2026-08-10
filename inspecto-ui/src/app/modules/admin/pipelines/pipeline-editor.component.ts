@@ -349,10 +349,10 @@ export class PipelineEditorComponent implements OnInit {
     readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
 
     /** The served recipe-verb palette (S4), `null` until it loads / on an old server. */
-    private readonly servedVerbs = signal<{ verb: string; type: string; label: string }[] | null>(null);
+    private readonly servedVerbs = signal<{ type: string; label: string }[] | null>(null);
 
     /** What the Add-Step menu offers: the served step-types, else the client verb map (dual-read). */
-    readonly recipeVerbs = computed<readonly { verb: string; type: string; label: string }[]>(
+    readonly recipeVerbs = computed<readonly { type: string; label: string }[]>(
         () => this.servedVerbs() ?? RECIPE_VERBS,
     );
 
@@ -567,7 +567,7 @@ export class PipelineEditorComponent implements OnInit {
         // (RECIPE_VERBS) on an old server — mirroring how typeAttributes tolerates one.
         this.api.stepTypes().subscribe({
             next: (sts) => {
-                const verbs = sts.filter((s) => s.lowerable).map((s) => ({ verb: s.verb, type: s.type, label: s.label }));
+                const verbs = sts.filter((s) => s.lowerable).map((s) => ({ type: s.type, label: s.label }));
                 // an empty palette is never what a real server means — treat it as "not served"
                 this.servedVerbs.set(verbs.length ? verbs : null);
             },

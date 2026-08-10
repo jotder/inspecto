@@ -260,11 +260,10 @@ export function typeCategoryMap(types: PipelineNodeType[]): Map<string, string> 
  * A node-type → per-TYPE display label ('Join', 'Filter') from the palette catalog. Distinct from
  * {@link categoryLabel}, which names the whole group ('Transformer') and so reads identically for every
  * transform. An authored node carries only its `type`, so a card that wants to say what a Step actually
- * IS has to resolve it through this map. Types the catalog omits a label for are simply absent — the
- * caller falls back to the category rather than printing a raw `transform.join`.
+ * IS has to resolve it through this map.
  */
 export function typeLabelMap(types: PipelineNodeType[]): Map<string, string> {
-    return new Map(types.filter((t) => !!t.label).map((t) => [t.type, t.label]));
+    return new Map(types.map((t) => [t.type, t.label]));
 }
 
 /**
@@ -594,20 +593,21 @@ function walkStepChain(
  * {@link insertRouteAfter}, not {@link insertStepAfter}: a branch point rewires its downstream
  * edge as its first branch.
  *
- * ⚠ `verb` is NOT unique — `transform` appears once per shape it authors (filter, join), because the
- * recipe spells a join as `transform: {join: …}` and `RecipeCompiler` has no `join` verb. `type` is the
- * unique key, so anything keying off an entry (a `track` expression, a Map) must use `type`.
+ * An entry is keyed by `type`, and only by `type`: two entries can author the same recipe verb, since
+ * the recipe spells a join `transform: {join: …}` and `RecipeCompiler` has no `join` verb. The verb
+ * itself is the server's business (it stays on the wire type `RecipeStepType`), so it is deliberately
+ * absent here — nothing client-side may key on a value that isn't unique.
  */
-export const RECIPE_VERBS: readonly { verb: string; type: string; label: string }[] = [
-    { verb: 'collect', type: 'acquisition', label: 'Collect' },
-    { verb: 'parse', type: 'parser', label: 'Parse' },
-    { verb: 'map', type: 'transform.map', label: 'Map' },
-    { verb: 'dedup', type: 'transform.dedup', label: 'Dedup' },
-    { verb: 'transform', type: 'transform.filter', label: 'Transform (filter)' },
-    { verb: 'transform', type: 'transform.join', label: 'Transform (join)' },
-    { verb: 'summarize', type: 'transform.summarize', label: 'Summarize' },
-    { verb: 'route', type: 'transform.route', label: 'Route' },
-    { verb: 'sink', type: 'sink.persistent', label: 'Sink' },
+export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
+    { type: 'acquisition', label: 'Collect' },
+    { type: 'parser', label: 'Parse' },
+    { type: 'transform.map', label: 'Map' },
+    { type: 'transform.dedup', label: 'Dedup' },
+    { type: 'transform.filter', label: 'Transform (filter)' },
+    { type: 'transform.join', label: 'Transform (join)' },
+    { type: 'transform.summarize', label: 'Summarize' },
+    { type: 'transform.route', label: 'Route' },
+    { type: 'sink.persistent', label: 'Sink' },
 ];
 
 /**

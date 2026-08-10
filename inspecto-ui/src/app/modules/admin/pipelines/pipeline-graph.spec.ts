@@ -780,19 +780,18 @@ describe('RECIPE_VERBS fallback vs the served step-types contract (S4 dual-read)
             .default as { verb: string; type: string; lowerable: boolean }[];
         const { RECIPE_VERBS } = await import('./pipeline-graph');
         // the served builtins are exactly the fallback map — a drift here means one side changed alone
-        expect(contract.map((c) => ({ verb: c.verb, type: c.type })))
-            .toEqual(RECIPE_VERBS.map((v) => ({ verb: v.verb, type: v.type })));
+        expect(contract.map((c) => c.type)).toEqual(RECIPE_VERBS.map((v) => v.type));
         for (const c of contract) expect(c.lowerable, `${c.verb} must be saveable`).toBe(true);
     });
 
-    /** `type` is an entry's unique key — `verb` is NOT, since `transform` names both filter and join
-     *  (the recipe spells a join `transform: {join: …}`). Anything keying on `verb` collapses the two. */
-    it('every entry has a unique type, and transform offers both filter and join', async () => {
+    /** `type` is an entry's only key: the served `verb` is NOT unique — it names both filter and join
+     *  (the recipe spells a join `transform: {join: …}`) — which is why the client tuple omits it. */
+    it('every entry has a unique type, and both transform shapes are offered', async () => {
         const { RECIPE_VERBS } = await import('./pipeline-graph');
         const types = RECIPE_VERBS.map((v) => v.type);
         expect(new Set(types).size, `duplicate type in RECIPE_VERBS: ${types.join(', ')}`).toBe(types.length);
-        expect(RECIPE_VERBS.filter((v) => v.verb === 'transform').map((v) => v.type))
-            .toEqual(['transform.filter', 'transform.join']);
+        expect(types).toContain('transform.filter');
+        expect(types).toContain('transform.join');
     });
 });
 

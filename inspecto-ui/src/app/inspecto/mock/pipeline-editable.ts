@@ -1,7 +1,7 @@
 /**
  * The mock's editable lift/lower — a faithful TS port of the backend `PipelineEditable` (W5). It
- * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_SINK / MULTI_JOIN / the
- * completeness set),
+ * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_JOIN / the completeness set —
+ * `MULTI_SINK` is NOT one of them: since sinks slice 4, >1 database lowers to a plural `sinks:` block),
  * or the offline preview passes a topology the real backend 422s — the textbook "mock more lenient
  * than the server" hole this project has been bitten by before. Node config is the raw config-file
  * vocabulary end to end, so lift→lower is a verbatim map round-trip.

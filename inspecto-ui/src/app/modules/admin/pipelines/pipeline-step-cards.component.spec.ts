@@ -208,16 +208,16 @@ describe('PipelineStepCardsComponent', () => {
     });
 
     /**
-     * The Add-Step menu keys on `type`, not `verb`, because `transform` names two shapes (filter, join).
-     * ⚠ This is the regression guard for a real trap: `track v.verb` renders duplicate keys, which Angular
-     * treats as an error — so BOTH transform entries have to survive into the opened menu. Asserting on the
-     * component's `verbs` input would pass either way; the menu panel is what has to be right.
+     * The Add-Step menu keys on `type`, the entry's only unique field — two entries can author the same
+     * recipe verb (filter and join are both `transform:`). Keying on a shared value renders duplicate
+     * `track` keys, which Angular treats as an error, so BOTH entries have to survive into the opened
+     * menu. Asserting on the component's `verbs` input would pass either way; the panel is what matters.
      */
-    it('offers every palette entry when a verb names two shapes (transform: filter + join)', () => {
+    it('offers every palette entry when two entries share a recipe verb (filter + join)', () => {
         const verbs = [
-            { verb: 'transform', type: 'transform.filter', label: 'Transform (filter)' },
-            { verb: 'transform', type: 'transform.join', label: 'Transform (join)' },
-            { verb: 'sink', type: 'sink.persistent', label: 'Sink' },
+            { type: 'transform.filter', label: 'Transform (filter)' },
+            { type: 'transform.join', label: 'Transform (join)' },
+            { type: 'sink.persistent', label: 'Sink' },
         ];
         const rows: StepRow[] = [{ kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 }];
         const { fixture, c } = create({ rows, typeCat: new Map([['acquisition', 'SOURCE']]), editable: true, verbs });
