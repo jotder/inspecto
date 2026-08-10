@@ -9,6 +9,7 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -382,7 +383,8 @@ public final class ComponentPreview {
 
     /**
      * Scratch-validate a {@code sink} component against {@code sampleRows}: confirm it declares a {@code store},
-     * its {@code format} is recognised, and any declared partition columns are present in the sample — reporting
+     * its {@code format} is recognised, and any declared partition columns (and the {@code source} columns they
+     * derive from, which the write path reads for event-time bounds) are present in the sample — reporting
      * the row count + bounded sample that <em>would</em> be written. Pure validation; nothing is persisted
      * (doc §7.2).
      */
@@ -401,6 +403,15 @@ public final class ComponentPreview {
         for (String pc : partitionColumns(content))
             if (!columns.contains(pc))
                 warnings.add("partition column '" + pc + "' is not present in the sample rows");
+
+        List<String> sources = partitionSources(content);
+        for (String ps : sources)
+            if (!columns.contains(ps))
+                warnings.add("partition source '" + ps + "' is not present in the sample rows"
+                        + " — no event-time bounds will be recorded for this sink");
+        if (sources.size() > 1)
+            warnings.add("partitions declare more than one 'source' (" + String.join(", ", sources)
+                    + ") — no single event time, so no bounds will be recorded for this sink");
 
         int cap = Math.min(rows.size(), MAX_ROWS);
         return new SinkResult(store, rows.size(), new ArrayList<>(rows.subList(0, cap)), warnings);
@@ -461,6 +472,24 @@ public final class ComponentPreview {
 
     private static String tryCast(String col, String sqlType) {
         return "TRY_CAST(" + col + " AS " + sqlType + ") IS NOT NULL";
+    }
+
+    /**
+     * The distinct {@code source} columns declared by a sink's {@code partitions} entries, in declaration order.
+     * A {@code source} names the raw column a partition was derived from; the write path aggregates it to record
+     * event-time bounds, and records none unless the entries agree on a single column that exists in the relation.
+     * Warning only — {@link PartitionSinkWriter} still degrades to null bounds rather than failing (decision D3).
+     */
+    private static List<String> partitionSources(Map<String, Object> content) {
+        Set<String> out = new LinkedHashSet<>();
+        if (content.get("partitions") instanceof List<?> parts) {
+            for (Object o : parts) {
+                if (!(o instanceof Map<?, ?> m) || m.get("source") == null) continue;
+                String s = m.get("source").toString().trim();
+                if (!s.isBlank()) out.add(s);
+            }
+        }
+        return new ArrayList<>(out);
     }
 
     /** Declared partition columns of a sink: a {@code partitions} list of names or {@code {column: …}} maps. */

@@ -120,6 +120,37 @@ class ComponentPreviewTest {
     }
 
     @Test
+    void sinkPreviewWarnsOnPartitionSourceMissingFromSample() {
+        // 'grp' is a sample column, so the partition itself is fine; the typo'd source is not
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(two("column", "grp", "source", "amount")));
+        ComponentPreview.SinkResult r = ComponentPreview.sink(sink, SAMPLE);
+
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("source"));
+        assertTrue(r.warnings().get(0).contains("amount"));
+    }
+
+    @Test
+    void sinkPreviewAcceptsPartitionSourcePresentInSample() {
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(two("column", "grp", "source", "amt")));
+        assertEquals(List.of(), ComponentPreview.sink(sink, SAMPLE).warnings());
+    }
+
+    @Test
+    void sinkPreviewWarnsWhenPartitionsDisagreeOnSource() {
+        // both sources exist, but PartitionSinkWriter identifies no single event time → no bounds recorded
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(two("column", "grp", "source", "amt"),
+                                      two("column", "id", "source", "grp")));
+        ComponentPreview.SinkResult r = ComponentPreview.sink(sink, SAMPLE);
+
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("more than one 'source'"));
+    }
+
+    @Test
     void sinkPreviewWarnsOnMissingStoreAndBadFormat() {
         Map<String, Object> sink = Map.of("format", "xlsx");   // no store, unknown format
         ComponentPreview.SinkResult r = ComponentPreview.sink(sink, SAMPLE);
