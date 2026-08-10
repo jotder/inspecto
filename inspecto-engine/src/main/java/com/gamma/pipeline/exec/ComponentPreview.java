@@ -405,8 +405,14 @@ public final class ComponentPreview {
                 warnings.add("partition column '" + pc + "' is not present in the sample rows");
 
         List<String> sources = partitionSources(content);
+        if (sources.remove(""))   // present but empty: the write path reads no bounds at all
+            warnings.add("a partition declares an empty 'source'"
+                    + " — no event-time bounds will be recorded for this sink");
         for (String ps : sources)
-            if (!columns.contains(ps))
+            if (!PartitionSinkWriter.SAFE_COLUMN.matcher(ps).matches())
+                warnings.add("partition source '" + ps + "' is not a plain column identifier"
+                        + " — no event-time bounds will be recorded for this sink");
+            else if (!columns.contains(ps))
                 warnings.add("partition source '" + ps + "' is not present in the sample rows"
                         + " — no event-time bounds will be recorded for this sink");
         if (sources.size() > 1)
@@ -477,16 +483,17 @@ public final class ComponentPreview {
     /**
      * The distinct {@code source} columns declared by a sink's {@code partitions} entries, in declaration order.
      * A {@code source} names the raw column a partition was derived from; the write path aggregates it to record
-     * event-time bounds, and records none unless the entries agree on a single column that exists in the relation.
-     * Warning only — {@link PartitionSinkWriter} still degrades to null bounds rather than failing (decision D3).
+     * event-time bounds, and records none unless the entries agree on a single plain identifier that exists in
+     * the relation ({@code PartitionSinkWriter.declaredEventTimeSource}). An entry whose {@code source} is
+     * present but blank is kept as {@code ""} — it voids the bounds there, so it must not vanish here.
+     * Warning only — {@code PartitionSinkWriter} still degrades to null bounds rather than failing (decision D3).
      */
     private static List<String> partitionSources(Map<String, Object> content) {
         Set<String> out = new LinkedHashSet<>();
         if (content.get("partitions") instanceof List<?> parts) {
             for (Object o : parts) {
                 if (!(o instanceof Map<?, ?> m) || m.get("source") == null) continue;
-                String s = m.get("source").toString().trim();
-                if (!s.isBlank()) out.add(s);
+                out.add(m.get("source").toString().trim());
             }
         }
         return new ArrayList<>(out);

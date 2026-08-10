@@ -196,7 +196,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
 
     /** A partition {@code source} is embedded in {@code min()}/{@code max()} SQL, so it must be a plain
      *  identifier — the same fail-closed check {@code DatasetRelation.temporalColumn} applies. */
-    private static final java.util.regex.Pattern SAFE_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    static final java.util.regex.Pattern SAFE_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /** The sink's {@code partitions} as an ordered column list ({@code []} when absent). */
     private static List<String> partitionColumns(PipelineNode sink) {
