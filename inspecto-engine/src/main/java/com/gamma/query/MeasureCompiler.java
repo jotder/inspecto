@@ -18,7 +18,9 @@ import java.util.regex.Pattern;
  */
 public final class MeasureCompiler {
 
-    private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+    /** Package-private for the same reason as {@link #AGGS}: the authoring form mirrors this pattern to
+     *  validate {@code group_by} columns, and {@code MeasureGrammarContractTest} pins the two together. */
+    static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     /** Package-private, not public: {@code MeasureGrammarContractTest} pins it against the committed
      *  {@code inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json} the Angular authoring form
      *  validates from, so adding an aggregate here fails that test until the client agrees. */

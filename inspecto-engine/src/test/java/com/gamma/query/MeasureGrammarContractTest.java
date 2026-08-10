@@ -56,6 +56,40 @@ class MeasureGrammarContractTest {
                 "MeasureCompiler.AGGS and " + CONTRACT + " disagree — decide which is right, then update both");
     }
 
+    @Test
+    void theIdentifierPatternTheEngineEnforcesMatchesTheCommittedContract() throws IOException {
+        Map<?, ?> contract = JSON.readValue(contractPath().toFile(), Map.class);
+        Object published = contract.get("identifier");
+
+        assertNotNull(published, "contract file has no `identifier` key");
+        // The UI anchors this pattern itself (Java's `matches()` is whole-string; JS `test()` is not), so
+        // what travels is the bare pattern — exactly the text this class compiles.
+        assertEquals(MeasureCompiler.SAFE_IDENT.pattern(), published,
+                "MeasureCompiler.SAFE_IDENT and " + CONTRACT + " disagree — a group_by column the form "
+                        + "accepts would then be refused by MaterializeTask, or vice versa");
+    }
+
+    /**
+     * A {@code group_by} column is checked by the same {@code safeIdent} the measure fields are, which is
+     * what makes one published pattern enough for both of the form's rules.
+     */
+    @Test
+    void aGroupByColumnIsHeldToThatSamePattern() {
+        Map<String, Object> ok = Map.of(
+                "dataset", "orders",
+                "measures", List.of(Map.of("agg", "sum", "field", "amount")),
+                "groupBy", List.of("region", "_tier"));
+        assertDoesNotThrow(() -> MeasureCompiler.parse(ok, 100, 1000));
+
+        Map<String, Object> bad = Map.of(
+                "dataset", "orders",
+                "measures", List.of(Map.of("agg", "sum", "field", "amount")),
+                "groupBy", List.of("region name"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> MeasureCompiler.parse(bad, 100, 1000));
+        assertTrue(e.getMessage().contains("groupBy column"), () -> "unhelpful refusal: " + e.getMessage());
+    }
+
     /** The contract is only meaningful if these names really are what {@code parse} accepts. */
     @Test
     void everyContractAggregateIsAcceptedAndAnythingElseIsRefused() {

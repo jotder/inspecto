@@ -405,7 +405,7 @@ recipe editor changes nothing there).
 > ⚠ **Still open:** §5.1's per-Step sample rows are **NOT** a UI task — `PipelineDocument.render` is pure by
 > design and S6a excluded them deliberately (a live dry-run is neither pure nor deterministic, and a
 > byte-wise golden-file test pins the format). Adding them is a backend change that trades away both.
-| **S7** | Table-entry collect + summarize cards | Phase 3 | **SPLIT 2026-08-06** — summarize half SHIPPED (below); table-entry half remains S3-blocked. Jobs nav retirement CANCELLED 2026-08-06 (Job un-banned) — no `ACCESS_ACTION_NODES`/nav removal |
+| **S7** | Table-entry collect + summarize cards | Phase 3 | **SPLIT 2026-08-06** — summarize half SHIPPED (below), its `group_by` follow-up SHIPPED 2026-08-08; table-entry half remains S3-blocked. Jobs nav retirement CANCELLED 2026-08-06 (Job un-banned) — no `ACCESS_ACTION_NODES`/nav removal |
 
 #### S7 SPLIT 2026-08-06 — the summarize half shipped; table-entry `collect` is genuinely blocked
 
@@ -449,10 +449,26 @@ invisible, **`required` included**. `listError()` + an explicit `role="alert"` l
 preview proved it by newly surfacing a real "Group by is required". A unit test asserting `errorFor()`
 returns the string passed the whole time — assert the rendered element instead.
 
+**`group_by` validation SHIPPED 2026-08-08 — the follow-up this section deferred.** Same failure mode as
+measures, same distance from the form: `MaterializeTask:135` splits `group_by` into `body.groupBy` and
+`MeasureCompiler:66` runs every entry through `safeIdent`, so `region name` also saved clean and died in a
+maintenance Job days later. `groupByError`/`groupByValidator` join `measure-grammar.ts` (both list rules now
+share a private `listEntryValidator`), wired as a second `configValidators` key on `NodeConfigDialog`.
+
+Two things worth carrying:
+1. **The identifier pattern is now contract-pinned too**, not just the agg list. It was a hardcoded literal
+   in `measure-grammar.ts` backed only by a doc comment; it is the *whole* rule for `group_by`, so it moved
+   into `measure-grammar.contract.json` as `identifier` and `MeasureCompiler.SAFE_IDENT` went
+   package-private beside `AGGS` for the contract test to pin. **The pattern travels unanchored** — Java's
+   `matches()` is whole-string, JS `test()` is a substring search — so the client anchors it itself; an
+   unanchored `test()` would accept `1amount` on the client alone, and there is a spec for exactly that.
+2. **Deliberately not the measure grammar's superset.** A grouping column is quoted verbatim into
+   `GROUP BY`, so `sum(amount)` there is a category error, not a near-miss — it gets its own message
+   redirecting the author to Measures rather than a restatement of the pattern.
+
 **Still open in S7:** the table-entry half (S3-gated), and the per-measure structured builder (an
 agg dropdown + column autocomplete per row) which was considered and **not** taken — it risks drifting
-from the string grammar the backend actually parses. `group_by` entries are likewise unvalidated though
-`MeasureCompiler.safeIdent` constrains them; same-shaped follow-up, deliberately out of this scope.
+from the string grammar the backend actually parses.
 
 ## 5. Known traps to carry (from the skill, amendment-specific)
 

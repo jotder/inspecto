@@ -30,7 +30,7 @@ import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/compon
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
-import { measuresValidator } from './measure-grammar';
+import { groupByValidator, measuresValidator } from './measure-grammar';
 import { nodeAttributesFor } from './node-attributes';
 import { environment } from 'environments/environment';
 
@@ -370,15 +370,18 @@ export class NodeConfigDialog {
     /** Schema-form seed: the node's config entries whose key the schema knows. */
     readonly schemaInitial: Record<string, unknown> = {};
     /**
-     * Per-key validators for rules the published spec cannot express. Only `transform.summarize`'s
-     * `measures` has one today: the pipeline never parses measures (summarize is authoring-only until the
-     * executor arms it) and the Job that does runs on its own schedule, so an unvalidated typo surfaces
-     * far away from the form that caused it. See `measure-grammar.ts`.
+     * Per-key validators for rules the published spec cannot express. Both belong to
+     * `transform.summarize`: the pipeline never parses that block (summarize is authoring-only until the
+     * executor arms it) and the Job that does runs on its own schedule, so an unvalidated typo in either
+     * field surfaces far away from the form that caused it. See `measure-grammar.ts`.
      *
      * <p>A plain field, not a computed — `specs` re-applies it on every spec swap, and the object is
-     * keyed by attribute so a node type without `measures` simply matches nothing.
+     * keyed by attribute so a node type carrying neither key simply matches nothing.
      */
-    readonly configValidators: Record<string, ValidatorFn[]> = { measures: [measuresValidator()] };
+    readonly configValidators: Record<string, ValidatorFn[]> = {
+        measures: [measuresValidator()],
+        group_by: [groupByValidator()],
+    };
     /** Free-form editor open state — open by default when there's no schema, or when extra keys exist. */
     readonly freeFormOpen = signal(false);
 
