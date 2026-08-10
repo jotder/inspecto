@@ -1,6 +1,7 @@
 /**
  * The mock's editable lift/lower — a faithful TS port of the backend `PipelineEditable` (W5). It
- * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_JOIN / the completeness set —
+ * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_JOIN / MULTI_DEDUP /
+ * MULTI_ROUTE / MULTI_SUMMARIZE / the completeness set —
  * `MULTI_SINK` is NOT one of them: since sinks slice 4, >1 database lowers to a plural `sinks:` block),
  * or the offline preview passes a topology the real backend 422s — the textbook "mock more lenient
  * than the server" hole this project has been bitten by before. Node config is the raw config-file
@@ -251,9 +252,24 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'parser') parser = n;
         else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
-        else if (n.type === 'transform.route') routeNode = n;
-        else if (n.type === 'transform.dedup') recordDedup = n;
-        else if (n.type === 'transform.summarize') summarizeNode = n;
+        // Three more one-slot kinds, refusing exactly as the server does since 2026-08-11. Each of
+        // these used to overwrite silently on both sides; they must flip together, or the offline
+        // preview greenlights a graph the backend now 422s.
+        else if (n.type === 'transform.route') {
+            if (routeNode) refusals.push({ code: 'MULTI_ROUTE', nodeId: n.id,
+                message: `a pipeline lowers one route; '${routeNode.id}' already claims it` });
+            else routeNode = n;
+        }
+        else if (n.type === 'transform.dedup') {
+            if (recordDedup) refusals.push({ code: 'MULTI_DEDUP', nodeId: n.id,
+                message: `a pipeline lowers one record dedup; '${recordDedup.id}' already claims it` });
+            else recordDedup = n;
+        }
+        else if (n.type === 'transform.summarize') {
+            if (summarizeNode) refusals.push({ code: 'MULTI_SUMMARIZE', nodeId: n.id,
+                message: `a pipeline lowers one summarize; '${summarizeNode.id}' already claims it` });
+            else summarizeNode = n;
+        }
         else if (n.type === 'transform.join') {
             // One slot only, exactly as PipelineEditable.java: a second join would replace the first
             // silently, so the server refuses MULTI_JOIN and so must this.

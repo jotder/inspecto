@@ -38,6 +38,12 @@ public final class PipelineEditable {
     /** A second {@code transform.join}: the flat config holds ONE {@code processing.join}, so the extra one
      *  would be silently discarded. Reachable from the recipe palette since the join verb shipped there. */
     public static final String MULTI_JOIN = "MULTI_JOIN";
+    /** A second {@code transform.dedup} — one {@code processing.dedup} slot. See {@link #MULTI_JOIN}. */
+    public static final String MULTI_DEDUP = "MULTI_DEDUP";
+    /** A second {@code transform.route} — one {@code route:} slot. See {@link #MULTI_JOIN}. */
+    public static final String MULTI_ROUTE = "MULTI_ROUTE";
+    /** A second {@code transform.summarize} — one {@code processing.summarize} slot. See {@link #MULTI_JOIN}. */
+    public static final String MULTI_SUMMARIZE = "MULTI_SUMMARIZE";
     public static final String NO_ACQUISITION = "NO_ACQUISITION";
     public static final String NO_PARSER = "NO_PARSER";
     public static final String NO_PERSISTENT_SINK = "NO_PERSISTENT_SINK";
@@ -232,9 +238,26 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
-            else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) recordDedup = n;
-            else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) routeNode = n;
-            else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) summarizeNode = n;
+            // Three more one-slot kinds, refusing exactly as MULTI_JOIN does. Until 2026-08-11 each of
+            // these assignments overwrote silently: the graph saved, the second node vanished, and the
+            // pipeline ran — just not the one the operator drew. Refusing means a graph that already
+            // holds two of a kind stops saving on its next edit; that is the accepted cost of not
+            // discarding authored work without a word.
+            else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) {
+                if (recordDedup != null) refusals.add(new PipelineCompileException.Refusal(MULTI_DEDUP, n.id(),
+                        "a pipeline lowers one record dedup; '" + recordDedup.id() + "' already claims it"));
+                else recordDedup = n;
+            }
+            else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) {
+                if (routeNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_ROUTE, n.id(),
+                        "a pipeline lowers one route; '" + routeNode.id() + "' already claims it"));
+                else routeNode = n;
+            }
+            else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) {
+                if (summarizeNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_SUMMARIZE, n.id(),
+                        "a pipeline lowers one summarize; '" + summarizeNode.id() + "' already claims it"));
+                else summarizeNode = n;
+            }
             else if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(t)) {
                 // one slot only — see MULTI_JOIN
                 if (joinNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_JOIN, n.id(),

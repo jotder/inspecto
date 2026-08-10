@@ -217,4 +217,42 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
         expect(multi.nodeId).toBe('join_2'); // the offender, not the incumbent
         expect(multi.message).toContain(first.id); // names who already claimed the block
     });
+
+    /**
+     * The other three one-slot kinds, flipped from last-one-wins to refusing on 2026-08-11 (operator
+     * decision). They must move with the server in the same change: a mock that still accepted two of
+     * them would preview a graph the backend now 422s, which is the exact "mock more lenient than the
+     * server" hole this file exists to close.
+     */
+    const expectSecondRefused = (type: string, code: string, config: Record<string, unknown>,
+                                 from: Record<string, unknown> = processedConfig()): void => {
+        const existing = from;
+        const g = liftConfig(existing);
+        const first = g.nodes.find((n) => n.type === type)!;
+        expect(first, `the fixture must already carry one ${type}`).toBeTruthy();
+        g.nodes.push({ id: 'dup_1', type, config });
+
+        const res = lowerGraph(g, existing, true);
+        expect('refusals' in res, JSON.stringify(res)).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
+        const multi = refusals.find((r) => r.code === code)!;
+        expect(multi).toBeTruthy();
+        expect(multi.nodeId).toBe('dup_1');          // the offender, not the incumbent
+        expect(multi.message).toContain(first.id);   // names who already claimed the slot
+    };
+
+    it('refuses a SECOND record dedup with MULTI_DEDUP', () => {
+        expectSecondRefused('transform.dedup', 'MULTI_DEDUP', { keys: ['imsi'] });
+    });
+
+    // Its own fixture: a transform.route node is lifted only from a top-level `route:` block, which the
+    // shared processedConfig() (processing-key transforms) deliberately has none of.
+    it('refuses a SECOND route with MULTI_ROUTE', () => {
+        expectSecondRefused('transform.route', 'MULTI_ROUTE', { on: 'second' },
+            { ...processedConfig(), route: { on: 'first', branches: [] } });
+    });
+
+    it('refuses a SECOND summarize with MULTI_SUMMARIZE', () => {
+        expectSecondRefused('transform.summarize', 'MULTI_SUMMARIZE', { group_by: ['cell'] });
+    });
 });

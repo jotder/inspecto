@@ -68,49 +68,52 @@ class PipelineEditableTest {
     }
 
     // ── the four single-slot node kinds ────────────────────────────────────────────────
-    // `lower` keeps ONE node per scalar slot. Only transform.join refuses a second (MULTI_JOIN);
-    // dedup/route/summarize are still last-one-wins and silently discard the earlier node.
-    //
-    // The three "silently discarded" cases below PIN that behaviour, they do not endorse it. Guarding
-    // them the way join is guarded would newly REFUSE a graph that saves today, so it needs an
-    // operator call — and until these tests existed the blast radius was unmeasured (BACKLOG §4
-    // "Pipeline graph" (a)). What they establish: the discard is real, it is silent, and it is the
-    // LAST node that survives in all three cases.
+    // `lower` keeps ONE node per scalar slot, and all four now REFUSE a second rather than keeping
+    // the last silently. Until 2026-08-11 only transform.join was guarded; dedup/route/summarize were
+    // last-one-wins, and the tests here pinned that discard rather than endorsing it. Flipping them
+    // was an operator call precisely because a graph holding two of a kind saves today and stops
+    // saving on its next edit — taken deliberately, since the alternative is dropping authored work
+    // with no signal at all.
 
-    /** A second {@code transform.dedup} silently wins; the first node's keys are lost. */
+    /** A second {@code transform.dedup} refuses; the first keeps the {@code processing.dedup} slot. */
     @Test
-    void secondDedupNodeSilentlyDiscardsTheFirst() {
-        Map<String, Object> lowered = lowerWithDuplicates(
+    void secondDedupNodeRefusesInsteadOfDiscarding() {
+        assertSingleSlotRefusal(PipelineEditable.MULTI_DEDUP, "dd1", "dd2",
                 node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))),
                 node("dd2", "transform.dedup", Map.of("keys", List.of("imsi"))));
-
-        Map<?, ?> dedup = (Map<?, ?>) ((Map<?, ?>) lowered.get("processing")).get("dedup");
-        assertEquals(List.of("imsi"), dedup.get("keys"),
-                "last-one-wins: dd2 claimed the single processing.dedup slot and dd1 vanished");
     }
 
-    /** A second {@code transform.route} silently wins — {@code lower} writes ONE {@code route} key. */
+    /** A second {@code transform.route} refuses — {@code lower} writes ONE {@code route} key. */
     @Test
-    void secondRouteNodeSilentlyDiscardsTheFirst() {
-        Map<String, Object> lowered = lowerWithDuplicates(
+    void secondRouteNodeRefusesInsteadOfDiscarding() {
+        assertSingleSlotRefusal(PipelineEditable.MULTI_ROUTE, "r1", "r2",
                 node("r1", "transform.route", Map.of("on", "first")),
                 node("r2", "transform.route", Map.of("on", "second")));
-
-        Map<?, ?> route = (Map<?, ?>) lowered.get("route");
-        assertEquals("second", route.get("on"),
-                "last-one-wins: r2 claimed the single route: key and r1 vanished");
     }
 
-    /** A second {@code transform.summarize} silently wins; the first node's grain is lost. */
+    /** A second {@code transform.summarize} refuses; the first keeps the grain. */
     @Test
-    void secondSummarizeNodeSilentlyDiscardsTheFirst() {
-        Map<String, Object> lowered = lowerWithDuplicates(
+    void secondSummarizeNodeRefusesInsteadOfDiscarding() {
+        assertSingleSlotRefusal(PipelineEditable.MULTI_SUMMARIZE, "s1", "s2",
                 node("s1", "transform.summarize", Map.of("group_by", List.of("day"))),
                 node("s2", "transform.summarize", Map.of("group_by", List.of("cell"))));
+    }
 
-        Map<?, ?> summarize = (Map<?, ?>) ((Map<?, ?>) lowered.get("processing")).get("summarize");
-        assertEquals(List.of("cell"), summarize.get("group_by"),
-                "last-one-wins: s2 claimed the single processing.summarize slot and s1 vanished");
+    /** One node per scalar slot: the SECOND is named as the offender and the message points at the
+     *  first, which keeps the slot — the shape {@code MULTI_JOIN} established. */
+    private static void assertSingleSlotRefusal(String code, String keeper, String offender,
+                                                PipelineNode... duplicates) {
+        PipelineGraph g = graphWith(duplicates);
+
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+
+        assertEquals(1, ex.refusals().size(), "exactly one refusal: " + ex.refusals());
+        assertEquals(code, ex.refusals().get(0).code());
+        assertEquals(offender, ex.refusals().get(0).nodeId(),
+                "the SECOND node is named as the offender; the first keeps the slot");
+        assertTrue(ex.refusals().get(0).message().contains(keeper),
+                "the message points at the node already holding the slot");
     }
 
     /**
@@ -146,10 +149,6 @@ class PipelineEditableTest {
     }
 
     /** Strict-lower a minimal graph carrying {@code extra}; fails the test if it refuses. */
-    private static Map<String, Object> lowerWithDuplicates(PipelineNode... extra) {
-        return PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);
-    }
-
     /**
      * A pipeline authored by the Onboarding Parsing stage carries its parse options in the top-level
      * {@code parsing:} block — the design-of-record spelling, which {@code PipelineConfigParser}
