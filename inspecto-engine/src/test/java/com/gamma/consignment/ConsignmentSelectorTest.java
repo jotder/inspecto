@@ -178,6 +178,60 @@ class ConsignmentSelectorTest {
         }
     }
 
+    // ── the connection-free enumerator (DatasetRelation's path) ──────────────
+
+    @Test
+    void sourceLiteralIsThePlainQuotedGlobWhenThereIsNothingToExclude(@TempDir Path dir) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String a = parquet(conn, dir, "a", 1);
+            db.record(List.of(row(a, State.LIVE)));
+            ConsignmentOutputStores.use(db);
+
+            String root = dir.toString().replace("\\", "/");
+            assertEquals("'" + root + "/**/*.parquet'", ConsignmentSelector.sourceLiteral(root, "parquet"));
+        }
+    }
+
+    @Test
+    void theWalkSubtractsTheSameFilesTheConnectionFormWould(@TempDir Path dir) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            String live = parquet(conn, dir, "live", 1);
+            String old = parquet(conn, dir, "old", 2);
+            db.record(List.of(row(live, State.LIVE), row(old, State.SUPERSEDED)));
+            ConsignmentOutputStores.use(db);
+
+            String root = dir.toString().replace("\\", "/");
+            String literal = ConsignmentSelector.sourceLiteral(root, "parquet");
+            assertEquals(List.of(1), idsFrom(conn, "read_parquet(" + literal + ")"));
+        }
+    }
+
+    /**
+     * {@code PartitionCompactor}'s safety model depends on its intermediates being invisible to readers'
+     * globs. A walk that picked up a hidden tree DuckDB would not have matched would make data appear in
+     * reads that was never there — the walk's one way to be more permissive than the glob it stands in for.
+     */
+    @Test
+    void theWalkSkipsHiddenSegmentsJustAsAGlobDoes(@TempDir Path dir) throws Exception {
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            Path hidden = dir.resolve(".staging");
+            java.nio.file.Files.createDirectories(hidden);
+            parquet(conn, hidden, "invisible", 99);
+            String live = parquet(conn, dir, "live", 1);
+            String old = parquet(conn, dir, "old", 2);
+            db.record(List.of(row(live, State.LIVE), row(old, State.SUPERSEDED)));
+            ConsignmentOutputStores.use(db);
+
+            String root = dir.toString().replace("\\", "/");
+            String literal = ConsignmentSelector.sourceLiteral(root, "parquet");
+            assertFalse(literal.contains(".staging"), "a hidden tree must not be promoted into an explicit list");
+            assertEquals(List.of(1), idsFrom(conn, "read_parquet(" + literal + ")"));
+        }
+    }
+
     /** Fail-open: a registry that cannot be consulted must cost a warning, never a read. */
     @Test
     void anUnusableConnectionFallsBackToTheGlob(@TempDir Path dir) throws Exception {

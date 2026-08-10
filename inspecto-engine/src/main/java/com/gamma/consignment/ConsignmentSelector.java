@@ -65,6 +65,22 @@ public final class ConsignmentSelector {
     }
 
     /**
+     * The SQL <b>source literal</b> for reading {@code root}'s {@code .ext} files — the quoted
+     * {@code root}{@code /**}{@code /*.ext} glob when the catalog has nothing to exclude, else a bracketed list
+     * of the survivors. For the callers that have no {@link Connection}: {@code DatasetRelation} builds its own
+     * bare {@code read_parquet(<literal>)} with deliberately no other options, so it cannot go through
+     * {@link SqlViews#reader}.
+     *
+     * <p>The glob is built here rather than accepted, so the pattern this enumerates and the pattern it falls
+     * back to cannot drift apart.
+     */
+    public static String sourceLiteral(String root, String ext) {
+        String glob = root.replace("\\", "/") + "/**/*." + ext;
+        List<String> kept = select(root, ext);
+        return kept == null ? "'" + glob + "'" : SqlViews.pathList(kept);
+    }
+
+    /**
      * The files {@code glob} matches that the catalog has not marked unreadable, or {@code null} when the
      * caller should just use the glob — no registry, nothing excluded, or the enumeration failed.
      *
@@ -73,14 +89,8 @@ public final class ConsignmentSelector {
      * common path is provably a no-op rather than a reimplementation of one.
      */
     static List<String> select(Connection conn, String glob) {
-        DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
-        if (store == null) return null;
-
-        List<String> unreadable = store.unreadablePaths();
-        if (unreadable.isEmpty()) return null;
-
-        Set<String> excluded = new HashSet<>();
-        for (String path : unreadable) excluded.add(DbConsignmentOutputStore.norm(path));
+        Set<String> excluded = excluded();
+        if (excluded == null) return null;
 
         List<String> kept = new ArrayList<>();
         int removed = 0;
@@ -89,9 +99,6 @@ public final class ConsignmentSelector {
             while (rs.next()) {
                 String file = rs.getString(1);
                 if (file == null) continue;
-                // Both sides through the same normaliser: the registry stores the writer's own spelling, which
-                // may be relative, while glob() answers in DuckDB's. Comparing raw would match nothing and
-                // report success — the silent failure markCompactedAway already had to defend against.
                 if (excluded.contains(DbConsignmentOutputStore.norm(file))) removed++;
                 else kept.add(file);
             }
@@ -100,10 +107,79 @@ public final class ConsignmentSelector {
                     glob, e.getMessage());
             return null;
         }
-        if (removed == 0) return null;
+        return report(removed, kept, glob);
+    }
 
-        log.debug("Consignment selector: {} of {} file(s) excluded under {}",
-                removed, removed + kept.size(), glob);
+    /**
+     * {@link #select(Connection, String)} without a connection: walks {@code root} for {@code .ext} files.
+     *
+     * <p><b>Why a second enumerator exists.</b> The connection form asks DuckDB to expand the very glob the
+     * read will use, so the two can never disagree about what exists — that is the better mechanism and stays
+     * the default where a connection is in scope. But only one of the seven readers in the product takes a
+     * {@link Connection}; the rest are config→SQL string builders, and threading one into
+     * {@code DatasetRelation} would change a public signature with call sites in three modules. A walk is not
+     * new coupling for those callers — {@link SqlViews#storeReadRoot} already stats the filesystem on the same
+     * line — but it is an approximation of DuckDB's glob, so it is kept to exactly the shape all seven use.
+     *
+     * <p><b>Hidden segments are skipped</b>, which is not cosmetic: {@code PartitionCompactor}'s safety model
+     * depends on its intermediates being invisible to readers' globs, and a walk that picked up a
+     * {@code .staging/} tree DuckDB would not have matched would make data appear in reads that never used to
+     * be there. Extension filtering already excludes {@code *.compact.tmp} and {@code *.parquet.compacting};
+     * this covers the directory half.
+     */
+    static List<String> select(String root, String ext) {
+        Set<String> excluded = excluded();
+        if (excluded == null) return null;
+
+        java.nio.file.Path base = java.nio.file.Path.of(root);
+        if (!java.nio.file.Files.isDirectory(base)) return null;
+
+        List<String> kept = new ArrayList<>();
+        int removed = 0;
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(base)) {
+            for (java.nio.file.Path p : walk.filter(java.nio.file.Files::isRegularFile).toList()) {
+                if (!p.getFileName().toString().endsWith("." + ext) || hasHiddenSegment(base, p)) continue;
+                String file = p.toString().replace("\\", "/");
+                if (excluded.contains(DbConsignmentOutputStore.norm(file))) removed++;
+                else kept.add(file);
+            }
+        } catch (java.io.IOException e) {
+            log.warn("Consignment selector could not walk {} — reading it unfiltered: {}", root, e.getMessage());
+            return null;
+        }
+        return report(removed, kept, root);
+    }
+
+    /** Whether any segment of {@code file} below {@code base} starts with a dot — see the walk's javadoc. */
+    private static boolean hasHiddenSegment(java.nio.file.Path base, java.nio.file.Path file) {
+        for (java.nio.file.Path seg : base.relativize(file))
+            if (seg.toString().startsWith(".")) return true;
+        return false;
+    }
+
+    /**
+     * The normalised set of paths the catalog says are unreadable, or {@code null} when there is nothing to do —
+     * no registry, or a registry with no dead rows. Both enumerators bail on {@code null} before touching a
+     * filesystem or a connection, so the default path costs one indexed query and nothing else.
+     *
+     * <p>Normalised on both sides because the registry stores the writer's own spelling, which may be relative,
+     * while an enumerator answers in its own. Comparing raw would match nothing and report success — the silent
+     * failure {@code markCompactedAway} already had to defend against.
+     */
+    private static Set<String> excluded() {
+        DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
+        if (store == null) return null;
+        List<String> unreadable = store.unreadablePaths();
+        if (unreadable.isEmpty()) return null;
+        Set<String> normalised = new HashSet<>();
+        for (String path : unreadable) normalised.add(DbConsignmentOutputStore.norm(path));
+        return normalised;
+    }
+
+    /** {@code kept} when anything was actually removed, else {@code null} so the caller keeps its own glob. */
+    private static List<String> report(int removed, List<String> kept, String what) {
+        if (removed == 0) return null;
+        log.debug("Consignment selector: {} of {} file(s) excluded under {}", removed, removed + kept.size(), what);
         return kept;
     }
 }

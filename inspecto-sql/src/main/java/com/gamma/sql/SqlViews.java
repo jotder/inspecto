@@ -64,16 +64,26 @@ public final class SqlViews {
      * than introducing a second, differently-shaped error for callers to learn.
      */
     public static String reader(String format, java.util.List<String> paths, boolean hive) {
-        if (paths == null || paths.isEmpty()) return reader(format, NO_FILES_GLOB, hive);
+        return over(format, pathList(paths), hive);
+    }
+
+    /**
+     * A file list as a DuckDB SQL literal — {@code ['a.parquet', 'b.parquet']} — or the quoted
+     * {@link #NO_FILES_GLOB} when there is nothing in it. The one renderer for a selected read, so a caller
+     * that builds its own {@code read_parquet(...)} (there is one: {@code DatasetRelation}, which deliberately
+     * passes no other options) stays byte-compatible with {@link #reader(String, java.util.List, boolean)}.
+     */
+    public static String pathList(java.util.List<String> paths) {
+        if (paths == null || paths.isEmpty()) return "'" + NO_FILES_GLOB + "'";
         StringBuilder list = new StringBuilder("[");
         for (int i = 0; i < paths.size(); i++) {
             if (i > 0) list.append(", ");
             list.append('\'').append(paths.get(i).replace("\\", "/").replace("'", "''")).append('\'');
         }
-        return over(format, list.append(']').toString(), hive);
+        return list.append(']').toString();
     }
 
-    /** A pattern no output file can match — the empty-selection rendering (see the list overload). */
+    /** A pattern no output file can match — the empty-selection rendering (see {@link #pathList}). */
     private static final String NO_FILES_GLOB = "__no_readable_files__/*";
 
     /** Both overloads' shared body. {@code source} is already a SQL literal — one quoted path, or a bracketed

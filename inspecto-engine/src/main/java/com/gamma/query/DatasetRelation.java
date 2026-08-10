@@ -73,8 +73,13 @@ public final class DatasetRelation {
             // mapped output only — quarantine/backup/nested trees stay out of the dataset. An explicit
             // deeper ref (orders/database, orders/rollup) resolves as written.
             if (!ref.startsWith(SHARED_PREFIX)) root = SqlViews.storeReadRoot(root);
-            String glob = root + "/**/*.parquet";
-            return "SELECT * FROM read_parquet(" + sqlStr(glob) + ")";
+            // Addressing §7-A: the Consignment catalog subtracts files it has marked unreadable, and yields the
+            // plain quoted glob when it has nothing to say. This is the only reader that sees a pipeline sink's
+            // output, so it is the one that has to be filtered before a full recompute may leave an old
+            // revision on disk (step 6). No connection is threaded here on purpose — relationSql has call
+            // sites in three modules — so the selector walks the tree, as the storeReadRoot check above does.
+            return "SELECT * FROM read_parquet("
+                    + com.gamma.consignment.ConsignmentSelector.sourceLiteral(root, "parquet") + ")";
         }
         throw new IllegalArgumentException("dataset must declare a 'view' or a 'physicalRef'");
     }
@@ -160,9 +165,5 @@ public final class DatasetRelation {
     private static String str(Map<String, Object> m, String key) {
         Object v = m == null ? null : m.get(key);
         return v == null || v.toString().isBlank() ? null : v.toString().trim();
-    }
-
-    private static String sqlStr(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 }
