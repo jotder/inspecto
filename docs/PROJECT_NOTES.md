@@ -112,6 +112,16 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- **A profile-scoped module is invisible to the verify loop that everyone actually runs.**
+  `inspecto-security` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
+  (`-Pedition-standard` / `-Pedition-enterprise`), not the default list — so `mvn -o clean test`
+  reports **BUILD SUCCESS while both edition builds are broken**. The 2026-08-10 artifactId rename
+  proved it: the two poms still declared `file-processor-parent`, which is a *non-resolvable parent*,
+  and nothing caught it because the routine loop never loads them. **Any change to the parent pom, a
+  shared artifactId, or a managed dependency must be verified with
+  `mvn -o clean test -Pedition-enterprise`** — that profile is the only one that pulls every module in.
+  Grepping `*/pom.xml` for the old name finds these two instantly; the reactor never will.
+
 - **`git mv` stages the rename from the INDEX, not the working tree.** Edit a doc and *then*
   `git mv` it, and the edits stay **unstaged** — `git status` shows `RM` (renamed + modified), which
   is easy to skim past, and the commit ships the file's *pre-edit* content at its new path. This bites
