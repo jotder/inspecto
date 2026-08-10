@@ -131,11 +131,20 @@ class ControlApiPipelinesTest {
                 verbs.add(t.get("verb").asText());
                 assertTrue(t.get("lowerable").asBoolean(), t.get("verb").asText() + " must author a saveable type");
             }
-            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "summarize", "route", "sink"), verbs);
+            // `transform` appears TWICE — once per shape it authors (transform.filter, transform.join).
+            // The recipe spells a join `transform: {join: …}` and RecipeCompiler has no `join` verb, so the
+            // palette entry is per SHAPE while the verb stays the recipe's own word. `type` is the unique key.
+            assertEquals(java.util.List.of("collect", "parse", "map", "dedup", "transform", "transform",
+                    "summarize", "route", "sink"), verbs);
             // dedup serves its specs (§5: specs reach the verbs, not just the raw node-type catalog)
             for (JsonNode t : arr)
                 if ("dedup".equals(t.get("verb").asText()))
                     assertEquals("keys", t.get("attributes").get(0).get("key").asText());
+            // and so does join, whose spec existed for days while the palette served no way to reach it
+            JsonNode join = null;
+            for (JsonNode t : arr) if ("transform.join".equals(t.get("type").asText())) join = t;
+            assertNotNull(join, "the transform verb must offer the join shape: " + arr);
+            assertEquals("reference", join.get("attributes").get(0).get("key").asText());
         }
     }
 
