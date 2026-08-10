@@ -58,9 +58,9 @@ public final class PipelineProjection {
     }
 
     /**
-     * The recipe-verb palette (ELT amendment §5, Phase 5): the seven verbs + {@code route}, with
-     * {@code transform} entered once per shape it authors (filter, join), in pipeline
-     * order, each carrying the node type it authors as plus that type's served attribute specs — the
+     * The recipe-verb palette (ELT amendment §5, Phase 5): the seven verbs + {@code route}, in pipeline
+     * order (see {@link #RECIPE_VERBS} — a verb may be entered once per shape it authors),
+     * each carrying the node type it authors as plus that type's served attribute specs — the
      * server-published version of the verb table the UI carried as its documented interim
      * ({@code RECIPE_VERBS}). {@code map} authors a {@code transform.map} node in the GRAPH editor even
      * though the recipe compiler folds it into parse — the verb exists either way, only its persistence

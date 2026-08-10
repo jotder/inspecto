@@ -236,8 +236,7 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) routeNode = n;
             else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) summarizeNode = n;
             else if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(t)) {
-                // One slot only — processing.join is a single block, so a second join would replace the
-                // first with no trace. Refuse by name rather than lose the operator's work silently.
+                // one slot only — see MULTI_JOIN
                 if (joinNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_JOIN, n.id(),
                         "a pipeline lowers one reference join; '" + joinNode.id() + "' already claims it"));
                 else joinNode = n;

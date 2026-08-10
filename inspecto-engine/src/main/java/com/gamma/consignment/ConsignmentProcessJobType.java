@@ -174,12 +174,11 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
          * <p><b>A summary-write failure fails the Run</b>, unlike the best-effort registry write: the processor's
          * numbers are its output, so losing them silently would make a green Run a lie. It is deliberately the
          * opposite trade-off from {@code record()}, where the data had already landed.
-         */
-        /**
+         *
          * @param processorId the {@code producer} for these registry rows — the processor that emitted them, not
          *                    this Job Type: two processors can summarise the same target, and
-         *                    {@code producerHighWater} groups by producer. ⚠ Event-time bounds stay null; see
-         *                    {@link SummaryWriter#write} for why a pre-aggregated summary row has none.
+         *                    {@code producerHighWater} groups by producer. Bounds stay null; see
+         *                    {@link SummaryWriter#write}.
          */
         private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows,
                                       String processorId) throws Exception {

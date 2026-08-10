@@ -151,9 +151,8 @@ public final class EnrichmentEngine {
                                 baseName, cfg.output().partitions(), List.of());
                         // §11.3 — routed rows live in their own relation, so their counts are NOT in
                         // __enriched's GROUP BY; count routedTable here, while it is still live.
-                        // producer is the enrichment's own identity, not `dest`: a routed/quarantine
-                        // destination can be written by more than one enrichment, so without it the rows
-                        // land in producerHighWater's unattributed group.
+                        // producer is the enrichment, not `dest`: a routed destination can be written by
+                        // more than one enrichment.
                         if (runId != null)
                             ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(
                                     runId, null, dest, routed,
@@ -172,8 +171,8 @@ public final class EnrichmentEngine {
             // registered themselves, from their own relation). There is no lineage matrix on this path, so the
             // per-file count comes from a GROUP BY over the relation just written. `runId` is the unit of work
             // for a recompute; the run_id column stays null until §13's Run model gives it a distinct identity.
-            // ⚠ `bounds` stays null: computing it needs an event-time column the enrichment can DECLARE, and
-            // `output.partitions` is a bare List<String> — it has no home for the sink's `source:` key. That is
+            // ⚠ `bounds` stays null: it needs an event-time column the enrichment can DECLARE, and
+            // `output.partitions` is a bare List<String> with no home for the sink's `source:` key —
             // a public .toon schema change, deliberately not smuggled in here (BACKLOG §4).
             if (runId != null)
                 ConsignmentOutputStores.record(ConsignmentOutputs.fromPartitionCounts(

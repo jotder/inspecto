@@ -12,9 +12,10 @@ import java.util.List;
  *
  * <p>Codes: {@code UNSUPPORTED_NODE} (the flat config has no home for this node type),
  * {@code MULTI_SINK} (more than one distinct persistent database dir — the flat config has exactly
- * one), and the strict-mode completeness set {@code NO_ACQUISITION} / {@code NO_PARSER} /
- * {@code NO_PERSISTENT_SINK} / {@code PARSER_NO_SCHEMA} (an {@code active} pipeline must be whole;
- * an inactive draft may be partial).
+ * one), {@code MULTI_JOIN} (a second {@code transform.join} — {@code processing.join} is a single
+ * block, so the extra one would be discarded silently), and the strict-mode completeness set
+ * {@code NO_ACQUISITION} / {@code NO_PARSER} / {@code NO_PERSISTENT_SINK} / {@code PARSER_NO_SCHEMA}
+ * (an {@code active} pipeline must be whole; an inactive draft may be partial).
  */
 @PublicApi(since = "4.7.0")
 public class PipelineCompileException extends RuntimeException {

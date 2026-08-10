@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
@@ -152,7 +153,7 @@ class ControlApiPipelineCrudTest {
             JsonNode g = json(send(c.port, "GET", "/pipelines/" + name + "/graph/raw", null));
             // a detectable edit: the fixture is active, so flipping it proves WHICH file received the save
             // (an inactive draft may be partial, so this cannot trip the completeness gate)
-            ((com.fasterxml.jackson.databind.node.ObjectNode) g).put("active", false);
+            ((ObjectNode) g).put("active", false);
 
             HttpResponse<String> put = send(c.port, "PUT", "/pipelines/" + name + "/graph", g.toString());
             assertEquals(200, put.statusCode(), put.body());
