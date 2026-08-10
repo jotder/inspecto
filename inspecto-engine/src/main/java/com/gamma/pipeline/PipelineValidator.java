@@ -68,6 +68,13 @@ public final class PipelineValidator {
     public static final String ILLEGAL_ACCEPT = "ILLEGAL_ACCEPT";
     public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
     public static final String UNKNOWN_USE_KIND = "UNKNOWN_USE_KIND";
+    /**
+     * A {@code use:} binding whose kind is recognized but whose NAMED component does not exist in the
+     * registry — e.g. {@code grammar/pipe-delimted}. Only reported when a {@link ComponentRegistry} is
+     * supplied ({@link #validate(PipelineGraph, ComponentRegistry)}); a registry-less validate cannot
+     * tell a typo from a component it simply cannot see, so it stays silent rather than guessing.
+     */
+    public static final String UNKNOWN_USE_REF = "UNKNOWN_USE_REF";
 
     /** One validation finding: a {@code severity}, a stable {@code code}, and a human message. */
     public record Issue(Severity severity, String code, String message) {
@@ -98,8 +105,21 @@ public final class PipelineValidator {
         }
     }
 
-    /** Validate {@code g}, collecting every issue (does not throw). */
+    /** Validate {@code g}, collecting every issue (does not throw). Does not check {@code use:} targets. */
     public static Result validate(PipelineGraph g) {
+        return validate(g, null);
+    }
+
+    /**
+     * Validate {@code g}, additionally checking that every {@code use:} binding names a component that
+     * actually EXISTS in {@code registry}. Pass the registry on any save/authoring path so a typo'd or
+     * unregistered binding is refused at save time; without it a dangling ref stays silent and
+     * {@link ComponentRegistry#effectiveConfig} later degrades to the node's local config, which is how
+     * a mistyped binding used to reach the engine unnoticed.
+     *
+     * @param registry the populated component registry, or {@code null} to skip the existence check
+     */
+    public static Result validate(PipelineGraph g, ComponentRegistry registry) {
         List<Issue> issues = new ArrayList<>();
         Set<String> ids = checkNodeIdentity(g, issues);
 
@@ -114,7 +134,7 @@ public final class PipelineValidator {
             issues.add(new Issue(Severity.ERROR, NO_ENTRY,
                     "Flow '" + g.name() + "' has no entry node — every node has an inbound edge, so nothing triggers it."));
         }
-        checkWiring(g, issues);
+        checkWiring(g, issues, registry);
         return new Result(issues);
     }
 
@@ -210,8 +230,13 @@ public final class PipelineValidator {
      * relationship; a {@code data} edge's target must {@code accept} {@code data}. Endpoints that don't
      * resolve to a node are skipped here (already flagged as dangling); unregistered types are warned and
      * left unchecked (a plugin may define them out of core).
+     *
+     * <p>When {@code registry} is non-null a {@code use:} binding is checked in two steps — the KIND
+     * prefix against the static component-type set, then the NAMED component against the registry's
+     * contents. A bad kind alone is reported: the name check would be meaningless for a kind that has no
+     * registry dir, and two errors for one typo reads as two faults.
      */
-    private static void checkWiring(PipelineGraph g, List<Issue> issues) {
+    private static void checkWiring(PipelineGraph g, List<Issue> issues, ComponentRegistry registry) {
         Map<String, PipelineNode> byId = g.byId();
         for (PipelineNode n : g.nodes()) {
             if (!PipelineNodeTypes.isKnown(n.type())) {
@@ -226,6 +251,11 @@ public final class PipelineValidator {
                     issues.add(new Issue(Severity.ERROR, UNKNOWN_USE_KIND,
                             "Node '" + n.id() + "' has use: '" + use + "' with unrecognized component kind '"
                                     + kind + "'."));
+                } else if (registry != null && !registry.isKnown(use)) {
+                    issues.add(new Issue(Severity.ERROR, UNKNOWN_USE_REF,
+                            "Node '" + n.id() + "' has use: '" + use + "' but no " + kind
+                                    + " named '" + (slash < 0 ? "" : use.substring(slash + 1))
+                                    + "' is registered."));
                 }
             }
         }

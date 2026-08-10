@@ -327,7 +327,7 @@ final class PipelineRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
         Map<String, Object> withId = new LinkedHashMap<>(body);
         withId.put("name", name);   // the URL name wins over any name in the body
-        PipelineGraph g = parseAndValidateFlow(withId);
+        PipelineGraph g = parseAndValidateFlow(api, withId);
 
         Optional<Path> registered = api.service().pathFor(name).map(Path::normalize)
                 .filter(p -> p.startsWith(writeRoot));
@@ -1050,19 +1050,29 @@ final class PipelineRoutes implements RouteModule {
     }
 
     /** Parse a flow definition (400 on a malformed shape) and validate it (422 on validation errors). */
-    private PipelineGraph parseAndValidateFlow(Map<String, Object> body) {
+    private PipelineGraph parseAndValidateFlow(ApiContext api, Map<String, Object> body) {
         PipelineGraph g;
         try {
             g = PipelineCodec.fromMap(body);
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         }
-        validatePipeline(g);
+        validatePipeline(api, g);
         return g;
     }
 
-    private void validatePipeline(PipelineGraph g) {
-        PipelineValidator.Result r = PipelineValidator.validate(g);
+    /**
+     * Validate a graph, including that every {@code use:} binding names a component that EXISTS — so a
+     * typo'd or unregistered reference is refused here (422) instead of degrading to the node's local
+     * config and surfacing much later, wherever the missing key is read.
+     *
+     * <p>The existence check is skipped when the space has no write root: {@link #componentRegistry}
+     * yields an EMPTY registry there, against which every binding would look dangling. A read-only space
+     * cannot save anyway, and a draft-validate over one must not invent refusals.
+     */
+    private void validatePipeline(ApiContext api, PipelineGraph g) {
+        ComponentRegistry registry = api.writeRoot() == null ? null : componentRegistry(api);
+        PipelineValidator.Result r = PipelineValidator.validate(g, registry);
         if (!r.ok())
             throw new ApiException(422, "flow validation failed: " + r.errors().stream()
                     .map(i -> i.code() + " — " + i.message()).toList());
@@ -1088,7 +1098,7 @@ final class PipelineRoutes implements RouteModule {
      * draft of a pipeline that does not exist yet previews too (no 404).
      */
     private Object dryRunFlow(ApiContext api, String id, Map<String, Object> body) {
-        PipelineGraph g = candidateGraph(body);
+        PipelineGraph g = candidateGraph(api, body);
         if (g == null) {
             Path root = pipelinesRootOrNull(api);
             try {
@@ -1115,9 +1125,9 @@ final class PipelineRoutes implements RouteModule {
      * could not be saved must not preview as if it could (400 malformed / 422 invalid, identically).
      */
     @SuppressWarnings("unchecked")
-    private PipelineGraph candidateGraph(Map<String, Object> body) {
+    private PipelineGraph candidateGraph(ApiContext api, Map<String, Object> body) {
         if (body == null || !(body.get("pipeline") instanceof Map<?, ?> candidate)) return null;
-        return parseAndValidateFlow((Map<String, Object>) candidate);
+        return parseAndValidateFlow(api, (Map<String, Object>) candidate);
     }
 
     /**

@@ -189,6 +189,43 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /**
+     * A {@code use:} binding naming a component that does not exist is refused AT SAVE (422) instead of
+     * degrading to the node's local config and failing later, deep in whatever reads the missing key.
+     * This is verified over real HTTP deliberately: the check needs the registry the control plane scans
+     * from the write root, so passing at the validator level alone would not prove the route wires it.
+     */
+    @Test
+    void aDanglingUseRefIsRefusedAtSaveButARegisteredOneSaves(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr.resolve("registry/grammars"));
+        Files.writeString(wr.resolve("registry/grammars/pipe.toon"),
+                "name: pipe-delimited\ndelimiter: \"|\"\n");
+
+        try (Ctx c = open(dir, wr)) {
+            String b = dir.toString().replace('\\', '/');
+            String flow = """
+                {"active":true,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
+                          {"id":"p","type":"parser","use":"grammar/%2$s"},
+                          {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],
+                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"out"}]}""";
+
+            // the author mistyped the grammar name — nothing named 'pipe-delimted' is registered
+            HttpResponse<String> bad = send(c.port, "PUT", "/pipelines/use_typo/graph",
+                    flow.formatted(b, "pipe-delimted"));
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("UNKNOWN_USE_REF"), bad.body());
+            assertTrue(bad.body().contains("pipe-delimted"),
+                    "the refusal names the binding the author typed, so the typo is findable");
+
+            // the correctly-spelled binding against the same registry saves
+            HttpResponse<String> ok = send(c.port, "PUT", "/pipelines/use_ok/graph",
+                    flow.formatted(b, "pipe-delimited"));
+            assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
     /** Two distinct-database sinks are no longer refused — they save as a multi-destination sinks: pipeline. */
     @Test
     void twoDistinctDatabasesSaveAsAMultiSinkPipeline(@TempDir Path dir) throws Exception {

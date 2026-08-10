@@ -5,6 +5,7 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -191,6 +192,70 @@ class PipelineValidatorTest {
                 List.of());
         PipelineValidator.Result r = PipelineValidator.validate(g);
         assertFalse(codes(r).contains(PipelineValidator.UNKNOWN_USE_KIND));
+    }
+
+    // ── use: TARGET existence (the refusal that was unbuilt until now) ─────────────────
+    // The kind-prefix check above only proves 'grammar' is a component type. These prove the NAMED
+    // component is checked too, but only when a registry is supplied — a registry-less validate
+    // cannot tell a typo from a component it merely cannot see.
+
+    /** A well-formed kind whose named component is absent is an error when a registry is supplied. */
+    @Test
+    void danglingUseRefIsAnErrorWhenARegistryIsSupplied(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("grammars"));
+        Files.writeString(root.resolve("grammars/pipe.toon"), "name: pipe-delimited\ndelimiter: \"|\"\n");
+        ComponentRegistry reg = ComponentRegistry.scan(root);
+
+        PipelineGraph g = new PipelineGraph("typo", true,
+                List.of(new PipelineNode("p", "parser.dsv", Map.of(), "grammar/pipe-delimted")),
+                List.of());
+
+        PipelineValidator.Result r = PipelineValidator.validate(g, reg);
+        assertTrue(codes(r).contains(PipelineValidator.UNKNOWN_USE_REF),
+                () -> "a typo'd grammar name must be refused, got " + r.issues());
+        assertFalse(r.ok(), "the dangling ref blocks the save");
+        assertTrue(r.errors().stream().anyMatch(i -> i.message().contains("pipe-delimted")),
+                "the message names the component the author actually typed");
+    }
+
+    /** …and the correctly-spelled one against the same registry is clean. */
+    @Test
+    void resolvableUseRefIsClean(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("grammars"));
+        Files.writeString(root.resolve("grammars/pipe.toon"), "name: pipe-delimited\ndelimiter: \"|\"\n");
+        ComponentRegistry reg = ComponentRegistry.scan(root);
+
+        PipelineGraph g = new PipelineGraph("good", true,
+                List.of(new PipelineNode("p", "parser.dsv", Map.of(), "grammar/pipe-delimited")),
+                List.of());
+
+        assertFalse(codes(PipelineValidator.validate(g, reg)).contains(PipelineValidator.UNKNOWN_USE_REF));
+    }
+
+    /** Without a registry the check is skipped entirely — the pre-existing contract, unchanged. */
+    @Test
+    void registrylessValidateStaysSilentAboutUseTargets() {
+        PipelineGraph g = new PipelineGraph("typo", true,
+                List.of(new PipelineNode("p", "parser.dsv", Map.of(), "grammar/nothing-registered")),
+                List.of());
+
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertFalse(codes(r).contains(PipelineValidator.UNKNOWN_USE_REF),
+                "a registry-less validate must not invent a dangling-ref error");
+    }
+
+    /** A bad KIND reports once, not twice — the name check is meaningless for a non-component kind. */
+    @Test
+    void badKindIsReportedWithoutAlsoReportingADanglingRef(@TempDir Path root) {
+        ComponentRegistry reg = ComponentRegistry.scan(root);
+        PipelineGraph g = new PipelineGraph("bad-use", true,
+                List.of(new PipelineNode("p", "parser.dsv", Map.of(), "bogus/thing")),
+                List.of());
+
+        PipelineValidator.Result r = PipelineValidator.validate(g, reg);
+        assertTrue(codes(r).contains(PipelineValidator.UNKNOWN_USE_KIND));
+        assertFalse(codes(r).contains(PipelineValidator.UNKNOWN_USE_REF),
+                "one typo must not read as two separate faults");
     }
 
     @Test
