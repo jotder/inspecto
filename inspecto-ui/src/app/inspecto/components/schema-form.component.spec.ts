@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { AbstractControl, ValidatorFn } from '@angular/forms';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { AttributeSpec } from 'app/inspecto/component-model';
+import { AttributeSpec, AttributeToken } from 'app/inspecto/component-model';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { InspectoSchemaFormComponent } from './schema-form.component';
 
@@ -27,6 +27,7 @@ describe('InspectoSchemaFormComponent', () => {
         specs: AttributeSpec[] = SPECS,
         initial?: Record<string, unknown>,
         extraValidators?: Record<string, ValidatorFn[]>,
+        tokens?: { tokens?: Record<string, AttributeToken[]>; tokenSyntax?: RegExp },
     ) {
         TestBed.configureTestingModule({
             imports: [InspectoSchemaFormComponent],
@@ -36,6 +37,8 @@ describe('InspectoSchemaFormComponent', () => {
         // Deliberately BEFORE `specs`: the controls don't exist yet, so this also proves the setter
         // re-applies host validators after a spec (re)build rather than dropping them.
         if (extraValidators) fixture.componentInstance.extraValidators = extraValidators;
+        if (tokens?.tokens) fixture.componentInstance.tokens = tokens.tokens;
+        if (tokens?.tokenSyntax) fixture.componentInstance.tokenSyntax = tokens.tokenSyntax;
         fixture.componentInstance.specs = specs;
         if (initial) fixture.componentInstance.initial = initial;
         fixture.detectChanges();
@@ -367,6 +370,109 @@ describe('InspectoSchemaFormComponent', () => {
             const fixture = create(EMAILS);
             fixture.componentInstance.form.get('to')!.setValue(['a@x.io', 'b@x.io']);
             expect(fixture.componentInstance.form.get('to')!.errors).toBeNull();
+        });
+    });
+
+    /**
+     * The whole-value token picker. The component stays domain-agnostic here — it is handed tokens and a
+     * syntax, and knows only that a token replaces the field's ENTIRE value.
+     */
+    describe('token picker', () => {
+        const TOKEN: AttributeToken = { token: '$today', description: 'The fire date', preview: '2026-08-10' };
+        /** `$`-led and not the `$$` escape, as the reference adopter's platform defines a token. */
+        const SYNTAX = /^\$(?!\$)/;
+
+        const TEXTS: AttributeSpec[] = [
+            { key: 'day', label: 'Day', type: 'string', tier: 'required', pattern: '\\d{4}-\\d{2}-\\d{2}' },
+            { key: 'plain', label: 'Plain', type: 'string', tier: 'required' },
+        ];
+        const EMAIL_LIST: AttributeSpec[] = [
+            { key: 'to', label: 'To', type: 'list', tier: 'required', required: false, pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+' },
+        ];
+
+        const pickers = (fixture: { nativeElement: HTMLElement }): HTMLElement[] =>
+            Array.from(fixture.nativeElement.querySelectorAll('button[aria-label^="Insert a runtime token"]'));
+
+        it('renders a picker only where the host offered tokens', () => {
+            const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            const labels = pickers(fixture).map((b) => b.getAttribute('aria-label'));
+            expect(labels).toEqual(['Insert a runtime token into Day']);
+        });
+
+        it('projects the picker into the form field SUFFIX slot, not beside the input', () => {
+            // The regression this pins: as markup inside an `<ng-template>` instantiated by
+            // *ngTemplateOutlet, `matSuffix` never matched — Material resolves projection statically at the
+            // declaration site — and the button rendered in `…-infix`, next to the text. Asserting the
+            // button merely EXISTS passes in both worlds, which is how the first cut looked green.
+            const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            const [picker] = pickers(fixture);
+            expect(picker.closest('.mat-mdc-form-field-icon-suffix')).not.toBeNull();
+            expect(picker.closest('.mat-mdc-form-field-infix')).toBeNull();
+        });
+
+        it('renders no picker for a key whose offer list is empty', () => {
+            // How a host says "literal only" — an empty list, not a missing key, is the likelier shape
+            // after filtering, and both must draw nothing.
+            const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [] }, tokenSyntax: SYNTAX });
+            expect(pickers(fixture)).toHaveLength(0);
+        });
+
+        it('replaces the whole value rather than inserting into it', () => {
+            const fixture = create(TEXTS, { day: '2026-01-01' }, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            const control = fixture.componentInstance.form.get('day')!;
+            fixture.componentInstance.applyToken(TEXTS[0], TOKEN);
+
+            // Not "2026-01-01$today", and not "$today" appended anywhere — the value IS the token, which
+            // is the only shape a whole-value evaluator resolves.
+            expect(control.value).toBe('$today');
+            expect(control.dirty).toBe(true);
+        });
+
+        it('exempts a token from the field format, so the picker cannot author a value Save refuses', () => {
+            // Without the exemption every date/instant/email field marks the token invalid the moment it
+            // lands — the picker offers it, the form rejects it, and the feature is decorative.
+            const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            const control = fixture.componentInstance.form.get('day')!;
+
+            control.setValue('not-a-date');
+            expect(control.valid).toBe(false); // the literal contract still bites
+
+            fixture.componentInstance.applyToken(TEXTS[0], TOKEN);
+            expect(control.valid).toBe(true);
+        });
+
+        it('still enforces the format when no tokenSyntax was supplied', () => {
+            // The default is no exemption, so every pre-existing adopter behaves exactly as before.
+            const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] } });
+            const control = fixture.componentInstance.form.get('day')!;
+            control.setValue('$today');
+            expect(control.valid).toBe(false);
+        });
+
+        it('replaces every entry of a list, because a list is one value', () => {
+            const fixture = create(EMAIL_LIST, undefined, undefined, { tokens: { to: [TOKEN] }, tokenSyntax: SYNTAX });
+            const control = fixture.componentInstance.form.get('to')!;
+            control.setValue(['ops@example.com', 'oncall@example.com']);
+
+            fixture.componentInstance.applyToken(EMAIL_LIST[0], { token: '$signal.recipient' });
+
+            expect(control.value).toEqual(['$signal.recipient']);
+            expect(control.valid).toBe(true); // a lone token is the whole value ⇒ format exempt
+        });
+
+        it('holds a token beside other entries to the literal format — it would never resolve', () => {
+            // The engine evaluates a value only when it is a token in its ENTIRETY, so "a@x.io,$signal.r"
+            // is a CSV literal. Flagging it is the point: silently accepting it authors a Job that fails
+            // at fire time with an invalid address.
+            const fixture = create(EMAIL_LIST, undefined, undefined, { tokens: { to: [TOKEN] }, tokenSyntax: SYNTAX });
+            const control = fixture.componentInstance.form.get('to')!;
+            control.setValue(['a@x.io', '$signal.recipient']);
+            expect(control.valid).toBe(false);
+        });
+
+        it('has no axe violations with pickers rendered', async () => {
+            const fixture = create(TEXTS, undefined, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            await expectNoA11yViolations(fixture.nativeElement);
         });
     });
 });

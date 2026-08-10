@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { JobParameterDecl } from 'app/inspecto/api';
-import { paramDeclToSpec, paramDeclsToSpecs, paramValueToApi, paramValueToForm } from './job-parameter-specs';
+import { JobExpressionDecl, JobParameterDecl } from 'app/inspecto/api';
+import { paramDeclToSpec, paramDeclsToSpecs, paramTokens, paramValueToApi, paramValueToForm, tokensForParam } from './job-parameter-specs';
 
 /**
  * The decl → widget generation contract (job-parameter-contract §7.4). One case per row of that table:
@@ -191,5 +191,100 @@ describe('paramValue round-trip', () => {
 
     it('reads a blank stored list as null so `required` sees it as empty', () => {
         expect(paramValueToForm(listSpec, '')).toBeNull();
+    });
+});
+
+/**
+ * The token picker's offer set (§8.5, step 13). Three filters decide it, and each one exists because the
+ * alternative is a value that authors cleanly and then fails at fire time — a picker that offers an
+ * unresolvable token is worse than no picker, because the author has no reason to doubt it.
+ */
+describe('tokensForParam', () => {
+    /** A catalog entry with the wire defaults `ExpressionDecl.toMap()` sends, overridden per case. */
+    function ex(p: Partial<JobExpressionDecl> & { token: string; yields: string }): JobExpressionDecl {
+        return {
+            form: 'LITERAL', description: '', example: '', contextFree: true, preview: '',
+            availableIn: ['cron', 'manual', 'on_pipeline', 'on_signal'],
+            ...p,
+        };
+    }
+
+    const today = ex({ token: '$today', yields: 'DATE', description: 'The fire date', example: '2026-08-07', preview: '2026-08-10' });
+    const now = ex({ token: '$now', yields: 'INSTANT', example: '2026-08-07T06:00:00Z', preview: '2026-08-10T13:00:00Z' });
+    const signal = ex({
+        token: '$signal.', form: 'PREFIX', yields: 'STRING', availableIn: ['on_signal'], contextFree: false,
+        description: "A field of the firing Signal's payload", example: '$signal.dataset', preview: '$signal.dataset',
+    });
+    const day = ex({ token: '$day(n)', form: 'FUNCTION', yields: 'DATE', description: 'Shifted by n days', example: '$day(-1)', preview: '2026-08-09' });
+    const catalog = [today, now, signal, day];
+
+    const param = (p: Partial<JobParameterDecl> & { name: string; type: string }) => decl(p);
+
+    it('withholds every token from a declaration that opted out of expressions', () => {
+        // The `sql.template` body: its own $-namespace, so a picker there would author a literal that
+        // merely looks like a token.
+        expect(tokensForParam(param({ name: 'sql', type: 'TEXT', expressions: false }), catalog, 'cron')).toEqual([]);
+    });
+
+    it('offers $signal.* only on a signal trigger', () => {
+        const onSignal = tokensForParam(param({ name: 'to', type: 'STRING' }), catalog, 'on_signal');
+        const onCron = tokensForParam(param({ name: 'to', type: 'STRING' }), catalog, 'cron');
+        expect(onSignal.map((t) => t.token)).toContain('$signal.dataset');
+        expect(onCron.map((t) => t.token)).not.toContain('$signal.dataset');
+    });
+
+    it('filters on the yields, keeping DATE and INSTANT apart', () => {
+        // A DATE resolution would fail `matchesType(INSTANT, …)` at fire time, and the reverse too.
+        const onDate = tokensForParam(param({ name: 'd', type: 'DATE' }), catalog, 'cron').map((t) => t.token);
+        expect(onDate).toContain('$today');
+        expect(onDate).not.toContain('$now');
+        const onInstant = tokensForParam(param({ name: 'i', type: 'INSTANT' }), catalog, 'cron').map((t) => t.token);
+        expect(onInstant).toContain('$now');
+        expect(onInstant).not.toContain('$today');
+    });
+
+    it('offers every token on a STRING or TEXT field, because everything resolves to text', () => {
+        for (const type of ['STRING', 'TEXT']) {
+            expect(tokensForParam(param({ name: 'x', type }), catalog, 'cron').map((t) => t.token))
+                .toEqual(['$today', '$now', '$day(-1)']);
+        }
+    });
+
+    it('offers a STRING-yielding token on a typed field, as the engine cannot pre-judge one either', () => {
+        // $signal.<field> legitimately carries an address; only the resolved value can be judged, and
+        // ParameterResolver re-validates it after resolution.
+        expect(tokensForParam(param({ name: 'to', type: 'EMAIL' }), catalog, 'on_signal').map((t) => t.token))
+            .toEqual(['$signal.dataset']);
+    });
+
+    it('offers the TYPEABLE form of a shaped token, never the shape itself', () => {
+        // `$day(n)` is a shape the registry cannot evaluate — inserting it authors an unknown expression.
+        const t = tokensForParam(param({ name: 'd', type: 'DATE' }), catalog, 'cron').find((x) => x.token.startsWith('$day'));
+        expect(t!.token).toBe('$day(-1)');
+        expect(t!.description).toContain('shape: $day(n)');
+    });
+
+    it('drops the preview line when it would only repeat the token being offered', () => {
+        // A context-bound token previews AS its sample: "$signal.dataset → $signal.dataset" is noise.
+        const [t] = tokensForParam(param({ name: 'x', type: 'STRING' }), catalog, 'on_signal').filter((x) => x.token === '$signal.dataset');
+        expect(t.preview).toBeUndefined();
+        const [d] = tokensForParam(param({ name: 'x', type: 'DATE' }), catalog, 'cron');
+        expect(d.preview).toBe('2026-08-10');
+    });
+});
+
+describe('paramTokens', () => {
+    const catalog: JobExpressionDecl[] = [{
+        token: '$today', form: 'LITERAL', yields: 'DATE', description: 'The fire date', example: '2026-08-07',
+        availableIn: ['cron', 'manual', 'on_pipeline', 'on_signal'], contextFree: true, preview: '2026-08-10',
+    }];
+
+    it('omits a parameter with nothing to offer, so the renderer draws no picker there', () => {
+        const map = paramTokens(
+            [decl({ name: 'day', type: 'DATE' }), decl({ name: 'sql', type: 'TEXT', expressions: false })],
+            catalog,
+            'cron',
+        );
+        expect(Object.keys(map)).toEqual(['day']);
     });
 });

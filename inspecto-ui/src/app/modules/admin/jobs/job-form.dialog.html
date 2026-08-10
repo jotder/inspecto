@@ -55,7 +55,15 @@
         <!-- Descriptor-driven parameters (P3c): the selected Job Type's declared params as typed fields. -->
         @if (paramSpecs().length) {
             <div class="mt-4 text-secondary text-xs font-semibold uppercase tracking-wider">Type parameters</div>
-            <inspecto-schema-form #pf [specs]="paramSpecs()" [initial]="paramInitial()" [optionLoaders]="paramOptionLoaders()" (submitted)="save()"></inspecto-schema-form>
+            <inspecto-schema-form
+                #pf
+                [specs]="paramSpecs()"
+                [initial]="paramInitial()"
+                [optionLoaders]="paramOptionLoaders()"
+                [tokens]="paramTokenMap()"
+                [tokenSyntax]="tokenSyntax"
+                (submitted)="save()"
+            ></inspecto-schema-form>
         }
 
         <!-- Platform Service grants (S1-2): the type's declared reach — what it may touch beyond its Run. -->

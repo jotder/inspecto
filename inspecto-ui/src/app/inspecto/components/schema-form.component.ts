@@ -10,8 +10,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AttributeOption, AttributeSpec, byTier, defaultsFor, dependsOnMatches, isRequired, listPatternViolation } from '../component-model';
+import { AttributeOption, AttributeSpec, AttributeToken, byTier, defaultsFor, dependsOnMatches, isRequired, listPatternViolation } from '../component-model';
 import { ChipComponent } from './chip.component';
+import { InspectoTokenPickerComponent } from './token-picker.component';
 
 /**
  * Supplies the suggestion list for a `type: 'autocomplete'` attribute. Receives the current raw form
@@ -37,6 +38,7 @@ export type AttributeOptionLoader = (
         NgTemplateOutlet,
         ReactiveFormsModule,
         ChipComponent,
+        InspectoTokenPickerComponent,
         MatAutocompleteModule,
         MatButtonModule,
         MatFormFieldModule,
@@ -145,6 +147,7 @@ export type AttributeOptionLoader = (
                                         <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                                     }
                                 </mat-autocomplete>
+                                <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
                                 @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
@@ -153,6 +156,7 @@ export type AttributeOptionLoader = (
                             <mat-form-field class="w-full" subscriptSizing="dynamic">
                                 <mat-label>{{ spec.label }}</mat-label>
                                 <textarea matInput rows="4" [formControlName]="spec.key" [placeholder]="spec.placeholder ?? ''" [attr.cdkFocusInitial]="first ? '' : null"></textarea>
+                                <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
                                 @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
@@ -183,6 +187,7 @@ export type AttributeOptionLoader = (
                                     >
                                         <mat-icon svgIcon="heroicons_outline:plus" />
                                     </button>
+                                    <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
                                     @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
                                     <!-- No <mat-error> here: this field's <input> is a DRAFT, never bound
                                          to the control, so the form-field has no NgControl and could
@@ -237,6 +242,7 @@ export type AttributeOptionLoader = (
                                     [placeholder]="spec.placeholder ?? ''"
                                     [attr.cdkFocusInitial]="first ? '' : null"
                                 />
+                                <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
                                 @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
@@ -309,6 +315,64 @@ export class InspectoSchemaFormComponent {
 
     /** Suggestion sources for `type: 'autocomplete'` attributes, keyed by attribute key. */
     @Input() optionLoaders: Record<string, AttributeOptionLoader> | undefined;
+
+    /**
+     * Whole-value tokens offered per attribute key (same idiom as {@link optionLoaders}). A key with no
+     * entry — or an empty list — renders no picker at all, which is how a host expresses "this field takes
+     * a literal only".
+     *
+     * <p>The host does all the filtering: only it knows which tokens suit which field. Jobs filters on
+     * three things (§8.5) — the parameter's type against the token's `yields`, the Job's trigger kind
+     * against `availableIn`, and the declaration's `expressions` flag.
+     */
+    @Input() tokens: Record<string, AttributeToken[]> | undefined;
+
+    /**
+     * Recognises a value that is a whole-value token rather than a literal, so the field's **format**
+     * contract (`pattern`) does not apply to it — the platform that owns the vocabulary validates it
+     * instead, and re-validates the resolved value against the same contract at run time.
+     *
+     * <p><b>Without this the picker is decorative.</b> Every typed field it is most useful on carries a
+     * preset `pattern` (date, instant, email), so the moment a token lands in one the form marks it
+     * invalid and Save refuses the very value the picker just authored.
+     *
+     * <p>⚠ Must not carry the `g` flag — `RegExp.test` is stateful with it and would alternate pass/fail
+     * across calls. Unset (the default) ⇒ no exemption, so every existing adopter is unaffected.
+     */
+    @Input() tokenSyntax: RegExp | undefined;
+
+    /** The tokens offered for a field. */
+    tokensFor(spec: AttributeSpec): AttributeToken[] {
+        return this.tokens?.[spec.key] ?? [];
+    }
+
+    /**
+     * Substitute a token for the field's **entire** value.
+     *
+     * <p>⚠ Never an insertion at the cursor. A platform that evaluates only a value which *is* a token
+     * leaves `report for $today` untouched, so a cursor insert would author a value that silently never
+     * resolves — the failure looks like a bad token rather than a bad position.
+     *
+     * <p>On a `list` field the same rule means the token replaces **every** entry: a list is one value
+     * (its items joined), so a token sitting beside other entries is part of a longer value too.
+     */
+    applyToken(spec: AttributeSpec, token: AttributeToken): void {
+        const control = this.form.get(spec.key);
+        if (!control) return;
+        if (spec.type === 'list') {
+            this.setListDraft(spec.key, '');
+            this.writeList(spec.key, [token.token]);
+            return;
+        }
+        control.setValue(token.token);
+        control.markAsDirty();
+        control.markAsTouched();
+    }
+
+    /** Whether a value is a whole-value token substitution rather than a literal — see {@link tokenSyntax}. */
+    private isTokenValue(value: unknown): boolean {
+        return !!this.tokenSyntax && typeof value === 'string' && this.tokenSyntax.test(value);
+    }
 
     /** Loaded suggestions per attribute key (refreshed on field focus). */
     private readonly loadedOptions = signal<Record<string, AttributeOption[]>>({});
@@ -470,11 +534,18 @@ export class InspectoSchemaFormComponent {
             v.push((control: AbstractControl) => {
                 const items = control.value;
                 if (!Array.isArray(items)) return null;
-                const message = listPatternViolation(s, items.filter((e): e is string => typeof e === 'string'));
+                const strings = items.filter((e): e is string => typeof e === 'string');
+                // A lone token IS the field's whole value, so the format contract does not apply to it
+                // (see `tokenSyntax`). Two or more entries are a literal even when one of them looks like
+                // a token — the platform evaluates a value only when it is a token in its ENTIRETY — so
+                // the format does apply, and flagging it here is the point rather than a false positive.
+                if (strings.length === 1 && this.isTokenValue(strings[0])) return null;
+                const message = listPatternViolation(s, strings);
                 return message ? { message } : null;
             });
         } else if (s.pattern) {
-            v.push(Validators.pattern(`^(?:${s.pattern})$`));
+            const literal = Validators.pattern(`^(?:${s.pattern})$`);
+            v.push((control: AbstractControl) => (this.isTokenValue(control.value) ? null : literal(control)));
         }
         if (s.type === 'number') {
             if (s.min !== undefined) v.push(Validators.min(s.min));

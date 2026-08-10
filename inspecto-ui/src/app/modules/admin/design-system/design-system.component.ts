@@ -17,7 +17,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
-import { AttributeSpec } from 'app/inspecto/component-model';
+import { AttributeSpec, AttributeToken } from 'app/inspecto/component-model';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import {
     statusBadgeHtml,
@@ -181,8 +181,26 @@ export class DesignSystemComponent {
             dependsOn: { key: 'protocol', equals: 'sftp' }, help: 'Shown only while protocol = SFTP.',
         },
         { key: 'include', label: 'Include pattern', type: 'string', tier: 'optional', placeholder: 'glob:**/*.csv' },
+        {
+            key: 'as_of', label: 'As of date', type: 'string', tier: 'required', pattern: '\d{4}-\d{2}-\d{2}',
+            placeholder: '2026-08-10', help: 'Has a token picker — a token replaces the whole value.',
+        },
         { key: 'parallel_fetch', label: 'Parallel fetch', type: 'number', tier: 'advanced', default: 4, min: 1, max: 32 },
     ];
+
+    /**
+     * Whole-value tokens for the demo's `as_of` field, keyed by attribute key exactly as a host supplies
+     * them. The HOST filters — the renderer is told what to offer, never how to decide.
+     */
+    readonly schemaFormTokens: Record<string, AttributeToken[]> = {
+        as_of: [
+            { token: '$today', description: 'The date at fire time', preview: '2026-08-10' },
+            { token: '$yesterday', description: 'The day before', preview: '2026-08-09' },
+        ],
+    };
+    /** Marks which values are tokens, so they are exempt from the field's `pattern` (a `$`-token is not a
+     *  date, and holding it to the date format would make the picker unusable). Never a global RegExp. */
+    readonly tokenSyntax = /^\$(?!\$)/;
 
     // ── Data table (tiered: mini / standard / pro / pro max) ─────────────────────────────────
     readonly dtTiers: DataTableTier[] = ['mini', 'standard', 'pro', 'proMax'];

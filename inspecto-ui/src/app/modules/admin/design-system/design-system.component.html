@@ -238,10 +238,16 @@
                 front, optional collapsed, advanced behind the gear. <code>dependsOn</code> attributes show
                 (and validate) only while their controller matches — switch the protocol to see the Host
                 field appear and disappear. Prefer this over a hand-built form whenever the fields are
-                plain config attributes.
+                plain config attributes. <strong>As of date</strong> carries a
+                <code>[tokens]</code> picker: choosing one replaces the field's <em>whole</em> value, and
+                <code>[tokenSyntax]</code> exempts it from the field's date <code>pattern</code>.
             </p>
             <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
-                <inspecto-schema-form [specs]="schemaFormSpecs"></inspecto-schema-form>
+                <inspecto-schema-form
+                    [specs]="schemaFormSpecs"
+                    [tokens]="schemaFormTokens"
+                    [tokenSyntax]="tokenSyntax"
+                ></inspecto-schema-form>
             </div>
             <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.schemaForm }}</code></pre>
         </section>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { JobDetail, JobRunLogs } from '../../api/jobs.service';
+import type { JobDetail, JobExpressionDecl, JobRunLogs } from '../../api/jobs.service';
 import type { JobRun, JobView } from '../../api/models';
 import { MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -146,5 +146,60 @@ describe('jobsHandler', () => {
         expect(handler(req('GET', '/api/jobs/metrics'), store)).toBeUndefined();
         expect(handler(req('GET', '/api/jobs/failures'), store)).toBeUndefined();
         expect(jobsHandler({ mockJobs: false })(req('GET', '/api/jobs'), store)).toBeUndefined();
+    });
+});
+
+/**
+ * `GET /jobs/expressions` (§4.3) — the offline half of the token picker. Java twin:
+ * `ControlApiJobExpressionsTest`. These mirror its assertions on purpose: the picker's promise is that
+ * what it offers is what a Run resolves, so a mock that served a richer vocabulary, or canned previews
+ * where the server evaluates, would rehearse a form that fails against a real backend.
+ */
+describe('jobsHandler — the Expression catalog', () => {
+    const handler = jobsHandler({ mockJobs: true });
+    const catalog = (): JobExpressionDecl[] =>
+        handler(req('GET', '/api/jobs/expressions'), seededStore())?.body as JobExpressionDecl[];
+    const byToken = (token: string): JobExpressionDecl => catalog().find((d) => d.token === token)!;
+
+    it('serves the fifteen built-in tokens with every key the server sends', () => {
+        const all = catalog();
+        expect(all).toHaveLength(15);
+        expect(Object.keys(byToken('$today')).sort()).toEqual(
+            ['availableIn', 'contextFree', 'description', 'example', 'form', 'preview', 'token', 'yields'],
+        );
+    });
+
+    it('declares the shapes and the trigger scoping the picker filters on', () => {
+        expect(byToken('$today')).toMatchObject({ form: 'LITERAL', yields: 'DATE', contextFree: true });
+        expect(byToken('$signal.')).toMatchObject({ form: 'PREFIX', availableIn: ['on_signal'] });
+        expect(byToken('$day(n)').availableIn).toHaveLength(4);
+        // Lowercase and sorted, exactly as ExpressionDecl.toMap() emits them.
+        expect(byToken('$day(n)').availableIn).toEqual(['cron', 'manual', 'on_pipeline', 'on_signal']);
+    });
+
+    it('previews a contextFree token as a LIVE value, not the declared sample', () => {
+        // The server evaluates at request time; a canned string here would drift the day after it was
+        // written and look correct offline the whole time.
+        const today = new Date();
+        const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        expect(byToken('$today').preview).toBe(iso);
+        expect(byToken('$today').preview).not.toBe(byToken('$today').example);
+        // A FUNCTION previews through its typeable example ($day(-1)), because the token is only a shape.
+        expect(byToken('$day(n)').preview).not.toBe('$day(-1)');
+        expect(byToken('$now.epoch_seconds').preview).toMatch(/^\d{10}$/);
+    });
+
+    it('previews a context-bound token as its sample rather than a fabricated value', () => {
+        for (const token of ['$run.id', '$run.actor', '$job.last_success_time', '$signal.']) {
+            const d = byToken(token);
+            expect(d.contextFree).toBe(false);
+            expect(d.preview).toBe(d.example);
+        }
+    });
+
+    it('is not shadowed by the /jobs/{name} route', () => {
+        // `expressions` is a fixed sub-path, not a job id — the same registration-order hazard the server
+        // has, and here the guard is that RESERVED knows about it.
+        expect(handler(req('GET', '/api/jobs/expressions'), seededStore())?.status ?? 200).toBe(200);
     });
 });

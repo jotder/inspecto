@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { JobsService, JobTypeDescriptor } from 'app/inspecto/api';
+import { JobExpressionDecl, JobsService, JobTypeDescriptor } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobFormData, JobFormDialog } from './job-form.dialog';
@@ -16,6 +16,7 @@ function create(
     save = vi.fn(() => of({ name: 'x' })),
     describeType = vi.fn(noParams),
     types: () => Observable<JobTypeDescriptor[]> = () => of([]),
+    expressions: () => Observable<JobExpressionDecl[]> = () => of([]),
 ) {
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
@@ -25,7 +26,7 @@ function create(
             provideHttpClient(), // the autocomplete option loaders inject root HTTP services
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: MatDialogRef, useValue: ref },
-            { provide: JobsService, useValue: { create: save, update: save, describeType, types } },
+            { provide: JobsService, useValue: { create: save, update: save, describeType, types, expressions } },
             { provide: ToastrService, useValue: { error: vi.fn() } },
         ],
     });
@@ -254,6 +255,90 @@ describe('JobFormDialog', () => {
             expect(c.descriptorMissing()).toBe(false);
             expect(c.paramsArray.length).toBe(1);
             expect((fixture.nativeElement as HTMLElement).textContent).toContain('Additional parameters');
+        });
+    });
+
+    /**
+     * The token picker's wiring (step 13). The filtering itself is pinned in `job-parameter-specs.spec.ts`;
+     * what only the dialog can prove is that the offer FOLLOWS the author — the trigger they pick and the
+     * type they switch to — rather than being computed once at open.
+     */
+    describe('expression token picker', () => {
+        const CATALOG: JobExpressionDecl[] = [
+            {
+                token: '$today', form: 'LITERAL', yields: 'DATE', description: 'The fire date', example: '2026-08-07',
+                availableIn: ['cron', 'manual', 'on_pipeline', 'on_signal'], contextFree: true, preview: '2026-08-10',
+            },
+            {
+                token: '$signal.', form: 'PREFIX', yields: 'STRING', description: 'A Signal field', example: '$signal.dataset',
+                availableIn: ['on_signal'], contextFree: false, preview: '$signal.dataset',
+            },
+        ];
+        const withParams = (params: { name: string; type: string; required?: boolean; expressions?: boolean }[]) =>
+            vi.fn(() =>
+                of({
+                    id: 'report', title: 'Report', description: '', emits: [], artifacts: [], requires: [],
+                    parameters: params.map((p) => ({ required: false, deduce: '', default: '', description: '', ...p })),
+                }),
+            );
+
+        it('offers the tokens a declared parameter can hold, and none for one that opted out', async () => {
+            const { c, fixture } = create(
+                {}, undefined,
+                withParams([{ name: 'day', type: 'DATE' }, { name: 'sql', type: 'TEXT', expressions: false }]),
+                () => of([]), () => of(CATALOG),
+            );
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            expect(Object.keys(c.paramTokenMap())).toEqual(['day']);
+            expect(c.paramTokenMap()['day'].map((t) => t.token)).toEqual(['$today']);
+        });
+
+        it('withdraws $signal.* when the author switches the trigger away from a signal', async () => {
+            const { c, fixture } = create(
+                {}, undefined, withParams([{ name: 'note', type: 'STRING' }]), () => of([]), () => of(CATALOG),
+            );
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            c.schemaForm.form.get('scheduleMode')!.setValue('signal');
+            expect(c.paramTokenMap()['note'].map((t) => t.token)).toEqual(['$today', '$signal.dataset']);
+
+            // A cron fire has no Signal payload, so leaving the token offerable would author a value that
+            // resolves to nothing.
+            c.schemaForm.form.get('scheduleMode')!.setValue('cron');
+            expect(c.paramTokenMap()['note'].map((t) => t.token)).toEqual(['$today']);
+        });
+
+        it('renders the picker affordance on the parameter field', async () => {
+            // `required` matters to this assertion, not just to validation: an optional-tier field sits
+            // inside the collapsed "Optional settings" disclosure and is not in the DOM at all until it is
+            // expanded, so a DOM query for its picker finds nothing for a reason that has nothing to do
+            // with tokens.
+            const { fixture } = create(
+                {}, undefined, withParams([{ name: 'day', type: 'DATE', required: true }]), () => of([]), () => of(CATALOG),
+            );
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            const picker = (fixture.nativeElement as HTMLElement).querySelector('button[aria-label="Insert a runtime token into Day"]');
+            expect(picker).not.toBeNull();
+            expect(picker!.closest('.mat-mdc-form-field-icon-suffix')).not.toBeNull();
+        });
+
+        it('degrades to no pickers when the catalog call fails, leaving the fields typeable', async () => {
+            // A server predating step 6 404s here. The picker is an accelerator over a field the author can
+            // still fill in by hand, so it must cost the pickers and nothing else.
+            const { c, fixture } = create(
+                {}, undefined, withParams([{ name: 'day', type: 'DATE' }]), () => of([]),
+                () => throwError(() => ({ status: 404 })),
+            );
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            expect(c.paramTokenMap()).toEqual({});
+            expect(c.paramSpecs().map((s) => s.key)).toEqual(['day']);
         });
     });
 });

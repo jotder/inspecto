@@ -193,3 +193,23 @@ export function attributeValidator(specs: AttributeSpec[]): (config: unknown) =>
     return (config: unknown) =>
         validateAttributes(specs, (config ?? {}) as Record<string, unknown>);
 }
+
+/**
+ * One offerable **whole-value** token for a field — a placeholder the platform substitutes at run time
+ * rather than a literal the author types (reference adopter: the Jobs runtime Expressions,
+ * job-parameter-contract §4.3).
+ *
+ * <p>⚠ Deliberately domain-agnostic: the renderer knows only that a token replaces the field's ENTIRE
+ * value — not what a token means, where the vocabulary comes from, or which of them suit a field. The host
+ * filters and supplies them per attribute key.
+ */
+export interface AttributeToken {
+    /** The typeable surface — this becomes the field's whole value, never an insertion at the cursor. */
+    token: string;
+    description?: string;
+    /**
+     * What it resolves to, for the picker's preview line. **Supplied by whoever owns the vocabulary** —
+     * never computed here, because a second implementation of a substitution is a second answer (§4.3).
+     */
+    preview?: string;
+}

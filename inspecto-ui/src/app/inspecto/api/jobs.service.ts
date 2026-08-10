@@ -136,6 +136,45 @@ export interface JobTypeDescriptor {
   version?: string;
 }
 
+/**
+ * One declared Expression of the runtime vocabulary (GET /jobs/expressions, §4.3) — what the authoring
+ * form's token picker offers, generated from the `ExpressionRegistry` so a Job Pack's tokens appear with
+ * no UI change.
+ *
+ * Mirrors `ExpressionDecl.toMap(preview)`. ⚠ **`preview` is the server's own evaluation** — the registry
+ * computes it with the same evaluator a Run uses, which is what makes the picker's preview correct by
+ * construction. §4.3 forbids a client-side evaluator: a second implementation is a second answer.
+ */
+export interface JobExpressionDecl {
+  /** The declared surface: `$today` (LITERAL), `$signal.` (PREFIX) or `$day(n)` (FUNCTION). */
+  token: string;
+  form: 'LITERAL' | 'PREFIX' | 'FUNCTION' | string;
+  /** The `ParamType` it resolves to, so a field offers only tokens it can hold. */
+  yields: string;
+  description: string;
+  /**
+   * The worked sample. For a shaped token (PREFIX/FUNCTION) this is an instance an author can actually
+   * type (`$day(-1)`) — the token itself is only a shape; for a LITERAL it is the value it resolves to.
+   * That split is why {@link typeableForm} exists rather than reading one field.
+   */
+  example: string;
+  /** Trigger kinds it is meaningful on, lowercase: `cron` | `on_pipeline` | `on_signal` | `manual`. */
+  availableIn: string[];
+  /** Resolves from fire time alone. When false there is no firing context at request time, so `preview`
+   *  is the declared sample rather than a live value. */
+  contextFree: boolean;
+  preview: string;
+}
+
+/**
+ * The form of a token an author can actually type — a LITERAL's own token, or a shaped token's example
+ * (`$day(n)` is a shape; `$day(-1)` is what resolves). Mirrors `ExpressionDecl.sampleExpression()`, the
+ * same rule the server previews through, so the picker inserts a value the registry can evaluate.
+ */
+export function typeableForm(decl: JobExpressionDecl): string {
+  return decl.form === 'LITERAL' ? decl.token : decl.example;
+}
+
 /** One log line for a job run (GET /jobs/{name}/runs/{runId}/logs). */
 export interface JobLogLine {
   ts: string;
@@ -223,6 +262,10 @@ export class JobsService {
   /** One Job Type's descriptor — its declared parameters generate the form (Workbench → Jobs, Phase D). */
   describeType(id: string): Observable<JobTypeDescriptor> {
     return this.http.get<JobTypeDescriptor>(apiUrl(`/jobs/types/${encodeURIComponent(id)}`));
+  }
+  /** The runtime Expression vocabulary (§4.3) — the token picker's source, previews included. */
+  expressions(): Observable<JobExpressionDecl[]> {
+    return this.http.get<JobExpressionDecl[]>(apiUrl('/jobs/expressions'));
   }
   runs(name: string): Observable<JobRun[]> {
     return this.http.get<JobRun[]>(apiUrl(`/jobs/${encodeURIComponent(name)}/runs`));

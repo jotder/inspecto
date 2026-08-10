@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { JobUpsert, jobFromWire, jobToWire } from './jobs.service';
+import { JobExpressionDecl, JobUpsert, jobFromWire, jobToWire, typeableForm } from './jobs.service';
 
 /**
  * The job write/read wire contract. The body a job endpoint accepts is the `job:` TOON section in JSON —
@@ -76,5 +76,25 @@ describe('jobFromWire', () => {
     it('defaults a job with no explicit enabled flag to armed, as the server does', () => {
         expect(jobFromWire({ name: 'j', type: 'maintenance' }).enabled).toBe(true);
         expect(jobFromWire({ name: 'j', type: 'maintenance', enabled: false }).enabled).toBe(false);
+    });
+});
+
+/**
+ * The typeable form of a token (§4.3). The catalog declares a *shape* for the prefix and function forms,
+ * and the shape is not evaluable — `$day(n)` authored verbatim fails the Run with "unknown expression".
+ * Mirrors `ExpressionDecl.sampleExpression()`, the same rule the server previews through.
+ */
+describe('typeableForm', () => {
+    const decl = (p: Partial<JobExpressionDecl> & { token: string; form: string }): JobExpressionDecl => ({
+        yields: 'STRING', description: '', example: '', availableIn: [], contextFree: true, preview: '', ...p,
+    } as JobExpressionDecl);
+
+    it('is a literal token itself', () => {
+        expect(typeableForm(decl({ token: '$today', form: 'LITERAL', example: '2026-08-07' }))).toBe('$today');
+    });
+
+    it('is the worked example for a shaped token, never the shape', () => {
+        expect(typeableForm(decl({ token: '$day(n)', form: 'FUNCTION', example: '$day(-1)' }))).toBe('$day(-1)');
+        expect(typeableForm(decl({ token: '$signal.', form: 'PREFIX', example: '$signal.dataset' }))).toBe('$signal.dataset');
     });
 });

@@ -106,6 +106,25 @@ body.dark {
     min-height: 0;
     max-height: none;
 }
+/* The whole-value token picker's menu (`inspecto/components/token-picker.component.ts`). Each item is a
+ * token, its resolved preview and a one-line description; Material's menu item is a fixed-height nowrap
+ * single line, which squeezes all three into a column of fragments. Widen it and let items wrap. */
+.inspecto-token-menu.mat-mdc-menu-panel {
+    min-width: 22rem;
+    max-width: min(30rem, 90vw);
+
+    .mat-mdc-menu-item {
+        height: auto;
+        min-height: 2.5rem;
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
+    }
+    .mat-mdc-menu-item .mat-mdc-menu-item-text {
+        white-space: normal;
+        line-height: 1.35;
+    }
+}
+
 .inspecto-dialog-resize-grip {
     position: absolute;
     right: 0;

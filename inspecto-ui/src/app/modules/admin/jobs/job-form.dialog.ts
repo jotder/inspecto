@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, JobDetail, JobsService, JobType, JobTypeDescriptor, JobUpsert } from 'app/inspecto/api';
+import { apiErrorMessage, JobDetail, JobExpressionDecl, JobsService, JobType, JobTypeDescriptor, JobUpsert } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { AttributeOptionLoader, InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -18,7 +18,7 @@ import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/componen
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { JOB_ATTRIBUTES } from './job-attributes';
-import { paramDeclsToSpecs, paramValueToApi, paramValueToForm } from './job-parameter-specs';
+import { paramDeclsToSpecs, paramTokens, paramValueToApi, paramValueToForm } from './job-parameter-specs';
 
 /** Dialog input: an existing job ⇒ edit; absent ⇒ create. `focusSchedule` opens with the schedule emphasized
  *  (the "Reschedule" action). */
@@ -33,6 +33,21 @@ export interface JobFormResult {
 }
 
 type ScheduleMode = 'cron' | 'event' | 'signal' | 'manual';
+
+/** The schedule mode in the wire spelling an Expression's `availableIn` uses (`ExpressionDecl.TriggerKind`,
+ *  lowercased) — the picker filters on this, so the two vocabularies have to meet somewhere. */
+const TRIGGER_KIND: Record<ScheduleMode, string> = {
+    cron: 'cron',
+    event: 'on_pipeline',
+    signal: 'on_signal',
+    manual: 'manual',
+};
+
+/** A value that is a runtime token rather than a literal: `$`-led and not the `$$` escape — mirrors
+ *  `ExpressionRegistry.isExpression`, so the form exempts from format validation exactly what the engine
+ *  evaluates. */
+const TOKEN_SYNTAX = /^\$(?!\$)/;
+
 const CRON_PRESETS: { label: string; cron: string }[] = [
     { label: 'Every hour', cron: '0 0 * * * *' },
     { label: 'Daily 06:00', cron: '0 0 6 * * *' },
@@ -183,6 +198,27 @@ export class JobFormDialog implements AfterViewInit {
      *  Job Type's own (a `DATASET_REF` renders as an autocomplete and would otherwise offer nothing). */
     readonly paramOptionLoaders = signal<Record<string, AttributeOptionLoader>>({});
 
+    /** The runtime Expression vocabulary (`GET /jobs/expressions`, §4.3) — the token picker's source. */
+    readonly expressions = signal<JobExpressionDecl[]>([]);
+    /** The selected trigger, in `availableIn`'s spelling. The picker follows it, because switching to cron
+     *  must WITHDRAW the `$signal.*` tokens rather than leave them offerable. */
+    readonly triggerKind = signal<string>(TRIGGER_KIND.cron);
+    /** Exposed for the template's `[tokenSyntax]`. */
+    readonly tokenSyntax = TOKEN_SYNTAX;
+
+    /**
+     * Offerable tokens per declared parameter (§8.5). A computed, so the offer follows both late arrivals —
+     * the catalog fetch and a type switch — and the author's own trigger choice.
+     *
+     * <p>⚠ Filtered from the DESCRIPTOR's declarations, not from `paramSpecs()`: the deciding `expressions`
+     * flag has no home on an `AttributeSpec` and is deliberately not given one. `AttributeSpec`'s unions are
+     * server-published (a Findings section is authored as one), so widening them for a Jobs-only policy flag
+     * would drag `FindingsSpec` along with it — the coupling step 11 recorded and refused to feed.
+     */
+    readonly paramTokenMap = computed(() =>
+        paramTokens(this.selectedType()?.parameters ?? [], this.expressions(), this.triggerKind()),
+    );
+
     constructor() {
         for (const [key, value] of Object.entries(this.data.job?.params ?? {})) this.addParam(key, String(value));
     }
@@ -203,9 +239,33 @@ export class JobFormDialog implements AfterViewInit {
                 // already records the type whose descriptor is rendered, so it is the dedupe key.
                 const t = String((v as { type?: unknown })?.type ?? '');
                 if (t !== this.selectedTypeId()) this.loadParams(t);
+                this.syncTriggerKind();
             });
-        queueMicrotask(() => this.loadParams(String(this.schemaForm.form.get('type')?.value ?? '')));
+        queueMicrotask(() => {
+            this.loadParams(String(this.schemaForm.form.get('type')?.value ?? ''));
+            this.syncTriggerKind();
+        });
         this.loadTypeCatalog();
+        this.loadExpressions();
+    }
+
+    /** Mirror the trigger control into the picker's filter. Read from the control rather than tracked
+     *  separately so an edited job's derived mode and a create default behave identically. */
+    private syncTriggerKind(): void {
+        const mode = String(this.schemaForm.form.get('scheduleMode')?.value ?? 'cron') as ScheduleMode;
+        this.triggerKind.set(TRIGGER_KIND[mode] ?? TRIGGER_KIND.manual);
+    }
+
+    /**
+     * Fetch the Expression vocabulary once (§4.3). Degrades silently to no pickers: the token affordance is
+     * an accelerator over a field an author can still type into, so a server predating step 6 (404) or a
+     * failed call must cost the pickers and nothing else.
+     */
+    private loadExpressions(): void {
+        this.api.expressions().subscribe({
+            next: (list) => this.expressions.set(list ?? []),
+            error: () => undefined,
+        });
     }
 
     /**

@@ -1,5 +1,5 @@
 import type { ComponentDef } from '../../api/components.service';
-import type { JobDetail, JobParameterDecl, JobRunLogs } from '../../api/jobs.service';
+import type { JobDetail, JobExpressionDecl, JobParameterDecl, JobRunLogs } from '../../api/jobs.service';
 import type { JobRun, JobView } from '../../api/models';
 import { componentCollection } from './components.handler';
 import { MockFlags } from '../mock-flags';
@@ -32,7 +32,9 @@ export interface ReportArtifact {
     content: string;
 }
 
-const RESERVED = new Set(['metrics', 'runs', 'failures', 'types']); // /jobs/<reserved> are real routes, not job ids
+// /jobs/<reserved> are real routes, not job ids — the server registers each as a fixed sub-path BEFORE
+// the single-segment /jobs/{name} regex, and `expressions` is one of them (step 6).
+const RESERVED = new Set(['metrics', 'runs', 'failures', 'types', 'expressions']);
 
 /**
  * One parameter declaration in the EXACT shape `ParameterDecl.toMap()` serves: every key of the
@@ -131,9 +133,110 @@ const JOB_TYPE_DESCRIPTORS = [
         // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
         implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
     },
+    {
+        // Mirrors `MailSendJobType.DESCRIPTOR` field for field (pinned server-side by
+        // `MailSendJobTypeTest`). It is here because it is the only built-in declaring EMAIL, `multi` and
+        // `group` — so without it the offline form can never rehearse a grouped, chip-edited, token-bearing
+        // field, which is exactly the shape §9 authors.
+        id: 'mail.send', title: 'Send Mail',
+        description: 'Composes and sends an email to the configured recipients.',
+        parameters: [
+            decl({ name: 'to', type: 'EMAIL', required: true, label: 'To', multi: true, group: 'Recipients', description: 'Recipient addresses' }),
+            decl({ name: 'cc', type: 'EMAIL', label: 'Cc', multi: true, group: 'Recipients', description: 'Additional recipients' }),
+            decl({ name: 'subject', type: 'STRING', required: true, label: 'Subject', group: 'Message', description: 'Message subject line' }),
+            decl({ name: 'body', type: 'TEXT', required: true, label: 'Body', group: 'Message', description: 'Message body' }),
+        ],
+        emits: ['mail.sent'], artifacts: [], requires: ['mail'],
+        implClass: 'com.gamma.job.MailSendJobType', source: 'builtin', version: '',
+    },
 ];
 
+/** Every Trigger kind, lowercase and sorted exactly as `ExpressionDecl.toMap` sorts `availableIn`. */
+const ALL_TRIGGERS = ['cron', 'manual', 'on_pipeline', 'on_signal'];
+
+/** Zero-padded to two digits, for the date previews below. */
+const pad = (n: number): string => String(n).padStart(2, '0');
+
+/**
+ * The fire date shifted the way `LocalDate.plusMonths`/`plusYears` shift it — day-of-month CLAMPED to the
+ * target month's length, not rolled over as JS `setMonth` would (the 31st minus one month is the 28th/30th,
+ * never the 3rd). Only the three date functions need it, and only for their `$unit(-1)` preview.
+ */
+function shiftedDate(days = 0, months = 0, years = 0): string {
+    const now = new Date();
+    const d = new Date(now.getFullYear() + years, now.getMonth() + months, 1);
+    d.setDate(Math.min(now.getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * One Expression declaration in the EXACT shape `ExpressionDecl.toMap(preview)` serves.
+ *
+ * <p>`preview` defaults to `example`, which IS the rule for a context-bound token: there is no firing Run
+ * at request time, so the catalog shows the declared worked sample rather than fabricating a value the
+ * author's Job will never see. A `contextFree` token overrides it with its evaluation.
+ */
+function expr(
+    p: Partial<JobExpressionDecl> & { token: string; yields: string; description: string; example: string },
+): JobExpressionDecl {
+    return {
+        form: 'LITERAL',
+        availableIn: ALL_TRIGGERS,
+        contextFree: true,
+        preview: p.preview ?? p.example,
+        ...p,
+    };
+}
+
+/**
+ * The Expression vocabulary (`GET /jobs/expressions`, §4.3) — the token picker's source, mirroring the
+ * fifteen tokens `BuiltinExpressions` declares, key for key with `ExpressionDecl.toMap()`.
+ *
+ * <p>⚠ A **function**, not a const, because the server evaluates each `contextFree` preview at request
+ * time with the same evaluator a Run uses. Computing dates here is not the client-side evaluator §4.3
+ * forbids — this file *is* the offline server, and a mock returning a canned `"2026-08-07"` where the
+ * server returns today would make the picker look right offline and stale against a real backend.
+ *
+ * <p>⚠ Do NOT add a token here that the engine does not declare. The picker's whole promise is that what
+ * it offers is what a Run will resolve; a mock-only token is an offline rehearsal of a Run that fails
+ * `REJECTED` with "unknown expression".
+ */
+function expressionCatalog(): JobExpressionDecl[] {
+    return [
+        expr({ token: '$today', yields: 'DATE', description: "The date at fire time, in the Job's zone", example: '2026-08-07', preview: shiftedDate() }),
+        expr({ token: '$yesterday', yields: 'DATE', description: 'The day before the fire date', example: '2026-08-06', preview: shiftedDate(-1) }),
+        expr({ token: '$tomorrow', yields: 'DATE', description: 'The day after the fire date', example: '2026-08-08', preview: shiftedDate(1) }),
+        expr({ token: '$now', yields: 'INSTANT', description: 'The fire-time instant', example: '2026-08-07T06:00:00Z', preview: new Date().toISOString() }),
+        expr({ token: '$now.epoch_seconds', yields: 'INTEGER', description: 'Fire time as epoch seconds', example: '1785045600', preview: String(Math.floor(Date.now() / 1000)) }),
+        expr({ token: '$now.epoch_millis', yields: 'INTEGER', description: 'Fire time as epoch milliseconds', example: '1785045600000', preview: String(Date.now()) }),
+        // These three need a firing Run/Job, so they keep their sample as the preview (contextFree: false).
+        expr({ token: '$run.id', yields: 'STRING', description: "This Run's id", example: 'run-20260807-060000-1', contextFree: false }),
+        expr({ token: '$run.fire_time', yields: 'INSTANT', description: 'When this Run fired', example: '2026-08-07T06:00:00Z', preview: new Date().toISOString() }),
+        expr({ token: '$run.actor', yields: 'STRING', description: 'Who or what triggered this Run', example: 'cron', contextFree: false }),
+        expr({
+            token: '$job.last_success_time', yields: 'INSTANT', contextFree: false,
+            description: "This Job's success watermark — the incremental-window anchor; unset before the first success",
+            example: '2026-08-06T06:00:04Z',
+        }),
+        // $signal.* is meaningless on a cron fire — the picker filters on exactly this.
+        expr({
+            token: '$signal.', form: 'PREFIX', yields: 'STRING', availableIn: ['on_signal'], contextFree: false,
+            description: "A dotted field of the firing Signal's payload", example: '$signal.dataset',
+        }),
+        expr({ token: '$day(n)', form: 'FUNCTION', yields: 'DATE', description: 'The fire date shifted by n days (negative = past)', example: '$day(-1)', preview: shiftedDate(-1) }),
+        expr({ token: '$month(n)', form: 'FUNCTION', yields: 'DATE', description: 'The fire date shifted by n months (negative = past)', example: '$month(-1)', preview: shiftedDate(0, -1) }),
+        expr({ token: '$year(n)', form: 'FUNCTION', yields: 'DATE', description: 'The fire date shifted by n years (negative = past)', example: '$year(-1)', preview: shiftedDate(0, 0, -1) }),
+        expr({
+            token: '$upstream(<job>).artifact(<name>).<attr>', form: 'FUNCTION', yields: 'STRING', contextFree: false,
+            description: 'An attribute (ref | rows | bytes | watermark | event_time_min | event_time_max) of a predecessor Job\'s latest Run Artifact',
+            example: '$upstream(loader).artifact(output).ref',
+        }),
+    ];
+}
+
 const JOBS = /\/jobs$/;
+const JOB_EXPRESSIONS = /\/jobs\/expressions$/;
 const JOB_TYPES = /\/jobs\/types$/;
 const JOB_TYPE_ONE = /\/jobs\/types\/([^/]+)$/;
 const JOB_RUN_LOGS = /\/jobs\/([^/]+)\/runs\/([^/]+)\/logs$/;
@@ -173,6 +276,7 @@ export function jobsHandler(flags: MockFlags): MockHandler {
             }
             return json([]);
         }
+        if (method === 'GET' && JOB_EXPRESSIONS.test(url)) return json(expressionCatalog());
         if (method === 'GET' && JOB_TYPES.test(url)) return json(JOB_TYPE_DESCRIPTORS);
         if (method === 'GET' && (m = match(url, JOB_TYPE_ONE))) {
             const d = JOB_TYPE_DESCRIPTORS.find((t) => t.id === m![1]);

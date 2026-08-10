@@ -1,5 +1,5 @@
-import { JobParameterDecl } from 'app/inspecto/api';
-import { AttributeOption, AttributeSpec, AttributeTier, AttributeType } from 'app/inspecto/component-model';
+import { JobExpressionDecl, JobParameterDecl, typeableForm } from 'app/inspecto/api';
+import { AttributeOption, AttributeSpec, AttributeTier, AttributeToken, AttributeType } from 'app/inspecto/component-model';
 
 /**
  * Maps a Job Type's declared {@link JobParameterDecl}s (from `GET /jobs/types/{id}`, R3) onto
@@ -121,6 +121,70 @@ export function paramDeclToSpec(decl: JobParameterDecl): AttributeSpec {
 
 export function paramDeclsToSpecs(decls: JobParameterDecl[]): AttributeSpec[] {
     return (decls ?? []).map(paramDeclToSpec);
+}
+
+/**
+ * Whether a token yielding `yields` can be offered on a parameter declared as `paramType`.
+ *
+ * <p>Permissive where the engine is permissive, strict where it refuses. `ParameterResolver` re-validates
+ * the **resolved** value against the declaration, so the only tokens worth withholding are the ones whose
+ * resolution `matchesType` would then reject — chiefly a DATE token on an INSTANT field and the reverse.
+ * A STRING-yielding token (`$signal.<field>`, `$upstream(…)`) is offered everywhere on purpose: the engine
+ * itself cannot pre-judge one, and it legitimately carries a date, an id or an address.
+ */
+function yieldsSuit(paramType: string, yields: string): boolean {
+    if (paramType === 'STRING' || paramType === 'TEXT') return true; // everything resolves to text
+    return paramType === yields || yields === 'STRING';
+}
+
+/**
+ * The tokens offerable on one declared parameter (§8.5) — three filters, each refusing for its own reason:
+ *
+ * <ol>
+ *   <li><b>`expressions: false`</b> ⇒ none at all. The declaration owns its `$`-namespace (the
+ *       `sql.template` body is the case this exists for), so a picker there would author a literal that
+ *       merely looks like a token.</li>
+ *   <li><b>The Job's trigger kind vs `availableIn`</b> — `$signal.*` resolves to nothing on a cron fire.</li>
+ *   <li><b>The parameter's type vs the token's `yields`</b> — see {@link yieldsSuit}.</li>
+ * </ol>
+ *
+ * <p>⚠ The offered value is the token's **typeable** form, not its declared surface: `$day(n)` is a shape
+ * the registry cannot evaluate, `$day(-1)` is what resolves. The shape rides the description instead, so
+ * the author can still see there is an argument to edit.
+ */
+export function tokensForParam(
+    decl: JobParameterDecl,
+    catalog: JobExpressionDecl[],
+    trigger: string,
+): AttributeToken[] {
+    if (decl.expressions === false) return [];
+    return (catalog ?? [])
+        .filter((d) => (d.availableIn ?? []).includes(trigger) && yieldsSuit(decl.type, d.yields))
+        .map((d) => {
+            const token = typeableForm(d);
+            return {
+                token,
+                description: d.form === 'LITERAL' ? d.description : `${d.description} · shape: ${d.token}`,
+                // A context-bound token previews AS its sample, which is the value being offered — showing
+                // "$signal.dataset → $signal.dataset" is noise, so the preview line is dropped instead.
+                preview: d.preview && d.preview !== token ? d.preview : undefined,
+            };
+        });
+}
+
+/** Every declared parameter's offerable tokens, keyed for `<inspecto-schema-form>`'s `tokens` input.
+ *  A parameter with nothing to offer is omitted entirely — the renderer then draws no picker. */
+export function paramTokens(
+    decls: JobParameterDecl[],
+    catalog: JobExpressionDecl[],
+    trigger: string,
+): Record<string, AttributeToken[]> {
+    const map: Record<string, AttributeToken[]> = {};
+    for (const decl of decls ?? []) {
+        const tokens = tokensForParam(decl, catalog, trigger);
+        if (tokens.length) map[decl.name] = tokens;
+    }
+    return map;
 }
 
 /**
