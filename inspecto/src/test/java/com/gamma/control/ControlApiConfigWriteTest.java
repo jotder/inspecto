@@ -220,6 +220,79 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /** A pipeline whose collector binds a connection by id. */
+    private static String pipelineBoundTo(String name, String connectionId) {
+        return """
+                {"type":"pipeline","config":{
+                   "name":"%s",
+                   "collector":{"connector":"sftp","connection":"%s"},
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1}}}""".formatted(name, connectionId);
+    }
+
+    /**
+     * A {@code collector.connection} naming a profile this space does not have is refused at save. It was
+     * accepted until 2026-08-11 and surfaced only at poll time, where the connector factory throws once per
+     * cycle — bundle import has always refused the same thing, so the two write paths now agree.
+     */
+    @Test
+    void unknownCollectorConnectionIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", pipelineBoundTo("remote", "ghost"));
+            assertEquals(422, r.statusCode(), r.body());
+            // A 422 is the v1 error object, not an unwrapped resource: the refusal detail sits under
+            // error.details, which is where `written` and `findings` live.
+            JsonNode details = V1Body.of(r.body()).get("error").get("details");
+            assertFalse(details.get("written").asBoolean(), "nothing is written when the binding dangles");
+            assertTrue(details.get("findings").toString().contains("collector.connection"),
+                    "the finding names the offending field: " + details.get("findings"));
+            assertFalse(Files.exists(root.resolve("remote_pipeline.toon")));
+        }
+    }
+
+    /** The refusal is about the id being unresolvable, not about binding a connection at all. */
+    @Test
+    void knownCollectorConnectionSaves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            c.svc.registerConnection(new com.gamma.acquire.ConnectionProfile(
+                    "cdr_sftp", "sftp", "sftp.example.test", 22, null,
+                    "/in", "svc", "${ENV:SFTP_PW}", Map.of(), null));
+            assertEquals(200, post(c.port, "/config/write", pipelineBoundTo("remote", "cdr_sftp")).statusCode());
+            assertTrue(Files.exists(root.resolve("remote_pipeline.toon")));
+        }
+    }
+
+    /**
+     * A stale {@code connection} on a LOCAL collector still saves. The local connector never resolves the
+     * binding — {@code CollectorConnectors.forConfig} short-circuits before looking it up — so the field is
+     * inert, not broken, and refusing it would reject configs that run today (it broke five
+     * {@code /config/patch} fixtures shaped exactly like this).
+     */
+    @Test
+    void aStaleConnectionOnALocalCollectorIsNotRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String localWithStaleRef = """
+                    {"type":"pipeline","config":{
+                       "name":"inbox","collector":{"connector":"local","connection":"old_conn"},
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            assertEquals(200, post(c.port, "/config/write", localWithStaleRef).statusCode());
+        }
+    }
+
+    /** A collector with no connection at all is untouched by the check (the local-inbox shape). */
+    @Test
+    void aCollectorWithNoConnectionIsUnaffected(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String local = """
+                    {"type":"pipeline","config":{
+                       "name":"local","collector":{"connector":"local"},
+                       "dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1}}}""";
+            assertEquals(200, post(c.port, "/config/write", local).statusCode());
+        }
+    }
+
     @Test
     void writesIntoAJailedSubdir(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

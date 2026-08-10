@@ -134,6 +134,9 @@ final class ConfigRoutes implements RouteModule {
         // ERROR: an armed pipeline with no schema source parses nowhere. Without this the write
         // returns written:true and the config is then silently dropped from the index forever.
         findings.addAll(armedWithoutSchemaFindings(type, draft));
+        // ERROR: a collector bound to a connection this space does not have cannot acquire anything —
+        // it throws once per poll cycle instead. Bundle import already refuses it; a save now agrees.
+        findings.addAll(unknownConnectionFindings(type, draft, api));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
@@ -320,6 +323,7 @@ final class ConfigRoutes implements RouteModule {
         findings.addAll(ConfigSafetyValidator.check(type, merged, SafetyPolicy.defaultPolicy()));
         findings.addAll(schemaFileFindings(type, merged, Severity.WARNING, target.getParent()));
         findings.addAll(armedWithoutSchemaFindings(type, merged));
+        findings.addAll(unknownConnectionFindings(type, merged, api));   // a patch can introduce one too
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("type", type, "written", false,
                     "error", "merged config has ERROR-level findings; not written", "findings", findings));
@@ -619,6 +623,41 @@ final class ConfigRoutes implements RouteModule {
                 "active: true but no schema is configured (processing.schema_file, "
                         + "processing.schemas[], or a plugin ingester) — keep the draft inactive "
                         + "until its schema is attached"));
+    }
+
+    /**
+     * A <b>remote</b> collector whose {@code connection} names a profile this space does not have. Left
+     * unchecked the dangling id reaches the poll cycle, where {@code CollectorConnectors.forConfig} resolves
+     * it to {@code null} and the connector factory throws — on <em>every</em> cycle, never once, and never
+     * at the moment the operator could fix it. Bundle import has always refused this
+     * ({@code DataSourceRoutes.referentialFindings}, same field path); a plain save did not.
+     *
+     * <p><b>Only when the connector is remote</b>, because that is the only case that resolves the binding:
+     * {@code CollectorConnectors.forConfig} short-circuits to the local connector first and never looks the
+     * id up, so a {@code connection} left behind on a {@code local} collector is inert, not broken. Refusing
+     * it would reject configs that run fine today — and does: it fails five {@code /config/patch} fixtures
+     * whose seed is exactly that shape. A blank/absent connector is the legacy no-{@code collector:}-block
+     * case and counts as local, matching {@code CollectorConnectors.isRemote}. Flipping such a config to a
+     * remote connector goes through this same gate (write or patch), which is where it starts to matter.
+     *
+     * <p>Checked against the live {@code ConnectionProfileRegistry} — the same source of truth the import
+     * path uses, updated in the same request by every connection write. One blind spot: a
+     * {@code *_connection.toon} copied straight onto disk with no restart since. There is no rescan route,
+     * so it is invisible here exactly as it is to the import check and to the run itself.
+     */
+    static List<Finding> unknownConnectionFindings(String type, Map<String, Object> draft, ApiContext api) {
+        if (!"pipeline".equals(type) || api == null) return List.of();
+        if (!(draft.get("collector") instanceof Map<?, ?> collector)) return List.of();
+        Object scheme = collector.get("connector");
+        String connector = scheme == null ? "" : String.valueOf(scheme).trim();
+        if (connector.isEmpty() || "local".equalsIgnoreCase(connector)) return List.of();
+        Object id = collector.get("connection");
+        if (id == null) return List.of();
+        String conn = String.valueOf(id).trim();
+        if (conn.isEmpty() || api.service().connections().containsKey(conn)) return List.of();
+        return List.of(new Finding(Severity.ERROR, "collector.connection",
+                "unknown connection '" + conn + "' — no such connection profile in this space;"
+                        + " create the connection first, or clear collector.connection"));
     }
 
     /**
