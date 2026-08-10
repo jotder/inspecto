@@ -139,6 +139,30 @@ class ComponentPreviewTest {
     }
 
     @Test
+    void sinkPreviewWarnsOnBlankPartitionSource() {
+        // declaredEventTimeSource returns null outright on a present-but-empty source → no bounds at all
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(two("column", "grp", "source", "   ")));
+        ComponentPreview.SinkResult r = ComponentPreview.sink(sink, SAMPLE);
+
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("empty 'source'"));
+    }
+
+    @Test
+    void sinkPreviewWarnsOnPartitionSourceThatIsNotAPlainIdentifier() {
+        // the column really is in the relation, so presence alone would pass it — but the writer's
+        // SAFE_COLUMN check rejects it and records no bounds, so the author must still hear about it
+        List<Map<String, Object>> sample = List.of(Map.of("TXN DATE", "2026-01-01"));
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(two("column", "TXN DATE", "source", "TXN DATE")));
+        ComponentPreview.SinkResult r = ComponentPreview.sink(sink, sample);
+
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("not a plain column identifier"));
+    }
+
+    @Test
     void sinkPreviewWarnsWhenPartitionsDisagreeOnSource() {
         // both sources exist, but PartitionSinkWriter identifies no single event time → no bounds recorded
         Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
