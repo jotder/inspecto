@@ -36,7 +36,24 @@ column is not evidence that it *is* event time:
 | Ingest (`BatchProcessor` → `DataTransformer`) | `__event_time`, coerced from the schema's date `PartitionDef` and **excluded from written output** | no date partition declared, or every row failed to parse |
 | Pipeline sink (`PartitionSinkWriter`) | `TRY_CAST(<source> AS TIMESTAMP)`, where `source` is a `partitions[]` entry's declared raw column | no entry declares one, entries disagree, or it is not a plain identifier |
 
-Enrichment and the Consignment processor still record **no** bounds and no producer.
+Enrichment and the Consignment processor **record a producer since 2026-08-10, and still no bounds** — and the
+two halves of that gap are different problems, so they are listed apart:
+
+| Writer | `producer` | `bounds` |
+|---|---|---|
+| Enrichment (`EnrichmentEngine`) | the enrichment's own `cfg.name()`, on the main **and** routed/quarantine writes | **open — needs a config-schema decision.** `EnrichmentConfig.Output.partitions` is a bare `List<String>`; it has no home for the `source:` key `SinkPartitions` reads, and giving it one is a public `.toon` change |
+| Consignment processor (`ConsignmentProcessJobType`) | the **processor id**, threaded through `SummaryWriter.write` | **open — a design call, possibly a won't-do.** A `SummaryRow` is pre-aggregated over an author-chosen `keys` grain with no enforced time key |
+
+⚠ **Neither writer was ever missing its registry row** — both always called `ConsignmentOutputStores.record`; the
+two columns just arrived null. Worth knowing before someone goes looking for an absent write path.
+
+⚠ **The producer is not the table.** Enrichment's routed/quarantine write goes to `dest`, which more than one
+enrichment can write, so `dest` would be a useless producer; and the process job's producer is the *processor*,
+not the Job Type, because two processors can summarise one target and `producerHighWater` groups by producer.
+
+⛔ **Do not close the summary-bounds gap by folding a `record_day` key into a range.** That describes the grain,
+not the events — and a wrong watermark is worse than a null, which a reader correctly treats as "cannot prune".
+Pinned as a deliberate null by `SummaryWriterTest#boundsStayNullBecauseASummaryRowHasNoEventTime`.
 
 The sink declaration has **one reader**: `SinkPartitions` (`pipeline/exec`), shared by the writer that acts on
 it and the `ComponentPreview` that predicts what it will do. Keeping that rule in both files let them disagree
