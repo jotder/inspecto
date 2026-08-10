@@ -66,10 +66,10 @@
     </form>
 
     <!-- Virtual: author the SQL view with the Query Core -->
-    @if (isVirtual()) {
+    @if (isVirtual() && ready()) {
         <section class="mt-6">
             <h2 class="mb-2 text-lg font-semibold">Query</h2>
-            <inspecto-query-panel [source]="querySource()" (queryChange)="onQueryChange($event)" />
+            <inspecto-query-panel [initialModel]="model()" [source]="querySource()" (queryChange)="onQueryChange($event)" />
         </section>
     }
 

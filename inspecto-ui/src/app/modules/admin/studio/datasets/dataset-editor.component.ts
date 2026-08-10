@@ -92,7 +92,13 @@ export class DatasetEditorComponent implements OnInit {
     readonly columns = signal<DatasetColumn[]>([]);
     readonly calculated = signal<CalculatedColumn[]>([]);
     readonly measures = signal<NamedMeasure[]>([]);
-    private readonly model = signal<QueryModel | null>(null);
+    /** The dataset's saved SQL view (virtual kind only) — seeds `<inspecto-query-panel>` on edit. */
+    readonly model = signal<QueryModel | null>(null);
+    /** True once there's nothing left to seed the panel from: immediately on create, only after the
+     *  async load resolves on edit. Gates mounting `<inspecto-query-panel>` — mounting it earlier (while
+     *  `model` is still its pre-load `null`) would let the panel's own first `queryModelChange` echo back
+     *  through `onQueryChange` and win the race against the real seed arriving moments later. */
+    readonly ready = signal(false);
 
     /** The Query Core source for the embedded panel — the selected sample source's rows + inferred columns. */
     readonly querySource = computed<QuerySource>(() => {
@@ -122,6 +128,7 @@ export class DatasetEditorComponent implements OnInit {
             this.loadExisting(this.id);
         } else {
             this.columns.set(inferRoles(this.inferredColumns()));
+            this.ready.set(true); // nothing to load — the panel can mount right away
             // Product-wide rule: block a duplicate id inline on create rather than relying on the server 409.
             this.datasets
                 .list()
@@ -134,6 +141,9 @@ export class DatasetEditorComponent implements OnInit {
     }
 
     private loadExisting(id: string): void {
+        // Unmount the panel across a reload (e.g. a history restore) too — a live instance's seed-once
+        // guard would otherwise ignore the freshly-restored model.
+        this.ready.set(false);
         this.datasets.get(id).subscribe({
             next: (d) => this.seed(d),
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load dataset "${id}"`)),
@@ -163,6 +173,7 @@ export class DatasetEditorComponent implements OnInit {
         this.calculated.set(d.calculated);
         this.measures.set(d.measures);
         this.model.set(d.query ?? null);
+        this.ready.set(true);
     }
 
     onQueryChange(change: QueryChange): void {

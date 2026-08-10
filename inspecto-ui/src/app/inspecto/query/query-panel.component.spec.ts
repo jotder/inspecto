@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
+import { DataTableComponent } from 'app/inspecto/data-table';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { QueryPanelComponent } from './query-panel.component';
-import { ConditionGroup, QuerySource } from './query-types';
+import { emptyGroup, QueryModel, QuerySource } from './query-types';
 
 const SOURCE: QuerySource = {
     name: 'cdr',
@@ -15,71 +17,75 @@ const SOURCE: QuerySource = {
     ],
 };
 
-function create() {
+async function create() {
     TestBed.configureTestingModule({
         imports: [QueryPanelComponent],
         providers: [provideNoopAnimations(), { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } }],
     });
+    await TestBed.compileComponents(); // the embedded data-table has a @defer block (the SQL editor)
     const f = TestBed.createComponent(QueryPanelComponent);
     f.componentInstance.source = SOURCE;
     f.detectChanges();
     return f;
 }
 
-const cellEqA: ConditionGroup = {
-    kind: 'group',
-    op: 'AND',
-    items: [{ kind: 'condition', field: 'cell', operator: '=', value: 'A' }],
-};
+function table(f: Awaited<ReturnType<typeof create>>): DataTableComponent {
+    return f.debugElement.query(By.directive(DataTableComponent)).componentInstance as DataTableComponent;
+}
 
 describe('QueryPanelComponent', () => {
-    it('infers columns + previews all rows initially', () => {
-        const c = create().componentInstance;
-        expect(c.allColumnNames()).toEqual(['id', 'cell', 'dur']);
-        expect(c.previewRows().length).toBe(3);
-        expect(c.sql()).toContain('SELECT *');
+    it('is a thin adapter: forwards rows/sourceName into the embedded pro-tier data-table', async () => {
+        const f = await create();
+        const t = table(f);
+        expect(t.tier()).toBe('pro');
+        expect(t.rows()).toEqual(SOURCE.rows);
+        expect(t.sourceName()).toBe('cdr');
     });
 
-    it('filters the preview live as the builder changes', () => {
-        const c = create().componentInstance;
-        c.where.set(cellEqA);
-        c.onWhereChanged();
-        expect(c.previewRows().length).toBe(2);
-        expect(c.sql()).toContain("\"cell\" = 'A'");
+    it('opens the Filter and SQL panels by default (authoring is the point of this surface)', async () => {
+        const f = await create();
+        const t = table(f);
+        expect(t.sqlOpen()).toBe(true);
+        expect(t.filterOpen()).toBe(true);
     });
 
-    it('compares numerically over an inferred (column-less) source', () => {
-        // SOURCE has no `columns` → types are inferred; a numeric >= must not compare as strings
-        const c = create().componentInstance;
-        c.where.set({ kind: 'group', op: 'AND', items: [{ kind: 'condition', field: 'dur', operator: '>=', value: '90' }] });
-        c.onWhereChanged();
-        expect(c.previewRows().length).toBe(2); // dur 120 and 90 (NOT a lexical '120' < '90')
-        expect(c.sql()).toContain('"dur" >= 90'); // unquoted ⇒ typed as number
+    it('re-emits the embedded table\'s queryModelChange as queryChange', async () => {
+        const f = await create();
+        const emitted: { model: QueryModel; sql: string }[] = [];
+        f.componentInstance.queryChange.subscribe((e) => emitted.push(e));
+
+        const t = table(f);
+        t.onChosen(['id', 'cell']);
+        f.detectChanges();
+
+        const last = emitted.at(-1)!;
+        expect(last.model.projection).toEqual(['id', 'cell']);
+        expect(last.sql).toContain('SELECT "id", "cell"');
     });
 
-    it('narrows the projected columns', () => {
-        const c = create().componentInstance;
-        c.setProjection(['id', 'cell']);
-        expect(c.gridColumns().map((x) => x.field)).toEqual(['id', 'cell']);
-        expect(c.sql()).toContain('SELECT "id", "cell"');
-    });
+    it('seeds the embedded table from initialModel (re-opening a saved query for edit)', async () => {
+        const seed: QueryModel = {
+            projection: ['cell', 'dur'],
+            where: { ...emptyGroup('AND'), items: [{ kind: 'condition', field: 'cell', operator: '=', value: 'A' }] },
+            sqlOverride: null,
+        };
+        TestBed.configureTestingModule({
+            imports: [QueryPanelComponent],
+            providers: [provideNoopAnimations(), { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } }],
+        });
+        await TestBed.compileComponents();
+        const f = TestBed.createComponent(QueryPanelComponent);
+        f.componentInstance.initialModel = seed;
+        f.componentInstance.source = SOURCE;
+        f.detectChanges();
 
-    it('Edit SQL enters one-way override; Revert restores the builder', () => {
-        const c = create().componentInstance;
-        c.where.set(cellEqA);
-        c.onWhereChanged();
-        c.editSql();
-        expect(c.overrideActive()).toBe(true);
-        c.onOverrideInput('SELECT substring(cell, 1, 1) FROM cdr');
-        expect(c.sql()).toContain('substring');
-        expect(c.previewRows().length).toBe(3); // custom SQL ⇒ sample passthrough
-        c.revertToBuilder();
-        expect(c.overrideActive()).toBe(false);
-        expect(c.previewRows().length).toBe(2); // builder filter restored
+        const t = table(f);
+        expect(t.chosen()).toEqual(['cell', 'dur']);
+        expect(t.where().items).toEqual(seed.where.items);
     });
 
     it('has no a11y violations', async () => {
-        const f = create();
+        const f = await create();
         await expectNoA11yViolations(f.nativeElement);
     });
 });

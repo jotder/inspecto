@@ -100,6 +100,45 @@ describe('DataTableComponent', () => {
         expect(c.generatedSql()).not.toContain('"id"');
     });
 
+    it('columnMeta overrides pure value-inference for the Pro filter/SQL builder', async () => {
+        const f = await create('pro');
+        f.componentRef.setInput('columnMeta', [{ name: 'id', type: 'string' as const }, { name: 'name', type: 'string' as const }]);
+        f.detectChanges();
+        expect(f.componentInstance.columnsCache()).toEqual([
+            { name: 'id', type: 'string' },
+            { name: 'name', type: 'string' },
+        ]);
+    });
+
+    it('initialModel seeds the Pro projection + filter exactly once', async () => {
+        const f = await create('pro');
+        f.componentRef.setInput('initialModel', {
+            projection: ['name'],
+            where: { kind: 'group' as const, op: 'AND' as const, items: [{ kind: 'condition' as const, field: 'name', operator: '=' as const, value: 'beta' }] },
+            sqlOverride: null,
+        });
+        f.detectChanges();
+        const c = f.componentInstance;
+        expect(c.chosen()).toEqual(['name']);
+        expect(c.where().items).toEqual([{ kind: 'condition', field: 'name', operator: '=', value: 'beta' }]);
+
+        // Seeding is one-time: a later change to `initialModel` (e.g. the host resetting a form) is ignored.
+        c.onChosen(['id']);
+        f.componentRef.setInput('initialModel', { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null });
+        f.detectChanges();
+        expect(c.chosen()).toEqual(['id']);
+    });
+
+    it('queryModelChange emits the current model + SQL whenever the projection/filter changes', async () => {
+        const f = await create('pro');
+        const c = f.componentInstance;
+        const emitted: string[] = [];
+        c.queryModelChange.subscribe((e) => emitted.push(e.sql));
+        c.onChosen(['name']);
+        f.detectChanges(); // flush the emit effect
+        expect(emitted.at(-1)).toContain('SELECT "name"');
+    });
+
     it('appends an actions column when rowActions are supplied', async () => {
         const f = await create('mini');
         f.componentRef.setInput('rowActions', [{ icon: 'heroicons_outline:eye', hint: 'View', onClick: () => {} }]);

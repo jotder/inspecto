@@ -68,6 +68,13 @@ export function emptyGroup(op: 'AND' | 'OR' = 'AND'): ConditionGroup {
     return { kind: 'group', op, items: [] };
 }
 
+/** The result of the reusable Query Core builder (`<inspecto-query-panel>`, `<inspecto-data-table
+ *  tier="pro">`): the structured model plus its compiled SQL. */
+export interface QueryChange {
+    model: QueryModel;
+    sql: string;
+}
+
 /**
  * Bridge a typed row array (e.g. `EventRow[]`) to the loose `Record<string, unknown>[]` a {@link QuerySource}
  * holds. Typed interfaces lack an index signature so they aren't structurally assignable; at runtime they

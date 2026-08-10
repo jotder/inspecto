@@ -1,5 +1,9 @@
 import { Injectable, inject } from '@angular/core';
-import { ParameterContext } from 'app/inspecto/query';
+// Direct file import (NOT the `app/inspecto/query` barrel) — that barrel re-exports `QueryPanelComponent`,
+// which imports `DataTableComponent`, which imports from `app/inspecto/rule`, whose types import from
+// `app/inspecto/query` too; going through the barrel here would close a module-init cycle back through
+// `app/inspecto/api` (this service's own module).
+import { ParameterContext } from '../query/parameters';
 import { LensService } from './lens.service';
 
 /**

@@ -1,4 +1,8 @@
-import { ConditionGroup, QueryModel, SqlParam } from 'app/inspecto/query';
+// Direct file imports (NOT the `app/inspecto/query` barrel) — that barrel re-exports `QueryPanelComponent`,
+// which imports `DataTableComponent`, which imports `RuleSaveDialog`/`RuleTemplate` from this module;
+// going through the barrel here would close a module-init cycle.
+import { ConditionGroup, QueryModel } from '../query/query-types';
+import { SqlParam } from '../query/query-sql';
 
 /**
  * A saved rule template — the Pro Max artifact. The body IS a {@link QueryModel} (projection + nested

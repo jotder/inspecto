@@ -18,17 +18,13 @@ import {
     noRowsOverlay,
     refreshAllCells,
 } from 'app/inspecto/grid';
-import {
-    ColumnMeta,
-    compileSql,
-    compileSqlWithParams,
-    ConditionGroup,
-    emptyGroup,
-    inferColumns,
-    QueryConditionGroupComponent,
-    QueryModel,
-    QuerySource,
-} from 'app/inspecto/query';
+// Imported from the specific `inspecto/query` files (NOT the barrel `app/inspecto/query`) — that barrel
+// also re-exports `QueryPanelComponent`, which itself imports `DataTableComponent`; going through the
+// barrel here would create a module-init cycle between the two components.
+import { ColumnMeta, ConditionGroup, emptyGroup, QueryChange, QueryModel, QuerySource } from '../query/query-types';
+import { inferColumns } from '../query/query-columns';
+import { compileSql, compileSqlWithParams } from '../query/query-sql';
+import { QueryConditionGroupComponent } from '../query/query-condition-group.component';
 import { RuleSaveDialog, RuleTemplate } from 'app/inspecto/rule';
 import { ColumnChooserComponent } from './column-chooser.component';
 import { fieldNames } from './core/column-resolve';
@@ -115,12 +111,29 @@ export class DataTableComponent {
     private host = inject<ElementRef<HTMLElement>>(ElementRef);
     private gridApi: GridApi | null = null;
 
+    /** Guards {@link initialModel} application to a single, one-time seed. */
+    private modelSeeded = false;
+
     constructor() {
         // Persist toolbar state (quick search + chosen columns) whenever it changes; no-op without a key.
         effect(() => {
             const key = this.stateKey();
             if (!key) return;
             this.gridState.patch(key, { search: this.search(), chosen: this.chosen() });
+        });
+        // Pro: seed the projection/filter/SQL from a previously-saved model exactly once.
+        effect(() => {
+            if (this.modelSeeded) return;
+            const seed = this.initialModel();
+            if (!seed) return;
+            this.modelSeeded = true;
+            if (seed.projection !== '*') this.chosen.set(seed.projection);
+            this.where.set(seed.where);
+            if (seed.sqlOverride != null) this.currentSql.set(seed.sqlOverride);
+        });
+        // Pro: tell the host whenever the authored query (projection/filter/SQL) changes.
+        effect(() => {
+            this.queryModelChange.emit({ model: this.currentModel(), sql: this.currentSql() || this.generatedSql() });
         });
         TABLES.add(this);
         inject(DestroyRef).onDestroy(() => TABLES.delete(this));
@@ -169,6 +182,13 @@ export class DataTableComponent {
      *  selection. Document-level so triage needs no click into the grid first; typed input and open
      *  dialogs are exempt. Arrow keys stay ag-Grid-native (they work once the grid has focus). */
     readonly keyNav = input(false);
+    /** Declared column types (e.g. a Dataset's schema) for the Pro filter/SQL builder's type handling —
+     *  overrides pure value-inference from `rows`. Omitted ⇒ inferred (existing behavior, unaffected). */
+    readonly columnMeta = input<ColumnMeta[] | undefined>(undefined);
+    /** Seed the Pro projection/filter/SQL once from a previously-saved {@link QueryModel} (e.g. re-opening
+     *  a saved query/dataset view for edit). Applied on first arrival only; later changes are ignored — a
+     *  source switch resets to empty like any other Pro host. */
+    readonly initialModel = input<QueryModel | null>(null);
 
     readonly rowClick = output<Record<string, unknown>>();
     /** Multi-select: the currently checked rows, re-emitted on every selection change. */
@@ -179,6 +199,9 @@ export class DataTableComponent {
     readonly runOnServer = output<string>();
     /** Server paging: emitted when "Load more" is pressed — the host fetches the next offset page and appends. */
     readonly loadMore = output<void>();
+    /** Pro: emits the current projection/filter/SQL (model + compiled SQL) whenever it changes — for a
+     *  host authoring a reusable query (a saved Query template, a virtual dataset's view). */
+    readonly queryModelChange = output<QueryChange>();
 
     /** ag-Grid selection config: checkbox multi-row wins over legacy single-select. */
     readonly rowSelectionValue = computed<RowSelectionOptions | 'single' | undefined>(() =>
@@ -222,7 +245,7 @@ export class DataTableComponent {
     );
 
     private readonly rowsRec = computed(() => this.rows() as Record<string, unknown>[]);
-    readonly columnsCache = computed<ColumnMeta[]>(() => inferColumns(this.rowsRec()));
+    readonly columnsCache = computed<ColumnMeta[]>(() => this.columnMeta() ?? inferColumns(this.rowsRec()));
 
     /** Every available field name (explicit columns win, else the row keys). */
     readonly allFields = computed<string[]>(() => {
@@ -252,6 +275,14 @@ export class DataTableComponent {
     readonly generatedSql = computed(() => compileSql(this.model(), this.querySource()));
     /** The current editor text (resets to {@link generatedSql}, overridden by hand edits / history picks). */
     readonly currentSql = linkedSignal(() => this.generatedSql());
+
+    /** The model to persist: the builder's `model`, with `sqlOverride` set only when the editor text has
+     *  diverged from the freshly generated SQL (mirrors the divergence check {@link onSaveRule} uses). */
+    private readonly currentModel = computed<QueryModel>(() => {
+        const sql = this.currentSql() || this.generatedSql();
+        const diverged = sql.trim() !== this.generatedSql().trim();
+        return diverged ? { ...this.model(), sqlOverride: sql } : this.model();
+    });
 
     readonly defaultColDef = computed<ColDef>(() => {
         const filterable = this.caps().columns;

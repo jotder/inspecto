@@ -1,7 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
-import { ConditionGroup, emptyGroup } from 'app/inspecto/query';
+// Direct file import (NOT the `app/inspecto/query` barrel) — see the note in `rule-types.ts`.
+import { ConditionGroup, emptyGroup } from '../query/query-types';
 import { RuleTemplate } from './rule-types';
 
 /**

@@ -9,7 +9,9 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
-import { QueryModel, SqlParam } from 'app/inspecto/query';
+// Direct file imports (NOT the `app/inspecto/query` barrel) — see the note in `rule-types.ts`.
+import { QueryModel } from '../query/query-types';
+import { SqlParam } from '../query/query-sql';
 import { buildRuleTemplate, RuleTemplate } from './rule-types';
 import { RulesService } from './rules.service';
 

@@ -31,11 +31,13 @@ function create(queries: Query[] = [Q], dialogResult: unknown = true) {
             provideRouter([]),
             { provide: QueriesService, useValue: { list, get: () => of(Q), save, remove } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
-            { provide: MatDialog, useValue: { open: dialogOpen } },
             { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
         ],
     });
+    // The embedded `<inspecto-query-panel>` mounts `<inspecto-data-table>`, which injects the real
+    // MatDialog — a plain `{provide: MatDialog, ...}` above is silently ignored, so it must be overridden.
+    TestBed.overrideProvider(MatDialog, { useValue: { open: dialogOpen } });
     return { fixture: TestBed.createComponent(QueriesComponent), save, remove, list, dialogOpen };
 }
 
