@@ -92,7 +92,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         String store = storeCfg.toString();
         String format = upper(sink.cfg("format"), "PARQUET");
         String compression = str(sink.cfg("compression"));
-        List<String> partCols = partitionColumns(sink);
+        List<String> partCols = SinkPartitions.columns(sink.cfg("partitions"));
         String dir = dataDir.replace("\\", "/") + "/" + store;
 
         List<PartitionOutput> outs = partCols.isEmpty()
@@ -149,7 +149,8 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
      * partition was derived from, exactly the word and meaning {@code PartitionDef.source} already carries on
      * the ingest schema. One concept, one word; no new config key, since {@code partitions[]} has always
      * accepted map entries. When entries are bare strings, or carry no {@code source}, there is nothing here to
-     * aggregate and bounds stay absent.
+     * aggregate and bounds stay absent. {@link SinkPartitions#eventTimeSource} owns that rule, so
+     * {@link ComponentPreview} warns on exactly the declarations this records nothing for.
      *
      * <p><b>Nothing is inferred.</b> A relation's only {@code TIMESTAMP} column is not evidence that it is event
      * time, and neither is a partition column that happens to be a date — that one merely restates the partition
@@ -162,7 +163,7 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
      * the same "no honest bound" rule {@link ConsignmentOutputs#boundsByPartition} already applies.
      */
     private Map<String, EventTimeBounds> boundsFor(PipelineNode sink, String inputTable, List<String> partCols) {
-        String source = declaredEventTimeSource(sink);
+        String source = SinkPartitions.eventTimeSource(sink.cfg("partitions"));
         if (source == null) return Map.of();
         try {
             return ConsignmentOutputs.boundsByPartition(conn, inputTable, partCols,
@@ -176,40 +177,6 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         }
     }
 
-    /**
-     * The single {@code source} column the sink's {@code partitions[]} entries agree on, or {@code null} when
-     * they declare none or disagree — mirroring {@code PartitionDef.eventTimeDef}'s rule on the ingest side,
-     * where two different sources mean no single event time is identified.
-     */
-    private static String declaredEventTimeSource(PipelineNode sink) {
-        if (!(sink.cfg("partitions") instanceof List<?> list)) return null;
-        String found = null;
-        for (Object o : list) {
-            if (!(o instanceof Map<?, ?> m) || m.get("source") == null) continue;
-            String source = m.get("source").toString().trim();
-            if (source.isEmpty() || !SAFE_COLUMN.matcher(source).matches()) return null;
-            if (found != null && !found.equals(source)) return null;   // two sources identify no one event time
-            found = source;
-        }
-        return found;
-    }
-
-    /** A partition {@code source} is embedded in {@code min()}/{@code max()} SQL, so it must be a plain
-     *  identifier — the same fail-closed check {@code DatasetRelation.temporalColumn} applies. */
-    static final java.util.regex.Pattern SAFE_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-
-    /** The sink's {@code partitions} as an ordered column list ({@code []} when absent). */
-    private static List<String> partitionColumns(PipelineNode sink) {
-        Object p = sink.cfg("partitions");
-        List<String> cols = new ArrayList<>();
-        if (p instanceof List<?> list) {
-            for (Object o : list) {
-                if (o instanceof Map<?, ?> m && m.get("column") != null) cols.add(m.get("column").toString());
-                else if (o != null && !o.toString().isBlank()) cols.add(o.toString());
-            }
-        }
-        return cols;
-    }
 
     private static String str(Object o) { return o == null ? null : o.toString(); }
 
