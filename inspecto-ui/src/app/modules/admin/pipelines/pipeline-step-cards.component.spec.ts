@@ -174,4 +174,35 @@ describe('PipelineStepCardsComponent', () => {
         expect(el.querySelectorAll('input')).toHaveLength(0);
         expect(el.querySelectorAll('button')).toHaveLength(0);
     });
+
+    /**
+     * The Add-Step menu keys on `type`, not `verb`, because `transform` names two shapes (filter, join).
+     * ⚠ This is the regression guard for a real trap: `track v.verb` renders duplicate keys, which Angular
+     * treats as an error — so BOTH transform entries have to survive into the opened menu. Asserting on the
+     * component's `verbs` input would pass either way; the menu panel is what has to be right.
+     */
+    it('offers every palette entry when a verb names two shapes (transform: filter + join)', () => {
+        const verbs = [
+            { verb: 'transform', type: 'transform.filter', label: 'Transform (filter)' },
+            { verb: 'transform', type: 'transform.join', label: 'Transform (join)' },
+            { verb: 'sink', type: 'sink.persistent', label: 'Sink' },
+        ];
+        const rows: StepRow[] = [{ kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 }];
+        const { fixture, c } = create({ rows, typeCat: new Map([['acquisition', 'SOURCE']]), editable: true, verbs });
+        const inserted: { type: string; afterId: string | null }[] = [];
+        c.insertStep.subscribe((e) => inserted.push(e));
+
+        const trigger = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
+            .find((b) => b.getAttribute('aria-label') === 'Add a Step at the start')!;
+        trigger.click();
+        fixture.detectChanges();
+
+        // the menu renders in an overlay, not inside the component's own element
+        const items = Array.from(document.querySelectorAll('.mat-mdc-menu-panel button.mat-mdc-menu-item'));
+        expect(items.map((i) => i.textContent?.trim()))
+            .toEqual(['Transform (filter)', 'Transform (join)', 'Sink']);
+
+        (items[1] as HTMLButtonElement).click();
+        expect(inserted).toEqual([{ type: 'transform.join', afterId: null }]);
+    });
 });

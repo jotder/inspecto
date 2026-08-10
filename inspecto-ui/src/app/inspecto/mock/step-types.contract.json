@@ -217,6 +217,28 @@
     "help" : "Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate."
   } ]
 }, {
+  "verb" : "transform",
+  "type" : "transform.join",
+  "category" : "TRANSFORM",
+  "label" : "Join",
+  "description" : "Joins against a Reference Dataset by key.",
+  "lowerable" : true,
+  "attributes" : [ {
+    "key" : "reference",
+    "label" : "Reference",
+    "type" : "autocomplete",
+    "tier" : "required",
+    "help" : "The registered Reference component joined onto the row set.",
+    "placeholder" : "reference/rates"
+  }, {
+    "key" : "on",
+    "label" : "Join keys",
+    "type" : "list",
+    "tier" : "required",
+    "help" : "Column(s) equated between the rows and the Reference.",
+    "placeholder" : "currency"
+  } ]
+}, {
   "verb" : "summarize",
   "type" : "transform.summarize",
   "category" : "TRANSFORM",

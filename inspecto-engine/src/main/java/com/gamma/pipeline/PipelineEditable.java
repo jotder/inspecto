@@ -35,6 +35,9 @@ public final class PipelineEditable {
     // ── refusal codes (stable; the UI renders them next to the offending node) ──────
     public static final String UNSUPPORTED_NODE = "UNSUPPORTED_NODE";
     public static final String MULTI_SINK = "MULTI_SINK";
+    /** A second {@code transform.join}: the flat config holds ONE {@code processing.join}, so the extra one
+     *  would be silently discarded. Reachable from the recipe palette since the join verb shipped there. */
+    public static final String MULTI_JOIN = "MULTI_JOIN";
     public static final String NO_ACQUISITION = "NO_ACQUISITION";
     public static final String NO_PARSER = "NO_PARSER";
     public static final String NO_PERSISTENT_SINK = "NO_PERSISTENT_SINK";
@@ -232,7 +235,13 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) recordDedup = n;
             else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) routeNode = n;
             else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) summarizeNode = n;
-            else if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(t)) joinNode = n;
+            else if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(t)) {
+                // One slot only — processing.join is a single block, so a second join would replace the
+                // first with no trace. Refuse by name rather than lose the operator's work silently.
+                if (joinNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_JOIN, n.id(),
+                        "a pipeline lowers one reference join; '" + joinNode.id() + "' already claims it"));
+                else joinNode = n;
+            }
             else if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(t)) filters.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {

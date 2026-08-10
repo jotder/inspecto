@@ -784,6 +784,16 @@ describe('RECIPE_VERBS fallback vs the served step-types contract (S4 dual-read)
             .toEqual(RECIPE_VERBS.map((v) => ({ verb: v.verb, type: v.type })));
         for (const c of contract) expect(c.lowerable, `${c.verb} must be saveable`).toBe(true);
     });
+
+    /** `type` is an entry's unique key — `verb` is NOT, since `transform` names both filter and join
+     *  (the recipe spells a join `transform: {join: …}`). Anything keying on `verb` collapses the two. */
+    it('every entry has a unique type, and transform offers both filter and join', async () => {
+        const { RECIPE_VERBS } = await import('./pipeline-graph');
+        const types = RECIPE_VERBS.map((v) => v.type);
+        expect(new Set(types).size, `duplicate type in RECIPE_VERBS: ${types.join(', ')}`).toBe(types.length);
+        expect(RECIPE_VERBS.filter((v) => v.verb === 'transform').map((v) => v.type))
+            .toEqual(['transform.filter', 'transform.join']);
+    });
 });
 
 describe('route parity round trip (mock lift/lower mirrors PipelineEditable/PipelineLift)', () => {

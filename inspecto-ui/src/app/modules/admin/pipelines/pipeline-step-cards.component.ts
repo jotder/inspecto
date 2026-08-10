@@ -221,7 +221,7 @@ import {
         </ol>
 
         <mat-menu #verbMenu="matMenu">
-            @for (v of verbs; track v.verb) {
+            @for (v of verbs; track v.type) {
                 <button mat-menu-item (click)="insertStep.emit({ type: v.type, afterId: insertAfterId })">
                     <mat-icon [svgIcon]="paletteHeroIcon(typeCat.get(v.type) ?? '')"></mat-icon>
                     <span>{{ v.label }}</span>
@@ -237,7 +237,8 @@ export class PipelineStepCardsComponent {
     @Input() statusOf?: (node: AuthoredNode) => NodeStatus;
     /** S2: reveal the editing affordances. The host still gates every mutation on canAuthor(). */
     @Input() editable = false;
-    /** S4: the Add-Step verb palette — served step-types when the host has them, else the client map. */
+    /** S4: the Add-Step verb palette — served step-types when the host has them, else the client map.
+     *  ⚠ Keyed on `type`, never `verb`: `transform` names two shapes (filter, join). */
     @Input() verbs: readonly { verb: string; type: string; label: string }[] = RECIPE_VERBS;
 
     /** Open the Step's config dialog (the host routes parse → GrammarEditorDialog, rest → NodeConfigDialog). */

@@ -1,6 +1,7 @@
 /**
  * The mock's editable lift/lower — a faithful TS port of the backend `PipelineEditable` (W5). It
- * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_SINK / the completeness set),
+ * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_SINK / MULTI_JOIN / the
+ * completeness set),
  * or the offline preview passes a topology the real backend 422s — the textbook "mock more lenient
  * than the server" hole this project has been bitten by before. Node config is the raw config-file
  * vocabulary end to end, so lift→lower is a verbatim map round-trip.
@@ -253,7 +254,13 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'transform.route') routeNode = n;
         else if (n.type === 'transform.dedup') recordDedup = n;
         else if (n.type === 'transform.summarize') summarizeNode = n;
-        else if (n.type === 'transform.join') joinNode = n;
+        else if (n.type === 'transform.join') {
+            // One slot only, exactly as PipelineEditable.java: a second join would replace the first
+            // silently, so the server refuses MULTI_JOIN and so must this.
+            if (joinNode) refusals.push({ code: 'MULTI_JOIN', nodeId: n.id,
+                message: `a pipeline lowers one reference join; '${joinNode.id}' already claims it` });
+            else joinNode = n;
+        }
         else if (n.type === 'transform.filter') filters.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;

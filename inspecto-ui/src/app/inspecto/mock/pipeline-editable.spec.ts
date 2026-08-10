@@ -195,4 +195,26 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
         const lp = (lax as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
         expect(lp['summarize']).toEqual({ group_by: ['region'], measures: ['sum(amount)'] });
     });
+
+    /**
+     * `processing.join` is ONE block, so a second join node had nowhere to go and the last one silently
+     * won — losing the first join's config with no refusal and no warning. The server now refuses
+     * MULTI_JOIN (`PipelineEditable.java`), so the mock must too: this became reachable when the recipe
+     * palette gained the join verb, and an offline preview that accepts it would greenlight a save the
+     * backend 422s.
+     */
+    it('refuses a SECOND join with MULTI_JOIN rather than silently replacing the first', () => {
+        const existing = processedConfig();
+        const g = liftConfig(existing);
+        const first = g.nodes.find((n) => n.type === 'transform.join')!;
+        g.nodes.push({ id: 'join_2', type: 'transform.join', config: { reference: 'reference/fx', on: 'ccy' } });
+
+        const res = lowerGraph(g, existing, true);
+        expect('refusals' in res, JSON.stringify(res)).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
+        const multi = refusals.find((r) => r.code === 'MULTI_JOIN')!;
+        expect(multi).toBeTruthy();
+        expect(multi.nodeId).toBe('join_2'); // the offender, not the incumbent
+        expect(multi.message).toContain(first.id); // names who already claimed the block
+    });
 });

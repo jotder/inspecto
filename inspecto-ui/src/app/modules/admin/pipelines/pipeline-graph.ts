@@ -582,6 +582,10 @@ function walkStepChain(
  * vocabulary, and a drift between the two fails the contract spec. `route` (S3) inserts via
  * {@link insertRouteAfter}, not {@link insertStepAfter}: a branch point rewires its downstream
  * edge as its first branch.
+ *
+ * ⚠ `verb` is NOT unique — `transform` appears once per shape it authors (filter, join), because the
+ * recipe spells a join as `transform: {join: …}` and `RecipeCompiler` has no `join` verb. `type` is the
+ * unique key, so anything keying off an entry (a `track` expression, a Map) must use `type`.
  */
 export const RECIPE_VERBS: readonly { verb: string; type: string; label: string }[] = [
     { verb: 'collect', type: 'acquisition', label: 'Collect' },
@@ -589,6 +593,7 @@ export const RECIPE_VERBS: readonly { verb: string; type: string; label: string 
     { verb: 'map', type: 'transform.map', label: 'Map' },
     { verb: 'dedup', type: 'transform.dedup', label: 'Dedup' },
     { verb: 'transform', type: 'transform.filter', label: 'Transform (filter)' },
+    { verb: 'transform', type: 'transform.join', label: 'Transform (join)' },
     { verb: 'summarize', type: 'transform.summarize', label: 'Summarize' },
     { verb: 'route', type: 'transform.route', label: 'Route' },
     { verb: 'sink', type: 'sink.persistent', label: 'Sink' },

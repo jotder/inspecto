@@ -58,7 +58,8 @@ public final class PipelineProjection {
     }
 
     /**
-     * The recipe-verb palette (ELT amendment §5, Phase 5): the seven verbs + {@code route} in pipeline
+     * The recipe-verb palette (ELT amendment §5, Phase 5): the seven verbs + {@code route}, with
+     * {@code transform} entered once per shape it authors (filter, join), in pipeline
      * order, each carrying the node type it authors as plus that type's served attribute specs — the
      * server-published version of the verb table the UI carried as its documented interim
      * ({@code RECIPE_VERBS}). {@code map} authors a {@code transform.map} node in the GRAPH editor even
@@ -78,13 +79,21 @@ public final class PipelineProjection {
         return out;
     }
 
-    /** verb → the node type it authors as, in pipeline order (collect first, sink last). */
+    /**
+     * verb → the node type it authors as, in pipeline order (collect first, sink last).
+     * <p>⚠ A verb may appear more than once: {@code transform} authors both {@code transform.filter} and
+     * {@code transform.join}, because the recipe spells a join as {@code transform: {join: …}} — there is no
+     * {@code join} case in {@link RecipeCompiler}'s verb switch, so publishing {@code verb: "join"} would
+     * advertise a vocabulary the compiler refuses. The palette entry is therefore per SHAPE while the verb
+     * stays the recipe's own word; {@code type} is the unique key of an entry, never {@code verb}.
+     */
     private static final List<String[]> RECIPE_VERBS = List.of(
             new String[] {"collect", BuiltinNodeType.ACQUISITION.type()},
             new String[] {"parse", BuiltinNodeType.PARSER.type()},
             new String[] {"map", BuiltinNodeType.TRANSFORM_MAP.type()},
             new String[] {"dedup", BuiltinNodeType.TRANSFORM_DEDUP.type()},
             new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
+            new String[] {"transform", BuiltinNodeType.TRANSFORM_JOIN.type()},
             new String[] {"summarize", BuiltinNodeType.TRANSFORM_SUMMARIZE.type()},
             new String[] {"route", BuiltinNodeType.TRANSFORM_ROUTE.type()},
             new String[] {"sink", BuiltinNodeType.SINK_PERSISTENT.type()});
