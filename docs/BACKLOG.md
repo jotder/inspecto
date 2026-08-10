@@ -1015,6 +1015,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     registry stores zone-less local date-times, valid as SQL timestamp literals but rejected by an
     `INSTANT`-typed parameter). Only a pipeline Job's sinks report a range; the other Job Types write no
     registry rows and answer unknown, which is honest rather than a gap.
+    **An eleventh landed 2026-08-10**: `build(pom)` — every reactor **artifactId** was renamed
+    `file-processor-*` → `inspecto-*` so it matches its directory (`inspecto-api`, `inspecto-util`, …;
+    parent `inspecto-parent`; the core is `inspecto-processor`, since `inspecto` would collide with the
+    aggregator directory). `groupId` (`com.gamma.inspector`) and the version are unchanged. Operator-visible
+    only to someone **building from source or depending on these coordinates** — anyone consuming the
+    shipped bundle sees nothing, because the deployment file name **`file-processor.jar` is deliberately
+    unchanged** (`serve.sh`, `run-example`, `docs/EDITIONS.md` all still reference it); only the artifact in
+    `inspecto/target/` is now `inspecto-processor-<version>.jar`. Release notes should carry the coordinate
+    table for downstream poms. Renaming the bundle itself is a **separate, unmade decision** — do not treat
+    it as leftover work.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
