@@ -134,6 +134,14 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   caller** despite being built for exactly that job — see
   [`okf/backend/engine/consignment-addressing.md`](okf/backend/engine/consignment-addressing.md) §2.
 
+- **Removing a component from a record that is persisted as JSON breaks reading the history.** A bare
+  `new ObjectMapper()` fails on unknown properties by default, and every append-only JSONL store here uses one
+  (`RunArtifactStore`, `RunLogStore`). Drop a field from the record and Jackson throws on every historical line
+  that still carries the key — the whole run's read fails, not just the stale field. Retiring
+  `RunArtifact.timeRange` (2026-08-10) needed `FAIL_ON_UNKNOWN_PROPERTIES=false` in the same change. **A reader
+  of durable history must tolerate the shapes history actually contains**, so set that flag when the store is
+  created, not when a field is first removed.
+
 - **Surefire `-Dtest=A,B` wants commas.** The `+` form silently matches nothing and fails the run with
   "No tests matching pattern … were executed", which reads like a missing class rather than a bad separator.
 
