@@ -65,7 +65,7 @@ import {
                             <span class="truncate text-sm font-semibold">
                                 {{ row.node.name && row.node.name.trim() ? row.node.name : row.node.id }}
                             </span>
-                            <span class="shrink-0 text-xs opacity-60">{{ categoryLabel(typeCat.get(row.node.type) ?? '') }}</span>
+                            <span class="shrink-0 text-xs opacity-60">{{ stepTypeLabel(row.node.type) }}</span>
                             @if (statusOf) {
                                 <span
                                     class="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold"
@@ -233,6 +233,13 @@ import {
 export class PipelineStepCardsComponent {
     @Input({ required: true }) rows: StepRow[] = [];
     @Input({ required: true }) typeCat!: Map<string, string>;
+    /**
+     * node-type → per-type label ('Join'), used for the card's kind caption. Optional: a host that has
+     * no served catalog leaves it empty and every card falls back to its CATEGORY label, which is what
+     * every card showed before — so a join and a filter read identically ('Transformer'). That fallback
+     * is the degraded path, not the intent.
+     */
+    @Input() typeLabel: Map<string, string> = new Map();
     /** Optional — omitted when the host has no registry-refs/test-outcome state loaded yet. */
     @Input() statusOf?: (node: AuthoredNode) => NodeStatus;
     /** S2: reveal the editing affordances. The host still gates every mutation on canAuthor(). */
@@ -263,7 +270,10 @@ export class PipelineStepCardsComponent {
     /** Where the open verb menu will insert (set by the clicked "+" before the menu opens). */
     insertAfterId: string | null = null;
 
-    readonly categoryLabel = categoryLabel;
+    /** What KIND of Step this card is: the type's own label, else its category group. */
+    stepTypeLabel(type: string): string {
+        return this.typeLabel.get(type) ?? categoryLabel(this.typeCat.get(type) ?? '');
+    }
     readonly paletteHeroIcon = paletteHeroIcon;
     readonly statusIcon = statusIcon;
     readonly statusLabel = statusLabel;

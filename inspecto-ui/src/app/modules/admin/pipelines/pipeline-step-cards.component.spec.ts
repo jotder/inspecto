@@ -36,6 +36,38 @@ describe('PipelineStepCardsComponent', () => {
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
+    it('distinguishes two TRANSFORM steps by their own type labels, not the shared category', () => {
+        // The defect this closes: both are category TRANSFORM, so both cards read 'Transformer' and a
+        // join is indistinguishable from a filter unless the operator happened to name it.
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: 'j', node: { id: 'j', type: 'transform.join' }, depth: 0 },
+            { kind: 'node', rowId: 'f', node: { id: 'f', type: 'transform.filter' }, depth: 0 },
+        ];
+        const typeCat = new Map([['transform.join', 'TRANSFORM'], ['transform.filter', 'TRANSFORM']]);
+        const typeLabel = new Map([['transform.join', 'Join'], ['transform.filter', 'Filter']]);
+
+        const { fixture } = create({ rows, typeCat, typeLabel });
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Join');
+        expect(text).toContain('Filter');
+        expect(text).not.toContain('Transformer');
+    });
+
+    it('falls back to the category label for a type the catalog gives no label for', () => {
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: 'j', node: { id: 'j', type: 'transform.join' }, depth: 0 },
+            { kind: 'node', rowId: 'x', node: { id: 'x', type: 'transform.bespoke' }, depth: 0 },
+        ];
+        const typeCat = new Map([['transform.join', 'TRANSFORM'], ['transform.bespoke', 'TRANSFORM']]);
+        const typeLabel = new Map([['transform.join', 'Join']]);   // the plugin type has no served label
+
+        const { fixture } = create({ rows, typeCat, typeLabel });
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Join');
+        expect(text).toContain('Transformer');
+        expect(text).not.toContain('transform.bespoke');   // never print the raw type at the user
+    });
+
     it('renders a branch-header row indented and shows its predicate + default flag', () => {
         const rows: StepRow[] = [
             { kind: 'node', rowId: 'route-1', node: { id: 'route-1', type: 'transform.route' }, depth: 0 },

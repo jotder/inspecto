@@ -257,6 +257,17 @@ export function typeCategoryMap(types: PipelineNodeType[]): Map<string, string> 
 }
 
 /**
+ * A node-type → per-TYPE display label ('Join', 'Filter') from the palette catalog. Distinct from
+ * {@link categoryLabel}, which names the whole group ('Transformer') and so reads identically for every
+ * transform. An authored node carries only its `type`, so a card that wants to say what a Step actually
+ * IS has to resolve it through this map. Types the catalog omits a label for are simply absent — the
+ * caller falls back to the category rather than printing a raw `transform.join`.
+ */
+export function typeLabelMap(types: PipelineNodeType[]): Map<string, string> {
+    return new Map(types.filter((t) => !!t.label).map((t) => [t.type, t.label]));
+}
+
+/**
  * Map an authored flow (config-bearing, from GET …/raw) to G6 data for the editor host. A node's category —
  * which drives shape + outline colour — is resolved from the palette ({@link typeCategoryMap}); an unknown
  * type falls back to TRANSFORM so a plugin/unknown node still renders. When {@code lastRunCounts} is supplied

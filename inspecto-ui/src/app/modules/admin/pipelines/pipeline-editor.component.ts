@@ -95,6 +95,7 @@ import {
     setEdgeRelInModel,
     statusLabel,
     typeCategoryMap,
+    typeLabelMap,
     uniqueNodeId,
     validatePipeline,
 } from './pipeline-graph';
@@ -213,6 +214,8 @@ export class PipelineEditorComponent implements OnInit {
     readonly paletteGroups = signal<NodeTypeGroup[]>([]);
     /** Public (template use only, e.g. the recipe view's category label): not otherwise part of the API. */
     readonly typeCat = signal<Map<string, string>>(new Map());
+    /** node-type → per-type display label, so a Step card can say 'Join' rather than 'Transformer'. */
+    readonly typeLabel = signal<Map<string, string>>(new Map());
     /** type → whether a save can lower it, from `GET /pipelines/node-types` (see G2/G5). */
     private readonly typeLowerable = signal<Map<string, boolean>>(new Map());
     /**
@@ -550,6 +553,7 @@ export class PipelineEditorComponent implements OnInit {
                 // grandfathered graph carrying such a node keeps rendering + flagging (unsupported()).
                 this.paletteGroups.set(groupByCategory(ts.filter((t) => t.lowerable)));
                 this.typeCat.set(typeCategoryMap(ts));
+                this.typeLabel.set(typeLabelMap(ts));
                 this.typeEmits.set(new Map(ts.map((t) => [t.type, t.emits])));
                 this.typeLowerable.set(new Map(ts.map((t) => [t.type, t.lowerable])));
                 // Only types the server actually specced — a type whose `attributes` the payload omits
