@@ -9,7 +9,6 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -400,16 +399,17 @@ public final class ComponentPreview {
         if (format != null && !ALLOWED_SINK_FORMATS.contains(format.toLowerCase()))
             warnings.add("unrecognised format '" + format + "' (expected one of " + ALLOWED_SINK_FORMATS + ")");
 
-        for (String pc : partitionColumns(content))
+        Object partitions = content.get("partitions");
+        for (String pc : SinkPartitions.columns(partitions))
             if (!columns.contains(pc))
                 warnings.add("partition column '" + pc + "' is not present in the sample rows");
 
-        List<String> sources = partitionSources(content);
+        List<String> sources = SinkPartitions.declaredSources(partitions);
         if (sources.remove(""))   // present but empty: the write path reads no bounds at all
             warnings.add("a partition declares an empty 'source'"
                     + " — no event-time bounds will be recorded for this sink");
         for (String ps : sources)
-            if (!PartitionSinkWriter.SAFE_COLUMN.matcher(ps).matches())
+            if (!SinkPartitions.SAFE_COLUMN.matcher(ps).matches())
                 warnings.add("partition source '" + ps + "' is not a plain column identifier"
                         + " — no event-time bounds will be recorded for this sink");
             else if (!columns.contains(ps))
@@ -478,37 +478,6 @@ public final class ComponentPreview {
 
     private static String tryCast(String col, String sqlType) {
         return "TRY_CAST(" + col + " AS " + sqlType + ") IS NOT NULL";
-    }
-
-    /**
-     * The distinct {@code source} columns declared by a sink's {@code partitions} entries, in declaration order.
-     * A {@code source} names the raw column a partition was derived from; the write path aggregates it to record
-     * event-time bounds, and records none unless the entries agree on a single plain identifier that exists in
-     * the relation ({@code PartitionSinkWriter.declaredEventTimeSource}). An entry whose {@code source} is
-     * present but blank is kept as {@code ""} — it voids the bounds there, so it must not vanish here.
-     * Warning only — {@code PartitionSinkWriter} still degrades to null bounds rather than failing (decision D3).
-     */
-    private static List<String> partitionSources(Map<String, Object> content) {
-        Set<String> out = new LinkedHashSet<>();
-        if (content.get("partitions") instanceof List<?> parts) {
-            for (Object o : parts) {
-                if (!(o instanceof Map<?, ?> m) || m.get("source") == null) continue;
-                out.add(m.get("source").toString().trim());
-            }
-        }
-        return new ArrayList<>(out);
-    }
-
-    /** Declared partition columns of a sink: a {@code partitions} list of names or {@code {column: …}} maps. */
-    private static List<String> partitionColumns(Map<String, Object> content) {
-        List<String> out = new ArrayList<>();
-        if (content.get("partitions") instanceof List<?> parts) {
-            for (Object o : parts) {
-                if (o instanceof Map<?, ?> m && m.get("column") != null) out.add(m.get("column").toString());
-                else if (o != null) out.add(o.toString());
-            }
-        }
-        return out;
     }
 
     private static String strOr(Map<String, Object> m, String key, String dflt) {
