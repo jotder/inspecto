@@ -38,6 +38,19 @@ column is not evidence that it *is* event time:
 
 Enrichment and the Consignment processor still record **no** bounds and no producer.
 
+The sink declaration has **one reader**: `SinkPartitions` (`pipeline/exec`), shared by the writer that acts on
+it and the `ComponentPreview` that predicts what it will do. Keeping that rule in both files let them disagree
+twice in one day, each time costing an author their bounds with no signal anywhere — so `eventTimeSource` is
+derived from `declaredSources` rather than parsing the list again, and the preview warns at authoring time on
+exactly the declarations the writer refuses: none declared, two that disagree, one blank, one that is not a
+plain identifier. Deliberately **not** unified with `PartitionDef.fromSchema` on the ingest side — same config
+word, different contract (`type` required per entry, non-list hard-fails, legacy `partitionKey` fallback).
+
+⚠ An entry declaring **no `column`** (or a blank one) is the single `partitions[]` defect this path refuses
+rather than degrades past. It names no directory segment, so accepting it silently writes the store to a layout
+its readers do not glob for; it previously stringified the whole entry into a directory named `{source=…}`.
+`PartitionSinkWriter` throws before writing a byte, and the preview warns while the config is still editable.
+
 ⚠ **Why not the dataset's `role: temporal`?** Because reaching a dataset *from* a store name is a
 reverse lookup that is ambiguous by construction (`putIfAbsent`, first-scan-wins), so the bounds would
 depend on directory scan order. `DatasetRelation.temporalColumn` therefore has no caller on any write
