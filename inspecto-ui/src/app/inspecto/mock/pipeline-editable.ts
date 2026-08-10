@@ -90,7 +90,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (config['trigger'] != null) acqCfg['trigger'] = config['trigger'];
     if (processing['file_pattern'] != null) acqCfg['file_pattern'] = processing['file_pattern'];
     const acqUse = collector['connection'] ? `connection/${String(collector['connection'])}` : undefined;
-    nodes.push({ id: 'acq', type: 'acquisition', name: 'Acquisition', use: acqUse, config: acqCfg });
+    nodes.push({ id: 'acq', type: 'acquisition', name: 'Collect', use: acqUse, config: acqCfg });
 
     // gap (control)
     const gapDetection = asMap(collector['gap_detection']);

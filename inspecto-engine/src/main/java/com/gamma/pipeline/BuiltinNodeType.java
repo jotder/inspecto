@@ -24,8 +24,10 @@ import java.util.Set;
 public enum BuiltinNodeType implements PipelineNodeType {
 
     // ── entry / acquisition (the collector role, §3.1) ───────────────────────────
-    ACQUISITION("acquisition", NodeCategory.SOURCE, "Acquisition",
-            "Collects files from a source (poll/listing); the pipeline entry.",
+    // The label is "Collect", not "Acquisition": GLOSSARY §2/§3 allows one word per concept, and the
+    // category this node sits under already renders "Collector". "Source" is banned outright.
+    ACQUISITION("acquisition", NodeCategory.SOURCE, "Collect",
+            "Collects files (poll/listing); the pipeline entry.",
             Set.of(), Set.of(PipelineRel.DATA, PipelineRel.GAP, PipelineRel.FAILURE), false),
     ADAPTER("adapter", NodeCategory.SOURCE, "Adapter",
             "Windows a stream/push source into intermediate files (by time/count/size), then lands them.",

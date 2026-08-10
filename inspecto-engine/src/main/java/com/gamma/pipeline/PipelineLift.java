@@ -125,7 +125,7 @@ public final class PipelineLift {
         if (cfg.triggerConfig() != null) c.put("trigger", cfg.triggerConfig());   // T13: entry-node trigger (§3.6)
         String use = src.hasConnection() ? "connection/" + src.connection() : null;
         return new PipelineNode(ACQ, BuiltinNodeType.ACQUISITION.type(),
-                "Acquisition", "Source: " + src.connector(), c, use);
+                "Collect", "Collector: " + src.connector(), c, use);
     }
 
     private static PipelineNode dedupMarkerNode(PipelineConfig cfg) {

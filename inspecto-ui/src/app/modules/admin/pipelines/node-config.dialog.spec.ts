@@ -157,7 +157,7 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'w', type: 'sink.file', config: { format: 'CSV', extra: '1' } },
-            typeLabel: 'sink.file', categoryLabel: 'Writer', bindKind: null,
+            typeLabel: 'sink.file', categoryLabel: 'Sink', bindKind: null,
         });
         const c = fixture.componentInstance;
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
@@ -185,7 +185,7 @@ describe('NodeConfigDialog', () => {
                     include: ['glob:**/*.csv'],
                 },
             },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
@@ -215,7 +215,7 @@ describe('NodeConfigDialog', () => {
                 id: 'acq', type: 'acquisition',
                 config: { duplicate: { mode: 'checksum', algorithm: 'SHA256' } },
             },
-            typeLabel: 'acquisition', categoryLabel: 'Acquisition', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(c.schemaInitial['duplicate__mode']).toBe('checksum');
@@ -230,7 +230,7 @@ describe('NodeConfigDialog', () => {
     it('seeds the schema form from a nested block instead of stringifying it into free-form', async () => {
         const c = (await create({
             node: { id: 'acq', type: 'acquisition', config: { stability: { window: '30s' }, mystery: { a: 1 } } },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         })).componentInstance;
         expect(c.schemaInitial['stability__window']).toBe('30s');
         // Only the genuinely unknown root is free-form — and it stays literal there.
@@ -287,7 +287,7 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', config: { include: ['*.csv'] } },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         pickConnectionMode(fixture);
@@ -306,7 +306,7 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', config: { include: ['*.csv'] } },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(collector(fixture).mode()).toBe('local');
@@ -324,7 +324,7 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         pickConnectionMode(fixture);
@@ -339,7 +339,7 @@ describe('NodeConfigDialog', () => {
     it('seeds the Connection attribute from an existing use: binding', async () => {
         const c = (await create({
             node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         })).componentInstance;
         expect(c.schemaInitial['connection']).toBe('lake_blob');
     });
@@ -356,7 +356,7 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(collector(fixture).mode()).toBe('connection');
@@ -373,7 +373,7 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const c = fixture.componentInstance;
         form(fixture).form.patchValue({ connection: '' });
@@ -392,7 +392,7 @@ describe('NodeConfigDialog', () => {
     it('renders the shared collector surface for an acquisition node', async () => {
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         expect(fixture.debugElement.query(By.directive(CollectorConfigComponent))).not.toBeNull();
     });
@@ -410,7 +410,7 @@ describe('NodeConfigDialog', () => {
     it('hides the free-text use box on an acquisition node', async () => {
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition', categoryLabel: 'Source', bindKind: null,
+            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
         });
         const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label'))
             .map((l) => (l as HTMLElement).textContent?.trim());
@@ -524,7 +524,7 @@ describe('NodeConfigDialog', () => {
 
     it('has no a11y violations (schema-backed type)', async () => {
         const fixture = await create({
-            node: { id: 'w', type: 'sink.file' }, typeLabel: 'sink.file', categoryLabel: 'Writer', bindKind: null,
+            node: { id: 'w', type: 'sink.file' }, typeLabel: 'sink.file', categoryLabel: 'Sink', bindKind: null,
         });
         await expectNoA11yViolations(fixture.nativeElement);
     });

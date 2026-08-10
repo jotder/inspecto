@@ -45,7 +45,7 @@ import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.h
  */
 export const NODE_TYPES: PipelineNodeType[] = ([
     // entry / acquisition (the collector role)
-    { type: 'acquisition', category: 'SOURCE', label: 'Acquisition', description: 'Collects files from a source (poll/listing); the pipeline entry.', accepts: [], emits: ['data', 'gap', 'failure'], emitsNamedRoutes: false },
+    { type: 'acquisition', category: 'SOURCE', label: 'Collect', description: 'Collects files (poll/listing); the pipeline entry.', accepts: [], emits: ['data', 'gap', 'failure'], emitsNamedRoutes: false },
     { type: 'adapter', category: 'SOURCE', label: 'Adapter', description: 'Windows a stream/push source into intermediate files (by time/count/size), then lands them.', accepts: [], emits: ['data'], emitsNamedRoutes: false },
     // parse — one type; the frontend (delimited / ASN.1 / JSON / …) is CONFIG, not a separate type
     { type: 'parser', category: 'PARSE', label: 'Parser', description: 'Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.', accepts: ['data'], emits: ['data', 'unmatched'], emitsNamedRoutes: true },

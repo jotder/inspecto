@@ -2,8 +2,8 @@
   "verb" : "collect",
   "type" : "acquisition",
   "category" : "SOURCE",
-  "label" : "Acquisition",
-  "description" : "Collects files from a source (poll/listing); the pipeline entry.",
+  "label" : "Collect",
+  "description" : "Collects files (poll/listing); the pipeline entry.",
   "lowerable" : true,
   "attributes" : [ {
     "key" : "connection",

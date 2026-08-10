@@ -30,10 +30,38 @@ describe('PipelineStepCardsComponent', () => {
         const { fixture } = create({ rows, typeCat });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Collect orders');
-        expect(text).toContain('parse-1'); // no name set — falls back to id
-        expect(text).toContain('Source');
+        expect(text).not.toContain('parse-1'); // no name set — heads with its KIND, never the node id
+        expect(text).toContain('Collector');
         expect(text).toContain('Parser');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('heads an unnamed Step with its kind, and does not repeat the kind as a caption', () => {
+        // The node id encodes the type it was created with (`transform_join_1`), so using it as a
+        // heading describes the type forever — it would start lying the day a Step can be retyped.
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: 'transform_join_1', node: { id: 'transform_join_1', type: 'transform.join' }, depth: 0 },
+        ];
+        const typeCat = new Map([['transform.join', 'TRANSFORM']]);
+        const typeLabel = new Map([['transform.join', 'Join']]);
+
+        const { fixture } = create({ rows, typeCat, typeLabel });
+        const text = ((fixture.nativeElement as HTMLElement).textContent ?? '').trim();
+        expect(text).not.toContain('transform_join_1');
+        expect((text.match(/Join/g) ?? []).length).toBe(1); // heading only — the caption is suppressed
+    });
+
+    it('keeps the kind caption beside a named Step', () => {
+        const rows: StepRow[] = [
+            { kind: 'node', rowId: 'j', node: { id: 'j', type: 'transform.join', name: 'Enrich with customers' }, depth: 0 },
+        ];
+        const typeCat = new Map([['transform.join', 'TRANSFORM']]);
+        const typeLabel = new Map([['transform.join', 'Join']]);
+
+        const { fixture } = create({ rows, typeCat, typeLabel });
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Enrich with customers');
+        expect(text).toContain('Join');
     });
 
     it('distinguishes two TRANSFORM steps by their own type labels, not the shared category', () => {

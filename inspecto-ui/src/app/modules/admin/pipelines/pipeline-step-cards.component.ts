@@ -62,10 +62,10 @@ import {
                                 class="icon-size-4 shrink-0 opacity-70"
                                 [svgIcon]="paletteHeroIcon(typeCat.get(row.node.type) ?? '')"
                             ></mat-icon>
-                            <span class="truncate text-sm font-semibold">
-                                {{ row.node.name && row.node.name.trim() ? row.node.name : row.node.id }}
-                            </span>
-                            <span class="shrink-0 text-xs opacity-60">{{ stepTypeLabel(row.node.type) }}</span>
+                            <span class="truncate text-sm font-semibold">{{ stepTitle(row.node) }}</span>
+                            @if (isNamed(row.node)) {
+                                <span class="shrink-0 text-xs opacity-60">{{ stepTypeLabel(row.node.type) }}</span>
+                            }
                             @if (statusOf) {
                                 <span
                                     class="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-semibold"
@@ -272,6 +272,23 @@ export class PipelineStepCardsComponent {
     /** What KIND of Step this card is: the type's own label, else its category group. */
     stepTypeLabel(type: string): string {
         return this.typeLabel.get(type) || categoryLabel(this.typeCat.get(type) ?? '');
+    }
+
+    /** Whether the operator gave this Step a name of its own. */
+    isNamed(n: AuthoredNode): boolean {
+        return !!n.name && !!n.name.trim();
+    }
+
+    /**
+     * The card's heading: the operator's name if there is one, else what kind of Step it is. Never the
+     * node id — `uniqueNodeId` mints it from the type the Step was created with (`transform_join_1`), so
+     * an id used as a heading describes the type forever, and would start lying the day a retype
+     * affordance exists. The id is still the Step's identity and stays on the tooltips and aria-labels,
+     * which is where an identifier belongs. When the heading IS the kind, the kind caption beside it is
+     * suppressed rather than printed twice.
+     */
+    stepTitle(n: AuthoredNode): string {
+        return this.isNamed(n) ? n.name!.trim() : this.stepTypeLabel(n.type);
     }
     readonly paletteHeroIcon = paletteHeroIcon;
     readonly statusIcon = statusIcon;

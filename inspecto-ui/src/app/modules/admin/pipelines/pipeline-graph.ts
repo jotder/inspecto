@@ -173,10 +173,13 @@ export function categoryColor(category: string): string {
 /** Friendly palette group name per category — the user-facing processor taxonomy. */
 export function categoryLabel(category: string): string {
     switch (category) {
-        case 'SOURCE':    return 'Source';
+        // GLOSSARY §2/§3 is binding: the acquisition entity is a Collector ('Source' is banned), and the
+        // write end is a Sink ('Writer' was never canonical). The served node-type label agrees — it is
+        // 'Collect', not 'Acquisition' — so a card's caption and its category group name one concept once.
+        case 'SOURCE':    return 'Collector';
         case 'PARSE':     return 'Parser';
         case 'TRANSFORM': return 'Transformer';
-        case 'SINK':      return 'Writer';
+        case 'SINK':      return 'Sink';
         case 'CONTROL':   return 'Control';
         case 'STORE':     return 'Store';
         default:          return category;
