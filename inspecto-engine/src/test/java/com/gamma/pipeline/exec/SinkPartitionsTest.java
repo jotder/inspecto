@@ -36,6 +36,27 @@ class SinkPartitionsTest {
         assertEquals(List.of(), SinkPartitions.columns("year,day"));   // JToon mis-syntax → not a list
     }
 
+    @Test
+    void aMapEntryContributesItsColumnAndNeverItselfAsOne() {
+        // it used to stringify the whole map, yielding a directory literally named "{source=TXN_DATE}"
+        Object noColumn = List.of(Map.of("source", "TXN_DATE"));
+        assertEquals(List.of(), SinkPartitions.columns(noColumn));
+        assertEquals(List.of("{source=TXN_DATE}"), SinkPartitions.entriesWithoutColumn(noColumn));
+    }
+
+    @Test
+    void aBlankColumnIsNoColumn() {
+        Object blank = List.of(entry("   ", "TXN_DATE"));
+        assertEquals(List.of(), SinkPartitions.columns(blank));
+        assertEquals(1, SinkPartitions.entriesWithoutColumn(blank).size());
+    }
+
+    @Test
+    void aBareStringEntryIsNeverReportedAsMissingAColumn() {
+        // long-standing behaviour: a blank bare string is skipped, not an error
+        assertEquals(List.of(), SinkPartitions.entriesWithoutColumn(List.of("year", "   ")));
+    }
+
     // ── event time ─────────────────────────────────────────────────────────────
 
     @Test

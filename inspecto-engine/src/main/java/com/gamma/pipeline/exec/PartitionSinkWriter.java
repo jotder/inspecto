@@ -94,6 +94,13 @@ public final class PartitionSinkWriter implements PipelineExecutor.SinkWriter {
         String store = storeCfg.toString();
         String format = upper(sink.cfg("format"), "PARQUET");
         String compression = str(sink.cfg("compression"));
+        // A partition entry with no 'column' names no directory segment, so there is nothing to write it under.
+        // Refused here rather than skipped: dropping it would silently change the store's layout — in the
+        // single-entry case, from partitioned to a lone unpartitioned file no downstream glob expects.
+        List<String> badParts = SinkPartitions.entriesWithoutColumn(sink.cfg("partitions"));
+        if (!badParts.isEmpty())
+            throw new IllegalStateException("sink '" + sink.id() + "' has a partition entry declaring no "
+                    + "'column': " + badParts);
         List<String> partCols = SinkPartitions.columns(sink.cfg("partitions"));
         String dir = dataDir.replace("\\", "/") + "/" + store;
 

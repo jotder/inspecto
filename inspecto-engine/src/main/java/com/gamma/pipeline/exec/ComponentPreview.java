@@ -400,6 +400,10 @@ public final class ComponentPreview {
             warnings.add("unrecognised format '" + format + "' (expected one of " + ALLOWED_SINK_FORMATS + ")");
 
         Object partitions = content.get("partitions");
+        for (String bad : SinkPartitions.entriesWithoutColumn(partitions))
+            warnings.add("partition entry " + bad + " declares no 'column'"
+                    + " — the sink will refuse to write until it does");
+
         for (String pc : SinkPartitions.columns(partitions))
             if (!columns.contains(pc))
                 warnings.add("partition column '" + pc + "' is not present in the sample rows");

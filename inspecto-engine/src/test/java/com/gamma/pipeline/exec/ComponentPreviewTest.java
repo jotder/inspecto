@@ -139,6 +139,17 @@ class ComponentPreviewTest {
     }
 
     @Test
+    void sinkPreviewWarnsOnAPartitionEntryWithNoColumn() {
+        // the writer throws on this one, so the preview has to say so while the author can still fix it
+        Map<String, Object> sink = Map.of("store", "out", "format", "parquet",
+                "partitions", List.of(Map.of("source", "amt")));
+        ComponentPreview.SinkResult r = ComponentPreview.sink(sink, SAMPLE);
+
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("declares no 'column'"));
+    }
+
+    @Test
     void sinkPreviewWarnsOnBlankPartitionSource() {
         // declaredEventTimeSource returns null outright on a present-but-empty source → no bounds at all
         Map<String, Object> sink = Map.of("store", "out", "format", "parquet",

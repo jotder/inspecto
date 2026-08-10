@@ -995,6 +995,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     consequence: **define a `retire_superseded` maintenance job**, or every full recompute leaves a
     complete extra copy of its output on disk permanently (retention is never on by default here, and this
     is the one retention task whose absence is a growth bug rather than just a longer history).
+    **A ninth landed 2026-08-10**: `fix(pipeline)` — a sink `partitions[]` entry declaring no `column`
+    (or a blank one) now **fails the sink branch** instead of stringifying the whole entry into a
+    partition directory literally named `{source=TXN_DATE}`. Filed as a fix, not `feat!`, because no
+    layout that broken could have been depended on — but it is a config that "ran" yesterday and stops
+    today, so release notes should say it plainly. The sink component preview warns on the same
+    declaration at authoring time, alongside new warnings for a partition `source` that names no column,
+    is blank, is not a plain identifier, or disagrees between entries — each of which silently costs the
+    store its event-time bounds.
 - **Postgres multi-user transactional backend** — DIRECTION captured, deferred by operator. **Write a
   `docs/superpower/` plan before building.** Most of it exists: the stores are interface-seamed with a
   `-D*.backend` toggle in `ServiceStores`, JDBC is dialect-aware, alerts/incidents/cases are already
