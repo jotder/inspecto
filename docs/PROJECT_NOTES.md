@@ -22,7 +22,10 @@
 multi-module · embedded **DuckDB** · **TOON** config · OpenCSV. Mainline = `master`; current release line
 = `4.x`. Editions = build flavors (see below), **never branches**.
 
-Module dirs were renamed 2026-06-12; **artifactIds were NOT renamed** (hence dir ≠ artifactId):
+Module dirs were renamed 2026-06-12; the **artifactIds caught up on 2026-08-10** (`a1da65f5`), so dir ==
+artifactId everywhere — with one deliberate exception: `inspecto/` is `inspecto-processor`, because a bare
+`inspecto` would collide with the aggregator. The shipped bundle is still named `file-processor.jar`; that
+is the deployment surface, not an artifactId:
 
 Reactor = **13 modules** (build order below; WS-D 2026-07-22 added `inspecto-engine`, then split
 `inspecto-etl`, `inspecto-event`, and `inspecto-acquire` out of it the same day, increments 2–4).
@@ -283,6 +286,20 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   as one focused failure (26 of them, 2026-07-27). A per-Space migration therefore has to run **lazily on
   first use**, guarded by a `WeakHashMap` keyed on the service (`WidgetTags.backfillOnce`) — the object-CSV
   equivalent gets away with living in `CollectorService` only because that *is* the per-Space object.
+- **A job write body is the `job:` TOON section, and an unknown key is ABSORBED, not rejected.**
+  `POST /jobs` / `PUT /jobs/{name}` hand the body straight to `JobConfig.fromMap`, so the keys are
+  **snake_case** (`on_pipeline`, `on_signal`, `catch_up`) and type-specific parameters are **flat**
+  alongside them — never nested under `params`. `fromMap`'s `default ->` branch sweeps every
+  unrecognised top-level key into the job's parameters, so a camelCase `onPipeline` is **not a 422**:
+  it becomes an inert parameter and the job silently ends up with no trigger. The UI had been sending
+  exactly that since the endpoint landed, and nothing caught it — no backend test POSTed a job body at
+  all, and the offline mock read `body.onPipeline` and echoed it back, so the preview looked perfect.
+  Fixed 2026-08-10: `jobToWire`/`jobFromWire` (`inspecto/api/jobs.service.ts`) own the mapping, the mock
+  mirrors `fromMap` **independently** (reusing the client adapter would make the round-trip
+  tautological), and `ControlApiJobCrudTest` pins all three shapes. ⚠ The read side is **asymmetric on
+  purpose**: `GET /jobs` is a Java record (camelCase `onPipeline`/`onSignal`) while `GET /jobs/{name}`
+  is the config section (snake_case, flat) and carries **no run state** — `lastStatus`/`nextFire` exist
+  only on the list, so a detail pane must merge an enable/reschedule response, never replace with it.
 
 ---
 
