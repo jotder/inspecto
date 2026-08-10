@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, inject, signal, ViewChild } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -9,7 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, JobDetail, JobsService, JobType, JobUpsert } from 'app/inspecto/api';
+import { apiErrorMessage, JobDetail, JobsService, JobType, JobTypeDescriptor, JobUpsert } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { AttributeOptionLoader, InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -96,7 +96,24 @@ export class JobFormDialog implements AfterViewInit {
     readonly saving = signal(false);
     readonly writesDisabled = signal(false);
     readonly cronPresets = CRON_PRESETS;
-    readonly attributes = JOB_ATTRIBUTES;
+    /** A signal, not the const: the `type` picker's options are replaced by the server's catalog (§8.2). */
+    readonly attributes = signal<AttributeSpec[]>(JOB_ATTRIBUTES);
+    /** Every registered Job Type (`GET /jobs/types`) — the picker's options and the "what this does" panel. */
+    readonly typeCatalog = signal<JobTypeDescriptor[]>([]);
+    /** The selected type's full descriptor, for the panel. Set alongside its parameters. */
+    readonly selectedType = signal<JobTypeDescriptor | undefined>(undefined);
+    /**
+     * The type published no descriptor (a legacy type, or a 404). The free key/value editor is the escape
+     * hatch for exactly this state and is surfaced as a warning rather than offered as a normal path (§8.4).
+     */
+    readonly descriptorMissing = computed(() => !!this.selectedTypeId() && !this.selectedType());
+    /** The type id whose descriptor was last looked up — read by the template, so not private. */
+    readonly selectedTypeId = signal('');
+
+    /** `name (kind)` per declared Run Artifact — what a run of this type records. */
+    artifactSummary(t: JobTypeDescriptor): string {
+        return (t.artifacts ?? []).map((a) => `${a.name} (${a.kind})`).join(', ');
+    }
 
     /** Create flow: `config` (type + trigger + params) → `save` (the job id, asked last). Edit stays on `config`. */
     readonly step = signal<'config' | 'save'>('config');
@@ -167,26 +184,73 @@ export class JobFormDialog implements AfterViewInit {
         // Descriptor-driven parameters (P3c): render the selected Job Type's declared params, and follow
         // the type picker so the form re-shapes when the author switches type. Deferred a microtask so the
         // schema-form's async paramSpecs input doesn't mutate during this change-detection pass.
-        const typeCtrl = this.schemaForm.form.get('type');
-        typeCtrl?.valueChanges
+        //
+        // ⚠ Subscribed on the FORM GROUP, not on the `type` control. Reassigning `specs` (which the type
+        // catalog below does) rebuilds every control, so a subscription held on the old control instance
+        // would go silent and switching type would stop reloading parameters. The FormGroup instance is
+        // stable across a spec swap; the control is not.
+        this.schemaForm.form.valueChanges
             .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe((t) => this.loadParams(String(t ?? '')));
-        queueMicrotask(() => this.loadParams(String(typeCtrl?.value ?? '')));
+            .subscribe((v) => {
+                const t = String((v as { type?: unknown })?.type ?? '');
+                if (t === this.lastType) return;
+                this.lastType = t;
+                this.loadParams(t);
+            });
+        queueMicrotask(() => {
+            this.lastType = String(this.schemaForm.form.get('type')?.value ?? '');
+            this.loadParams(this.lastType);
+        });
+        this.loadTypeCatalog();
+    }
+
+    /** The type whose parameters are currently rendered — guards the valueChanges re-entry above. */
+    private lastType = '';
+
+    /**
+     * Replace the hardcoded type list with the server's registry (§8.2). Deployed plugins and Job Packs
+     * then appear with no UI change — which is the whole point of a descriptor-driven form.
+     *
+     * <p>Degrades to the declared list on failure: an empty picker would make the dialog unusable, and the
+     * built-ins really are present on any server this UI talks to.
+     */
+    private loadTypeCatalog(): void {
+        this.api.types().subscribe({
+            next: (list) => {
+                if (!list?.length) return;
+                this.typeCatalog.set(list);
+                // Reassigning `specs` rebuilds every control from its declared default, so capture the
+                // live values first and put them back — the same trap the collector/grammar editors hit.
+                const live = this.schemaForm?.form.getRawValue() ?? {};
+                this.attributes.set(
+                    JOB_ATTRIBUTES.map((s) =>
+                        s.key === 'type'
+                            ? { ...s, options: list.map((d) => ({ value: d.id, label: d.title || d.id })) }
+                            : s,
+                    ),
+                );
+                queueMicrotask(() => this.schemaForm?.form.patchValue({ ...this.initialValue, ...live }));
+            },
+            error: () => undefined, // keep the declared options; the picker must not go empty
+        });
     }
 
     /** Fetch the type's descriptor and render its parameters; prune declared keys from the free editor. */
     private loadParams(typeId: string): void {
+        this.selectedTypeId.set(typeId);
         if (!typeId) {
             this.paramSpecs.set([]);
             this.paramInitial.set(undefined);
             this.paramOptionLoaders.set({});
             this.typeRequires.set([]);
+            this.selectedType.set(undefined);
             return;
         }
         this.api.describeType(typeId).subscribe({
             next: (d) => {
                 const specs = paramDeclsToSpecs(d.parameters);
                 this.paramSpecs.set(specs);
+                this.selectedType.set(d);
                 this.typeRequires.set(d.requires ?? []);
                 // A declared DATASET_REF maps to an autocomplete; give each one the dataset suggestions.
                 const loaders: Record<string, AttributeOptionLoader> = {};
@@ -207,11 +271,13 @@ export class JobFormDialog implements AfterViewInit {
                 }
             },
             error: () => {
-                // Unknown type / no descriptor (e.g. a legacy type or 404) → free key/value editor only.
+                // Unknown type / no descriptor (e.g. a legacy type or 404) → free key/value editor only,
+                // and `descriptorMissing()` surfaces that as a warning rather than letting it look normal.
                 this.paramSpecs.set([]);
                 this.paramInitial.set(undefined);
                 this.paramOptionLoaders.set({});
                 this.typeRequires.set([]);
+                this.selectedType.set(undefined);
             },
         });
     }

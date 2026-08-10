@@ -77,7 +77,8 @@ const JOB_TYPE_DESCRIPTORS = [
         description: 'Runs a Stage-2 enrichment once (full recompute) and publishes a chain commit.',
         parameters: [decl({ name: 'config', type: 'STRING', required: true, description: 'Path to the enrichment .toon' })],
         emits: ['pipeline.commit'], artifacts: [],
-        requires: [],
+        // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
+        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
     },
     {
         id: 'report', title: 'Report',
@@ -89,7 +90,8 @@ const JOB_TYPE_DESCRIPTORS = [
             decl({ name: 'dataset', type: 'DATASET_REF', description: 'Dataset id (scope=dataset)' }),
         ],
         emits: [], artifacts: [{ name: 'report', kind: 'report' }],
-        requires: [],
+        // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
+        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
     },
     {
         id: 'maintenance', title: 'Maintenance',
@@ -101,7 +103,8 @@ const JOB_TYPE_DESCRIPTORS = [
             decl({ name: 'store', type: 'STRING', description: 'Store(s) a delete task targets (fenced)' }),
         ],
         emits: [], artifacts: [],
-        requires: [],
+        // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
+        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
     },
     {
         id: 'pipeline', title: 'Pipeline',
@@ -111,7 +114,8 @@ const JOB_TYPE_DESCRIPTORS = [
             decl({ name: 'incremental_column', type: 'STRING', description: 'Watermark column for incremental runs' }),
         ],
         emits: ['pipeline.commit'], artifacts: [],
-        requires: [],
+        // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
+        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
     },
     {
         id: 'sql.template', title: 'Templated SQL',
@@ -124,7 +128,8 @@ const JOB_TYPE_DESCRIPTORS = [
             decl({ name: 'sources', type: 'STRING', description: 'CSV of source store names to register as views' }),
         ],
         emits: ['job.dataset.produced'], artifacts: [{ name: 'output', kind: 'dataset' }],
-        requires: [],
+        // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
+        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
     },
 ];
 

@@ -2,16 +2,21 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { JobsService } from 'app/inspecto/api';
+import { JobsService, JobTypeDescriptor } from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobFormData, JobFormDialog } from './job-form.dialog';
 
 const noParams = () => of({ id: 'x', title: '', description: '', parameters: [], emits: [], artifacts: [], requires: [] });
 
-function create(data: JobFormData, save = vi.fn(() => of({ name: 'x' })), describeType = vi.fn(noParams)) {
+function create(
+    data: JobFormData,
+    save = vi.fn(() => of({ name: 'x' })),
+    describeType = vi.fn(noParams),
+    types: () => Observable<JobTypeDescriptor[]> = () => of([]),
+) {
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
         imports: [JobFormDialog],
@@ -20,7 +25,7 @@ function create(data: JobFormData, save = vi.fn(() => of({ name: 'x' })), descri
             provideHttpClient(), // the autocomplete option loaders inject root HTTP services
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: MatDialogRef, useValue: ref },
-            { provide: JobsService, useValue: { create: save, update: save, describeType, types: () => of([]) } },
+            { provide: JobsService, useValue: { create: save, update: save, describeType, types } },
             { provide: ToastrService, useValue: { error: vi.fn() } },
         ],
     });
@@ -176,5 +181,77 @@ describe('JobFormDialog', () => {
         c.schemaForm.form.patchValue({ scheduleMode: 'signal', onSignal: 'dataset.write' });
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    /** Step 12: the picker and the "what this does" panel come from the server's registry. */
+    describe('type catalog', () => {
+        const CATALOG = [
+            { id: 'report', title: 'Report', description: 'Computes a report.', parameters: [], emits: [], artifacts: [], requires: [] },
+            { id: 'acme.thing', title: 'Acme Thing', description: 'From a pack.', parameters: [], emits: ['acme.done'],
+              artifacts: [{ name: 'out', kind: 'dataset' }], requires: [], implClass: 'com.acme.ThingType', source: 'pack:acme', version: '2.1.0' },
+        ];
+        const typeOptions = (c: JobFormDialog) =>
+            (c.attributes().find((s) => s.key === 'type')?.options ?? []).map((o) => o.value);
+
+        it('builds the type options from GET /jobs/types, not the hardcoded list', () => {
+            const { c } = create({}, undefined, undefined, () => of(CATALOG));
+            // A packaged type the UI has never heard of must be selectable — that is the whole claim.
+            expect(typeOptions(c)).toEqual(['report', 'acme.thing']);
+        });
+
+        it('keeps the declared options when the catalog is empty, so the picker is never blank', () => {
+            const { c } = create({}, undefined, undefined, () => of([]));
+            expect(typeOptions(c).length).toBeGreaterThan(0);
+        });
+
+        it('shows the selected type\'s provenance so a packaged type is identifiable', async () => {
+            const describe2 = vi.fn(() => of(CATALOG[1]));
+            const { c, fixture } = create({}, undefined, describe2, () => of(CATALOG));
+            c.schemaForm.form.patchValue({ type: 'acme.thing' });
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+            expect(text).toContain('pack:acme');
+            expect(text).toContain('2.1.0');
+            expect(text).toContain('com.acme.ThingType');
+            expect(c.artifactSummary(CATALOG[1])).toBe('out (dataset)');
+        });
+    });
+
+    /** Step 14: the free key/value editor is the descriptor-missing escape hatch, not a normal path. */
+    describe('free key/value fallback', () => {
+        it('is hidden when the type publishes a contract and no untyped params exist', async () => {
+            const { c, fixture } = create({});
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            expect(c.descriptorMissing()).toBe(false);
+            expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Additional parameters');
+        });
+
+        it('appears WITH a warning when the type publishes no descriptor', async () => {
+            const failing = vi.fn(() => throwError(() => new Error('404')));
+            const { c, fixture } = create({}, undefined, failing);
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            expect(c.descriptorMissing()).toBe(true);
+            const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+            expect(text).toContain('publishes no parameter contract');
+            expect(text).toContain('Additional parameters');
+        });
+
+        it('stays visible for a job that already carries untyped params, so editing cannot strand them', async () => {
+            const { c, fixture } = create({
+                job: { name: 'j1', type: 'report', cron: '0 0 6 * * *', onPipeline: null, enabled: true, params: { legacy_key: 'v' } },
+            });
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            expect(c.descriptorMissing()).toBe(false);
+            expect(c.paramsArray.length).toBe(1);
+            expect((fixture.nativeElement as HTMLElement).textContent).toContain('Additional parameters');
+        });
     });
 });

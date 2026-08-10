@@ -124,6 +124,16 @@ export interface JobTypeDescriptor {
   artifacts: { name: string; kind: string }[];
   /** Platform Service ids this type is granted (`requires:`, platform-services S1-2); [] for most types. */
   requires: string[];
+  /**
+   * Provenance (§7.3) — where this type came from, so "what is this job" is answerable from the UI.
+   * Assembled by the REGISTRY, not the descriptor: a provider cannot know its own provenance.
+   * Optional here because a server predating step 9 omits them.
+   */
+  implClass?: string;
+  /** `builtin` | `classpath` | `pack:<id>`. */
+  source?: string;
+  /** The owning Job Pack's version; '' for anything not from a pack. */
+  version?: string;
 }
 
 /** One log line for a job run (GET /jobs/{name}/runs/{runId}/logs). */
