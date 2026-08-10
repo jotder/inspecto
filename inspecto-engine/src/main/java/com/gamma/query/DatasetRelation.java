@@ -97,6 +97,42 @@ public final class DatasetRelation {
                         "shared dataset '" + ref + "' is not available (no active grant, or no snapshot published yet)"));
     }
 
+    /**
+     * The dataset's declared <b>temporal column</b> — the {@code columns[{name,type,role}]} entry carrying
+     * {@code role: temporal} (consignment addressing §3.1, step 2). Until now that declaration was written by
+     * Studio and read by nobody; this is the one place the backend resolves it, so event-time bounds are
+     * captured from a column the dataset itself names rather than a guessed one.
+     *
+     * <p><b>Absent degrades, ambiguous rejects.</b> No {@code columns} block, or none carrying the role,
+     * returns empty — a dataset without a temporal column must still be readable (decision D3: addressing
+     * degrades, it does not break). Two columns claiming the role throw: there is no honest way to pick one,
+     * and silently taking the first would bind the catalog's bounds to declaration order.
+     *
+     * <p>The name is identifier-checked here because the caller's next move is to embed it in
+     * {@code min()/max()} SQL — the same fail-closed rule the calculated columns follow.
+     *
+     * @throws IllegalArgumentException if two columns declare {@code role: temporal}, or the one that does
+     *                                  has no plain-identifier name
+     */
+    public static Optional<String> temporalColumn(Map<String, Object> datasetConfig) {
+        Object cols = datasetConfig == null ? null : datasetConfig.get("columns");
+        if (!(cols instanceof java.util.List<?> list)) return Optional.empty();
+        String found = null;
+        for (Object o : list) {
+            // an entry that is not an object declares no role at all — it cannot be the temporal one
+            if (!(o instanceof Map<?, ?> c) || !"temporal".equalsIgnoreCase(str(cast(c), "role"))) continue;
+            String name = str(cast(c), "name");
+            if (name == null || !SAFE_IDENT.matcher(name).matches())
+                throw new IllegalArgumentException(
+                        "temporal column needs a plain-identifier 'name', got '" + name + "'");
+            if (found != null)
+                throw new IllegalArgumentException("dataset declares two temporal columns ('" + found
+                        + "' and '" + name + "'); exactly one column may carry role: temporal");
+            found = name;
+        }
+        return Optional.ofNullable(found);
+    }
+
     /** Wrap {@code base} with the dataset's calculated columns (DAT-5), or return it untouched when none. */
     private static String withCalculated(String base, Map<String, Object> datasetConfig) {
         Object calc = datasetConfig == null ? null : datasetConfig.get("calculated");

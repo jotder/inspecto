@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -90,5 +91,63 @@ class DatasetRelationTest {
                 "physicalRef", "cdr",
                 "calculated", List.of(Map.of("name", "x"))),
                 Path.of("/data"), null), "missing expr rejected");
+    }
+
+    // ── declared temporal column (consignment addressing step 2) ──────────────────
+
+    /** The shape Studio persists and JToon decodes: columns[n]{name,type,role} → List<Map<String,Object>>. */
+    @SafeVarargs
+    private static Map<String, Object> columns(Map<String, Object>... cols) {
+        return Map.of("physicalRef", "cdr", "columns", List.of(cols));
+    }
+
+    private static Map<String, Object> col(String name, String role) {
+        return Map.of("name", name, "type", "string", "role", role);
+    }
+
+    @Test
+    void declaredTemporalColumnResolves() {
+        assertEquals(Optional.of("event_time"), DatasetRelation.temporalColumn(columns(
+                col("id", "dimension"), col("bytes_used", "measure"), col("event_time", "temporal"))));
+        // role matching is case-insensitive: the block is hand-editable TOON, not only Studio output
+        assertEquals(Optional.of("event_time"), DatasetRelation.temporalColumn(columns(
+                col("event_time", "Temporal"))));
+    }
+
+    @Test
+    void noTemporalColumnDegradesRatherThanBreaking() {
+        // decision D3: a dataset that declares no temporal column stays usable, bounds just stay null
+        assertEquals(Optional.empty(), DatasetRelation.temporalColumn(columns(
+                col("id", "dimension"), col("cost_usd", "measure"))));
+        assertEquals(Optional.empty(), DatasetRelation.temporalColumn(Map.of("physicalRef", "cdr")),
+                "no columns block at all");
+        assertEquals(Optional.empty(), DatasetRelation.temporalColumn(null));
+    }
+
+    @Test
+    void twoTemporalColumnsRejected() {
+        // no honest way to pick one, and taking the first would bind the catalog's bounds to declaration order
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> DatasetRelation.temporalColumn(columns(
+                        col("event_time", "temporal"), col("ingested_at", "temporal"))));
+        assertTrue(e.getMessage().contains("event_time") && e.getMessage().contains("ingested_at"),
+                "names both offenders: " + e.getMessage());
+    }
+
+    @Test
+    void temporalColumnNameFailsClosed() {
+        // the caller embeds this name in min()/max() SQL, so it is identifier-checked like a calculated column
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.temporalColumn(columns(
+                col("event_time\") AS x, (SELECT 1", "temporal"))), "smuggled SQL rejected");
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.temporalColumn(columns(
+                Map.of("type", "date", "role", "temporal"))), "role without a name rejected");
+    }
+
+    @Test
+    void temporalColumnIgnoresNonObjectEntries() {
+        // a scalar entry declares no role, so it cannot be the temporal one — it must not mask a real declaration
+        assertEquals(Optional.of("event_time"), DatasetRelation.temporalColumn(Map.of(
+                "physicalRef", "cdr",
+                "columns", List.of("id", Map.of("name", "event_time", "role", "temporal")))));
     }
 }

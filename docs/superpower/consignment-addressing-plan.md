@@ -83,7 +83,7 @@ batch, Consignment or file. The near-misses, all verified as *not* that:
 | `PipelineWatermarkStore` | single `max(incremental_column)` per `(flow, store)`, no min | `PipelineWatermarkStore.java:55-57` |
 | `AcquisitionLedger` high-watermark | file **modification** time — arrival, not event | `DbAcquisitionLedger.java:101,232` |
 | `$job.last_success_time` | wall-clock of the run | `JobRunLedger.java:115` |
-| dataset `role: temporal` | declares *which* column is temporal; carries no bound, and `DatasetRelation` never reads it | `premium_cdr_view.toon:13-21`, `DatasetRelation.java:47-80` |
+| dataset `role: temporal` | declares *which* column is temporal; carries no bound. ✔ **now read** by `DatasetRelation.temporalColumn` (step 2, 2026-08-10); before that it was a **UI-only** field no backend class parsed | `premium_cdr_view.toon:13-21`, `DatasetRelation.java:100-131` |
 
 `$upstream(...).time_range` is already wired to the dead field (`BuiltinExpressions.java:118`), so an
 author can reference a value that is always null.
@@ -166,9 +166,19 @@ the watermark (§3.6) possible — and parallel producers are the *normal* CDR c
 column at write time now, versus a backfill migration later.
 
 **Which column?** The dataset registry already declares `columns[{name,type,role}]` with
-`role: temporal` (`premium_cdr_view.toon:13-21`). Make that declaration **load-bearing** — today
-`DatasetRelation` ignores it entirely. One declaration point, already in the config shape, no new
+`role: temporal` (`premium_cdr_view.toon:13-21`). Make that declaration **load-bearing** — ✔ done in
+step 2 via `DatasetRelation.temporalColumn`. One declaration point, already in the config shape, no new
 vocabulary.
+
+> ⚠ **Correction (2026-08-10).** This section said `DatasetRelation` "ignores it entirely", implying the
+> declaration was already understood backend-side and merely unread. It was not: `role` lived **only in
+> the Angular dataset editor** (`dataset-types.ts:13-24`, inferred from type/name heuristics) and no Java
+> class parsed a dataset's `columns[]` at all. Step 2 therefore *introduced* the backend's reader.
+> Two consequences for the steps below: (a) there is still **no `ConfigSpec` entry** for `columns[]`, so a
+> dataset declaring two temporal columns is rejected when something *resolves* it, not at save time —
+> a save-time gate is a separate, deliberate deferral; (b) the role is **operator-editable heuristic
+> output**, not a verified schema fact, so step 3 must tolerate it naming a column that is absent from the
+> data or not a timestamp, rather than assuming the declaration is true.
 
 **How, cheaply?** The COPY in `PartitionWriter` already has the relation open in DuckDB. Compute
 `min()/max()` of the temporal column in the same connection and hand them to `ConsignmentOutputs.build`.
@@ -478,7 +488,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | # | Step | Verify |
 |---|---|---|
 | 1 | ✔ **DONE 2026-08-10 — rung A measured**, harness `RescanBenchmark` (opt-in, `-Dbench.run=true`). **145 ms pruned / 239 ms glob** against 90 days = 200 M rows = 1.4 GB. ⚠ It refuted this plan's performance premise: pruning cuts rows 29–88× but wall-clock only 1.3–2.6×, so the Selector is a **correctness** feature (generation pinning, excluding superseded files), not a speed one — see §5.4 | ✔ a number in §5.4, not an estimate |
-| 2 | **Make `role: temporal` load-bearing.** `DatasetRelation` resolves the declared temporal column; reject a dataset that declares two. | unit test: dataset with `role: temporal` resolves; duplicate rejected |
+| 2 | ✔ **DONE 2026-08-10** — `DatasetRelation.temporalColumn(config)` → `Optional<String>`. Absent degrades to empty (D3), two declarations throw, and the name is identifier-checked because step 3 embeds it in `min()/max()` SQL. ⚠ Note the plan's framing was off: `role` did **not** exist anywhere in the Java backend — it was a **UI-only** concept (`dataset-types.ts:13-24`), so this added the backend's first reader of `columns[]`, it did not switch on an ignored one | ✔ `DatasetRelationTest` — resolves, degrades, duplicate rejected, name fails closed |
 | 3 | **Capture event-time bounds + `producer` at write.** `min()/max()/spread` in the existing `PartitionWriter` COPY connection → `ConsignmentOutputs.build` → four new `consignment_outputs` columns (§3.1). | ingest a file with known bounds; assert the catalog row carries bounds and producer |
 | 4 | **Per-stream watermark** (§3.6), derived from the catalog; decision D4 recorded. | seeded catalog, two producers: a window reports complete only when *both* have passed `hi + allowed_lateness` |
 | 5 | **Catalog on by default** (decision D1) + migration for existing installs. | fresh space records rows with no `-D` flag |
