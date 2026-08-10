@@ -367,7 +367,16 @@ advertise a vocabulary the compiler refuses. Consequences worth carrying:
   `processing.csv_settings` verbatim.
 - **`processing.join` is ONE block, so a second join is refused (`MULTI_JOIN`)** rather than silently
   replacing the first. ⚠ `recordDedup`, `routeNode` and `summarizeNode` share that single-slot,
-  last-one-wins shape and are **not** yet guarded — see [BACKLOG](../../../BACKLOG.md) §4.
-- ⚠ **Step cards show the *category*, not the type**, so a join and a filter card are indistinguishable
-  unless the operator names them — and `uniqueNodeId` bakes the type into the id, which is what a card
-  falls back to. Any future retype affordance makes that id a lie.
+  last-one-wins shape and are **not** guarded — whether to guard them is an operator call, because a
+  graph that saves today (losing a node) would start being refused. Their current behaviour is now
+  **pinned** by a case per slot in `PipelineEditableTest`: the discard is silent and the **LAST** node
+  wins. Those three tests are what an inversion would have to rewrite — see
+  [BACKLOG](../../../BACKLOG.md) §4. The mock `pipeline-editable.ts` mirrors the same four slots and
+  must move in the same commit as any refusal.
+- **A step card captions the type's own label** ("Join", "Filter"), via the optional `[typeLabel]` input
+  that `typeLabelMap()` builds from the served node-type catalog. Before this, cards showed the
+  *category*, so every transform read "Transformer" and a join was indistinguishable from a filter. A
+  type the catalog gives no label for falls back to the category label — never to the raw `type` string,
+  which is not user-facing vocabulary.
+- ⚠ **`uniqueNodeId` still bakes the type into the id** (`transform_join_1`), which is what a card falls
+  back to when the node is unnamed. Any future retype affordance makes that id a lie.

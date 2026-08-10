@@ -93,10 +93,11 @@ engine code has ever read, which is what the dialog did before this unification.
 
 ## Deferred (logged to `docs/BACKLOG.md`)
 
-- **The unknown-`use:`-prefix refusal.** Nothing reads `node.use()` for validation
-  (`ComponentRegistry.resolve/isKnown` has no caller), so a bad *non-grammar* binding still fails
-  silently. Blocked on the `connection/` vs `connections/` vocabulary split, fixed 2026-08-04
-  (`375757ae`) — the refusal itself is still unbuilt.
+- ~~**The unknown-`use:`-prefix refusal.**~~ **SHIPPED 2026-08-10** — see
+  `okf/backend/pipeline-graph/pipeline-graph-design.md` for the as-built. Two claims this section made
+  were wrong: `ComponentRegistry.resolve` *did* have a caller (`ComponentStore.get`; only `isKnown` had
+  none), and the seam was `PipelineValidator.checkWiring`, not `ConfigSafetyValidator`. A binding whose
+  kind is valid but whose named component is absent now refuses at save with `UNKNOWN_USE_REF` (422).
 - **Slice 6's live browser smoke** was not run this shift (the preview pane denied navigation); the
   new `grammar-editor.dialog.spec.ts` (10 cases) covers the same seams (inline-default save, extract,
   bound-edit round-trip, unbind, legacy `parser_type` read, plugin-save refusal) but a real

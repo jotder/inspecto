@@ -870,6 +870,21 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   `isReferenced(...)` answer "what references this component?" by scanning `use:` — the safe-delete guard
   generalising `connectionInUse`. The `DELETE /components/{type}/{id}` 409-on-in-use endpoint lands with component
   CRUD (Phase 5, T19). 2 tests.
+- [x] **A dangling `use:` is refused at SAVE (done 2026-08-10).** `effectiveConfig` degrades an unresolved
+  ref to the node's local config by design — its test even said "caller flags the dangling ref", but for a
+  long time **no caller did**. Now `PipelineValidator.validate(g, ComponentRegistry)` reports
+  `UNKNOWN_USE_REF` (ERROR ⇒ 422) when the kind is a real component type but the NAMED component is absent,
+  and `PipelineRoutes.validatePipeline` passes the registry it already scans for dry-run. Two decisions worth
+  keeping: the **registry-less `validate(g)` overload is unchanged**, so `PipelineExecutor.validateOrThrow`
+  and `InspectoTools` keep their behaviour and a caller that cannot see a registry does not guess; and the
+  check is **skipped when the space has no write root**, because `componentRegistry()` returns an EMPTY
+  registry there and every binding would look dangling. A bad *kind* reports once (`UNKNOWN_USE_KIND`)
+  rather than also as a dangling ref — one typo must not read as two faults.
+  ⚠ **This narrows the gap; it does not close it.** `PipelineJobRunner` — the REAL execution path — never
+  calls `effectiveGraph`/`effectiveConfig` at all; only the dry-run route does. So a `use:` binding is
+  resolved for preview and **not** for an actual run, exactly as `ComponentRegistry`'s own javadoc warns.
+  Save-time validation means a *saved* graph's refs existed at save time, which is not the same as a run
+  honouring them.
 
 ### Phase 3 — `*_flow.toon` authoring + topological executor (the heavy phase — sequence R1→R2→R3)
 - [x] **T9 (R1a) — declarative contract enforced; runtime multi-output → T10/T12.** The *descriptor* of the
