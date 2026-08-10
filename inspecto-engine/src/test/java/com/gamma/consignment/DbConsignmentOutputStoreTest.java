@@ -297,4 +297,93 @@ class DbConsignmentOutputStoreTest {
         assertEquals(0, db.markCompactedAway(List.of()));
         assertEquals(0, db.markCompactedAway(null));
     }
+
+    // ── per-producer high water (consignment addressing §3.6) ────────────────────
+
+    private static ConsignmentOutput by(String producer, String path, String eventTimeMax,
+                                        String writtenAt, State state) {
+        return new ConsignmentOutput("c-" + path, "run-1", "cdr", "dt=2026-08-10", "2026-08-10", path,
+                1, 100, writtenAt, 0, state, null,
+                eventTimeMax == null ? null : new EventTimeBounds("2026-08-10T00:00:00", eventTimeMax, 0),
+                producer);
+    }
+
+    private static ProducerHighWater find(List<ProducerHighWater> all, String producer) {
+        return all.stream().filter(p -> java.util.Objects.equals(p.producer(), producer))
+                .findFirst().orElseThrow(() -> new AssertionError("no group for producer " + producer));
+    }
+
+    @Test
+    void producerHighWaterGroupsByProducerAndKeepsTheirNewestEventTime() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    by("north", "/w/n1.parquet", "2026-08-10T06:00:00", "2026-08-10T07:00:00Z", State.LIVE),
+                    by("north", "/w/n2.parquet", "2026-08-10T11:00:00", "2026-08-10T12:00:00Z", State.LIVE),
+                    by("south", "/w/s1.parquet", "2026-08-10T09:00:00", "2026-08-10T10:00:00Z", State.LIVE),
+                    by(null, "/w/x1.parquet", null, "2026-08-10T10:30:00Z", State.LIVE)));
+
+            List<ProducerHighWater> all = db.producerHighWater("cdr");
+            assertEquals(3, all.size(), "one group per producer, and the unattributed rows are one of them");
+            assertEquals("2026-08-10T11:00:00", find(all, "north").eventTimeMax());
+            assertEquals("2026-08-10T09:00:00", find(all, "south").eventTimeMax());
+            assertNull(find(all, null).eventTimeMax(), "rows with no bounds report unknown, not a value");
+            assertTrue(db.producerHighWater("other_table").isEmpty(), "grouping is per stream");
+        }
+    }
+
+    /**
+     * SUPERSEDED rows are excluded, COMPACTED_AWAY rows are not. Their data still exists inside a merged file,
+     * so dropping them would make the watermark travel backwards the moment a partition is compacted.
+     */
+    @Test
+    void producerHighWaterExcludesSupersededButKeepsCompactedAway() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    by("north", "/w/live.parquet", "2026-08-10T06:00:00", "2026-08-10T07:00:00Z", State.LIVE),
+                    by("north", "/w/merged.parquet", "2026-08-10T08:00:00", "2026-08-10T09:00:00Z",
+                            State.COMPACTED_AWAY),
+                    by("north", "/w/old.parquet", "2026-08-10T23:00:00", "2026-08-10T23:30:00Z",
+                            State.SUPERSEDED)));
+
+            assertEquals("2026-08-10T08:00:00", find(db.producerHighWater("cdr"), "north").eventTimeMax(),
+                    "the compacted row counts; the superseded one must not claim delivery that was replaced");
+        }
+    }
+
+    /**
+     * {@code written_at} is {@code Instant.toString()}, whose fractional digits vary — so its lexicographic
+     * order is not its chronological one, and a plain {@code max()} over the text would pick the earlier row.
+     */
+    @Test
+    void producerLastSeenIsChronologicalNotLexicographic() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    by("north", "/w/a.parquet", "2026-08-10T06:00:00", "2026-08-10T10:00:00Z", State.LIVE),
+                    by("north", "/w/b.parquet", "2026-08-10T07:00:00", "2026-08-10T10:00:00.500Z", State.LIVE)));
+
+            assertEquals(java.time.Instant.parse("2026-08-10T10:00:00.500Z"),
+                    find(db.producerHighWater("cdr"), "north").lastSeen(),
+                    "text max would answer 10:00:00Z here, because '.' sorts before 'Z'");
+        }
+    }
+
+    /** One unreadable timestamp must not fail the whole query — it reads back as an unknown last-seen, which
+     *  the fold treats as in-horizon rather than dropping the producer. */
+    @Test
+    void unreadableWrittenAtDegradesToUnknownLastSeen() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(by("north", "/w/a.parquet", "2026-08-10T06:00:00", "not-a-timestamp", State.LIVE)));
+
+            ProducerHighWater p = find(db.producerHighWater("cdr"), "north");
+            assertNull(p.lastSeen());
+            assertEquals("2026-08-10T06:00:00", p.eventTimeMax(), "the event time is still usable");
+        }
+    }
+
+    @Test
+    void producerHighWaterIsBestEffortAndNeverThrows() throws Exception {
+        DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:");
+        db.close();
+        assertTrue(db.producerHighWater("cdr").isEmpty());
+    }
 }

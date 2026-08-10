@@ -280,6 +280,29 @@ completeness-needing rule in §5.3 (non-monotonic, absence/gap) also need "has t
 watermark(stream) = min over producers of max(event_time_max) over COMMITTED rows
 ```
 
+> ⚠ **Correction (2026-08-10, as built — `StreamWatermark` / `DbConsignmentOutputStore.producerHighWater`).**
+> Three things in this section did not survive contact with the catalog:
+>
+> 1. **There is no `COMMITTED` state.** The enum is `LIVE`/`SUPERSEDED`/`COMPACTED_AWAY`, and the two non-live
+>    states are *opposites* here. `COMPACTED_AWAY` rows are **included** — that data was genuinely delivered and
+>    still exists inside the merged file, so excluding them would make the watermark travel **backwards** the
+>    moment a partition is compacted. `SUPERSEDED` rows are **excluded** — a reprocess replaced them, so counting
+>    them could claim delivery the current data no longer supports.
+> 2. **A "stream" has no key of its own.** The catalog's grain is `table_name`, so that is the stream key.
+>    Nothing else in the schema identifies one.
+> 3. **`producer` is nullable and that is not a legacy artefact.** Three live write paths record rows with no
+>    pipeline identity *and* no bounds today — `EnrichmentEngine` (×2), `PartitionSinkWriter`,
+>    `ConsignmentProcessJobType`, all via `fromPartitionCounts`. They group as one unattributed producer and,
+>    having no placeable event time, **suppress the stream's watermark entirely**. That is the honest answer, not
+>    a gap: a table those paths write to is receiving data nobody can place in event time. Giving those paths a
+>    producer identity and bounds is what unlocks a watermark for them, and it is not in this plan.
+>
+> Property 1 ("conservative but correct") also had to be applied in two places the sketch does not mention:
+> staleness must be **proven** (a row whose `written_at` will not parse keeps its producer in the set rather than
+> dropping it out), and any in-horizon producer with an unknown `event_time_max` suppresses the answer rather
+> than being skipped over. Both protect the one direction that is unsafe — advancing too far closes a window
+> while rows are still owed, which fires an absence rule on data that was merely late.
+
 A window `[lo, hi)` is complete when `watermark(stream) ≥ hi + allowed_lateness` (the per-stream
 lateness declared in step 9). Three properties, matching the Selector's own:
 
@@ -519,7 +542,7 @@ rung-A number, re-measured, has visibly degraded with file count — whichever e
 | 1 | ✔ **DONE 2026-08-10 — rung A measured**, harness `RescanBenchmark` (opt-in, `-Dbench.run=true`). **145 ms pruned / 239 ms glob** against 90 days = 200 M rows = 1.4 GB. ⚠ It refuted this plan's performance premise: pruning cuts rows 29–88× but wall-clock only 1.3–2.6×, so the Selector is a **correctness** feature (generation pinning, excluding superseded files), not a speed one — see §5.4 | ✔ a number in §5.4, not an estimate |
 | 2 | ✔ **DONE 2026-08-10** — `DatasetRelation.temporalColumn(config)` → `Optional<String>`. Absent degrades to empty (D3), two declarations throw, and the name is identifier-checked because step 3 embeds it in `min()/max()` SQL. ⚠ Note the plan's framing was off: `role` did **not** exist anywhere in the Java backend — it was a **UI-only** concept (`dataset-types.ts:13-24`), so this added the backend's first reader of `columns[]`, it did not switch on an ignored one | ✔ `DatasetRelationTest` — resolves, degrades, duplicate rejected, name fails closed |
 | 3 | ✔ **DONE 2026-08-10** — four columns land on the **ingest path**, keyed per output file. ⚠ Built differently from the sketch below, which did not survive grounding twice: there is **no live connection** at `finalizeSource` (the seam is `BatchIngestStrategy.writeAndTrace`), and the written relation **has no aggregatable event-time column** — so a coerced `__event_time` is now materialised in `DataTransformer` and excluded from output. See the correction box in §3.1 | ✔ `ConsignmentOutputRegistrationTest` — bounds + spread + producer per file; no-event-time degrades to null bounds; `__event_time` absent from written output |
-| 4 | **Per-stream watermark** (§3.6), derived from the catalog; decision D4 recorded. | seeded catalog, two producers: a window reports complete only when *both* have passed `hi + allowed_lateness` |
+| 4 | ✔ **DONE 2026-08-10** — `StreamWatermark.of(producerHighWater, horizon, now)` → `Optional<LocalDateTime>`, plus `windowComplete(wm, hi, lateness)`; the per-producer aggregation is `DbConsignmentOutputStore.producerHighWater(table)`. **D4 resolved: observed-within-horizon**, default 24 h, overridable per call site (see §8). Derived on read — no table, no update path. ⚠ Three corrections in the §3.6 box: no `COMMITTED` state (it is `SUPERSEDED`-excluded / `COMPACTED_AWAY`-**included**), the stream key is `table_name`, and unattributed writes suppress the watermark rather than being skipped | ✔ `StreamWatermarkTest` (11) — lagging producer wins, stale drops out, unknown suppresses, and the seeded-catalog two-producer window closes only when both pass `hi + lateness`; `DbConsignmentOutputStoreTest` (+5) — grouping, state filter, chronological last-seen |
 | 5 | **Catalog on by default** (decision D1) + migration for existing installs. | fresh space records rows with no `-D` flag |
 | 6 | **End stable-name overwrites** (R1 promoted): a pipeline-sink full recompute writes a new `<name>_<generation>` path and flips `generation`; it never rewrites a path a catalog row points at. | recompute while a selector-pinned read is open: the read completes on the old generation; the next resolve sees the new one |
 | 7 | **The Consignment Selector.** Config shape + resolver emitting an explicit `read_parquet([...])` list, generation-pinned. | test: selector over a seeded catalog names exactly the overlapping files |
@@ -546,10 +569,13 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
 - **D3 — what happens to a Consignment whose dataset declares no temporal column?** Recommend:
   bounds stay null, selector falls back to the current glob, no error. Addressing must degrade, not
   break.
-- **D4 — the watermark's expected-producer set (§3.6).** Observed-within-horizon (producers seen in
-  the last H advance/hold the watermark; one silent past H drops out) vs declared-per-stream
-  (explicit, but one more thing to configure). Recommend **observed** with a per-stream horizon
-  default, declaration as the override for streams with known slow reporters.
+- **D4 — the watermark's expected-producer set (§3.6). ✔ RESOLVED 2026-08-10: observed-within-horizon**,
+  `StreamWatermark.DEFAULT_HORIZON` = 24 h, passed per call rather than configured. A declared set is exact but
+  goes stale silently — a decommissioned producer nobody removed from the list freezes the stream's watermark
+  forever — while observed self-heals, at the cost of a window closing early for an outage longer than `H`.
+  A day is the smallest horizon that survives a normal overnight gap in operator CDR delivery. **No config
+  surface was added**: nothing consumes the watermark yet, so a per-stream declaration would be speculative;
+  step 9 already owns per-stream lateness and is where a declared override belongs if one is ever needed.
 - **R1 — output naming is inconsistent** (§2.4); a full recompute overwrites a stable file name.
   **Promoted to delivery step 6** — invalidation-by-`generation` alone cannot protect a path whose
   bytes are replaced in place (and on Windows the open read handle makes the *writer* fail instead);
@@ -568,10 +594,14 @@ replaced in place — and on the measured evidence step 6 is now the *load-beari
 
 `GLOSSARY.md` and `docs/INDEX.md` must be updated in the same change that lands step 7:
 **Consignment Selector**, **hopping window**, **size**, **hop**, **pane**, **dirty window**, and a
-ban on bare *sliding window* for the hopping case. Step 4 additionally forces the **watermark**
-split — the word already carries three concepts (`PipelineWatermarkStore`'s incremental read cursor ·
-`$job.last_success_time`'s wall clock · §3.6's per-stream event-time completeness). Reserve
-**Watermark** for the §3.6 concept and qualify the other two in the same entry.
+ban on bare *sliding window* for the hopping case.
+
+✔ **The watermark split landed with step 4** (`GLOSSARY.md` §6-B, 2026-08-10): **Watermark** now means the §3.6
+per-stream event-time completeness, with *incremental cursor* / *acquisition high-watermark*
+(`PipelineWatermarkStore`, `source.incremental.watermark`, `AcquisitionLedger.highWatermark`) and
+*last-success time* (`$job.last_success_time`) banned from the bare word. ⚠ The plan said the word "already
+carries three concepts" in the glossary — it carried **none**: `GLOSSARY.md` had no watermark entry at all, so
+this was an addition, not an amendment, and the two older meanings live only in code and in `docs/okf/`.
 
 ---
 

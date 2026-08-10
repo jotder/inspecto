@@ -423,6 +423,19 @@ screen. ⛔ "Cube" stays a *verb* (the Transform action that produces it), never
 **Store / Storage** — The **physical** backend that holds the Parquet/partition files. Reserve this word for the
 backend only — it is never a Dataset.
 
+**Watermark** *(added 2026-08-10 — consignment addressing §3.6, `StreamWatermark.java`)* — **Event-time
+completeness for one stream**: `min over producers of max(event_time_max)` over the Consignment catalog's
+non-superseded rows. It is the only thing that can answer *"has this window closed"* — a window `[lo, hi)` is
+complete when `Watermark ≥ hi + allowed lateness` — which non-monotonic, absence and gap rules all need and
+overlap pruning cannot give them. Derived on read, never stored. **Absent means unknown, never "closed"**.
+⛔ The word carries two older, unrelated meanings in the code and neither may be called a Watermark unqualified:
+- **Incremental read cursor** (`PipelineWatermarkStore`, `source.incremental.watermark`,
+  `AcquisitionLedger.highWatermark`) — a per-`(pipeline, store)` or per-Collector `max(column)` used to skip
+  already-read input. One value, no producer set, no completeness claim. Say **incremental cursor** /
+  **acquisition high-watermark**.
+- **Wall clock** (`$job.last_success_time`) — when a Job last succeeded, not where its data reaches. Say
+  **last-success time**.
+
 **Query** *(added 2026-07-06, R3)* — A first-class, reusable **executable knowledge** Component:
 `{ type (sql \| structured), source Dataset, text \| model, Parameters }`. Lifted out of the artifacts that
 embed it (a Dataset's view SQL, a Widget's channel mapping) so **one Query serves many renderings**. Authored in

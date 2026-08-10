@@ -263,6 +263,15 @@ carried `__event_time` — the coerced event-time column `DataTransformer` mater
 every row written before these columns existed all read back `NULL`. A consumer that prunes on bounds must
 therefore treat a null-bounds row as a **possible match**, or it will silently drop data.
 
+**The two non-live states are opposites to a reader that aggregates.** `producerHighWater(table)` — the
+per-producer `max(event_time_max)` the §3.6 Watermark folds — filters `state <> 'SUPERSEDED'` but keeps
+`COMPACTED_AWAY`: compacted rows describe data that was genuinely delivered and still exists inside the merged
+file, so dropping them would make the watermark travel **backwards** when a partition is compacted, while
+superseded rows were replaced by a reprocess and would claim delivery the current data no longer supports. It
+also cannot `max(written_at)` as text — that column is `Instant.toString()`, whose fractional digits vary, so
+`…33.1Z` sorts *after* `…33.12Z`; it casts to a timestamp and projects epoch millis instead. `event_time_max`
+is safe to `max()` as text only because §3.1 writes it in a fixed-width format.
+
 The durable output registry from the
 [consignment-ELT plan](../../../superpower/consignment-elt-architecture.md) §11.3 — the catalog substitute
 its no-catalog decision implies, answering *"every file this Consignment wrote, across all partitions"* with

@@ -164,6 +164,50 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     /**
+     * Per-producer high water for one stream — the aggregation {@link StreamWatermark} folds into a watermark
+     * (consignment addressing §3.6). One row per distinct {@code producer} that has written to {@code tableName},
+     * including the unattributed group (see {@link ProducerHighWater#producer()}).
+     *
+     * <p><b>{@code SUPERSEDED} rows are excluded; {@code COMPACTED_AWAY} rows are not.</b> The plan's sketch says
+     * "over COMMITTED rows", but there is no such state here (the enum is {@code LIVE}/{@code SUPERSEDED}/
+     * {@code COMPACTED_AWAY}) — and the two non-live states are opposites for this purpose. Compacted rows were
+     * genuinely delivered and their data still exists inside a merged file, so their event time must keep
+     * counting or a compaction would make the watermark travel <em>backwards</em>. Superseded rows were replaced
+     * by a reprocess that wrote its own rows; counting them could claim delivery the current data does not
+     * support, which is the one direction a watermark must never err in.
+     *
+     * <p>Neither aggregate can be a plain {@code max()} over the stored text. {@code written_at} is
+     * {@code Instant.toString()}, whose fractional-second digits vary, so its lexicographic order is not its
+     * chronological one ({@code …33.1Z} sorts after {@code …33.12Z}) — hence the cast to a real timestamp and the
+     * epoch-millis projection, which crosses JDBC with no format or zone left to reinterpret. {@code TRY_CAST}
+     * keeps one malformed value from failing the whole query; it reads back as an unknown last-seen, which the
+     * fold treats as in-horizon. {@code event_time_max} is safe to {@code max()} as text only because §3.1 writes
+     * it in a fixed-width format where the two orders coincide.
+     */
+    public synchronized List<ProducerHighWater> producerHighWater(String tableName) {
+        String sql = "SELECT producer, max(event_time_max) AS event_time_max, "
+                + "epoch_ms(max(TRY_CAST(written_at AS TIMESTAMPTZ))) AS last_seen_ms FROM " + T
+                + " WHERE table_name = ? AND coalesce(state, 'LIVE') <> 'SUPERSEDED' GROUP BY producer";
+        List<ProducerHighWater> out = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, tableName);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    // wasNull() reports on the most recent get*, so it has to be read immediately — asking after
+                    // the other columns would answer for one of those and turn an absent instant into the epoch.
+                    long ms = rs.getLong("last_seen_ms");
+                    java.time.Instant lastSeen = rs.wasNull() ? null : java.time.Instant.ofEpochMilli(ms);
+                    out.add(new ProducerHighWater(rs.getString("producer"), rs.getString("event_time_max"),
+                            lastSeen));
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("consignment-outputs producer high water failed for {}: {}", tableName, e.getMessage());
+        }
+        return out;
+    }
+
+    /**
      * Mark every still-{@code LIVE} file of one Consignment {@code SUPERSEDED} — the state flip that belongs
      * beside {@code ManifestStore.supersede}, for when a Consignment's output is replaced by a reprocess.
      *
