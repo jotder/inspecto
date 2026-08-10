@@ -271,11 +271,16 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
 created before they existed (CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows
 read back `NULL`.
 
-**Null bounds mean *unknown*, never *empty*.** A file gets bounds only when the relation that produced it
-carried `__event_time` — the coerced event-time column `DataTransformer` materialises on the ingest path
-(and excludes from written output). Enrichment and Pipeline-sink writes, schemas with no date partition, and
-every row written before these columns existed all read back `NULL`. A consumer that prunes on bounds must
-therefore treat a null-bounds row as a **possible match**, or it will silently drop data.
+**Null bounds mean *unknown*, never *empty*.** A consumer that prunes on bounds must treat a null-bounds row
+as a **possible match**, or it will silently drop data. Two write paths can fill them, each from its own
+declaration, and neither ever guesses which column is temporal:
+
+| Path | Bounds come from | Absent when |
+|---|---|---|
+| Ingest (`BatchProcessor`) | `__event_time`, the coerced column `DataTransformer` materialises from the schema's date partition and excludes from written output | the schema declares no date partition, or every row failed to parse |
+| Pipeline sink (`PartitionSinkWriter`) | `TRY_CAST(<source> AS TIMESTAMP)`, where `source` is a `partitions[]` entry's declared raw column — the same word `PartitionDef.source` uses | no entry declares a `source`, entries disagree on it, or it is not a plain identifier |
+
+Enrichment writes and every row predating these columns still read back `NULL`.
 
 **`supersedeOtherRevisions(table, keep)` is scoped the opposite way to `supersede(consignment)`**, and has to
 be: a full recompute invalidates work it did not do, spread across however many earlier runs wrote that store

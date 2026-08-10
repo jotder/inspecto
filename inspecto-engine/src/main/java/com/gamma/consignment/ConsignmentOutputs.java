@@ -98,11 +98,43 @@ public final class ConsignmentOutputs {
     public static List<ConsignmentOutput> fromPartitionCounts(String consignmentId, String runId, String tableName,
                                                               List<PartitionOutput> outputs,
                                                               Map<String, Long> rowsByPartition) {
+        return fromPartitionCounts(consignmentId, runId, tableName, outputs, rowsByPartition, null, null);
+    }
+
+    /**
+     * {@link #fromPartitionCounts(String, String, String, List, Map)} with addressing §3.1's columns — the
+     * event-time {@code bounds} <b>keyed by partition</b>, and the {@code producer}.
+     *
+     * <p><b>Keyed by partition here, unlike {@link #fromLineage}</b>, which keys bounds by output file. That
+     * asymmetry is not an oversight: {@code fromLineage} serves the ingest path, where decision-rule routing
+     * writes rejected rows to their own destination under a partition key the main write may also have used, so
+     * a partition-keyed lookup could hand a routed file the main relation's range. This path writes one relation
+     * per destination, so the partition key is unambiguous and is what {@link #boundsByPartition} already
+     * produces.
+     */
+    public static List<ConsignmentOutput> fromPartitionCounts(String consignmentId, String runId, String tableName,
+                                                              List<PartitionOutput> outputs,
+                                                              Map<String, Long> rowsByPartition,
+                                                              Map<String, EventTimeBounds> bounds,
+                                                              String producer) {
         Map<String, Long> counts = rowsByPartition == null ? Map.of() : rowsByPartition;
+        Map<String, EventTimeBounds> byPartition = bounds == null ? Map.of() : bounds;
         // No fingerprint on this path: enrichment and Pipeline sinks derive their output from a query, not a
         // declared schema — their derived output schema arrives with the per-Step type flow (Phase 2 S2).
         return build(consignmentId, runId, tableName, outputs,
-                o -> counts.getOrDefault(o.partition(), 0L), null, null, null);
+                o -> counts.getOrDefault(o.partition(), 0L), null,
+                outputs == null ? null : keyByFile(outputs, byPartition), producer);
+    }
+
+    /** Re-key partition-keyed bounds onto output files, which is what {@link #build} joins on. */
+    private static Map<String, EventTimeBounds> keyByFile(List<PartitionOutput> outputs,
+                                                          Map<String, EventTimeBounds> byPartition) {
+        Map<String, EventTimeBounds> byFile = new HashMap<>();
+        for (PartitionOutput o : outputs) {
+            EventTimeBounds b = byPartition.get(o.partition());
+            if (b != null) byFile.put(o.outputFile(), b);
+        }
+        return byFile;
     }
 
     /**
@@ -160,7 +192,23 @@ public final class ConsignmentOutputs {
     public static Map<String, EventTimeBounds> boundsByPartition(Connection conn, String table,
                                                                  List<String> partCols) throws SQLException {
         if (!hasEventTime(conn, table)) return Map.of();
-        String col = "\"" + TransformCompiler.EVENT_TIME_COL + "\"";
+        return boundsByPartition(conn, table, partCols, "\"" + TransformCompiler.EVENT_TIME_COL + "\"");
+    }
+
+    /**
+     * {@link #boundsByPartition(Connection, String, List)} over an arbitrary event-time <b>expression</b> rather
+     * than the internal {@code __event_time} column — for the write paths that never ran through
+     * {@code DataTransformer} and so have no such column to aggregate.
+     *
+     * <p>The caller owns the expression, and therefore owns the claim that it <em>is</em> event time. A
+     * Pipeline sink derives it from the {@code source} its own {@code partitions[]} entry declares
+     * ({@code PartitionSinkWriter}); nothing here guesses which of a relation's columns is temporal, because a
+     * wrong guess produces bounds that are confidently incorrect rather than absent.
+     */
+    public static Map<String, EventTimeBounds> boundsByPartition(Connection conn, String table,
+                                                                 List<String> partCols, String eventTimeExpr)
+            throws SQLException {
+        String col = eventTimeExpr;
         String agg = "strftime(min(" + col + "), '%Y-%m-%dT%H:%M:%S'), "
                 + "strftime(max(" + col + "), '%Y-%m-%dT%H:%M:%S'), "
                 + "datediff('millisecond', min(" + col + "), max(" + col + "))";

@@ -616,19 +616,28 @@ bounds is not a job.
 
 **What unblocking it actually requires** — pick one, then step 8 is small:
 
-1. **Give the Pipeline-sink path event-time bounds.** The principled source is the sink's target dataset
-   declaring `role: temporal`, which `DatasetRelation.temporalColumn` (step 2) already resolves — this is the
-   first use that would need it outside step 3's partition inference. The obstacle is scope: `PartitionSinkWriter`
-   holds the store *name*, not the dataset config, so something has to resolve one from the other.
-   ⛔ **Do not substitute a heuristic** such as "the relation's only TIMESTAMP column". A silently wrong
-   `time_range` is worse than a null one, because it feeds a downstream job's scheduling decision, whereas
-   `null` merely fails to.
+1. ✔ **DONE 2026-08-10 — the Pipeline-sink path now records bounds and `producer`.** Not from the target
+   dataset's `role: temporal`, which was the obvious idea and does not work: reaching a dataset from a store
+   name is the store→dataset reverse lookup step 3 already rejected as **ambiguous by construction**
+   (`putIfAbsent`, first-scan-wins), so the bounds would depend on directory scan order. The declaration used
+   instead is the **`source` of the sink's own `partitions[]` entry** — the raw column the partition was derived
+   from, which is exactly the word and meaning `PartitionDef.source` already carries on the ingest schema. One
+   concept, one word, and **no new config key**: `partitions[]` has always accepted map entries.
+   `PartitionSinkWriter` aggregates `TRY_CAST(<source> AS TIMESTAMP)` per partition, so the bounds land at the
+   source's own resolution rather than the partition's day granularity — which would merely restate
+   `record_day`. Absent, bare-string, disagreeing or unsafe declarations all record **no** bounds.
+   ⛔ The heuristic stayed banned: a relation's only TIMESTAMP column is *not* evidence of event time, and
+   `anUndeclaredTimestampColumnIsNotTreatedAsEventTime` pins that. A silently wrong `time_range` is worse than
+   a null one, because it feeds a downstream job's scheduling decision, whereas `null` merely fails to.
 2. **Or accept that `time_range` describes ingest, not jobs**, and expose it somewhere other than
    `$upstream(job)` — a Consignment-scoped accessor rather than a Run-artifact field. This is the smaller
    change but it is a scope decision about what the token means, not an implementation detail.
 
-Until one is chosen, `RunArtifact.timeRange` stays `null` and `$upstream(...).time_range` keeps returning
-nothing — which is at least honest, and is the D3 posture.
+**Step 8 is still not done**, and option 1 was only its *first* prerequisite. `PipelineJobRunner` records no
+`RunArtifact` at all, and `RunContext`'s `dataset(...)` API has no parameter to carry a range even if it did.
+What changed is that there is now something true to put in one. ⚠ Also note the ingest path — the *other*
+producer of bounds — is not a Job and has no Run to hang an artifact on, so option 2 remains live and may
+still be the more honest answer for that half.
 
 ### 7-A. The 5–6–7 knot, resolved (2026-08-10)
 
