@@ -75,20 +75,21 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/pipeline-multiplicity-plan.md`](superpower/pipeline-multiplicity-plan.md) — **ACTIVE
-  (opened 2026-08-11).** A pipeline should be constrained by whether a Step *accepts its neighbours*, not
-  by how many Steps of a kind exist. **Part A (plan, executable):** the engine is not the limit —
-  `PipelineExecutor` is a generic topological walker that already runs N transforms of a kind; the limit
-  is `PipelineEditable.lower()` targeting a flat file with one block per kind. Widen it with **plural
-  blocks, following the shipped `sinks:` precedent**, then drop the `MULTI_*` refusals. ⚠ **Do not open
-  by reverting `2cf7005e`** — the refusal is the only thing making the loss visible until the format can
-  hold multiples; it goes in the *same* slice that widens the format. ⚠ Ordering is the hard part (the
-  flat file has no edges, and dedup→summarize→route is a sequence, unlike the order-free sinks case).
-  ⚠ `summarize`/`join` have no `RowShaper` case and **throw**, so plural is moot for them until singular
-  works. **Part B (design, decide first):** multi-location acquisition — `collector` is singular and every
-  stateful acquisition subsystem (ledger, stability gate, gap tracker, breaker, retry, watermark) is keyed
-  on one collector id, so identity/merge/failure-isolation must be settled before any list appears, and it
-  must beat the zero-change `MultiCollectorProcessor` + downstream merge it would replace.
+- ~~`superpower/pipeline-multiplicity-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-11**
+  ([archive copy](archived-documents/plans-archive/pipeline-multiplicity-plan.md), provenance only).
+  A pipeline is now constrained by whether a Step *accepts its neighbours*, not by how many Steps of a
+  kind exist. **Part A (A1–A6, all shipped):** the flat `*_pipeline.toon` holds an ordered `steps:` chain
+  (`lower()` writes it only for a chain the singular keys cannot hold, so every existing file round-trips
+  verbatim), all `MULTI_*` transform refusals are gone, `ILLEGAL_PAIRING` refuses a wiring-invalid
+  neighbour pairing, and **every Stage-2 kind executes** — dedup, summarize (via `MeasureCompiler`) and
+  join (LEFT JOIN through the `ReferenceResolver` seam). A5 was re-scoped to **at-rest** routing and
+  completed: `output_store:` + `PipelineLift.stageTwo` + a `pipeline_config:` flow job run the chain over
+  the landed store. As-built in [`okf/backend/engine/stage1-architecture.md`](okf/backend/engine/stage1-architecture.md)
+  *Step 3*. **Part B (decided, not built):** multi-location acquisition is **composition**, not a
+  `collector` list — as-built in
+  [`okf/backend/pipeline-graph/multi-location-ingest.md`](okf/backend/pipeline-graph/multi-location-ingest.md).
+  Residuals in `BACKLOG.md` §4 (the orphan-`output_store` audit finding; ingest-side `route:` demux and
+  multi-sink arming still wait on the branch-aware executor).
 
 - ~~`superpower/job-parameter-contract-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-10**
   ([archive copy](archived-documents/plans-archive/job-parameter-contract-plan.md), provenance only).

@@ -1,7 +1,19 @@
 # Pipeline multiplicity — plural transform blocks, and multi-location acquisition
 
-**Status:** ACTIVE (opened 2026-08-11). Part A is a plan to execute; Part B is a design to settle before
-anything is built. Operator decisions of 2026-08-11 — see `docs/BACKLOG.md` §4 *Pipeline graph*.
+> ⚠ **ARCHIVED 2026-08-11 — provenance only, never maintained, do not treat as current.** The whole plan
+> shipped the day it opened: Part A A1–A6 (including A5, re-scoped to at-rest routing) and Part B (decided
+> as composition, all three residuals built). The durable as-built lives in
+> [`okf/backend/engine/stage1-architecture.md`](../../okf/backend/engine/stage1-architecture.md) *Step 3 —
+> the Stage-2 transform chain, at rest* and
+> [`okf/backend/pipeline-graph/multi-location-ingest.md`](../../okf/backend/pipeline-graph/multi-location-ingest.md);
+> the remaining open items are in [`BACKLOG.md`](../../BACKLOG.md) §4. ⚠ Statements below were true when
+> written and several were **later proved wrong by the build** — each is corrected inline where it sits
+> (notably "the `prepare()` gates stay", and slice 5's "adapt `EnrichmentEngine.referenceReader`", which
+> became an extraction).
+
+**Status:** ~~ACTIVE (opened 2026-08-11)~~ **COMPLETE + ARCHIVED 2026-08-11.** Part A was a plan to
+execute; Part B a design to settle before anything was built. Operator decisions of 2026-08-11 — see
+`docs/BACKLOG.md` §4 *Pipeline graph*.
 
 **One-line premise:** a pipeline should be constrained by whether a Step *accepts its neighbours*, not by
 how many Steps of a kind exist. Today it is constrained by neither — it is constrained by how many slots
