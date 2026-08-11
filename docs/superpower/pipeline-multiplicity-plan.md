@@ -422,6 +422,32 @@ pre-parse lists it is wrong. Nothing executes today (arming is refused), so it i
 question, not a live bug — but **A5 must not route a chain carrying pre-parse filter keys** without
 splitting them back out.
 
+### ⚠ A5 RE-SHAPED 2026-08-11 — record dedup moved to Stage-2 (operator decision)
+
+`processing.dedup` no longer executes on the ingest path. It was the one cross-record operation inside
+the M..N multiplexer (`BatchIngestStrategy.applyRecordDedup`, a `ROW_NUMBER()` QUALIFY); the operator's
+call is that **dedup is a transform concern — in ELT terms it belongs in the T, not the EL**. The
+executor is deleted and `prepare()` refuses to arm a pipeline carrying the key.
+
+**This makes A5 one uniform problem instead of three different ones.** Before, the five chain kinds were
+in three states: `filter` executed, `dedup` executed, and `route`/`summarize`/`join` refused. Now:
+
+| kind | Stage | state |
+|---|---|---|
+| `filter` | Stage-1 (per-record) | ✅ executes |
+| `route` | Stage-1 — it *is* the demux | ❌ refuses to arm; needs the branch-aware executor |
+| `dedup` · `summarize` · `join` | **Stage-2** | ❌ all three refuse to arm; all three need a Stage-2 route |
+
+⚠ **Do not read the removal as a capability loss with no replacement.** `RowShaper.dedup`
+(`pipeline/exec/RowShaper.java:151-166`) already implements the same window and is *better* — it emits
+the losers as a first-class `duplicate` relation rather than counting and discarding them. The gap is
+routing, not implementation. Of the three Stage-2 kinds, only `summarize` and `join` lack an executor
+there (`RowShaper.shape()` throws for both) — tracked separately, already decided, not started.
+
+⚠ **`EventType.DEDUP_RECORDS_DROPPED` now has no emitter.** The constant is kept deliberately: the
+taxonomy is public and the Stage-2 executor is the right place to emit it. A grep for "who emits this"
+returning nothing is expected, not a bug.
+
 **A5 — ⛔ BLOCKED (grounded 2026-08-11, finding 7).** Not started, and deliberately not faked. There is no
 production route from a flat `steps:` file to `PipelineExecutor`: its only caller is at-rest, reads its
 graph from `PipelineStore` rather than the flat file, and the ingest-side seam (`BatchGraphRunner`) has no

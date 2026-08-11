@@ -15,22 +15,44 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Record-grain dedup execution (ELT amendment §2.4 — the dedup STEP): {@code processing.dedup} drives a
- * {@code ROW_NUMBER() = 1} QUALIFY between transform materialisation and the partitioned write, so one
- * winner per business key lands and the section is never dead config (the W1 lesson: a lowered key the
- * engine ignores is a trap, not a feature).
+ * Record-grain dedup is <b>not</b> executed by Stage-1 — the assertion this class used to make, inverted
+ * 2026-08-11 on an operator decision.
+ *
+ * <p><b>What changed and why.</b> {@code processing.dedup} used to drive a {@code ROW_NUMBER() = 1}
+ * QUALIFY between transform materialisation and the partitioned write. It worked, but it was the one
+ * genuine cross-record operation inside the M..N multiplexer, and dedup is a <em>transform</em> concern:
+ * in ELT terms it belongs in the T, not the EL. Stage-1 is now per-record work plus routing, which is
+ * what keeps every batch embarrassingly parallel and crash-isolated.
+ *
+ * <p>⚠ <b>Removing an executor is only half a change.</b> Deleting the QUALIFY and leaving the config key
+ * parsing would give a pipeline that arms, runs, writes — and silently keeps every duplicate it was
+ * configured to fold. That is worse than never having shipped the feature, and it is precisely the
+ * silent-discard shape the multiplicity work exists to remove. So the executor's removal is paired with
+ * a {@code prepare()} refusal, and <b>both halves are asserted here</b>: the rows are not folded, and an
+ * {@code active} pipeline carrying the key cannot arm at all.
+ *
+ * <p>The replacement already exists and is better: {@code RowShaper.dedup} computes the same window but
+ * emits the losers as a first-class {@code duplicate} relation rather than counting and discarding them.
+ * Routing a pipeline to it is the multiplicity plan's slice A5.
  */
 class RecordDedupExecutionTest {
 
+    /**
+     * The behavioural half: three rows in, two sharing a key, and <b>all three land</b>. Asserted through
+     * the lineage row count — the same signal the old test used to prove the opposite — so the inversion
+     * is visible as a changed number rather than a deleted test.
+     */
     @Test
-    void oneWinnerPerKeyLandsAndTheWinnerFollowsOrderBy(@TempDir Path dir) throws Exception {
-        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, """
+    void stage1DoesNotFoldDuplicatesAnyMore(@TempDir Path dir) throws Exception {
+        // active: false — the arming refusal is the other half of this change, asserted below
+        Path toon = PipelineConfigBatchTestRef.writeInactivePipeline(dir, """
                   dedup:
                     keys[1]: ID
                     order_by: AMT DESC
                 """);
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
-        assertNotNull(cfg.dedup(), "harness precondition: the dedup section parsed");
+        assertNotNull(cfg.dedup(),
+                "the section still PARSES and round-trips — it is authoring-only, not rejected outright");
 
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("dedup_exec_");
@@ -48,15 +70,13 @@ class RecordDedupExecutionTest {
                     cfg.dirs().database(), "b1", "batch-1", Map.of(0, "solo.csv"));
 
             long rows = written.lineage().stream().mapToLong(com.gamma.etl.LineageRow::rowCount).sum();
-            assertEquals(2, rows, "3 rows in, one duplicate key folded, 2 rows written");
+            assertEquals(3, rows, "all 3 rows land — Stage-1 no longer folds the duplicate key");
 
-            assertFalse(written.outputs().isEmpty(), "the partitioned write ran over the deduped table");
-            // the winner is order_by's pick — the materialised __dedup table is what was written
-            try (Statement st = conn.createStatement();
-                 var rs = st.executeQuery("SELECT AMT FROM __dedup WHERE ID = 'a'")) {
-                assertTrue(rs.next());
-                assertEquals(99.0, rs.getDouble(1), 0.001, "order_by AMT DESC keeps the highest-AMT row");
-                assertFalse(rs.next(), "exactly one winner per key");
+            // and the intermediate table the old executor materialised is gone entirely
+            try (Statement st = conn.createStatement()) {
+                assertThrows(java.sql.SQLException.class,
+                        () -> st.executeQuery("SELECT * FROM __dedup"),
+                        "no __dedup table is materialised on the ingest path any more");
             }
         } finally {
             DuckDbUtil.deleteTempDb(db);
@@ -64,51 +84,21 @@ class RecordDedupExecutionTest {
     }
 
     /**
-     * Phase 4 §2.4/§11.3 — the legacy lane's edge-grain counter: {@code applyRecordDedup} has no
-     * per-node provenance graph to record against, so the dropped-duplicate count is a durable,
-     * queryable {@link com.gamma.event.EventType#DEDUP_RECORDS_DROPPED} event instead of a log line only.
+     * The fail-closed half, and the one that makes the removal safe: the same config with
+     * {@code active: true} refuses to load, so nobody gets a running pipeline quietly ignoring its
+     * dedup. Mirrors the refusals {@code route}/{@code summarize}/{@code join} have always had — all
+     * three cross-record kinds are finally uniform.
      */
     @Test
-    void dedupDropCountIsRecordedAsADurableEvent(@TempDir Path dir) throws Exception {
-        com.gamma.event.InMemoryEventStore events = new com.gamma.event.InMemoryEventStore(1000);
-        com.gamma.event.EventLog.global().installStore(events);
-
+    void anActivePipelineCarryingDedupRefusesToArm(@TempDir Path dir) throws Exception {
         Path toon = PipelineConfigBatchTestRef.writePipeline(dir, """
                   dedup:
                     keys[1]: ID
-                    order_by: AMT DESC
-                """);
-        PipelineConfig cfg = PipelineConfig.load(toon.toString());
-
-        DuckDbUtil.loadDriver();
-        File db = DuckDbUtil.tempDbFile("dedup_evt_");
-        try (Connection conn = DuckDbUtil.openConnection(db)) {
-            try (Statement st = conn.createStatement()) {
-                st.execute("""
-                        CREATE TABLE transformed AS SELECT * FROM (VALUES
-                          ('a', 10.0, '2026', '07', '01', 0),
-                          ('a', 99.0, '2026', '07', '01', 0),
-                          ('b',  5.0, '2026', '07', '01', 0)
-                        ) v(ID, AMT, year, month, day, __src_id)""");
-            }
-            BatchIngestStrategy.writeAndTrace(conn, "transformed", List.of("year", "month", "day"), cfg,
-                    cfg.dirs().database(), "b1", "batch-evt-1", Map.of(0, "solo.csv"));
-
-            // installStore() drains the global log's pre-existing buffered events into the new store
-            // (so nothing emitted before the swap is lost) — filter by this test's own batch id, not
-            // just type, since another test in this class emits the same event type for its own batch.
-            List<com.gamma.event.Event> dropped = events.recent(1000).stream()
-                    .filter(e -> com.gamma.event.EventType.DEDUP_RECORDS_DROPPED.equals(e.type())
-                            && "batch-evt-1".equals(e.correlationId()))
-                    .toList();
-            assertEquals(1, dropped.size(), "exactly one dedup-drop event for this batch");
-            com.gamma.event.Event e = dropped.get(0);
-            assertEquals("batch-evt-1", e.correlationId());
-            assertEquals(cfg.identity().pipelineName(), e.pipeline());
-            assertEquals("1", String.valueOf(e.attributes().get("dropped")), "one duplicate folded");
-            assertEquals("ID", String.valueOf(e.attributes().get("keys")));
-        } finally {
-            DuckDbUtil.deleteTempDb(db);
-        }
+                """);   // the shared fixture is active: true
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(toon.toString()),
+                "arming a pipeline whose dedup nothing executes would silently keep every duplicate");
+        assertTrue(e.getMessage().contains("processing.dedup"), e.getMessage());
+        assertTrue(e.getMessage().contains("Stage-2"), e.getMessage());
     }
 }

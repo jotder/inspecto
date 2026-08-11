@@ -123,11 +123,15 @@ interface BatchIngestStrategy {
         String writeTable = table;
         String writeBase  = baseName;
 
-        // Record-grain dedup (processing.dedup — the dedup STEP, ELT amendment §2.4): one winner per
-        // business key via ROW_NUMBER, applied to the transformed rows BEFORE reference versioning
-        // (versioning a duplicate would mint a spurious version) and before the partitioned write.
-        if (cfg.dedup() != null)
-            writeTable = applyRecordDedup(conn, writeTable, cfg.dedup(), cfg, batchId);
+        // ⚠ Record-grain dedup does NOT run here. It used to (a ROW_NUMBER QUALIFY between transform and
+        // the write), and it was the one cross-record operation in the ingest path. Moved out 2026-08-11
+        // (operator decision): dedup is a TRANSFORM concern, so in ELT terms it belongs in the T, not the
+        // EL. Stage-1 stays the M..N multiplexer — per-record work and routing — which is what keeps each
+        // batch embarrassingly parallel and crash-isolated.
+        //
+        // It is not silently dropped: PipelineConfig.prepare() now REFUSES to arm a pipeline carrying
+        // processing.dedup, exactly as it already did for route/summarize/join. The three cross-record
+        // kinds are finally uniform — parsed, lifted and round-tripped, executed by Stage-2 only.
 
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
             String versioned = "__ref_versioned";
@@ -166,46 +170,12 @@ interface BatchIngestStrategy {
         return new Written(outputs, lineage, bounds);
     }
 
-    /**
-     * Materialise {@code __dedup} from {@code src} keeping one row per {@code processing.dedup} business
-     * key ({@code ROW_NUMBER() OVER (PARTITION BY keys [ORDER BY order_by]) = 1} — no {@code order_by}
-     * means the winner is arbitrary). Duplicates are counted and recorded durably as a
-     * {@link com.gamma.event.EventType#DEDUP_RECORDS_DROPPED} event (Phase 4 §2.4/§11.3) — the legacy
-     * lane's counter, since this strategy has no per-node provenance graph to record against. Landing
-     * the dropped rows themselves in quarantine as a browsable reject stream remains separate work.
-     */
-    static String applyRecordDedup(Connection conn, String src, PipelineConfig.Dedup dedup,
-                                   PipelineConfig cfg, String batchId) throws SQLException {
-        String dst = "__dedup";
-        StringBuilder part = new StringBuilder();
-        for (String k : dedup.keys()) {
-            if (part.length() > 0) part.append(", ");
-            part.append('"').append(k).append('"');
-        }
-        String window = "PARTITION BY " + part
-                + (dedup.orderBy() != null && !dedup.orderBy().isBlank() ? " ORDER BY " + dedup.orderBy() : "");
-        try (Statement st = conn.createStatement()) {
-            st.execute("CREATE OR REPLACE TABLE \"" + dst + "\" AS SELECT * FROM \"" + src
-                    + "\" QUALIFY ROW_NUMBER() OVER (" + window + ") = 1");
-            try (var rs = st.executeQuery("SELECT (SELECT COUNT(*) FROM \"" + src + "\") - COUNT(*) FROM \""
-                    + dst + "\"")) {
-                long dupes = rs.next() ? rs.getLong(1) : 0;
-                if (dupes > 0) {
-                    org.slf4j.LoggerFactory.getLogger(BatchIngestStrategy.class).info(
-                            "[DEDUP] [{}] {} duplicate record(s) dropped by key {}", batchId, dupes, dedup.keys());
-                    com.gamma.event.EventLog.current().emit(
-                            com.gamma.event.Event.builder(com.gamma.event.EventType.DEDUP_RECORDS_DROPPED)
-                                    .source(BatchIngestStrategy.class.getName())
-                                    .pipeline(cfg.identity().pipelineName())
-                                    .correlationId(batchId)
-                                    .message(dupes + " duplicate record(s) dropped by key " + dedup.keys())
-                                    .attr("keys", String.join(",", dedup.keys()))
-                                    .attr("dropped", dupes));
-                }
-            }
-        }
-        return dst;
-    }
+    // ⚠ applyRecordDedup lived here and was deleted 2026-08-11 with the move of record dedup to Stage-2.
+    // Its replacement already exists and is better: RowShaper.dedup (pipeline/exec) computes the same
+    // ROW_NUMBER window but emits the losers as a first-class `duplicate` relation instead of counting
+    // and discarding them — so the rows this lane could only report as a number are inspectable there.
+    // A consequence worth knowing: EventType.DEDUP_RECORDS_DROPPED now has NO emitter. The constant is
+    // deliberately kept — the taxonomy is public and the Stage-2 executor is the right place to emit it.
 
     /** The reference system columns a versioned store carries (§2.1) — never part of the payload hash. */
     List<String> REF_SYSTEM_COLUMNS =

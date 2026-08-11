@@ -50,11 +50,21 @@ public class PipelineConfigBatchTest {
 
     /** Writes a minimal valid pipeline toon into dir; returns its path. batchSection may be "". */
     public static Path writePipeline(Path dir, String batchSection) throws Exception {
+        return writePipeline(dir, batchSection, true);
+    }
+
+    /**
+     * As {@link #writePipeline(Path, String)} but with an explicit {@code active} flag — needed by any
+     * test whose section is <b>authoring-only</b> ({@code dedup}/{@code summarize}/{@code join}/
+     * {@code route}/{@code steps}), since {@code prepare()} refuses to arm those and the config would
+     * not load at all at {@code active: true}.
+     */
+    public static Path writePipeline(Path dir, String batchSection, boolean active) throws Exception {
         Path schema = dir.resolve("mini_schema.toon");
         Files.writeString(schema, miniSchema());
         String toon = """
             name: MINI_ETL
-            active: true
+            active: %s
             version: 1
             dirs:
               poll: %s/inbox
@@ -83,7 +93,7 @@ public class PipelineConfigBatchTest {
                 skip_tail_lines: 0
                 date_formats[1]: "%%Y-%%m-%%d"
                 timestamp_formats[1]: "%%Y-%%m-%%d"
-            """.formatted(dir, dir, dir, dir, dir, dir, dir, dir, dir,
+            """.formatted(active, dir, dir, dir, dir, dir, dir, dir, dir, dir,
                           schema.toString().replace("\\", "/"), batchSection);
         Path p = dir.resolve("mini_pipeline.toon");
         Files.writeString(p, toon);

@@ -7,4 +7,9 @@ final class PipelineConfigBatchTestRef {
     static Path writePipeline(Path dir, String batchSection) throws Exception {
         return com.gamma.etl.PipelineConfigBatchTest.writePipeline(dir, batchSection);
     }
+
+    /** An {@code active: false} draft — required for authoring-only sections, which cannot arm. */
+    static Path writeInactivePipeline(Path dir, String batchSection) throws Exception {
+        return com.gamma.etl.PipelineConfigBatchTest.writePipeline(dir, batchSection, false);
+    }
 }

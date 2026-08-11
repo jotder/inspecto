@@ -67,10 +67,33 @@ does these; see the scope note above):
 - **Join against external / reference data.** No dimension lookups, no
   enrichment from a second source, no foreign-key resolution.
 - **Aggregate across records.** No `GROUP BY` rollups, no windowing, no dedup
-  across rows. (The only cross-record operation is the lineage count matrix,
-  which is audit metadata, not output data.)
+  across rows.
 - **Hold state across records or batches.** Each record is transformed in
   isolation; each batch is independent.
+
+> ⚠ **Read the list above as the *rule*, not as a description of every line of code.** It was audited
+> against the implementation on 2026-08-11 and three things were found crossing it. One has been removed;
+> two are deliberate and remain. Recording them here because the gap between this list and the code is
+> what made the boundary hard to reason about when deciding where the pipeline `steps:` chain executes.
+>
+> - ✅ **Record dedup (`processing.dedup`) used to run here** — a `ROW_NUMBER()` QUALIFY in
+>   `BatchIngestStrategy`, the one genuine cross-record operation in the multiplexer. **Removed
+>   2026-08-11**: dedup is a transform concern, so in ELT terms it belongs in the T, not the EL.
+>   The key still parses, lifts and round-trips; `prepare()` now **refuses to arm** a pipeline carrying
+>   it, exactly as it does for `summarize`, `join` and `route`. Stage-2 executes it.
+> - ⚠ **Two `GROUP BY` aggregates remain, and they are load-bearing.** `LineageCollector` runs
+>   `SELECT __src_id, <partCols>, COUNT(*) … GROUP BY` and `ConsignmentOutputs` runs
+>   `min()/max(__event_time) … GROUP BY` per write. An earlier version of this page called lineage
+>   "audit metadata, not output data" — **that is not accurate**: `ConsignmentOutputs.fromLineage` turns
+>   those counts into durable output-registry rows.
+> - ⚠ **Reference versioning holds state across batches.** For `produces: reference` with
+>   `load: upsert|scd2`, `stampReferenceVersions` reads the store's *existing* on-disk versions and skips
+>   rows identical to the current one.
+>
+> What actually unifies the three survivors — and the test to apply to anything proposed for Stage-1 — is
+> **batch independence**, not statelessness per record. Lineage and bounds are within-batch; reference
+> versioning touches only its own store's history. None of them requires shared state across concurrently
+> running batches, which is the property the non-goals exist to protect.
 
 ### Why the non-goals matter
 

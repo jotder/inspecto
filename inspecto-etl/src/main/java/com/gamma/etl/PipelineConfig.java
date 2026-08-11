@@ -1172,6 +1172,20 @@ public final class PipelineConfig {
                     "processing.summarize is authoring-only until a recipe-driven executor lands — "
                             + "keep the pipeline inactive (active: false) or remove the summarize block");
         }
+        // processing.dedup joins them 2026-08-11 (operator decision): record-grain dedup is a TRANSFORM
+        // concern, so in ELT terms it belongs in the T and not the EL. It DID execute on this path — a
+        // ROW_NUMBER QUALIFY in BatchIngestStrategy, the one cross-record operation in the multiplexer —
+        // and was removed so Stage-1 stays per-record work plus routing.
+        // ⚠ This refusal is the whole point of that removal. Deleting the executor and leaving the key
+        // parsing would mean a pipeline that arms, runs, writes — and silently keeps every duplicate it
+        // was configured to fold. That is strictly worse than never having had the feature, and it is the
+        // same silent-discard shape the multiplicity work exists to remove.
+        if (active && dedup != null) {
+            throw new IllegalStateException(
+                    "processing.dedup is a Stage-2 (transform) concern and no longer executes on the "
+                            + "linear ingest path — keep the pipeline inactive (active: false), or move "
+                            + "the dedup into a Stage-2 job over the landed store");
+        }
         // processing.join (Phase 3 S2) too: the join model executes post-commit via EnrichmentEngine
         // (companion *_enrich.toon), never inside this pipeline's linear ingest path.
         if (active && join != null) {

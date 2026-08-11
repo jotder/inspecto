@@ -375,6 +375,17 @@ class NodeConfigNameContractTest {
     }
 
     /** A single-schema CSV pipeline carrying every block the contracts touch, filters included. */
+    /**
+     * The shared fixture. ⚠ It is {@code active: false} <b>deliberately</b>, and must stay that way: it
+     * carries {@code processing.dedup}, and dedup joined {@code route}/{@code summarize}/{@code join} as
+     * an authoring-only section when record dedup moved to Stage-2 (2026-08-11), so an {@code active}
+     * fixture is now invalid config that {@code prepare()} refuses to load.
+     *
+     * <p>This is a contract test about <b>attribute names reaching the config model</b> — whether the
+     * pipeline could also be armed was never part of what it asserts, which is why turning the flag off
+     * costs no coverage. Three tests below were already patching {@code active} to false by hand for
+     * exactly this reason; they now do it redundantly rather than necessarily.
+     */
     private static Path writeFixture(Path dir) throws Exception {
         Path sf = dir.resolve("schema.toon");
         Files.writeString(sf, """
@@ -396,7 +407,7 @@ class NodeConfigNameContractTest {
         Path p = dir.resolve("contract_pipeline.toon");
         Files.writeString(p, """
                 name: NAME_CONTRACT
-                active: true
+                active: false
                 dirs:
                   poll: %1$s/inbox
                   database: %1$s/db
