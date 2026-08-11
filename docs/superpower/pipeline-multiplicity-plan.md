@@ -463,10 +463,18 @@ mark A5 done while `summarize`/`join` still throw in `RowShaper`; they are repre
 executable only after that separate work, and a `steps:` file carrying one must refuse to arm, exactly as
 `prepare()` does today.
 
-**A6 — wiring validation becomes the real constraint.** Extend `PipelineValidator.checkWiring` so an
-invalid neighbour pairing refuses with a named code, which is what should have been rejecting bad graphs
-all along. Unaffected by the (a)/(b) choice. → verify: a wiring-invalid graph refuses; a wiring-valid
-graph with N transforms saves.
+**A6 — ✅ BUILT 2026-08-11.** `PipelineValidator.checkWiring` now refuses an invalid neighbour pairing
+with the named code **`ILLEGAL_PAIRING`**: an outcome/route edge whose target can neither accept the
+edge's relationship nor accept `data`. What "invalid pairing" turned out to mean, grounded: the emit
+side was already checked for every edge and the accept side for `data` edges (`ILLEGAL_EMIT`/
+`ILLEGAL_ACCEPT`), so the live gap was outcome/route edges — `failure → acquisition` (an entry accepts
+nothing) and `route:x → gap` (accepts only `gap`) both passed silently. The handler exemption is
+preserved deliberately: a row-consumer (sink/alert, anything accepting `data`) takes any outcome
+stream as rows, so handlers still need no per-outcome listing — the check fires only when a target can
+take neither. Save-path refusal came free: `PipelineRoutes.validatePipeline` already 422s on validator
+errors. Verified per the criterion: two refusal tests + the handler-exemption pass + a wiring-valid
+chain with two filters and two dedups (`PipelineValidatorTest`); check falsified before trusting green;
+full `-Pedition-enterprise` reactor green (engine 1176→1180, nothing outside the validator affected).
 
 **Out of scope, deliberately:** making `summarize`/`join` executable (see the ⚠ above) — separate work,
 tracked in BACKLOG.

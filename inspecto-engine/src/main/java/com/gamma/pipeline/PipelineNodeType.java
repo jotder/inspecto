@@ -56,7 +56,9 @@ public interface PipelineNodeType {
     /**
      * Relationships this node type accepts inbound. An entry node accepts nothing.
      * {@link PipelineValidator} enforces this on {@code data} edges (a {@code data} edge's target must
-     * accept {@code data}); a control/split outcome routed to a handler is governed by the emitter.
+     * accept {@code data}) and on outcome/route edges as a neighbour-pairing check (A6): their target
+     * must accept the relationship or accept {@code data} — a row-consumer (sink/alert) takes any
+     * outcome stream as rows, so handlers need not list every inbound outcome.
      */
     default Set<String> accepts() {
         return Set.of(PipelineRel.DATA);

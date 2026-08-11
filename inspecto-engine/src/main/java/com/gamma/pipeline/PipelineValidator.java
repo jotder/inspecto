@@ -35,11 +35,13 @@ import java.util.Set;
  *       graph (nothing can start a flow in which every node has an inbound edge).</li>
  *   <li><b>Relationship wiring against the node-output contract</b> (T9): an edge's relationship must
  *       be one its source node type {@link PipelineNodeType#emits() emits} (or a {@code route:*} branch
- *       when it {@link PipelineNodeType#emitsNamedRoutes() emits named routes}); and a {@code data} edge's
- *       target must {@link PipelineNodeType#accepts() accept} {@code data}. The accept side is checked only
- *       for {@code data} edges — a control/split outcome ({@code failure}/{@code unmatched}/{@code gap})
- *       routed to a handler (sink/alert) is governed by the emitter, so handlers need not list every
- *       inbound outcome. An unregistered node type is flagged (warning) and its wiring left unchecked.</li>
+ *       when it {@link PipelineNodeType#emitsNamedRoutes() emits named routes}); a {@code data} edge's
+ *       target must {@link PipelineNodeType#accepts() accept} {@code data}; and an outcome/route edge's
+ *       target must accept the relationship <em>or</em> accept {@code data} (A6 — the handler exemption:
+ *       a control/split outcome ({@code failure}/{@code unmatched}/{@code gap}) routed to a row-consumer
+ *       (sink/alert) is rows, so handlers need not list every inbound outcome; only a target that can
+ *       take neither refuses, with {@link #ILLEGAL_PAIRING}). An unregistered node type is flagged
+ *       (warning) and its wiring left unchecked.</li>
  *   <li><b>Unknown {@code use:} kind</b> — a node's {@code use:} reference must have a recognized
  *       {@code <kind>/<name>} prefix ({@link ComponentRegistry#isComponentType}); an unrecognized kind
  *       (typo or removed component type) is a hard error, since it silently falls back to the node's
@@ -66,6 +68,14 @@ public final class PipelineValidator {
     public static final String NO_ENTRY = "NO_ENTRY";
     public static final String ILLEGAL_EMIT = "ILLEGAL_EMIT";
     public static final String ILLEGAL_ACCEPT = "ILLEGAL_ACCEPT";
+    /**
+     * An outcome/route edge whose target can neither accept the edge's relationship nor consume it
+     * as rows (A6, pipeline-multiplicity plan). The handler exemption is preserved: a target that
+     * accepts {@code data} may take any outcome/route stream as rows (a sink taking a reject
+     * stream), so this fires only for targets that accept neither — an entry node (accepts
+     * nothing), or a specialised consumer like {@code gap} fed the wrong relationship.
+     */
+    public static final String ILLEGAL_PAIRING = "ILLEGAL_PAIRING";
     public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
     public static final String UNKNOWN_USE_KIND = "UNKNOWN_USE_KIND";
     /**
@@ -279,6 +289,21 @@ public final class PipelineValidator {
                             issues.add(new Issue(Severity.ERROR, ILLEGAL_ACCEPT,
                                     "Node '" + e.to() + "' (" + to.type() + ") does not accept data — accepts "
                                             + dst.accepts() + "."));
+                        }
+                    });
+                }
+            } else if (!PipelineRel.ON_COMMIT.equals(e.rel())) {
+                // Neighbour pairing for an outcome/route edge (A6): the target must accept the
+                // relationship, or accept data (the handler exemption — a reject/route stream is
+                // rows to a row-consumer). on_commit is cross-flow, its target is not a local node.
+                PipelineNode to = byId.get(e.to());
+                if (to != null) {
+                    PipelineNodeTypes.get(to.type()).ifPresent(dst -> {
+                        if (!dst.accepts().contains(e.rel()) && !dst.accepts().contains(PipelineRel.DATA)) {
+                            issues.add(new Issue(Severity.ERROR, ILLEGAL_PAIRING,
+                                    "Node '" + e.to() + "' (" + to.type() + ") cannot be wired after '"
+                                            + e.from() + "' via '" + e.rel() + "' — it accepts " + dst.accepts()
+                                            + " and does not consume rows."));
                         }
                     });
                 }

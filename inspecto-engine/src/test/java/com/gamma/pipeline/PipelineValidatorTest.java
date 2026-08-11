@@ -165,6 +165,72 @@ class PipelineValidatorTest {
         assertTrue(PipelineValidator.validate(linearValid()).ok());
     }
 
+    // ── neighbour pairing on outcome/route edges (A6, pipeline-multiplicity plan) ──────
+    // The emit side is checked for every edge, but the accept side used to be checked only for
+    // data edges — so an outcome routed into a node that can neither accept the relationship nor
+    // consume it as rows passed silently. The handler exemption stays: a sink/alert taking a
+    // reject stream as rows (accepts data) needs no per-outcome listing.
+
+    @Test
+    void anOutcomeEdgeIntoTheEntryNodeRefusesWithIllegalPairing() {
+        // acquisition emits failure, so the emit side is legal — but the second acquisition node
+        // accepts NOTHING inbound; wiring a failure stream into a pipeline entry is nonsense.
+        PipelineGraph g = new PipelineGraph("pairing", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("acq2", "acquisition"),
+                        PipelineNode.of("sink", "sink.persistent")),
+                List.of(PipelineEdge.data("acq", "sink"),
+                        new PipelineEdge("acq", PipelineRel.FAILURE, "acq2")));
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertFalse(r.ok());
+        assertTrue(codes(r).contains(PipelineValidator.ILLEGAL_PAIRING));
+        assertTrue(r.errors().stream().anyMatch(i -> i.message().contains("acq2")
+                        && i.message().contains(PipelineRel.FAILURE)),
+                () -> "" + r.issues());
+    }
+
+    @Test
+    void aRouteBranchIntoANodeThatConsumesNeitherTheRouteNorRowsRefuses() {
+        // route:* branches carry rows; 'gap' accepts only the gap relationship, never rows.
+        PipelineGraph g = new PipelineGraph("pairing-route", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("r", "transform.route"),
+                        PipelineNode.of("g", "gap")),
+                List.of(PipelineEdge.data("acq", "r"),
+                        new PipelineEdge("r", PipelineRel.route("emea"), "g")));
+        assertTrue(codes(PipelineValidator.validate(g)).contains(PipelineValidator.ILLEGAL_PAIRING));
+    }
+
+    @Test
+    void theHandlerExemptionSurvives_outcomesIntoRowConsumersAndDeclaredAcceptorsPass() {
+        // failure → alert (declared acceptor), gap → gap node (declared), failure → sink (row
+        // consumer), unmatched → sink (row consumer, already in linearValid): all legal pairings.
+        PipelineGraph g = new PipelineGraph("handlers", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("al", "alert"),
+                        PipelineNode.of("gd", "gap"), PipelineNode.of("q", "sink.persistent"),
+                        PipelineNode.of("sink", "sink.persistent")),
+                List.of(PipelineEdge.data("acq", "sink"),
+                        new PipelineEdge("acq", PipelineRel.FAILURE, "al"),
+                        new PipelineEdge("acq", PipelineRel.GAP, "gd"),
+                        new PipelineEdge("acq", PipelineRel.FAILURE, "q")));
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertTrue(r.ok(), () -> "" + r.issues());
+        assertTrue(PipelineValidator.validate(linearValid()).ok());
+    }
+
+    /** The A6 verify criterion's other half: a wiring-valid chain with N transforms of one kind saves. */
+    @Test
+    void aWiringValidChainWithRepeatedTransformKindsHasNoErrors() {
+        PipelineGraph g = new PipelineGraph("n-transforms", true,
+                List.of(PipelineNode.of("acq", "acquisition"), PipelineNode.of("p", "parser"),
+                        PipelineNode.of("f1", "transform.filter"), PipelineNode.of("d1", "transform.dedup"),
+                        PipelineNode.of("f2", "transform.filter"), PipelineNode.of("d2", "transform.dedup"),
+                        PipelineNode.of("sink", "sink.persistent")),
+                List.of(PipelineEdge.data("acq", "p"), PipelineEdge.data("p", "f1"),
+                        PipelineEdge.data("f1", "d1"), PipelineEdge.data("d1", "f2"),
+                        PipelineEdge.data("f2", "d2"), PipelineEdge.data("d2", "sink")));
+        PipelineValidator.Result r = PipelineValidator.validate(g);
+        assertTrue(r.ok(), () -> "" + r.issues());
+    }
+
     @Test
     void unregisteredTypeIsAWarningAndItsWiringIsNotChecked() {
         PipelineGraph g = new PipelineGraph("plugin", true,
