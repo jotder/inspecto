@@ -36,12 +36,14 @@ same slice that makes the format able to represent the thing.**
 constraint — but a wiring-valid graph with two dedups still has nowhere to *put* the second one in a
 single-slot file. The two checks answer different questions and both are needed.
 
-⚠ **`transform.join` does not execute at all** on either path: `RowShaper.shape()` has no case for it and
-throws (it needs a resolver seam — `shape()` cannot reach reference data). ~~`transform.summarize`~~
+~~⚠ `transform.join` does not execute at all~~ **join gained its executor 2026-08-11**: `RowShaper.join`
+executes `{reference, on}` as a LEFT JOIN through the new `RowShaper.ReferenceResolver` seam
+(functional-interface, same shape as `SinkWriter`/`ProvenanceCollector`, threaded via
+`PipelineExecutor.execute`/`dryRun` overloads; the `NONE` default refuses). ~~`transform.summarize`~~
 **summarize gained its executor 2026-08-11**: `RowShaper.summarize` routes `{group_by, measures}` through
-`MeasureCompiler`; arming a flat pipeline carrying it still refuses in `prepare()`, unchanged. **"Allow
-many" is moot for join until "allow one" works** — its plural blocks stay authoring-only, exactly as its
-single block is today.
+`MeasureCompiler`. Arming a flat pipeline carrying either still refuses in `prepare()`, unchanged —
+for join the open remainder is a **production resolver** (adapt `EnrichmentEngine.referenceReader`'s
+path/by-name resolution to the seam; A5 territory, since it decides which route owns reference context).
 
 ---
 
@@ -164,7 +166,7 @@ already tracked and already blocked". **That was wrong.** The blocked item is Ph
 | `transform.route` | ❌ `prepare()` refuses | ✅ `route` |
 | `transform.split` / `validate` | ❌ not lowerable | ✅ `split` / `validate` |
 | `transform.map` / `select` / `derive` | partial | ✅ `project` |
-| `transform.summarize` / `join` | ❌ `prepare()` refuses | ❌ `shape()` throws — the one real gap |
+| `transform.summarize` / `join` | ❌ `prepare()` refuses | ✅ `summarize` (2026-08-11, via `MeasureCompiler`) / ✅ `join` (2026-08-11, LEFT JOIN via the `ReferenceResolver` seam — a caller must supply reference context) |
 
 So the walker that executes an arbitrary ordered chain **exists, is wired (`PipelineJobRunner`), and is
 strictly more capable than the flat path** — it already runs N transforms of a kind in any order, because
@@ -442,8 +444,9 @@ in three states: `filter` executed, `dedup` executed, and `route`/`summarize`/`j
 ⚠ **Do not read the removal as a capability loss with no replacement.** `RowShaper.dedup`
 (`pipeline/exec/RowShaper.java:151-166`) already implements the same window and is *better* — it emits
 the losers as a first-class `duplicate` relation rather than counting and discarding them. The gap is
-routing, not implementation. Of the three Stage-2 kinds, only `join` still lacks an executor there
-(`RowShaper.shape()` throws) — `summarize` gained its executor 2026-08-11 via `MeasureCompiler`.
+routing, not implementation. All three Stage-2 kinds now have executors: `summarize` (2026-08-11, via
+`MeasureCompiler`) and `join` (2026-08-11, LEFT JOIN via the `ReferenceResolver` seam) joined `dedup` —
+the whole remaining gap is the Stage-2 *route* (and, for join, a production resolver on that route).
 
 ⚠ **`EventType.DEDUP_RECORDS_DROPPED` now has no emitter.** The constant is kept deliberately: the
 taxonomy is public and the Stage-2 executor is the right place to emit it. A grep for "who emits this"

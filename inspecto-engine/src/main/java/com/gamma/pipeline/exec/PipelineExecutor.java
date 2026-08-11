@@ -119,6 +119,22 @@ public final class PipelineExecutor {
                                      SinkWriter sinkWriter,
                                      BranchCommitCoordinator.SourceFinalize sourceFinalize,
                                      ProvenanceCollector prov) throws Exception {
+        return execute(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize, prov,
+                RowShaper.ReferenceResolver.NONE);
+    }
+
+    /**
+     * As the {@link ProvenanceCollector} overload, with reference context: {@code references} resolves a
+     * {@code transform.join} node's Reference Dataset to a relation on {@code conn}
+     * ({@link RowShaper.ReferenceResolver}). The default {@link RowShaper.ReferenceResolver#NONE} refuses,
+     * so a caller with no reference context fails a join loudly rather than resolving wrongly.
+     */
+    public static ExecResult execute(Connection conn, PipelineGraph g, Map<String, String> seeds,
+                                     String batchId, BranchCommitCoordinator coordinator,
+                                     SinkWriter sinkWriter,
+                                     BranchCommitCoordinator.SourceFinalize sourceFinalize,
+                                     ProvenanceCollector prov,
+                                     RowShaper.ReferenceResolver references) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
 
@@ -147,7 +163,8 @@ public final class PipelineExecutor {
                 produced.put(nodeId, rels);
                 recordCounts(conn, prov, nodeId, rels);
             } else if (isShapeable(node.type())) {
-                Map<String, String> rels = index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced), nodeId));
+                Map<String, String> rels = index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced),
+                        nodeId, references));
                 produced.put(nodeId, rels);
                 recordCounts(conn, prov, nodeId, rels);
             }
@@ -175,6 +192,12 @@ public final class PipelineExecutor {
      */
     public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId, String seedTable)
             throws Exception {
+        return dryRun(conn, g, seedNodeId, seedTable, RowShaper.ReferenceResolver.NONE);
+    }
+
+    /** As {@link #dryRun(Connection, PipelineGraph, String, String)}, with reference context for {@code transform.join}. */
+    public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId, String seedTable,
+                                      RowShaper.ReferenceResolver references) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
         Map<String, Map<String, String>> produced = new LinkedHashMap<>();
@@ -194,7 +217,8 @@ public final class PipelineExecutor {
                 for (PipelineEdge e : inbound) inputs.add(tableOf(e, produced));
                 produced.put(nodeId, index(RowShaper.merge(conn, node, inputs, nodeId)));
             } else if (isShapeable(node.type())) {
-                produced.put(nodeId, index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced), nodeId)));
+                produced.put(nodeId, index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced),
+                        nodeId, references)));
             }
         }
         return new DryRunResult(produced, sinkInputs);

@@ -73,7 +73,9 @@ public enum BuiltinNodeType implements PipelineNodeType {
     // Reference join (ELT amendment D-4/Phase 3 S2: the join is a transform concern — no enrich verb).
     // Flat home: processing.join {reference, on}. Distinct from ENRICHMENT below: that node is the
     // companion-persisted post-commit stage (truth = *_enrich.toon, ignored by lower); this one IS
-    // lowered, and is compile-only until an in-pipeline join executor lands.
+    // lowered. Executes in RowShaper.join (2026-08-11) as a LEFT JOIN through the ReferenceResolver
+    // seam — a caller with no reference context refuses rather than resolving wrongly. Arming a flat
+    // pipeline that carries it stays gated by prepare() until a production route supplies a resolver.
     TRANSFORM_JOIN("transform.join", NodeCategory.TRANSFORM, "Join",
             "Joins against a Reference Dataset by key.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),

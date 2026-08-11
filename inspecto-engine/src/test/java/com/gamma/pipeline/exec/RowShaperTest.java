@@ -170,6 +170,66 @@ class RowShaperTest {
                 PipelineNode.of("sm", "transform.summarize", Map.of("measures", List.of("median(amt)"))), "src", "sm"));
     }
 
+    // ── join (reference LEFT JOIN through the resolver seam) ────────────────────
+
+    /** ref(grp VARCHAR, label VARCHAR): only grp 'a' is present, so id 2 (grp 'b') must survive with NULL. */
+    private RowShaper.ReferenceResolver seedRef() throws SQLException {
+        sql("CREATE TABLE refdim AS SELECT * FROM (VALUES ('a','Alpha')) t(grp, label)");
+        return (c, name) -> {
+            assertEquals("reference/groups", name);   // the node's cfg value reaches the resolver verbatim
+            return "refdim";
+        };
+    }
+
+    @Test
+    void joinIsALeftJoin_unmatchedRowsSurviveWithNulls() throws Exception {
+        seedSrc();
+        var resolver = seedRef();
+        var out = new RelationByRel(RowShaper.shape(conn,
+                PipelineNode.of("j", "transform.join",
+                        Map.of("reference", "reference/groups", "on", "grp")),
+                "src", "j", resolver));
+        String t = out.table(PipelineRel.DATA);
+        assertEquals(3, count(t));   // LEFT JOIN: nothing dropped
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, label FROM \"" + t + "\" ORDER BY id")) {
+            assertTrue(rs.next()); assertEquals(1, rs.getInt(1)); assertEquals("Alpha", rs.getString(2));
+            assertTrue(rs.next()); assertEquals(2, rs.getInt(1)); assertNull(rs.getString(2));
+            assertTrue(rs.next()); assertEquals(3, rs.getInt(1)); assertEquals("Alpha", rs.getString(2));
+            assertFalse(rs.next());
+        }
+    }
+
+    /** The two lowering paths disagree on {@code on}'s shape (scalar vs list) — both must work. */
+    @Test
+    void joinAcceptsOnAsAListToo() throws Exception {
+        seedSrc();
+        var out = new RelationByRel(RowShaper.shape(conn,
+                PipelineNode.of("j", "transform.join",
+                        Map.of("reference", "reference/groups", "on", List.of("grp"))),
+                "src", "j", seedRef()));
+        assertEquals(3, count(out.table(PipelineRel.DATA)));
+    }
+
+    /** Without reference context the 4-arg shape must refuse — never resolve wrongly or no-op. */
+    @Test
+    void joinWithoutAResolverRefuses() {
+        var node = PipelineNode.of("j", "transform.join",
+                Map.of("reference", "reference/groups", "on", "grp"));
+        var e = assertThrows(IllegalStateException.class, () -> RowShaper.shape(conn, node, "src", "j"));
+        assertTrue(e.getMessage().contains("reference/groups"));
+    }
+
+    @Test
+    void joinRefusesMissingReferenceAndMissingOn() throws Exception {
+        seedSrc();
+        var resolver = seedRef();
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("j", "transform.join", Map.of("on", "grp")), "src", "j", resolver));
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("j", "transform.join", Map.of("reference", "reference/groups")), "src", "j", resolver));
+    }
+
     @Test
     void fuseFiltersAndProjectionIntoOnePass() throws Exception {
         seedSrc();

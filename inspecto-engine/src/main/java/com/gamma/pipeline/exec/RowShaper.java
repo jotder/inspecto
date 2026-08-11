@@ -40,6 +40,10 @@ import java.util.Optional;
  *   <li>{@code transform.dedup[.*]} — {@code keys}: [col]; optional {@code order_by} (SQL) →
  *       {@code data} (first per key) + {@code duplicate}.</li>
  *   <li>{@code transform.split} — {@code column}: list/array col; optional {@code as} → {@code data}.</li>
+ *   <li>{@code transform.join} — {@code reference}: Reference Dataset name; {@code on}: key column(s)
+ *       (scalar or list — the two lowering paths disagree, both are accepted) → {@code data} (LEFT JOIN:
+ *       every input row survives, unmatched keys carry NULLs). Needs a {@link ReferenceResolver} —
+ *       the 4-arg {@link #shape} refuses it (see {@link ReferenceResolver#NONE}).</li>
  *   <li>{@code transform.summarize} — {@code group_by}: [col] (optional); {@code measures}: shorthand
  *       ({@code count} | {@code agg(field)}, compiled by {@link MeasureCompiler}) → {@code data}
  *       (the rollup).</li>
@@ -62,12 +66,40 @@ public final class RowShaper {
     public record Relation(String rel, String table) {}
 
     /**
+     * <b>The reference seam.</b> Resolves a Reference Dataset name to a DuckDB relation (table/view name)
+     * readable on the given connection — the one thing {@code transform.join} needs that the rest of the
+     * shaper does not: reach outside the batch. Same functional-interface seam shape as
+     * {@link PipelineExecutor.SinkWriter}/{@code ProvenanceCollector}; the caller that owns reference
+     * context (dry-run sampling a reference, a future production route) supplies one — everything else
+     * gets {@link #NONE}, which refuses rather than resolving wrongly.
+     */
+    @FunctionalInterface
+    public interface ReferenceResolver {
+        String resolve(Connection conn, String reference) throws SQLException;
+
+        /** The no-context default: any resolution attempt refuses with the reference it could not reach. */
+        ReferenceResolver NONE = (conn, reference) -> {
+            throw new IllegalStateException("no ReferenceResolver supplied — cannot resolve reference '"
+                    + reference + "' for transform.join in this execution context");
+        };
+    }
+
+    /**
      * Shape a single-input {@code transform.*} node over {@code input}, creating its output tables under
-     * {@code outPrefix}. {@code transform.merge} is multi-input — call {@link #merge} instead.
+     * {@code outPrefix}. {@code transform.merge} is multi-input — call {@link #merge} instead. This overload
+     * carries no reference context, so a {@code transform.join} node refuses
+     * ({@link ReferenceResolver#NONE}).
      */
     public static List<Relation> shape(Connection conn, PipelineNode node, String input, String outPrefix)
             throws SQLException {
+        return shape(conn, node, input, outPrefix, ReferenceResolver.NONE);
+    }
+
+    /** As {@link #shape(Connection, PipelineNode, String, String)}, with reference context for {@code transform.join}. */
+    public static List<Relation> shape(Connection conn, PipelineNode node, String input, String outPrefix,
+                                       ReferenceResolver references) throws SQLException {
         String type = node.type();
+        if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(type))     return join(conn, node, input, outPrefix, references);
         if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(type))   return filter(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_VALIDATE.type().equals(type)) return validate(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(type))    return route(conn, node, input, outPrefix);
@@ -208,6 +240,42 @@ public final class RowShaper {
         String select = MeasureCompiler.compile(MeasureCompiler.parse(body, Integer.MAX_VALUE, Integer.MAX_VALUE));
         String data = table(prefix, PipelineRel.DATA);
         exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
+        return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    // ── join (reference LEFT JOIN through the resolver seam) ─────────────────────
+
+    /**
+     * {@code transform.join} — {@code reference}: the Reference Dataset name, resolved to a relation via
+     * the {@link ReferenceResolver} seam; {@code on}: the key column(s). {@code on} arrives as a scalar
+     * string from {@code PipelineLift}/the flat file but as a list from {@code RecipeCompiler} — both
+     * spellings are accepted.
+     *
+     * <p>Always a <b>LEFT JOIN</b>: the node emits only {@code data} (no reject relation), so an inner
+     * join would silently drop unmatched rows — the exact silent-discard shape the multiplicity work
+     * removes. Unmatched keys carry NULL reference columns instead; {@code USING} folds the key columns
+     * once. A non-key column name shared by both sides fails the {@code CREATE TABLE} loudly rather than
+     * writing an ambiguous result.
+     */
+    private static List<Relation> join(Connection conn, PipelineNode node, String input, String prefix,
+                                       ReferenceResolver references) throws SQLException {
+        String reference = strOrNull(node, "reference");
+        if (reference == null)
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs a 'reference'");
+        List<String> on = new ArrayList<>();
+        if (node.cfg("on") instanceof List<?> list) {
+            for (Object o : list) if (o != null && !o.toString().isBlank()) on.add(o.toString());
+        } else {
+            String scalar = strOrNull(node, "on");
+            if (scalar != null) on.add(scalar);
+        }
+        if (on.isEmpty())
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs 'on' key column(s)");
+        String ref = references.resolve(conn, reference);
+        String using = "USING (" + String.join(", ", on.stream().map(RowShaper::q).toList()) + ")";
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * FROM " + q(input)
+                + " LEFT JOIN " + q(ref) + " " + using);
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 

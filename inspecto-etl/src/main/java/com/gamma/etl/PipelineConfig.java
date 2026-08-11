@@ -1186,12 +1186,14 @@ public final class PipelineConfig {
                             + "linear ingest path — keep the pipeline inactive (active: false), or move "
                             + "the dedup into a Stage-2 job over the landed store");
         }
-        // processing.join (Phase 3 S2) too: the join model executes post-commit via EnrichmentEngine
-        // (companion *_enrich.toon), never inside this pipeline's linear ingest path.
+        // processing.join (Phase 3 S2) too: the executor exists (RowShaper.join, 2026-08-11), but the
+        // linear ingest path this prepare() arms has no ReferenceResolver to feed it — resolving a
+        // Reference Dataset by name lives in EnrichmentEngine, post-commit. Lifted when a production
+        // route supplies a resolver (multiplicity plan A5 territory).
         if (active && join != null) {
             throw new IllegalStateException(
-                    "processing.join is authoring-only until an in-pipeline join executor lands — "
-                            + "keep the pipeline inactive (active: false) or remove the join block");
+                    "processing.join is authoring-only — this pipeline's linear path cannot resolve a "
+                            + "Reference Dataset; keep the pipeline inactive (active: false) or remove the join block");
         }
         // ⚠ An explicit steps: chain arms NOTHING today, and the three guards above cannot catch it.
         // They test the TYPED fields (route/summarize/join), which a steps: file never populates — the
