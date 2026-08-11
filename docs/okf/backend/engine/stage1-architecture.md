@@ -75,6 +75,7 @@ does these; see the scope note above):
 > against the implementation on 2026-08-11 and three things were found crossing it. One has been removed;
 > two are deliberate and remain. Recording them here because the gap between this list and the code is
 > what made the boundary hard to reason about when deciding where the pipeline `steps:` chain executes.
+> **That question is now answered — see *Step 3 — the Stage-2 transform chain, at rest* below.**
 >
 > - ✅ **Record dedup (`processing.dedup`) used to run here** — a `ROW_NUMBER()` QUALIFY in
 >   `BatchIngestStrategy`, the one genuine cross-record operation in the multiplexer. **Removed
@@ -332,6 +333,56 @@ Reads both generated config files, polls the inbox directory, and for each unpro
 3. Writes partitioned output (Parquet or CSV)
 4. Optionally registers output into DuckLake
 5. Writes a `.processed` marker and updates the status log
+
+### Step 3 — the Stage-2 transform chain, at rest (shipped 2026-08-11)
+
+The boundary audit above left one question open: **where does a flat pipeline's transform chain
+execute**, given that `dedup`/`summarize`/`join` were all removed from — or never ran on — the linear
+ingest path? Answer: as a **flow job over the store Step 2 landed**, never inside the EL.
+
+A flat `*_pipeline.toon` declares its chain and where the shaped result rests:
+
+```
+name: orders_etl
+output_store: orders_shaped        # authored, never derived — the store the chain writes
+steps[2]:
+  - dedup:
+      keys[1]: ORDER_ID
+  - summarize:
+      group_by[1]: ORDER_DAY
+      measures[1]: count
+```
+
+and a job runs it:
+
+```
+job:
+  name: orders_shape
+  type: pipeline
+  pipeline_config: config/orders_pipeline.toon    # lifted at run time — the flat file stays the truth
+  on_pipeline: orders_etl                          # each ingest commit shapes the new rows
+```
+
+`PipelineLift.stageTwo` projects the chain into `source_store(landed) → chain → sink.persistent(output_store)`;
+`PipelineJobRunner` executes it through the production `PipelineExecutor`/`RowShaper`. A `transform.join`
+resolves its Reference Dataset through the shared `ReferenceReader` — the same resolution the Stage-2
+enrichment uses, so a versioned reference store's current/as-of view is derived identically on both routes.
+
+**`output_store:` is the arming condition.** `prepare()` refuses to arm a pipeline carrying
+`summarize`/`dedup`/`join`/`steps:` *unless* `output_store:` is authored — with it, the file itself
+declares the EL/T split; without it the keys have no execution route and arming would silently run
+neither. ⚠ An absolute refusal was the original design and was **wrong**: it would have meant Stage 1
+could never land the store the chain reads, making the route unreachable.
+
+⛔ **Not covered by this route** (both wait on the branch-aware executor): ingest-side `route:` demux —
+one `output_store` cannot name N branch destinations, so a `route` step refuses here too — and
+multi-destination `sinks:` arming. ⚠ **Refused at rest as well:** a *legacy* (pre-map) filter, whose
+predicate speaks raw-column vocabulary the landed store no longer has, and any filter carrying pre-parse
+include/exclude keys. An explicit `steps:` filter is post-map and runs fine.
+
+⚠ **Open gap, deliberate:** nothing yet warns when a pipeline authors `output_store:` and no
+`pipeline_config:` job exists to run its chain — the chain is then quietly not running. A scheduler-audit
+finding is the fail-visible follow-up (`BACKLOG` §4).
 
 ---
 

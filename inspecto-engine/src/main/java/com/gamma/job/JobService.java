@@ -105,6 +105,9 @@ public final class JobService implements AutoCloseable {
      *  between two runs takes effect on the second. Null until wired: the run then resolves nothing, which
      *  is the behaviour every run had before this was added. */
     private volatile java.util.function.Supplier<com.gamma.pipeline.ComponentRegistry> componentRegistry;
+
+    /** Loaded pipelines a flow job's {@code transform.join} resolves a by-name reference against; nullable. */
+    private volatile java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>> pipelineConfigs;
     /** Data root under which each store is a sub-directory — a flow job reads/writes {@code <dataDir>/<store>} (T32). */
     private final String dataDir;
     /** Optional deletion fence (T25): consulted before a {@code maintenance} job that declares a {@code store:}
@@ -577,13 +580,24 @@ public final class JobService implements AutoCloseable {
         if (pipelineStore == null && c.opt("pipeline_config", null) == null)
             throw new IllegalStateException("flow job '" + c.name()
                     + "' needs an authored-flow store; set -Dassist.write.root so authored flows can be loaded");
-        return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore, componentRegistry);
+        return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore,
+                componentRegistry, pipelineConfigs);
     }
 
     /** Wire this space's component registry so a pipeline run resolves its {@code use:} bindings (like
      *  {@link #knownPipelines}, set by the hosting service). Without it a run sees only local config. */
     public void componentRegistry(java.util.function.Supplier<com.gamma.pipeline.ComponentRegistry> supplier) {
         this.componentRegistry = supplier;
+    }
+
+    /**
+     * Wire this space's loaded pipelines so a flow job's {@code transform.join} can resolve a <b>by-name</b>
+     * reference ({@code reference/<pipeline>}) — the same context {@code EnrichmentService} already supplies
+     * its engine. Without it a by-name join refuses naming the missing wiring; a {@code path:} reference
+     * never needs it. Set by the hosting service, like {@link #componentRegistry} and {@link #knownPipelines}.
+     */
+    public void pipelineConfigs(java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>> supplier) {
+        this.pipelineConfigs = supplier;
     }
 
     private void onBatchEvent(BatchEvent event) {

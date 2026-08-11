@@ -640,6 +640,121 @@ class PipelineJobRunnerTest {
                 "dedup by amt keeps the first per key — id 3's amt=150 is the duplicate");
     }
 
+    // ── A5-at-rest slice 5: transform.join resolves its Reference Dataset for real ──
+
+    /** A path-form reference needs no pipeline context at all — the file is self-describing. */
+    @Test
+    void aStageTwoJoinAgainstAPathReferenceEnrichesTheLandedRows() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        Path dim = tmp.resolve("region_dim.parquet");
+        seedDim(dim, "(1,'EMEA'),(2,'APAC')");
+
+        Path flat = tmp.resolve("j1_pipeline.toon");
+        Files.writeString(flat, """
+                name: j1_etl
+                active: false
+                output_store: joined
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - join:
+                      reference: %s
+                      on[1]: id
+                """.formatted(dim.toString().replace("\\", "/")));
+        seedParquet(dataDir, "j1_etl", "(1,150),(2,50),(3,200)");
+
+        JobConfig cfg = new JobConfig("j1", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        // LEFT JOIN: all three rows survive; id 3 has no dimension row and carries NULL
+        assertEquals(List.of(1, 2, 3), readIds(dataDir, "joined"));
+        assertEquals(java.util.Arrays.asList("EMEA", "APAC", null),   // by id; List.of rejects the null
+                readColumn(dataDir, "joined", "region"));
+    }
+
+    /** A by-name reference (reference/<pipeline>) resolves through the loaded-pipeline context. */
+    @Test
+    void aStageTwoJoinResolvesAByNameReferenceFromThePipelineContext() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        // the reference producer: a pipeline declaring produces: reference, whose store holds the dimension
+        Path refStore = tmp.resolve("refdb");
+        seedDim(refStore.resolve("dim.parquet"), "(1,'EMEA'),(2,'APAC')");
+        Path refCfgPath = tmp.resolve("regions_pipeline.toon");
+        Files.writeString(refCfgPath, """
+                name: regions
+                active: false
+                produces: reference
+                dirs:
+                  poll: in
+                  database: %s
+                output:
+                  format: PARQUET
+                processing:
+                  threads: 1
+                """.formatted(refStore.toString().replace("\\", "/")));
+        var refCfg = com.gamma.etl.PipelineConfig.load(refCfgPath.toString());
+
+        Path flat = tmp.resolve("j2_pipeline.toon");
+        Files.writeString(flat, """
+                name: j2_etl
+                active: false
+                output_store: joined2
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - join:
+                      reference: reference/regions
+                      on[1]: id
+                """);
+        seedParquet(dataDir, "j2_etl", "(1,150),(2,50)");
+
+        JobConfig cfg = new JobConfig("j2", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir, auditDir,
+                null, null, () -> List.of(refCfg)).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of("EMEA", "APAC"), readColumn(dataDir, "joined2", "region"));   // by id
+    }
+
+    /** Without the pipeline context a by-name join must refuse, naming the missing wiring. */
+    @Test
+    void aByNameJoinWithoutPipelineContextRefuses() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        Path flat = tmp.resolve("j3_pipeline.toon");
+        Files.writeString(flat, """
+                name: j3_etl
+                active: false
+                output_store: joined3
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - join:
+                      reference: reference/nowhere
+                      on[1]: id
+                """);
+        seedParquet(dataDir, "j3_etl", "(1,150)");
+        JobConfig cfg = new JobConfig("j3", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        var e = assertThrows(IllegalArgumentException.class, () ->
+                new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir,
+                        tmp.resolve("audit").toString()).run());
+        assertTrue(e.getMessage().contains("nowhere"), e.getMessage());
+    }
+
     @Test
     void aJobCarryingBothGraphSourcesRefuses() throws Exception {
         String dataDir = tmp.resolve("data").toString();
@@ -664,6 +779,33 @@ class PipelineJobRunnerTest {
         try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
             st.execute("COPY (SELECT * FROM (VALUES " + valuesSql + ") t(id,amt)) TO '"
                     + dir.resolve(file + ".parquet").toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** Write {@code (id,region)} VALUES as one Parquet dimension file at {@code path}. */
+    private static void seedDim(Path path, String valuesSql) throws Exception {
+        Files.createDirectories(path.getParent());
+        File db = DuckDbUtil.tempDbFile("dim_");
+        try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES " + valuesSql + ") t(id,region)) TO '"
+                    + path.toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** Read one column of every Parquet file under {@code <dataDir>/<store>}, ordered by {@code id}. */
+    private static List<String> readColumn(String dataDir, String store, String column) throws Exception {
+        String glob = dataDir.replace("\\", "/") + "/" + store + "/**/*.parquet";
+        File db = DuckDbUtil.tempDbFile("rc_");
+        try (Connection c = DuckDbUtil.openConnection(db); Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("SELECT \"" + column + "\" FROM "
+                     + SqlViews.reader("PARQUET", glob, true) + " ORDER BY id")) {
+            List<String> out = new ArrayList<>();
+            while (rs.next()) out.add(rs.getString(1));
+            return out;
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }

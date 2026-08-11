@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.api.PublicApi;
+import com.gamma.enrich.ReferenceReader;
 import com.gamma.etl.BatchEvent;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.event.Event;
@@ -101,6 +102,8 @@ public final class PipelineJobRunner implements Job {
     private final String auditDir;
     private final DbProvenanceStore provenance;   // T21 — nullable; default-off unless -Dprovenance.backend set
     private final Supplier<ComponentRegistry> registry;   // nullable — no registry means no `use:` resolution
+    /** Loaded-pipeline context a {@code transform.join}'s by-name reference resolves against; nullable. */
+    private final Supplier<List<com.gamma.etl.PipelineConfig>> pipelines;
 
     /** As {@link #PipelineJobRunner(JobConfig, BatchEventBus, PipelineStore, String, String, DbProvenanceStore)} with no provenance store. */
     public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
@@ -131,6 +134,19 @@ public final class PipelineJobRunner implements Job {
     public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
                          String dataDir, String auditDir, DbProvenanceStore provenance,
                          Supplier<ComponentRegistry> registry) {
+        this(cfg, bus, pipelineStore, dataDir, auditDir, provenance, registry, null);
+    }
+
+    /**
+     * As above, plus the loaded-pipeline context a {@code transform.join} node's <b>by-name</b> reference
+     * ({@code reference/<pipeline>}) resolves against — A5-at-rest slice 5. Supplied rather than held for
+     * the same reason as {@code registry}: each run reads live. {@code null} leaves by-name joins refusing
+     * with the wiring named ({@link ReferenceReader#sqlFor}); a {@code path:} reference needs no context.
+     */
+    public PipelineJobRunner(JobConfig cfg, BatchEventBus bus, PipelineStore pipelineStore,
+                         String dataDir, String auditDir, DbProvenanceStore provenance,
+                         Supplier<ComponentRegistry> registry,
+                         Supplier<List<com.gamma.etl.PipelineConfig>> pipelines) {
         this.cfg = cfg;
         this.bus = bus;
         this.pipelineStore = pipelineStore;
@@ -138,6 +154,7 @@ public final class PipelineJobRunner implements Job {
         this.auditDir = auditDir;
         this.provenance = provenance;
         this.registry = registry;
+        this.pipelines = pipelines;
     }
 
     @Override public String name() { return cfg.name(); }
@@ -245,7 +262,8 @@ public final class PipelineJobRunner implements Job {
                     ? PipelineExecutor.ProvenanceCollector.NONE
                     : (nodeId, rel, rowCount) -> provRows.add(new ProvenanceRow(pipelineId, batchId, nodeId, rel, rowCount, runTs));
 
-            PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, collector);
+            PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, collector,
+                    references());
 
             if (provenance != null) {
                 provenance.record(provRows);
@@ -272,6 +290,34 @@ public final class PipelineJobRunner implements Job {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────────
+
+    /** View-name prefix for a resolved Reference Dataset (distinct from the {@code source_store} seeds). */
+    private static final String REF_VIEW_PREFIX = "pipeline_ref";
+
+    /**
+     * <b>A5-at-rest slice 5 — the production {@link RowShaper.ReferenceResolver}.</b> Resolves a
+     * {@code transform.join} node's {@code reference} ({@code reference/<pipeline>} or a path) through
+     * {@link ReferenceReader} — the same resolution the Stage-2 {@code EnrichmentEngine} uses, so a
+     * versioned reference store's current/as-of view is derived identically on both routes — and registers
+     * it as a view on this run's scratch connection, because {@link RowShaper} joins against a named
+     * relation, not an expression.
+     *
+     * <p>The view is created once per distinct reference and reused: two joins against the same dimension
+     * read one view rather than two, and re-resolving mid-run could otherwise see a reference store that
+     * changed between them.
+     */
+    private RowShaper.ReferenceResolver references() {
+        return (conn, reference) -> {
+            String view = REF_VIEW_PREFIX + "_" + safe(reference);
+            String sql = ReferenceReader.sqlFor(ReferenceReader.parse(reference),
+                    pipelines == null ? null : pipelines.get());
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+            }
+            log.info("[FLOWJOB] {} resolved reference '{}' for join", cfg.name(), reference);
+            return view;
+        };
+    }
 
     /**
      * Record one dataset Run Artifact per store this run wrote bytes to, named and {@code ref}'d by the store

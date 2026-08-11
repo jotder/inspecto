@@ -267,12 +267,32 @@ Slices (build order):
    pins it. ⚠ Residual accepted risk: an armed `output_store:` pipeline whose operator never registered
    the `pipeline_config:` job has a chain that quietly isn't running — a scheduler-audit finding
    ("output_store with no shaping job") is the fail-visible follow-up, not yet built.
-5. **Join's production resolver** lands here: `PipelineJobRunner` builds a
-   `RowShaper.ReferenceResolver` from its loaded-pipelines context (adapt
-   `EnrichmentEngine.referenceReader`'s path/by-name resolution), closing the Part-B/join remainder.
+5. ✅ **Join's production resolver — BUILT 2026-08-11. A5 is COMPLETE.** `PipelineJobRunner.references()`
+   resolves a `transform.join`'s `reference` and registers it as a view (RowShaper joins a *named*
+   relation, not an expression), once per distinct reference so two joins on one dimension read one view.
+   ⚠ **Not adapted — SHARED.** `EnrichmentEngine.referenceReader` + `versionedView` + the system-column
+   list were extracted verbatim into `com.gamma.enrich.ReferenceReader`, which both callers now use: a
+   versioned store's current/as-of derivation (QUALIFY latest `__valid_from`, drop `delete` tombstones,
+   strip `__key_hash`/`__row_hash`/`__valid_from`/`__op`/`__batch_id`) is one rule in one place. Copying
+   it would have been a second subtle thing to keep right — the same call as routing summarize through
+   `MeasureCompiler`. `ReferenceReader.parse` maps the join node's string into the existing
+   `EnrichmentConfig.Reference` record, so the two routes reach the resolver as the same thing and cannot
+   diverge. The pipelines context is a `Supplier<List<PipelineConfig>>` on `PipelineJobRunner` +
+   `JobService.pipelineConfigs(…)` (the `componentRegistry`/`knownPipelines` precedent, and the shape
+   `EnrichmentService` already had); absent ⇒ a by-name join refuses naming the missing wiring, a `path:`
+   reference needs no context. Pinned: path-form join (LEFT JOIN, unmatched row keeps NULL), by-name via
+   context, by-name without context refuses, `ReferenceReaderParseTest`; the prefix split falsified.
 
 **Not in scope:** `route:` demux into *ingest-side* branches (that genuinely is the branch-aware
 executor); multi-sink arming (`sinks:` stays authoring-only, finding 4).
+
+✅ **A5 is COMPLETE (all five slices, 2026-08-11) — and with it Part A, so this plan is ready to
+archive.** A flat pipeline's Stage-2 chain now authors, arms and *executes*: `output_store:` names its
+resting store, a `pipeline_config:` flow job lifts and runs it over the landed store, and every Stage-2
+kind — dedup, summarize, join — has an executor with a production reference resolver behind it. What
+remains is deliberately out of scope and tracked elsewhere: ingest-side `route:` demux and multi-sink
+arming both wait on the branch-aware executor (BACKLOG §4 / ELT amendment Phase 4 S4 + Phase 6), and
+the orphan-`output_store` scheduler-audit finding is a follow-up (slice 4's accepted risk).
 
 ### Finding 4 — ⚠ the `sinks:` precedent option (a) mirrors never got its own A5
 
