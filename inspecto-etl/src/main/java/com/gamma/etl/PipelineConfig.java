@@ -1178,13 +1178,16 @@ public final class PipelineConfig {
                     "route: is authoring-only until the branch-aware executor lands — "
                             + "keep the pipeline inactive (active: false) or remove the route: block");
         }
-        // processing.summarize (Phase 3) has no linear-batch executor either — MaterializeTask runs
-        // over a Dataset relation on its own schedule, not this pipeline's ingest path. Arming would be
-        // dead config the engine silently ignores (the same W1 lesson route's gate already applies).
-        if (active && summarize != null) {
+        // The three Stage-2 blocks below (summarize / dedup / join) arm ONLY when output_store: is
+        // authored (A5-at-rest, 2026-08-11): the file itself then declares that its chain executes as
+        // a flow job over the landed store (PipelineLift.stageTwo via a pipeline_config: job), so the
+        // linear path running the pure EL is the intended split, not a silent skip. Without
+        // output_store: the keys have no execution route and arming stays refused, exactly as before.
+        if (active && summarize != null && outputStore == null) {
             throw new IllegalStateException(
-                    "processing.summarize is authoring-only until a recipe-driven executor lands — "
-                            + "keep the pipeline inactive (active: false) or remove the summarize block");
+                    "processing.summarize does not execute on the linear ingest path — author a top-level "
+                            + "output_store: and run the chain at rest (pipeline_config: flow job), keep "
+                            + "the pipeline inactive (active: false), or remove the summarize block");
         }
         // processing.dedup joins them 2026-08-11 (operator decision): record-grain dedup is a TRANSFORM
         // concern, so in ELT terms it belongs in the T and not the EL. It DID execute on this path — a
@@ -1194,20 +1197,21 @@ public final class PipelineConfig {
         // parsing would mean a pipeline that arms, runs, writes — and silently keeps every duplicate it
         // was configured to fold. That is strictly worse than never having had the feature, and it is the
         // same silent-discard shape the multiplicity work exists to remove.
-        if (active && dedup != null) {
+        if (active && dedup != null && outputStore == null) {
             throw new IllegalStateException(
                     "processing.dedup is a Stage-2 (transform) concern and no longer executes on the "
-                            + "linear ingest path — keep the pipeline inactive (active: false), or move "
-                            + "the dedup into a Stage-2 job over the landed store");
+                            + "linear ingest path — author a top-level output_store: and run it at rest "
+                            + "(pipeline_config: flow job), keep the pipeline inactive (active: false), "
+                            + "or remove the dedup block");
         }
         // processing.join (Phase 3 S2) too: the executor exists (RowShaper.join, 2026-08-11), but the
-        // linear ingest path this prepare() arms has no ReferenceResolver to feed it — resolving a
-        // Reference Dataset by name lives in EnrichmentEngine, post-commit. Lifted when a production
-        // route supplies a resolver (multiplicity plan A5 territory).
-        if (active && join != null) {
+        // linear ingest path this prepare() arms has no ReferenceResolver to feed it — the at-rest
+        // route carries one (A5 slice 5), so the same output_store: condition applies.
+        if (active && join != null && outputStore == null) {
             throw new IllegalStateException(
-                    "processing.join is authoring-only — this pipeline's linear path cannot resolve a "
-                            + "Reference Dataset; keep the pipeline inactive (active: false) or remove the join block");
+                    "processing.join does not execute on the linear ingest path — author a top-level "
+                            + "output_store: and run it at rest (pipeline_config: flow job), keep the "
+                            + "pipeline inactive (active: false), or remove the join block");
         }
         // ⚠ An explicit steps: chain arms NOTHING today, and the three guards above cannot catch it.
         // They test the TYPED fields (route/summarize/join), which a steps: file never populates — the
@@ -1219,10 +1223,19 @@ public final class PipelineConfig {
         // Same fail-safe posture as route:/summarize/join above; lifted in plan slice A5, which routes a
         // steps: pipeline to the graph executor that can actually walk it.
         if (active && explicitSteps) {
-            throw new IllegalStateException(
-                    "steps: is authoring-only until the chain executor is routed (multiplicity plan A5) — "
-                            + "keep the pipeline inactive (active: false), or express the chain with the "
-                            + "singular transform blocks, which the linear path does execute");
+            if (outputStore == null) {
+                throw new IllegalStateException(
+                        "steps: does not execute on the linear ingest path — author a top-level "
+                                + "output_store: and run the chain at rest (pipeline_config: flow job), "
+                                + "or keep the pipeline inactive (active: false)");
+            }
+            // the at-rest route (PipelineLift.stageTwo) refuses a route step — one output_store cannot
+            // name N branches — so arming here would only defer that refusal to the job's first run
+            if (steps.stream().anyMatch(s -> Step.ROUTE.equals(s.kind()))) {
+                throw new IllegalStateException(
+                        "steps: chains a 'route' step, which neither the linear path nor the at-rest "
+                                + "route can execute — route demux needs the branch-aware executor");
+            }
         }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));

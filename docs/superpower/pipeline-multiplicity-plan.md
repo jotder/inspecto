@@ -249,13 +249,24 @@ Slices (build order):
    a **legacy-projected filter** (pre-map — raw-column vocabulary the landed store no longer has;
    explicit `steps:` filters are post-map and pass) · any filter carrying a pre-parse key
    (`include_prefixes` …). `PipelineStageTwoLiftTest` (6) + `PipelineConfigOutputStoreTest` (3).
-2. **Graph source.** The `pipeline` job type reads its graph only from `PipelineStore` (`:164-167`).
-   Add a `pipeline_config: <name>` job key that loads + lifts the flat config at run time —
-   single-truth, no derived graph persisted to the authored-flow store.
-3. **Trigger.** Nothing new: `on_pipeline: <the flat pipeline>` chains the shaping job off each ingest
-   commit (and the new `on_pipeline_gate: all` covers multi-upstream shapes).
-4. **Gates.** The `prepare()` refusals STAY (the ingest path still cannot execute these keys); their
-   messages point at this route once it exists.
+2. ✅ **Graph source — BUILT 2026-08-11.** `pipeline_config: <path to the flat *_pipeline.toon>` on a
+   `type: pipeline` job (the enrich job's `config:` path precedent) — loaded + `stageTwo`-lifted at
+   run time, single truth. Mutually exclusive with `pipeline:`/`flow:` (refuses both). Works with a
+   null flow store (`buildPipelineJob` + `registerViews` exempt it). End-to-end pinned through the
+   real toon codec: `PipelineJobRunnerTest.runsAFlatConfigsStageTwoChainOverItsLandedStore`.
+3. ✅ **Trigger — nothing to build**, as planned: `on_pipeline:` + the new `on_pipeline_gate` cover it.
+4. ✅ **Gates — BUILT 2026-08-11, and the original wording ("gates stay") was WRONG.** Grounding slice 2
+   exposed it: an absolute gate means a Stage-2-carrying pipeline can never arm, so Stage 1 never lands
+   the store the at-rest chain reads — the route would be unreachable. The coherent shape is a
+   **conditional** gate: `summarize`/`dedup`/`join`/`steps:` arm **iff `output_store:` is authored**
+   (the file itself declares the EL/T split); without it they refuse exactly as before. `route:` (and a
+   route step inside `steps:`) stays refused unconditionally — `stageTwo` refuses it too, so arming
+   would only defer the refusal. Pinned both ways in `RecordDedupRouteConfigTest`.
+   ⚠ **Falsifying this found a pre-existing hole**: the active-dedup arming refusal — the load-bearing
+   half of `04004af8` (BREAKING) — had NO pinning test; `anActivePipelineWithDedupRefusesToArm` now
+   pins it. ⚠ Residual accepted risk: an armed `output_store:` pipeline whose operator never registered
+   the `pipeline_config:` job has a chain that quietly isn't running — a scheduler-audit finding
+   ("output_store with no shaping job") is the fail-visible follow-up, not yet built.
 5. **Join's production resolver** lands here: `PipelineJobRunner` builds a
    `RowShaper.ReferenceResolver` from its loaded-pipelines context (adapt
    `EnrichmentEngine.referenceReader`'s path/by-name resolution), closing the Part-B/join remainder.

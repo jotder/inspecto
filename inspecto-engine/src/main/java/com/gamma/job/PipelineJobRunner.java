@@ -72,7 +72,10 @@ import java.util.function.Supplier;
  * job:
  *   name: nightly_rollup
  *   type: pipeline             # this runner
- *   flow: events_rollup        # authored flow id (PipelineStore.get)
+ *   flow: events_rollup        # authored flow id (PipelineStore.get); `pipeline:` is the canonical key
+ *   pipeline_config: config/x_pipeline.toon   # OR (A5-at-rest): the flat file whose Stage-2 chain this
+ *                              #   run executes over its landed store (PipelineLift.stageTwo, lifted at
+ *                              #   run time); mutually exclusive with pipeline:/flow:
  *   cron: "0 2 * * *"          # OR on_pipeline: events_etl  (event)  OR manual (trigger API)
  *   data_dir: database         # optional — overrides the injected data root; must not point inside
  *                              #   the space data root (sinks are top-level stores — see below)
@@ -159,12 +162,27 @@ public final class PipelineJobRunner implements Job {
 
     /** @param artifacts where to record this run's produced stores, or {@code null} to record none. */
     private JobResult execute(ArtifactRecorder artifacts) throws Exception {
+        // A5-at-rest slice 2: `pipeline_config:` names the flat *_pipeline.toon file (a path, like the
+        // enrich job's `config:`); the Stage-2 remainder is lifted at RUN time (PipelineLift.stageTwo),
+        // so the flat file stays the single truth — no derived graph is persisted to the flow store.
+        // Mutually exclusive with `pipeline:`/`flow:` — carrying both leaves the graph source undefined.
+        String flatPath = cfg.opt("pipeline_config", null);
         // Tier 3 dual-read (vocabulary plan §4): `pipeline:` is canonical; `flow:` is the pre-rename key,
         // read only, kept for existing *_job.toon files that were never resaved.
         String pipelineIdOpt = cfg.opt("pipeline", null);
-        final String pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
-        PipelineGraph g = pipelineStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
-                "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
+        final String pipelineId;
+        PipelineGraph g;
+        if (flatPath != null) {
+            if (pipelineIdOpt != null || cfg.opt("flow", null) != null)
+                throw new IllegalArgumentException("flow job '" + cfg.name()
+                        + "' carries both pipeline_config: and pipeline:/flow: — pick one graph source");
+            g = com.gamma.pipeline.PipelineLift.stageTwo(com.gamma.etl.PipelineConfig.load(flatPath));
+            pipelineId = g.name();
+        } else {
+            pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
+            g = pipelineStore.get(pipelineId).orElseThrow(() -> new IllegalArgumentException(
+                    "flow job '" + cfg.name() + "' references unknown flow '" + pipelineId + "'"));
+        }
         // Resolve `use:` bindings before anything reads the graph. PipelineStore.get returns the graph as
         // authored — local config only — so a node that references a component (a mapping's rules, a
         // grammar) would otherwise run with those keys simply absent, silently producing nothing rather
@@ -392,6 +410,9 @@ public final class PipelineJobRunner implements Job {
      * {@code <write-root>/views/} (sibling of the authored-flow store) for a KPI/report/alert API to bind to.
      */
     private void registerViews(PipelineGraph g, String pipelineId, List<String> srcStores, String dir) {
+        // an A5-at-rest run (pipeline_config:) has no authored-flow store to anchor the views sibling on —
+        // and its lifted graph only ever carries sink.persistent, so there is nothing to register anyway
+        if (pipelineStore == null) return;
         ViewStore views = new ViewStore(pipelineStore.root().resolveSibling("views"));
         String now = Instant.now().toString();
         for (PipelineStores.Produced p : PipelineStores.producedStores(g)) {

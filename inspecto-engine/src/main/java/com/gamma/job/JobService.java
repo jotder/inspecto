@@ -572,7 +572,9 @@ public final class JobService implements AutoCloseable {
 
     /** A {@link JobType#PIPELINE} job (T32) — requires an authored-flow store (set {@code -Dassist.write.root}). */
     private Job buildPipelineJob(JobConfig c) {
-        if (pipelineStore == null)
+        // an A5-at-rest job (pipeline_config:) lifts its graph from the flat file at run time and
+        // never touches the authored-flow store, so the store requirement doesn't apply to it
+        if (pipelineStore == null && c.opt("pipeline_config", null) == null)
             throw new IllegalStateException("flow job '" + c.name()
                     + "' needs an authored-flow store; set -Dassist.write.root so authored flows can be loaded");
         return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore, componentRegistry);

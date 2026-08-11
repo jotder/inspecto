@@ -235,6 +235,80 @@ class RecordDedupRouteConfigTest {
         assertTrue(e.getMessage().contains("join"), e.getMessage());
     }
 
+    /** ⚠ Added 2026-08-11: this refusal is the load-bearing half of dedup's Stage-2 move (`04004af8`,
+     *  BREAKING) and had NO pinning test until a falsification of the A5 gate change stayed green. */
+    @Test
+    void anActivePipelineWithDedupRefusesToArm(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, """
+                  dedup:
+                    keys[1]: ID
+                """, "");
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "record dedup no longer executes on the linear path — arming would silently keep every duplicate");
+        assertTrue(e.getMessage().contains("dedup"), e.getMessage());
+    }
+
+    // ── A5-at-rest (2026-08-11): output_store: is the arming condition for the Stage-2 blocks ──
+
+    /** With an authored output_store: the chain has a real route (the at-rest flow job), so arming is
+     *  the intended EL/T split — not the silent skip the gates exist to refuse. */
+    @Test
+    void anAuthoredOutputStoreArmsAStageTwoPipeline(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, """
+                  dedup:
+                    keys[1]: ID
+                """, "output_store: mini_shaped\n");
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        assertNotNull(cfg.dedup());
+        assertEquals("mini_shaped", cfg.outputStore());
+    }
+
+    /** route: stays refused regardless — the at-rest route refuses it too (one output_store cannot
+     *  name N branches), so arming would only defer the refusal to the job's first run. */
+    @Test
+    void routeStaysRefusedEvenWithAnOutputStore(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, "", """
+                route:
+                  mode: case
+                  branches[1]{key,where}:
+                    emea,"ID LIKE 'E%'"
+                output_store: mini_shaped
+                """);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("route"), e.getMessage());
+    }
+
+    @Test
+    void anAuthoredOutputStoreArmsAnExplicitStepsChain(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, "", """
+                steps[2]:
+                  - dedup:
+                      keys[1]: ID
+                  - summarize:
+                      group_by[1]: EVENT_DATE
+                      measures[1]: count
+                output_store: mini_shaped
+                """);
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        assertTrue(cfg.hasExplicitSteps());
+        assertEquals("mini_shaped", cfg.outputStore());
+    }
+
+    @Test
+    void aStepsChainCarryingARouteStepRefusesEvenWithAnOutputStore(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, "", """
+                steps[1]:
+                  - route:
+                      mode: case
+                output_store: mini_shaped
+                """);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("branch-aware"), e.getMessage());
+    }
+
     @Test
     void anActivePipelineWithSummarizeRefusesToArm(@TempDir Path dir) throws Exception {
         Path p = write(dir, true, """

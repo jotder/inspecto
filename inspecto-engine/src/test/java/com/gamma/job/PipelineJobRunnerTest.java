@@ -604,6 +604,53 @@ class PipelineJobRunnerTest {
         }
     }
 
+    // ── A5-at-rest slice 2: pipeline_config: lifts the flat file's Stage-2 chain at run time ──
+
+    @Test
+    void runsAFlatConfigsStageTwoChainOverItsLandedStore() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        String auditDir = tmp.resolve("audit").toString();
+        // the REAL file, through the real toon codec — a fromMap test would skip the spelling
+        // (steps: needs the element count; a bare list decodes as a map and refuses)
+        Path flat = tmp.resolve("shape_pipeline.toon");
+        Files.writeString(flat, """
+                name: shape_etl
+                active: false
+                output_store: shaped
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                steps[1]:
+                  - dedup:
+                      keys[1]: amt
+                      order_by: id
+                """);
+        // the landed store's name is the lift's canonical-name fallback — read it off the config
+        String landed = com.gamma.etl.PipelineConfig.load(flat.toString()).identity().pipelineName();
+        seedParquet(dataDir, landed, "(1,150),(2,50),(3,150)");   // amt 150 is duplicated
+
+        JobConfig cfg = new JobConfig("shaper", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+        JobResult res = new PipelineJobRunner(cfg, new BatchEventBus(), null, dataDir, auditDir).run();
+
+        assertTrue(res.success(), res.message());
+        assertEquals(List.of(1, 2), readIds(dataDir, "shaped"),
+                "dedup by amt keeps the first per key — id 3's amt=150 is the duplicate");
+    }
+
+    @Test
+    void aJobCarryingBothGraphSourcesRefuses() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        JobConfig cfg = new JobConfig("twosrc", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", "x.toon", "flow", "some_flow", "data_dir", dataDir));
+        PipelineJobRunner runner = new PipelineJobRunner(cfg, new BatchEventBus(), null,
+                dataDir, tmp.resolve("audit").toString());
+        var e = assertThrows(IllegalArgumentException.class, runner::run);
+        assertTrue(e.getMessage().contains("pick one graph source"), e.getMessage());
+    }
+
     /** Write {@code (id,amt)} VALUES as a Parquet file under {@code <dataDir>/<store>/} (the at-rest store). */
     private static void seedParquet(String dataDir, String store, String valuesSql) throws Exception {
         seedParquetFile(dataDir, store, "seed", valuesSql);
