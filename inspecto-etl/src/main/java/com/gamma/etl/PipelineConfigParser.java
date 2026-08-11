@@ -358,10 +358,19 @@ final class PipelineConfigParser {
         // ── steps (the ordered transform chain) ─────────────────────────────────
         // A top-level `steps:` list, each entry a single-key map of kind → that kind's own config:
         //
-        //     steps:
-        //       - dedup:     {keys: [msisdn], order_by: "ts desc"}
-        //       - summarize: {group_by: [day], measures: [count]}
-        //       - dedup:     {keys: [imsi]}
+        //     steps[3]:
+        //       - dedup:
+        //           keys[1]: MSISDN
+        //           order_by: TS DESC
+        //       - summarize:
+        //           group_by[1]: RECORD_DAY
+        //           measures[1]: count
+        //       - dedup:
+        //           keys[1]: IMSI
+        //
+        // ⚠ The count is REQUIRED and the config must be an indented block. An earlier version of this
+        // comment showed `- dedup: {keys: [msisdn]}`; toon decodes that inline brace form as a plain
+        // STRING, so it reaches the entry check below and is refused. Do not reinstate it.
         //
         // Order is list position. A single-key map rather than a flat {kind: dedup, …} entry so `kind`
         // never collides with a config key of the same name, and so a malformed entry is a structural
@@ -370,12 +379,29 @@ final class PipelineConfigParser {
         // Absent ⇒ PipelineConfig projects the legacy singular blocks into the same order PipelineLift
         // wires them. Authoring/round-trip only for now — nothing executes from `steps:` until plan
         // slice A5 routes it, exactly the posture `sinks:` has had since it shipped.
-        if (raw.get("steps") instanceof List<?> stepList) {
+        // ⚠ A `steps:` written WITHOUT an element count decodes as a map, not a list — toon needs the
+        // `steps[N]:` arity — and an `instanceof List` test alone would then skip the whole block in
+        // silence, dropping every transform the author wrote. That is the exact failure mode this format
+        // exists to remove, so a non-list `steps` is refused, loudly, with the spelling that works.
+        Object rawSteps = raw.get("steps");
+        if (rawSteps != null && !(rawSteps instanceof List<?>)) {
+            throw new IllegalArgumentException("""
+                    steps: must be a LIST, and in .toon that needs an explicit element count plus a block \
+                    per entry — a bare 'steps:' decodes as a map. Write:
+                      steps[2]:
+                        - dedup:
+                            keys[1]: MSISDN
+                        - summarize:
+                            group_by[1]: RECORD_DAY
+                            measures[1]: count
+                    got: """ + rawSteps);
+        }
+        if (rawSteps instanceof List<?> stepList) {
             for (Object entry : stepList) {
                 if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) {
                     throw new IllegalArgumentException(
                             "each steps[] entry must be a single-key map of kind to its config, e.g. "
-                                    + "'- dedup: {keys: [msisdn]}' — got " + entry);
+                                    + "'- dedup:' followed by an indented 'keys[1]: MSISDN' — got " + entry);
                 }
                 Map.Entry<?, ?> only = sm.entrySet().iterator().next();
                 String kind = String.valueOf(only.getKey()).trim();

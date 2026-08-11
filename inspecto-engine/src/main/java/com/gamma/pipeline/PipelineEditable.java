@@ -5,7 +5,6 @@ import com.gamma.etl.PipelineConfig;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,15 +34,12 @@ public final class PipelineEditable {
     // ── refusal codes (stable; the UI renders them next to the offending node) ──────
     public static final String UNSUPPORTED_NODE = "UNSUPPORTED_NODE";
     public static final String MULTI_SINK = "MULTI_SINK";
-    /** A second {@code transform.join}: the flat config holds ONE {@code processing.join}, so the extra one
-     *  would be silently discarded. Reachable from the recipe palette since the join verb shipped there. */
-    public static final String MULTI_JOIN = "MULTI_JOIN";
-    /** A second {@code transform.dedup} — one {@code processing.dedup} slot. See {@link #MULTI_JOIN}. */
-    public static final String MULTI_DEDUP = "MULTI_DEDUP";
-    /** A second {@code transform.route} — one {@code route:} slot. See {@link #MULTI_JOIN}. */
-    public static final String MULTI_ROUTE = "MULTI_ROUTE";
-    /** A second {@code transform.summarize} — one {@code processing.summarize} slot. See {@link #MULTI_JOIN}. */
-    public static final String MULTI_SUMMARIZE = "MULTI_SUMMARIZE";
+    // ⚠ MULTI_JOIN / MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE were removed in the multiplicity plan's
+    // slice A3. They were never the destination — they made a silent discard VISIBLE while the flat file
+    // still had exactly one slot per kind (`2cf7005e`, after `6e4d4be0` measured the loss). The file can
+    // now hold an ordered `steps:` chain, so the thing they were protecting no longer exists, and the
+    // codes went in the same change that widened the format — never before it, which would have restored
+    // the silent discard they replaced.
     public static final String NO_ACQUISITION = "NO_ACQUISITION";
     public static final String NO_PARSER = "NO_PARSER";
     public static final String NO_PERSISTENT_SINK = "NO_PERSISTENT_SINK";
@@ -59,6 +55,18 @@ public final class PipelineEditable {
             BuiltinNodeType.TRANSFORM_JOIN.type(),      // reference join → processing.join (ELT P3 S2), authoring-only
             BuiltinNodeType.TRANSFORM_FILTER.type(), BuiltinNodeType.TRANSFORM_MAP.type(),
             BuiltinNodeType.SINK_PERSISTENT.type(), BuiltinNodeType.ENRICHMENT.type());
+
+    /**
+     * Node type → the {@code steps:} kind it lowers to: the five kinds the flat file's transform chain
+     * can hold. {@code transform.map} is deliberately absent — it is the schema projection the lift
+     * always emits, not something an author places in a chain.
+     */
+    private static final Map<String, String> STEP_KIND = Map.of(
+            BuiltinNodeType.TRANSFORM_FILTER.type(),    PipelineConfig.Step.FILTER,
+            BuiltinNodeType.TRANSFORM_JOIN.type(),      PipelineConfig.Step.JOIN,
+            BuiltinNodeType.TRANSFORM_DEDUP.type(),     PipelineConfig.Step.DEDUP,
+            BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), PipelineConfig.Step.SUMMARIZE,
+            BuiltinNodeType.TRANSFORM_ROUTE.type(),     PipelineConfig.Step.ROUTE);
 
     /**
      * Whether a save can lower this node type back to the flat config. The palette reads this so a
@@ -221,9 +229,11 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
-        PipelineNode recordDedup = null, routeNode = null, summarizeNode = null, joinNode = null;
         PipelineNode primarySink = null, quarantineSink = null;
-        List<PipelineNode> filters = new ArrayList<>();
+        // The transform chain in authored order — the five kinds the flat file can hold. Order is node
+        // order, which is what the editor sends and what PipelineLift emits; the flat file has no edges,
+        // so there is no topology to sort by at this point.
+        List<PipelineNode> chain = new ArrayList<>();
         // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
         // output:/dirs.database shorthand; more than one ⇒ a plural sinks: block (slice 4).
         LinkedHashMap<String, PipelineNode> destByDatabase = new LinkedHashMap<>();
@@ -238,33 +248,9 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
-            // Three more one-slot kinds, refusing exactly as MULTI_JOIN does. Until 2026-08-11 each of
-            // these assignments overwrote silently: the graph saved, the second node vanished, and the
-            // pipeline ran — just not the one the operator drew. Refusing means a graph that already
-            // holds two of a kind stops saving on its next edit; that is the accepted cost of not
-            // discarding authored work without a word.
-            else if (BuiltinNodeType.TRANSFORM_DEDUP.type().equals(t)) {
-                if (recordDedup != null) refusals.add(new PipelineCompileException.Refusal(MULTI_DEDUP, n.id(),
-                        "a pipeline lowers one record dedup; '" + recordDedup.id() + "' already claims it"));
-                else recordDedup = n;
-            }
-            else if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(t)) {
-                if (routeNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_ROUTE, n.id(),
-                        "a pipeline lowers one route; '" + routeNode.id() + "' already claims it"));
-                else routeNode = n;
-            }
-            else if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(t)) {
-                if (summarizeNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_SUMMARIZE, n.id(),
-                        "a pipeline lowers one summarize; '" + summarizeNode.id() + "' already claims it"));
-                else summarizeNode = n;
-            }
-            else if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(t)) {
-                // one slot only — see MULTI_JOIN
-                if (joinNode != null) refusals.add(new PipelineCompileException.Refusal(MULTI_JOIN, n.id(),
-                        "a pipeline lowers one reference join; '" + joinNode.id() + "' already claims it"));
-                else joinNode = n;
-            }
-            else if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(t)) filters.add(n);
+            // The five chain kinds. Each used to claim a single slot and refuse a second (MULTI_*); they
+            // now join an ordered chain, and how many there are stops being the question — see stepsOf.
+            else if (STEP_KIND.containsKey(t)) chain.add(n);
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
                     quarantineSink = n;
@@ -281,6 +267,25 @@ public final class PipelineEditable {
         // own route: key (with the branch↔sink pairing stamped from the edges), and transform.derive is
         // not LOWERABLE so it fails UNSUPPORTED_NODE above. Every sink reaching this map is therefore a
         // data/schema-dispatch fan-out, which sinks: (replicate-per-destination) represents faithfully.
+
+        // ⚠ The chain is written in ONE of two spellings, never both — the parser refuses a file
+        // carrying `steps:` next to a singular transform block, because there is no non-arbitrary
+        // position at which the block would join the sequence. So the shape decides the whole emission
+        // below: legacy-shaped chains keep the singular keys byte-for-byte (every pre-existing file
+        // round-trips verbatim, which is the property that makes this change safe to ship), and only a
+        // chain the singular keys CANNOT hold becomes a `steps:` list.
+        //
+        // A chain that is not legacy-shaped is, by construction, one that refused to save at all before
+        // this slice — so nothing that runs today starts being written differently.
+        boolean legacyShaped = isLegacyShaped(chain);
+        PipelineNode recordDedup   = legacyShaped ? first(chain, PipelineConfig.Step.DEDUP)     : null;
+        PipelineNode routeNode     = legacyShaped ? first(chain, PipelineConfig.Step.ROUTE)     : null;
+        PipelineNode summarizeNode = legacyShaped ? first(chain, PipelineConfig.Step.SUMMARIZE) : null;
+        PipelineNode joinNode      = legacyShaped ? first(chain, PipelineConfig.Step.JOIN)      : null;
+        // At most one under legacyShaped — two filters are precisely a case the singular
+        // `csv_settings.where` cannot hold, and merging them with putAll is how the second one used to
+        // disappear without a word (the loss MULTI_* refused for the other four kinds, still live here).
+        List<PipelineNode> filters = legacyShaped ? all(chain, PipelineConfig.Step.FILTER) : List.of();
 
         if (strict) {
             if (acq == null) refusals.add(new PipelineCompileException.Refusal(NO_ACQUISITION, null,
@@ -399,6 +404,34 @@ public final class PipelineEditable {
             }
         }
 
+        // ── the ordered chain ──────────────────────────────────────────────────────
+        if (legacyShaped) {
+            // The singular keys said it all; a file that had grown a steps: block and was edited back
+            // down to a legacy shape loses it, or the two spellings would collide on the next load.
+            out.remove("steps");
+        } else {
+            out.put("steps", stepsOf(g, chain));
+            // ⚠ Every singular transform key must go, in BOTH modes — this is not the usual
+            // strict-only "the graph owns its section" rule. Leaving one behind writes a file that
+            // refuses to load: the parser rejects steps: alongside a legacy block outright, so a
+            // lenient save would hand back config that can never be read again.
+            processing.remove("dedup");
+            processing.remove("join");
+            processing.remove("summarize");
+            out.remove("route");
+            // `where` is the legacy spelling of a filter step and lives INSIDE the parser's own
+            // csv_settings block, so the parser node carries it back in verbatim and it survives the
+            // removals above. The pre-parse list keys in that block are not chain steps (they anchor
+            // the CSV reader on a column index) and stay exactly where they are.
+            if (processing.get("csv_settings") instanceof Map<?, ?> cs) {
+                Map<String, Object> stripped = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> e : cs.entrySet())
+                    if (!"where".equals(e.getKey())) stripped.put(String.valueOf(e.getKey()), e.getValue());
+                if (stripped.isEmpty()) processing.remove("csv_settings");
+                else processing.put("csv_settings", stripped);
+            }
+        }
+
         if (primarySink != null) {
             output.clear();
             putIfPresent(output, "format", primarySink.cfg("format"));
@@ -439,6 +472,82 @@ public final class PipelineEditable {
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * Whether {@code chain} is expressible in the legacy singular keys: at most one of each kind, and in
+     * the order {@link PipelineLift} wires them ({@code filter → join → dedup → summarize → route}).
+     *
+     * <p>⚠ <b>Order is half the test, and it is the half that is easy to miss.</b> One dedup and one
+     * summarize fit the singular keys whichever way round they are authored — but the flat file stores no
+     * order at all, so on the next lift they come back in the lift's constant order. An authored
+     * {@code summarize → dedup} that lowered to singular keys would come back reversed, silently. That is
+     * a two-node pipeline losing its meaning, with nothing over-full about it.
+     *
+     * <p>Both halves are the single strictly-increasing test below: a repeated kind has the same position
+     * as the one before it, so it fails {@code <=} exactly as an out-of-order kind does. A separate
+     * "already seen this kind" set was written first and proved dead — deleting it turned no test red,
+     * which is how it was caught.
+     */
+    private static boolean isLegacyShaped(List<PipelineNode> chain) {
+        int previous = -1;
+        for (PipelineNode n : chain) {
+            int position = PipelineConfig.Step.KINDS.indexOf(STEP_KIND.get(n.type()));
+            if (position <= previous) return false;
+            previous = position;
+        }
+        return true;
+    }
+
+    /** The ordered {@code steps:} list: one single-key {@code kind → config} map per chain node. */
+    private static List<Map<String, Object>> stepsOf(PipelineGraph g, List<PipelineNode> chain) {
+        List<Map<String, Object>> steps = new ArrayList<>();
+        for (PipelineNode n : chain) {
+            String kind = STEP_KIND.get(n.type());
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put(kind, stepConfig(g, n, kind));
+            steps.add(entry);
+        }
+        return steps;
+    }
+
+    /** A step's config in the same shape its legacy block held, so the two spellings stay one vocabulary. */
+    private static Map<String, Object> stepConfig(PipelineGraph g, PipelineNode n, String kind) {
+        Map<String, Object> c = new LinkedHashMap<>();
+        switch (kind) {
+            case PipelineConfig.Step.DEDUP -> {
+                putIfPresent(c, "keys", n.cfg("keys"));
+                putIfPresent(c, "order_by", n.cfg("order_by"));
+            }
+            case PipelineConfig.Step.JOIN -> {
+                putIfPresent(c, "reference", n.cfg("reference"));
+                putIfPresent(c, "on", n.cfg("on"));
+            }
+            case PipelineConfig.Step.SUMMARIZE -> {
+                putIfPresent(c, "group_by", n.cfg("group_by"));
+                putIfPresent(c, "measures", n.cfg("measures"));
+            }
+            // route keeps the branch↔sink pairing stamped from the edges, exactly as route: does
+            case PipelineConfig.Step.ROUTE -> c.putAll(routeSection(g, n));
+            // filter: verbatim. Its keys are two different things fused into one node — the post-parse
+            // `where` predicate, and the pre-parse include/exclude lists — and a chain step keeps both
+            // so the round-trip is lossless. Only `where` has a legacy singular spelling.
+            default -> c.putAll(deepCopy(n.config()));
+        }
+        return c;
+    }
+
+    /** The first chain node of {@code kind}, or {@code null}. */
+    private static PipelineNode first(List<PipelineNode> chain, String kind) {
+        for (PipelineNode n : chain) if (kind.equals(STEP_KIND.get(n.type()))) return n;
+        return null;
+    }
+
+    /** Every chain node of {@code kind}, in order. */
+    private static List<PipelineNode> all(List<PipelineNode> chain, String kind) {
+        List<PipelineNode> out = new ArrayList<>();
+        for (PipelineNode n : chain) if (kind.equals(STEP_KIND.get(n.type()))) out.add(n);
+        return out;
+    }
 
     /**
      * The {@code route:} section for {@code routeNode}: its config deep-copied, with each branch entry's

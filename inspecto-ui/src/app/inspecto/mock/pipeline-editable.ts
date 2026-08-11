@@ -1,11 +1,16 @@
 /**
  * The mock's editable lift/lower — a faithful TS port of the backend `PipelineEditable` (W5). It
- * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE / MULTI_JOIN / MULTI_DEDUP /
- * MULTI_ROUTE / MULTI_SUMMARIZE / the completeness set —
- * `MULTI_SINK` is NOT one of them: since sinks slice 4, >1 database lowers to a plural `sinks:` block),
- * or the offline preview passes a topology the real backend 422s — the textbook "mock more lenient
- * than the server" hole this project has been bitten by before. Node config is the raw config-file
- * vocabulary end to end, so lift→lower is a verbatim map round-trip.
+ * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE + the completeness set), or the
+ * offline preview passes a topology the real backend 422s — the textbook "mock more lenient than the
+ * server" hole this project has been bitten by before. Node config is the raw config-file vocabulary
+ * end to end, so lift→lower is a verbatim map round-trip.
+ *
+ * ⚠ `MULTI_SINK` is NOT a refusal (since sinks slice 4, >1 database lowers to a plural `sinks:` block),
+ * and neither are `MULTI_JOIN` / `MULTI_DEDUP` / `MULTI_ROUTE` / `MULTI_SUMMARIZE` any more — the
+ * multiplicity plan's slice A3 gave the flat file an ordered `steps:` chain, so the single slot those
+ * codes protected no longer exists. **The obligation runs both ways:** a mock that still refused a
+ * second dedup would be *stricter* than the server, which greys out work the backend would happily
+ * save — the same class of bug as being lenient, pointing the other way.
  */
 import type { AuthoredEdge, AuthoredNode, AuthoredPipeline } from '../api/pipelines.service';
 
@@ -235,10 +240,10 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
 export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean): { config: Cfg } | { refusals: Refusal[] } {
     const refusals: Refusal[] = [];
     let acq: AuthoredNode | undefined, parser: AuthoredNode | undefined, gap: AuthoredNode | undefined;
-    let marker: AuthoredNode | undefined, routeNode: AuthoredNode | undefined;
-    let recordDedup: AuthoredNode | undefined, summarizeNode: AuthoredNode | undefined, joinNode: AuthoredNode | undefined;
+    let marker: AuthoredNode | undefined;
     let primarySink: AuthoredNode | undefined, quarantine: AuthoredNode | undefined;
-    const filters: AuthoredNode[] = [];
+    // The transform chain in authored order — node order, exactly as PipelineEditable.lower reads it.
+    const chain: AuthoredNode[] = [];
     // Distinct output destinations keyed by database dir (order-preserving). One => the single
     // output:/dirs.database shorthand; more than one => a plural sinks: block (slice 4).
     const destByDatabase = new Map<string, AuthoredNode>();
@@ -252,32 +257,12 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (n.type === 'parser') parser = n;
         else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
-        // Three more one-slot kinds, refusing exactly as the server does since 2026-08-11. Each of
-        // these used to overwrite silently on both sides; they must flip together, or the offline
-        // preview greenlights a graph the backend now 422s.
-        else if (n.type === 'transform.route') {
-            if (routeNode) refusals.push({ code: 'MULTI_ROUTE', nodeId: n.id,
-                message: `a pipeline lowers one route; '${routeNode.id}' already claims it` });
-            else routeNode = n;
-        }
-        else if (n.type === 'transform.dedup') {
-            if (recordDedup) refusals.push({ code: 'MULTI_DEDUP', nodeId: n.id,
-                message: `a pipeline lowers one record dedup; '${recordDedup.id}' already claims it` });
-            else recordDedup = n;
-        }
-        else if (n.type === 'transform.summarize') {
-            if (summarizeNode) refusals.push({ code: 'MULTI_SUMMARIZE', nodeId: n.id,
-                message: `a pipeline lowers one summarize; '${summarizeNode.id}' already claims it` });
-            else summarizeNode = n;
-        }
-        else if (n.type === 'transform.join') {
-            // One slot only, exactly as PipelineEditable.java: a second join would replace the first
-            // silently, so the server refuses MULTI_JOIN and so must this.
-            if (joinNode) refusals.push({ code: 'MULTI_JOIN', nodeId: n.id,
-                message: `a pipeline lowers one reference join; '${joinNode.id}' already claims it` });
-            else joinNode = n;
-        }
-        else if (n.type === 'transform.filter') filters.push(n);
+        // The five chain kinds. They briefly refused a second node (MULTI_DEDUP / MULTI_ROUTE /
+        // MULTI_SUMMARIZE / MULTI_JOIN, 2026-08-11) while the flat file still had one slot per kind;
+        // the file now holds an ordered steps: chain, so the refusals are gone on both sides. They had
+        // to flip together in one commit — a preview that refuses what the backend accepts is the same
+        // bug as one that accepts what the backend refuses, just pointing the other way.
+        else if (STEP_KIND[n.type]) chain.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
             else {
@@ -289,6 +274,16 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     }
     // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4);
     // a transform.route node lowers to the route: block below (backend route lowering, S3).
+
+    // One spelling or the other, never both — the server's parser refuses a file carrying steps: next
+    // to a singular transform block, so a legacy-shaped chain keeps the singular keys verbatim and only
+    // a chain they cannot hold becomes a steps: list (mirrors PipelineEditable.isLegacyShaped).
+    const legacyShaped = isLegacyShaped(chain);
+    const recordDedup = legacyShaped ? chain.find((n) => n.type === 'transform.dedup') : undefined;
+    const routeNode = legacyShaped ? chain.find((n) => n.type === 'transform.route') : undefined;
+    const summarizeNode = legacyShaped ? chain.find((n) => n.type === 'transform.summarize') : undefined;
+    const joinNode = legacyShaped ? chain.find((n) => n.type === 'transform.join') : undefined;
+    const filters = legacyShaped ? chain.filter((n) => n.type === 'transform.filter') : [];
 
     if (strict) {
         if (!acq) refusals.push({ code: 'NO_ACQUISITION', message: 'an active pipeline needs an acquisition node' });
@@ -366,18 +361,7 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     // route: block — node config verbatim, each branch stamped with the destination database its
     // route:<key> edge feeds (mirrors PipelineEditable.routeSection; edges don't survive the flat file).
     if (routeNode) {
-        const rc = structuredClone(routeNode.config ?? {}) as Cfg;
-        if (Array.isArray(rc['branches'])) {
-            const byId = new Map(g.nodes.map((n) => [n.id, n]));
-            for (const e of g.edges) {
-                if (e.from !== routeNode.id || !e.rel.startsWith('route:')) continue;
-                const key = e.rel.slice('route:'.length);
-                const db = byId.get(e.to)?.config?.['database'];
-                if (db == null) continue;
-                for (const b of rc['branches'] as Cfg[]) if (String(b['key']) === key) b['database'] = db;
-            }
-        }
-        out['route'] = rc;
+        out['route'] = routeSection(g, routeNode);
     } else if (strict) {
         delete out['route'];
     }
@@ -400,6 +384,30 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         else if (strict) delete parsingBlock['grammar'];
         if (Object.keys(parsingBlock).length) out['parsing'] = parsingBlock;
         else delete out['parsing'];
+    }
+
+    // ── the ordered chain (mirrors PipelineEditable.lower) ────────────────────────────
+    if (legacyShaped) {
+        // A file that had grown a steps: block and was edited back to a legacy shape loses it, or the
+        // two spellings collide on the next load.
+        delete out['steps'];
+    } else {
+        out['steps'] = chain.map((n) => ({ [STEP_KIND[n.type]]: stepConfig(g, n) }));
+        // Every singular transform key must go, in BOTH modes — not the usual strict-only rule. The
+        // server's parser rejects steps: alongside a legacy block outright, so leaving one behind
+        // writes config that can never be read back.
+        delete processing['dedup'];
+        delete processing['join'];
+        delete processing['summarize'];
+        delete out['route'];
+        // `where` is the legacy spelling of a filter step and lives inside the parser's own
+        // csv_settings block, so it survives the deletions above. The pre-parse include/exclude lists
+        // in that block are not chain steps and stay where they are.
+        const csv = processing['csv_settings'];
+        if (csv && typeof csv === 'object') {
+            delete (csv as Cfg)['where'];
+            if (!Object.keys(csv as Cfg).length) delete processing['csv_settings'];
+        }
     }
 
     if (primarySink) {
@@ -431,6 +439,72 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     // A file with no output: block must not gain an empty one (mirrors PipelineEditable.lower).
     if (Object.keys(output).length === 0) delete out['output'];
     return { config: out };
+}
+
+/** Node type → the `steps:` kind it lowers to; the five kinds the flat file's chain can hold. */
+const STEP_KIND: Record<string, string> = {
+    'transform.filter': 'filter',
+    'transform.join': 'join',
+    'transform.dedup': 'dedup',
+    'transform.summarize': 'summarize',
+    'transform.route': 'route',
+};
+/** The chain order the singular keys imply, i.e. the order PipelineLift wires them in. */
+const STEP_KINDS = ['filter', 'join', 'dedup', 'summarize', 'route'];
+
+/**
+ * Whether `chain` fits the legacy singular keys: at most one of each kind, in the lift's order.
+ *
+ * ⚠ Order is half the test, and the half that is easy to miss. One dedup and one summarize fit the
+ * singular slots whichever way round they are authored — but the flat file stores no order, so an
+ * authored `summarize → dedup` would come back from the next lift reversed: a two-node pipeline
+ * quietly changing meaning, with nothing over-full about it.
+ *
+ * Both halves are the one strictly-increasing test: a repeated kind has the same position as the one
+ * before it, so it fails `<=` just as an out-of-order kind does. A separate "seen this kind" set was
+ * written first and turned out to be dead — removing it changed no test, which is how it was found.
+ */
+function isLegacyShaped(chain: AuthoredNode[]): boolean {
+    let previous = -1;
+    for (const n of chain) {
+        const position = STEP_KINDS.indexOf(STEP_KIND[n.type]);
+        if (position <= previous) return false;
+        previous = position;
+    }
+    return true;
+}
+
+/** A step's config in the same shape its legacy block held (mirrors PipelineEditable.stepConfig). */
+function stepConfig(g: AuthoredPipeline, n: AuthoredNode): Cfg {
+    const c: Cfg = {};
+    const keep = (...keys: string[]) => {
+        for (const k of keys) if (n.config?.[k] != null) c[k] = n.config[k];
+    };
+    switch (STEP_KIND[n.type]) {
+        case 'dedup': keep('keys', 'order_by'); return c;
+        case 'join': keep('reference', 'on'); return c;
+        case 'summarize': keep('group_by', 'measures'); return c;
+        case 'route': return routeSection(g, n);
+        // filter: verbatim — the post-parse `where` and the pre-parse include/exclude lists together,
+        // so the round-trip is lossless. Only `where` has a legacy singular spelling.
+        default: return structuredClone(n.config ?? {}) as Cfg;
+    }
+}
+
+/** A route node's config with each branch stamped with the database its `route:<key>` edge feeds. */
+function routeSection(g: AuthoredPipeline, routeNode: AuthoredNode): Cfg {
+    const rc = structuredClone(routeNode.config ?? {}) as Cfg;
+    if (Array.isArray(rc['branches'])) {
+        const byId = new Map(g.nodes.map((n) => [n.id, n]));
+        for (const e of g.edges) {
+            if (e.from !== routeNode.id || !e.rel.startsWith('route:')) continue;
+            const key = e.rel.slice('route:'.length);
+            const db = byId.get(e.to)?.config?.['database'];
+            if (db == null) continue;
+            for (const b of rc['branches'] as Cfg[]) if (String(b['key']) === key) b['database'] = db;
+        }
+    }
+    return rc;
 }
 
 function overlay(section: Cfg, key: string, value: unknown, strict: boolean): void {

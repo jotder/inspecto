@@ -170,6 +170,29 @@ strictly more capable than the flat path** — it already runs N transforms of a
 that falls out of Kahn-sorting and keying outputs by `nodeId`. `summarize` and `join` are the only kinds
 missing, and they are missing from *both* paths, tracked separately.
 
+### Finding 6 — ⚠ the format was never tested through the FILE, and both spellings we documented were wrong
+
+Grounded 2026-08-11 during A3, by probing the codec rather than reading it. **Every test of `steps:` —
+and, it turned out, every test of the `sinks:` plural block that set the precedent — went through
+`PipelineConfig.fromMap` with a hand-built Java map.** That skips the codec entirely, and the codec is
+where a config format is actually decided: `ConfigCodec.toToon` is what `PipelineRoutes` writes on every
+save (`PipelineRoutes.java:363`). A block can be perfectly modelled, perfectly parsed from a map, and
+still be unwritable or unreadable as a file. Two defects were hiding in that gap:
+
+| Spelling | What toon actually does |
+|---|---|
+| `steps:` (no element count) | decodes as a **map**, `{- dedup={…}}` — so the parser's `instanceof List` test never matched and **the entire chain was skipped in silence** |
+| `- dedup: {keys: [ID]}` | the value decodes as a plain **String**, never a config block |
+
+The first is the exact silent-discard shape this whole format was introduced to remove, recreated in its
+own reader — and it was the spelling the plan, the `Step` javadoc, the parser's own comment and its error
+message all taught. Both are now refusals (the non-list `steps` names the working spelling in the message),
+and `PipelineStepsFileRoundTripTest` (in `inspecto`, the only module that can see both `ConfigCodec` and
+`PipelineEditable`) is the standing guard over graph → lower → toToon → disk → load → config → lift.
+
+⚠ **The lesson generalises past this plan:** a config-format slice is not verified by a `fromMap` test.
+`sinks:` still has no file-level test.
+
 ### Finding 4 — ⚠ the `sinks:` precedent option (a) mirrors never got its own A5
 
 `sinks:` is the template this plan tells you to follow. It is **authoring-only**: `resolveSinks`
@@ -214,12 +237,20 @@ node per kind" to "one **run** per kind" — narrower than the plan's opening pr
 ### Option (b) — an ordered `steps:` sequence
 
 ```toon
-steps:
-  - dedup:     {keys: [msisdn]}
-  - summarize: {group_by: [day], measures: [count]}
-  - dedup:     {keys: [imsi]}
-  - filter:    {where: "duration > 0"}
+steps[4]:
+  - dedup:
+      keys[1]: MSISDN
+  - summarize:
+      group_by[1]: RECORD_DAY
+      measures[1]: count
+  - dedup:
+      keys[1]: IMSI
+  - filter:
+      where: "duration > 0"
 ```
+
+⚠ **That syntax is exact, and an earlier draft of this plan had it wrong** — see *Finding 6*. The
+element count is required, and the config must be an indented block, never an inline `{…}`.
 
 | Slice | Work |
 |---|---|
@@ -288,7 +319,8 @@ reachable, so it is the acceptance test for A2/A3 rather than a record of someth
 `PipelineConfig.steps()`, fed by an explicit top-level `steps:` list or, absent one, the legacy singular
 blocks projected into the lift's order. As-built notes:
 
-- **A `steps:` entry is a single-key map** of kind → config (`- dedup: {keys: […]}`), not a flat
+- **A `steps:` entry is a single-key map** of kind → config (⚠ spelled as an indented block, **not**
+  `- dedup: {keys: […]}` — see *Finding 6*), not a flat
   `{kind: dedup, …}`. Chosen so `kind` can never collide with a config key of the same name, and so a
   malformed entry is a structural error rather than a silently-ignored one.
 - **Order is list position, full stop.** No `after:` key, no index — a second ordering channel is a second
@@ -307,6 +339,37 @@ blocks projected into the lift's order. As-built notes:
 - ⚠ **Cross-module gotcha:** `-pl inspecto-engine` resolves `inspecto-etl` from `~/.m2`, not the reactor,
   so new symbols are invisible until `mvn -o install -pl inspecto-etl`. Bit once here; will bite A3.
 
+**A3 + A4 — ✅ SHIPPED 2026-08-11.** `lower()` emits `steps:` only for a chain the singular keys cannot
+hold; `MULTI_DEDUP`/`MULTI_ROUTE`/`MULTI_SUMMARIZE`/`MULTI_JOIN` deleted; filters no longer merged into
+one `csv_settings`; both A1 properties green with `@Disabled` removed. As-built, including four things
+the plan did not say:
+
+- ⚠ **A3 needed a `lift()` half, which the plan's A3 text does not mention.** Its own verify criterion —
+  the A1 round-trip properties — goes graph → lower → config → **lift** → graph, so emitting `steps:`
+  without consuming it could never have gone green. `PipelineLift` now walks an explicit chain post-map
+  and keeps its proven hard-coded emission for legacy files, gated on a new
+  `PipelineConfig.hasExplicitSteps()`. The two paths are kept apart deliberately: every pipeline in
+  existence lifts through the legacy one, and collapsing them would put an untested rewrite under all of
+  them to save a dozen lines.
+- ⚠ **`prepare()` could not see a `steps:` pipeline at all, so A5's trap was live in A3.** The three
+  arming guards test the *typed* fields (`route`/`summarize`/`join`), and an explicit `steps:` file never
+  populates them — the parser refuses both spellings together, so they are null whatever the chain says.
+  A `steps:` pipeline carrying a summarize would have armed and run on the linear path, which reads
+  `dedup()`/`csv.rowWhere()` and would have applied **none** of the chain. A fourth guard refuses to arm
+  an explicit chain; A5 lifts it.
+- ⚠ **Legacy-expressible is about ORDER as well as count**, which the plan framed as a count question
+  throughout. One dedup and one summarize fit the singular keys either way round, but the file stores no
+  order, so an authored `summarize → dedup` would come back reversed — a two-node pipeline quietly
+  changing meaning with nothing over-full about it. Out-of-order ⇒ `steps:`, same as a repeat. The two
+  conditions turned out to be **one** strictly-increasing test: a repeat has the same position as its
+  predecessor, so it fails `<=` too. A separate "seen this kind" set was written first and proved dead —
+  deleting it turned no test red, which is how it was found.
+- ⚠ **The pinned A1 expectation was unreachable as written.** It compared against a raw `transform.*`
+  list, which includes the `transform.map` schema projection the lift emits for every branch, so
+  `[filter, filter]` was being compared with `[filter, map]`. Red for the right reason *at the time*, but
+  no implementation could ever have satisfied it. `transformChain` now restricts to authorable kinds, the
+  rule `PipelineStepsProjectionTest.liftedChain` already used.
+
 **A4 — the mock moves in the same commit as A3** under either option.
 `inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts` must stop refusing exactly when the server does.
 ⚠ Standing rule: **a mock must never be more lenient *or stricter* than the server** — a preview that
@@ -318,6 +381,15 @@ expressible in the legacy singular keys, so an unchanged pipeline round-trips ve
 `MULTI_DEDUP`/`MULTI_ROUTE`/`MULTI_SUMMARIZE` **in this slice**. ⚠ Also stop merging filters into one
 `csv_settings` map (finding 1) — that is a silent loss with no code to delete, so it is the easy one to
 leave behind. → verify: the A1 property tests pass with `@Disabled` **removed**.
+
+⚠ **One structural consequence A3 hands to A5: a chain filter sits POST-map, a legacy filter sits
+PRE-map.** The lift wires the legacy filter between parser and map, because `csv_settings` carries two
+different things fused into one node — the post-parse `where` predicate *and* the pre-parse
+include/exclude lists, which anchor the CSV reader on a column index and therefore have to run before
+mapping. A walked chain emits every step after map. For a `where` that is arguably more correct; for the
+pre-parse lists it is wrong. Nothing executes today (arming is refused), so it is a representation
+question, not a live bug — but **A5 must not route a chain carrying pre-parse filter keys** without
+splitting them back out.
 
 **A5 — ⚠ the slice that can silently do nothing.** A config that saves, loads and runs only the first
 block is this plan's own bug, relocated one layer down. Under (b) A5 is a **routing** decision: a

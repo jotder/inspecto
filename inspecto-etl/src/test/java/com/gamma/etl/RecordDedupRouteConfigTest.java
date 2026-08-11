@@ -152,6 +152,76 @@ class RecordDedupRouteConfigTest {
         assertTrue(e.getMessage().contains("NO_SUCH_COLUMN"), e.getMessage());
     }
 
+    // ── the steps: chain arms nothing yet, and the guards above cannot see it ──────────
+
+    /**
+     * ⚠ <b>The fourth arming guard, and the one the other three cannot cover.</b> They test the TYPED
+     * fields — {@code route}, {@code summarize}, {@code join} — and an explicit {@code steps:} file never
+     * populates any of them: the parser refuses the two spellings in one file, so those fields are null
+     * no matter what the chain says. Without a guard of its own, a {@code steps:} pipeline carrying a
+     * summarize would pass every check above and run on the linear path, which reads {@code dedup()} and
+     * {@code csv.rowWhere()} and would therefore apply <em>none</em> of the chain — the config saves,
+     * loads, arms, and silently runs a different pipeline than the one authored.
+     *
+     * <p>That is the multiplicity plan's own failure mode relocated one layer down, so the format slice
+     * (A3) that made {@code steps:} writable is the slice that has to fail closed. Lifted by A5.
+     */
+    @Test
+    void anActivePipelineWithAStepsChainRefusesToArm(@TempDir Path dir) throws Exception {
+        Path p = write(dir, true, "", """
+                steps[2]:
+                  - dedup:
+                      keys[1]: ID
+                  - dedup:
+                      keys[1]: EVENT_DATE
+                """);
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(p.toString()),
+                "nothing reads steps: yet — arming would run a pipeline that applies none of the chain");
+        assertTrue(e.getMessage().contains("steps:"), e.getMessage());
+    }
+
+    /**
+     * ⚠ <b>A {@code steps:} written without its element count is REFUSED, not ignored.</b> Found by
+     * probing the codec rather than by reading it: toon decodes a bare {@code steps:} as a <em>map</em>
+     * ({@code {- dedup={…}}}), so the parser's {@code instanceof List} test simply did not match and the
+     * entire chain vanished — no error, no warning, a pipeline running none of its authored transforms.
+     * The one silent-discard shape this whole format was introduced to remove, recreated in its reader.
+     */
+    @Test
+    void aStepsBlockWithoutItsElementCountIsRefusedRatherThanSilentlyIgnored(@TempDir Path dir)
+            throws Exception {
+        Path p = write(dir, false, "", """
+                steps:
+                  - dedup:
+                      keys[1]: ID
+                """);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.load(p.toString()));
+        assertTrue(e.getMessage().contains("steps[2]:"),
+                "the refusal shows the spelling that works: " + e.getMessage());
+    }
+
+    /** …and the same chain in an inactive draft parses and keeps its order, which is the point of A3. */
+    @Test
+    void anInactiveDraftWithAStepsChainParsesAndKeepsItsOrder(@TempDir Path dir) throws Exception {
+        Path p = write(dir, false, "", """
+                steps[3]:
+                  - dedup:
+                      keys[1]: ID
+                  - summarize:
+                      group_by[1]: EVENT_DATE
+                      measures[1]: count
+                  - dedup:
+                      keys[1]: AMT
+                """);
+        PipelineConfig cfg = PipelineConfig.load(p.toString());
+        assertTrue(cfg.hasExplicitSteps(), "an authored chain is not the legacy projection");
+        assertEquals(java.util.List.of("dedup", "summarize", "dedup"),
+                cfg.steps().stream().map(PipelineConfig.Step::kind).toList());
+        assertNull(cfg.dedup(), "the singular slot stays empty — the chain is the only spelling here");
+    }
+
     @Test
     void anActivePipelineWithJoinRefusesToArm(@TempDir Path dir) throws Exception {
         Path p = write(dir, true, """

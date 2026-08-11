@@ -10,12 +10,18 @@ import java.util.List;
  * replacing the silent truncation the compile-back used to do (it picked the first sink and
  * dropped the rest).
  *
- * <p>Codes: {@code UNSUPPORTED_NODE} (the flat config has no home for this node type),
- * {@code MULTI_SINK} (more than one distinct persistent database dir — the flat config has exactly
- * one), {@code MULTI_JOIN} (a second {@code transform.join} — {@code processing.join} is a single
- * block, so the extra one would be discarded silently), and the strict-mode completeness set
- * {@code NO_ACQUISITION} / {@code NO_PARSER} / {@code NO_PERSISTENT_SINK} / {@code PARSER_NO_SCHEMA}
- * (an {@code active} pipeline must be whole; an inactive draft may be partial).
+ * <p>Codes: {@code UNSUPPORTED_NODE} (the flat config has no home for this node type) and the
+ * strict-mode completeness set {@code NO_ACQUISITION} / {@code NO_PARSER} /
+ * {@code NO_PERSISTENT_SINK} / {@code PARSER_NO_SCHEMA} (an {@code active} pipeline must be whole; an
+ * inactive draft may be partial).
+ *
+ * <p>⚠ <b>The "too many of a kind" codes are gone, and that is the direction of travel.</b>
+ * {@code MULTI_SINK} stopped firing when {@code sinks:} became a plural block, and
+ * {@code MULTI_JOIN} / {@code MULTI_DEDUP} / {@code MULTI_ROUTE} / {@code MULTI_SUMMARIZE} were
+ * removed with the ordered {@code steps:} chain (multiplicity plan A3). Each existed only to make a
+ * silent discard visible while the flat file had one slot per kind; none was ever the destination, and
+ * each went in the same change that let the format hold what it was refusing. A count is not what
+ * should constrain a pipeline — whether a step accepts its neighbours is ({@code PipelineValidator}).
  */
 @PublicApi(since = "4.7.0")
 public class PipelineCompileException extends RuntimeException {

@@ -67,89 +67,118 @@ class PipelineEditableTest {
         assertEquals("d1", ex.refusals().get(0).nodeId());
     }
 
-    // ── the four single-slot node kinds ────────────────────────────────────────────────
-    // `lower` keeps ONE node per scalar slot, and all four now REFUSE a second rather than keeping
-    // the last silently. Until 2026-08-11 only transform.join was guarded; dedup/route/summarize were
-    // last-one-wins, and the tests here pinned that discard rather than endorsing it. Flipping them
-    // was an operator call precisely because a graph holding two of a kind saves today and stops
-    // saving on its next edit — taken deliberately, since the alternative is dropping authored work
-    // with no signal at all.
+    // ── the four kinds that used to hold a single slot ─────────────────────────────────
+    // These four were last-one-wins (a second node vanished silently), then briefly REFUSED
+    // (MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE joining MULTI_JOIN, 2026-08-11). Both were stations
+    // on the way here: the refusal existed only to make the discard visible while the flat file still
+    // had one slot per kind, and it was removed in the same slice (A3) that gave the file an ordered
+    // `steps:` chain — never before, which would have restored the silent discard.
+    //
+    // So the assertion inverts: the graphs below used to be the refusal fixtures, and now they SAVE.
 
-    /** A second {@code transform.dedup} refuses; the first keeps the {@code processing.dedup} slot. */
+    /** Two record dedups: both survive, in order, rather than one claiming a slot. */
     @Test
-    void secondDedupNodeRefusesInsteadOfDiscarding() {
-        assertSingleSlotRefusal(PipelineEditable.MULTI_DEDUP, "dd1", "dd2",
+    void secondDedupNodeLowersToTheChain() {
+        assertChain(List.of("dedup", "dedup"),
                 node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))),
                 node("dd2", "transform.dedup", Map.of("keys", List.of("imsi"))));
     }
 
-    /** A second {@code transform.route} refuses — {@code lower} writes ONE {@code route} key. */
+    /** Two routes: the top-level {@code route:} key held one, the chain holds both. */
     @Test
-    void secondRouteNodeRefusesInsteadOfDiscarding() {
-        assertSingleSlotRefusal(PipelineEditable.MULTI_ROUTE, "r1", "r2",
+    void secondRouteNodeLowersToTheChain() {
+        assertChain(List.of("route", "route"),
                 node("r1", "transform.route", Map.of("on", "first")),
                 node("r2", "transform.route", Map.of("on", "second")));
     }
 
-    /** A second {@code transform.summarize} refuses; the first keeps the grain. */
+    /** Two summarizes: two grains, not one grain and a discarded node. */
     @Test
-    void secondSummarizeNodeRefusesInsteadOfDiscarding() {
-        assertSingleSlotRefusal(PipelineEditable.MULTI_SUMMARIZE, "s1", "s2",
+    void secondSummarizeNodeLowersToTheChain() {
+        assertChain(List.of("summarize", "summarize"),
                 node("s1", "transform.summarize", Map.of("group_by", List.of("day"))),
                 node("s2", "transform.summarize", Map.of("group_by", List.of("cell"))));
     }
 
-    /** One node per scalar slot: the SECOND is named as the offender and the message points at the
-     *  first, which keeps the slot — the shape {@code MULTI_JOIN} established. */
-    private static void assertSingleSlotRefusal(String code, String keeper, String offender,
-                                                PipelineNode... duplicates) {
-        PipelineGraph g = graphWith(duplicates);
-
-        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
-                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
-
-        assertEquals(1, ex.refusals().size(), "exactly one refusal: " + ex.refusals());
-        assertEquals(code, ex.refusals().get(0).code());
-        assertEquals(offender, ex.refusals().get(0).nodeId(),
-                "the SECOND node is named as the offender; the first keeps the slot");
-        assertTrue(ex.refusals().get(0).message().contains(keeper),
-                "the message points at the node already holding the slot");
+    /** Two reference joins — the kind that was guarded first, and is now just another chain kind. */
+    @Test
+    void secondJoinNodeLowersToTheChain() {
+        assertChain(List.of("join", "join"),
+                node("j1", "transform.join", Map.of("reference", "sites")),
+                node("j2", "transform.join", Map.of("reference", "cells")));
     }
 
     /**
-     * The contrast case, and the only one of the four that is guarded: a second {@code transform.join}
-     * REFUSES with {@code MULTI_JOIN} rather than discarding. The guard shipped with the join verb but
-     * had no engine-level test — the join slice asserted it only at the palette contract level.
+     * ⚠ Two of a kind is not the only thing the singular keys could not hold — <b>order</b> is the other,
+     * and it looks harmless. One dedup and one summarize fit the singular slots whichever way round they
+     * are authored, but the flat file stores no order, so {@code summarize → dedup} would come back from
+     * the next lift as {@code dedup → summarize}: a two-node pipeline quietly changing meaning with
+     * nothing over-full about it. Authored out of the lift's order ⇒ the chain, same as a repeat.
      */
     @Test
-    void secondJoinNodeRefusesInsteadOfDiscarding() {
-        PipelineGraph g = graphWith(
-                node("j1", "transform.join", Map.of("reference", "sites")),
-                node("j2", "transform.join", Map.of("reference", "cells")));
+    void aChainAuthoredOutOfTheLiftsOrderAlsoLowersToTheChain() {
+        assertChain(List.of("summarize", "dedup"),
+                node("s1", "transform.summarize", Map.of("group_by", List.of("day"))),
+                node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))));
+    }
 
-        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
-                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+    /** …while the same two kinds authored IN the lift's order keep the singular keys, untouched. */
+    @Test
+    void aLegacyShapedChainKeepsTheSingularKeysAndWritesNoStepsBlock() {
+        Map<String, Object> out = PipelineEditable.lower(graphWith(
+                node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))),
+                node("s1", "transform.summarize", Map.of("group_by", List.of("day")))),
+                new LinkedHashMap<>(), true);
 
-        assertEquals(1, ex.refusals().size());
-        assertEquals(PipelineEditable.MULTI_JOIN, ex.refusals().get(0).code());
-        assertEquals("j2", ex.refusals().get(0).nodeId(),
-                "the SECOND join is named as the offender; the first keeps the slot");
-        assertTrue(ex.refusals().get(0).message().contains("j1"),
-                "the message points at the node already holding the slot");
+        assertFalse(out.containsKey("steps"),
+                "an existing pipeline must round-trip verbatim — steps: is only for what the keys cannot hold");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) out.get("processing");
+        assertEquals(Map.of("keys", List.of("msisdn")), processing.get("dedup"));
+        assertEquals(Map.of("group_by", List.of("day")), processing.get("summarize"));
+    }
+
+    /** Lower {@code extra} and assert the {@code steps:} kinds it produced, in order. */
+    private static void assertChain(List<String> expected, PipelineNode... extra) {
+        Map<String, Object> out = PipelineEditable.lower(graphWith(extra), new LinkedHashMap<>(), true);
+
+        Object steps = out.get("steps");
+        assertInstanceOf(List.class, steps, "the chain lowers to a steps: list, not a refusal");
+        List<String> kinds = ((List<?>) steps).stream()
+                .map(e -> ((Map<?, ?>) e).keySet().iterator().next().toString())
+                .toList();
+        assertEquals(expected, kinds);
+        // ⚠ Both spellings in one file is a PARSE refusal, so a stale singular key would not merely be
+        // untidy — it would write config that can never be loaded again.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> processing = (Map<String, Object>) out.get("processing");
+        for (String legacy : List.of("dedup", "join", "summarize"))
+            assertFalse(processing.containsKey(legacy), "processing." + legacy + " must not survive steps:");
+        assertFalse(out.containsKey("route"), "route: must not survive steps:");
     }
 
     // ── A1: the multiplicity round-trip property (docs/superpower/pipeline-multiplicity-plan.md) ──
     //
-    // ⚠ THESE TESTS ARE EXPECTED TO FAIL UNTIL PART A LANDS. They are the plan's slice-A1 deliverable:
-    // pin the property first, so A2/A3 have something that goes green rather than a shape argued on a
-    // whiteboard. @Disabled with the reason on it — a red suite is not a specification, it is noise that
-    // trains the next shift to ignore the runner.
+    // Pinned red in A1 so A2/A3 had something to turn green rather than a shape argued on a whiteboard;
+    // GREEN since A3 (lower emits steps:, lift walks it), so the @Disabled markers are gone.
 
-    /** The transform nodes of {@code g}, in topological order, as {@code <type>} strings. */
+    /**
+     * The <b>authored</b> transform chain of {@code g}, in node order, as step kinds.
+     *
+     * <p>⚠ {@code transform.map} is filtered out, and that is not cosmetic — it is the schema projection
+     * {@code PipelineLift} emits for every branch, authored by nobody. While these tests were pinned they
+     * compared against a raw {@code transform.*} list and so expected {@code [filter, filter]} against an
+     * actual {@code [filter, map]}: red for the right reason at the time, but an expectation no
+     * implementation could ever have satisfied. Restricting to the kinds a chain can hold is the same rule
+     * {@code PipelineStepsProjectionTest.liftedChain} already applies.
+     */
     private static List<String> transformChain(PipelineGraph g) {
         return g.nodes().stream()
                 .map(PipelineNode::type)
                 .filter(t -> t.startsWith("transform."))
+                .map(t -> t.substring("transform.".length()))
+                .filter(com.gamma.etl.PipelineConfig.Step.KINDS::contains)
+                .map(k -> "transform." + k)
                 .toList();
     }
 
@@ -187,7 +216,6 @@ class PipelineEditableTest {
      * <p>That is the same data loss {@code 2cf7005e} refused for the other kinds, still live, in the kind
      * most likely to be authored more than once and the most order-sensitive of them all.
      */
-    @org.junit.jupiter.api.Disabled("A1: pins the target property; goes green in A3/A5")
     @Test
     void twoFiltersSurviveTheRoundTrip(@TempDir Path dir) throws Exception {
         assertEquals(List.of("transform.filter", "transform.filter"),
@@ -212,7 +240,6 @@ class PipelineEditableTest {
      * per-kind blocks at all, or grows an ordered {@code steps:} sequence. This test deliberately asserts
      * the <em>interleaved</em> order so it cannot be made green by the per-kind shape alone.
      */
-    @org.junit.jupiter.api.Disabled("A1: pins the target property; the cross-kind half needs the A1 shape decision")
     @Test
     void twoOfEachKindSurviveTheRoundTripInAuthoredOrder(@TempDir Path dir) throws Exception {
         assertEquals(List.of("transform.dedup", "transform.summarize",

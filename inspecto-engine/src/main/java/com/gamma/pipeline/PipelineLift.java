@@ -184,9 +184,40 @@ public final class PipelineLift {
         nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_MAP.type(), mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));
 
+        String sinkUpstream = mapId;
+        String routeId = null;
+        Map<String, Object> routeCfg = cfg.routeConfig();
+
+        // ⚠ An explicit steps: chain is walked; a legacy file keeps the proven emission below.
+        //
+        // The two produce the same graph for every legacy file — PipelineConfig projects the singular
+        // blocks into exactly this order, and PipelineStepsProjectionTest cross-checks that against the
+        // emission below rather than against a constant. They are kept apart anyway, because the legacy
+        // path is what every pipeline in existence lifts through: collapsing them would put an untested
+        // rewrite under all of them to save a dozen lines.
+        if (cfg.hasExplicitSteps()) {
+            Map<String, Integer> seen = new LinkedHashMap<>();
+            List<PipelineConfig.Step> steps = cfg.steps();
+            for (int i = 0; i < steps.size(); i++) {
+                PipelineConfig.Step step = steps.get(i);
+                String kind = step.kind();
+                // The first of a kind keeps the bare id the single-slot era gave it, so a chain that
+                // happens to hold one of each lifts to byte-for-byte the same node ids as before;
+                // repeats are distinguished by step position, which is stable across a round-trip.
+                int nth = seen.merge(kind, 1, Integer::sum);
+                String id = kind + suffix + (nth == 1 ? "" : "__s" + i);
+                Map<String, Object> sc = new LinkedHashMap<>(step.config());
+                nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null, sc, null));
+                edges.add(PipelineEdge.data(sinkUpstream, id));
+                sinkUpstream = id;
+                if (PipelineConfig.Step.ROUTE.equals(kind)) { routeId = id; routeCfg = sc; }
+            }
+            emitSinks(nodes, edges, suffix, schema, table, cfg, sinkUpstream, routeId, routeCfg);
+            return;
+        }
+
         // Reference join (processing.join) sits right after map — dedup/summarize downstream see the
         // enriched row set. Authoring-only (prepare() refuses arming), like route/summarize below.
-        String sinkUpstream = mapId;
         if (cfg.join() != null) {
             String joinId = "join" + suffix;
             Map<String, Object> jc = new LinkedHashMap<>();
@@ -227,8 +258,6 @@ public final class PipelineLift {
         // An authored route: block lifts as a transform.route node whose route:<key> edges feed the
         // sinks — branch↔sink pairing is by the branch's declared destination database. Authoring-only
         // for now (prepare() refuses arming), so this exists for the editor/recipe round-trip.
-        String routeId = null;
-        Map<String, Object> routeCfg = cfg.routeConfig();
         if (routeCfg != null) {
             routeId = "route" + suffix;
             nodes.add(new PipelineNode(routeId, BuiltinNodeType.TRANSFORM_ROUTE.type(),
@@ -237,6 +266,14 @@ public final class PipelineLift {
             sinkUpstream = routeId;
         }
 
+        emitSinks(nodes, edges, suffix, schema, table, cfg, sinkUpstream, routeId, routeCfg);
+    }
+
+    /** The chain's tail: one {@code sink.persistent} per destination, fed by {@code sinkUpstream} (or by
+     *  the route node's {@code route:<key>} edge when a branch names that destination's database). */
+    private static void emitSinks(List<PipelineNode> nodes, List<PipelineEdge> edges, String suffix,
+                                  Map<String, Object> schema, String table, PipelineConfig cfg,
+                                  String sinkUpstream, String routeId, Map<String, Object> routeCfg) {
         // The declared data-store this sink produces — the join key a downstream job/enrichment matches
         // its source store against, so the topology superimposes from config/metadata (see PipelineStores).
         // Legacy pipelines only ever write a resting store, so the lift always emits sink.persistent;
@@ -259,6 +296,19 @@ public final class PipelineLift {
                     ? new PipelineEdge(routeId, PipelineRel.route(branchKey), sinkId)
                     : PipelineEdge.data(sinkUpstream, sinkId));
         }
+    }
+
+    /** A chain step's display name — the same label the legacy emission gives that kind, so a pipeline
+     *  reads identically on the canvas whichever spelling its file uses. */
+    private static String stepLabel(String kind) {
+        return switch (kind) {
+            case PipelineConfig.Step.FILTER    -> "Row filter";
+            case PipelineConfig.Step.JOIN      -> "Join";
+            case PipelineConfig.Step.DEDUP     -> "Dedup (record)";
+            case PipelineConfig.Step.SUMMARIZE -> "Summarize";
+            case PipelineConfig.Step.ROUTE     -> "Route";
+            default -> kind;
+        };
     }
 
     /** The route branch key whose declared {@code database} matches {@code database}, or {@code null}. */

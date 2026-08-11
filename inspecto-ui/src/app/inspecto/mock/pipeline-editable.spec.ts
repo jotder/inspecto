@@ -197,35 +197,20 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
     });
 
     /**
-     * `processing.join` is ONE block, so a second join node had nowhere to go and the last one silently
-     * won — losing the first join's config with no refusal and no warning. The server now refuses
-     * MULTI_JOIN (`PipelineEditable.java`), so the mock must too: this became reachable when the recipe
-     * palette gained the join verb, and an offline preview that accepts it would greenlight a save the
-     * backend 422s.
+     * ⚠ These four used to be the MULTI_* refusal specs, and they now assert the opposite.
+     *
+     * Each kind held ONE block, so a second node silently replaced the first; on 2026-08-11 all four
+     * flipped to refusing, which made the loss visible while the flat file still had a single slot.
+     * The multiplicity plan's slice A3 gave the file an ordered `steps:` chain, so the slot — and with
+     * it the reason for the refusal — is gone, and the codes went in the same change that widened the
+     * format.
+     *
+     * **The mock had to move in that same commit, and the direction matters.** The usual failure is a
+     * mock more *lenient* than the server. This is the mirror image: a mock still refusing a second
+     * dedup would block, offline, a graph the backend now saves happily — same bug, other sign.
      */
-    it('refuses a SECOND join with MULTI_JOIN rather than silently replacing the first', () => {
-        const existing = processedConfig();
-        const g = liftConfig(existing);
-        const first = g.nodes.find((n) => n.type === 'transform.join')!;
-        g.nodes.push({ id: 'join_2', type: 'transform.join', config: { reference: 'reference/fx', on: 'ccy' } });
-
-        const res = lowerGraph(g, existing, true);
-        expect('refusals' in res, JSON.stringify(res)).toBe(true);
-        const refusals = (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
-        const multi = refusals.find((r) => r.code === 'MULTI_JOIN')!;
-        expect(multi).toBeTruthy();
-        expect(multi.nodeId).toBe('join_2'); // the offender, not the incumbent
-        expect(multi.message).toContain(first.id); // names who already claimed the block
-    });
-
-    /**
-     * The other three one-slot kinds, flipped from last-one-wins to refusing on 2026-08-11 (operator
-     * decision). They must move with the server in the same change: a mock that still accepted two of
-     * them would preview a graph the backend now 422s, which is the exact "mock more lenient than the
-     * server" hole this file exists to close.
-     */
-    const expectSecondRefused = (type: string, code: string, config: Record<string, unknown>,
-                                 from: Record<string, unknown> = processedConfig()): void => {
+    const expectSecondLowersToTheChain = (type: string, kind: string, config: Record<string, unknown>,
+                                          from: Record<string, unknown> = processedConfig()): void => {
         const existing = from;
         const g = liftConfig(existing);
         const first = g.nodes.find((n) => n.type === type)!;
@@ -233,26 +218,52 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
         g.nodes.push({ id: 'dup_1', type, config });
 
         const res = lowerGraph(g, existing, true);
-        expect('refusals' in res, JSON.stringify(res)).toBe(true);
-        const refusals = (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
-        const multi = refusals.find((r) => r.code === code)!;
-        expect(multi).toBeTruthy();
-        expect(multi.nodeId).toBe('dup_1');          // the offender, not the incumbent
-        expect(multi.message).toContain(first.id);   // names who already claimed the slot
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const out = (res as { config: Record<string, unknown> }).config;
+
+        const steps = out['steps'] as Record<string, unknown>[];
+        expect(Array.isArray(steps), 'two of a kind lower to a steps: chain').toBe(true);
+        expect(steps.filter((s) => kind in s).length, 'both survive, neither replaces the other').toBe(2);
+
+        // ⚠ Both spellings in one file is a PARSE refusal on the server, so a stale singular key would
+        // not merely be untidy — it would write config that can never be loaded again.
+        const processing = out['processing'] as Record<string, unknown>;
+        for (const legacy of ['dedup', 'join', 'summarize']) expect(processing[legacy]).toBeUndefined();
+        expect(out['route']).toBeUndefined();
     };
 
-    it('refuses a SECOND record dedup with MULTI_DEDUP', () => {
-        expectSecondRefused('transform.dedup', 'MULTI_DEDUP', { keys: ['imsi'] });
+    it('lowers a SECOND join into the chain rather than replacing the first', () => {
+        expectSecondLowersToTheChain('transform.join', 'join', { reference: 'reference/fx', on: 'ccy' });
+    });
+
+    it('lowers a SECOND record dedup into the chain', () => {
+        expectSecondLowersToTheChain('transform.dedup', 'dedup', { keys: ['imsi'] });
     });
 
     // Its own fixture: a transform.route node is lifted only from a top-level `route:` block, which the
     // shared processedConfig() (processing-key transforms) deliberately has none of.
-    it('refuses a SECOND route with MULTI_ROUTE', () => {
-        expectSecondRefused('transform.route', 'MULTI_ROUTE', { on: 'second' },
+    it('lowers a SECOND route into the chain', () => {
+        expectSecondLowersToTheChain('transform.route', 'route', { on: 'second' },
             { ...processedConfig(), route: { on: 'first', branches: [] } });
     });
 
-    it('refuses a SECOND summarize with MULTI_SUMMARIZE', () => {
-        expectSecondRefused('transform.summarize', 'MULTI_SUMMARIZE', { group_by: ['cell'] });
+    it('lowers a SECOND summarize into the chain', () => {
+        expectSecondLowersToTheChain('transform.summarize', 'summarize', { group_by: ['cell'] });
+    });
+
+    /**
+     * The safety property that lets A3 ship, mirrored from the server: a graph the singular keys CAN
+     * express is written exactly as before, with no `steps:` block. Every existing pipeline is this
+     * case, so this is the spec that would catch the mock rewriting files it should have left alone.
+     */
+    it('leaves a legacy-shaped graph on the singular keys, with no steps: block', () => {
+        const existing = processedConfig();
+        const res = lowerGraph(liftConfig(existing), existing, true);
+
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const out = (res as { config: Record<string, unknown> }).config;
+        expect(out['steps'], 'an unchanged pipeline must round-trip verbatim').toBeUndefined();
+        const processing = out['processing'] as Record<string, unknown>;
+        expect(processing['dedup']).toEqual({ keys: ['call_id'], order_by: 'event_ts DESC' });
     });
 });

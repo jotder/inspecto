@@ -746,6 +746,7 @@ public final class PipelineConfig {
     private final Output     output;
     private final List<Sink> sinks;
     private final List<Step> steps;
+    private final boolean explicitSteps;
     private final Schemas    schemas;
     private final DuckDbSettings duckdb;
     private final Chunking       chunking;
@@ -850,10 +851,22 @@ public final class PipelineConfig {
      *
      * <p>⚠ <b>Nothing executes from this yet</b> — the flat batch path still reads {@link #dedup()} and
      * {@code csv.rowWhere()} directly, and the graph-native path walks the graph. This is the reader half
-     * (plan slice A2); {@code lower()} starts emitting {@code steps:} in A3 and execution routes in A5.
-     * Until then a {@code steps:} file is authoring-only, exactly as {@code sinks:} has been.
+     * (plan slice A2); {@code lower()} emits {@code steps:} since A3 and execution routes in A5. Until
+     * then an explicit {@code steps:} file is authoring-only — and {@link #prepare()} <b>refuses to arm
+     * one</b>, because a chain nothing reads is a pipeline that runs the wrong thing in silence.
      */
     public List<Step> steps()      { return steps; }
+    /**
+     * Whether the chain came from an explicit {@code steps:} block rather than the legacy projection.
+     *
+     * <p>⚠ <b>The two are not interchangeable, which is why this exists.</b> {@link #steps()} is always
+     * populated, so it cannot answer "did the author write a sequence?" — and three places need that
+     * answer, for the same underlying reason: the legacy blocks are what the flat path actually reads.
+     * {@code PipelineLift} walks an explicit chain but keeps its proven hard-coded emission for legacy
+     * files; {@link #prepare()} refuses to arm an explicit chain; and {@code PipelineEditable.lower()}
+     * only writes {@code steps:} for a graph the singular keys cannot hold.
+     */
+    public boolean hasExplicitSteps() { return explicitSteps; }
     public Schemas    schemas()    { return schemas; }
     /** Optional DuckDB resource controls; never null (fields may be null ⇒ DuckDB defaults). */
     public DuckDbSettings duckdb()   { return duckdb; }
@@ -930,6 +943,7 @@ public final class PipelineConfig {
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
         this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.route);
+        this.explicitSteps = b.steps != null && !b.steps.isEmpty();
         this.schemas = new Schemas(b.schemaSelector, b.singleSchema, b.segmentSchemas,
                 b.ingesterClass,
                 b.ingesterConfig != null
@@ -988,6 +1002,7 @@ public final class PipelineConfig {
         this.output = src.output;
         this.sinks = src.sinks;   // already resolved + validated on the original build
         this.steps = src.steps;   // ditto — the projection is order-sensitive, never re-derive it here
+        this.explicitSteps = src.explicitSteps;
         this.schemas = src.schemas;
         this.duckdb = src.duckdb;
         this.chunking = src.chunking;
@@ -1163,6 +1178,21 @@ public final class PipelineConfig {
             throw new IllegalStateException(
                     "processing.join is authoring-only until an in-pipeline join executor lands — "
                             + "keep the pipeline inactive (active: false) or remove the join block");
+        }
+        // ⚠ An explicit steps: chain arms NOTHING today, and the three guards above cannot catch it.
+        // They test the TYPED fields (route/summarize/join), which a steps: file never populates — the
+        // parser refuses the two spellings together, so `route`, `summarize` and `join` are all null no
+        // matter what the chain says. Without this guard a steps: pipeline carrying a summarize would
+        // sail past every check and run on the linear path, which reads dedup()/csv.rowWhere() and would
+        // silently apply neither. That is exactly the failure the multiplicity plan exists to remove,
+        // relocated one layer down: the config saves, loads, arms — and runs the wrong pipeline quietly.
+        // Same fail-safe posture as route:/summarize/join above; lifted in plan slice A5, which routes a
+        // steps: pipeline to the graph executor that can actually walk it.
+        if (active && explicitSteps) {
+            throw new IllegalStateException(
+                    "steps: is authoring-only until the chain executor is routed (multiplicity plan A5) — "
+                            + "keep the pipeline inactive (active: false), or express the chain with the "
+                            + "singular transform blocks, which the linear path does execute");
         }
         if (statusDirToPrepare != null && !statusDirToPrepare.isBlank()) {
             Files.createDirectories(Paths.get(statusDirToPrepare));
