@@ -34,6 +34,8 @@ done
 
 [ "$status" -ne 0 ] && exit 1
 
-echo "pre-push: branch/release policy — fixes use MERGE-FORWARD (oldest supported -> master);" >&2
-echo "          editions are build flavors, not branches. See docs/BRANCHING.md." >&2
+echo "pre-push: nothing is in production after 3.x — master is the only line worked on, so the" >&2
+echo "          merge-forward set is EMPTY and 4.x receives nothing (BRANCHING.md §0-A)." >&2
+echo "          When 4.x is cut and has users, MERGE-FORWARD (oldest supported -> master) applies again." >&2
+echo "          Editions are build flavors, not branches." >&2
 exit 0

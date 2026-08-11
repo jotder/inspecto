@@ -16,6 +16,21 @@ checklist. Enforced by three layers: a Claude Code hook (agent reminder), `.gith
 (local block), and CI `.github/workflows/branch-policy.yml` (un-bypassable backstop).
 **One-time per clone:** `git config core.hooksPath .githooks`.
 
+## CURRENT STATE (2026-08-11) — apply this before the checklist below
+
+**Nothing is in production after `3.x`.** Work goes along `master`; `4.x` is cut as a release later,
+then work continues toward 5. So **`master` is the only line anyone works on**, the **merge-forward set
+is always empty** (there is no older *supported* line for a `fix:` to land on), and **`4.x` receives
+nothing — no back-merge, let it drift.**
+
+Practically, checklist step 4 below resolves to: *"propagation set: empty — `master` only"*. State it
+and proceed; do not go looking for an older branch and do not ask the operator to re-confirm it for
+routine work. Everything else in this skill still applies — classify the commit, never touch retired
+`1.x`/`2.x`/`3.x`, editions are build flavors.
+
+⚠ The rest of this file describes the model for **when a release exists and has users**. It is not
+wrong, it is **not yet in force**. See `docs/BRANCHING.md` §0-A.
+
 ## The two axes — never confuse them
 
 - **Versions = git branches.** Active: `master` (newest mainline) + the current `N.x` (today **`4.x`**).

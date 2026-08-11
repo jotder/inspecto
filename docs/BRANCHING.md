@@ -8,6 +8,37 @@
 
 ---
 
+## 0-A. CURRENT STATE (2026-08-11) — read this before applying §3
+
+**Nothing is in production after `3.x`.** Work goes along `master`; at some point `4.x` is cut as a
+release; then work continues toward 5. So today:
+
+| | |
+|---|---|
+| **The only line anyone works on** | **`master`** |
+| **`4.x`** | a **future release cut**, not a maintenance line with users on it — **ignore it** |
+| **The merge-forward set (§3)** | **always empty** — there is no older *supported* line to land a `fix:` on |
+| **Back-merges into `4.x`** | **not owed**; let it drift |
+
+⚠ **§1's "Active" list and §3's propagation rule below describe the model for when a release exists
+and has users.** They are not wrong as policy — they are simply **not yet in force**, because the
+precondition (a shipped major with people running it) is not met. Apply §3 from the day `4.x` is cut
+and starts receiving fixes; until then a `fix:` lands on `master` like everything else.
+
+⚠ **Do not "fix" this by deleting §1/§3.** The machinery becomes correct the moment a release exists,
+and rewriting it now would mean re-deriving it later.
+
+⚠ `.githooks/pre-push` still prints the §3 reminder on every push. It **prints and allows** — it does
+not block — and has been left that way deliberately rather than silenced, so the rule stays visible for
+when it applies. Treat its output as a prompt to state the propagation set (today: empty), not as an
+instruction to go find an older branch.
+
+*(History: this was briefly run as "`4.x` is kept a byte-identical mirror of `master`" earlier the same
+day, producing the back-merges `bb6e6618`…`b6d658ca`. Those are harmless and stay; the mirroring rule
+does not. The stable fact is the first line of this section — nothing is in production after 3.x.)*
+
+---
+
 ## 0. The two axes (do not confuse them)
 
 | Axis | Mechanism | Example |
@@ -24,9 +55,11 @@ modules get assembled* from the same commit. See the editions plan for the assem
 
 ### Active (supported — may receive commits)
 - **`master`** — the mainline / newest supported line. All new features land here; it is the forward
-  end of every merge chain. HEAD of the current development version.
+  end of every merge chain. HEAD of the current development version. ⚠ **Today it is the *only* line
+  worked on — see §0-A.**
 - **`<N>.x`** — the maintenance branch for the **current** major (today: **`4.x`**). Receives `fix:`
-  backports for the shipped major; tagged `vN.y.z` on release.
+  backports for the shipped major; tagged `vN.y.z` on release. ⚠ **Not yet in that role** — `4.x` has
+  no production users, so it receives nothing today (§0-A).
 
 ### Retired (FROZEN — end-of-life, NO commits/pushes/tags, NEVER a propagation target)
 - **`1.x`, `2.x`, `3.x`** — read-only history only. The release guard hard-blocks any
@@ -60,6 +93,10 @@ Scope is encouraged (`fix(etl):`, `feat(ui):`, `fix(security):`).
 
 > **A fix is made on the OLDEST still-supported branch it affects, then merged forward up the chain to
 > `master`.** A fix can never silently regress in a newer line.
+
+⚠ **Not in force yet — see §0-A.** With nothing in production after `3.x` there is no older *supported*
+branch, so "the oldest affected branch" resolves to `master` for every change and the merge-forward set
+is empty. The rule below applies from the day `4.x` is cut and has users.
 
 ```
         fix lands here
