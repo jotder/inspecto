@@ -130,15 +130,45 @@ representations:
 | `join` | `processing.join` | `Join` record | ❌ `prepare()` refuses when `active` |
 | `route` | top-level `route:` | ⚠ raw `Map<String,Object>`, untyped passthrough | ❌ `prepare()` refuses when `active` |
 
+⚠ **`dedup` in that table means the *distinct* dedup, and there are two dedups** (operator correction,
+2026-08-11). **File dedup** (content-fingerprint) was **folded into the Acquisition/Collect node**
+2026-08-04 (`PipelineEditable.java:74`) — it is a property of the collector, not a step in the chain, so
+it is singular by construction and **plural does not apply to it**. **Distinct dedup** is
+`transform.dedup` → `processing.dedup`, a `QUALIFY ROW_NUMBER() OVER (PARTITION BY keys ORDER BY
+order_by)`, and ⚠ **it is per-Consignment only as of now** (`applyRecordDedup` runs over the batch write
+table, not the store). Both are what Part A's plural is about; only the second is a chain step.
+
 Two consequences the plan was written without:
 
-1. ⚠ **A5's real scope is `dedup` and `filter` — two kinds, not five.** The other three have nothing to
-   honour because they do not run at all; `PipelineConfig.prepare()` refuses an `active` pipeline
-   carrying any of them. Their plural form is authoring-only *on top of* an authoring-only feature.
+1. ⚠ **Three of the five have no flat-path executor** (not "A5 is smaller" — see finding 5, the scope
+   does not shrink, it moves). `PipelineConfig.prepare()` refuses an `active` pipeline carrying
+   `summarize`, `join` or `route`, so on **path A** their plural form would be authoring-only stacked on
+   authoring-only. Path B is a different story entirely.
 2. ⚠ **`filter` has no plural home.** It is not a block that could become a list — it is one String
    inside the parse-settings block. Making it plural means either `where:` becomes a list of predicates
    (cheap, but AND is commutative so it can never be *positioned* relative to a dedup) **or** filters get
    lifted into a block of their own — which is a new key, i.e. the very thing option (a) exists to avoid.
+
+### Finding 5 — ⚠ CORRECTION: option (b)'s executor already exists and already runs
+
+An earlier draft of this plan (and the 2026-08-11 write-up) said (b)'s A5 "is the branch-aware executor,
+already tracked and already blocked". **That was wrong.** The blocked item is Phase 4 S4 / Phase 6's
+*unscoped output parity* (BACKLOG §4), which is not the same thing as walking a chain. Checked directly,
+`RowShaper.shape()` (`pipeline/exec/RowShaper.java:64-76`) dispatches:
+
+| Node kind | Path A (flat) | Path B (`PipelineExecutor` + `RowShaper`) |
+|---|---|---|
+| `transform.filter` | ✅ one `csv_settings.where` | ✅ `filter` |
+| `transform.dedup` (distinct) | ✅ one `processing.dedup` | ✅ `dedup` — ⚠ via `type.startsWith("transform.dedup")`, so it covers **both** dedup kinds, and it additionally emits a `duplicate` relation path A discards |
+| `transform.route` | ❌ `prepare()` refuses | ✅ `route` |
+| `transform.split` / `validate` | ❌ not lowerable | ✅ `split` / `validate` |
+| `transform.map` / `select` / `derive` | partial | ✅ `project` |
+| `transform.summarize` / `join` | ❌ `prepare()` refuses | ❌ `shape()` throws — the one real gap |
+
+So the walker that executes an arbitrary ordered chain **exists, is wired (`PipelineJobRunner`), and is
+strictly more capable than the flat path** — it already runs N transforms of a kind in any order, because
+that falls out of Kahn-sorting and keying outputs by `nodeId`. `summarize` and `join` are the only kinds
+missing, and they are missing from *both* paths, tracked separately.
 
 ### Finding 4 — ⚠ the `sinks:` precedent option (a) mirrors never got its own A5
 
@@ -196,41 +226,70 @@ steps:
 | **A2** | One `List<Step>` (`kind` + config). ⚠ **The subtle part is back-compat:** the legacy singular keys must still parse *and* project into the step list at the position `PipelineLift`'s hard-coded chain implies — that projection is the bridge, and it is where a round-trip can silently reorder someone's pipeline. |
 | **A3** | `lower()` emits `steps:` only when the chain is not expressible in the legacy singular keys; otherwise verbatim legacy. Same refusal deletions as (a). |
 | **A4** | Mock mirrors A3, same commit. |
-| **A5** | ⚠ **This is the whole decision.** Honouring an arbitrary order means the flat path walks a step list — which is *precisely what `PipelineExecutor` already does* on the graph-native path. Teaching path A to walk is re-implementing path B. The real A5 is therefore **route these pipelines to path B**, not extend path A. |
+| **A5** | ⚠ **This is the whole decision.** Honouring an arbitrary order means walking a step list — which is *precisely what `PipelineExecutor` already does* (finding 5). Teaching path A to walk is re-implementing path B. So A5 is **route a `steps:` pipeline to path B**, not extend path A. |
 | **A6** | Wiring validation (unchanged by the choice). |
 
-**Ceiling:** none on expressiveness. The cost is that A5 is not a slice of this plan at all — it is the
-branch-aware executor, already tracked and already blocked.
+**Ceiling:** none on expressiveness. A5 is not "extend the flat executor" — it is a routing decision onto
+an executor that already exists and is already wired.
 
 ### ⇒ What the choice actually is
 
 **Not a file-format preference.** It is: *does the flat linear executor keep existing as the thing that
 runs pipelines?*
 
-- **(a) says yes.** Keep path A's fixed stage chain; allow repetition *within* a stage. Fully shippable
-  now, A5 included, for the two kinds that execute. Buys: two dedups, two filters, actually running.
-  Gives up interleaving for good.
-- **(b) says no.** The flat file becomes a serialisation of the real graph, and running it means path B.
-  Buys: everything the canvas can draw. Costs: A5 is blocked on work that is already blocked, so A2–A4
-  would ship as authoring-only — the same posture `sinks:` has been in since it shipped (finding 4).
+- **(a) says yes.** Keep path A's fixed stage chain; allow repetition *within* a stage. Ships now, A5
+  included, for the kinds path A executes. Gives up interleaving for good.
+- **(b) says no.** The flat file becomes a serialisation of the real graph; running it means path B —
+  which already runs, already handles every kind path A does **plus** route, split and validate, and
+  already executes N transforms of a kind in any order.
 
-⚠ **A defensible third answer is "(a) now, (b) when path B lands."** They are not exclusive: (a)'s plural
-lists are a strict subset of (b)'s step list, and a `steps:` reader could absorb them later. The cost of
-sequencing it that way is one format migration instead of none — and the honest version of (a) says so up
-front rather than presenting per-kind lists as the destination.
+## DECISION — (b), the ordered `steps:` sequence
+
+**Recommended and taken 2026-08-11**, operator having delegated the call and directed that scope not be
+lowered. The deciding facts, in order of weight:
+
+1. ⚠ **Finding 5 removes (b)'s only real cost.** The argument for (a) was "(b)'s A5 is blocked". It is
+   not — that was my error, corrected above. The walker exists, is wired, and is *more* capable than the
+   flat path. (b) does not need new execution machinery; it needs the file to stop lying about what the
+   graph is.
+2. **(a) does not actually avoid a new key** (finding 3.2). `filter` has no plural home without one, and
+   filter is the kind most likely to be authored twice. So (a)'s headline advantage is largely illusory,
+   while its ceiling is permanent.
+3. **(a)'s ceiling bites the case the operator named.** Distinct dedup is per-Consignment and key-set
+   specific; chaining two with a transform between them is a *normal* shape, not an exotic one. Under
+   (a) the flat file can never express it, however the lists are keyed.
+4. **(a) is throwaway.** Its per-kind lists are a strict subset of (b)'s step list, so choosing (a) buys
+   a shipping date and pays for it with a second format migration plus a mental model ("per-kind stages")
+   that the migration then breaks.
+5. **The premise of this plan is only delivered by (b).** "Constrained by whether a Step accepts its
+   neighbours, not by how many exist" is (b). Under (a) the count limit becomes a sequence limit, which
+   is the same restriction wearing a different hat.
+
+⚠ **What (b) does NOT solve, and must not be claimed to:** `summarize` and `join` still execute nowhere
+(`RowShaper.shape()` throws for both). (b) makes them *representable in order*; it does not make them
+run. That is the separate `RowShaper` work already tracked in BACKLOG.
+
+⚠ **The risky slice is A2, not A5.** Legacy singular keys must keep parsing *and* project into the step
+list at the position `PipelineLift`'s hard-coded chain implies. Get that projection wrong and an existing
+pipeline silently reorders on its next save — the exact failure this plan exists to prevent, introduced
+by the fix for it. Property-test the projection before writing the reader.
 
 ---
 
 ### Slices (option-independent parts)
 
-**A1 — decide and pin the plural shape.** ✅ **Property tests pinned and proven red 2026-08-11**; findings
-1–4 are the grounding. ⏳ **The (a)/(b) decision is OPEN and needs the operator.** `filter` is in scope
-alongside `dedup`, `route`, `summarize`, `join`.
+**A1 — decide and pin the plural shape.** ✅ **DONE 2026-08-11.** Property tests pinned and proven red;
+findings 1–5 are the grounding; **decision taken: option (b)**. Scope is all five kinds — `filter`,
+`dedup` (distinct), `route`, `summarize`, `join` — deliberately **not** reduced to the two that execute
+today. ⚠ `twoOfEachKindSurviveTheRoundTripInAuthoredOrder` stays exactly as written: under (b) it is
+reachable, so it is the acceptance test for A2/A3 rather than a record of something given up.
 
-**A2–A5 — see the per-option tables above.** ⛔ Do not start A2 before the choice: the two produce
-different `PipelineConfig` surfaces, and `twoOfEachKindSurviveTheRoundTripInAuthoredOrder` asserts the
-interleaved order deliberately, so it **cannot go green under (a)** — amending it is the record of the
-capability being given up.
+**A2 — `PipelineConfig` reads `steps:`.** One `List<Step>` (`kind` + config). ⚠ **The dangerous half is
+back-compat, not the new reader**: legacy `processing.dedup` / `route:` / `csv_settings.where` must keep
+parsing *and* project into the step list at the position `PipelineLift`'s hard-coded chain implies.
+→ verify: a property test over the projection **first** — every existing fixture lowers to the same
+`steps:` order the current lift produces — then the new reader. Every existing `*_pipeline.toon` must
+keep parsing byte-identically.
 
 **A4 — the mock moves in the same commit as A3** under either option.
 `inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts` must stop refusing exactly when the server does.
@@ -238,10 +297,19 @@ capability being given up.
 refuses what the backend now accepts is the same class of bug, pointing the other way. → verify:
 `pipeline-editable.spec.ts` green with the refusal specs rewritten as round-trip specs.
 
-**A5 — ⚠ the slice that can silently do nothing**, under either option. A config that saves, loads and
-runs only the first block is the same bug this plan exists to remove, relocated one layer down. → verify:
-an end-to-end test with two **filters** proves both applied (assert row counts, never "it ran") — filters,
-because with `dedup` they are the only two kinds that execute at all (finding 3).
+**A3 — `lower()` emits `steps:` and the refusals go.** Emit `steps:` only when the chain is not
+expressible in the legacy singular keys, so an unchanged pipeline round-trips verbatim. Delete
+`MULTI_DEDUP`/`MULTI_ROUTE`/`MULTI_SUMMARIZE` **in this slice**. ⚠ Also stop merging filters into one
+`csv_settings` map (finding 1) — that is a silent loss with no code to delete, so it is the easy one to
+leave behind. → verify: the A1 property tests pass with `@Disabled` **removed**.
+
+**A5 — ⚠ the slice that can silently do nothing.** A config that saves, loads and runs only the first
+block is this plan's own bug, relocated one layer down. Under (b) A5 is a **routing** decision: a
+`steps:` pipeline runs on path B (finding 5), which already walks it. → verify: an end-to-end test with
+two **filters** and two **distinct dedups** proves each applied, by row count — never "it ran". ⚠ Do not
+mark A5 done while `summarize`/`join` still throw in `RowShaper`; they are representable after A3 and
+executable only after that separate work, and a `steps:` file carrying one must refuse to arm, exactly as
+`prepare()` does today.
 
 **A6 — wiring validation becomes the real constraint.** Extend `PipelineValidator.checkWiring` so an
 invalid neighbour pairing refuses with a named code, which is what should have been rejecting bad graphs
