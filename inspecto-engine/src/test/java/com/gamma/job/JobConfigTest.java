@@ -46,6 +46,20 @@ class JobConfigTest {
     }
 
     @Test
+    void onPipelinesSplitsACommaListAndKeepsTheScalarWhole() {
+        var one = new JobConfig("j", JobType.MAINTENANCE, null, "EVENTS", true, false, java.util.Map.of());
+        assertEquals(java.util.List.of("EVENTS"), one.onPipelines());
+
+        var many = new JobConfig("j", JobType.MAINTENANCE, null, " a_etl , b_etl ,, c_etl ", true, false,
+                java.util.Map.of());
+        assertEquals(java.util.List.of("a_etl", "b_etl", "c_etl"), many.onPipelines(),
+                "trimmed, blanks dropped");
+
+        var none = new JobConfig("j", JobType.MAINTENANCE, null, null, true, false, java.util.Map.of());
+        assertEquals(java.util.List.of(), none.onPipelines());
+    }
+
+    @Test
     void enabledFalseIsHonoured(@TempDir Path dir) throws Exception {
         Path p = write(dir, "off_job.toon", """
                 job:

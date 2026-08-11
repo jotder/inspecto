@@ -624,6 +624,53 @@ class JobServiceTest {
     }
 
     @Test
+    void aCommaListOnPipelineFiresOnAnyUpstreamByDefault(@TempDir Path dir) throws Exception {
+        // multiplicity Part B residual (a): several upstreams, default gate = any → each commit fires.
+        JobConfig j = maintenance("merger", null, "a_etl, b_etl", Map.of("task", "heartbeat"));
+        BatchEventBus bus = new BatchEventBus();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(j), bus, s, null,
+                     dir.resolve("audit").toString(), null, null, null)) {
+            js.start();
+            bus.publish(new BatchEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
+            JobRun first = await(() -> js.lastRunOf("merger").orElse(null));
+            assertTrue(first.trigger().startsWith("event:a_etl"), first.trigger());
+            bus.publish(new BatchEvent("b_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));
+            JobRun second = await(() -> js.runsFor("merger").stream()
+                    .filter(r -> r.trigger().startsWith("event:b_etl")).findFirst().orElse(null));
+            assertEquals("SUCCESS", second.status());
+        }
+    }
+
+    @Test
+    void anAllGateWaitsForEveryUpstreamThenReArms(@TempDir Path dir) throws Exception {
+        // on_pipeline_gate=all: no run until every named upstream has committed; then the gate re-arms,
+        // so the next cycle needs the full roster again.
+        JobConfig j = maintenance("merger", null, "a_etl, b_etl",
+                Map.of("task", "heartbeat", "on_pipeline_gate", "all"));
+        BatchEventBus bus = new BatchEventBus();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(j), bus, s, null,
+                     dir.resolve("audit").toString(), null, null, null)) {
+            js.start();
+            bus.publish(new BatchEvent("a_etl", "b1", "SUCCESS", List.of(), 1L, 1L, 0));
+            bus.publish(new BatchEvent("a_etl", "b2", "SUCCESS", List.of(), 1L, 1L, 0));   // same source again
+            Thread.sleep(300);
+            assertTrue(js.lastRunOf("merger").isEmpty(), "half the roster must not fire the job");
+            bus.publish(new BatchEvent("b_etl", "b3", "SUCCESS", List.of(), 1L, 1L, 0));
+            JobRun run = await(() -> js.lastRunOf("merger").orElse(null));
+            assertEquals("SUCCESS", run.status(), run.message());
+            assertTrue(run.trigger().startsWith("event:b_etl"), "the completing commit fires it: " + run.trigger());
+
+            // re-armed: one more a_etl alone must not fire a second run
+            bus.publish(new BatchEvent("a_etl", "b4", "SUCCESS", List.of(), 1L, 1L, 0));
+            Thread.sleep(300);
+            assertEquals(1, js.runsFor("merger").stream()
+                    .filter(r -> r.trigger().startsWith("event:")).count(), "gate re-arms after firing");
+        }
+    }
+
+    @Test
     void aFlowJobSuccessChainsADownstreamJob(@TempDir Path dir) throws Exception {
         // chaining OUT of a flow: PipelineJobRunner publishes a BatchEvent(jobName) on success, so a
         // downstream on_pipeline job fires — the flow job is a first-class upstream in the event graph.

@@ -20,6 +20,7 @@ import java.util.Map;
  *   type: enrich                 # enrich | report | maintenance (ingest is pipeline-only, §3.8)
  *   cron: "0 2 * * *"            # optional — calendar schedule (5 or 6 cron fields)
  *   on_pipeline: UPSTREAM        # optional — also run when this pipeline commits a batch
+ *                                #   (comma-separated for several: "a, b"; see on_pipeline_gate)
  *   enabled: true                # optional — default true
  *   catch_up: false              # optional — on startup, run once if a cron fire was missed (T26)
  *   config: config/events_enrich.toon     # type-specific params follow…
@@ -33,7 +34,11 @@ import java.util.Map;
  * @param name       unique job name
  * @param type       the kind of work
  * @param cron       cron expression, or {@code null}/blank for no schedule
- * @param onPipeline upstream pipeline/job name whose batch-commit triggers this job, or {@code null}
+ * @param onPipeline upstream pipeline/job name(s) whose batch-commit triggers this job, or {@code null};
+ *                   comma-separated for several upstreams (split by {@link #onPipelines()}). With
+ *                   several, the {@code on_pipeline_gate} param picks the semantics: {@code any}
+ *                   (default — each upstream commit fires a run) or {@code all} (one run once every
+ *                   named upstream has committed since the last firing; the gate then re-arms)
  * @param enabled    whether the scheduler should arm this job
  * @param catchUp    whether to run once on startup when a scheduled fire was missed while down (T26)
  * @param params     type-specific parameters (all values as strings)
@@ -88,6 +93,17 @@ public record JobConfig(String name, String type, String cron, String onPipeline
 
     public boolean hasCron()   { return cron != null && !cron.isBlank(); }
     public boolean hasEvent()  { return onPipeline != null && !onPipeline.isBlank(); }
+
+    /**
+     * The upstream name(s) in {@code on_pipeline} — one, or several comma-separated. Empty when
+     * {@link #hasEvent()} is false. Matching against {@code BatchEvent.pipeline()} stays the caller's
+     * concern, exactly as with the scalar accessor.
+     */
+    public java.util.List<String> onPipelines() {
+        if (!hasEvent()) return java.util.List.of();
+        return java.util.Arrays.stream(onPipeline.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty()).toList();
+    }
     public boolean hasSignal() { return onSignal != null && !onSignal.isBlank(); }
     public boolean hasWhen()   { return when != null && !when.isBlank(); }
     public boolean hasBind()   { return !bind.isEmpty(); }

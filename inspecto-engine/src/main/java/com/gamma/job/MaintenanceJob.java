@@ -615,10 +615,12 @@ final class MaintenanceJob implements Job {
             for (JobConfig c : all) jobNames.add(c.name().toLowerCase());
             for (JobConfig c : all) {
                 if (!c.enabled() || !c.hasEvent()) continue;
-                String target = c.onPipeline().toLowerCase();   // BatchEvent.pipeline() is lowercased
-                if (!pipelines.contains(target) && !jobNames.contains(target))
-                    findings.add("orphan trigger: job '" + c.name() + "' waits on unknown pipeline '"
-                            + c.onPipeline() + "'");
+                for (String up : c.onPipelines()) {             // on_pipeline may be a comma list
+                    String target = up.toLowerCase();           // BatchEvent.pipeline() is lowercased
+                    if (!pipelines.contains(target) && !jobNames.contains(target))
+                        findings.add("orphan trigger: job '" + c.name() + "' waits on unknown pipeline '"
+                                + up + "'");
+                }
             }
         }
         Set<String> emitted = new LinkedHashSet<>(List.of("job.run.started", "job.run.completed",

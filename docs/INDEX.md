@@ -52,7 +52,7 @@ former root reference docs** (each index lists them):
     API-stability policy, queries, jobs + Job Framework, the Job-vs-Step capability boundary,
     Platform Services & the plugin envelope, metadata
     bundle, multi-space), pipeline-graph
-    (incl. the full design doc), components, config (incl. the configuration + parsing-options
+    (incl. the full design doc + the multi-location-ingest pattern, new 2026-08-11), components, config (incl. the configuration + parsing-options
     references), editions & security, agent, modules (incl. the Maven reactor & module-extraction
     playbook, new 2026-07-21), build-run (incl. operations reference, troubleshooting,
     performance), gotchas, integrations, architecture layers.

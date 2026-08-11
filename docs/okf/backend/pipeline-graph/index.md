@@ -8,4 +8,5 @@ executor — layered on top of the [engine](../engine). Authored Pipelines run a
 
 * [Design](design.md) - the `PipelineGraph` IR, `PipelineLift`, `PipelineValidator`, `PipelineExecutor`, and the node-type registry.
 * [Live execution](live-execution.md) - running an authored Pipeline end-to-end (`PipelineJobRunner`, `source_store` seeds, conservation checks).
+* [Multi-location ingest](multi-location-ingest.md) - the composition pattern (N collector pipelines → one merge flow job + the `on_pipeline` all-gate); `collector()` stays singular permanently.
 * [Pipeline graph design (full design)](pipeline-graph-design.md) - the authoritative deep design incl. §14 backlog (moved from `docs/flow-graph-design.md`).

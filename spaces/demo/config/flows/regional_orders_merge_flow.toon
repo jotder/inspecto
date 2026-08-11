@@ -1,0 +1,23 @@
+name: regional_orders_merge_flow
+active: true
+nodes[4]:
+  - id: src_east
+    type: acquisition
+    config:
+      source_store: orders_east
+  - id: src_west
+    type: acquisition
+    config:
+      source_store: orders_west
+  - id: m
+    type: transform.merge
+    config:
+      type: union
+  - id: out
+    type: sink.persistent
+    config:
+      store: orders_all
+edges[3]{from,rel,to}:
+  src_east,data,m
+  src_west,data,m
+  m,data,out

@@ -227,6 +227,39 @@ the blocked item itself.
 gap is a missing capability that fails closed, not a silent no-op. `steps:` is authoring-only — exactly the
 posture `sinks:` has had since it shipped (finding 4), which is the precedent this plan chose to follow.
 
+### A5 RE-SCOPED (operator decision 2026-08-11): at-rest routing, not ingest wiring
+
+The operator chose **re-scope now** over waiting for the branch-aware executor. The re-scope drops the
+blocked half entirely: ⛔ the ingest path stays untouched (`BatchGraphRunner` keeps zero callers; the
+unscoped-output-parity blocker is not engaged). Instead:
+
+> **A5-at-rest:** Stage 1 (EL) lands the store exactly as today, executing none of the Stage-2 keys.
+> The `steps:` chain / `processing.dedup|summarize|join` / `route:` run as a **flow job over the landed
+> store**, through the existing production route (`PipelineJobRunner`, at-rest by design). This is also
+> where the operator's "keep dedup out of the EL" boundary points: Stage-2 kinds *belong* post-landing.
+
+Slices (build order):
+
+1. **Stage-2 lift.** Project a flat config's Stage-2 remainder into a runnable graph:
+   `source_store: <the pipeline's landed store>` seed → the ordered chain (`PipelineLift` already lifts
+   `steps:`, A3) → a sink. ⚠ Open call: the output store's name (authored key vs derived suffix) —
+   surface, don't invent. ⚠ Honour the A5 caveat above: a chain carrying **pre-parse filter keys**
+   (include/exclude lists fused into `csv_settings`) must refuse this route — those already ran in
+   Stage 1.
+2. **Graph source.** The `pipeline` job type reads its graph only from `PipelineStore` (`:164-167`).
+   Add a `pipeline_config: <name>` job key that loads + lifts the flat config at run time —
+   single-truth, no derived graph persisted to the authored-flow store.
+3. **Trigger.** Nothing new: `on_pipeline: <the flat pipeline>` chains the shaping job off each ingest
+   commit (and the new `on_pipeline_gate: all` covers multi-upstream shapes).
+4. **Gates.** The `prepare()` refusals STAY (the ingest path still cannot execute these keys); their
+   messages point at this route once it exists.
+5. **Join's production resolver** lands here: `PipelineJobRunner` builds a
+   `RowShaper.ReferenceResolver` from its loaded-pipelines context (adapt
+   `EnrichmentEngine.referenceReader`'s path/by-name resolution), closing the Part-B/join remainder.
+
+**Not in scope:** `route:` demux into *ingest-side* branches (that genuinely is the branch-aware
+executor); multi-sink arming (`sinks:` stays authoring-only, finding 4).
+
 ### Finding 4 — ⚠ the `sinks:` precedent option (a) mirrors never got its own A5
 
 `sinks:` is the template this plan tells you to follow. It is **authoring-only**: `resolveSinks`
@@ -514,6 +547,49 @@ each with its own single-arity ledger and output. It sidesteps merging rather th
 
 ⛔ **Do not start Part B by turning `collector()` into a list.** That is the last step, not the first: the
 answers above determine whether the list is even the right shape.
+
+### Grounded answers (2026-08-11) — the composition wins; the list is refuted
+
+Question 4 was decisive, so it was grounded first: **the existing machinery already composes to
+multi-location ingest with zero acquisition-engine change**, and it answers questions 1–3 by
+construction. The composition:
+
+> N independent single-collector pipelines (`MultiCollectorProcessor` — vthread-per-source, semaphore
+> bounded, no shared state beyond the executor and the `onCommit` callback,
+> `inspector/MultiCollectorProcessor.java:53-263`) → N landed stores → **one flow job**
+> (`PipelineJobRunner.seedsOf` registers one DuckDB view per `source_store` node — T32 Phase C,
+> production and schedulable via `JobService`, `job/PipelineJobRunner.java:179-203,369-386`) →
+> `transform.merge` (union/inner/left, `RowShaper.merge`) → sink.
+
+1. **Identity — SOLVED by construction.** Each location keeps its own collector id, so every
+   single-arity keyed subsystem (ledger, `GapTracker`, `StabilityGate`, `CircuitBreaker`, watermark)
+   is untouched. No sub-identities, no ledger migration.
+2. **Merge semantics — one batch per source.** Stage-1 batches stay per-source and independent; the
+   merge is Stage-2, in the flow job. The watermark question dissolves: `PipelineWatermarkStore` is
+   already keyed `(pipelineId, store)`, so incremental mode advances per source
+   (`PipelineJobRunner.java:180-203`). A late/down source simply contributes its rows on a later run.
+3. **Failure isolation — free.** One bad source trips *its* circuit breaker and stops *its* pipeline;
+   the others land normally. Per-source signals (gap events, incidents) already exist at collector
+   grain. The "silently proceeds on 3 of 4" concern is real but is an **alerting** concern — a
+   freshness Expectation/Alert Rule per landed store — not an engine one.
+4. **Does it beat the existing model? No — inverted: the existing model beats the design.** A
+   `collector()` list would re-key five durable stateful subsystems (a migration) to reach semantics
+   the composition already has.
+
+**The one real gap is coordination, and it is small and scoped:** `JobConfig.on_pipeline` is a single
+scalar (`JobConfig.java:90,133`), matched with `.equals` in `JobService.onBatchEvent`
+(`JobService.java:584-592`), so a flow job can be event-triggered off exactly **one** upstream commit.
+`TriggerCoalescer` coalesces one job's event storm, not an upstream *set*. For N upstreams, **cron is
+the only correct trigger today**. If event-driven merge is wanted: list-valued `on_pipeline` + an
+any/all gate in `onBatchEvent` — a job-system slice, not an acquisition change.
+
+**DECIDED by the operator 2026-08-11:**
+- ✅ The composition is *the* multi-location pattern; ⛔ `collector()` stays singular **permanently**.
+- ✅ All three residuals are scheduled: (a) the list-valued `on_pipeline` any/all trigger gate;
+  (b) an N-source demo flow (⚠ the grounding claim "no test exists" was WRONG —
+  `PipelineJobRunnerTest.unionsTwoSourceStores` already pins multi-seed + merge, so only the demo
+  config was missing); (c) an OKF write-up of the pattern.
+- ✅ **A5 is to be RE-SCOPED now** (same decision session), not left parked — see the A5 re-scope note.
 
 ---
 

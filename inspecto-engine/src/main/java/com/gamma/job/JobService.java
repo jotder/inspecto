@@ -165,6 +165,9 @@ public final class JobService implements AutoCloseable {
     private volatile com.gamma.ops.ObjectService objects;
     /** One coalescer per on-signal Job, so a burst of matching signals folds into one follow-up Run (§8.4). */
     private final Map<String, TriggerCoalescer> signalCoalescers = new ConcurrentHashMap<>();
+
+    /** Per-job upstream commits seen since the job's last {@code on_pipeline_gate=all} firing. */
+    private final Map<String, Set<String>> pendingUpstreams = new ConcurrentHashMap<>();
     /** Loop cut: a signal-triggered Run beyond this chain depth does not fire (§8.4) — {@code -Djobs.signal.maxChainDepth}. */
     private final int maxChainDepth = Integer.getInteger("jobs.signal.maxChainDepth", 8);
     /** The ledger subscriber this service installed, kept so {@link #close()} can remove it — the default
@@ -585,8 +588,20 @@ public final class JobService implements AutoCloseable {
         if (!"SUCCESS".equals(event.status())) return;
         for (JobConfig c : configs) {
             if (!c.enabled() || !c.hasEvent()) continue;
-            if (!c.onPipeline().equals(event.pipeline())) continue;
+            List<String> upstreams = c.onPipelines();
+            if (!upstreams.contains(event.pipeline())) continue;
             if (c.name().equals(event.pipeline())) continue;   // self-loop guard
+            // on_pipeline_gate=all (N-source merge, multiplicity Part B): fire once every named
+            // upstream has committed since the last firing, then re-arm. The pending set is
+            // in-memory — a restart forgets partial progress, so the gate waits for a full cycle
+            // again (a late run, never a wrong one). Default any = each commit fires, as before.
+            if (upstreams.size() > 1 && "all".equalsIgnoreCase(c.opt("on_pipeline_gate", "any"))) {
+                Set<String> seen = pendingUpstreams.computeIfAbsent(c.name(),
+                        k -> ConcurrentHashMap.newKeySet());
+                seen.add(event.pipeline());
+                if (!seen.containsAll(upstreams)) continue;
+                pendingUpstreams.remove(c.name());
+            }
             submit(c.name(), "event:" + event.pipeline());
         }
     }
