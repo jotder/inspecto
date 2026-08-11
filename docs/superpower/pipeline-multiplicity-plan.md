@@ -193,6 +193,37 @@ and `PipelineStepsFileRoundTripTest` (in `inspecto`, the only module that can se
 ⚠ **The lesson generalises past this plan:** a config-format slice is not verified by a `fromMap` test.
 `sinks:` still has no file-level test.
 
+### Finding 7 — ⚠ A5 is BLOCKED: "already wired" was true of the executor, not of any route to it
+
+Grounded 2026-08-11 after A3 shipped. **Finding 5 is half right, and the wrong half is the half A5 was
+sized on.** Its load-bearing claim — `RowShaper` dispatches filter/dedup/route/split/validate/project,
+and `PipelineExecutor` Kahn-sorts keying outputs by `nodeId`, so it *already* runs N transforms of a kind
+in any order — **is confirmed and still justifies choosing (b)** over per-kind lists. What does not hold
+is the inference drawn from it, that A5 is therefore "a routing decision onto an executor that already
+exists and is already wired":
+
+- `PipelineExecutor.execute` has **one** production caller, `PipelineJobRunner`
+  (`job/PipelineJobRunner.java:230`), and it is **at-rest only**: `seedsOf` requires every node to declare
+  a `source_store` and throws `"declares no 'source_store' — a flow job reads data at rest (§3.8)"`
+  (`:370-386`). Its own doc says *"ingest is pipeline-exclusive… a flow job has no acquisition to
+  finalise"* (`:53-66`).
+- ⚠ **It does not read the flat file at all.** It loads its graph from `PipelineStore`, the authored-flow
+  store under `<write-root>/flows` (`:166`) — not from a lifted `PipelineConfig`. So a `steps:` block in a
+  `*_pipeline.toon` cannot reach it even for an at-rest pipeline.
+- The ingest-side seam that *would* carry it, `pipeline/exec/BatchGraphRunner.java`, exists and is
+  explicitly "the seam the plan draws now so the driver can change later" — with **zero production
+  callers**. `BatchProcessor` only mentions it in a comment (`inspector/BatchProcessor.java:96-104`) and
+  still calls the flat `finalizeSource`/`commit` path.
+
+⇒ **Routing a `steps:` pipeline to path B means wiring `BatchGraphRunner` into the ingest path**, which is
+the branch-aware-executor work tracked in BACKLOG §4 / ELT amendment Phase 4 S4 + Phase 6 and **blocked on
+unscoped output parity**. ⛔ Do not discharge A5 by "just wiring `engages()`" — that is the named trap on
+the blocked item itself.
+
+⚠ **This does not undo A3.** The `prepare()` guard added there refuses to arm an explicit chain, so the
+gap is a missing capability that fails closed, not a silent no-op. `steps:` is authoring-only — exactly the
+posture `sinks:` has had since it shipped (finding 4), which is the precedent this plan chose to follow.
+
 ### Finding 4 — ⚠ the `sinks:` precedent option (a) mirrors never got its own A5
 
 `sinks:` is the template this plan tells you to follow. It is **authoring-only**: `resolveSinks`
@@ -390,6 +421,13 @@ mapping. A walked chain emits every step after map. For a `where` that is arguab
 pre-parse lists it is wrong. Nothing executes today (arming is refused), so it is a representation
 question, not a live bug — but **A5 must not route a chain carrying pre-parse filter keys** without
 splitting them back out.
+
+**A5 — ⛔ BLOCKED (grounded 2026-08-11, finding 7).** Not started, and deliberately not faked. There is no
+production route from a flat `steps:` file to `PipelineExecutor`: its only caller is at-rest, reads its
+graph from `PipelineStore` rather than the flat file, and the ingest-side seam (`BatchGraphRunner`) has no
+production caller and is itself blocked on unscoped output parity. A3's `prepare()` guard means the gap
+fails closed rather than silently. **Needs an operator decision** — wait for the branch-aware executor,
+or re-scope A5. Original slice text follows.
 
 **A5 — ⚠ the slice that can silently do nothing.** A config that saves, loads and runs only the first
 block is this plan's own bug, relocated one layer down. Under (b) A5 is a **routing** decision: a
