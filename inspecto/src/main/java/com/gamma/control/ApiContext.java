@@ -42,7 +42,8 @@ interface ApiContext {
     // switch. Where it resolves to the HttpContext's map, every attribute below is shared by every
     // request the server ever handles — ControlApi serves everything from one createContext("/") — and a
     // value stamped by one request is readable by the next. Anything that must not leak across requests
-    // therefore has to be either derived from the request itself (see #v1) or cleared at dispatch.
+    // therefore has to be either derived from the request itself (see #v1) or cleared at dispatch —
+    // every constant below is on ControlApi.REQUEST_SCOPED_ATTRS, cleared as dispatch's first act.
     /** The request's correlation id (caller-supplied {@code Correlation-ID} header, or issued). */
     String ATTR_CORRELATION_ID = "inspecto.correlationId";
     /** {@code System.nanoTime()} at dispatch start (v1 {@code metadata.durationMs}). */

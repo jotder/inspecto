@@ -70,28 +70,27 @@ each row's detail stays in its own section.
    engineering task: five OAuth secrets, one of them a named-customer production credential, were public
    on GitHub for six weeks. The code is clean as of 2026-07-25 but **rotation at the issuer is
    outstanding** — history keeps the values, so deletion remediated nothing.
-0-b. 🔴 **SEC-EXCHANGE-ATTRS — the authenticated Subject can leak between requests on a shared-attribute
-   runtime. OPEN, found 2026-08-11, deliberately NOT fixed pending an operator call.** ControlApi keeps
-   every per-request value in `HttpExchange` attributes, and that map is private to the exchange only by
-   *default* — `sun.net.httpserver.ExchangeImpl` picks it at class-init:
-   `perExchangeAttributes = !System.getProperty("jdk.httpserver.attributes","").equals("context")`, else
-   `getHttpContext().getAttributes()`. ControlApi serves everything from a single `createContext("/")`, so
-   wherever that falls back — **any pre-26 runtime, or a current one started with
-   `-Djdk.httpserver.attributes=context`** — one map is shared by every request the server handles.
-   ⚠ **`ATTR_SUBJECT` is set only on success and never cleared** (`ControlApi.java:648`:
-   `if (subject.isPresent()) ex.setAttribute(...)`, `else if (required) throw 401`). So: request A
-   authenticates as alice → request B hits a public path (`required == false`, no 401, nothing stamped) →
-   every later `getAttribute(ATTR_SUBJECT)` in B returns **alice**, flowing into `requireCapability`,
-   `actorId()`, `ComponentAccess`, `RowScope` and `authorize()`. `ATTR_RAW_BODY` (the request body) and
-   the authz attributes ride the same map. **Corroboration that this is not theoretical:** `authorize()`
-   (`:667`) already hand-clears `ATTR_MATCHED_POLICY` — *"clear stale; the decider re-stamps"* — i.e.
-   staleness was hit on one attribute and patched locally instead of at the root.
-   **Minimal fix:** clear the request-scoped attributes at dispatch start (the move `authorize()` already
-   makes for one of them) — small, but it is authentication code and wants its own commit, its own test,
-   and an explicit decision. **Blast radius depends on the shipped runtime**, which was NOT determined:
-   only JDK 26 is installed on the dev box and no runtime is pinned in the build scripts. ⛔ Do not assume
-   latent — confirm the bundle's JVM and the property before downgrading it. Found while fixing the
-   narrower `ApiContext.v1` case (which IS fixed: it derives from the URI and cannot latch).
+0-b. ✅ **SEC-EXCHANGE-ATTRS — CLOSED 2026-08-11.** The authenticated Subject could leak between requests
+   on a shared-attribute runtime: `HttpExchange` attributes are per-exchange only by *default* —
+   `sun.net.httpserver.ExchangeImpl` picks the map at class-init
+   (`perExchangeAttributes = !System.getProperty("jdk.httpserver.attributes","").equals("context")`), and
+   wherever it falls back (**any pre-26 runtime, or a current one started with
+   `-Djdk.httpserver.attributes=context`**) ControlApi's single `createContext("/")` means one map shared
+   by every request. `ATTR_SUBJECT` was set only on success and never cleared, so request A's alice was
+   readable by request B's public-path request, flowing into `requireCapability`, `actor()` and
+   `authorize()`; `ATTR_RAW_BODY` rode the same map.
+   **Grounding that closed the "is it latent?" question:** the `-NoRuntime` bundle flavor explicitly
+   supports "target server must provide **Java 24+**" (`inspecto/package.ps1:40`, `:555`, `:702`) and
+   nothing anywhere sets the property — so the shared-map configuration is a *supported deployment*, not
+   a hypothetical, which is what warranted the fix without waiting further.
+   **Fix (2026-08-11):** `ControlApi.clearRequestScope` clears the full `REQUEST_SCOPED_ATTRS` roster
+   (all ten `ApiContext.ATTR_*` plus `Roles.ATTR_CONFIG_ROOT`, `AccessDecider.ATTR_MATCHED_POLICY` and
+   the effective-path) as dispatch's first act, in the outermost `correlation` stage — a shared-map
+   runtime now behaves like a private-map one; on a private-map runtime the map is empty and it's a no-op.
+   `ExchangeAttributeScopeTest` pins the leak scenario and enforces roster completeness by reflection
+   over `ApiContext`'s `ATTR_*` constants (a new constant missing from the roster is a red build, not a
+   leak). The in-request hand-clears in `authorize()`/`RowScope` stay — they guard staleness *between two
+   `decide()` calls of the same request*, which the dispatch-start clear does not cover.
 1. **Root enablers — DRAINED, now including MNT-14.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound,
    Incidents I1 resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
    2026-07-23/24; the last survivor **MNT-14 shipped 2026-07-27** as the `incident_purge` maintenance task

@@ -431,6 +431,28 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     }
     private static void setPath(HttpExchange ex, String path) { ex.setAttribute(ATTR_EFFECTIVE_PATH, path); }
 
+    /** SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): every request-scoped attribute any stage or route stamps on
+     *  the exchange. The attribute map is private to the exchange only by DEFAULT — see the note on
+     *  ApiContext's attribute block. Wherever it falls back to the shared {@code HttpContext} map (any
+     *  pre-JDK-26 runtime, or a current one started with {@code -Djdk.httpserver.attributes=context} —
+     *  and the -NoRuntime bundle explicitly supports "Java 24+"), one map is shared by every request this
+     *  server handles: request A authenticates, request B hits a public path (nothing stamped, no 401),
+     *  and B's {@code ATTR_SUBJECT} reads A's Subject — flowing into requireCapability, actor() and
+     *  authorize(). Clearing the roster at dispatch start makes a shared-map runtime behave like a
+     *  private-map one; on a private-map runtime the map is empty here and this is a no-op.
+     *  Completeness is enforced by {@code ExchangeAttributeScopeTest} against ApiContext's ATTR_* roster. */
+    static final String[] REQUEST_SCOPED_ATTRS = {
+            ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_START_NANOS, ApiContext.ATTR_SELF_PATH,
+            ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_STORE, ApiContext.ATTR_IDEMPOTENCY_KEY,
+            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_RESOURCE_PERMISSIONS,
+            ApiContext.ATTR_PAGINATION, ATTR_EFFECTIVE_PATH, Roles.ATTR_CONFIG_ROOT,
+            AccessDecider.ATTR_MATCHED_POLICY };
+
+    /** Clear every {@link #REQUEST_SCOPED_ATTRS} entry — dispatch's first act (see {@link #correlation}). */
+    static void clearRequestScope(HttpExchange ex) {
+        for (String attr : REQUEST_SCOPED_ATTRS) ex.setAttribute(attr, null);
+    }
+
     private void dispatch(HttpExchange ex) throws IOException {
         try {
             pipeline.proceed(ex);
@@ -449,6 +471,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  tie back. Engine-typed events keep their own explicit correlation (batch/run ids). Outermost stage:
      *  its finally closes the exchange once the whole chain has unwound. */
     private void correlation(HttpExchange ex, Chain next) throws Exception {
+        clearRequestScope(ex);   // SEC-EXCHANGE-ATTRS: nothing from a previous request may be readable
         String cid = ex.getRequestHeaders().getFirst("Correlation-ID");
         cid = (cid == null || cid.isBlank()) ? java.util.UUID.randomUUID().toString() : cid.trim();
         ex.setAttribute(ApiContext.ATTR_CORRELATION_ID, cid);
