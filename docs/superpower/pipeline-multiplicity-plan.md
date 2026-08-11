@@ -117,39 +117,136 @@ many exist" — is only fully delivered by (b). Under (a) the count limit become
 
 ---
 
-### Slices
+### Finding 3 — the five kinds are five different things in the file, and only two of them execute
+
+Grounded 2026-08-11 while sizing A2/A5. "The plural blocks" is one phrase covering five unrelated
+representations:
+
+| Kind | How the file holds it today | Typed? | Executes on the flat path? |
+|---|---|---|---|
+| `dedup` | `processing.dedup` | `Dedup` record | ✅ `BatchIngestStrategy.java:129` |
+| `filter` | ⚠ **`processing.csv_settings.where`, a single String** — a *field inside another block*, not a block | `String rowWhere` | ✅ `DataTransformer.java:65` |
+| `summarize` | `processing.summarize` | `Summarize` record | ❌ `prepare()` refuses when `active` |
+| `join` | `processing.join` | `Join` record | ❌ `prepare()` refuses when `active` |
+| `route` | top-level `route:` | ⚠ raw `Map<String,Object>`, untyped passthrough | ❌ `prepare()` refuses when `active` |
+
+Two consequences the plan was written without:
+
+1. ⚠ **A5's real scope is `dedup` and `filter` — two kinds, not five.** The other three have nothing to
+   honour because they do not run at all; `PipelineConfig.prepare()` refuses an `active` pipeline
+   carrying any of them. Their plural form is authoring-only *on top of* an authoring-only feature.
+2. ⚠ **`filter` has no plural home.** It is not a block that could become a list — it is one String
+   inside the parse-settings block. Making it plural means either `where:` becomes a list of predicates
+   (cheap, but AND is commutative so it can never be *positioned* relative to a dedup) **or** filters get
+   lifted into a block of their own — which is a new key, i.e. the very thing option (a) exists to avoid.
+
+### Finding 4 — ⚠ the `sinks:` precedent option (a) mirrors never got its own A5
+
+`sinks:` is the template this plan tells you to follow. It is **authoring-only**: `resolveSinks`
+(`PipelineConfig.java:976`) builds the list and the editor round-trips it, but `prepare()` refuses more
+than one destination for execution until the branch-aware executor lands. So the precedent demonstrates
+A2+A3+A4 and **stops exactly where A5 begins** — and the branch-aware executor is itself blocked
+(BACKLOG §4, ELT amendment Phase 4 S4 / Phase 6).
+
+Copying that precedent faithfully therefore delivers *authoring*, and honesty about it comes from an
+explicit `prepare()` refusal, not from the format.
+
+---
+
+## The two options, sliced side by side
+
+⚠ **The slice list below used to describe option (a) only** — "mirror `List<Sink>`: `List<Dedup>`" is
+already a choice. Written out per option, the real difference is not syntax.
+
+### Option (a) — per-kind plural lists
+
+```toon
+processing:
+  dedup:
+    - {keys: [msisdn], order_by: "ts desc"}
+    - {keys: [imsi]}
+  summarize:
+    - {group_by: [day], measures: [count]}
+```
+
+| Slice | Work |
+|---|---|
+| **A2** | `List<Dedup>`, `List<Summarize>`, `List<Join>`, `List<Map>` for `route`. Singular key resolves to a one-element list — copy `resolveSinks`. ⚠ **`filter` needs its own answer first** (finding 3.2). |
+| **A3** | `lower()` emits a plural only when >1, so single-transform pipelines round-trip verbatim. Delete `MULTI_DEDUP`/`MULTI_ROUTE`/`MULTI_SUMMARIZE`. Stop merging filters into `csv_settings`. |
+| **A4** | Mock mirrors A3, same commit. |
+| **A5** | Loop where the code today calls once: `BatchIngestStrategy:129` applies each `Dedup` in turn; `DataTransformer:65` ANDs each predicate. **summarize/join/route: nothing to do — they do not execute.** |
+| **A6** | Wiring validation (unchanged by the choice). |
+
+**Ceiling:** ⛔ `dedup → summarize → dedup` stays unrepresentable, permanently. `PipelineLift` still emits
+its fixed chain, so per-kind lists mean *all dedups, then all summarizes*. The constraint moves from "one
+node per kind" to "one **run** per kind" — narrower than the plan's opening premise.
+
+### Option (b) — an ordered `steps:` sequence
+
+```toon
+steps:
+  - dedup:     {keys: [msisdn]}
+  - summarize: {group_by: [day], measures: [count]}
+  - dedup:     {keys: [imsi]}
+  - filter:    {where: "duration > 0"}
+```
+
+| Slice | Work |
+|---|---|
+| **A2** | One `List<Step>` (`kind` + config). ⚠ **The subtle part is back-compat:** the legacy singular keys must still parse *and* project into the step list at the position `PipelineLift`'s hard-coded chain implies — that projection is the bridge, and it is where a round-trip can silently reorder someone's pipeline. |
+| **A3** | `lower()` emits `steps:` only when the chain is not expressible in the legacy singular keys; otherwise verbatim legacy. Same refusal deletions as (a). |
+| **A4** | Mock mirrors A3, same commit. |
+| **A5** | ⚠ **This is the whole decision.** Honouring an arbitrary order means the flat path walks a step list — which is *precisely what `PipelineExecutor` already does* on the graph-native path. Teaching path A to walk is re-implementing path B. The real A5 is therefore **route these pipelines to path B**, not extend path A. |
+| **A6** | Wiring validation (unchanged by the choice). |
+
+**Ceiling:** none on expressiveness. The cost is that A5 is not a slice of this plan at all — it is the
+branch-aware executor, already tracked and already blocked.
+
+### ⇒ What the choice actually is
+
+**Not a file-format preference.** It is: *does the flat linear executor keep existing as the thing that
+runs pipelines?*
+
+- **(a) says yes.** Keep path A's fixed stage chain; allow repetition *within* a stage. Fully shippable
+  now, A5 included, for the two kinds that execute. Buys: two dedups, two filters, actually running.
+  Gives up interleaving for good.
+- **(b) says no.** The flat file becomes a serialisation of the real graph, and running it means path B.
+  Buys: everything the canvas can draw. Costs: A5 is blocked on work that is already blocked, so A2–A4
+  would ship as authoring-only — the same posture `sinks:` has been in since it shipped (finding 4).
+
+⚠ **A defensible third answer is "(a) now, (b) when path B lands."** They are not exclusive: (a)'s plural
+lists are a strict subset of (b)'s step list, and a `steps:` reader could absorb them later. The cost of
+sequencing it that way is one format migration instead of none — and the honest version of (a) says so up
+front rather than presenting per-kind lists as the destination.
+
+---
+
+### Slices (option-independent parts)
 
 **A1 — decide and pin the plural shape.** ✅ **Property tests pinned and proven red 2026-08-11**; findings
-1 and 2 above are the grounding. ⏳ **The shape decision (a) vs (b) is OPEN and needs the operator** — it
-is a public config-format call, not an implementation detail. `filter` is now in scope alongside `dedup`,
-`route`, `summarize`, `join`.
+1–4 are the grounding. ⏳ **The (a)/(b) decision is OPEN and needs the operator.** `filter` is in scope
+alongside `dedup`, `route`, `summarize`, `join`.
 
-**A2 — `PipelineConfig` reads the plural.** Mirror `List<Sink>`: `List<Dedup>`, etc., with the singular
-key still accepted as a one-element list (every existing `*_pipeline.toon` must keep parsing byte-identically).
-→ verify: existing config tests unchanged and green; a new test parses a plural block.
+**A2–A5 — see the per-option tables above.** ⛔ Do not start A2 before the choice: the two produce
+different `PipelineConfig` surfaces, and `twoOfEachKindSurviveTheRoundTripInAuthoredOrder` asserts the
+interleaved order deliberately, so it **cannot go green under (a)** — amending it is the record of the
+capability being given up.
 
-**A3 — `lower()` emits the plural and the refusals go.** One destination ⇒ no plural block, so a
-single-transform pipeline round-trips verbatim (the sinks rule). Delete `MULTI_DEDUP`/`MULTI_ROUTE`/
-`MULTI_SUMMARIZE` and their tests **in this slice**, replacing them with round-trip tests. ⚠ Also stop
-`lower()` merging filters into one `csv_settings` map (finding 1) — that is a silent loss, not a refusal,
-so it has no code to delete and is easy to leave behind.
-→ verify: `PipelineEditableTest` green; the A1 property tests pass with `@Disabled` **removed**.
+**A4 — the mock moves in the same commit as A3** under either option.
+`inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts` must stop refusing exactly when the server does.
+⚠ Standing rule: **a mock must never be more lenient *or stricter* than the server** — a preview that
+refuses what the backend now accepts is the same class of bug, pointing the other way. → verify:
+`pipeline-editable.spec.ts` green with the refusal specs rewritten as round-trip specs.
 
-**A4 — the mock moves in the same commit as A3.** `inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts`
-must stop refusing exactly when the server does. ⚠ Standing rule: **a mock must never be more lenient
-*or stricter* than the server** — a preview that refuses what the backend now accepts is the same class
-of bug, pointing the other way. → verify: `pipeline-editable.spec.ts` green with the refusal specs
-rewritten as round-trip specs.
-
-**A5 — the flat execution path honours the plural.** ⚠ **This is the slice that can silently do nothing.**
-`BatchProcessor`/`DataTransformer` read `processing.dedup` etc. as single blocks; emitting a plural the
-executor ignores would produce a config that saves, loads, and quietly runs only the first. Ground where
-each block is *read* before writing this slice. → verify: an end-to-end test with two filters proves both
-applied (assert row counts, never "it ran").
+**A5 — ⚠ the slice that can silently do nothing**, under either option. A config that saves, loads and
+runs only the first block is the same bug this plan exists to remove, relocated one layer down. → verify:
+an end-to-end test with two **filters** proves both applied (assert row counts, never "it ran") — filters,
+because with `dedup` they are the only two kinds that execute at all (finding 3).
 
 **A6 — wiring validation becomes the real constraint.** Extend `PipelineValidator.checkWiring` so an
 invalid neighbour pairing refuses with a named code, which is what should have been rejecting bad graphs
-all along. → verify: a wiring-invalid graph refuses; a wiring-valid graph with N transforms saves.
+all along. Unaffected by the (a)/(b) choice. → verify: a wiring-invalid graph refuses; a wiring-valid
+graph with N transforms saves.
 
 **Out of scope, deliberately:** making `summarize`/`join` executable (see the ⚠ above) — separate work,
 tracked in BACKLOG.
