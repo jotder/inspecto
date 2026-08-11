@@ -119,6 +119,16 @@ final class PipelineConfigParser {
             b.stream = b.pipelineName;
         }
 
+        // ── at-rest Stage-2 output store (multiplicity plan "A5 RE-SCOPED"; absent ⇒ no default) ──
+        // Names the resting store the at-rest shaping run (PipelineLift.stageTwo) writes. Authored,
+        // never derived (operator decision 2026-08-11); normalised + validated like stream: because it
+        // becomes a store directory / catalog join key. The linear ingest path never reads it.
+        Object outputStoreRaw = raw.get("output_store");
+        if (outputStoreRaw != null && !outputStoreRaw.toString().isBlank()) {
+            b.outputStore = outputStoreRaw.toString().trim().toLowerCase().replace(' ', '_');
+            Identifiers.validate(b.outputStore, "output_store");
+        }
+
         // ── entry-node trigger (T13 / §3.6; absent ⇒ default poll = today's behaviour) ──
         // Carried verbatim; the live loop (CollectorService) classifies it via PipelineTrigger into
         // schedule(every/cron) / event / manual. Absent leaves the pipeline on the global poll cycle.

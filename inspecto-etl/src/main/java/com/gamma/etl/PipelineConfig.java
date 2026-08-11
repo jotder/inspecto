@@ -799,6 +799,16 @@ public final class PipelineConfig {
     private final String stream;
 
     /**
+     * The resting store the <b>at-rest Stage-2 chain</b> writes (top-level {@code output_store:}), or
+     * {@code null} when absent. Authored, never derived — the operator decision (2026-08-11, multiplicity
+     * plan "A5 RE-SCOPED"): the input of that run is this pipeline's landed store, so its output needs its
+     * own explicit name. Normalised and validated like {@code stream:} because it becomes a store
+     * directory / catalog join key. Read by {@code PipelineLift.stageTwo}; the linear ingest path ignores
+     * it entirely.
+     */
+    private final String outputStore;
+
+    /**
      * The optional entry-node {@code trigger:} block (T13 / §3.6) verbatim, or {@code null} when absent.
      * Absent ⇒ the pipeline rides the default poll cycle exactly as before; present ⇒ the live loop
      * ({@link com.gamma.service.CollectorService}) classifies it via {@code com.gamma.pipeline.PipelineTrigger}
@@ -892,6 +902,8 @@ public final class PipelineConfig {
     public Reference       reference()  { return reference; }
     /** The logical Catalog Stream this pipeline belongs to ({@code stream:}, default = pipeline name). */
     public String          stream()     { return stream; }
+    /** The authored at-rest Stage-2 output store ({@code output_store:}), or {@code null} when absent. */
+    public String          outputStore(){ return outputStore; }
     /** The raw entry-node {@code trigger:} block (T13), or {@code null} when absent (⇒ default poll). */
     public Map<String, Object> triggerConfig() { return trigger; }
     /** Record-grain dedup ({@code processing.dedup}), or {@code null} when absent. */
@@ -965,6 +977,7 @@ public final class PipelineConfig {
         this.produces = b.produces;
         this.reference = b.reference;
         this.stream = b.stream;
+        this.outputStore = b.outputStore;
         this.trigger = b.trigger;
         this.dedup = b.dedup;
         this.route = b.route;
@@ -1016,6 +1029,7 @@ public final class PipelineConfig {
         this.produces = src.produces;
         this.reference = src.reference;
         this.stream = src.stream;
+        this.outputStore = src.outputStore;
         this.trigger = src.trigger;
         this.dedup = src.dedup;
         this.route = src.route;
@@ -1226,6 +1240,7 @@ public final class PipelineConfig {
         Produces produces    = Produces.STREAM;   // catalog product; `produces: reference` ⇒ Reference Dataset
         Reference reference  = Reference.DEFAULT;  // `reference:` block; full-replace/no-key when absent
         String   stream;                           // logical Catalog Stream; parser defaults it to pipelineName
+        String   outputStore;                      // at-rest Stage-2 output store (output_store:); null = absent
         Map<String, Object> trigger = null;   // optional entry-node trigger: block (T13); null ⇒ default poll
         Dedup dedup = null;                   // record-grain dedup (processing.dedup); null ⇒ none
         Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline

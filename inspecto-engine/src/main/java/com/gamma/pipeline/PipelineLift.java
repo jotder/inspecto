@@ -101,6 +101,92 @@ public final class PipelineLift {
         return new PipelineGraph(cfg.identity().pipelineName(), cfg.active(), nodes, edges);
     }
 
+    /** Stable node ids of the at-rest Stage-2 lift ({@link #stageTwo}). */
+    static final String STAGE2_SRC  = "src";
+    static final String STAGE2_SINK = "sink";
+
+    /** Filter-step keys that only execute pre-parse (raw {@code c<N>} columns) — impossible at rest. */
+    private static final List<String> PRE_PARSE_FILTER_KEYS = List.of(
+            "filter_target_column", "include_prefixes", "include_regex", "exclude_prefixes", "exclude_regex");
+
+    /**
+     * <b>A5-at-rest slice 1 (multiplicity plan "A5 RE-SCOPED", 2026-08-11).</b> Lift ONLY a flat config's
+     * Stage-2 remainder into a runnable at-rest graph: a {@code source_store} seed reading the store this
+     * pipeline's linear path lands → the ordered {@link PipelineConfig#steps() chain} → one
+     * {@code sink.persistent} named by the authored top-level {@code output_store:} key. The ingest head
+     * (acquisition/parse/map) is deliberately absent — Stage 1 already ran; this graph re-shapes its
+     * output through {@code PipelineJobRunner} (slice 2 wires the job key).
+     *
+     * <p>Refusals — each is a chain this route would run <em>wrongly</em>, so it fails closed instead:
+     * <ul>
+     *   <li>no chain, or no {@code output_store:} — nothing to run / nowhere to write;</li>
+     *   <li>a multi-schema pipeline (selector/segments) — it lands several stores, and one seed cannot
+     *       pick among them;</li>
+     *   <li>a {@code route} step — its branches need one sink per branch key, which one
+     *       {@code output_store} cannot name (ingest-side demux stays with the branch-aware executor);</li>
+     *   <li>a legacy-projected {@code filter} step — the legacy filter is <b>pre-map</b> (fused
+     *       {@code csv_settings}), so its predicate speaks raw-column vocabulary the landed store no
+     *       longer has; an explicit {@code steps:} filter is post-map and fine — unless it carries a
+     *       pre-parse key ({@code include_prefixes} …), which cannot execute at rest either.</li>
+     * </ul>
+     */
+    public static PipelineGraph stageTwo(PipelineConfig cfg) {
+        String name = cfg.identity().pipelineName();
+        List<PipelineConfig.Step> steps = cfg.steps();
+        if (steps.isEmpty())
+            throw new IllegalArgumentException("pipeline '" + name + "' has no Stage-2 chain to lift");
+        String out = cfg.outputStore();
+        if (out == null)
+            throw new IllegalArgumentException("pipeline '" + name + "' has a Stage-2 chain but no "
+                    + "top-level 'output_store:' — the at-rest run needs an authored name for the store it writes");
+        PipelineConfig.Schemas s = cfg.schemas();
+        if ((s.selector() != null && s.selector().hasSchemas()) || (s.segments() != null && !s.segments().isEmpty()))
+            throw new IllegalArgumentException("pipeline '" + name + "' is multi-schema — it lands several "
+                    + "stores, and the at-rest Stage-2 lift cannot pick one seed among them");
+        for (PipelineConfig.Step step : steps) {
+            if (PipelineConfig.Step.ROUTE.equals(step.kind()))
+                throw new IllegalArgumentException("pipeline '" + name + "' chains a 'route' step — route "
+                        + "demux needs one sink per branch, which a single output_store cannot name");
+            if (PipelineConfig.Step.FILTER.equals(step.kind())) {
+                if (!cfg.hasExplicitSteps())
+                    throw new IllegalArgumentException("pipeline '" + name + "' carries a legacy (pre-map) "
+                            + "filter — its predicate speaks raw-column vocabulary the landed store no longer has");
+                for (String k : PRE_PARSE_FILTER_KEYS)
+                    if (step.config().containsKey(k))
+                        throw new IllegalArgumentException("pipeline '" + name + "' chains a filter carrying "
+                                + "pre-parse key '" + k + "', which cannot execute over the landed store");
+            }
+        }
+
+        List<PipelineNode> nodes = new ArrayList<>();
+        List<PipelineEdge> edges = new ArrayList<>();
+        String landed = canonicalName(s.single(), name);
+        nodes.add(new PipelineNode(STAGE2_SRC, BuiltinNodeType.ACQUISITION.type(), "Landed store",
+                "Reads the store the linear path lands",
+                Map.of(PipelineStores.CONFIG_SOURCE_STORE, landed), null));
+
+        String upstream = STAGE2_SRC;
+        Map<String, Integer> seen = new LinkedHashMap<>();
+        for (int i = 0; i < steps.size(); i++) {
+            PipelineConfig.Step step = steps.get(i);
+            String kind = step.kind();
+            int nth = seen.merge(kind, 1, Integer::sum);
+            String id = kind + (nth == 1 ? "" : "__s" + i);   // same id scheme as the ingest-headed lift
+            nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null,
+                    new LinkedHashMap<>(step.config()), null));
+            edges.add(PipelineEdge.data(upstream, id));
+            upstream = id;
+        }
+
+        Map<String, Object> sinkCfg = new LinkedHashMap<>();
+        sinkCfg.put(PipelineStores.CONFIG_STORE, out);
+        nodes.add(new PipelineNode(STAGE2_SINK, BuiltinNodeType.SINK_PERSISTENT.type(), out,
+                "Persistent store", sinkCfg, null));
+        edges.add(PipelineEdge.data(upstream, STAGE2_SINK));
+
+        return new PipelineGraph(name + "_stage2", cfg.active(), nodes, edges);
+    }
+
     // ── node builders ──────────────────────────────────────────────────────────
 
     private static PipelineNode acquisitionNode(PipelineConfig cfg) {

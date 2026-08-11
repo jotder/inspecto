@@ -240,12 +240,15 @@ unscoped-output-parity blocker is not engaged). Instead:
 
 Slices (build order):
 
-1. **Stage-2 lift.** Project a flat config's Stage-2 remainder into a runnable graph:
-   `source_store: <the pipeline's landed store>` seed → the ordered chain (`PipelineLift` already lifts
-   `steps:`, A3) → a sink. ⚠ Open call: the output store's name (authored key vs derived suffix) —
-   surface, don't invent. ⚠ Honour the A5 caveat above: a chain carrying **pre-parse filter keys**
-   (include/exclude lists fused into `csv_settings`) must refuse this route — those already ran in
-   Stage 1.
+1. ✅ **Stage-2 lift — BUILT 2026-08-11.** `PipelineLift.stageTwo(cfg)`: `source_store` seed (the
+   landed store, `canonicalName` fallback = pipeline name) → the ordered chain (same node-id scheme as
+   the ingest-headed lift) → one `sink.persistent` named by the **authored top-level `output_store:`**
+   key (operator call: authored, never derived; parsed/normalised/validated like `stream:`,
+   `PipelineConfigParser`, preserved by `lower()` as an unmodeled key). Refusals, each falsified:
+   no chain · no `output_store:` · multi-schema · a `route` step (one store cannot name N branches) ·
+   a **legacy-projected filter** (pre-map — raw-column vocabulary the landed store no longer has;
+   explicit `steps:` filters are post-map and pass) · any filter carrying a pre-parse key
+   (`include_prefixes` …). `PipelineStageTwoLiftTest` (6) + `PipelineConfigOutputStoreTest` (3).
 2. **Graph source.** The `pipeline` job type reads its graph only from `PipelineStore` (`:164-167`).
    Add a `pipeline_config: <name>` job key that loads + lifts the flat config at run time —
    single-truth, no derived graph persisted to the authored-flow store.
