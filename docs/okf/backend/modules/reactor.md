@@ -125,7 +125,7 @@ is maintainability-only, **not** a split blocker.
   they moved to fp-engine and reach the fat JAR **transitively** through core→fp-engine. Core kept only
   the third-party it uses directly (jackson ×4, slf4j ×23, jtoon ×6) + the leaf modules.
 - **Fat JAR unchanged:** shade (in core) has no include-list, so fp-engine's classes/resources bundle
-  automatically. Verified in `inspecto-processor-4.0.0-RC1.jar`: `Main-Class: com.gamma.inspector.CollectorProcessor`
+  automatically. Verified in `inspecto-processor-4.0.0-SNAPSHOT.jar`: `Main-Class: com.gamma.inspector.CollectorProcessor`
   present, `logback.xml` at root, both service files present, engine + third-party classes bundled.
 
 ## Intra-engine structure (measured 2026-07-22) — why the sub-splits are NOT mechanical
