@@ -155,6 +155,47 @@ public final class PipelineConfig {
     public record Sink(String database, String format, String compression, Map<String, Object> duckLake) {}
 
     /**
+     * One entry of the ordered {@code steps:} transform chain — <b>the flat file's answer to "how many,
+     * and in what order"</b> (multiplicity plan Part A, option (b)).
+     *
+     * <p>Before this existed the file held at most one {@code processing.dedup}, one {@code route:}, and
+     * so on, and the <em>order</em> of the chain was not in the file at all: {@code PipelineLift} emitted
+     * a hard-coded {@code filter → join → dedup → summarize → route}. With one node per kind a constant
+     * order is indistinguishable from a stored one, which is why nothing noticed. At two it stops being —
+     * an authored {@code dedup → summarize → dedup} cannot be expressed by per-kind blocks however they
+     * are keyed, so the sequence itself has to be the representation.
+     *
+     * <p><b>Order is list position, full stop.</b> No {@code after:} key, no index — a second ordering
+     * channel is a second source of truth, and the two disagree the first time someone hand-edits the file.
+     *
+     * @param kind   one of {@link #FILTER}, {@link #JOIN}, {@link #DEDUP}, {@link #SUMMARIZE},
+     *               {@link #ROUTE} — the node type's own word, minus its {@code transform.} prefix, so
+     *               one concept keeps one name across the graph, the file and the palette.
+     * @param config the step's own keys, verbatim — the same shape the corresponding legacy block held.
+     */
+    public record Step(String kind, Map<String, Object> config) {
+
+        /** Post-parse row predicate. Legacy spelling: {@code processing.csv_settings.where}. */
+        public static final String FILTER = "filter";
+        /** Reference join. Legacy spelling: {@code processing.join}. */
+        public static final String JOIN = "join";
+        /** ⚠ Record-grain <b>distinct</b> dedup ({@code processing.dedup}) — <b>not</b> file/content
+         *  fingerprint dedup, which is a property of the Collect node and is singular by construction. */
+        public static final String DEDUP = "dedup";
+        /** Group-by rollup. Legacy spelling: {@code processing.summarize}. */
+        public static final String SUMMARIZE = "summarize";
+        /** Branch tree. Legacy spelling: the top-level {@code route:} block. */
+        public static final String ROUTE = "route";
+
+        /** Every kind a {@code steps:} entry may name, in the order the legacy projection emits them. */
+        public static final List<String> KINDS = List.of(FILTER, JOIN, DEDUP, SUMMARIZE, ROUTE);
+
+        public Step {
+            config = (config == null) ? Map.of() : Map.copyOf(config);
+        }
+    }
+
+    /**
      * Schema resolution — at most one of {@code selector} (multi-schema {@code schemas[]}),
      * {@code single} (legacy {@code schema_file}), or {@code segments} (plugin path) is
      * non-null; all three are {@code null} for a schema-less <em>draft</em> (v5.1.0 — allowed
@@ -704,6 +745,7 @@ public final class PipelineConfig {
     private final CsvSettings csv;
     private final Output     output;
     private final List<Sink> sinks;
+    private final List<Step> steps;
     private final Schemas    schemas;
     private final DuckDbSettings duckdb;
     private final Chunking       chunking;
@@ -801,6 +843,17 @@ public final class PipelineConfig {
      * ({@code dirs.database} + {@code output:}); a longer list comes from an explicit {@code sinks:} block.
      */
     public List<Sink> sinks()      { return sinks; }
+    /**
+     * The ordered transform chain — an explicit {@code steps:} list, else the legacy singular blocks
+     * projected into {@code PipelineLift}'s order. Never {@code null}; empty when the pipeline has no
+     * transforms at all.
+     *
+     * <p>⚠ <b>Nothing executes from this yet</b> — the flat batch path still reads {@link #dedup()} and
+     * {@code csv.rowWhere()} directly, and the graph-native path walks the graph. This is the reader half
+     * (plan slice A2); {@code lower()} starts emitting {@code steps:} in A3 and execution routes in A5.
+     * Until then a {@code steps:} file is authoring-only, exactly as {@code sinks:} has been.
+     */
+    public List<Step> steps()      { return steps; }
     public Schemas    schemas()    { return schemas; }
     /** Optional DuckDB resource controls; never null (fields may be null ⇒ DuckDB defaults). */
     public DuckDbSettings duckdb()   { return duckdb; }
@@ -876,6 +929,7 @@ public final class PipelineConfig {
                 b.filterTargetColumn, b.rowWhere);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
+        this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.route);
         this.schemas = new Schemas(b.schemaSelector, b.singleSchema, b.segmentSchemas,
                 b.ingesterClass,
                 b.ingesterConfig != null
@@ -933,6 +987,7 @@ public final class PipelineConfig {
         this.csv = src.csv;
         this.output = src.output;
         this.sinks = src.sinks;   // already resolved + validated on the original build
+        this.steps = src.steps;   // ditto — the projection is order-sensitive, never re-derive it here
         this.schemas = src.schemas;
         this.duckdb = src.duckdb;
         this.chunking = src.chunking;
@@ -977,6 +1032,49 @@ public final class PipelineConfig {
         return (declared == null || declared.isEmpty())
                 ? List.of(new Sink(database, output.format(), output.compression(), output.duckLake()))
                 : List.copyOf(declared);
+    }
+
+    /**
+     * Resolve the transform chain: an explicit {@code steps:} list when present, otherwise the legacy
+     * singular blocks <b>projected into the order {@link com.gamma.pipeline.PipelineLift} builds them in</b>.
+     *
+     * <p>⚠ <b>That projection order is the whole risk of this change, not the new reader.</b> Every existing
+     * config reaches the chain through this method, so an order that disagrees with the lift by one position
+     * silently reorders someone's pipeline the next time it is saved — which is precisely the loss this work
+     * exists to stop, reintroduced by the fix for it. The order below is
+     * {@code filter → join → dedup → summarize → route} because that is the sequence
+     * {@code PipelineLift.branch} wires ({@code PipelineLift.java:172-238}), and
+     * {@code PipelineConfigStepsTest} cross-checks the two rather than trusting this comment.
+     *
+     * <p>The two spellings are <b>mutually exclusive</b>, refused in the parser rather than merged: there
+     * is no non-arbitrary position at which a legacy block would join an authored sequence, and picking one
+     * silently is the failure mode this record was introduced to remove.
+     */
+    private static List<Step> resolveSteps(List<Step> declared, String rowWhere, Join join, Dedup dedup,
+                                           Summarize summarize, Map<String, Object> route) {
+        if (declared != null && !declared.isEmpty()) return List.copyOf(declared);
+
+        List<Step> out = new ArrayList<>();
+        if (rowWhere != null && !rowWhere.isBlank())
+            out.add(new Step(Step.FILTER, Map.of("where", rowWhere)));
+        if (join != null)
+            out.add(new Step(Step.JOIN, cfg("reference", join.reference(), "on", join.on())));
+        if (dedup != null)
+            out.add(new Step(Step.DEDUP, cfg("keys", dedup.keys(), "order_by", dedup.orderBy())));
+        if (summarize != null)
+            out.add(new Step(Step.SUMMARIZE,
+                    cfg("group_by", summarize.groupBy(), "measures", summarize.measures())));
+        if (route != null)
+            out.add(new Step(Step.ROUTE, route));
+        return List.copyOf(out);
+    }
+
+    /** A two-entry config map that drops null values — a step carries only the keys its block had. */
+    private static Map<String, Object> cfg(String k1, Object v1, String k2, Object v2) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        if (v1 != null) m.put(k1, v1);
+        if (v2 != null) m.put(k2, v2);
+        return m;
     }
 
     // ── static factory ────────────────────────────────────────────────────────
@@ -1163,6 +1261,7 @@ public final class PipelineConfig {
         Map<String, Object> duckLakeCfg;
         /** Explicit {@code sinks:} destinations; empty ⇒ synthesise the single-{@code output:} shorthand. */
         List<Sink> sinks = new ArrayList<>();
+        List<Step> steps = new ArrayList<>();   // explicit `steps:` only; empty ⇒ project from the legacy blocks
         SchemaSelector      schemaSelector;
         Map<String, Object> singleSchema;
         String ingesterClass;

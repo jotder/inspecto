@@ -355,6 +355,55 @@ final class PipelineConfigParser {
             }
         }
 
+        // ── steps (the ordered transform chain) ─────────────────────────────────
+        // A top-level `steps:` list, each entry a single-key map of kind → that kind's own config:
+        //
+        //     steps:
+        //       - dedup:     {keys: [msisdn], order_by: "ts desc"}
+        //       - summarize: {group_by: [day], measures: [count]}
+        //       - dedup:     {keys: [imsi]}
+        //
+        // Order is list position. A single-key map rather than a flat {kind: dedup, …} entry so `kind`
+        // never collides with a config key of the same name, and so a malformed entry is a structural
+        // error rather than a silently-ignored one.
+        //
+        // Absent ⇒ PipelineConfig projects the legacy singular blocks into the same order PipelineLift
+        // wires them. Authoring/round-trip only for now — nothing executes from `steps:` until plan
+        // slice A5 routes it, exactly the posture `sinks:` has had since it shipped.
+        if (raw.get("steps") instanceof List<?> stepList) {
+            for (Object entry : stepList) {
+                if (!(entry instanceof Map<?, ?> sm) || sm.size() != 1) {
+                    throw new IllegalArgumentException(
+                            "each steps[] entry must be a single-key map of kind to its config, e.g. "
+                                    + "'- dedup: {keys: [msisdn]}' — got " + entry);
+                }
+                Map.Entry<?, ?> only = sm.entrySet().iterator().next();
+                String kind = String.valueOf(only.getKey()).trim();
+                if (!PipelineConfig.Step.KINDS.contains(kind)) {
+                    throw new IllegalArgumentException("unknown steps[] kind '" + kind + "' — expected one of "
+                            + PipelineConfig.Step.KINDS);
+                }
+                if (only.getValue() != null && !(only.getValue() instanceof Map<?, ?>)) {
+                    throw new IllegalArgumentException("steps[] entry '" + kind
+                            + "' must map to a config block, got " + only.getValue());
+                }
+                b.steps.add(new PipelineConfig.Step(kind, (Map<String, Object>) only.getValue()));
+            }
+            // Mutually exclusive with the legacy spellings: there is no non-arbitrary position at which a
+            // legacy block would join an authored sequence, and choosing one silently is the reordering
+            // this whole change exists to remove.
+            List<String> legacy = new ArrayList<>();
+            if (b.rowWhere != null && !b.rowWhere.isBlank()) legacy.add("processing.csv_settings.where");
+            if (b.join      != null) legacy.add("processing.join");
+            if (b.dedup     != null) legacy.add("processing.dedup");
+            if (b.summarize != null) legacy.add("processing.summarize");
+            if (b.route     != null) legacy.add("route");
+            if (!legacy.isEmpty()) {
+                throw new IllegalArgumentException("steps: replaces the singular transform blocks — remove "
+                        + legacy + ", or drop steps: and keep them; carrying both leaves the order undefined");
+            }
+        }
+
         // ── plugin ingester + segments ────────────────────────────────────────
         // `parsing.plugin` (frontend: plugin) is the unified alias for the legacy
         // `processing.ingester`/`segments`/`ingester_config` triple; when present its keys win.
