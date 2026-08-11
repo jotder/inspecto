@@ -75,6 +75,21 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/pipeline-multiplicity-plan.md`](superpower/pipeline-multiplicity-plan.md) — **ACTIVE
+  (opened 2026-08-11).** A pipeline should be constrained by whether a Step *accepts its neighbours*, not
+  by how many Steps of a kind exist. **Part A (plan, executable):** the engine is not the limit —
+  `PipelineExecutor` is a generic topological walker that already runs N transforms of a kind; the limit
+  is `PipelineEditable.lower()` targeting a flat file with one block per kind. Widen it with **plural
+  blocks, following the shipped `sinks:` precedent**, then drop the `MULTI_*` refusals. ⚠ **Do not open
+  by reverting `2cf7005e`** — the refusal is the only thing making the loss visible until the format can
+  hold multiples; it goes in the *same* slice that widens the format. ⚠ Ordering is the hard part (the
+  flat file has no edges, and dedup→summarize→route is a sequence, unlike the order-free sinks case).
+  ⚠ `summarize`/`join` have no `RowShaper` case and **throw**, so plural is moot for them until singular
+  works. **Part B (design, decide first):** multi-location acquisition — `collector` is singular and every
+  stateful acquisition subsystem (ledger, stability gate, gap tracker, breaker, retry, watermark) is keyed
+  on one collector id, so identity/merge/failure-isolation must be settled before any list appears, and it
+  must beat the zero-change `MultiCollectorProcessor` + downstream merge it would replace.
+
 - ~~`superpower/job-parameter-contract-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-10**
   ([archive copy](archived-documents/plans-archive/job-parameter-contract-plan.md), provenance only).
   All 17 steps: the Job authoring form is now generated **entirely** from a Job Type's declaration, and
