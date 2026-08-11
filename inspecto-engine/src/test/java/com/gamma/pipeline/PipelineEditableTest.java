@@ -138,6 +138,93 @@ class PipelineEditableTest {
                 "the message points at the node already holding the slot");
     }
 
+    // ── A1: the multiplicity round-trip property (docs/superpower/pipeline-multiplicity-plan.md) ──
+    //
+    // ⚠ THESE TESTS ARE EXPECTED TO FAIL UNTIL PART A LANDS. They are the plan's slice-A1 deliverable:
+    // pin the property first, so A2/A3 have something that goes green rather than a shape argued on a
+    // whiteboard. @Disabled with the reason on it — a red suite is not a specification, it is noise that
+    // trains the next shift to ignore the runner.
+
+    /** The transform nodes of {@code g}, in topological order, as {@code <type>} strings. */
+    private static List<String> transformChain(PipelineGraph g) {
+        return g.nodes().stream()
+                .map(PipelineNode::type)
+                .filter(t -> t.startsWith("transform."))
+                .toList();
+    }
+
+    /**
+     * graph → strict lower → {@code PipelineConfig} → lift → graph, the full authoring round-trip.
+     *
+     * <p>⚠ Unlike {@link #graphWith}, this needs a schema file that actually exists: {@code fromMap}
+     * resolves {@code schema_file} eagerly, so the {@code s.toon} placeholder the refusal tests use dies
+     * with {@code FileNotFound} <em>before</em> reaching the code under test — a red test for the wrong
+     * reason, which proves nothing.
+     */
+    private static PipelineGraph roundTrip(Path dir, PipelineNode... extra) throws Exception {
+        Path schema = dir.resolve("s.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        List<PipelineNode> nodes = new java.util.ArrayList<>(List.of(
+                node("acq", "acquisition", Map.of("poll", dir.resolve("in").toString())),
+                node("parse", "parser", Map.of("schema_file", schema.toString())),
+                node("sink", "sink.persistent", Map.of("database", dir.resolve("db").toString()))));
+        nodes.addAll(List.of(extra));
+
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph("dup", true, nodes, List.of()), new LinkedHashMap<>(), true);
+        return PipelineLift.lift(PipelineConfig.fromMap(lowered));
+    }
+
+    /**
+     * ⚠ <b>The finding that reframes A1, and it is about {@code transform.filter} — a kind the plan does
+     * not list.</b> Filter <em>looks</em> handled: {@code lower} collects filters into a {@code List} and
+     * has no {@code MULTI_FILTER} refusal, so it reads as the one kind that already allows many. It does
+     * not. The list is merged into a single {@code processing.csv_settings} map with {@code putAll}
+     * ({@code PipelineEditable.java:398}) and {@code lift} emits exactly one Filter node, so a second
+     * filter is <b>silently absorbed</b> — and where two filters set the same key, last-one-wins decides
+     * the pipeline's behaviour with no signal anywhere.
+     *
+     * <p>That is the same data loss {@code 2cf7005e} refused for the other kinds, still live, in the kind
+     * most likely to be authored more than once and the most order-sensitive of them all.
+     */
+    @org.junit.jupiter.api.Disabled("A1: pins the target property; goes green in A3/A5")
+    @Test
+    void twoFiltersSurviveTheRoundTrip(@TempDir Path dir) throws Exception {
+        assertEquals(List.of("transform.filter", "transform.filter"),
+                transformChain(roundTrip(dir,
+                        node("f1", "transform.filter", Map.of("where", "duration > 0")),
+                        node("f2", "transform.filter", Map.of("where", "cell_id IS NOT NULL")))),
+                "both authored filters survive; today the second is merged away without a word");
+    }
+
+    /**
+     * The property the plan names: two of each kind survive with their <b>order</b> intact.
+     *
+     * <p>⚠ <b>Order here is not one question but two, and the plan only names the first.</b> Within a kind,
+     * list position can carry it. <em>Across</em> kinds nothing can, because the flat file stores no order
+     * at all — {@code PipelineLift.branch} emits a hard-coded chain, {@code map → join → dedup → summarize
+     * → route → sink} ({@code PipelineLift.java:187-238}). Today that is invisible: with at most one node
+     * per kind a constant order is indistinguishable from a stored one. Add a second of any kind and it
+     * stops being: an authored {@code dedup → summarize → dedup} cannot be represented by per-kind plural
+     * lists however they are keyed, since the lift will always emit both dedups adjacent.
+     *
+     * <p>So A1's real decision is not "index or list position" — it is whether the flat format keeps
+     * per-kind blocks at all, or grows an ordered {@code steps:} sequence. This test deliberately asserts
+     * the <em>interleaved</em> order so it cannot be made green by the per-kind shape alone.
+     */
+    @org.junit.jupiter.api.Disabled("A1: pins the target property; the cross-kind half needs the A1 shape decision")
+    @Test
+    void twoOfEachKindSurviveTheRoundTripInAuthoredOrder(@TempDir Path dir) throws Exception {
+        assertEquals(List.of("transform.dedup", "transform.summarize",
+                        "transform.dedup", "transform.summarize"),
+                transformChain(roundTrip(dir,
+                        node("dd1", "transform.dedup", Map.of("keys", List.of("msisdn"))),
+                        node("s1", "transform.summarize", Map.of("group_by", List.of("day"))),
+                        node("dd2", "transform.dedup", Map.of("keys", List.of("imsi"))),
+                        node("s2", "transform.summarize", Map.of("group_by", List.of("cell"))))),
+                "the authored interleaving survives — per-kind lists alone cannot express this");
+    }
+
     /** A minimal strict-lowerable graph (acquisition + parser + persistent sink) plus {@code extra}. */
     private static PipelineGraph graphWith(PipelineNode... extra) {
         List<PipelineNode> nodes = new java.util.ArrayList<>(List.of(

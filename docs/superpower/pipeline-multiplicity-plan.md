@@ -56,12 +56,73 @@ edges. The sinks case dodged this (destinations are a set); dedup→summarize→
 plural block must carry enough to reconstruct the chain on the next lift, or a round-trip silently
 reorders the pipeline. Decide this in slice 1, not later.
 
+---
+
+## A1 findings (grounded 2026-08-11) — these change what A1 decides
+
+The two round-trip properties are pinned in `PipelineEditableTest`, `@Disabled` with the reason on them
+(`twoFiltersSurviveTheRoundTrip`, `twoOfEachKindSurviveTheRoundTripInAuthoredOrder`). Both were run with
+`-Djunit.jupiter.conditions.deactivate='*'` and **both fail today, for the right reasons** — the first
+attempt failed on `FileNotFound: s.toon` instead, because `PipelineConfig.fromMap` resolves `schema_file`
+eagerly; a red test for the wrong reason proves nothing, so `roundTrip` writes a real schema.
+
+### Finding 1 — ⚠ `transform.filter` is ALREADY losing nodes, silently, and the plan does not list it
+
+Filter *looks* like the one kind that already allows many: `lower()` collects filters into a `List` and
+there is no `MULTI_FILTER` refusal. It is not. The list is merged into a single `processing.csv_settings`
+map with `putAll` (`PipelineEditable.java:398`) and `lift` emits **exactly one** Filter node. Measured:
+
+```
+authored [transform.filter, transform.filter]  →  round-trips to  [transform.filter, transform.map]
+```
+
+No refusal, no warning. Where two filters set the same key, `putAll` last-one-wins silently decides the
+pipeline's behaviour. **This is the same data loss `2cf7005e` refused for the other four kinds, still
+live** — in the kind most likely to be authored more than once, and the most order-sensitive of them all.
+It was missed because a `List<PipelineNode>` in the source reads as "handled".
+
+⇒ **`filter` joins A1's scope as a first-class kind**, not an afterthought. ⛔ Do not close this by adding
+a `MULTI_FILTER` refusal — that walks away from the destination for the one kind whose plural form is
+least controversial.
+
+### Finding 2 — ⚠ cross-kind order is not in the file at all, so per-kind lists cannot restore it
+
+`PipelineLift.branch` emits a **hard-coded** chain (`PipelineLift.java:187-238`):
+
+```
+map → [join] → [dedup] → [summarize] → [route] → sink
+```
+
+Nothing about order is read from the flat config; the order is a constant in the lift. Today that is
+invisible, because with at most one node per kind a constant order is indistinguishable from a stored
+one. A second node of any kind makes it visible: an authored `dedup → summarize → dedup` **cannot be
+represented by per-kind plural lists however they are keyed**, because the lift will always emit both
+dedups adjacent.
+
+⇒ **A1's decision is not "explicit index vs. list position".** That question only covers order *within* a
+kind. The actual choice is:
+
+| Option | Shape | Cost |
+|---|---|---|
+| **(a) Per-kind plural lists** | `processing.dedup: [ … ]`, etc. Order within a kind = list position; order across kinds stays the lift's hard-coded constant | Cheapest, mirrors `sinks:` exactly, and **cannot express an interleaving**. Honest only if the engine also refuses to author one — i.e. the constraint moves from "one per kind" to "one *run* per kind", which is a smaller win than the premise promises |
+| **(b) An ordered `steps:` sequence** | one list of `{kind, …config}` entries; order is the list, full stop | Expresses everything, is what the graph actually is, and is a genuinely new top-level format key — A2/A3/A5 all grow, and every `*_pipeline.toon` reader must accept both spellings for as long as the singular keys exist |
+
+⛔ **Do not start A2 until this is chosen.** (a) and (b) produce different `PipelineConfig` surfaces, and
+`twoOfEachKindSurviveTheRoundTripInAuthoredOrder` deliberately asserts the interleaved order so it
+**cannot be made green by (a) alone** — if (a) is chosen, that test must be amended, and the amendment is
+the record of the capability being given up.
+
+⚠ The premise this plan opens with — "constrained by whether a Step accepts its neighbours, not by how
+many exist" — is only fully delivered by (b). Under (a) the count limit becomes a sequence limit.
+
+---
+
 ### Slices
 
-**A1 — decide and pin the plural shape.** For each of `dedup`, `route`, `summarize`, `join`: a list of
-the existing block, plus whatever `lift` needs to restore order (an explicit `after:`/index, or list
-position as the contract). Write the round-trip property as a test *first*: lift(lower(g)) preserves node
-count and order for a graph with two of each. → verify: the test exists and fails.
+**A1 — decide and pin the plural shape.** ✅ **Property tests pinned and proven red 2026-08-11**; findings
+1 and 2 above are the grounding. ⏳ **The shape decision (a) vs (b) is OPEN and needs the operator** — it
+is a public config-format call, not an implementation detail. `filter` is now in scope alongside `dedup`,
+`route`, `summarize`, `join`.
 
 **A2 — `PipelineConfig` reads the plural.** Mirror `List<Sink>`: `List<Dedup>`, etc., with the singular
 key still accepted as a one-element list (every existing `*_pipeline.toon` must keep parsing byte-identically).
@@ -69,8 +130,10 @@ key still accepted as a one-element list (every existing `*_pipeline.toon` must 
 
 **A3 — `lower()` emits the plural and the refusals go.** One destination ⇒ no plural block, so a
 single-transform pipeline round-trips verbatim (the sinks rule). Delete `MULTI_DEDUP`/`MULTI_ROUTE`/
-`MULTI_SUMMARIZE` and their tests **in this slice**, replacing them with round-trip tests.
-→ verify: `PipelineEditableTest` green; the A1 property test passes.
+`MULTI_SUMMARIZE` and their tests **in this slice**, replacing them with round-trip tests. ⚠ Also stop
+`lower()` merging filters into one `csv_settings` map (finding 1) — that is a silent loss, not a refusal,
+so it has no code to delete and is easy to leave behind.
+→ verify: `PipelineEditableTest` green; the A1 property tests pass with `@Disabled` **removed**.
 
 **A4 — the mock moves in the same commit as A3.** `inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts`
 must stop refusing exactly when the server does. ⚠ Standing rule: **a mock must never be more lenient
