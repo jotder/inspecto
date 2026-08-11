@@ -36,11 +36,12 @@ same slice that makes the format able to represent the thing.**
 constraint — but a wiring-valid graph with two dedups still has nowhere to *put* the second one in a
 single-slot file. The two checks answer different questions and both are needed.
 
-⚠ **`transform.summarize` and `transform.join` do not execute at all**, on either path: `RowShaper.shape()`
-(`pipeline/exec/RowShaper.java:64-76`) has no case for them and throws
-`IllegalArgumentException("RowShaper cannot shape node type …")`; `BuiltinNodeType` calls them
-"compile-only". **"Allow many" is moot for these two until "allow one" works** — so their plural blocks
-are authoring-only until that lands, exactly as their single blocks are today.
+⚠ **`transform.join` does not execute at all** on either path: `RowShaper.shape()` has no case for it and
+throws (it needs a resolver seam — `shape()` cannot reach reference data). ~~`transform.summarize`~~
+**summarize gained its executor 2026-08-11**: `RowShaper.summarize` routes `{group_by, measures}` through
+`MeasureCompiler`; arming a flat pipeline carrying it still refuses in `prepare()`, unchanged. **"Allow
+many" is moot for join until "allow one" works** — its plural blocks stay authoring-only, exactly as its
+single block is today.
 
 ---
 
@@ -441,8 +442,8 @@ in three states: `filter` executed, `dedup` executed, and `route`/`summarize`/`j
 ⚠ **Do not read the removal as a capability loss with no replacement.** `RowShaper.dedup`
 (`pipeline/exec/RowShaper.java:151-166`) already implements the same window and is *better* — it emits
 the losers as a first-class `duplicate` relation rather than counting and discarding them. The gap is
-routing, not implementation. Of the three Stage-2 kinds, only `summarize` and `join` lack an executor
-there (`RowShaper.shape()` throws for both) — tracked separately, already decided, not started.
+routing, not implementation. Of the three Stage-2 kinds, only `join` still lacks an executor there
+(`RowShaper.shape()` throws) — `summarize` gained its executor 2026-08-11 via `MeasureCompiler`.
 
 ⚠ **`EventType.DEDUP_RECORDS_DROPPED` now has no emitter.** The constant is kept deliberately: the
 taxonomy is public and the Stage-2 executor is the right place to emit it. A grep for "who emits this"

@@ -123,6 +123,53 @@ class RowShaperTest {
         assertTrue(columns(der.table(PipelineRel.DATA)).containsAll(List.of("id", "grp", "amt", "amt2")));
     }
 
+    // ── summarize (group-by rollup through MeasureCompiler) ─────────────────────
+
+    @Test
+    void summarizeRollsUpByGroupWithMeasures() throws Exception {
+        seedSrc();
+        var out = run(PipelineNode.of("sm", "transform.summarize",
+                Map.of("group_by", List.of("grp"), "measures", List.of("count", "sum(amt)"))));
+        String t = out.table(PipelineRel.DATA);
+        assertEquals(2, count(t));   // two groups: a, b
+        // result columns carry MeasureCompiler's stable measure ids (count, sum_amt)
+        assertEquals(List.of("count", "grp", "sum_amt"), columns(t).stream().sorted().toList());
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT grp, \"count\", sum_amt FROM \"" + t + "\" ORDER BY grp")) {
+            assertTrue(rs.next());
+            assertEquals("a", rs.getString(1)); assertEquals(2, rs.getInt(2)); assertEquals(350, rs.getInt(3));
+            assertTrue(rs.next());
+            assertEquals("b", rs.getString(1)); assertEquals(1, rs.getInt(2)); assertEquals(50, rs.getInt(3));
+            assertFalse(rs.next());
+        }
+    }
+
+    @Test
+    void summarizeWithoutGroupByIsAGlobalRollup() throws Exception {
+        seedSrc();
+        var out = run(PipelineNode.of("sm", "transform.summarize",
+                Map.of("measures", List.of("sum(amt)"))));
+        String t = out.table(PipelineRel.DATA);
+        assertEquals(1, count(t));
+        assertEquals(List.of(400), ids(t, "sum_amt"));
+    }
+
+    /** The measures grammar is MeasureCompiler's, not a local one — bad input refuses, never mis-parses. */
+    @Test
+    void summarizeRefusesMissingMalformedAndUnknownMeasures() throws Exception {
+        seedSrc();
+        // no measures at all
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("sm", "transform.summarize", Map.of("group_by", List.of("grp"))), "src", "sm"));
+        // outside the count | agg(field) shorthand
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("sm", "transform.summarize", Map.of("measures", List.of("sum(amt"))), "src", "sm"));
+        // well-formed but an aggregation MeasureCompiler does not know
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("sm", "transform.summarize", Map.of("measures", List.of("median(amt)"))), "src", "sm"));
+    }
+
     @Test
     void fuseFiltersAndProjectionIntoOnePass() throws Exception {
         seedSrc();

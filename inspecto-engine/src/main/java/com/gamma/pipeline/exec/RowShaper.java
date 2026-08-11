@@ -6,6 +6,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
+import com.gamma.query.MeasureCompiler;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -39,6 +40,9 @@ import java.util.Optional;
  *   <li>{@code transform.dedup[.*]} — {@code keys}: [col]; optional {@code order_by} (SQL) →
  *       {@code data} (first per key) + {@code duplicate}.</li>
  *   <li>{@code transform.split} — {@code column}: list/array col; optional {@code as} → {@code data}.</li>
+ *   <li>{@code transform.summarize} — {@code group_by}: [col] (optional); {@code measures}: shorthand
+ *       ({@code count} | {@code agg(field)}, compiled by {@link MeasureCompiler}) → {@code data}
+ *       (the rollup).</li>
  *   <li>{@code transform.map}/{@code select}/{@code derive} — {@code columns}: map/select take
  *       [{@code {name, expr}}] / [name]; derive adds [{@code {name, expr}}] to the input columns →
  *       {@code data}.</li>
@@ -69,6 +73,7 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_ROUTE.type().equals(type))    return route(conn, node, input, outPrefix);
         if (type.startsWith("transform.dedup"))                      return dedup(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SPLIT.type().equals(type))    return split(conn, node, input, outPrefix);
+        if (BuiltinNodeType.TRANSFORM_SUMMARIZE.type().equals(type)) return summarize(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_MAP.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
@@ -163,6 +168,47 @@ public final class RowShaper {
         exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * EXCLUDE(__rn) FROM " + ranked + " WHERE __rn = 1");
         exec(conn, "CREATE TABLE " + q(dup)  + " AS SELECT * EXCLUDE(__rn) FROM " + ranked + " WHERE __rn > 1");
         return List.of(new Relation(PipelineRel.DATA, data), new Relation(PipelineRel.DUPLICATE, dup));
+    }
+
+    // ── summarize (group-by rollup) ───────────────────────────────────────────────
+
+    /**
+     * {@code transform.summarize} — {@code group_by}: [col] (optional); {@code measures}: shorthand
+     * strings in {@code MaterializeTask.compileSpec}'s documented grammar ({@code count} |
+     * {@code agg(field)}) → one aggregated {@code data} relation. The shorthand is split exactly as
+     * MaterializeTask splits it and everything downstream is {@link MeasureCompiler} — validated
+     * identifiers, the shared aggregation set, the stable {@code agg_field} result-column ids — so
+     * a summarize node, a materialize job and a BI query all speak one measure grammar.
+     *
+     * <p>The compiled SELECT carries MeasureCompiler's mandatory LIMIT, passed as
+     * {@link Integer#MAX_VALUE} — a batch's group count is bounded by its row count, so the cap
+     * never binds; it is the compiler's shape, not a sampling decision.
+     */
+    private static List<Relation> summarize(Connection conn, PipelineNode node, String input, String prefix)
+            throws SQLException {
+        Object measuresRaw = node.cfg("measures");
+        if (!(measuresRaw instanceof List<?> measureList) || measureList.isEmpty())
+            throw new IllegalArgumentException("transform.summarize node '" + node.id()
+                    + "' needs a non-empty 'measures' list");
+        List<Map<String, Object>> measures = new ArrayList<>();
+        for (Object o : measureList) {
+            String m = o.toString().trim();
+            if ("count".equals(m)) { measures.add(Map.of("agg", "count")); continue; }
+            int p = m.indexOf('(');
+            if (p < 0 || !m.endsWith(")"))
+                throw new IllegalArgumentException("node '" + node.id()
+                        + "': measure must be count or agg(field), got '" + m + "'");
+            measures.add(Map.of("agg", m.substring(0, p), "field", m.substring(p + 1, m.length() - 1)));
+        }
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("dataset", input);
+        body.put("measures", measures);
+        if (node.cfg("group_by") instanceof List<?> groupBy && !groupBy.isEmpty()) body.put("groupBy", groupBy);
+        body.put("limit", Integer.MAX_VALUE);
+        String select = MeasureCompiler.compile(MeasureCompiler.parse(body, Integer.MAX_VALUE, Integer.MAX_VALUE));
+        String data = table(prefix, PipelineRel.DATA);
+        exec(conn, "CREATE TABLE " + q(data) + " AS " + select);
+        return List.of(new Relation(PipelineRel.DATA, data));
     }
 
     // ── split (UNNEST) ────────────────────────────────────────────────────────────

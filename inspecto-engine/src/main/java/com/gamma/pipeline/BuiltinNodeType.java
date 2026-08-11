@@ -79,7 +79,9 @@ public enum BuiltinNodeType implements PipelineNodeType {
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
     // Group-by rollup (ELT amendment §2.4/Phase 3: summarize IS a Step). Flat home: processing.summarize
     // {group_by, measures} — measures reuse MaterializeTask's shorthand grammar (count, sum(amount), …).
-    // Compile-only for now: MaterializeTask stays the runtime until a recipe-driven executor lands.
+    // Executes in RowShaper.summarize (2026-08-11) via MeasureCompiler — one measure grammar across
+    // the summarize node, materialize jobs and BI queries. Arming a flat pipeline that carries it
+    // stays gated by prepare(), unchanged.
     TRANSFORM_SUMMARIZE("transform.summarize", NodeCategory.TRANSFORM, "Summarize",
             "Group-by rollup with algebraically-composable measures.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA), false),
