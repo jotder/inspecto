@@ -115,6 +115,22 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- **An `HttpExchange` attribute is per-request by DEFAULT, not by guarantee — derive or clear, never
+  trust a stamp.** `sun.net.httpserver.ExchangeImpl` decides *once at class-init* whether each exchange
+  gets a private map:
+  `static final boolean perExchangeAttributes = !System.getProperty("jdk.httpserver.attributes","").equals("context")`.
+  Wherever it falls back — **any pre-26 runtime, or a current one started with
+  `-Djdk.httpserver.attributes=context`** — `ControlApi`'s single `createContext("/")` means **one map
+  shared by every request in the JVM**. This produced two real defects on 2026-08-11: a stamped `v1` flag
+  that latched across requests (`890025e9`, fixed by deriving it from the URI) and, more seriously,
+  an authenticated `ATTR_SUBJECT` readable by a later unauthenticated request — set only on success and
+  never cleared, so it flowed into `requireCapability`, `actor()` and `authorize()` (`f0d5f131`, fixed by
+  clearing the whole `ControlApi.REQUEST_SCOPED_ATTRS` roster as dispatch's first act, with a
+  reflection-based completeness guard so a new `ATTR_*` constant missing from the roster is a red build
+  rather than a leak). ⚠ **Do not dismiss this as latent on the strength of the local JDK** — the
+  `-NoRuntime` bundle documents "Java 24+" as its target requirement, so the shared-map configuration is
+  a *supported deployment*. Read the JDK source before reasoning about attribute lifetime.
+
 - **A profile-scoped module is invisible to the verify loop that everyone actually runs.**
   `inspecto-security` / `inspecto-policy` live in the parent's *profile-scoped* `<modules>`
   (`-Pedition-standard` / `-Pedition-enterprise`), not the default list — so `mvn -o clean test`
