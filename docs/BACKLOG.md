@@ -70,6 +70,28 @@ each row's detail stays in its own section.
    engineering task: five OAuth secrets, one of them a named-customer production credential, were public
    on GitHub for six weeks. The code is clean as of 2026-07-25 but **rotation at the issuer is
    outstanding** — history keeps the values, so deletion remediated nothing.
+0-b. 🔴 **SEC-EXCHANGE-ATTRS — the authenticated Subject can leak between requests on a shared-attribute
+   runtime. OPEN, found 2026-08-11, deliberately NOT fixed pending an operator call.** ControlApi keeps
+   every per-request value in `HttpExchange` attributes, and that map is private to the exchange only by
+   *default* — `sun.net.httpserver.ExchangeImpl` picks it at class-init:
+   `perExchangeAttributes = !System.getProperty("jdk.httpserver.attributes","").equals("context")`, else
+   `getHttpContext().getAttributes()`. ControlApi serves everything from a single `createContext("/")`, so
+   wherever that falls back — **any pre-26 runtime, or a current one started with
+   `-Djdk.httpserver.attributes=context`** — one map is shared by every request the server handles.
+   ⚠ **`ATTR_SUBJECT` is set only on success and never cleared** (`ControlApi.java:648`:
+   `if (subject.isPresent()) ex.setAttribute(...)`, `else if (required) throw 401`). So: request A
+   authenticates as alice → request B hits a public path (`required == false`, no 401, nothing stamped) →
+   every later `getAttribute(ATTR_SUBJECT)` in B returns **alice**, flowing into `requireCapability`,
+   `actorId()`, `ComponentAccess`, `RowScope` and `authorize()`. `ATTR_RAW_BODY` (the request body) and
+   the authz attributes ride the same map. **Corroboration that this is not theoretical:** `authorize()`
+   (`:667`) already hand-clears `ATTR_MATCHED_POLICY` — *"clear stale; the decider re-stamps"* — i.e.
+   staleness was hit on one attribute and patched locally instead of at the root.
+   **Minimal fix:** clear the request-scoped attributes at dispatch start (the move `authorize()` already
+   makes for one of them) — small, but it is authentication code and wants its own commit, its own test,
+   and an explicit decision. **Blast radius depends on the shipped runtime**, which was NOT determined:
+   only JDK 26 is installed on the dev box and no runtime is pinned in the build scripts. ⛔ Do not assume
+   latent — confirm the bundle's JVM and the property before downgrading it. Found while fixing the
+   narrower `ApiContext.v1` case (which IS fixed: it derives from the URI and cannot latch).
 1. **Root enablers — DRAINED, now including MNT-14.** RBAC/ABAC R0–R5 + A1–A5, job-concurrency bound,
    Incidents I1 resolution gate, `ObjectStore.delete`, and off-request-thread legacy triggers all shipped
    2026-07-23/24; the last survivor **MNT-14 shipped 2026-07-27** as the `incident_purge` maintenance task

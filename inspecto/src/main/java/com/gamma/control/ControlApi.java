@@ -499,7 +499,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private void normalizePath(HttpExchange ex, Chain next) throws Exception {
         String path = ex.getRequestURI().getPath();
         if (path.equals("/api/v1") || path.startsWith("/api/v1/")) {
-            ex.setAttribute(ApiContext.ATTR_V1, Boolean.TRUE);
+            // No "this is v1" marker is stamped: ApiContext.v1 derives it from the URI, because a stamped
+            // flag survives the request wherever exchange attributes fall back to the shared HttpContext map.
             ex.setAttribute(ApiContext.ATTR_START_NANOS, System.nanoTime());
             ex.setAttribute(ApiContext.ATTR_SELF_PATH, path);
             path = path.length() == 7 ? "/" : path.substring(7);

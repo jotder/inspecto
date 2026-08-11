@@ -10,7 +10,7 @@ import java.util.Map;
  * Shapes a handler result into the v1 response envelope {@code {data, metadata, links,
  * diagnostics}} — or, for a non-2xx status, into the structured v1 error object
  * {@code {error: {errorCode, message, recoverable, correlationId, details?}}}. Applied only when
- * the request arrived under {@code /api/v1} (dispatch sets {@link ApiContext#ATTR_V1}); legacy
+ * the request arrived under {@code /api/v1} ({@link ApiContext#v1}, derived from the URI); legacy
  * (unversioned) responses stay byte-for-byte unchanged. {@code permissions} carries the authenticated
  * {@link Subject}'s resolved capability grants (W6) and is present only when the security module
  * attached one (Standard edition, authenticated request); absent on Personal / anonymous requests.

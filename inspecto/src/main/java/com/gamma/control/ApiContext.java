@@ -28,8 +28,21 @@ interface ApiContext {
     ObjectMapper JSON = new ObjectMapper();
 
     // ── per-exchange attributes set by ControlApi.dispatch (v1 transport spine, v4.8.0) ─────────
-    /** Marks a request that arrived under {@code /api/v1} — responses get the {@link Envelope}. */
-    String ATTR_V1             = "inspecto.v1";
+    //
+    // ⚠ "Per-exchange" is a JDK-VERSION-DEPENDENT promise, not a guarantee. `ExchangeImpl` picks its
+    // attribute map like this:
+    //
+    //     private static final boolean perExchangeAttributes =
+    //         !System.getProperty("jdk.httpserver.attributes", "").equals("context");
+    //     ...
+    //     this.attributes = perExchangeAttributes ? new ConcurrentHashMap<>()
+    //                                             : getHttpContext().getAttributes();
+    //
+    // So the map is private to the exchange only by DEFAULT and only on a JDK new enough to have that
+    // switch. Where it resolves to the HttpContext's map, every attribute below is shared by every
+    // request the server ever handles — ControlApi serves everything from one createContext("/") — and a
+    // value stamped by one request is readable by the next. Anything that must not leak across requests
+    // therefore has to be either derived from the request itself (see #v1) or cleared at dispatch.
     /** The request's correlation id (caller-supplied {@code Correlation-ID} header, or issued). */
     String ATTR_CORRELATION_ID = "inspecto.correlationId";
     /** {@code System.nanoTime()} at dispatch start (v1 {@code metadata.durationMs}). */
@@ -59,9 +72,26 @@ interface ApiContext {
     /** JSON bodies at or above this size are gzipped when the client sent {@code Accept-Encoding: gzip}. */
     int GZIP_MIN_BYTES = 1024;
 
-    /** True when this request arrived under the {@code /api/v1} prefix (v1 envelope semantics). */
+    /**
+     * True when this request arrived under the {@code /api/v1} prefix (v1 envelope semantics).
+     *
+     * <p><b>Derived from the request URI on every call, and deliberately not cached on the exchange.</b>
+     * It used to read an {@code inspecto.v1} attribute stamped by {@code ControlApi.normalizePath}, which
+     * is only correct while exchange attributes are private to the exchange — see the note on the
+     * attribute block above. Where they resolve to the shared {@code HttpContext} map, the flag latched
+     * TRUE for the life of the server after the first {@code /api/v1} request, and two things followed:
+     * the API-5 guard in {@code ControlApi.routeDispatch} stopped retiring the unversioned surface, so a
+     * browser deep link to an Angular route sharing a name with a route pattern ({@code /pipelines}) was
+     * answered with API JSON instead of the SPA shell; and {@code /health} came back wrapped in a v1
+     * envelope quoting the <em>previous</em> request's {@code links.self}.
+     *
+     * <p>The prefix is the whole input, so there is nothing to store. Keep it that way: a derived answer
+     * cannot go stale, and this one is a pure function of a URI the caller cannot make ambiguous —
+     * {@code /api/v1x} shares six characters with {@code /api/v1/} and is a different namespace.
+     */
     static boolean v1(HttpExchange ex) {
-        return Boolean.TRUE.equals(ex.getAttribute(ATTR_V1));
+        String path = ex.getRequestURI().getPath();
+        return path.equals("/api/v1") || path.startsWith("/api/v1/");
     }
 
     /** The request's correlation id (set by dispatch on every request), or {@code null} pre-dispatch. */
