@@ -81,10 +81,10 @@ public final class SummaryWriter {
      * @param rows          rows already validated by {@link GuardedSummaryEmitter}
      * @param producer      what wrote these summaries (the Job's name), so the rows are attributable in
      *                      {@code producerHighWater}; {@code null} is accepted and leaves them unattributed.
-     *                      ⚠ Event-time {@code bounds} is deliberately NOT a parameter — a {@link SummaryRow}
-     *                      is pre-aggregated over an author-chosen {@code keys} grain with no enforced time
-     *                      key, so there is no per-row timestamp to fold and no declaration to read one from
-     *                      (BACKLOG §4: it is a design call, not a wiring gap)
+     *                      ⚠ Event-time {@code bounds} is still not a parameter, and still not derived from the
+     *                      grain — but it is no longer always absent: a {@link SummaryRow} may now
+     *                      {@linkplain SummaryRow#bounds() declare} the range of the detail behind it, and
+     *                      {@link #boundsByPartition} folds those declarations per file.
      */
     public static List<ConsignmentOutput> write(Connection conn, String summariesRoot,
                                                String consignmentId, List<SummaryRow> rows,
@@ -155,7 +155,8 @@ public final class SummaryWriter {
 
             Map<String, Long> counts = ConsignmentOutputs.countByPartition(conn, scratch,
                     partitioned ? List.of(RECORD_DAY) : List.of());
-            return register(consignmentId, target, written, counts, writtenAt, producer);
+            return register(consignmentId, target, written, counts, boundsByPartition(rows, partitioned),
+                    writtenAt, producer);
         } finally {
             try (Statement st = conn.createStatement()) {
                 st.execute("DROP TABLE IF EXISTS " + scratch);
@@ -265,14 +266,51 @@ public final class SummaryWriter {
      */
     private static List<ConsignmentOutput> register(String consignmentId, String target,
                                                     List<PartitionOutput> written, Map<String, Long> counts,
+                                                    Map<String, EventTimeBounds> bounds,
                                                     String writtenAt, String producer) {
         List<ConsignmentOutput> out = new ArrayList<>(written.size());
         for (PartitionOutput p : written) {
             String partition = p.partition() == null ? "" : p.partition();
             out.add(new ConsignmentOutput(consignmentId, null, target + SUMMARY_SUFFIX, partition,
                     recordDayOf(partition), p.outputFile(), counts.getOrDefault(partition, 0L),
-                    p.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE, null, null, producer));
+                    p.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE, null, bounds.get(partition),
+                    producer));
         }
+        return out;
+    }
+
+    /**
+     * The event-time bounds of each file, folded from what the rows in it <b>declared</b> — the union of their
+     * ranges, keyed exactly as {@link PartitionOutput#partition()} keys them.
+     *
+     * <p>⚠ <b>A file is bounded only when every row in it declared a range.</b> One silent row means the file
+     * holds events the fold does not cover, and a bound that under-covers its file makes the Selector skip a
+     * file that overlaps the query — a false negative, which is worse than the {@code null} a reader already
+     * knows to treat as "cannot prune". So a single undeclared row drops the whole file's bound.
+     *
+     * <p>{@code spreadMs} is re-derived from the folded endpoints rather than summed from the per-row spreads,
+     * which would double-count wherever two rows' ranges overlap.
+     */
+    private static Map<String, EventTimeBounds> boundsByPartition(List<SummaryRow> rows, boolean partitioned) {
+        Map<String, String> min = new LinkedHashMap<>();
+        Map<String, String> max = new LinkedHashMap<>();
+        Set<String> unbounded = new LinkedHashSet<>();
+        for (SummaryRow r : rows) {
+            String key = partitioned ? RECORD_DAY + "=" + r.keys().get(RECORD_DAY) : "";
+            EventTimeBounds b = r.bounds();
+            if (b == null || b.min() == null || b.max() == null) {
+                unbounded.add(key);
+                continue;
+            }
+            min.merge(key, b.min(), (a, c) -> a.compareTo(c) <= 0 ? a : c);
+            max.merge(key, b.max(), (a, c) -> a.compareTo(c) >= 0 ? a : c);
+        }
+
+        Map<String, EventTimeBounds> out = new LinkedHashMap<>();
+        min.forEach((key, lo) -> {
+            if (unbounded.contains(key)) return;
+            out.put(key, EventTimeBounds.of(lo, max.get(key)));
+        });
         return out;
     }
 

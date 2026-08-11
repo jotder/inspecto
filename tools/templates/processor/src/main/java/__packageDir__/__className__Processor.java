@@ -45,6 +45,17 @@ public class {{className}}Processor implements ConsignmentProcessor {
         }
 
         // Every summary row must carry the reserved `count` measure — see SummaryEmitter.COUNT.
+        //
+        // A row may also declare the event-time range of the detail behind it, which is the only way a
+        // summary becomes prunable by time:
+        //
+        //     new SummaryRow(relation, Map.of("record_day", day), List.of(Measure.additive("count", n)),
+        //                    EventTimeBounds.of(minTs, maxTs))
+        //
+        // Get minTs/maxTs from the detail you aggregated (`min(ts), max(ts)` alongside your GROUP BY).
+        // Do NOT pass the grain key: `record_day` is the bucket the rows fell in, so using it as a range
+        // collapses a whole day to one instant and makes the Selector skip a file that does overlap the
+        // query. Leaving bounds off is the honest default — the reader just cannot prune.
         ctx.log().info("summaries are emitted through", "emitter", SummaryEmitter.class.getSimpleName());
 
         ctx.signals().emit("{{id}}.completed", Severity.INFO, Map.of("outputs", ctx.outputs().size()));

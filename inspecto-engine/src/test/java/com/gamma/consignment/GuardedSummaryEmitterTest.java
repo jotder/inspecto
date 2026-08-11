@@ -117,7 +117,65 @@ class GuardedSummaryEmitterTest {
         assertTrue(msg.contains("'count'"), msg);
     }
 
+    // ── RED: a declared event-time range is optional, but never approximate ──────
+
+    private static SummaryRow bounded(EventTimeBounds bounds) {
+        return new SummaryRow("cdr", Map.of("record_day", "2026-07-01"),
+                List.of(Measure.additive(SummaryEmitter.COUNT, 1)), bounds);
+    }
+
+    /**
+     * ⚠ The whole reason this shape is a stated range rather than a pointer at a grain key. Declaring the
+     * record day as the event time collapses a day of events to its first instant, and the Selector then skips
+     * a file that does overlap the query. Refused at the seam, with the reason in the message.
+     */
+    @Test
+    void refusesADateAsAnEventTimeBound() {
+        String msg = refused(bounded(new EventTimeBounds("2026-07-01", "2026-07-01", 0))).getMessage();
+        assertTrue(msg.contains("not ISO-8601 local date-time"), msg);
+        assertTrue(msg.contains("a grain, not an event time"), msg);
+    }
+
+    /** Half a range reads as bounded but covers nothing on the open side — the worst of both. */
+    @Test
+    void refusesAHalfOpenRange() {
+        assertTrue(refused(bounded(new EventTimeBounds("2026-07-01T08:00:00", null, 0)))
+                .getMessage().contains("declare only a min"));
+        assertTrue(refused(bounded(new EventTimeBounds(null, "2026-07-01T08:00:00", 0)))
+                .getMessage().contains("declare only a max"));
+    }
+
+    @Test
+    void refusesARangeThatRunsBackwards() {
+        assertTrue(refused(bounded(new EventTimeBounds("2026-07-01T09:00:00", "2026-07-01T08:00:00", 0)))
+                .getMessage().contains("run backwards"));
+    }
+
+    /**
+     * {@code spreadMs} is what compaction and late-arrival segregation actually filter on, so a spread that
+     * disagrees with its own endpoints misfilters while looking well-formed.
+     */
+    @Test
+    void refusesASpreadThatDisagreesWithItsEndpoints() {
+        String msg = refused(bounded(new EventTimeBounds("2026-07-01T08:00:00", "2026-07-01T09:00:00", 42)))
+                .getMessage();
+        assertTrue(msg.contains("spreadMs is 42"), msg);
+        assertTrue(msg.contains("EventTimeBounds.of"), msg);
+    }
+
     // ── GREEN: what a correct summary looks like ─────────────────────────────────
+
+    /** Absent bounds stay legal: "I do not know" is the honest default, not a violation. */
+    @Test
+    void acceptsARowWithNoBoundsAndOneBuiltByTheFactory() {
+        GuardedSummaryEmitter emitter = new GuardedSummaryEmitter();
+        emitter.emit(bounded(null));
+        emitter.emit(bounded(EventTimeBounds.of("2026-07-01T08:00:00", "2026-07-01T09:00:00")));
+
+        assertEquals(2, emitter.emitted().size());
+        assertNull(emitter.emitted().get(0).bounds());
+        assertEquals(3_600_000L, emitter.emitted().get(1).bounds().spreadMs());
+    }
 
     @Test
     void acceptsAndCollectsAWellDeclaredSummary() {

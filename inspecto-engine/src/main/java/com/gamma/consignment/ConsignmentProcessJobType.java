@@ -177,8 +177,9 @@ public final class ConsignmentProcessJobType implements JobTypeProvider {
          *
          * @param processorId the {@code producer} for these registry rows — the processor that emitted them, not
          *                    this Job Type: two processors can summarise the same target, and
-         *                    {@code producerHighWater} groups by producer. Bounds stay null; see
-         *                    {@link SummaryWriter#write}.
+         *                    {@code producerHighWater} groups by producer. Event-time bounds come from what the
+         *                    rows themselves {@linkplain SummaryRow#bounds() declare} — nothing here derives
+         *                    them; see {@link SummaryWriter#write}.
          */
         private void persistSummaries(JobContext ctx, String consignmentId, List<SummaryRow> rows,
                                       String processorId) throws Exception {

@@ -36,14 +36,13 @@ column is not evidence that it *is* event time:
 | Ingest (`BatchProcessor` → `DataTransformer`) | `__event_time`, coerced from the schema's date `PartitionDef` and **excluded from written output** | no date partition declared, or every row failed to parse |
 | Pipeline sink (`PartitionSinkWriter`) | `TRY_CAST(<source> AS TIMESTAMP)`, where `source` is a `partitions[]` entry's declared raw column | no entry declares one, entries disagree, or it is not a plain identifier |
 
-Enrichment and the Consignment processor **record a producer since 2026-08-10**; enrichment records bounds
-since 2026-08-11, the processor still does not — the two halves were different problems, so they stay listed
-apart:
+Enrichment and the Consignment processor **record a producer since 2026-08-10**, and both record bounds since
+2026-08-11 — but by opposite mechanisms, because they are opposite problems:
 
 | Writer | `producer` | `bounds` |
 |---|---|---|
 | Enrichment (`EnrichmentEngine`) | the enrichment's own `cfg.name()`, on the main **and** routed/quarantine writes | **SHIPPED 2026-08-11.** An `output.partitions` entry may be the sink's `{column, source}` map instead of a bare name; the parser folds the declared sources to `Output.eventTimeSource` and `boundsOf` runs the same `TRY_CAST(<source> AS TIMESTAMP)` fold as the sink |
-| Consignment processor (`ConsignmentProcessJobType`) | the **processor id**, threaded through `SummaryWriter.write` | **open — a design call, possibly a won't-do.** A `SummaryRow` is pre-aggregated over an author-chosen `keys` grain with no enforced time key |
+| Consignment processor (`ConsignmentProcessJobType`) | the **processor id**, threaded through `SummaryWriter.write` | **SHIPPED 2026-08-11 — stated, not derived.** `SummaryRow` gained an optional `EventTimeBounds bounds`; `SummaryWriter` folds the declarations per output file. See §2-A |
 
 ⚠ **Neither writer was ever missing its registry row** — both always called `ConsignmentOutputStores.record`; the
 two columns just arrived null. Worth knowing before someone goes looking for an absent write path.
@@ -52,9 +51,37 @@ two columns just arrived null. Worth knowing before someone goes looking for an 
 enrichment can write, so `dest` would be a useless producer; and the process job's producer is the *processor*,
 not the Job Type, because two processors can summarise one target and `producerHighWater` groups by producer.
 
-⛔ **Do not close the summary-bounds gap by folding a `record_day` key into a range.** That describes the grain,
-not the events — and a wrong watermark is worse than a null, which a reader correctly treats as "cannot prune".
-Pinned as a deliberate null by `SummaryWriterTest#boundsStayNullBecauseASummaryRowHasNoEventTime`.
+### 2-A. Summary bounds are *stated by the processor*, never derived
+
+Every other writer folds bounds **out of** the rows it is writing. A summary row has no rows — it is already an
+aggregate — so the only party that ever saw the detail is the processor that aggregated it. That inverts the
+mechanism: `SummaryRow` carries an optional `EventTimeBounds bounds`, built with `EventTimeBounds.of(min, max)`,
+and `SummaryWriter.boundsByPartition` folds those declarations per output file.
+
+⛔ **Do not "simplify" this into a pointer at a grain key** (the shape the backlog originally proposed: "declare
+which key is event time"). `record_day` is the *bucket* the rows fell into, so reading it as an event time
+collapses a whole day to its first instant, and the Selector then **skips a file that does overlap the query** —
+a false negative, strictly worse than the null a reader correctly treats as "cannot prune". A grain key is only
+a correct event time in the degenerate case where the grain *is* an instant, which the stated form expresses
+anyway as `of(t, t)`.
+
+Three rules fall out, each pinned by a test:
+
+- **A file is bounded only when every row in it declared a range.** One silent row means the file holds events
+  outside the fold, and a bound that under-covers its file is exactly the false negative above. One undeclared
+  row drops the whole file's bound. *(Verified by disabling the rule and watching the test go red.)*
+- **`spreadMs` is derived, never stated.** `EventTimeBounds.of` computes it, `GuardedSummaryEmitter` refuses a
+  hand-built bounds whose spread disagrees with its own endpoints, and the per-file fold re-derives it from the
+  folded endpoints rather than summing per-row spreads (which would double-count overlap).
+- **The endpoints must be ISO-8601 local date-*time*.** Enforced at `emit()`, not at write time, because the
+  registry compares them lexicographically in SQL — a bare `2026-07-01` would compare wrong rather than fail,
+  and it is precisely the grain-as-event-time mistake arriving in another costume.
+
+Absence stays legal and stays the default: a processor that declares nothing records `null`, exactly as every
+processor written before this did. Nothing in the `ConsignmentProcessor` interface changed, so the three in-repo
+implementers needed no edit — ⚠ contrary to this item's "breaking for every implementation" framing, which
+assumed the pointer shape. `tools/templates/processor/` was updated anyway, because its job is to *teach* the
+capability: a new processor that never learns bounds exist is the failure the template exists to prevent.
 
 ⚠ **The enrichment and sink declarations are the same shape but NOT the same reader.** `EnrichmentConfig`
 folds its own copy (`eventTimeSourceOf`) because it parses `.toon` into a record at load time, while

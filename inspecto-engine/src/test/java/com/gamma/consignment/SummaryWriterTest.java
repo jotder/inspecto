@@ -278,18 +278,104 @@ class SummaryWriterTest {
         for (ConsignmentOutput o : rows) assertEquals("daily_rollup", o.producer(), o.path());
     }
 
+    // ── event-time bounds: stated by the processor, never derived from the grain ─────────────────
+
+    /** {@link #row} plus the declared event-time range of the detail behind it. */
+    private static SummaryRow bounded(String target, String day, String min, String max, Measure... measures) {
+        Map<String, String> keys = new LinkedHashMap<>();
+        if (day != null) keys.put(SummaryWriter.RECORD_DAY, day);
+        return new SummaryRow(target, keys, List.of(measures), EventTimeBounds.of(min, max));
+    }
+
     /**
-     * ⚠ Bounds stay null BY DESIGN, and this pins it so nobody "fixes" it by folding the record-day key into a
-     * range. A summary row is pre-aggregated over an author-chosen grain with no enforced time key, so a
-     * min/max over it would describe the grain, not the events — a wrong watermark is worse than none, which
-     * a reader treats as "cannot prune". Closing this properly is a design call (BACKLOG §4).
+     * ⚠ The replacement for {@code boundsStayNullBecauseASummaryRowHasNoEventTime}. Absence is still the
+     * default — what changed is that it is now the answer for a row that <em>declares</em> nothing, rather than
+     * the only answer available. A reader treats a null bound as "cannot prune", which is the honest degradation.
      */
     @Test
-    void boundsStayNullBecauseASummaryRowHasNoEventTime(@TempDir Path root) throws Exception {
+    void aRowThatDeclaresNoEventTimeStillRecordsNoBounds(@TempDir Path root) throws Exception {
         List<ConsignmentOutput> rows = write(root, "c1",
                 List.of(row("cdr", "2026-07-01", Measure.additive("count", 3))), "daily_rollup");
 
         assertEquals(1, rows.size());
-        assertNull(rows.get(0).bounds(), "a pre-aggregated summary row has no event-time range to record");
+        assertNull(rows.get(0).bounds(), "nothing was declared, so nothing is claimed");
+    }
+
+    /** A declared range reaches the registry row for the file it was written into. */
+    @Test
+    void aDeclaredRangeIsRecordedOnTheFile(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1",
+                List.of(bounded("cdr", "2026-07-01", "2026-07-01T00:12:30", "2026-07-01T23:47:05",
+                        Measure.additive("count", 3))), "daily_rollup");
+
+        assertEquals(1, rows.size());
+        EventTimeBounds b = rows.get(0).bounds();
+        assertNotNull(b, "the processor declared a range");
+        assertEquals("2026-07-01T00:12:30", b.min());
+        assertEquals("2026-07-01T23:47:05", b.max());
+    }
+
+    /**
+     * Several rows land in one file (one partition), so the file's bounds are the <b>union</b> of theirs — and
+     * {@code spreadMs} is re-derived from the folded endpoints, not summed from the per-row spreads, which
+     * would double-count the overlap.
+     */
+    @Test
+    void boundsFoldAcrossEveryRowInTheSameFile(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1", List.of(
+                bounded("cdr", "2026-07-01", "2026-07-01T08:00:00", "2026-07-01T09:00:00",
+                        Measure.additive("count", 3)),
+                bounded("cdr", "2026-07-01", "2026-07-01T06:30:00", "2026-07-01T07:00:00",
+                        Measure.additive("count", 4))), "daily_rollup");
+
+        assertEquals(1, rows.size(), "same record_day — one file");
+        EventTimeBounds b = rows.get(0).bounds();
+        assertEquals("2026-07-01T06:30:00", b.min(), "earliest across the rows");
+        assertEquals("2026-07-01T09:00:00", b.max(), "latest across the rows");
+        assertEquals(150 * 60 * 1000L, b.spreadMs(), "06:30 → 09:00, derived from the folded endpoints");
+    }
+
+    /** Bounds belong to the file, so two partitions get their own — never one range smeared over both. */
+    @Test
+    void eachPartitionKeepsItsOwnBounds(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1", List.of(
+                bounded("cdr", "2026-07-01", "2026-07-01T08:00:00", "2026-07-01T09:00:00",
+                        Measure.additive("count", 3)),
+                bounded("cdr", "2026-07-02", "2026-07-02T10:00:00", "2026-07-02T11:00:00",
+                        Measure.additive("count", 4))), "daily_rollup");
+
+        Map<String, EventTimeBounds> byPartition = new LinkedHashMap<>();
+        for (ConsignmentOutput o : rows) byPartition.put(o.partitionKey(), o.bounds());
+        assertEquals("2026-07-01T08:00:00", byPartition.get("record_day=2026-07-01").min());
+        assertEquals("2026-07-02T11:00:00", byPartition.get("record_day=2026-07-02").max());
+    }
+
+    /**
+     * A file is bounded only when <b>every</b> row in it declared a range. One undeclared row means the file
+     * contains events the range does not cover, and a bound that under-covers its file is exactly the false
+     * negative the Selector must never be given.
+     */
+    @Test
+    void oneUndeclaredRowLeavesTheWholeFileUnbounded(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1", List.of(
+                bounded("cdr", "2026-07-01", "2026-07-01T08:00:00", "2026-07-01T09:00:00",
+                        Measure.additive("count", 3)),
+                row("cdr", "2026-07-01", Measure.additive("count", 4))), "daily_rollup");
+
+        assertEquals(1, rows.size());
+        assertNull(rows.get(0).bounds(),
+                "a partial range would claim the file holds nothing outside 08:00–09:00, which is not known");
+    }
+
+    /** The unpartitioned fallback carries bounds too — it is the layout that most needs them to be prunable. */
+    @Test
+    void theFlatFallbackIsBoundedAsWell(@TempDir Path root) throws Exception {
+        List<ConsignmentOutput> rows = write(root, "c1",
+                List.of(bounded("cdr", null, "2026-07-01T08:00:00", "2026-07-03T09:00:00",
+                        Measure.additive("count", 3))), "daily_rollup");
+
+        assertEquals(1, rows.size());
+        assertEquals("", rows.get(0).partitionKey());
+        assertEquals("2026-07-03T09:00:00", rows.get(0).bounds().max());
     }
 }

@@ -23,4 +23,21 @@ import com.gamma.api.PublicApi;
  */
 @PublicApi(since = "5.0.0")
 public record EventTimeBounds(String min, String max, long spreadMs) {
+
+    /**
+     * The bounds of {@code [min, max]}, with {@code spreadMs} <b>derived</b> rather than stated.
+     *
+     * <p>Every producer inside the engine gets {@code spreadMs} from SQL ({@code datediff}) as a by-product of
+     * computing the extremes, so it cannot disagree with them. A hand-built {@code new EventTimeBounds(min, max,
+     * spread)} can — and a spread that disagrees with its own endpoints misfilters compaction (§6.3) and
+     * late-arrival segregation (§9) while looking perfectly well-formed. This factory is the seam for callers
+     * that hold two timestamps and nothing else; prefer it to the canonical constructor.
+     *
+     * @throws java.time.format.DateTimeParseException when either endpoint is not ISO-8601 local date-time
+     */
+    public static EventTimeBounds of(String min, String max) {
+        java.time.LocalDateTime lo = java.time.LocalDateTime.parse(min);
+        java.time.LocalDateTime hi = java.time.LocalDateTime.parse(max);
+        return new EventTimeBounds(min, max, java.time.Duration.between(lo, hi).toMillis());
+    }
 }

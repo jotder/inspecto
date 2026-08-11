@@ -39,6 +39,14 @@ public final class GuardedSummaryEmitter implements SummaryEmitter {
                     + "|stddev|stdev|sd|variance|var|distinct|unique|nunique|min|max)$",
             Pattern.CASE_INSENSITIVE);
 
+    /**
+     * The exact shape {@link EventTimeBounds} documents: ISO-8601 local date-<b>time</b>, optionally with a
+     * fraction. Enforced here rather than left to a parse at write time because the registry compares these
+     * <em>lexicographically</em> in SQL, and mixing widths (or admitting a bare {@code 2026-07-01}) makes that
+     * comparison quietly wrong instead of loudly broken.
+     */
+    private static final Pattern EVENT_TIME = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?");
+
     private final List<SummaryRow> emitted = new ArrayList<>();
 
     @Override
@@ -106,6 +114,43 @@ public final class GuardedSummaryEmitter implements SummaryEmitter {
             Measure c = row.byName().get(COUNT);
             if (c != null && c.composability() != Measure.Composability.ADDITIVE)
                 out.add("'" + COUNT + "' must be ADDITIVE, not " + c.composability());
+        }
+        out.addAll(checkBounds(row.bounds()));
+        return out;
+    }
+
+    /**
+     * Every problem with a declared event-time range, empty when it is absent (which is allowed) or sound.
+     *
+     * <p>A range is <b>optional but not approximate</b>: absent means "I do not know", and the reader degrades
+     * to a full scan. Anything present is taken as fact by the Selector, so it is checked here — at the seam
+     * the author calls — rather than at write time, where the same refusal would name a file instead of a row.
+     */
+    private static List<String> checkBounds(EventTimeBounds b) {
+        if (b == null) return List.of();
+        List<String> out = new ArrayList<>();
+        if (b.min() == null || b.max() == null) {
+            // A half-range is the dangerous shape: it reads as bounded but covers nothing on the open side.
+            out.add("event-time bounds declare only " + (b.min() == null ? "a max" : "a min")
+                    + " — declare both endpoints or none, because a half-open range prunes as if the missing "
+                    + "side were empty");
+            return out;
+        }
+        for (String s : List.of(b.min(), b.max()))
+            if (!EVENT_TIME.matcher(s).matches())
+                out.add("event-time bound '" + s + "' is not ISO-8601 local date-time (" + EVENT_TIME.pattern()
+                        + ") — a date alone is a grain, not an event time, and collapses a whole day to its "
+                        + "first instant");
+        if (!out.isEmpty()) return out;
+
+        if (b.min().compareTo(b.max()) > 0) {
+            out.add("event-time bounds run backwards: min " + b.min() + " is after max " + b.max());
+        } else {
+            long derived = EventTimeBounds.of(b.min(), b.max()).spreadMs();
+            if (b.spreadMs() != derived)
+                out.add("event-time spreadMs is " + b.spreadMs() + " but " + b.min() + " → " + b.max()
+                        + " is " + derived + "ms — build bounds with EventTimeBounds.of(min, max) rather than "
+                        + "stating a spread that can disagree with its own endpoints");
         }
         return out;
     }
