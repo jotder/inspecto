@@ -284,12 +284,28 @@ findings 1–5 are the grounding; **decision taken: option (b)**. Scope is all f
 today. ⚠ `twoOfEachKindSurviveTheRoundTripInAuthoredOrder` stays exactly as written: under (b) it is
 reachable, so it is the acceptance test for A2/A3 rather than a record of something given up.
 
-**A2 — `PipelineConfig` reads `steps:`.** One `List<Step>` (`kind` + config). ⚠ **The dangerous half is
-back-compat, not the new reader**: legacy `processing.dedup` / `route:` / `csv_settings.where` must keep
-parsing *and* project into the step list at the position `PipelineLift`'s hard-coded chain implies.
-→ verify: a property test over the projection **first** — every existing fixture lowers to the same
-`steps:` order the current lift produces — then the new reader. Every existing `*_pipeline.toon` must
-keep parsing byte-identically.
+**A2 — `PipelineConfig` reads `steps:`.** ✅ **SHIPPED 2026-08-11 (`240b0da6`).** `Step {kind, config}` +
+`PipelineConfig.steps()`, fed by an explicit top-level `steps:` list or, absent one, the legacy singular
+blocks projected into the lift's order. As-built notes:
+
+- **A `steps:` entry is a single-key map** of kind → config (`- dedup: {keys: […]}`), not a flat
+  `{kind: dedup, …}`. Chosen so `kind` can never collide with a config key of the same name, and so a
+  malformed entry is a structural error rather than a silently-ignored one.
+- **Order is list position, full stop.** No `after:` key, no index — a second ordering channel is a second
+  source of truth, and the two disagree the first time someone hand-edits the file.
+- ⚠ **The two spellings are mutually exclusive**, refused in the parser with the offending legacy keys
+  named. There is no non-arbitrary position at which a legacy block joins an authored sequence.
+- ✅ **The projection is cross-checked against `PipelineLift`, not against a constant.**
+  `PipelineStepsProjectionTest` (in `inspecto-engine`, the module that can see both) *reads the expected
+  order off the lift* across eight block combinations, with the blocks inserted in deliberately wrong
+  declaration order so a projection that merely echoes it cannot pass. It was green on first run and
+  therefore proved nothing until `dedup`/`summarize` were swapped in the projection and it went red —
+  one position of drift is caught, and the message reports the lift's real chain.
+- ⚠ **`steps()` has no consumer yet, by design.** The flat path still reads `dedup()` / `csv.rowWhere()`;
+  the graph path walks the graph. A `steps:` file is authoring-only until A5, the posture `sinks:` has
+  had since it shipped, and the accessor javadoc says so.
+- ⚠ **Cross-module gotcha:** `-pl inspecto-engine` resolves `inspecto-etl` from `~/.m2`, not the reactor,
+  so new symbols are invisible until `mvn -o install -pl inspecto-etl`. Bit once here; will bite A3.
 
 **A4 — the mock moves in the same commit as A3** under either option.
 `inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts` must stop refusing exactly when the server does.
