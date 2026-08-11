@@ -1224,6 +1224,23 @@ public final class JobService implements AutoCloseable {
         return s == null ? null : s.get();
     }
 
+    /** Active pipelines that authored a top-level {@code output_store:} (A5-at-rest), lowercased
+     *  pipeline name → store name. Null until wired — the audit then skips that finding class
+     *  rather than guessing. Set by the hosting service (like {@link #knownPipelines}). */
+    private volatile java.util.function.Supplier<Map<String, String>> pipelineOutputStores;
+
+    /** Wire the host's output-store supplier so scheduler_audit can detect an armed Stage-2 chain
+     *  that no enabled {@code pipeline_config:} job runs. */
+    public void pipelineOutputStores(java.util.function.Supplier<Map<String, String>> supplier) {
+        this.pipelineOutputStores = supplier;
+    }
+
+    /** The host-supplied active-pipeline output stores (lowercased name → store), or null when never wired. */
+    Map<String, String> pipelineOutputStores() {
+        java.util.function.Supplier<Map<String, String>> s = pipelineOutputStores;
+        return s == null ? null : s.get();
+    }
+
     /** Immutable snapshot of every configured job, for the scheduler_audit task. */
     List<JobConfig> configSnapshot() {
         return List.copyOf(configs);

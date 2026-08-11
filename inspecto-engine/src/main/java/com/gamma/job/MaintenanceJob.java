@@ -581,7 +581,9 @@ final class MaintenanceJob implements Job {
      * {@code scheduler_audit} (MNT-4): read-only hygiene audit of the hosting Job registry. Finding
      * classes: disabled jobs, duplicate job names (last registration wins, hiding the earlier one),
      * identical specs under different names, {@code on_pipeline} triggers naming a pipeline/job the
-     * host doesn't know (only when the host wired its pipeline names — never guesses), and
+     * host doesn't know (only when the host wired its pipeline names — never guesses), active
+     * pipelines whose authored {@code output_store:} Stage-2 chain no enabled
+     * {@code pipeline_config:} job runs (A5-at-rest; only when the host wired its output stores), and
      * {@code on_signal} triggers whose type no registered Job Type declares in {@code emits} and that
      * isn't a framework lifecycle type (reported as "verify", not asserted broken — signal types are
      * open). Cron syntax needs no re-check here: it is validated eagerly at config load. Findings go
@@ -623,6 +625,23 @@ final class MaintenanceJob implements Job {
                 }
             }
         }
+        // A5-at-rest follow-up: an ACTIVE pipeline that authored a top-level output_store: armed its
+        // Stage-2 chain on the promise that a `pipeline_config:` job runs it over the landed store —
+        // with no such enabled job the chain quietly never runs (the prepare() silent-skip, deferred).
+        Map<String, String> outputStores = host.pipelineOutputStores();   // null = host never wired them — skip, don't guess
+        if (outputStores != null) {
+            Set<String> shaped = new HashSet<>();
+            for (JobConfig c : all) {
+                if (!c.enabled()) continue;
+                String p = c.params().get("pipeline_config");
+                if (p != null && !p.isBlank()) shaped.add(pipelineNameOf(p));
+            }
+            outputStores.forEach((pipeline, store) -> {
+                if (!shaped.contains(pipeline))
+                    findings.add("orphan output_store: pipeline '" + pipeline + "' declares output_store '"
+                            + store + "' but no enabled pipeline_config job runs its chain");
+            });
+        }
         Set<String> emitted = new LinkedHashSet<>(List.of("job.run.started", "job.run.completed",
                 "job.run.failed", "job.run.rejected", "job.chain.cut", "pipeline.commit"));
         for (JobTypeDescriptor d : host.jobTypes()) emitted.addAll(d.emits());
@@ -642,6 +661,15 @@ final class MaintenanceJob implements Job {
         return JobResult.ok("scheduler_audit: " + findings.size() + " finding(s) across " + all.size()
                 + " job(s)" + (findings.isEmpty() ? " — healthy" : ""),
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /** The pipeline name a {@code pipeline_config:} path refers to: the file basename, minus the
+     *  {@code .toon} extension and the conventional {@code _pipeline} suffix, lowercased. */
+    private static String pipelineNameOf(String path) {
+        String base = Path.of(path.trim()).getFileName().toString().toLowerCase();
+        if (base.endsWith(".toon")) base = base.substring(0, base.length() - ".toon".length());
+        if (base.endsWith("_pipeline")) base = base.substring(0, base.length() - "_pipeline".length());
+        return base;
     }
 
     /**

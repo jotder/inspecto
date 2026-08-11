@@ -638,6 +638,36 @@ class MaintenanceLibraryTest {
     }
 
     @Test
+    void schedulerAuditFlagsAnOutputStoreNoPipelineConfigJobRuns(@TempDir Path audit) throws Exception {
+        // 'covered' has an enabled pipeline_config job (basename match); 'orphaned' has none;
+        // 'disabled_shaper' has a job, but it is disabled — the chain still never runs.
+        JobConfig covered  = new JobConfig("rollup", JobType.PIPELINE, null, null, true, false,
+                Map.of("pipeline_config", "config/covered_pipeline.toon"));
+        JobConfig offShaper = new JobConfig("dormant", JobType.PIPELINE, null, null, false, false,
+                Map.of("pipeline_config", "config/disabled_shaper_pipeline.toon"));
+        JobConfig auditJob = new JobConfig("hygiene", JobType.MAINTENANCE, null, null, true, false, Map.of("task", "scheduler_audit"));
+        try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
+             JobService js = new JobService(List.of(covered, offShaper, auditJob),
+                     new com.gamma.etl.BatchEventBus(), s, null, audit.toString())) {
+            js.pipelineOutputStores(() -> Map.of(
+                    "covered", "covered_out",
+                    "orphaned", "orphan_store",
+                    "disabled_shaper", "dormant_out"));
+            String runId = js.triggerRun("hygiene", null).orElseThrow();
+            JobRun run = await(() -> js.lastRunOf("hygiene").orElse(null));
+
+            assertEquals("SUCCESS", run.status(), run.message());
+            List<String> logged = js.runLog(runId).stream().map(RunLogEntry::message).toList();
+            assertTrue(logged.stream().anyMatch(m -> m.contains("orphan output_store: pipeline 'orphaned'")
+                    && m.contains("orphan_store")), logged.toString());
+            assertTrue(logged.stream().anyMatch(m -> m.contains("orphan output_store: pipeline 'disabled_shaper'")
+                    && m.contains("dormant_out")), logged.toString());
+            assertTrue(logged.stream().noneMatch(m -> m.contains("output_store") && m.contains("'covered'")),
+                    logged.toString());
+        }
+    }
+
+    @Test
     void schedulerAuditIsHealthyOnACleanRegistry(@TempDir Path audit) throws Exception {
         JobConfig ok = new JobConfig("fine", JobType.MAINTENANCE, "0 4 * * *", null, true, false, Map.of("task", "heartbeat"));
         JobConfig listener = new JobConfig("chained", JobType.MAINTENANCE, null, null, true, false,

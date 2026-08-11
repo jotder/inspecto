@@ -418,6 +418,7 @@ public final class CollectorService implements AutoCloseable {
             this.jobs.spaceId(spaceId);                     // run this space's jobs under its MDC (per-space routing)
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
+            this.jobs.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             this.jobs.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
         }
         this.semanticModels    = List.copyOf(semanticModels);
@@ -1204,6 +1205,7 @@ public final class CollectorService implements AutoCloseable {
             created.spaceId(spaceId);
             created.eventLog(eventLog);
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
+            created.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             created.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.objects(this.objects);                         // recon.run promotion + incident_purge (MNT-14)
@@ -1221,6 +1223,18 @@ public final class CollectorService implements AutoCloseable {
             names.add(cfg.identity().pipelineName().toLowerCase());
         }
         return names;
+    }
+
+    /** Active pipelines that authored a top-level {@code output_store:} (A5-at-rest), lowercased
+     *  name → store — scheduler_audit flags any whose Stage-2 chain no enabled
+     *  {@code pipeline_config:} job runs (MNT-4). */
+    private java.util.Map<String, String> pipelineOutputStoresForAudit() {
+        java.util.Map<String, String> stores = new java.util.HashMap<>();
+        for (PipelineConfig cfg : configRegistry.configs()) {
+            if (cfg.active() && cfg.outputStore() != null)
+                stores.put(cfg.identity().pipelineName().toLowerCase(), cfg.outputStore());
+        }
+        return stores;
     }
 
     /** The Stage-2 enrichment service — always present since v5.1.0 (hosts zero jobs on a space
