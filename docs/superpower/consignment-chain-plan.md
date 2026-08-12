@@ -116,10 +116,19 @@ operator decision needed. G7 stays gated and is out of scope here.**
   `jobToWire`/`fromWire` (`any` omitted — the engine default). Stale `*_flow.toon` editor comment
   fixed. Contract JSONs regenerated; spec expectations updated.
   **Residuals (tracked here, not silently dropped):**
-  - *Sink `partitions[]` on the node* — **deliberately NOT specced**: entries are `{column, source}`
-    maps and the `AttributeSpec` `list` type is `string[]` — the exact `transform.route` `branches`
-    precedent. Authoring stays on the sink *component* form (Components pane) until the spec system
-    grows a map-list type; do not fake it with string parsing.
+  - [x] *Sink `partitions[]` on the node* — **RE-SCOPED by grounding 2026-08-12, then CLOSED.**
+    The UI field as planned is REFUTED for flat pipelines: EL-lane partitions are **schema-owned**
+    (`PartitionDef.fromSchema` reads `partitions[]{column,source,type}` from the schema toon —
+    already authorable in the Schema editor), and `PipelineConfig.Sink`/`PipelineLift.sinkConfig`
+    carry no partitions key, so a sink-node field would author dead config (the G3 class) and
+    split-brain the schema's ownership. The ONE honoured path — a hand-authored `sinks[].partitions`
+    reaching the at-rest job lane via `RecipeConverter`'s wholesale copy of non-primary sinks — was
+    being **deleted on every editor save** (`lower()` rebuilt `sinks:` entries with only 4 keys,
+    violating its own preserved-keys contract). That defect is FIXED: unmodeled sinks-entry keys now
+    carry over by destination database (graph-owned keys are still never resurrected); guard =
+    `PipelineSinksFileRoundTripTest.anUnmodeledSinksEntryKeySurvivesTheSave`. A first-class
+    sink-owned partitions knob + the map-list `AttributeSpec` type it needs → BACKLOG, gated on the
+    partition-ownership decision (schema vs sink; adjacent to G7).
   - [x] *Editor links + "Suggest from sample" — SHIPPED 2026-08-12.* The parse dialog
     (`GrammarEditorDialog`) mirrors its test-parse rows from `(previewed)` and grew *Draft Schema…* /
     *Draft Mapping…* onward links (cross-feature dialog import per the `node-config.dialog`

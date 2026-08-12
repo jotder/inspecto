@@ -104,6 +104,10 @@ public final class PipelineEditable {
      */
     private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads");
 
+    /** The sinks[]-entry keys the graph models (and therefore owns) — everything else in a
+     *  pre-existing entry is preserved verbatim through a save, per lower()'s contract. */
+    private static final Set<String> SINK_ENTRY_MODELED = Set.of("database", "format", "compression", "ducklake");
+
     // ═════════════════════════════ editable lift ═════════════════════════════
 
     /**
@@ -469,6 +473,16 @@ public final class PipelineEditable {
         // dirs.database above stays the shorthand + parser fallback, consistent with the first destination).
         // One destination ⇒ no sinks: block, so a single-output pipeline round-trips verbatim.
         if (destByDatabase.size() > 1) {
+            // Rebuilding the list must still honour lower()'s contract — keys the graph does not
+            // model are preserved. A hand-authored sinks[].partitions is read by the at-rest job
+            // lane (RecipeConverter copies extra sinks wholesale), so dropping it here would delete
+            // honoured config on every editor save. Modeled keys stay graph-owned and are NOT
+            // resurrected from the file; everything else carries over by destination database.
+            Map<String, Map<?, ?>> priorByDatabase = new LinkedHashMap<>();
+            if (out.get("sinks") instanceof List<?> prior)
+                for (Object o : prior)
+                    if (o instanceof Map<?, ?> pm && pm.get("database") != null)
+                        priorByDatabase.putIfAbsent(String.valueOf(pm.get("database")), pm);
             List<Map<String, Object>> sinks = new ArrayList<>();
             for (PipelineNode s : destByDatabase.values()) {
                 Map<String, Object> sink = new LinkedHashMap<>();
@@ -476,6 +490,11 @@ public final class PipelineEditable {
                 putIfPresent(sink, "format", s.cfg("format"));
                 putIfPresent(sink, "compression", s.cfg("compression"));
                 putIfPresent(sink, "ducklake", s.cfg("ducklake"));
+                Map<?, ?> prior = priorByDatabase.get(String.valueOf(s.cfg("database")));
+                if (prior != null)
+                    for (Map.Entry<?, ?> e : prior.entrySet())
+                        if (!SINK_ENTRY_MODELED.contains(String.valueOf(e.getKey())))
+                            sink.putIfAbsent(String.valueOf(e.getKey()), e.getValue());
                 sinks.add(sink);
             }
             out.put("sinks", sinks);

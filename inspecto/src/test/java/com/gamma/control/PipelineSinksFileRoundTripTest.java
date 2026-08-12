@@ -101,6 +101,56 @@ class PipelineSinksFileRoundTripTest {
     }
 
     /**
+     * A hand-authored {@code sinks[].partitions} is honoured by the at-rest job lane
+     * ({@code RecipeConverter} copies non-primary sinks wholesale), so the editor's save must not
+     * delete it: rebuilding the plural block still honours {@code lower}'s contract that keys the
+     * graph does not model are preserved — while graph-OWNED keys the node dropped are not
+     * resurrected from the file.
+     */
+    @Test
+    void anUnmodeledSinksEntryKeySurvivesTheSave(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("s.toon"), com.gamma.etl.PipelineConfigBatchTest.miniSchema(),
+                StandardCharsets.UTF_8);
+        List<PipelineNode> nodes = List.of(
+                node("acq", "acquisition", Map.of("poll", dir.resolve("in").toString())),
+                node("parse", "parser", Map.of("schema_file", dir.resolve("s.toon").toString())),
+                node("hot", "sink.persistent", Map.of(
+                        "database", dir.resolve("hot").toString(), "format", "parquet")),
+                node("cold", "sink.persistent", Map.of(
+                        "database", dir.resolve("cold").toString(), "format", "csv")));
+
+        // The file as it stands: the cold destination carries partitions (unmodeled — preserved)
+        // and a compression the editor's node no longer declares (modeled — graph-owned, dropped).
+        Map<String, Object> coldEntry = new LinkedHashMap<>();
+        coldEntry.put("database", dir.resolve("cold").toString());
+        coldEntry.put("format", "csv");
+        coldEntry.put("compression", "gzip");
+        coldEntry.put("partitions", List.of(new LinkedHashMap<>(
+                Map.of("column", "day", "source", "TXN_DATE"))));
+        Map<String, Object> existing = new LinkedHashMap<>();
+        existing.put("sinks", new ArrayList<>(List.of(coldEntry)));
+
+        Map<String, Object> lowered = PipelineEditable.lower(
+                new PipelineGraph("fanout", false, nodes, List.of()), existing, true);
+        Path file = dir.resolve("fanout_pipeline.toon");
+        Files.writeString(file, ConfigCodec.toToon(lowered), StandardCharsets.UTF_8);
+        Map<String, Object> reloaded = ToonHelper.load(file.toString());
+
+        List<?> sinks = (List<?>) reloaded.get("sinks");
+        assertEquals(2, sinks.size());
+        Map<?, ?> cold = sinks.stream().map(Map.class::cast)
+                .filter(s -> dir.resolve("cold").toString().equals(String.valueOf(s.get("database"))))
+                .findFirst().orElseThrow();
+        List<?> partitions = (List<?>) cold.get("partitions");
+        assertNotNull(partitions, "the unmodeled partitions key must survive the save:\n" + lowered);
+        Map<?, ?> p0 = (Map<?, ?>) partitions.get(0);
+        assertEquals("day", p0.get("column"));
+        assertEquals("TXN_DATE", p0.get("source"));
+        assertNull(cold.get("compression"),
+                "a graph-owned key the node dropped must NOT be resurrected from the file");
+    }
+
+    /**
      * The safety property that lets this ship: a pipeline with one destination is written exactly as
      * before, with no {@code sinks:} block at all. Every pipeline in existence takes this path.
      */
