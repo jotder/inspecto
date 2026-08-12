@@ -25,6 +25,16 @@ House style for control-plane routes. The core is **auth-free** — no auth/scop
 - Register the route in `ControlApi` following the surrounding pattern (JDK HttpServer, manual DI).
 - **Real-HTTP test class covering every gate**, modeled on `ControlApiConfigWriteTest`
   (ephemeral port, actual requests, one test per gate + the happy path).
+- ⚠ **A 2xx `/api/v1` body is the ENVELOPE `{data, metadata, links, diagnostics}`** (`Envelope.shape`),
+  so a happy-path test must read its payload under `data` — `JSON.readTree(body).get("data")`, the
+  idiom in `ControlApiAsyncV1Test`/`ControlApiDbBrowserTest`. Gate tests that only assert a status
+  code pass either way, so this surfaces as NPEs in the happy path ALONE and reads like a handler bug
+  when it is a test bug. Non-2xx uses `{error: {…}}` instead — a different shape, not the envelope.
+- A **read** route has no write-root gate: skip 503 rather than inventing one. Prefer a key that
+  cannot traverse (a bare name, separators refused → 403) over jailing a caller-supplied path, and
+  jail the resolved result anyway.
+- Bound any collection a route returns (`?limit=` or a hard cap + a `truncated` flag reporting the
+  TRUE total) — a diagnostic read must not become an unbounded export.
 - Full verify before reporting done: GAUNTLET — see the `build-verify` skill
   (`mvn -o clean test`; UI trio only if UI files changed).
 - Leave the change uncommitted unless the operator asks (release-workflow skill governs commits).
