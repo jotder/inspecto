@@ -57,6 +57,11 @@ final class RunRoutes implements RouteModule {
         api.get("/runs/([^/]+)/files",      (e, m) -> api.service().statusStore().files(cfg(api, m)));
         api.get("/runs/([^/]+)/lineage",    (e, m) -> api.service().statusStore().lineage(cfg(api, m), ApiContext.query(e, "batchId")));
         api.get("/runs/([^/]+)/quarantine", (e, m) -> api.service().statusStore().quarantine(cfg(api, m)));
+        // The rejected ROWS behind an error_rows count (audit hole 2): the audit ledgers carry counts,
+        // filenames and an error string, never row content — which existed all along in the companion
+        // `<base>_errors.csv` but only on disk, so an operator without filesystem access could see
+        // THAT 37 rows failed and never WHICH.
+        api.get("/runs/([^/]+)/errors", (e, m) -> rejectedRows(api, e, m));
         // Inbox/processing status: files still pending (matched, not yet processed) + whether the
         // pipeline is currently ingesting. Complements the audit-backed /files (processed history).
         api.get("/runs/([^/]+)/pending",    (e, m) ->
@@ -129,6 +134,78 @@ final class RunRoutes implements RouteModule {
         m.put("failed", r.failed());
         m.put("message", r.message());
         return m;
+    }
+
+    /** Rejected-row detail is a diagnostic sample, not an export — a 4M-reject file must not be a response. */
+    private static final int MAX_REJECT_ROWS = 500;
+
+    /**
+     * {@code GET /runs/{name}/errors?file=<name>} — the rejected ROWS behind a file's
+     * {@code error_rows} count, from its companion {@code <base>_errors.csv}
+     * ({@code line_number,column,reason,raw_line}, written by {@code DuckDbCsvIngester.writeRejects}).
+     *
+     * <p><b>Why a bare file NAME is the key.</b> Both surfaces that need this — the Files tab (a file
+     * accepted with rejects, whose errors file stays in {@code dirs.errors()}) and the Quarantine tab
+     * (a file rejected outright, whose errors file was moved next to it) — already hold the file name,
+     * and the two locations differ. Resolving by name in both places serves one key from either tab,
+     * and a name with no separator cannot traverse: the errors dir is searched first, then the
+     * quarantine tree. Both results are jailed to their configured root regardless, so a symlink or an
+     * odd config cannot reach outside.
+     *
+     * <p>Gates: unknown pipeline → 404; missing {@code ?file=} → 400; a name carrying a path separator
+     * or {@code ..} → 403 (never resolved at all); no errors file → 404, which is the honest answer for
+     * "this file had no rejected rows recorded" and distinguishes it from an empty list.
+     */
+    private Object rejectedRows(ApiContext api, HttpExchange e, Matcher m) throws IOException {
+        PipelineConfig cfg = cfg(api, m);                       // 404 — unknown pipeline
+        String file = ApiContext.query(e, "file");
+        if (file == null || file.isBlank())
+            throw new ApiException(400, "?file= is required (the input file's name)");
+        if (file.contains("/") || file.contains("\\") || file.contains(".."))
+            throw new ApiException(403, "?file= must be a bare file name, not a path");
+
+        String wanted = com.gamma.etl.CsvIngester.stripExtensions(file) + "_errors.csv";
+        Path found = locateErrorsFile(cfg, wanted);
+        if (found == null)
+            throw new ApiException(404, "no rejected-row detail recorded for '" + file + "'");
+
+        List<Map<String, String>> rows = new ArrayList<>();
+        try {
+            com.gamma.util.Csv.readInto(found, rows);
+        } catch (Exception bad) {
+            throw new ApiException(422, "could not read the rejected-row detail: " + bad.getMessage());
+        }
+        boolean truncated = rows.size() > MAX_REJECT_ROWS;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pipeline", ApiContext.name(m));
+        out.put("file", file);
+        out.put("errorsFile", found.getFileName().toString());
+        out.put("rowCount", rows.size());
+        out.put("truncated", truncated);
+        out.put("rows", truncated ? rows.subList(0, MAX_REJECT_ROWS) : rows);
+        return out;
+    }
+
+    /**
+     * The errors file for one input, or {@code null}. {@code dirs.errors()} holds it while the input was
+     * accepted-with-rejects; {@code QuarantineManager} moves it beside the file when the input itself is
+     * quarantined, so the quarantine tree is searched by name (bounded depth) as the fallback.
+     */
+    private static Path locateErrorsFile(PipelineConfig cfg, String wanted) throws IOException {
+        if (cfg.dirs().errors() != null) {
+            Path root = Path.of(cfg.dirs().errors()).toAbsolutePath().normalize();
+            Path direct = WriteGates.jail(root, root.resolve(wanted), "errors file");
+            if (Files.isRegularFile(direct)) return direct;
+        }
+        if (cfg.dirs().quarantine() == null) return null;
+        Path qRoot = Path.of(cfg.dirs().quarantine()).toAbsolutePath().normalize();
+        if (!Files.isDirectory(qRoot)) return null;
+        try (var walk = Files.walk(qRoot, 6)) {          // <poll-subpath>/<reason>/<file> plus headroom
+            return walk.filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().equals(wanted))
+                    .map(p -> WriteGates.jail(qRoot, p, "errors file"))
+                    .findFirst().orElse(null);
+        }
     }
 
     private PipelineConfig cfg(ApiContext api, Matcher m) {

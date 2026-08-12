@@ -30,6 +30,15 @@ export interface IngestSnapshot {
   startedAt: string;
 }
 
+/** The chain step a Consignment is at right now ("step index of total") — G6/S7's live gauge. */
+export interface StepSnapshot {
+  consignmentId: string;
+  step: string;      // the step/node id (parse, transform, sink, …)
+  index: number;     // 1-based position in the chain
+  total: number;     // step count
+  startedAt: string;
+}
+
 /** Inbox/processing status (GET /runs/{n}/pending). */
 export interface InboxStatus {
   pipeline: string;
@@ -37,6 +46,21 @@ export interface InboxStatus {
   pending: number;   // files matched but not yet processed; -1 if the scan failed
   running: boolean;  // pipeline currently mid-ingest ("under processing")
   current?: IngestSnapshot | null; // live per-file progress; absent when not mid-file
+  step?: StepSnapshot | null;      // live per-step progress; absent when nothing is running
+}
+
+/**
+ * The rejected ROWS behind a file's `error_rows` count (GET /runs/{n}/errors?file=). Rows are the
+ * companion `_errors.csv`'s own columns (`line_number`, `column`, `reason`, `raw_line`);
+ * `rowCount` is the TRUE total even when `truncated` caps what was sent.
+ */
+export interface RejectedRows {
+  pipeline: string;
+  file: string;
+  errorsFile: string;
+  rowCount: number;
+  truncated: boolean;
+  rows: AuditRow[];
 }
 
 // ── status + reports ───────────────────────────────────────────────────────────

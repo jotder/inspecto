@@ -206,6 +206,9 @@ function files(pipeline: string): Record<string, string>[] {
         consignment_id: `${pipeline}-b${1000 + (i % 10)}`,
         status: i % 12 === 0 ? 'QUARANTINED' : 'PROCESSED',
         rows: String(400 + ((i * 71) % 3000)),
+        // The real status ledger carries error_rows per file; every 4th file rejected some rows, so
+        // the "View the rejected rows" affordance (which keys off this count) is reachable offline.
+        error_rows: String(i % 4 === 0 ? 3 + (i % 7) : 0),
         size_bytes: String(48000 + ((i * 997) % 500000)),
         received_at: new Date(NOW - i * 1_800_000).toISOString(),
     }));
@@ -219,6 +222,22 @@ function lineage(pipeline: string): Record<string, string>[] {
         output_partition: `day=${20260601 + i}`,
         rows_in: String(1200 + ((i * 311) % 5000)),
         rows_out: String(1100 + ((i * 293) % 4500)),
+    }));
+}
+
+/**
+ * Rejected rows for one input file — the real `_errors.csv` columns verbatim
+ * (`line_number,column,reason,raw_line`, written by `DuckDbCsvIngester.writeRejects`). Only files
+ * whose name marks them bad have detail, so the 404 path stays reachable offline.
+ */
+function rejectedRows(file: string): Record<string, string>[] {
+    if (!/bad|reject|error/i.test(file)) return [];
+    const reasons = ['CAST', 'TOO MANY COLUMNS', 'MISSING COLUMNS', 'UNQUOTED VALUE'];
+    return Array.from({ length: 6 }, (_, i) => ({
+        line_number: String(7 + i * 13),
+        column: i % 3 === 0 ? 'AMT' : i % 3 === 1 ? 'EVENT_DATE' : '',
+        reason: reasons[i % reasons.length],
+        raw_line: `SUB${1000 + i},notanumber,2026-06-0${(i % 9) + 1},extra`,
     }));
 }
 
@@ -370,6 +389,7 @@ const PIPELINE_FILES = /\/runs\/([^/]+)\/files$/;
 const PIPELINE_LINEAGE = /\/runs\/([^/]+)\/lineage$/;
 const PIPELINE_QUARANTINE = /\/runs\/([^/]+)\/quarantine$/;
 const PIPELINE_PENDING = /\/runs\/([^/]+)\/pending$/;
+const PIPELINE_ERRORS = /\/runs\/([^/]+)\/errors(\?|$)/;
 const PIPELINE_REPORT = /\/runs\/([^/]+)\/report$/;
 const PIPELINE_COMMITS = /\/runs\/([^/]+)\/commits$/;
 const PIPELINE_TRIGGER = /\/runs\/([^/]+)\/trigger$/;
@@ -421,6 +441,25 @@ export function demoHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && (m = match(url, PIPELINE_FILES))) return json(files(m[1]));
         if (method === 'GET' && (m = match(url, PIPELINE_LINEAGE))) return json(lineage(m[1]));
         if (method === 'GET' && (m = match(url, PIPELINE_QUARANTINE))) return json(quarantine(m[1]));
+        // Rejected-row detail. Mirrors RunRoutes.rejectedRows' gates exactly (mock-never-more-lenient):
+        // missing ?file= → 400, a path-ish name → 403 (never resolved), nothing recorded → 404.
+        if (method === 'GET' && (m = match(url, PIPELINE_ERRORS))) {
+            const pipeline = m[1];
+            const file = (req.params?.['file'] ?? '').trim();
+            if (!file) return error(400, "?file= is required (the input file's name)");
+            if (file.includes('/') || file.includes('\\') || file.includes('..'))
+                return error(403, '?file= must be a bare file name, not a path');
+            const rows = rejectedRows(file);
+            if (!rows.length) return error(404, `no rejected-row detail recorded for '${file}'`);
+            return json({
+                pipeline,
+                file,
+                errorsFile: `${file.replace(/\.(csv|gz|zip|txt)$/i, '')}_errors.csv`,
+                rowCount: rows.length,
+                truncated: false,
+                rows,
+            });
+        }
         if (method === 'GET' && (m = match(url, PIPELINE_PENDING))) {
             const name = m[1];
             return json(INBOX_STATUSES[name] ?? { pipeline: name, inbox: `inboxes/${name}`, pending: 0, running: false });

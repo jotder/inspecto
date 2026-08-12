@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
-import { AuditRow, RunResult, RunView, BatchAuditReport, ReportWindow, InboxStatus } from './models';
+import { AuditRow, RunResult, RunView, BatchAuditReport, ReportWindow, InboxStatus, RejectedRows } from './models';
 
 /** Ingest run lifecycle + audit queries (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
@@ -43,6 +43,15 @@ export class RunsService {
   }
   quarantine(name: string): Observable<AuditRow[]> {
     return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/quarantine`));
+  }
+  /**
+   * The rejected ROWS behind a file's `error_rows` count — the audit ledgers carry only counts, the
+   * content lives in the companion `<base>_errors.csv`. `file` is the input file's bare NAME (the
+   * key both the Files and Quarantine tabs already hold); 404 means no detail was recorded.
+   */
+  rejectedRows(name: string, file: string): Observable<RejectedRows> {
+    return this.http.get<RejectedRows>(
+      apiUrl(`/runs/${encodeURIComponent(name)}/errors`), { params: toParams({ file }) });
   }
   /** Inbox/processing status: files pending (matched, not yet processed) + whether mid-ingest. */
   pending(name: string): Observable<InboxStatus> {

@@ -35,13 +35,19 @@ function create(inputs?: { name: string; embedded: boolean }, confirmResult = tr
                     quarantine: () => of([QUARANTINED]),
                     commits: () => of([]),
                     reprocess: () => of({}),
+                    rejectedRows: () => of({ pipeline: 'cdr_ingest', file: 'x', errorsFile: 'x_errors.csv', rowCount: 0, truncated: false, rows: [] }),
                 },
             },
-            { provide: MatDialog, useValue: {} },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(confirmResult) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
         ],
+    });
+    // ⚠ `<inspecto-data-table>` injects the REAL MatDialog, so a plain useValue provider in the same
+    // TestBed is silently ignored (the give-away is the dialog actually constructing). overrideProvider
+    // is the documented fix — without it the `open` spy below never sees a call.
+    TestBed.overrideProvider(MatDialog, {
+        useValue: { open: vi.fn(() => ({ afterClosed: () => of(undefined) })) },
     });
     const fixture = TestBed.createComponent(RunDetailComponent);
     if (inputs) {
@@ -85,7 +91,32 @@ describe('RunDetailComponent', () => {
         c.selectedIndex = c.tabs.findIndex((t) => t.id === 'quarantine');
         c.onTabChange();
         expect(c.rows).toEqual([QUARANTINED]);
-        expect(c.auditRowActions.map((a) => a.hint)).toEqual(['Lineage & details', 'Reprocess this batch']);
+        // A quarantined file's whole content was rejected, so its rejected-row detail is always offered.
+        expect(c.auditRowActions.map((a) => a.hint))
+            .toEqual(['Lineage & details', 'Reprocess this batch', 'View the rejected rows']);
+    });
+
+    it('offers the rejected rows only on files that actually rejected some', () => {
+        const c = create().componentInstance;
+        const action = c.fileRowActions.find((a) => a.hint === 'View the rejected rows')!;
+        expect(action).toBeDefined();
+        expect(action.visible?.({ filename: 'clean.csv', error_rows: '0' })).toBe(false);
+        expect(action.visible?.({ filename: 'partly.csv', error_rows: '37' })).toBe(true);
+    });
+
+    it('opens the rejected-row dialog with the file NAME, whichever key the surface spells it with', () => {
+        const c = create().componentInstance;
+        const spy = TestBed.inject(MatDialog).open as unknown as ReturnType<typeof vi.fn>;
+
+        c.openRejectedRows({ filename: 'a.csv' });                 // status ledger
+        c.openRejectedRows({ file: 'b.csv' });                     // quarantine listing
+        c.openRejectedRows({ file_name: 'c.csv' });                // offline mock
+        expect(spy.mock.calls.map((call) => (call[1] as { data: { file: string } }).data.file))
+            .toEqual(['a.csv', 'b.csv', 'c.csv']);
+
+        spy.mockClear();
+        c.openRejectedRows({ consignment_id: 'no-file-here' });     // nothing to key on → no dialog
+        expect(spy).not.toHaveBeenCalled();
     });
 
     it('reprocessing a quarantined row asks for confirmation before calling the API', async () => {

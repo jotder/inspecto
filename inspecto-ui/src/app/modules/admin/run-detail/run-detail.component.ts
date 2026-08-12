@@ -19,6 +19,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { FmtPercentPipe } from 'app/inspecto/format';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { BatchDetailDialog } from './batch-detail.dialog';
+import { RejectedRowsDialog } from './rejected-rows.dialog';
 
 type TabKey = 'batches' | 'files' | 'lineage' | 'quarantine' | 'commits' | 'report';
 type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
@@ -200,8 +201,9 @@ export class RunDetailComponent implements OnInit {
             hint: 'Lineage & details',
             onClick: (r) => this.openBatchById(r['consignment_id']),
         };
-        if (!this.lens.canOperateRuns()) return [details];
-        return [
+        const rejects = this.rejectedRowsAction;
+        if (!this.lens.canOperateRuns()) return this.activeTab === 'quarantine' ? [details, rejects] : [details];
+        const operate: InspectoRowAction<AuditRow>[] = [
             details,
             {
                 icon: 'heroicons_outline:arrow-path',
@@ -209,6 +211,7 @@ export class RunDetailComponent implements OnInit {
                 onClick: (r) => this.reprocessRow(r),
             },
         ];
+        return this.activeTab === 'quarantine' ? [...operate, rejects] : operate;
     }
 
     readonly fileRowActions: InspectoRowAction<AuditRow>[] = [
@@ -217,7 +220,24 @@ export class RunDetailComponent implements OnInit {
             hint: 'Open the batch this file belongs to',
             onClick: (r) => this.openBatchById(r['consignment_id']),
         },
+        {
+            icon: 'heroicons_outline:exclamation-triangle',
+            hint: 'View the rejected rows',
+            // Only where rows were actually rejected — the ledger's own count decides, so the
+            // affordance never promises detail that was never written.
+            visible: (r) => this.errorRows(r) > 0,
+            onClick: (r) => this.openRejectedRows(r),
+        },
     ];
+
+    /** Quarantine rows carry no count (the whole file was rejected), so the action always shows. */
+    private get rejectedRowsAction(): InspectoRowAction<AuditRow> {
+        return {
+            icon: 'heroicons_outline:exclamation-triangle',
+            hint: 'View the rejected rows',
+            onClick: (r) => this.openRejectedRows(r),
+        };
+    }
 
     // ── file-processing status ───────────────────────────────────────────────────
     private isSuccess(f: AuditRow): boolean {
@@ -259,6 +279,24 @@ export class RunDetailComponent implements OnInit {
         this.dialog.open(BatchDetailDialog, {
             data: { pipeline: this.name, batchId: id },
             width: '880px',
+            maxHeight: '85vh',
+        });
+    }
+
+    /**
+     * Open the rejected-row detail for an audit row. The file NAME is the route's key, and the three
+     * surfaces spell it differently (`filename` in the status ledger, `file` in the quarantine
+     * listing, `file_name` in the offline mock), so take the first one present rather than assuming.
+     */
+    openRejectedRows(r: AuditRow): void {
+        const file = (r['filename'] || r['file'] || r['file_name'] || '').trim();
+        if (!file) {
+            this.toastr.warning('No file name on this row');
+            return;
+        }
+        this.dialog.open(RejectedRowsDialog, {
+            data: { pipeline: this.name, file },
+            width: '900px',
             maxHeight: '85vh',
         });
     }
