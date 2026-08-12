@@ -114,6 +114,51 @@ describe('ComponentFormDialog', () => {
         expect(api.create).toHaveBeenCalledWith('sink', expect.objectContaining({ partitions: ['month'] }));
     });
 
+    // The engine's SinkPartitions reader accepts both a bare column name and a {column, source} map, so a
+    // string-only write is legal but lossy: `source` names the column the value is derived FROM.
+    it('round-trips a sink partitions entry that carries a source', () => {
+        const ref = { close: vi.fn() };
+        const api = { create: vi.fn(() => of(SAVED)), update: vi.fn(() => of(SAVED)) };
+        const def: ComponentDef = {
+            type: 'sink',
+            name: 'my-sink',
+            ref: 'sink:my-sink',
+            content: {
+                type: 'sink.persistent',
+                store: 'warehouse',
+                partitions: ['tenant', { column: 'day', source: 'event_time' }],
+            },
+        };
+        TestBed.configureTestingModule({
+            imports: [ComponentFormDialog],
+            providers: [
+                provideNoopAnimations(),
+                { provide: MAT_DIALOG_DATA, useValue: { kind: 'sink', def } },
+                { provide: MatDialogRef, useValue: ref },
+                { provide: ComponentsService, useValue: api },
+                { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
+            ],
+        });
+        const fixture = TestBed.createComponent(ComponentFormDialog);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.form.controls['partitions'].value).toEqual(['tenant', 'day']);
+
+        c.submit();
+        expect(api.update).toHaveBeenCalledWith('sink', 'my-sink', expect.objectContaining({
+            partitions: ['tenant', { column: 'day', source: 'event_time' }],
+        }));
+
+        // A newly typed chip is still a bare string, and dropping the mapped chip drops its map with it.
+        api.update.mockClear();
+        c.removePartition('day');
+        c.addPartition({ value: 'region', chipInput: { clear: vi.fn() } } as never);
+        c.submit();
+        expect(api.update).toHaveBeenCalledWith('sink', 'my-sink', expect.objectContaining({
+            partitions: ['tenant', 'region'],
+        }));
+    });
+
     // AI drafting was offered ONLY for the `schema` kind and was removed with it (unification W1,
     // 2026-07-31): a schema is no longer a registry component. The specs that covered `applySchemaDraft`
     // and the field-row FormArray went with the code. What survives is the rule that made the affordance

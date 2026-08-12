@@ -92,6 +92,9 @@ export class ComponentFormDialog {
     sampleText = this.kind === 'grammar' ? 'a,b,c\n1,2,3' : '';
     sampleRows = '[{ "id": "1", "amt": "150" }, { "id": "x", "amt": "abc" }]';
 
+    /** Original `partitions:` entries by chip label — a `{column, source}` map survives an untouched save. */
+    private readonly sinkPartitionEntries = new Map<string, unknown>();
+
     readonly title = computed(() => `${this.isEdit ? 'Edit' : 'New'} ${this.kind}`);
     readonly partitionSeparatorKeys = [ENTER, COMMA];
 
@@ -137,6 +140,15 @@ export class ComponentFormDialog {
                 config: Object.keys(rest).length ? JSON.stringify(rest, null, 2) : this.form.get('config')!.value,
             });
         } else if (this.kind === 'sink') {
+            // Keep the original partitions entries (some carry {column, source} maps) keyed by their
+            // chip label, so an unedited entry round-trips verbatim instead of collapsing to a string.
+            const src = c['partitions'];
+            if (Array.isArray(src)) {
+                for (const p of src) {
+                    const label = partitionLabel(p);
+                    if (label) this.sinkPartitionEntries.set(label, p);
+                }
+            }
             this.form.patchValue({
                 sinkKind: str(c['type'], SINK_KINDS[0]),
                 store: str(c['store'], ''),
@@ -188,7 +200,10 @@ export class ComponentFormDialog {
                 const out: Record<string, unknown> = { type: v.sinkKind };
                 if (v.store?.trim()) out['store'] = v.store.trim();
                 if (v.format) out['format'] = v.format;
-                const parts = (v.partitions as string[]).map((p) => p.trim()).filter(Boolean);
+                const parts = (v.partitions as string[])
+                    .map((p) => p.trim())
+                    .filter(Boolean)
+                    .map((p) => this.sinkPartitionEntries.get(p) ?? p);
                 if (parts.length) out['partitions'] = parts;
                 return out;
             }
@@ -283,8 +298,12 @@ function num(v: unknown, dflt: number): number {
     const n = Number(v);
     return Number.isFinite(n) ? n : dflt;
 }
+/** The chip label for a `partitions:` entry — a bare column name, or the `column` of a `{column, source}` map. */
+function partitionLabel(p: unknown): string {
+    return (p && typeof p === 'object' ? String((p as { column?: unknown }).column ?? '') : String(p ?? '')).trim();
+}
 function partitionsOf(c: Record<string, unknown>): string[] {
     const src = c['partitions'];
     if (!Array.isArray(src)) return [];
-    return src.map((p) => (p && typeof p === 'object' ? String((p as { column?: unknown }).column ?? '') : String(p))).filter(Boolean);
+    return src.map(partitionLabel).filter(Boolean);
 }
