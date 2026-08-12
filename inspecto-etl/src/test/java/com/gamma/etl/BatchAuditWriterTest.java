@@ -38,6 +38,11 @@ class BatchAuditWriterTest {
         String batches = Files.readString(Path.of(batchesCsv));
         assertTrue(batches.contains("consignment_id,pipeline,schema_name,output_table"));
         assertTrue(batches.contains("B1"));
+        // cast_failures is the last column and this row never measured it — a BLANK cell, not 0,
+        // so an unmeasured coercion count can never be read as a clean batch.
+        assertTrue(batches.contains("duration_ms,error,cast_failures"), batches);
+        assertTrue(batches.lines().filter(l -> l.startsWith("B1")).findFirst().orElseThrow().endsWith(",\"\","),
+                "unmeasured writes a trailing blank: " + batches);
 
         String lin = Files.readString(Path.of(lineageCsv));
         assertTrue(lin.startsWith("consignment_id,src_id,input_file,output_file,partition,row_count"));

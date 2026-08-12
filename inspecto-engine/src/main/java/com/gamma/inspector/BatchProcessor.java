@@ -386,7 +386,8 @@ public final class BatchProcessor {
                 outcome.batchStart().format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT), status,
                 batch.members().size(), rejected, outcome.totalInputRows(), totalOutputRows,
                 outputs.size(), totalOutputBytes,
-                Duration.between(outcome.batchStart(), end).toMillis(), error);
+                Duration.between(outcome.batchStart(), end).toMillis(), error,
+                outcome.castFailures());
 
         audit.flush(batchRow, fileRows, lineage);
     }

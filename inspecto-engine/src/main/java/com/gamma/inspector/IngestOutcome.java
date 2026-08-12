@@ -27,6 +27,11 @@ import java.util.Map;
  * @param bounds         §3.1 event-time range per output file path, for the output registry. Empty — never
  *                       null — when the path wrote nothing, materialised no event time, or the schema
  *                       declares no date partition.
+ * @param castFailures   values a declared type coercion silently nulled while the row was KEPT
+ *                       ({@link com.gamma.etl.DataTransformer#countCastFailures}). <b>{@code -1} means
+ *                       NOT MEASURED</b> — the only two states are "measured" ({@code >= 0}) and
+ *                       "unknown"; a path that cannot measure must never report {@code 0}, which would
+ *                       claim a clean batch. The audit ledger writes unknown as a blank cell.
  */
 record IngestOutcome(LocalDateTime batchStart,
                      String status,
@@ -37,13 +42,22 @@ record IngestOutcome(LocalDateTime batchStart,
                      List<LineageRow> lineage,
                      long totalInputRows,
                      String schemaLabel,
-                     Map<String, EventTimeBounds> bounds) {
+                     Map<String, EventTimeBounds> bounds,
+                     long castFailures) {
+
+    /** Unmeasured form — the coercion count defaults to {@code -1} ("not measured"), never {@code 0}. */
+    IngestOutcome(LocalDateTime batchStart, String status, String error, List<Batch.Member> survivors,
+                  List<MemberAudit> memberAudits, List<PartitionOutput> outputs, List<LineageRow> lineage,
+                  long totalInputRows, String schemaLabel, Map<String, EventTimeBounds> bounds) {
+        this(batchStart, status, error, survivors, memberAudits, outputs, lineage, totalInputRows,
+                schemaLabel, bounds, -1);
+    }
 
     /** No-bounds form — {@code EMPTY}/{@code FAILED} outcomes and any path that wrote no output files. */
     IngestOutcome(LocalDateTime batchStart, String status, String error, List<Batch.Member> survivors,
                   List<MemberAudit> memberAudits, List<PartitionOutput> outputs, List<LineageRow> lineage,
                   long totalInputRows, String schemaLabel) {
         this(batchStart, status, error, survivors, memberAudits, outputs, lineage, totalInputRows,
-                schemaLabel, Map.of());
+                schemaLabel, Map.of(), -1);
     }
 }

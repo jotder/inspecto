@@ -47,7 +47,7 @@ public final class BatchAuditWriter {
         this.batches = batchesPath == null ? null : new CsvLedger<>(batchesPath,
                 "consignment_id,pipeline,schema_name,output_table,start_time,end_time,status," +
                         "member_count,rejected_count,total_input_rows,total_output_rows," +
-                        "output_file_count,total_output_bytes,duration_ms,error",
+                        "output_file_count,total_output_bytes,duration_ms,error,cast_failures",
                 BatchAuditWriter::batchLine);
         this.lineage = lineagePath == null ? null : new CsvLedger<>(lineagePath,
                 "consignment_id,src_id,input_file,output_file,partition,row_count",
@@ -82,12 +82,29 @@ public final class BatchAuditWriter {
                           long parsedRows, long errorRows, List<String> outputPaths,
                           List<Long> outputSizes, long durationMs, String error, String batchId) {}
 
-    /** One batch-summary audit row. */
+    /**
+     * One batch-summary audit row. {@code castFailures} counts values a declared type coercion
+     * silently nulled while keeping the row; <b>{@code -1} = not measured</b> and is written as a
+     * BLANK cell, so "unknown" is never mistaken for "clean" (readers parse this ledger by header
+     * name, so pre-existing files simply carry no such key).
+     */
     public record BatchRow(String batchId, String pipeline, String schemaName, String outputTable,
                            String startTime, String endTime, String status,
                            int memberCount, int rejectedCount, long totalInputRows,
                            long totalOutputRows, int outputFileCount, long totalOutputBytes,
-                           long durationMs, String error) {}
+                           long durationMs, String error, long castFailures) {
+
+        /** Unmeasured form — {@code castFailures} defaults to {@code -1} ("not measured"). */
+        public BatchRow(String batchId, String pipeline, String schemaName, String outputTable,
+                        String startTime, String endTime, String status,
+                        int memberCount, int rejectedCount, long totalInputRows,
+                        long totalOutputRows, int outputFileCount, long totalOutputBytes,
+                        long durationMs, String error) {
+            this(batchId, pipeline, schemaName, outputTable, startTime, endTime, status, memberCount,
+                    rejectedCount, totalInputRows, totalOutputRows, outputFileCount, totalOutputBytes,
+                    durationMs, error, -1);
+        }
+    }
 
     /**
      * Append this batch's rows to the three audit CSVs, then record the batch in
@@ -142,13 +159,15 @@ public final class BatchAuditWriter {
     }
 
     private static String batchLine(BatchRow b) {
-        return String.format("%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,\"%s\"",
+        return String.format("%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%d,%d,%d,\"%s\",%s",
                 b.batchId(), b.pipeline(), b.schemaName(),
                 b.outputTable() == null ? "" : b.outputTable(),
                 b.startTime(), b.endTime(), b.status(),
                 b.memberCount(), b.rejectedCount(), b.totalInputRows(), b.totalOutputRows(),
                 b.outputFileCount(), b.totalOutputBytes(), b.durationMs(),
-                CsvLedger.q(b.error()));
+                CsvLedger.q(b.error()),
+                // blank, not -1: an unmeasured coercion count must not read as a clean batch
+                b.castFailures() < 0 ? "" : String.valueOf(b.castFailures()));
     }
 
     private static String lineageLine(LineageRow r) {

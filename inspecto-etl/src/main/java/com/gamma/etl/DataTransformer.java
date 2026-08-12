@@ -1,6 +1,10 @@
 package com.gamma.etl;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.*;
 
@@ -32,6 +36,8 @@ import java.util.*;
  * </ul>
  */
 public final class DataTransformer {
+
+    private static final Logger log = LoggerFactory.getLogger(DataTransformer.class);
 
     private DataTransformer() {}
 
@@ -131,6 +137,96 @@ public final class DataTransformer {
         select.append(", \"").append(sourceTable).append("\".\"__src_id\" AS __src_id");
         select.append(" FROM \"").append(sourceTable).append('"');
         return select.toString();
+    }
+
+    /**
+     * Count the values a typed coercion <b>silently nulled</b> in {@code sourceTable}: the source was
+     * non-blank, yet the compiled expression yields NULL. Returns cell-level failures (one per value,
+     * so a batch can report more failures than it has rows) and logs the per-column breakdown at WARN
+     * when non-zero, which is what makes the total diagnosable.
+     *
+     * <p><b>Why this exists.</b> A `TRY_CAST`/`TRY_STRPTIME` that fails does not reject its row — the
+     * value becomes NULL and the row is kept (see {@link #materialize}), so a whole column of
+     * mis-formatted timestamps could land as NULLs with nothing in the audit trail saying so. Parse
+     * failures have {@code errorRows} + a companion {@code _errors.csv}; coercion failures had
+     * <em>nothing</em>. This does not change what is written — it only makes the loss countable.
+     *
+     * <p>Counted per rule kind: {@code DIRECT} only for the coercing declared types
+     * ({@code TIMESTAMP}/{@code DATE}/{@code DOUBLE} — a VARCHAR pass-through cannot null-out),
+     * {@code CONCAT_DT} and {@code FILENAME_DATE} always (both can fail to match). ⛔ {@code EXPR} is
+     * deliberately EXCLUDED: its {@code sourceExpression} is author-owned SQL, not a column reference,
+     * so "the source was non-blank" has no defined meaning — counting it would invent a denominator.
+     *
+     * <p>Best-effort: any SQL failure returns {@code -1} ("not measured") rather than failing a batch
+     * that otherwise succeeded. One extra aggregate scan per batch.
+     */
+    @SuppressWarnings("unchecked")
+    public static long countCastFailures(Connection conn, Map<String, Object> schemaConfig,
+                                        PipelineConfig cfg, String sourceTable) {
+        Map<String, String> fieldTypes = new LinkedHashMap<>();
+        for (Map<String, Object> f : (List<Map<String, Object>>)
+                ((Map<String, Object>) schemaConfig.get("raw")).get("fields"))
+            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+
+        List<Map<String, String>> rules = (List<Map<String, String>>)
+                ((Map<String, Object>) schemaConfig.get("mapping")).get("rules");
+
+        List<String> targets = new ArrayList<>();
+        StringBuilder select = new StringBuilder("SELECT ");
+        for (Map<String, String> rule : rules) {
+            String raw = coercedSourceColumn(rule, fieldTypes);
+            if (raw == null) continue;
+            String col = "\"" + sourceTable + "\".\"" + raw + '"';
+            String expr = TransformCompiler.dataColumn(rule, fieldTypes, sourceTable, cfg.csv());
+            if (!targets.isEmpty()) select.append(", ");
+            select.append("SUM(CASE WHEN NULLIF(TRIM(CAST(").append(col).append(" AS VARCHAR)), '') IS NOT NULL")
+                    .append(" AND (").append(expr).append(") IS NULL THEN 1 ELSE 0 END)");
+            targets.add(rule.get("targetColumn"));
+        }
+        if (targets.isEmpty()) return 0;   // nothing coercing — no failure is possible
+        select.append(" FROM \"").append(sourceTable).append('"');
+
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(select.toString())) {
+            if (!rs.next()) return 0;
+            long total = 0;
+            StringBuilder worst = new StringBuilder();
+            for (int i = 0; i < targets.size(); i++) {
+                long n = rs.getLong(i + 1);
+                if (n <= 0) continue;
+                total += n;
+                if (!worst.isEmpty()) worst.append(", ");
+                worst.append(targets.get(i)).append('=').append(n);
+            }
+            if (total > 0)
+                log.warn("{} value(s) failed their declared type coercion and were stored as NULL "
+                        + "(the rows were KEPT): {}", total, worst);
+            return total;
+        } catch (Exception e) {
+            log.warn("Could not count cast failures on {}: {}", sourceTable, e.toString());
+            return -1;   // not measured — never fails the batch
+        }
+    }
+
+    /**
+     * The single raw column a rule's coercion reads, or {@code null} when the rule cannot be measured
+     * (an {@code EXPR}'s author-owned SQL, or a {@code DIRECT} whose declared type is a pass-through).
+     * {@code CONCAT_DT}/{@code FILENAME_DATE} pack extra arguments after a {@code |} — the column is
+     * the first segment.
+     */
+    private static String coercedSourceColumn(Map<String, String> rule, Map<String, String> fieldTypes) {
+        String source = rule.get("sourceExpression");
+        if (source == null || source.isBlank()) return null;
+        String type = rule.get("transformType");
+        String norm = type == null ? "" : type.trim().toUpperCase();
+        if (norm.isEmpty() || norm.equals("DIRECT")) {
+            String declared = fieldTypes.getOrDefault(source, "VARCHAR");
+            return switch (declared) {
+                case "TIMESTAMP", "DATE", "DOUBLE" -> source;
+                default -> null;      // VARCHAR (and anything unrecognised) is emitted verbatim
+            };
+        }
+        if (norm.equals("CONCAT_DT") || norm.equals("FILENAME_DATE")) return source.split("\\|", 2)[0];
+        return null;                  // EXPR — see countCastFailures
     }
 
     /**

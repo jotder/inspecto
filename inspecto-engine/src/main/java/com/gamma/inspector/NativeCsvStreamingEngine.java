@@ -132,6 +132,7 @@ final class NativeCsvStreamingEngine {
             st.execute("CREATE VIEW \"raw_input\" AS " + unionAll(memberViews));
         }
         DataTransformer.materialize(conn, schema, cfg);   // single streaming pass over all members
+        long castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
         var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
                 cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
@@ -139,7 +140,7 @@ final class NativeCsvStreamingEngine {
 
         return new IngestOutcome(batchStart, "SUCCESS", "", survivors, memberAudits,
                 written.outputs(), written.lineage(), totalInputRows, batch.schemaName(),
-                written.bounds());
+                written.bounds(), castFailures);
     }
 
     private static void dropView(Connection conn, String view) {
@@ -184,7 +185,7 @@ final class NativeCsvStreamingEngine {
             return empty(batch, batchStart, MemberAudit.rejected(m, "QUARANTINED_UNREADABLE", msg(e), mStart));
         }
         return finishSingle(batch, m, cfg, batchStart, mStart, s.parsed(), s.rejects(),
-                s.outputs(), s.lineage(), s.bounds());
+                s.outputs(), s.lineage(), s.bounds(), s.castFailures());
     }
 
     /**
@@ -213,6 +214,7 @@ final class NativeCsvStreamingEngine {
         List<PartitionOutput> outputs = new ArrayList<>();
         List<LineageRow>      lineage = new ArrayList<>();
         Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
+        long castTotal = -1;   // stays "not measured" unless at least one chunk measured
         int chunkCount = 0;
 
         try (FileChunker chunker = new FileChunker(m.file(), cfg, chunkDir)) {
@@ -230,6 +232,8 @@ final class NativeCsvStreamingEngine {
                     outputs.addAll(s.outputs());
                     lineage.addAll(s.lineage());
                     bounds.putAll(s.bounds());
+                    // Sum across chunks; one unmeasurable chunk must not erase the others' counts.
+                    if (s.castFailures() >= 0) castTotal = Math.max(castTotal, 0) + s.castFailures();
                 } finally {
                     Files.deleteIfExists(chunk.toPath());
                 }
@@ -240,7 +244,7 @@ final class NativeCsvStreamingEngine {
                 String.format("%,d", parsedTotal), rejectTotal > 0 ? "  rejected=" + rejectTotal : "");
 
         return finishSingle(batch, m, cfg, batchStart, mStart, parsedTotal, rejectTotal, outputs, lineage,
-                bounds);
+                bounds, castTotal);
     }
 
     /**
@@ -259,17 +263,19 @@ final class NativeCsvStreamingEngine {
         dropTable(conn, "transformed");
         DuckDbCsvIngester.createRawInputView(physical, conn, schema, cfg, "raw_input", srcId);
         DataTransformer.materialize(conn, schema, cfg);   // read_csv runs here (streaming)
+        long castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
         long parsed  = countRows(conn, "transformed");
         long rejects = DuckDbCsvIngester.drainRejects(conn, physical, cfg);
         if (parsed == 0) {
             dropTable(conn, "transformed");
-            return new Streamed(0, rejects, List.of(), List.of(), Map.of());
+            return new Streamed(0, rejects, List.of(), List.of(), Map.of(), castFailures);
         }
         var written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
                 batchId, Map.of(srcId, lineageName));
         dropTable(conn, "transformed");
-        return new Streamed(parsed, rejects, written.outputs(), written.lineage(), written.bounds());
+        return new Streamed(parsed, rejects, written.outputs(), written.lineage(), written.bounds(),
+                castFailures);
     }
 
     /** Apply the shared empty/quarantine/success decision for a single-member outcome. */
@@ -277,7 +283,8 @@ final class NativeCsvStreamingEngine {
                                               LocalDateTime batchStart, LocalDateTime mStart,
                                               long parsed, long rejects,
                                               List<PartitionOutput> outputs, List<LineageRow> lineage,
-                                              Map<String, EventTimeBounds> bounds)
+                                              Map<String, EventTimeBounds> bounds,
+                                              long castFailures)
             throws Exception {
         if (parsed == 0 && rejects > 0) {
             QuarantineManager.quarantine(m.file(), "field_mismatch", true, cfg);
@@ -294,7 +301,7 @@ final class NativeCsvStreamingEngine {
 
         return new IngestOutcome(batchStart, "SUCCESS", "", List.of(m),
                 List.of(MemberAudit.accepted(m, parsed, rejects, mStart)),
-                outputs, lineage, parsed, batch.schemaName(), bounds);
+                outputs, lineage, parsed, batch.schemaName(), bounds, castFailures);
     }
 
     private static IngestOutcome empty(Batch batch, LocalDateTime batchStart, MemberAudit memberAudit) {
@@ -305,7 +312,8 @@ final class NativeCsvStreamingEngine {
     /** Per-unit streaming result aggregated by {@link #chunkedIngest}. */
     private record Streamed(long parsed, long rejects,
                             List<PartitionOutput> outputs, List<LineageRow> lineage,
-                            Map<String, EventTimeBounds> bounds) {}
+                            Map<String, EventTimeBounds> bounds,
+                            long castFailures) {}
 
     private static long countRows(Connection conn, String table) throws java.sql.SQLException {
         try (Statement st = conn.createStatement();

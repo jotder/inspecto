@@ -61,6 +61,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
         List<PartitionOutput> outputs = List.of();
         List<LineageRow>      lineage = List.of();
         Map<String, EventTimeBounds> bounds = Map.of();
+        long castFailures = -1;   // -1 = not measured (no transform ran); never 0, which claims clean
 
         File tempDb = null;
         try {
@@ -157,6 +158,9 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                     Map<String, Object> schema = batch.members().get(0).selection().schema();
                     StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "transform", 2, 3);
                     DataTransformer.materialize(conn, schema, cfg);
+                    // A failed coercion nulls its value and KEEPS the row, so count what was lost —
+                    // parse rejects have _errors.csv, this stage had no audit trail at all.
+                    castFailures = DataTransformer.countCastFailures(conn, schema, cfg, "raw_input");
 
                     StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "sink", 3, 3);
                     var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
@@ -176,7 +180,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
         }
 
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
-                outputs, lineage, totalInputRows, batch.schemaName(), bounds);
+                outputs, lineage, totalInputRows, batch.schemaName(), bounds, castFailures);
     }
 
 }
