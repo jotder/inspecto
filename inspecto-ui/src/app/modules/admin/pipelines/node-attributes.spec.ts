@@ -62,7 +62,7 @@ describe('node-attributes', () => {
      *  never migrate into OUTPUT_ATTRIBUTES (the other sink kinds have no ConsignmentPlanner). */
     it('appends the consignment grouping caps after the shared output block', () => {
         const keys = nodeAttributesFor('sink.persistent')!.map((s) => s.key);
-        expect(keys.slice(-2)).toEqual(['batch__max_files', 'batch__max_bytes']);
+        expect(keys.slice(-3)).toEqual(['batch__max_files', 'batch__max_bytes', 'batch__order']);
     });
 
     /** The shared table's format default is the ENGINE's absent-key behaviour, not a UX suggestion. */

@@ -101,7 +101,8 @@ import {
 } from './pipeline-graph';
 
 /**
- * Pipeline editor (T32, build-side NiFi UX) — author/edit a `*_flow.toon` pipeline on an interactive G6 canvas:
+ * Pipeline editor (T32, build-side NiFi UX) — author/edit a pipeline on an interactive G6 canvas; Save
+ * lowers the graph to the canonical flat `*_pipeline.toon` (no UI surface writes `*_flow.toon`):
  * drag node types from the palette, click two nodes to connect, edit node config in the inspector, dry-run a
  * sample, and Save (PUT). The {@link AuthoredPipeline} signal is the logical truth; the canvas owns layout. Loaded
  * losslessly via {@code GET …/raw} so node config round-trips. Reached via the Pipelines pane's `editor` mode.

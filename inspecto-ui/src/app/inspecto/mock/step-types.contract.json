@@ -333,5 +333,19 @@
     "tier" : "advanced",
     "min" : 1.0,
     "help" : "Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."
+  }, {
+    "key" : "batch__order",
+    "label" : "Consignment order",
+    "type" : "select",
+    "tier" : "advanced",
+    "default" : "mtime",
+    "options" : [ {
+      "value" : "mtime",
+      "label" : "By arrival (file time)"
+    }, {
+      "value" : "name",
+      "label" : "By name (path order)"
+    } ],
+    "help" : "How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime."
   } ]
 } ]

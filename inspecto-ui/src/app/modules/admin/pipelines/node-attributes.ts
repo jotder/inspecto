@@ -91,6 +91,7 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
         // batch_max_files spelling was write-only; never spec it).
         { key: 'batch__max_files', label: 'Max files per consignment', type: 'number', tier: 'advanced', min: 1, help: 'Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment).' },
         { key: 'batch__max_bytes', label: 'Max bytes per consignment', type: 'number', tier: 'advanced', min: 1, help: 'Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one.' },
+        { key: 'batch__order', label: 'Consignment order', type: 'select', tier: 'advanced', default: 'mtime', options: [{ value: 'mtime', label: 'By arrival (file time)' }, { value: 'name', label: 'By name (path order)' }], help: 'How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime.' },
     ],
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,

@@ -110,6 +110,10 @@ public final class NodeAttributes {
         attrs.add(NodeAttribute.of("batch__max_bytes", "Max bytes per consignment", "number", "advanced")
                 .min(1)
                 .help("Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."));
+        attrs.add(NodeAttribute.of("batch__order", "Consignment order", "select", "advanced")
+                .defaultValue("mtime")
+                .options("mtime", "By arrival (file time)", "name", "By name (path order)")
+                .help("How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime."));
         return List.copyOf(attrs);
     }
 

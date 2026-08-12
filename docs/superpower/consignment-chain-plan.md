@@ -88,21 +88,41 @@ operator decision needed. G7 stays gated and is out of scope here.**
   quarantine / sink boundaries via the existing `DbProvenanceStore` writer; the in-editor
   edge-weight view then works for ingest pipelines too. → verify: run a smoke pipeline with
   `-Dprovenance.backend=duckdb`, assert rows for `parse`/`sink` with matching counts.
-- [ ] **S4 — Schema inference at authoring time (G1).** New control route (e.g.
+- [x] **S4 — SHIPPED 2026-08-12 (route + engine; editor button = S6 residual).**
+  `POST /config/suggest/schema` over the parsing preview's own `sampleRows` shape, so the routes
+  chain: parse the sample, then suggest from what parsed. `SchemaSuggest` (engine) runs TRY_CAST
+  voting per column on a scratch DuckDB — `BIGINT → DOUBLE → TIMESTAMP` (demoted to `DATE` when
+  every value is midnight) `→ BOOLEAN`, else `VARCHAR`; `BIGINT` before `BOOLEAN` so `0/1` stays
+  numeric; blanks abstain. Returns a DRAFT `raw.fields` + identity mapping — never auto-applied
+  (the `ParserPlugin.suggest` posture); ingest keeps `auto_detect=false`.
+  **Schema inference at authoring time (G1).** New control route (e.g.
   `POST /config/suggest/schema`): `FileSampler` + DuckDB sniff **without** `all_varchar` +
   `TRY_CAST` voting over the sample → draft `raw.fields` (+ identity mapping) returned for human
   edit in `SchemaEditorDialog`; never auto-applied (same posture as grammar `suggest()`); ingest
   keeps `auto_detect=false`. → verify: route test over a CSV + a JSON sample; editor shows the
   draft.
-- [x] **S5 — SHIPPED 2026-08-12** (with S1). `processing.batch.order: name|mtime`, garbage refused at
-  parse time; NAME-default reproducibility pinned by test. **Consignment ordering knob (G2).** `processing.batch.order: name|mtime`
+- [x] **S5 — SHIPPED 2026-08-12** (with S1), **default amended same day by operator decision:
+  `mtime` (arrival) is the DEFAULT** — "ordering default should be file arrival timestamp, not name" —
+  and `name` is the opt-in for feeds whose stamps are unreliable (a copy resets mtime; a name-embedded
+  timestamp survives transport). Safe to flip: grouping was un-authorable before G3 and `max_files`
+  defaults to 1, so no existing pipeline observed the name default. `processing.batch.order:
+  mtime|name`, garbage refused at parse time. **Consignment ordering knob (G2).** `processing.batch.order: name|mtime`
   (default `name`, today's behaviour — mtime is copy-fragile, so opt-in). → verify: planner test
   with shuffled mtimes.
-- [ ] **S6 — UI chain repair (G8 + G3's surface).** Consignment Generation fields on the Collect
-  or Sink panel (decide placement with the operator); link Schema/Mapping editors from the parse
-  node dialog; `on_pipeline` multi-value + `on_pipeline_gate` select; sink `partitions[]` on the
-  node; fix the stale `*_flow.toon` comment. → verify: contract JSONs (`node-attributes.contract.json`)
-  regenerate + `NodeAttributesContractTest` green.
+- [x] **S6 — SHIPPED 2026-08-12, two residuals below.** Consignment Generation completed on the
+  Sink panel (`batch__order` select joins the two caps — the engine carries the tuning on the sink
+  node, so the panel lives there; movable later without a config change). Jobs pane: `on_pipeline`
+  advertises the comma list, `on_pipeline_gate` (any/all) is a real field wired through
+  `jobToWire`/`fromWire` (`any` omitted — the engine default). Stale `*_flow.toon` editor comment
+  fixed. Contract JSONs regenerated; spec expectations updated.
+  **Residuals (tracked here, not silently dropped):**
+  - *Sink `partitions[]` on the node* — **deliberately NOT specced**: entries are `{column, source}`
+    maps and the `AttributeSpec` `list` type is `string[]` — the exact `transform.route` `branches`
+    precedent. Authoring stays on the sink *component* form (Components pane) until the spec system
+    grows a map-list type; do not fake it with string parsing.
+  - *Editor links: parse dialog → Schema/Mapping editors, + a "Suggest from sample" button on
+    `SchemaEditorDialog` calling `POST /config/suggest/schema`* — UI feature work, next shift's
+    first pick; the route contract is stable and tested.
 - [ ] **S7 — Step lifecycle signals (G6, design first).** Decide grain (per step-start/stop Signal
   vs. periodic `IngestProgress` persistence) before building — event volume on the sync bus is the
   constraint (`ingestLock` deadlock note, PROJECT_NOTES). Not started until S1–S3 land.

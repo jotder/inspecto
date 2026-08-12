@@ -12,6 +12,8 @@ export interface JobDetail extends JobView {
   catchUp?: boolean;
   /** Guard expression over the firing Signal's payload; only meaningful with `onSignal`. */
   when?: string | null;
+  /** `any` (default) fires per upstream commit; `all` waits for every comma-listed upstream (Part B). */
+  onPipelineGate?: string | null;
 }
 
 /** The editable shape for create (POST /jobs) and edit (PUT /jobs/{name}). A job is cron-scheduled, event-driven
@@ -21,6 +23,8 @@ export interface JobUpsert {
   type: JobType;
   cron?: string | null;
   onPipeline?: string | null;
+  /** `any` (default) fires per upstream commit; `all` waits for every comma-listed upstream (Part B). */
+  onPipelineGate?: string | null;
   onSignal?: string | null;
   when?: string | null;
   enabled: boolean;
@@ -30,7 +34,7 @@ export interface JobUpsert {
 
 /** The job keys the server recognises as config rather than as a type-specific parameter — `JobConfig.fromMap`'s
  *  known-key set. Anything else at the top level of a job body IS a parameter. */
-const JOB_WIRE_KEYS = ['name', 'type', 'cron', 'on_pipeline', 'on_signal', 'when', 'enabled', 'catch_up', 'args', 'bind'];
+const JOB_WIRE_KEYS = ['name', 'type', 'cron', 'on_pipeline', 'on_pipeline_gate', 'on_signal', 'when', 'enabled', 'catch_up', 'args', 'bind'];
 
 /**
  * A `JobUpsert` as the write endpoints actually accept it (`POST /jobs`, `PUT /jobs/{name}`).
@@ -45,6 +49,8 @@ export function jobToWire(u: JobUpsert): Record<string, unknown> {
   const body: Record<string, unknown> = { name: u.name, type: u.type, enabled: u.enabled };
   if (u.cron) body['cron'] = u.cron;
   if (u.onPipeline) body['on_pipeline'] = u.onPipeline;
+  // The gate only travels with the event trigger it modifies; `any` is the engine default — omit it.
+  if (u.onPipeline && u.onPipelineGate && u.onPipelineGate !== 'any') body['on_pipeline_gate'] = u.onPipelineGate;
   if (u.onSignal) body['on_signal'] = u.onSignal;
   if (u.when) body['when'] = u.when;
   if (u.catchUp) body['catch_up'] = true;
@@ -65,6 +71,7 @@ export function jobFromWire(raw: Record<string, unknown>): JobDetail {
     type: String(raw?.['type'] ?? '') as JobType,
     cron: (raw?.['cron'] as string) ?? null,
     onPipeline: (raw?.['on_pipeline'] as string) ?? null,
+    onPipelineGate: (raw?.['on_pipeline_gate'] as string) ?? null,
     onSignal: (raw?.['on_signal'] as string) ?? null,
     when: (raw?.['when'] as string) ?? null,
     enabled: raw?.['enabled'] !== false,

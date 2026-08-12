@@ -167,6 +167,7 @@ export class JobFormDialog implements AfterViewInit {
               scheduleMode: triggerModeOf(this.data.job),
               cron: this.data.job.cron ?? '0 0 6 * * *',
               onPipeline: this.data.job.onPipeline ?? '',
+              onPipelineGate: this.data.job.onPipelineGate ?? 'any',
               onSignal: this.data.job.onSignal ?? '',
               when: this.data.job.when ?? '',
               enabled: this.data.job.enabled,
@@ -396,6 +397,7 @@ export class JobFormDialog implements AfterViewInit {
             scheduleMode: ScheduleMode;
             cron?: string;
             onPipeline?: string;
+            onPipelineGate?: string;
             onSignal?: string;
             when?: string;
             enabled?: boolean;
@@ -420,6 +422,8 @@ export class JobFormDialog implements AfterViewInit {
             type: v.type,
             cron: v.scheduleMode === 'cron' ? String(v.cron ?? '').trim() : null,
             onPipeline: v.scheduleMode === 'event' ? String(v.onPipeline ?? '').trim() : null,
+            // The gate only travels with the event trigger it modifies — switching away drops it.
+            onPipelineGate: v.scheduleMode === 'event' ? String(v.onPipelineGate ?? '').trim() || null : null,
             onSignal: v.scheduleMode === 'signal' ? String(v.onSignal ?? '').trim() : null,
             // The guard only travels with the signal trigger it narrows — switching away drops it.
             when: v.scheduleMode === 'signal' ? String(v.when ?? '').trim() || null : null,

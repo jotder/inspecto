@@ -43,8 +43,21 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
     {
         key: 'onPipeline', label: 'On pipeline', type: 'autocomplete', tier: 'required',
         dependsOn: { key: 'scheduleMode', equals: 'event' },
-        placeholder: 'e.g. cdr_ingest',
-        help: 'Runs when this pipeline commits a batch.',
+        placeholder: 'e.g. cdr_ingest (comma-separate for several)',
+        // The engine takes a comma list (JobConfig.onPipelines) — advertise it instead of hiding it.
+        help: 'Runs when this pipeline commits a batch. Comma-separate to watch several upstreams.',
+    },
+    {
+        key: 'onPipelineGate', label: 'Fire when', type: 'select', tier: 'optional',
+        dependsOn: { key: 'scheduleMode', equals: 'event' },
+        default: 'any',
+        options: [
+            { value: 'any', label: 'Any upstream commits' },
+            { value: 'all', label: 'All upstreams have committed' },
+        ],
+        // multi-location-ingest.md: the all-gate's pending set is in-memory — a restart waits for a
+        // full cycle again (a late run, never a wrong one).
+        help: 'With several upstreams: fire per commit, or once every named upstream has committed since the last firing (then re-arm).',
     },
     {
         key: 'onSignal', label: 'On signal', type: 'string', tier: 'required',
