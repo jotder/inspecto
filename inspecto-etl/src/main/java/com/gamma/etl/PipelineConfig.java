@@ -1275,7 +1275,7 @@ public final class PipelineConfig {
         String filePattern   = "glob:**/*.{csv,csv.gz}";
         int    batchMaxFiles   = 1;
         long   batchMaxBytes   = Long.MAX_VALUE;
-        String batchOrder      = "name";          // ConsignmentPlanner.Order — mtime is opt-in (copy-fragile)
+        String batchOrder      = "mtime";         // ConsignmentPlanner.Order — arrival order (operator 2026-08-12); name = opt-in
         long   largeFileBytes  = 268_435_456L;   // 256 MB: streaming plugin generation-mode threshold
         long   flushRecords    = 5_000_000L;      // streaming plugin generation row budget
         String duckMemoryLimit;

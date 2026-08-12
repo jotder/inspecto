@@ -63,30 +63,30 @@ class ConsignmentPlannerTest {
     }
 
     @Test
-    void mtimeOrderPacksInFileTimeOrder(@TempDir Path dir) throws Exception {
-        // Path order says a < b; the stamps say b is older. MTIME must follow the stamps (G2 —
-        // processing.batch.order: mtime), with path as the tie-break for determinism.
+    void theDefaultOrderFollowsArrivalTime(@TempDir Path dir) throws Exception {
+        // Path order says a < b; the stamps say b arrived first. The DEFAULT follows arrival
+        // (operator decision 2026-08-12): a Consignment packs in the order data actually landed.
         File a = file(dir, "t1_a.csv", 10);
         File b = file(dir, "t1_b.csv", 10);
         Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(2_000_000L));
         Files.setLastModifiedTime(b.toPath(), FileTime.fromMillis(1_000_000L));
-        List<Batch> batches = ConsignmentPlanner.plan(List.of(a, b), byPrefix(),
-                500, Long.MAX_VALUE, "TS", ConsignmentPlanner.Order.MTIME);
+        List<Batch> batches = ConsignmentPlanner.plan(List.of(a, b), byPrefix(), 500, Long.MAX_VALUE, "TS");
         assertEquals(List.of("t1_b.csv", "t1_a.csv"),
                 batches.get(0).members().stream().map(m -> m.file().getName()).toList(),
-                "file time must beat the path order the default would give");
+                "arrival time (the default) must beat path order");
     }
 
     @Test
-    void theDefaultOrderIgnoresMtime(@TempDir Path dir) throws Exception {
+    void nameOrderIsTheStampIndependentOptIn(@TempDir Path dir) throws Exception {
         File a = file(dir, "t1_a.csv", 10);
         File b = file(dir, "t1_b.csv", 10);
         Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(2_000_000L));   // a is newer, still first
         Files.setLastModifiedTime(b.toPath(), FileTime.fromMillis(1_000_000L));
-        List<Batch> batches = ConsignmentPlanner.plan(List.of(b, a), byPrefix(), 500, Long.MAX_VALUE, "TS");
+        List<Batch> batches = ConsignmentPlanner.plan(List.of(b, a), byPrefix(),
+                500, Long.MAX_VALUE, "TS", ConsignmentPlanner.Order.NAME);
         assertEquals(List.of("t1_a.csv", "t1_b.csv"),
                 batches.get(0).members().stream().map(m -> m.file().getName()).toList(),
-                "NAME (the default) is path order — reproducible regardless of copy-fragile stamps");
+                "NAME ignores stamps — the opt-in for feeds where a copy would reset mtime");
     }
 
     @Test

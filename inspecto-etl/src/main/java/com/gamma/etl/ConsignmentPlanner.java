@@ -27,19 +27,20 @@ public final class ConsignmentPlanner {
     }
 
     /**
-     * How candidate files are ordered before packing. {@code NAME} — absolute-path lexicographic —
-     * is the default: reproducible on any machine, and already time-ordered whenever names embed
-     * timestamps (the common CDR layout). {@code MTIME} follows file modification time for feeds
-     * whose names carry no order; it is copy-fragile (a copy or re-download resets the stamp),
-     * which is why it is opt-in ({@code processing.batch.order: mtime}).
+     * How candidate files are ordered before packing. {@code MTIME} — file modification time, which
+     * for a collected file is its arrival in the inbox — is the DEFAULT (operator decision
+     * 2026-08-12): a Consignment follows the order data actually arrived. A path tie-break keeps
+     * equal stamps deterministic. {@code NAME} (absolute-path lexicographic) is the opt-in for feeds
+     * whose stamps are unreliable — a copy or re-download resets mtime, while a timestamp embedded
+     * in the NAME survives any transport ({@code processing.batch.order: name}).
      */
     public enum Order { NAME, MTIME }
 
-    /** As {@link #plan(List, SchemaResolver, int, long, String, Order)} with {@link Order#NAME}. */
+    /** As {@link #plan(List, SchemaResolver, int, long, String, Order)} with the default {@link Order#MTIME}. */
     public static List<Batch> plan(List<File> files, SchemaResolver resolver,
                                    int maxFiles, long maxBytes, String runTimestamp)
             throws IOException {
-        return plan(files, resolver, maxFiles, maxBytes, runTimestamp, Order.NAME);
+        return plan(files, resolver, maxFiles, maxBytes, runTimestamp, Order.MTIME);
     }
 
     /**
@@ -59,8 +60,8 @@ public final class ConsignmentPlanner {
             throws IOException {
 
         // Group by table key (insertion-ordered for determinism), preserving each file's resolved
-        // selection. NAME keeps packing reproducible; MTIME tie-breaks on path so files sharing a
-        // stamp cannot reorder between runs.
+        // selection. MTIME (the default) tie-breaks on path so files sharing a stamp cannot reorder
+        // between runs; NAME is the stamp-independent opt-in.
         Comparator<File> byPath = Comparator.comparing(f -> f.toPath().toAbsolutePath().toString());
         List<File> sorted = new ArrayList<>(files);
         sorted.sort(order == Order.MTIME
