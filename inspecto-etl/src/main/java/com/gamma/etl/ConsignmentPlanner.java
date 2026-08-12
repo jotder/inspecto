@@ -12,10 +12,13 @@ import java.util.*;
  * <p>Pure and side-effect free apart from reading {@link File#length()}; the
  * schema resolution is injected via {@link SchemaResolver} so it is unit-testable
  * without a {@link PipelineConfig}.
+ *
+ * <p>Named for the canonical <b>Consignment</b> concept (GLOSSARY §2) ahead of the coordinated
+ * Batch→Consignment sweep (§13, amendment Phase 7) — the {@link Batch} type it returns renames there.
  */
-public final class BatchPlanner {
+public final class ConsignmentPlanner {
 
-    private BatchPlanner() {}
+    private ConsignmentPlanner() {}
 
     /** Resolves the schema/table for one file (wraps {@code SchemaSelector.select} or a single schema). */
     @FunctionalInterface

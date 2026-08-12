@@ -126,7 +126,7 @@ If you add a bus subscriber that does real work, **hand off to an executor**; ne
    `connector.post()` → `FILE_ARCHIVED`. Events `FILE_DISCOVERED`/`FILE_FETCHED`/`FILE_VALIDATED`/`FILE_FETCH_FAILED`.
 7. **Dedup** — PATH mode → `MarkerManager.isAlreadyProcessed`; content mode → `AcquisitionLedger.find` +
    `DuplicatePolicy.decide`. `inspecto_duplicates_skipped_total`.
-8. **Batch planning** — `BatchPlanner.plan()` groups survivors by schema into `Batch`es.
+8. **Batch planning** — `ConsignmentPlanner.plan()` groups survivors by schema into `Batch`es.
 9. **Batch processing** — `BatchProcessor.process(batch, cfg, audit)` (inner vthread pool).
 
 ### Commit ordering invariant (`BatchProcessor.commit`) — crash-safety

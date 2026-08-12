@@ -110,11 +110,11 @@ public class CollectorProcessor {
         }
 
         // ── plan batches ─────────────────────────────────────────────────────────
-        BatchPlanner.SchemaResolver resolver = (cfg.schemas().selector() != null)
+        ConsignmentPlanner.SchemaResolver resolver = (cfg.schemas().selector() != null)
                 ? cfg.schemas().selector()::select
                 : f -> new SchemaSelector.Selection(cfg.schemas().single(), null);
 
-        List<Batch> batches = BatchPlanner.plan(
+        List<Batch> batches = ConsignmentPlanner.plan(
                 candidates, resolver, cfg.processing().batchMaxFiles(), cfg.processing().batchMaxBytes(), cfg.identity().runTimestamp());
         log.info("Planned {} batch(es) from {} file(s) using {} thread(s)...",
                 batches.size(), candidates.size(), cfg.processing().threads());

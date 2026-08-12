@@ -74,7 +74,7 @@ Dir == artifactId for every module **except** `inspecto/` → `inspecto-processo
 ## Key packages (module ≠ `inspecto/` for most of these)
 
 - **`com.gamma.etl`** (`inspecto-etl`) — `PipelineConfig` (the one config record),
-  `BatchProcessor`/`BatchPlanner`, `CsvIngester`, `Compression`, `QuarantineManager`, `MarkerManager`.
+  `BatchProcessor`/`ConsignmentPlanner`, `CsvIngester`, `Compression`, `QuarantineManager`, `MarkerManager`.
 - **`com.gamma.inspector`** (`inspecto-engine`) — `CollectorProcessor` (poll-cycle: discover →
   stabilize → dedup → materialize → batch).
 - **`com.gamma.acquire`** (`inspecto-acquire`; connector impls in `inspecto-connectors`) — Data

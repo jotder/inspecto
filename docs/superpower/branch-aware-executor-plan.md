@@ -142,7 +142,7 @@ the Stage B reversal. The trick is to draw the unit boundary now and change the 
 > **Status 2026-08-02.** Steps 1–3 are built + verified and committed (`318acf2a` seam, `6965f6f3`
 > finalize + predicate). They land as **tested-but-dormant machinery**: an investigation this shift
 > confirmed the ingest path **cannot express a multi-sink batch today** — a `Batch` is always
-> single-schema (`BatchPlanner` groups by schema before building batches, `Batch.java`), and a flat
+> single-schema (`ConsignmentPlanner` groups by schema before building batches, `Batch.java`), and a flat
 > `*_pipeline.toon` cannot author route/derive/multi-destination (the editor refuses them). So the
 > engagement predicate (`BatchGraphRunner.engages`) is **`false` for every real ingest config**, and the
 > flat single-output path stays byte-for-byte. **Step 3's strategy wiring and step 4 (lift the editor
