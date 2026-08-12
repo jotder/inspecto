@@ -11,6 +11,7 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.BatchEvent;
 import com.gamma.etl.BatchEventBus;
 import com.gamma.etl.IngestProgress;
+import com.gamma.etl.StepProgress;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.StatusStore;
 import com.gamma.pipeline.DeletionFence;
@@ -1299,12 +1300,15 @@ public final class CollectorService implements AutoCloseable {
      * @param running  whether this pipeline is mid-ingest right now ("under processing")
      * @param current  the file being ingested right now ("file index of total"); {@code null}
      *                 when the pipeline is not mid-file (v4.1.0, per-file in-flight visibility)
+     * @param step     the chain step the current Consignment is at ("step index of total"); {@code null}
+     *                 when nothing is running (G6/S7, live step gauge — in-memory, poll-read)
      * @param oldestInboxAgeSeconds lag: seconds since the oldest waiting inbox file was modified
      *                 ({@code 0} when the inbox is empty); the same signal as the
      *                 {@code inspecto_inbox_oldest_seconds} metric (pipeline-graph §3.5 / T15)
      */
     public record InboxStatus(String pipeline, String inbox, int pending, boolean running,
-                              IngestProgress.Snapshot current, double oldestInboxAgeSeconds) {}
+                              IngestProgress.Snapshot current, StepProgress.Snapshot step,
+                              double oldestInboxAgeSeconds) {}
 
     /** Inbox/processing status for one registered pipeline; empty if no pipeline by that name. */
     public Optional<InboxStatus> inboxStatus(String pipelineName) {
@@ -1314,6 +1318,7 @@ public final class CollectorService implements AutoCloseable {
                 CollectorProcessor.countPending(cfg),
                 running.contains(pipelineName),
                 IngestProgress.current(cfg.identity().pipelineName()),
+                StepProgress.current(cfg.identity().pipelineName()),
                 CollectorProcessor.oldestInboxAgeSeconds(cfg.dirs().poll())));
     }
 

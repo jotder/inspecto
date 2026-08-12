@@ -57,8 +57,9 @@ public final class BatchProcessor {
         try {
             outcome = strategy.ingest(batch, cfg);
         } finally {
-            // The strategies report per-member progress; the snapshot must never outlive the batch.
+            // The strategies report per-member/per-step progress; a snapshot must never outlive the batch.
             IngestProgress.clear(cfg.identity().pipelineName());
+            StepProgress.clear(cfg.identity().pipelineName());
         }
 
         String status = outcome.status();

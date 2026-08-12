@@ -94,6 +94,7 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
 
                 boolean rawCreated = false;
                 int memberIdx = 0;
+                StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "parse", 1, 3);
                 for (Batch.Member m : batch.members()) {
                     IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                             m.file().getName(), ++memberIdx, batch.members().size());
@@ -154,8 +155,10 @@ final class CsvBatchStrategy implements BatchIngestStrategy {
                     batchStatus = "EMPTY";
                 } else {
                     Map<String, Object> schema = batch.members().get(0).selection().schema();
+                    StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "transform", 2, 3);
                     DataTransformer.materialize(conn, schema, cfg);
 
+                    StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "sink", 3, 3);
                     var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
                             cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
                             batch.batchId(), srcIdToFile);

@@ -137,9 +137,53 @@ operator decision needed. G7 stays gated and is out of scope here.**
     (`ConfigService.suggestSchema`) — confirm-guarded over named rows, never auto-saved. Mock
     handler mirrors the server's 400/422 strictness AND the BIGINT round-trip guard (pinned in
     `onboarding.handler.spec.ts`). Preview-verified: `1.5` → DOUBLE, date-only → DATE.
-- [ ] **S7 — Step lifecycle signals (G6, design first).** Decide grain (per step-start/stop Signal
-  vs. periodic `IngestProgress` persistence) before building — event volume on the sync bus is the
-  constraint (`ingestLock` deadlock note, PROJECT_NOTES). Not started until S1–S3 land.
+- [x] **S7 — Step lifecycle signals (G6). DESIGN DECIDED + engine/route halves SHIPPED 2026-08-12;
+  the UI poll surface (item 3) is the one open follow-on.**
+  The question "consignment X is at step 3/5" is a **live-status** question, not a durable-history
+  one — durable per-step history already exists at batch/run end (S3's provenance rows) and terminal
+  outcomes already emit Signals. So the grain decision is: **in-memory step progress, poll-read; NO
+  per-step Signals, NO periodic persistence.**
+
+  *Why the two named options lose (all file:line grounded 2026-08-12):*
+  - **Per step-start/stop Signal — REFUSED.** A Signal is a durable ledger write
+    (`PipelineBatchSignal.emit` → `EventLog.current()`), and today exactly ONE is written per
+    terminal batch, synchronously, inside the batch-commit path — i.e. **inside the pipeline's run
+    claim** (`BatchAuditWriter.flush:116-129`). Per-step Signals multiply that to steps ×
+    consignments durable writes on the claim-holding thread, onto the single-writer DuckDB the lanes
+    now share (S3). Worse than volume: Signals trigger jobs (`on_signal`), so a mid-batch step
+    Signal invites event-triggered work to fire **while the claim is held** — the exact re-entrancy
+    class PROJECT_NOTES:257-270 exists to forbid. A durable mid-flight hook can be revisited only at
+    per-consignment grain with a mandatory off-bus hand-off, and only when automation demands one.
+  - **Periodic `IngestProgress` persistence — REFUSED.** A persisted snapshot is stale by
+    construction, costs recurring DuckDB writes for data whose value expires in seconds, and leaves
+    crash-orphaned rows needing cleanup. The post-crash question ("what was it doing?") is already
+    answered better by the audit ledgers + provenance. No consumer needs a durable copy of a gauge.
+
+  *What to build instead — generalise the idiom that already works.* `IngestProgress` is already an
+  in-memory, per-pipeline live gauge (`Snapshot(batchId, file, index, total, startedAt)`, written by
+  the ingest engines via `track()`, cleared in `BatchProcessor`'s `finally`, served by
+  `CollectorService.inboxStatus`) — but it counts **files**, not steps, and the job lane has nothing.
+  Build a `StepProgress` registry (the `FileStages`/`ProvenanceStores` per-space idiom):
+  1. **Engine — SHIPPED 2026-08-12.** `com.gamma.etl.StepProgress` (the `IngestProgress` idiom;
+     `Snapshot(consignmentId, step, index, total, startedAt)`). EL lane: `CsvBatchStrategy.ingest`
+     tracks `parse`(1/3) → `transform`(2/3) → `sink`(3/3) on the Java per-member path — the native
+     streaming paths are single-pass (parse/transform/sink fused) and deliberately untracked rather
+     than faked; cleared in `BatchProcessor`'s existing `finally` beside `IngestProgress`. Job lane:
+     `PipelineExecutor.execute` tracks each node of the topological walk (`nodeId`, position/total,
+     keyed by `g.name()`) with a `finally` clear so a snapshot never outlives a run — success or
+     failure. Guards: `StepProgressTest` (3) +
+     `PipelineExecutorTest.theLiveStepGaugeIsVisibleDuringTheWalkAndClearedAfter` (live during the
+     sink write, null after, null after a thrown run).
+  2. **Control route — SHIPPED 2026-08-12.** `CollectorService.InboxStatus` gained a `step`
+     field (`StepProgress.Snapshot`, null when idle), served by the existing inbox-status route
+     (`RunRoutes.java:63`) — poll-read, no stream, no new thread. (The `PipelineScheduler` tick /
+     `NotificationService.digestTimer` precedents exist if a push surface is ever wanted — not now.)
+  3. **UI (follow-on, small, OPEN)**: the Processing-status/Runs surface polls the route and renders
+     "step 3/5 · transform" per active consignment.
+  *Deferred until a consumer demands them:* durable step start/stop rows in provenance (schema
+  change — `DbProvenanceStore` has no way to say "started, not yet counted": new nullable
+  `phase`/`started_at` column, written off-thread); coarse per-consignment mid-flight Signals for
+  automation (hand-off mandatory).
 
 ## 5. Related
 

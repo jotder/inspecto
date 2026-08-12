@@ -89,6 +89,33 @@ class PipelineExecutorTest {
         assertTrue(res.commit().sourceFinalized());
     }
 
+    /** G6/S7: the live step gauge is visible while the run is walking and never outlives it. */
+    @Test
+    void theLiveStepGaugeIsVisibleDuringTheWalkAndClearedAfter() throws Exception {
+        sql("CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150)) t(id,amt)");
+        PipelineGraph g = new PipelineGraph("GAUGE_ETL", true,
+                List.of(PipelineNode.of("parse", "parser"),
+                        PipelineNode.of("sink", "sink.persistent", Map.of(FlowStoresStoreKey, "out"))),
+                List.of(PipelineEdge.data("parse", "sink")));
+
+        com.gamma.etl.StepProgress.Snapshot[] duringSink = new com.gamma.etl.StepProgress.Snapshot[1];
+        PipelineExecutor.execute(conn, g, "parse", "parsed", "bg",
+                new BranchCommitCoordinator(new BranchCommitLog(dir.resolve("gauge.csv").toString())),
+                (s, t) -> duringSink[0] = com.gamma.etl.StepProgress.current("GAUGE_ETL"), () -> {});
+
+        assertNotNull(duringSink[0], "the gauge is live while the run's sink writes");
+        assertEquals("bg", duringSink[0].consignmentId());
+        assertEquals(2, duringSink[0].total());
+        assertNull(com.gamma.etl.StepProgress.current("GAUGE_ETL"), "a snapshot never outlives the run");
+
+        // …and a FAILED run clears it too (the finally, not the happy path, owns the erase)
+        sql("CREATE TABLE parsed2 AS SELECT * FROM (VALUES (1,150)) t(id,amt)");
+        assertThrows(Exception.class, () -> PipelineExecutor.execute(conn, g, "parse", "parsed2", "bg2",
+                new BranchCommitCoordinator(new BranchCommitLog(dir.resolve("gauge2.csv").toString())),
+                (s, t) -> { throw new IllegalStateException("boom"); }, () -> {}));
+        assertNull(com.gamma.etl.StepProgress.current("GAUGE_ETL"), "cleared on failure as well");
+    }
+
     @Test
     void rerunIsIdempotent_noRewriteNoDoubleFinalise() throws Exception {
         sql("CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150),(3,200)) t(id,amt)");

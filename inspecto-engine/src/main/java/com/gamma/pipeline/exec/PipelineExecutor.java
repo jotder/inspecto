@@ -1,6 +1,7 @@
 package com.gamma.pipeline.exec;
 
 import com.gamma.api.PublicApi;
+import com.gamma.etl.StepProgress;
 import com.gamma.pipeline.BuiltinNodeType;
 import com.gamma.pipeline.PipelineEdge;
 import com.gamma.pipeline.PipelineGraph;
@@ -145,7 +146,13 @@ public final class PipelineExecutor {
         for (Map.Entry<String, String> seed : seeds.entrySet())
             prov.record(seed.getKey(), PipelineRel.DATA, count(conn, seed.getValue()));
 
-        for (String nodeId : topoOrder(g)) {
+        List<String> order = topoOrder(g);
+        int step = 0;
+        try {
+        for (String nodeId : order) {
+            // Live step gauge (G6/S7): where this Consignment is in the walk — in-memory only,
+            // poll-read via the control plane; never a Signal, never persisted (see StepProgress).
+            StepProgress.track(g.name(), batchId, nodeId, ++step, order.size());
             if (seeds.containsKey(nodeId)) continue;       // pre-seeded source/parse relation
             PipelineNode node = byId.get(nodeId);
             if (!node.enabled()) continue;                 // disabled node (§3.6) — produces nothing; downstream inert
@@ -178,6 +185,9 @@ public final class PipelineExecutor {
                 branch -> sinkWriter.write(byId.get(branch), sinkInputs.get(branch)),
                 sourceFinalize);
         return new ExecResult(produced, sinkInputs, commit);
+        } finally {
+            StepProgress.clear(g.name());   // a snapshot must never outlive the run — success or failure alike
+        }
     }
 
     /** What a dry-run produced: every node's named relations + which table each sink would consume. No commit. */
