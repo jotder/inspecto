@@ -373,6 +373,7 @@ public final class SpaceManager implements AutoCloseable {
         // the purge below fail outright. unregister is idempotent, so the double call is free.
         com.gamma.consignment.ConsignmentOutputStores.unregister(id.value());
         com.gamma.consignment.FileStages.unregister(id.value());
+        com.gamma.pipeline.exec.ProvenanceStores.unregister(id.value());
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
             if (base.startsWith(spacesRoot) && Files.isDirectory(base)) deleteRecursively(base);

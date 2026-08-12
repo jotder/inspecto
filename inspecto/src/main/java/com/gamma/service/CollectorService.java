@@ -377,6 +377,13 @@ public final class CollectorService implements AutoCloseable {
         // idiom as the output-file registry above, since BatchProcessor.finalizeSource is static.
         com.gamma.consignment.FileStages.register(
                 spaceId, ServiceStores.openFileStageStore(root));
+        // This space's data-plane provenance projection (T21) — ONE instance shared by both lanes:
+        // the ingest lane records via the same static per-space idiom as the two registries above
+        // (BatchProcessor is static), and the Job engine gets the identical instance ctor-injected
+        // below. One store, one connection — DuckDB is single-writer; JDBC close is idempotent, so
+        // the teardown double-close (JobService + unregister) is free.
+        com.gamma.pipeline.exec.DbProvenanceStore provenanceStore = ServiceStores.openProvenanceStore(root);
+        com.gamma.pipeline.exec.ProvenanceStores.register(spaceId, provenanceStore);
         this.registry          = new CopyOnWriteArrayList<>(registry);
         this.pollSeconds       = Math.max(1, pollSeconds);
         this.maxConcurrentRuns = Math.max(1, maxConcurrentRuns);
@@ -411,7 +418,7 @@ public final class CollectorService implements AutoCloseable {
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
                         System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                        pipelineStore, System.getProperty("data.dir", root.dataDir()), ServiceStores.openProvenanceStore(root),
+                        pipelineStore, System.getProperty("data.dir", root.dataDir()), provenanceStore,
                         platformServices);   // S1-2: ctor-injected so requires: validates at registration
         if (this.jobs != null) {
             this.jobs.deletionGuard(this::checkDeletion);   // T25: fence delete jobs
@@ -1570,6 +1577,7 @@ public final class CollectorService implements AutoCloseable {
         // Release the output-file registry this service registered (+ its DB handle); no-op when default-off.
         com.gamma.consignment.ConsignmentOutputStores.unregister(spaceId);
         com.gamma.consignment.FileStages.unregister(spaceId);
+        com.gamma.pipeline.exec.ProvenanceStores.unregister(spaceId);
         if (status instanceof AutoCloseable c) {       // close a DB-backed store's connection
             try { c.close(); } catch (Exception e) { log.warn("Error closing status store: {}", e.getMessage()); }
         }

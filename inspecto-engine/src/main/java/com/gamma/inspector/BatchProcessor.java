@@ -82,6 +82,28 @@ public final class BatchProcessor {
         } catch (Exception e) {
             log.error("Batch {} failed during audit", batch.batchId(), e);
         }
+        recordProvenance(cfg.identity().pipelineName(), batch, outcome, status);
+    }
+
+    // ── data-plane provenance (T21 — consignment-chain-plan.md S3) ─────────────
+
+    /**
+     * Project the batch's step counts into the space's provenance store — the same
+     * {@code inspecto_pipeline_provenance} matrix the job lane's {@code PipelineExecutor} records, so
+     * the editor's per-edge weights work for ingest pipelines too. Node ids match the editable lift
+     * ({@code parse}/{@code sink}); a row's {@code (nodeId, rel)} paints the node's outgoing
+     * {@code data} edge. Default-off (no store registered ⇒ a map lookup) and best-effort like every
+     * registry on this path. SUCCESS only — a failed batch wrote nothing durable to count.
+     */
+    static void recordProvenance(String pipeline, Batch batch, IngestOutcome outcome, String status) {
+        if (!"SUCCESS".equals(status) || com.gamma.pipeline.exec.ProvenanceStores.shared() == null) return;
+        String ts = java.time.Instant.now().toString();
+        long written = outcome.lineage().stream().mapToLong(LineageRow::rowCount).sum();
+        com.gamma.pipeline.exec.ProvenanceStores.record(List.of(
+                new com.gamma.pipeline.exec.ProvenanceRow(
+                        pipeline, batch.batchId(), "parse", "data", outcome.totalInputRows(), ts),
+                new com.gamma.pipeline.exec.ProvenanceRow(
+                        pipeline, batch.batchId(), "sink", "data", written, ts)));
     }
 
     // ── commit: register, manifest, markers, backup ────────────────────────────

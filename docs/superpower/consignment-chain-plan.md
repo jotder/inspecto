@@ -80,7 +80,10 @@ operator decision needed. G7 stays gated and is out of scope here.**
   `$trigger.partitions`, …) instead of `Firing.NONE`. Additive: jobs that bind nothing behave
   identically. → verify: a `type: pipeline` job with `bind: {consignment_id: $trigger.batchId}`
   resolves it on a real commit-triggered run; existing `JobServiceTest` on_pipeline tests unchanged.
-- [ ] **S3 — EL-side step provenance (G5/G6 first half).** `BatchProcessor`/`CsvBatchStrategy`
+- [x] **S3 — SHIPPED 2026-08-12.** New per-space `ProvenanceStores` registry (the `FileStages`
+  idiom); ONE `DbProvenanceStore` instance now shared by both lanes (DuckDB is single-writer);
+  `BatchProcessor.recordProvenance` projects `parse`/`sink` rows into the same matrix the editor's
+  Sankey reads. SUCCESS batches only. **EL-side step provenance (G5/G6 first half).** `BatchProcessor`/`CsvBatchStrategy`
   record `ProvenanceRow(pipelineId, batchId, nodeId=step, rel, rowCount)` at parse / map /
   quarantine / sink boundaries via the existing `DbProvenanceStore` writer; the in-editor
   edge-weight view then works for ingest pipelines too. → verify: run a smoke pipeline with
