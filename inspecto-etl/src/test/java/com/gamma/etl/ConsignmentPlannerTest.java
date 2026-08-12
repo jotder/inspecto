@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +60,33 @@ class ConsignmentPlannerTest {
         assertEquals(2, batches.size());
         assertEquals(1, batches.get(0).members().size());
         assertEquals("t1_big.csv", batches.get(0).members().get(0).file().getName());
+    }
+
+    @Test
+    void mtimeOrderPacksInFileTimeOrder(@TempDir Path dir) throws Exception {
+        // Path order says a < b; the stamps say b is older. MTIME must follow the stamps (G2 —
+        // processing.batch.order: mtime), with path as the tie-break for determinism.
+        File a = file(dir, "t1_a.csv", 10);
+        File b = file(dir, "t1_b.csv", 10);
+        Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(2_000_000L));
+        Files.setLastModifiedTime(b.toPath(), FileTime.fromMillis(1_000_000L));
+        List<Batch> batches = ConsignmentPlanner.plan(List.of(a, b), byPrefix(),
+                500, Long.MAX_VALUE, "TS", ConsignmentPlanner.Order.MTIME);
+        assertEquals(List.of("t1_b.csv", "t1_a.csv"),
+                batches.get(0).members().stream().map(m -> m.file().getName()).toList(),
+                "file time must beat the path order the default would give");
+    }
+
+    @Test
+    void theDefaultOrderIgnoresMtime(@TempDir Path dir) throws Exception {
+        File a = file(dir, "t1_a.csv", 10);
+        File b = file(dir, "t1_b.csv", 10);
+        Files.setLastModifiedTime(a.toPath(), FileTime.fromMillis(2_000_000L));   // a is newer, still first
+        Files.setLastModifiedTime(b.toPath(), FileTime.fromMillis(1_000_000L));
+        List<Batch> batches = ConsignmentPlanner.plan(List.of(b, a), byPrefix(), 500, Long.MAX_VALUE, "TS");
+        assertEquals(List.of("t1_a.csv", "t1_b.csv"),
+                batches.get(0).members().stream().map(m -> m.file().getName()).toList(),
+                "NAME (the default) is path order — reproducible regardless of copy-fragile stamps");
     }
 
     @Test

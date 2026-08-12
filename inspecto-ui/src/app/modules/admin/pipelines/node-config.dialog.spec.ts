@@ -258,7 +258,8 @@ describe('NodeConfigDialog', () => {
             node: { id: 'w', type: 'sink.persistent' },
             typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
         })).componentInstance;
-        expect(c.specs().map((s) => s.key)).toEqual(['database', 'format', 'compression']);
+        expect(c.specs().map((s) => s.key)).toEqual(
+            ['database', 'format', 'compression', 'batch__max_files', 'batch__max_bytes']);
     });
 
     /**

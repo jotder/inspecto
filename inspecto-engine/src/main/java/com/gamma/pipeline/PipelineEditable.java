@@ -95,9 +95,14 @@ public final class PipelineEditable {
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
 
-    /** Sink-owned processing keys (batch/write tuning carried on the persistent sink node). */
-    private static final Set<String> SINK_PROC_OWNED = Set.of(
-            "threads", "duckdb_threads", "batch_max_files", "batch_max_bytes");
+    /**
+     * Sink-owned FLAT processing keys (write tuning carried on the persistent sink node). Consignment
+     * grouping is deliberately not here: the engine reads it as the nested {@code processing.batch:}
+     * map ({@code PipelineConfigParser}), so the sink node owns that map wholesale instead — the flat
+     * {@code batch_max_files}/{@code batch_max_bytes} spellings were write-only (G3,
+     * {@code consignment-chain-plan.md}) and lower removes them.
+     */
+    private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads");
 
     // ═════════════════════════════ editable lift ═════════════════════════════
 
@@ -204,6 +209,18 @@ public final class PipelineEditable {
                 putIfPresent(c, "backup", dirs.get("backup"));
                 putIfPresent(c, "temp", dirs.get("temp"));
                 for (String k : SINK_PROC_OWNED) putIfPresent(c, k, processing.get(k));
+                // Consignment grouping: the nested processing.batch map, owned wholesale (its keys
+                // surface as the batch__* specs). A file carrying only the legacy flat spellings —
+                // written by the editor before G3 was fixed, read by nothing — heals into the nested
+                // shape on its next save.
+                if (processing.get("batch") instanceof Map<?, ?> b) {
+                    c.put("batch", b);
+                } else {
+                    Map<String, Object> batch = new LinkedHashMap<>();
+                    putIfPresent(batch, "max_files", processing.get("batch_max_files"));
+                    putIfPresent(batch, "max_bytes", processing.get("batch_max_bytes"));
+                    if (!batch.isEmpty()) c.put("batch", batch);
+                }
             }
         } else {
             // filter / map: the lifted config is already plain (derived views; lower ignores map,
@@ -441,6 +458,12 @@ public final class PipelineEditable {
             replaceOrRemove(dirs, "backup", primarySink.cfg("backup"));
             replaceOrRemove(dirs, "temp", primarySink.cfg("temp"));
             for (String k : SINK_PROC_OWNED) replaceOrRemove(processing, k, primarySink.cfg(k));
+            // Consignment grouping lowers as the nested processing.batch: map the parser reads. The
+            // flat spellings go unconditionally — they were read by nothing (G3), and leaving one
+            // behind would keep two spellings of the same knob in one file.
+            replaceOrRemove(processing, "batch", primarySink.cfg("batch"));
+            processing.remove("batch_max_files");
+            processing.remove("batch_max_bytes");
         }
         // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
         // dirs.database above stays the shorthand + parser fallback, consistent with the first destination).

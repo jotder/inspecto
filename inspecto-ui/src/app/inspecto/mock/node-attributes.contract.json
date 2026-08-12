@@ -255,6 +255,20 @@
     "tier" : "optional",
     "help" : "Codec for the output (e.g. snappy / zstd / gzip); blank = format default.",
     "placeholder" : "snappy"
+  }, {
+    "key" : "batch__max_files",
+    "label" : "Max files per consignment",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 1.0,
+    "help" : "Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment)."
+  }, {
+    "key" : "batch__max_bytes",
+    "label" : "Max bytes per consignment",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 1.0,
+    "help" : "Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."
   } ],
   "sink.materialized" : [ {
     "key" : "format",

@@ -86,6 +86,11 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     'sink.persistent': [
         { key: 'database', label: 'Database directory', type: 'string', tier: 'required', required: false, placeholder: 'data/<pipeline>/database', help: "Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead." },
         ...OUTPUT_ATTRIBUTES,
+        // Consignment Generation (the ConsignmentPlanner caps): batch__* nests to the node's `batch`
+        // map, which lowers to the processing.batch: block the engine reads (G3 fix — the flat
+        // batch_max_files spelling was write-only; never spec it).
+        { key: 'batch__max_files', label: 'Max files per consignment', type: 'number', tier: 'advanced', min: 1, help: 'Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment).' },
+        { key: 'batch__max_bytes', label: 'Max bytes per consignment', type: 'number', tier: 'advanced', min: 1, help: 'Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one.' },
     ],
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,

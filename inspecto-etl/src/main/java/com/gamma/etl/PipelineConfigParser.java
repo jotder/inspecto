@@ -186,6 +186,14 @@ final class PipelineConfigParser {
             b.batchMaxFiles = toInt(batch.getOrDefault("max_files", 1));
             Object mb = batch.get("max_bytes");
             b.batchMaxBytes = (mb == null) ? Long.MAX_VALUE : Long.parseLong(String.valueOf(mb));
+            // Ordering before packing (S5): name = path-lexicographic (reproducible, the default);
+            // mtime = file time, opt-in because a copy or re-download resets it. Garbage refuses at
+            // parse time — a silently-ignored knob is exactly the G3 failure mode.
+            String order = String.valueOf(batch.getOrDefault("order", "name"));
+            if (!"name".equals(order) && !"mtime".equals(order))
+                throw new IllegalArgumentException(
+                        "processing.batch.order must be 'name' or 'mtime', got '" + order + "'");
+            b.batchOrder = order;
         }
 
         // ── streaming plugin engine: mode threshold + generation budget (optional) ──

@@ -100,6 +100,16 @@ public final class NodeAttributes {
                 .placeholder("data/<pipeline>/database")
                 .help("Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead."));
         attrs.addAll(OUTPUT);
+        // Consignment Generation (the ConsignmentPlanner caps). Declared batch__* so the dialog's
+        // nestKeys lands them on the node's nested `batch` map, which lowers to the processing.batch:
+        // block the engine reads. ⚠ Never spec the flat batch_max_files spelling — it was write-only
+        // (G3, consignment-chain-plan.md).
+        attrs.add(NodeAttribute.of("batch__max_files", "Max files per consignment", "number", "advanced")
+                .min(1)
+                .help("Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment)."));
+        attrs.add(NodeAttribute.of("batch__max_bytes", "Max bytes per consignment", "number", "advanced")
+                .min(1)
+                .help("Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one."));
         return List.copyOf(attrs);
     }
 

@@ -59,7 +59,12 @@ the editor's class-doc comment still claiming `*_flow.toon` is stale — `pipeli
 Ordered by leverage; each slice independently shippable. **S1–S3 are engine/UI work with no
 operator decision needed. G7 stays gated and is out of scope here.**
 
-- [ ] **S1 — Fix G3 (the key-shape defect).** Canonical shape = the documented nested
+- [x] **S1 — SHIPPED 2026-08-12** (with S5, one commit). Three mirrors the plan missed, all caught by
+  the suites: `RecipeConverter` must carry the `batch` map or a round trip deletes it (the real
+  `voucher_pipeline.toon` fixture proved it), `step-types.contract.json` is a SECOND served contract
+  (regenerate via `-Dstep.types.write=true`), and two UI specs pinned "sink = database + OUTPUT only"
+  by identity. Guard: `ConsignmentGroupingFileRoundTripTest` (5 tests, incl. legacy-flat healing and
+  wholesale-map preservation). **Fix G3 (the key-shape defect).** Canonical shape = the documented nested
   `processing.batch:{max_files,max_bytes}` (FEATURE_INVENTORY row). `PipelineEditable` lowers the
   sink node's grouping fields into the nested block (and lifts them out of it); add
   `AttributeSpec`s (`batch.max_files`, `batch.max_bytes`, int-typed, bounds per
@@ -83,7 +88,8 @@ operator decision needed. G7 stays gated and is out of scope here.**
   edit in `SchemaEditorDialog`; never auto-applied (same posture as grammar `suggest()`); ingest
   keeps `auto_detect=false`. → verify: route test over a CSV + a JSON sample; editor shows the
   draft.
-- [ ] **S5 — Consignment ordering knob (G2).** `processing.batch.order: name|mtime`
+- [x] **S5 — SHIPPED 2026-08-12** (with S1). `processing.batch.order: name|mtime`, garbage refused at
+  parse time; NAME-default reproducibility pinned by test. **Consignment ordering knob (G2).** `processing.batch.order: name|mtime`
   (default `name`, today's behaviour — mtime is copy-fragile, so opt-in). → verify: planner test
   with shuffled mtimes.
 - [ ] **S6 — UI chain repair (G8 + G3's surface).** Consignment Generation fields on the Collect

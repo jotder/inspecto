@@ -124,8 +124,19 @@ public final class RecipeConverter {
         putIfPresent(sink, "temp", dirs.get("temp"));
         // sink-owned processing keys (write tuning): a present sink node owns them wholesale in the
         // lowering, so the projection must carry them or a round trip deletes them.
-        for (String k : new String[]{"threads", "duckdb_threads", "batch_max_files", "batch_max_bytes"})
+        for (String k : new String[]{"threads", "duckdb_threads"})
             putIfPresent(sink, k, processing.get(k));
+        // Consignment grouping: the nested processing.batch map, owned wholesale by the sink in the
+        // lowering since G3 (consignment-chain-plan.md) — carry it or a round trip deletes it. The
+        // legacy flat spellings were write-only and heal into the nested shape, same as the editor.
+        if (processing.get("batch") instanceof Map<?, ?> b) {
+            sink.put("batch", b);
+        } else {
+            Map<String, Object> batch = new LinkedHashMap<>();
+            putIfPresent(batch, "max_files", processing.get("batch_max_files"));
+            putIfPresent(batch, "max_bytes", processing.get("batch_max_bytes"));
+            if (!batch.isEmpty()) sink.put("batch", batch);
+        }
 
         List<Map<String, Object>> extraSinks = new ArrayList<>();
         if (config.get("sinks") instanceof List<?> sinks) {

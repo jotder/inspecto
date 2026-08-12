@@ -27,6 +27,22 @@ public final class ConsignmentPlanner {
     }
 
     /**
+     * How candidate files are ordered before packing. {@code NAME} — absolute-path lexicographic —
+     * is the default: reproducible on any machine, and already time-ordered whenever names embed
+     * timestamps (the common CDR layout). {@code MTIME} follows file modification time for feeds
+     * whose names carry no order; it is copy-fragile (a copy or re-download resets the stamp),
+     * which is why it is opt-in ({@code processing.batch.order: mtime}).
+     */
+    public enum Order { NAME, MTIME }
+
+    /** As {@link #plan(List, SchemaResolver, int, long, String, Order)} with {@link Order#NAME}. */
+    public static List<Batch> plan(List<File> files, SchemaResolver resolver,
+                                   int maxFiles, long maxBytes, String runTimestamp)
+            throws IOException {
+        return plan(files, resolver, maxFiles, maxBytes, runTimestamp, Order.NAME);
+    }
+
+    /**
      * Plan batches from the given files.
      *
      * @param files        candidate files (already filtered for duplicates)
@@ -34,17 +50,22 @@ public final class ConsignmentPlanner {
      * @param maxFiles      max member files per batch (>= 1)
      * @param maxBytes      max summed bytes per batch (>= 1)
      * @param runTimestamp  run timestamp embedded in each batch id
+     * @param order         ordering before packing ({@link Order})
      * @return batches, grouped by schema/table, in deterministic order
      * @throws IOException if schema resolution fails
      */
     public static List<Batch> plan(List<File> files, SchemaResolver resolver,
-                                   int maxFiles, long maxBytes, String runTimestamp)
+                                   int maxFiles, long maxBytes, String runTimestamp, Order order)
             throws IOException {
 
-        // Group by table key (insertion-ordered for determinism), preserving each
-        // file's resolved selection. Files sorted by path so packing is reproducible.
+        // Group by table key (insertion-ordered for determinism), preserving each file's resolved
+        // selection. NAME keeps packing reproducible; MTIME tie-breaks on path so files sharing a
+        // stamp cannot reorder between runs.
+        Comparator<File> byPath = Comparator.comparing(f -> f.toPath().toAbsolutePath().toString());
         List<File> sorted = new ArrayList<>(files);
-        sorted.sort(Comparator.comparing(f -> f.toPath().toAbsolutePath().toString()));
+        sorted.sort(order == Order.MTIME
+                ? Comparator.comparingLong(File::lastModified).thenComparing(byPath)
+                : byPath);
 
         LinkedHashMap<String, List<File>> byKey = new LinkedHashMap<>();
         Map<File, SchemaSelector.Selection> selByFile = new HashMap<>();

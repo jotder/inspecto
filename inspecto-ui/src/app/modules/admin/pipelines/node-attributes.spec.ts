@@ -53,8 +53,16 @@ describe('node-attributes', () => {
      *  sink prepends its own destination (`database`) to that shared block. */
     it('authors the output block with the shared OUTPUT_ATTRIBUTES table', () => {
         const specs = nodeAttributesFor('sink.persistent')!;
-        expect(specs.slice(1)).toEqual(OUTPUT_ATTRIBUTES);
+        expect(specs.slice(1, 1 + OUTPUT_ATTRIBUTES.length)).toEqual(OUTPUT_ATTRIBUTES);
         for (const [i, shared] of OUTPUT_ATTRIBUTES.entries()) expect(specs[i + 1]).toBe(shared);
+    });
+
+    /** G3 fix: the persistent sink appends the Consignment Generation caps AFTER the shared block —
+     *  they are sink-owned processing.batch keys, not part of the output: vocabulary, so they must
+     *  never migrate into OUTPUT_ATTRIBUTES (the other sink kinds have no ConsignmentPlanner). */
+    it('appends the consignment grouping caps after the shared output block', () => {
+        const keys = nodeAttributesFor('sink.persistent')!.map((s) => s.key);
+        expect(keys.slice(-2)).toEqual(['batch__max_files', 'batch__max_bytes']);
     });
 
     /** The shared table's format default is the ENGINE's absent-key behaviour, not a UX suggestion. */
@@ -167,7 +175,7 @@ describe('node-attributes', () => {
     it('gives every sink kind the same output-block schema', () => {
         expect(nodeAttributesFor('sink.materialized')).toBe(OUTPUT_ATTRIBUTES);
         expect(nodeAttributesFor('sink.view')).toBe(OUTPUT_ATTRIBUTES);
-        expect(nodeAttributesFor('sink.persistent')!.slice(1)).toEqual(OUTPUT_ATTRIBUTES);
+        expect(nodeAttributesFor('sink.persistent')!.slice(1, 1 + OUTPUT_ATTRIBUTES.length)).toEqual(OUTPUT_ATTRIBUTES);
     });
 
     it('drops the sink keys the backend never read', () => {

@@ -201,8 +201,18 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     if (dirs['database'] != null) sinkCfg['database'] = dirs['database'];
     if (dirs['backup'] != null) sinkCfg['backup'] = dirs['backup'];
     if (dirs['temp'] != null) sinkCfg['temp'] = dirs['temp'];
-    for (const k of ['threads', 'duckdb_threads', 'batch_max_files', 'batch_max_bytes']) {
+    for (const k of ['threads', 'duckdb_threads']) {
         if (processing[k] != null) sinkCfg[k] = processing[k];
+    }
+    // Consignment grouping: the nested processing.batch map, owned wholesale. A file carrying only
+    // the legacy flat spellings (written pre-G3, read by nothing) heals into the nested shape on save.
+    if (processing['batch'] != null) {
+        sinkCfg['batch'] = processing['batch'];
+    } else {
+        const batch: Cfg = {};
+        if (processing['batch_max_files'] != null) batch['max_files'] = processing['batch_max_files'];
+        if (processing['batch_max_bytes'] != null) batch['max_bytes'] = processing['batch_max_bytes'];
+        if (Object.keys(batch).length) sinkCfg['batch'] = batch;
     }
     const store = String(config['name'] ?? 'out');
     sinkCfg['store'] = store;
@@ -418,7 +428,12 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         setOrDel(dirs, 'database', primarySink.config?.['database']);
         setOrDel(dirs, 'backup', primarySink.config?.['backup']);
         setOrDel(dirs, 'temp', primarySink.config?.['temp']);
-        for (const k of ['threads', 'duckdb_threads', 'batch_max_files', 'batch_max_bytes']) setOrDel(processing, k, primarySink.config?.[k]);
+        for (const k of ['threads', 'duckdb_threads']) setOrDel(processing, k, primarySink.config?.[k]);
+        // Consignment grouping lowers as the nested processing.batch: map the parser reads; the flat
+        // spellings go unconditionally (read by nothing — G3).
+        setOrDel(processing, 'batch', primarySink.config?.['batch']);
+        delete processing['batch_max_files'];
+        delete processing['batch_max_bytes'];
     }
     // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
     // dirs.database above stays the shorthand). One destination => no sinks: block (verbatim round-trip).

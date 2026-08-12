@@ -103,7 +103,16 @@ class NodeConfigNameContractTest {
                 new Contract("sink.persistent", "format", "format", "PARQUET",
                         c -> c.output().format(), "PARQUET"),
                 new Contract("sink.persistent", "compression", "compression", "zstd",
-                        c -> c.output().compression(), "zstd"));
+                        c -> c.output().compression(), "zstd"),
+
+                // ── Consignment grouping — the nested batch map (G3). The dialog's nestKeys turns
+                // batch__max_files into node cfg batch.max_files; lower writes processing.batch:,
+                // which is the ONLY spelling the parser reads. These two entries are exactly the
+                // contract whose absence let the flat write-only spelling ship.
+                new Contract("sink.persistent", "batch__max_files", "batch.max_files", 500,
+                        c -> c.processing().batchMaxFiles(), 500),
+                new Contract("sink.persistent", "batch__max_bytes", "batch.max_bytes", 268_435_456L,
+                        c -> c.processing().batchMaxBytes(), 268_435_456L));
     }
 
     /**

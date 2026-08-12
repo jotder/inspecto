@@ -67,7 +67,7 @@ public final class PipelineConfig {
      */
     @PublicApi(since = "2.0.0")
     public record Processing(int threads, int duckdbThreads, String filePattern,
-                             int batchMaxFiles, long batchMaxBytes,
+                             int batchMaxFiles, long batchMaxBytes, String batchOrder,
                              boolean duplicateCheckEnabled, String markerExtension,
                              int retentionDays, long largeFileBytes, long flushRecords) {}
 
@@ -939,7 +939,7 @@ public final class PipelineConfig {
                 b.quarantineDir, b.markersDir, b.logDir, b.statusFilePath,
                 b.batchesFilePath, b.lineageFilePath, b.manifestsDir, b.commitLogPath);
         this.processing = new Processing(b.threads, b.duckdbThreads, b.filePattern,
-                b.batchMaxFiles, b.batchMaxBytes, b.duplicateCheckEnabled,
+                b.batchMaxFiles, b.batchMaxBytes, b.batchOrder, b.duplicateCheckEnabled,
                 b.markerExtension, b.retentionDays, b.largeFileBytes, b.flushRecords);
         this.csv = new CsvSettings(b.delimiter, b.skipHeaderLines, b.skipJunkLines,
                 b.skipTailLines, b.skipTailCols, b.hasHeader, b.csvEngine,
@@ -1275,6 +1275,7 @@ public final class PipelineConfig {
         String filePattern   = "glob:**/*.{csv,csv.gz}";
         int    batchMaxFiles   = 1;
         long   batchMaxBytes   = Long.MAX_VALUE;
+        String batchOrder      = "name";          // ConsignmentPlanner.Order — mtime is opt-in (copy-fragile)
         long   largeFileBytes  = 268_435_456L;   // 256 MB: streaming plugin generation-mode threshold
         long   flushRecords    = 5_000_000L;      // streaming plugin generation row budget
         String duckMemoryLimit;

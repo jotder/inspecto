@@ -115,7 +115,9 @@ public class CollectorProcessor {
                 : f -> new SchemaSelector.Selection(cfg.schemas().single(), null);
 
         List<Batch> batches = ConsignmentPlanner.plan(
-                candidates, resolver, cfg.processing().batchMaxFiles(), cfg.processing().batchMaxBytes(), cfg.identity().runTimestamp());
+                candidates, resolver, cfg.processing().batchMaxFiles(), cfg.processing().batchMaxBytes(),
+                cfg.identity().runTimestamp(),
+                ConsignmentPlanner.Order.valueOf(cfg.processing().batchOrder().toUpperCase(java.util.Locale.ROOT)));
         log.info("Planned {} batch(es) from {} file(s) using {} thread(s)...",
                 batches.size(), candidates.size(), cfg.processing().threads());
 
