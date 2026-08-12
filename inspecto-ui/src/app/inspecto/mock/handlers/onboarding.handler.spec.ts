@@ -206,3 +206,38 @@ describe('onboardingHandler schema gate ↔ component-registry bridge', () => {
         expect((comp!.content['raw'] as Record<string, unknown>)['name']).toBe('ev');
     });
 });
+
+describe('onboardingHandler POST /config/suggest/schema', () => {
+    const suggest = (sampleRows: unknown) =>
+        handler(req('POST', '/api/config/suggest/schema', { sampleRows }), new MockStore());
+
+    it('400s a missing or empty sampleRows list (server: ConfigRoutes.suggestSchema)', () => {
+        expect(suggest(undefined)?.status).toBe(400);
+        expect(suggest([])?.status).toBe(400);
+    });
+
+    it('422s column-less sample rows (server: SchemaSuggest.infer refuses)', () => {
+        expect(suggest([{}])?.status).toBe(422);
+    });
+
+    it('votes per column with the BIGINT round-trip guard, blank abstention and DATE demotion', () => {
+        const res = suggest([
+            { ID: '1', AMT: '1.5', DAY: '2026-01-02', TS: '2026-01-02 10:30:00', OK: 'true', NOTE: 'hi', BLANK: '' },
+            { ID: '2', AMT: '2', DAY: '2026-01-03', TS: '2026-01-03 00:00:00', OK: 'f', NOTE: '', BLANK: null },
+        ]);
+        expect(res?.status ?? 200).toBe(200);
+        const body = res?.body as { fields: { name: string; selector: string; type: string }[]; mapping: { rules: { transformType: string }[] } };
+        const type = (n: string) => body.fields.find((f) => f.name === n)?.type;
+        expect(type('ID')).toBe('BIGINT');
+        expect(type('AMT')).toBe('DOUBLE');      // TRY_CAST('1.5' AS BIGINT) rounds — the guard demotes
+        expect(type('DAY')).toBe('DATE');        // every value is midnight
+        expect(type('TS')).toBe('TIMESTAMP');
+        expect(type('OK')).toBe('BOOLEAN');
+        expect(type('NOTE')).toBe('VARCHAR');    // the blank second value abstains; 'hi' decides
+        expect(type('BLANK')).toBe('VARCHAR');   // nothing to vote with — unknown is not evidence
+        // The DRAFT shape: selector = the column key, identity mapping rules, DIRECT transform.
+        expect(body.fields.find((f) => f.name === 'ID')?.selector).toBe('ID');
+        expect(body.mapping.rules).toHaveLength(body.fields.length);
+        expect(body.mapping.rules[0].transformType).toBe('DIRECT');
+    });
+});

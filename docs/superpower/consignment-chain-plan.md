@@ -120,9 +120,14 @@ operator decision needed. G7 stays gated and is out of scope here.**
     maps and the `AttributeSpec` `list` type is `string[]` — the exact `transform.route` `branches`
     precedent. Authoring stays on the sink *component* form (Components pane) until the spec system
     grows a map-list type; do not fake it with string parsing.
-  - *Editor links: parse dialog → Schema/Mapping editors, + a "Suggest from sample" button on
-    `SchemaEditorDialog` calling `POST /config/suggest/schema`* — UI feature work, next shift's
-    first pick; the route contract is stable and tested.
+  - [x] *Editor links + "Suggest from sample" — SHIPPED 2026-08-12.* The parse dialog
+    (`GrammarEditorDialog`) mirrors its test-parse rows from `(previewed)` and grew *Draft Schema…* /
+    *Draft Mapping…* onward links (cross-feature dialog import per the `node-config.dialog`
+    `ComponentFormDialog` precedent); `SchemaEditorDialog` takes optional `sampleRows` and its
+    *Suggest from sample* button seeds the grid from `POST /config/suggest/schema`
+    (`ConfigService.suggestSchema`) — confirm-guarded over named rows, never auto-saved. Mock
+    handler mirrors the server's 400/422 strictness AND the BIGINT round-trip guard (pinned in
+    `onboarding.handler.spec.ts`). Preview-verified: `1.5` → DOUBLE, date-only → DATE.
 - [ ] **S7 — Step lifecycle signals (G6, design first).** Decide grain (per step-start/stop Signal
   vs. periodic `IngestProgress` persistence) before building — event volume on the sync bus is the
   constraint (`ingestLock` deadlock note, PROJECT_NOTES). Not started until S1–S3 land.

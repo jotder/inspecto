@@ -13,9 +13,11 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ComponentFormResult } from './component-form.dialog';
 
-/** Dialog data: `def` set ⇒ edit an existing schema; absent ⇒ create. */
+/** Dialog data: `def` set ⇒ edit an existing schema; absent ⇒ create. `sampleRows` (already-parsed
+ *  rows, e.g. a parse dialog's test-parse output) arms the "Suggest from sample" draft inference. */
 export interface SchemaEditorData {
     def?: ComponentDef;
+    sampleRows?: Record<string, unknown>[];
 }
 
 /** One typed field row — `ConfigSpecs.schema()`'s `raw.fields[]` keys, verbatim. */
@@ -87,6 +89,12 @@ const COLUMNS: EditableGridColumn[] = [
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
+            @if (data.sampleRows?.length) {
+                <button mat-stroked-button type="button" (click)="suggestFromSample()" [disabled]="suggesting()">
+                    <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:sparkles"></mat-icon>
+                    Suggest from sample
+                </button>
+            }
             @if (refused()) {
                 <button mat-stroked-button type="button" (click)="saveAnyway()">
                     Save anyway (skip compatibility check)
@@ -140,9 +148,44 @@ export class SchemaEditorDialog {
         return map;
     });
 
+    /** True while the suggest route is in flight — gates the button, never the grid. */
+    readonly suggesting = signal(false);
+
     private dirty = false;
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.dirty, this.confirm);
+
+    /**
+     * Fill the grid with a DRAFT inferred from the dialog's `sampleRows` (`POST
+     * /config/suggest/schema`, TRY_CAST voting). The draft only seeds the grid — the human still
+     * reviews and saves; nothing is written here. Confirms first when it would replace named rows.
+     */
+    async suggestFromSample(): Promise<void> {
+        const sampleRows = this.data.sampleRows ?? [];
+        if (!sampleRows.length) return;
+        if (this.rows().some((r) => r['name'].trim().length)) {
+            const ok = await this.confirm.confirmDestructive(
+                'Replace the current field rows with types suggested from the sample? Nothing is saved '
+                + 'until you review and press Save.',
+                { title: 'Suggest from sample' },
+            );
+            if (!ok) return;
+        }
+        this.suggesting.set(true);
+        this.config.suggestSchema(sampleRows).subscribe({
+            next: (s) => {
+                this.suggesting.set(false);
+                this.onRows(s.fields.map((f) => Object.fromEntries(
+                    COLUMNS.map((c) => [c.key, String((f as unknown as Record<string, unknown>)[c.key] ?? '')]),
+                )));
+                this.toast.success(`Suggested ${s.fields.length} typed field(s) — review, then Save.`);
+            },
+            error: (err) => {
+                this.suggesting.set(false);
+                this.toast.error(apiErrorMessage(err, 'Could not suggest a schema from the sample'));
+            },
+        });
+    }
 
     onRows(rows: Record<string, string>[]): void {
         this.rows.set(rows);

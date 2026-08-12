@@ -7,7 +7,8 @@ import { componentCollection } from './components.handler';
  * Stream-onboarding mock domain — the offline mirror of the server-side draft lifecycle
  * (`ConfigRoutes` + pipeline registration, v5.1.0/v5.2.0): write → register → read back →
  * overwrite → delete, plus the stateless `POST /config/preview/parsing` / `.../schema` sample
- * previews (tiny JS parsers that mimic the DuckDB frontends' behaviour: header skip,
+ * previews and `POST /config/suggest/schema` draft inference
+ * (tiny JS parsers that mimic the DuckDB frontends' behaviour: header skip,
  * min-record-length drop, named regex groups, NDJSON validity filter, TRY_CAST-alike type
  * checks). Pipeline + schema + enrichment configs (enrichment registration mirrors pipelines:
  * `POST /enrichment` flips the stored flag); `/config/spec` + `/validate` stay with the demo
@@ -45,6 +46,7 @@ const WRITE = /\/config\/write$/;
 const PATCH = /\/config\/patch$/;
 const PREVIEW_PARSING = /\/config\/preview\/parsing$/;
 const PREVIEW_SCHEMA = /\/config\/preview\/schema$/;
+const SUGGEST_SCHEMA = /\/config\/suggest\/schema$/;
 const CONFIG_FILE = /\/config\/(pipeline|schema|enrichment)\/([^/?]+)$/;
 const RUNS = /\/runs$/;
 const ENRICHMENT = /\/enrichment$/;
@@ -195,6 +197,18 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 return json(previewSchema(body.config, body.sampleRows));
             } catch (e) {
                 return error(422, e instanceof Error ? e.message : 'schema preview failed');
+            }
+        }
+
+        if (method === 'POST' && SUGGEST_SCHEMA.test(url)) {
+            const body = (req.body ?? {}) as { sampleRows?: Record<string, unknown>[] };
+            if (!body.sampleRows?.length) {
+                return error(400, "body must include non-empty 'sampleRows'");
+            }
+            try {
+                return json(suggestSchema(body.sampleRows));
+            } catch (e) {
+                return error(422, e instanceof Error ? e.message : 'schema suggestion failed');
             }
         }
 
@@ -423,6 +437,52 @@ function previewSchema(config: Record<string, unknown>, sampleRows: Record<strin
         (allCast ? ok : rejected).push(row);
     }
     return { columns, okCount: ok.length, rejectedCount: rejected.length, rejectedRows: rejected.slice(0, 200) };
+}
+
+/**
+ * Mirrors `SchemaSuggest.infer` + `ConfigRoutes.suggestSchema` (mock-never-more-lenient): per
+ * column, the most specific type every non-blank value accepts wins — BIGINT (with the server's
+ * DOUBLE=BIGINT round-trip guard: DuckDB's TRY_CAST rounds, so only integral values count) →
+ * DOUBLE → TIMESTAMP (demoted to DATE when no value carries a non-midnight time) → BOOLEAN, else
+ * VARCHAR. Blanks abstain; an all-blank column is VARCHAR. Same response shape as the real route:
+ * a DRAFT fields list (selector = the column key) + identity mapping rules.
+ */
+function suggestSchema(sampleRows: Record<string, unknown>[]): {
+    fields: Record<string, string>[];
+    mapping: { rules: Record<string, string>[] };
+} {
+    const columns: string[] = [];
+    for (const r of sampleRows) for (const k of Object.keys(r)) if (!columns.includes(k)) columns.push(k);
+    if (!columns.length) throw new Error('sample rows have no columns');
+
+    const infer = (col: string): string => {
+        const values = sampleRows
+            .map((r) => r[col])
+            .filter((v) => v !== null && v !== undefined && String(v).trim() !== '')
+            .map((v) => String(v).trim());
+        if (!values.length) return 'VARCHAR'; // nothing to vote with — unknown is not evidence
+        if (values.every((v) => Number.isFinite(Number(v)) && Number.isInteger(Number(v)))) return 'BIGINT';
+        if (values.every((v) => Number.isFinite(Number(v)))) return 'DOUBLE';
+        if (values.every((v) => !Number.isNaN(Date.parse(v)))) {
+            const timed = values.some((v) => {
+                const t = /(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(v);
+                return !!t && (Number(t[1]) !== 0 || Number(t[2]) !== 0 || Number(t[3] ?? 0) !== 0);
+            });
+            return timed ? 'TIMESTAMP' : 'DATE';
+        }
+        if (values.every((v) => /^(true|false|t|f|yes|no|1|0)$/i.test(v))) return 'BOOLEAN';
+        return 'VARCHAR';
+    };
+
+    const fields = columns.map((c) => ({ name: c, selector: c, type: infer(c) }));
+    return {
+        fields,
+        mapping: {
+            rules: fields.map((f) => ({
+                targetColumn: f.name, sourceExpression: f.name, transformType: 'DIRECT',
+            })),
+        },
+    };
 }
 
 function previewParsing(config: Record<string, unknown>, sampleText: string): Preview {

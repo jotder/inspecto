@@ -347,6 +347,13 @@ export interface SchemaPreview {
   rejectedRows: Record<string, unknown>[];
 }
 
+/** Result of POST /config/suggest/schema — a DRAFT `raw.fields` + identity mapping inferred from
+ *  already-parsed sample rows (TRY_CAST voting); seeds a human edit, never auto-applied. */
+export interface SchemaSuggestion {
+  fields: { name: string; selector: string; type: string }[];
+  mapping: { rules: { targetColumn: string; sourceExpression: string; transformType: string }[] };
+}
+
 /** Result of POST /enrichment/preview — a draft transform run over an in-memory `input` sample. */
 export interface EnrichmentPreview {
   columns: string[];

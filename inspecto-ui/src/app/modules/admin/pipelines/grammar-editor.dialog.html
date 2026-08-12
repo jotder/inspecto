@@ -49,8 +49,29 @@
             [initial]="initialBlock()"
             [configuredIngester]="configuredIngester()"
             (pluginChange)="plugin.set($event)"
+            (previewed)="onPreviewed($event)"
             (submitted)="save()"
         />
+
+        <!-- Onward links: the chain continues Grammar → Schema → Mapping; a test parse feeds the
+             Schema editor's "Suggest from sample". -->
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button type="button" mat-stroked-button (click)="openSchemaEditor()">
+                <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:table-cells"></mat-icon>
+                Draft Schema…
+            </button>
+            <button type="button" mat-stroked-button (click)="openMappingEditor()">
+                <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
+                Draft Mapping…
+            </button>
+            <span class="text-secondary text-xs">
+                @if (previewRows().length) {
+                    The Schema editor can suggest typed fields from the {{ previewRows().length }} test-parsed row(s).
+                } @else {
+                    Run a test parse first to arm “Suggest from sample” in the Schema editor.
+                }
+            </span>
+        </div>
     } @else {
         <!-- Extract step: the id pipelines will reference via `use: grammar/<id>`. -->
         <section aria-label="Name this Grammar" class="space-y-1" [formGroup]="nameForm">

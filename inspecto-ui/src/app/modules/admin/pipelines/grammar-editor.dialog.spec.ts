@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
@@ -29,7 +29,7 @@ function saved(name: string, content: Record<string, unknown> = {}): ComponentDe
     return { type: 'grammar', name, ref: `grammar/${name}`, content };
 }
 
-async function create(opts: { node?: AuthoredNode; grammars?: ComponentDef[] } = {}) {
+async function create(opts: { node?: AuthoredNode; grammars?: ComponentDef[]; dialogOpen?: ReturnType<typeof vi.fn> } = {}) {
     const close = vi.fn();
     const components = {
         list: () => of(opts.grammars ?? []),
@@ -55,6 +55,9 @@ async function create(opts: { node?: AuthoredNode; grammars?: ComponentDef[] } =
             { provide: ToastrService, useValue: { success: () => {}, error: () => {} } },
         ],
     });
+    // MatDialogModule's own provider wins over a plain useValue in the same TestBed (the
+    // data-table trap) — overrideProvider is the documented fix when a test spies on open().
+    if (opts.dialogOpen) TestBed.overrideProvider(MatDialog, { useValue: { open: opts.dialogOpen } });
     await TestBed.compileComponents(); // the data-table pro tier @defer-loads its SQL editor
     const fixture = TestBed.createComponent(GrammarEditorDialog);
     fixture.detectChanges();
@@ -166,6 +169,21 @@ describe('GrammarEditorDialog', () => {
         expect(fixture.nativeElement.textContent).toContain('Parsing stage');
         c.save();
         expect(close).not.toHaveBeenCalled();
+    });
+
+    it('a table test-parse arms the Draft Schema link with the parsed rows; a tree preview disarms it', async () => {
+        const open = vi.fn();
+        const { c } = await create({ dialogOpen: open });
+
+        c.onPreviewed(TABLE_PREVIEW);
+        expect(c.previewRows()).toEqual([{ id: '1' }]);
+
+        c.openSchemaEditor();
+        expect(open).toHaveBeenCalledWith(expect.anything(),
+            expect.objectContaining({ data: { sampleRows: [{ id: '1' }] } }));
+
+        c.onPreviewed({ kind: 'tree', recordCount: 1, nodes: [] });
+        expect(c.previewRows()).toEqual([]);
     });
 
     it('has no a11y violations on the editor step or the name step', async () => {

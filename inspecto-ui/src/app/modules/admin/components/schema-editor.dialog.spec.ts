@@ -43,10 +43,17 @@ const REFUSAL = {
     },
 };
 
-function create(def?: ComponentDef, config: Partial<ConfigService> = {}) {
+function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleRows?: Record<string, unknown>[]) {
     const ref = { close: vi.fn(), disableClose: false };
     const api = {
         write: vi.fn().mockReturnValue(of({ type: 'schema', written: true, path: 'ev.toon', name: 'ev', bytes: 1, overwritten: true, findings: [] })),
+        suggestSchema: vi.fn().mockReturnValue(of({
+            fields: [
+                { name: 'ID', selector: 'ID', type: 'BIGINT' },
+                { name: 'AMT', selector: 'AMT', type: 'DOUBLE' },
+            ],
+            mapping: { rules: [] },
+        })),
         ...config,
     };
     const confirm = { confirmDestructive: vi.fn().mockResolvedValue(true) };
@@ -54,7 +61,7 @@ function create(def?: ComponentDef, config: Partial<ConfigService> = {}) {
         imports: [SchemaEditorDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { def } },
+            { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ConfigService, useValue: api },
             { provide: ToastrService, useValue: { success: () => undefined, warning: () => undefined, error: () => undefined } },
@@ -117,6 +124,42 @@ describe('SchemaEditorDialog', () => {
         expect(confirm.confirmDestructive).toHaveBeenCalled();
         expect(write).toHaveBeenLastCalledWith('schema', expect.anything(), { overwrite: true, compatibility: 'none' });
         expect(ref.close).toHaveBeenCalledWith({ saved: expect.anything() });
+    });
+
+    it('shows no Suggest button without sampleRows in the dialog data', () => {
+        const { fixture } = create(DEF);
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Suggest from sample');
+    });
+
+    it('Suggest from sample fills the grid with the served DRAFT and marks the dialog dirty — nothing is written', async () => {
+        const sample = [{ ID: '1', AMT: '1.5' }];
+        const { fixture, c, api } = create(undefined, {}, sample);
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Suggest from sample');
+
+        await c.suggestFromSample();
+        expect(api.suggestSchema).toHaveBeenCalledWith(sample);
+        expect(c.rows()).toEqual([
+            { name: 'ID', selector: 'ID', type: 'BIGINT', description: '', unit: '', classification: '' },
+            { name: 'AMT', selector: 'AMT', type: 'DOUBLE', description: '', unit: '', classification: '' },
+        ]);
+        expect(api.write).not.toHaveBeenCalled(); // a draft seeds the grid; the human still saves
+        // Flush the row update into the grid before axe runs — an un-flushed ag-grid sits in a
+        // transient rowless state that trips aria-required-children on .ag-root.
+        fixture.detectChanges();
+        await new Promise((r) => setTimeout(r, 0));
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('suggesting over already-named rows asks first and keeps them on decline', async () => {
+        const { c, api, confirm } = create(DEF, {}, [{ ID: '1' }]);
+        confirm.confirmDestructive.mockResolvedValue(false);
+        const before = c.rows();
+
+        await c.suggestFromSample();
+        expect(confirm.confirmDestructive).toHaveBeenCalled();
+        expect(api.suggestSchema).not.toHaveBeenCalled();
+        expect(c.rows()).toEqual(before);
     });
 
     it('create mode requires a name, refuses an empty field list, and drops rows with a blank name', () => {

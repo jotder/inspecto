@@ -13,6 +13,7 @@ import {
   ParsingPreview,
   PipelineRegisterResult,
   SchemaPreview,
+  SchemaSuggestion,
   ValidateResult,
 } from './models';
 
@@ -100,6 +101,11 @@ export class ConfigService {
   /** TRY_CAST already-parsed sample rows against a draft schema's typed fields — stateless, scratch-only. */
   previewSchema(config: Record<string, unknown>, sampleRows: Record<string, unknown>[]): Observable<SchemaPreview> {
     return this.http.post<SchemaPreview>(apiUrl('/config/preview/schema'), { config, sampleRows });
+  }
+  /** Infer a DRAFT schema (typed fields + identity mapping) from already-parsed sample rows —
+   *  stateless, scratch-only; the result seeds a human edit and is never auto-applied. */
+  suggestSchema(sampleRows: Record<string, unknown>[]): Observable<SchemaSuggestion> {
+    return this.http.post<SchemaSuggestion>(apiUrl('/config/suggest/schema'), { sampleRows });
   }
   /** Run a draft enrichment's transform over an in-memory `input` sample — stateless, scratch-only. */
   previewEnrichment(config: Record<string, unknown>, sampleRows: Record<string, unknown>[]): Observable<EnrichmentPreview> {

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, ViewChild, computed, inject, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -9,13 +9,15 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, AuthoredNode, ComponentDef, ComponentsService, ParserDef } from 'app/inspecto/api';
+import { apiErrorMessage, AuthoredNode, ComponentDef, ComponentsService, ParserDef, ParserPreview } from 'app/inspecto/api';
 import { parseUseRef } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
+import { MappingEditorDialog } from 'app/modules/admin/components/mapping-editor.dialog';
+import { SchemaEditorData, SchemaEditorDialog } from 'app/modules/admin/components/schema-editor.dialog';
 import { NodeConfigResult } from './node-config.dialog';
 
 /** Dialog data: the parse node to configure + its (resolved) type/category labels for the header. */
@@ -68,6 +70,7 @@ export class GrammarEditorDialog {
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
     private ref = inject(MatDialogRef<GrammarEditorDialog, NodeConfigResult>);
+    private dialog = inject(MatDialog);
     readonly data = inject<GrammarEditorDialogData>(MAT_DIALOG_DATA);
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
@@ -88,6 +91,10 @@ export class GrammarEditorDialog {
      */
     readonly plugin = signal<ParserDef | null>(null);
     readonly pluginBlocked = computed(() => this.plugin() !== null);
+
+    /** The last test-parse's table rows, mirrored from `(previewed)` — they arm the Schema
+     *  editor's "Suggest from sample" when the user follows the Draft Schema link. */
+    readonly previewRows = signal<Record<string, unknown>[]>([]);
 
     readonly saving = signal(false);
 
@@ -132,6 +139,25 @@ export class GrammarEditorDialog {
         const plugin = block['plugin'];
         const ingester = plugin && typeof plugin === 'object' ? (plugin as Record<string, unknown>)['ingester'] : null;
         this.configuredIngester.set(typeof ingester === 'string' ? ingester : '');
+    }
+
+    onPreviewed(p: ParserPreview): void {
+        this.previewRows.set(p.kind === 'table' ? p.rows : []);
+    }
+
+    /** Onward link: author the Schema this parse feeds — seeded with the test-parsed rows, so
+     *  "Suggest from sample" is armed. The editor saves itself; nothing here changes the node. */
+    openSchemaEditor(): void {
+        this.dialog.open(SchemaEditorDialog, {
+            data: { sampleRows: this.previewRows() } satisfies SchemaEditorData,
+            width: '1000px',
+            maxHeight: '88vh',
+        });
+    }
+
+    /** Onward link: author the Mapping the typed fields feed. Saves itself, node untouched. */
+    openMappingEditor(): void {
+        this.dialog.open(MappingEditorDialog, { data: {}, width: '900px', maxHeight: '88vh' });
     }
 
     /** Choose where the Grammar lives: `''` = inline on this node, or an existing reusable Grammar. */
