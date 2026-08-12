@@ -55,6 +55,7 @@ final class ConfigRoutes implements RouteModule {
         // TRY_CAST a draft schema's typed fields against already-parsed sample rows — stateless,
         // scratch-only (stream onboarding's Schema & Mapping stage; the parsed→typed hop).
         api.post("/config/preview/schema", (e, m) -> previewSchema(api.body(e)));
+        api.post("/config/suggest/schema", (e, m) -> suggestSchema(api.body(e)));
         // Requires canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
         api.post("/config/write", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> writeConfig(api, e, api.body(e))));
         // Block-level save (collector-config unification, 2026-08-04): deep-merge a patch over the
@@ -545,6 +546,47 @@ final class ConfigRoutes implements RouteModule {
             throw new ApiException(422, badSchema.getMessage());
         } catch (Exception castFail) {
             throw new ApiException(422, "schema preview failed: " + castFail.getMessage());
+        }
+    }
+
+    /**
+     * {@code POST /config/suggest/schema} — draft-schema inference over already-parsed
+     * {@code sampleRows} (G1, {@code consignment-chain-plan.md} S4). {@code SchemaSuggest} runs
+     * TRY_CAST voting per column on a scratch DuckDB and this handler shapes the winners into a
+     * DRAFT: a {@code raw.fields} list ({@code selector} = the sample's own column key) plus
+     * identity {@code mapping} rules, for the schema editor to seed a HUMAN edit — never
+     * auto-applied (the {@code ParserPlugin.suggest} posture), and real ingest keeps
+     * {@code auto_detect=false}. Body {@code {sampleRows:[{...}]}} — the parsing preview's output
+     * shape, so the two routes chain: parse the sample, then suggest from what parsed.
+     */
+    private Object suggestSchema(Map<String, Object> body) {
+        List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
+        if (sampleRows.isEmpty())
+            throw new ApiException(400, "body must include non-empty 'sampleRows'");
+        try {
+            List<Map<String, Object>> fields = new ArrayList<>();
+            List<Map<String, Object>> rules = new ArrayList<>();
+            for (com.gamma.pipeline.exec.SchemaSuggest.Field f
+                    : com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows)) {
+                Map<String, Object> field = new LinkedHashMap<>();
+                field.put("name", f.name());
+                field.put("selector", f.name());
+                field.put("type", f.type());
+                fields.add(field);
+                Map<String, Object> rule = new LinkedHashMap<>();
+                rule.put("targetColumn", f.name());
+                rule.put("sourceExpression", f.name());
+                rule.put("transformType", "DIRECT");
+                rules.add(rule);
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("fields", fields);
+            out.put("mapping", Map.of("rules", rules));
+            return out;
+        } catch (IllegalArgumentException badSample) {
+            throw new ApiException(422, badSample.getMessage());
+        } catch (Exception inferFail) {
+            throw new ApiException(422, "schema suggestion failed: " + inferFail.getMessage());
         }
     }
 

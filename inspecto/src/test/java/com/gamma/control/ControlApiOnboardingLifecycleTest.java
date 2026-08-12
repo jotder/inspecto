@@ -198,6 +198,35 @@ class ControlApiOnboardingLifecycleTest {
         }
     }
 
+    /**
+     * G1 ({@code consignment-chain-plan.md} S4): {@code POST /config/suggest/schema} drafts typed
+     * {@code raw.fields} + identity mapping rules from the SAME {@code sampleRows} shape the parsing
+     * preview emits, so the two routes chain: parse the sample, then suggest from what parsed. A
+     * draft for the schema editor — the route never writes anything (stateless compute, no write root).
+     */
+    @Test
+    void schemaSuggestDraftsTypedFieldsFromSampleRows(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            String body = """
+                    {"sampleRows":[
+                       {"ORDER_ID":"1001","QUANTITY":"3.5","ORDER_DAY":"2026-01-01"},
+                       {"ORDER_ID":"1002","QUANTITY":"2","ORDER_DAY":"2026-01-02"}]}""";
+            HttpResponse<String> r = post(c.port, "/config/suggest/schema", body);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertEquals("ORDER_ID", out.get("fields").get(0).get("name").asText());
+            assertEquals("BIGINT", out.get("fields").get(0).get("type").asText());
+            assertEquals("DOUBLE", out.get("fields").get(1).get("type").asText());
+            assertEquals("DATE", out.get("fields").get(2).get("type").asText(),
+                    "date-only strings demote from TIMESTAMP to DATE");
+            assertEquals("ORDER_ID", out.get("mapping").get("rules").get(0).get("targetColumn").asText());
+            assertEquals("DIRECT", out.get("mapping").get("rules").get(0).get("transformType").asText());
+
+            assertEquals(400, post(c.port, "/config/suggest/schema", "{}").statusCode(),
+                    "no sampleRows is the caller's error, said up front");
+        }
+    }
+
     @Test
     void schemaPreviewGates400And422(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg, null)) {
