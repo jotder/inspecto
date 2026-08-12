@@ -75,13 +75,11 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/consignment-chain-plan.md`](superpower/consignment-chain-plan.md) — **ACTIVE 2026-08-12.**
-  The UI ↔ conceptual-pipeline ↔ engine three-way map, the per-Consignment status-flow (flowfile) gap
-  register, and the repair plan (S1–S7). Headline defects: the consignment-grouping **key-shape mismatch**
-  (editor lowers flat `processing.batch_max_files`, parser reads only nested `processing.batch:` —
-  no UI path can author grouping the engine honours) and `on_pipeline` firing with `Firing.NONE`
-  (consignment identity dropped at the lane seam). G7 (two half-engines) stays operator-gated in the
-  ELT amendment plan — deliberately not re-planned here.
+- ~~`superpower/consignment-chain-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-13**
+  ([archive copy](archived-documents/plans-archive/consignment-chain-plan.md), provenance only).
+  S1–S7 all delivered; as-built in [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md)
+  (status/audit/gauge) and [`okf/backend/engine/ingestion.md`](okf/backend/engine/ingestion.md)
+  (grouping + ordering). Open remainder in [`BACKLOG.md`](BACKLOG.md) §4.
 
 - ~~`superpower/pipeline-multiplicity-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-11**
   ([archive copy](archived-documents/plans-archive/pipeline-multiplicity-plan.md), provenance only).

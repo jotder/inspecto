@@ -26,8 +26,11 @@ writes to a sink store. It is hosted as a [`JobType.PIPELINE`](../control-plane/
 4. `PipelineExecutor.execute(…)` walks the graph (see [design](design.md)).
 5. `PartitionSinkWriter` (the `SinkWriter` impl) delegates each sink write to
    [`PartitionWriter`](../engine/output-sinks.md).
-6. Optionally collect provenance (`DbProvenanceStore`) and run `ConservationCheck` → emit
-   `PIPELINE_CONSERVATION_IMBALANCE` events when records are lost at a non-amplifying node.
+6. Optionally collect provenance (`DbProvenanceStore`, one row per node — shared with the ingest lane
+   through `ProvenanceStores` since 2026-08-12) and run `ConservationCheck` → emit
+   `PIPELINE_CONSERVATION_IMBALANCE` events when records are lost at a non-amplifying node. The
+   executor also reports its live position per node (`StepProgress`, cleared in a `finally`) — see
+   [consignment status flow](../engine/consignment-status-flow.md).
 7. Advance `PipelineWatermarkStore` per source (opt-in incremental mode); register `sink.view` outputs as durable
    `ViewDefinition`s.
 8. Publish a `BatchEvent`, return a `JobResult`.

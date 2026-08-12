@@ -1,6 +1,12 @@
 # Consignment chain — UI ↔ concept ↔ engine map, status-flow gaps, repair plan
 
-> **Status: ACTIVE (opened 2026-08-12).** Operator framing: *"not much gap, just chain broken"* — the
+> **Status: SHIPPED + ARCHIVED 2026-08-13 — provenance only, never maintained.** S1–S7 all delivered
+> (`6c368310`…`28c3aa84`, plus the two follow-on audit-hole fixes `2410e331`/`907c8d38`). Durable
+> as-built lives in [`okf/backend/engine/consignment-status-flow.md`](../../okf/backend/engine/consignment-status-flow.md)
+> and [`okf/backend/engine/ingestion.md`](../../okf/backend/engine/ingestion.md); the open remainder is
+> in [`BACKLOG.md`](../../BACKLOG.md). Read the OKF concepts, not this file.
+>
+> **Status when active: ACTIVE (opened 2026-08-12).** Operator framing: *"not much gap, just chain broken"* — the
 > conceptual pipeline (collection → Stream onboard EL → transforms → Sink, uniform plugin Steps with a
 > status/event bus) is already the canon (GLOSSARY §2 *Consignment*, §2 *Step* seven verbs,
 > Run ⊇ Consignment ⊇ File), and most of it is built. What is broken is the **chain between the built

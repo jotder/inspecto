@@ -37,7 +37,10 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
 * `CollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/CollectorProcessor.java`) — the per-source ETL
   entry point, split into two halves (B3b): **`acquire(cfg)`** runs the [acquisition](../acquisition/framework.md)
   phases (remote fetch-and-land; a no-op for a `local` collector), and **`ingest(cfg, onCommit)`** scans the
-  inbox → groups into `Batch`es (bounded by `processing.batch.max_files`/`max_bytes`) → submits to a
+  inbox → groups into `Batch`es via `ConsignmentPlanner` (bounded by
+  `processing.batch.max_files`/`max_bytes`, ordered by `processing.batch.order` — **default `mtime`
+  (file arrival)**, operator decision 2026-08-12; `name` is the opt-in for feeds whose stamps are
+  unreliable, and any other value is refused at parse) → submits to a
   virtual-thread executor bounded by `Semaphore(processing.threads)`. `run()` = `acquire` then `ingest`, the
   self-contained one-shot used by the single-pipeline CLI `main`, `reprocess`, and the service's manual "run
   now". The always-on service instead drives the two halves on **separate timers with separate budgets** — see
@@ -48,7 +51,10 @@ Selectors (parsed in `PipelineConfigParser`): `processing.streaming.large_file_b
   coordinator: pick a [`BatchIngestStrategy`](transforms-seams.md) (CSV or plugin), run `ingest()` → an
   `IngestOutcome`, then the path-agnostic tail `commit()` (DuckLake register → manifest → backup originals →
   markers → ledger, in that crash-safe order) and `writeAudit()`. Never throws for a batch failure — audit is
-  always written (see [quarantine](output-sinks.md)).
+  always written (see [quarantine](output-sinks.md)). Markers/fingerprints go **last**, so a FAILED
+  Consignment leaves no "already processed" record and its files are rediscovered next poll (retry is
+  implicit); what is recorded about a Consignment either way — ledgers, provenance, live gauges, and how
+  an operator audits a failed file or record — is [consignment status flow](consignment-status-flow.md).
 * `MultiCollectorProcessor` (`inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
   orchestrator running many `.toon` sources concurrently in one JVM, bounded by `Semaphore(sources.max)`.
   Total worker pressure = `sources.max × processing.threads × duckdb_threads`.
