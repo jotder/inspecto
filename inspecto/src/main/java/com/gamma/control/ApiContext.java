@@ -1,6 +1,8 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceManager;
 import com.sun.net.httpserver.HttpExchange;
@@ -9,6 +11,7 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +27,16 @@ interface ApiContext {
     /** Returned by a handler that has already written its own (non-JSON) response. */
     Object HANDLED = new Object();
 
-    /** Shared response serialiser (default mapper; same output as the dispatcher's JSON writer). */
-    ObjectMapper JSON = new ObjectMapper();
+    /**
+     * Shared response serialiser. {@code java.time} values are written as their ISO-8601
+     * {@code toString()} rather than pulled in through a JSR-310 module: a DuckDB {@code DATE} column
+     * reaches a response as a {@link java.time.LocalDate} (via {@code JdbcRows.toMaps}), and a bare
+     * mapper fails those with {@code REQUIRE_HANDLERS_FOR_JAVA8_TIMES} — turning a dry-run or store
+     * read that actually succeeded into a 500. Serialising at the edge keeps the row maps carrying
+     * real temporals for every non-JSON caller, and keeps the SBOM free of another Jackson artifact.
+     */
+    ObjectMapper JSON = new ObjectMapper()
+            .registerModule(new SimpleModule().addSerializer(Temporal.class, new ToStringSerializer()));
 
     // ── per-exchange attributes set by ControlApi.dispatch (v1 transport spine, v4.8.0) ─────────
     //

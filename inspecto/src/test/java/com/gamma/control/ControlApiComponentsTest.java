@@ -122,6 +122,32 @@ class ControlApiComponentsTest {
         }
     }
 
+    /**
+     * A preview whose rows carry a temporal column must serialise, not 500. DuckDB hands a {@code DATE}
+     * back as a {@link java.time.LocalDate}, and a bare Jackson mapper refuses those
+     * ({@code REQUIRE_HANDLERS_FOR_JAVA8_TIMES}) — so a dry-run that had already produced its rows died
+     * in the response writer. Pins the ISO-8601 text form the {@code ApiContext.JSON} serialiser emits.
+     */
+    @Test
+    void aTemporalColumnSerialisesAsIsoTextRatherThanFailingTheResponse(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            assertEquals(200, send(c.port, "POST", "/components/transform",
+                    "{\"id\":\"dated\",\"type\":\"transform.map\",\"columns\":["
+                    + "{\"name\":\"id\",\"expr\":\"id\"},"
+                    + "{\"name\":\"d\",\"expr\":\"CAST('2026-01-15' AS DATE)\"}]}").statusCode());
+
+            HttpResponse<String> r = send(c.port, "POST", "/components/transform/dated/test",
+                    "{\"sampleRows\":[{\"id\":\"1\"}]}");
+            assertEquals(200, r.statusCode(), r.body());
+
+            JsonNode rows = null;
+            for (JsonNode rel : json(r).get("relations"))
+                if ("data".equals(rel.get("rel").asText())) rows = rel.get("rows");
+            assertNotNull(rows, r.body());
+            assertEquals("2026-01-15", rows.get(0).get("d").asText(), r.body());
+        }
+    }
+
     @Test
     void grammarPreviewParsesRawSampleText(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
