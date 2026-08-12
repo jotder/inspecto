@@ -618,8 +618,23 @@ public final class JobService implements AutoCloseable {
                 if (!seen.containsAll(upstreams)) continue;
                 pendingUpstreams.remove(c.name());
             }
-            submit(c.name(), "event:" + event.pipeline());
+            fireOnCommit(c.name(), event);
         }
+    }
+
+    /**
+     * G4 ({@code consignment-chain-plan.md}): an {@code on_pipeline} firing carries the committed
+     * Consignment's identity, so a Job may {@code bind: $signal.batchId} exactly as the
+     * {@code on_signal} path resolves it — same payload shape as {@link #mirrorPipelineCommit}, one
+     * vocabulary across both triggers. Under {@code on_pipeline_gate=all} the payload is the
+     * gate-closing upstream's commit. A Job that binds nothing behaves exactly as before —
+     * {@code Firing.NONE} was an empty payload, and nothing else reads it.
+     */
+    private void fireOnCommit(String name, BatchEvent event) {
+        if (!jobs.containsKey(name)) return;
+        String runId = newRunId(name);
+        submitRun(runId, name, "event:" + event.pipeline(), runId, 0,
+                new Firing(Map.of(), commitPayload(event), false));
     }
 
     /**
@@ -654,6 +669,13 @@ public final class JobService implements AutoCloseable {
      *  {@code on_signal: pipeline.commit}. The existing {@code on_pipeline} path (via {@link #onBatchEvent})
      *  is unchanged — the two coexist (no double-fire; different config keys). */
     private void mirrorPipelineCommit(BatchEvent be) {
+        emitSignal("pipeline.commit", "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
+                be.batchId(), Ref.of("pipeline", be.pipeline()), commitPayload(be));
+    }
+
+    /** The commit fields both event surfaces speak — {@code bind:} resolves {@code $signal.<field>}
+     *  against this map whether the Job fired {@code on_signal: pipeline.commit} or {@code on_pipeline}. */
+    private static Map<String, Object> commitPayload(BatchEvent be) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("pipeline", be.pipeline());
         payload.put("batchId", be.batchId());
@@ -661,8 +683,7 @@ public final class JobService implements AutoCloseable {
         payload.put("rows", be.outputRows());
         payload.put("ms", be.durationMs());
         payload.put("parts", be.partitions());
-        emitSignal("pipeline.commit", "SUCCESS".equals(be.status()) ? Severity.INFO : Severity.WARN,
-                be.batchId(), Ref.of("pipeline", be.pipeline()), payload);
+        return payload;
     }
 
     /** Emit a framework signal outside a Run (mirror / chain-cut) directly to this space's ledger. */

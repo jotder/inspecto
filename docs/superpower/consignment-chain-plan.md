@@ -72,7 +72,10 @@ operator decision needed. G7 stays gated and is out of scope here.**
   → verify: a **file-level** round-trip test (graph → `lower` → `toToon` → disk → `load` →
   `PipelineConfig.fromMap` → `batchMaxFiles()==500`), mirroring `PipelineSinksFileRoundTripTest`;
   plus editor round-trip of a pre-existing nested block.
-- [ ] **S2 — Thread the Consignment through `on_pipeline` (G4).** `onBatchEvent` builds a
+- [x] **S2 — SHIPPED 2026-08-12.** `commitPayload` extracted (not copied) and shared with the
+  `mirrorPipelineCommit` Signal mirror, so `bind: $signal.<field>` means the same thing on both
+  triggers; end-to-end proof rides `sample.hello`'s parameter echo (`JobServiceTest`,
+  `anOnPipelineFiringCarriesTheCommitPayload`). **Thread the Consignment through `on_pipeline` (G4).** `onBatchEvent` builds a
   `Firing` from the `BatchEvent` payload exactly as `onSignalEvent` does (`$trigger.batchId`,
   `$trigger.partitions`, …) instead of `Firing.NONE`. Additive: jobs that bind nothing behave
   identically. → verify: a `type: pipeline` job with `bind: {consignment_id: $trigger.batchId}`

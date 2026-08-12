@@ -624,6 +624,29 @@ class JobServiceTest {
     }
 
     @Test
+    void anOnPipelineFiringCarriesTheCommitPayload(@TempDir Path dir) throws Exception {
+        // G4 (consignment-chain-plan.md): the committed Consignment's identity rides the on_pipeline
+        // Firing, so bind: resolves $signal.<field> exactly as the on_signal path does. Before the
+        // fix this path fired Firing.NONE and the audience below stayed at its default ("world") —
+        // per-Consignment work could only be triggered via the pipeline.commit Signal mirror.
+        JobConfig greeter = new JobConfig("greeter", "sample.hello", null, "UPSTREAM", true, false,
+                Map.of("raise_alert", "false"), null, null, Map.of(),
+                Map.of("audience", "$signal.batchId"));
+        BatchEventBus bus = new BatchEventBus();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(greeter), bus, s, null,
+                     dir.resolve("audit").toString())) {
+            js.start();
+            bus.publish(new BatchEvent("UPSTREAM", "b_2026_0042", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
+            JobRun run = await(() -> js.lastRunOf("greeter").orElse(null));
+            assertEquals("SUCCESS", run.status(), run.message());
+            assertTrue(run.trigger().startsWith("event:UPSTREAM"), run.trigger());
+            assertTrue(run.message().contains("b_2026_0042"),
+                    "the bound $signal.batchId must reach the job's resolved parameters: " + run.message());
+        }
+    }
+
+    @Test
     void aCommaListOnPipelineFiresOnAnyUpstreamByDefault(@TempDir Path dir) throws Exception {
         // multiplicity Part B residual (a): several upstreams, default gate = any → each commit fires.
         JobConfig j = maintenance("merger", null, "a_etl, b_etl", Map.of("task", "heartbeat"));
