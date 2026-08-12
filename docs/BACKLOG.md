@@ -1,6 +1,13 @@
 # Consolidated Backlog — every OPEN item, one page
 
-**Updated:** 2026-07-27 (**MNT-14 COMPLETE — the `incident_purge` maintenance task ships**, the last root
+**Updated:** 2026-08-12 (§6 gains three rows from driving the pipeline builder end-to-end — create →
+save → open → test — against a cleared config tree: **AUTHOR-1** an authored `transform.map` binding is
+silently dropped on save while the route answers `200 written:true`; **DRYRUN-1** a `transform.join`
+pipeline cannot be dry-run at all (422, no `ReferenceResolver` in that context); **DRYRUN-2** a dry-run
+reaching no node returns a silent empty 200. The JSR-310 defect found in the same pass is **FIXED, not
+filed** — `bc4304d9`: a DuckDB `DATE` reaches the response as a `java.time.LocalDate` and the bare
+control-plane mapper turned an already-succeeded dry-run into a 500, breaking every schema-backed
+pipeline.) · Previously 2026-07-27 (**MNT-14 COMPLETE — the `incident_purge` maintenance task ships**, the last root
 enabler, and `ObjectStore.delete` finally has its production caller. `ObjectService.purge` cascades to
 notes/attachments, links and tag edges; selection is `ObjectQuery.purgeEligible`; legal hold is enforced
 **inside** `purge()` so a hold applied between preview and run still wins; the dry run reports held-but-
@@ -1081,6 +1088,34 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   directly for OLTP, reserve the plugin (or a materialize-to-Parquet CQRS split) for cross-engine
   analytical joins. Editions: DuckDB-file stays the Personal default (zero external deps / jlink),
   Postgres for Standard/Enterprise via the existing toggle. `okf/backend/engine/db-layer.md`
+- 🔴 **AUTHOR-1 — an authored `transform.map` config is SILENTLY DROPPED on save.** Found
+  2026-08-12 driving the UI end-to-end (create → save → open → test). The builder offers a Configure
+  dialog with a transform picker and a "New transform" flow for a `map` step; the component is created
+  and persisted (`registry/transforms/<id>.toon`), the step renders **"Configured"**, and
+  `PUT /pipelines/{name}/graph` returns **200 `written:true`** — but the binding never reaches the
+  `.toon`, and `GET …/graph/raw` still shows the node with `{}`. **Cause:** `TRANSFORM_MAP` is in
+  `LOWERABLE` (`PipelineEditable.java:56`) so it escapes the `UNSUPPORTED_NODE` refusal, but it is
+  absent from `STEP_KIND` and no branch claims it — it falls through to the bare
+  `// transform.map + enrichment: derived / companion-persisted — nothing to lower` comment
+  (`:264`). The engine's stated premise (`:60-62`) is that a map node's config is the **lift's derived
+  schema projection**, never author-set. **So the real defect is that the UI and the engine disagree
+  about whether a map node is author-configurable** — decide that first, then either (a) give it a
+  lowering target, or (b) refuse explicitly with a named code. ⛔ Do **not** "fix" this by writing a
+  `steps:` entry for map without settling (a)/(b): map nodes never enter the chain that triggers the
+  `steps:` path, so that would change when `steps:` is emitted at all.
+- 🟠 **DRYRUN-1 — a `transform.join` pipeline cannot be dry-run at all.**
+  `POST …/pipelines/authored/{id}/dry-run` on demo's `orders_enriched_rollup` returns **422
+  `no ReferenceResolver supplied — cannot resolve reference '…/region_dim.csv' for transform.join in
+  this execution context`**. Honest and recoverable, not a crash — but it means the dry-run surface is
+  blind to every join pipeline, which is most realistic ones. The seam already exists: `b9f3b30e`
+  extracted the shared `com.gamma.enrich.ReferenceReader` for the production join executor, so this is
+  wiring a resolver into the dry-run context, not new machinery. Note the reference is a **path on
+  disk**, so the write-root/path-jail gate has to be honoured on the dry-run route too.
+- 🟡 **DRYRUN-2 — a dry-run that reaches no node returns a silent empty 200.** ucc's
+  `voucher_unknown_etl` answers `200 {"seedNode":"parse","nodes":[],"sinks":[]}` for a sample that
+  matches nothing. Indistinguishable from success in the UI. Should carry a warning (or a named
+  finding) saying the sample never reached a node — compare the sink preview, which already returns a
+  `warnings` array for a missing partition column.
 
 **Closed — do not re-propose without the stated trigger:**
 - **M2 `CollectorService` decomposition — won't-do.** Already reads as a composition-root/facade
