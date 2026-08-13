@@ -67,9 +67,9 @@ public final class ConsignmentSelector {
     /**
      * The SQL <b>source literal</b> for reading {@code root}'s {@code .ext} files — the quoted
      * {@code root}{@code /**}{@code /*.ext} glob when the catalog has nothing to exclude, else a bracketed list
-     * of the survivors. For the callers that have no {@link Connection}: {@code DatasetRelation} builds its own
-     * bare {@code read_parquet(<literal>)} with deliberately no other options, so it cannot go through
-     * {@link SqlViews#reader}.
+     * of the survivors. For the callers that have no {@link Connection}: {@code DatasetRelation} hands the
+     * literal straight to {@link SqlViews#readerOverLiteral}, so it decides the source without deciding the
+     * read options.
      *
      * <p>The glob is built here rather than accepted, so the pattern this enumerates and the pattern it falls
      * back to cannot drift apart.

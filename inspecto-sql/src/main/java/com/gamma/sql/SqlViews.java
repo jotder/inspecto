@@ -70,10 +70,27 @@ public final class SqlViews {
     }
 
     /**
+     * The same reader over a <b>source literal a caller has already rendered</b> — one quoted path/glob, or a
+     * bracketed list from {@link #pathList} — for the callers that decide the source themselves but must not
+     * decide the read <em>options</em> themselves. {@code ConsignmentSelector.sourceLiteral} produces exactly
+     * this shape, and {@code DatasetRelation} consumes it.
+     *
+     * <p>Added when {@code DatasetRelation} was found hand-building a bare {@code read_parquet(<literal>)}:
+     * a glob with no {@code union_by_name} fails on the additive schema drift the option exists to absorb, so
+     * the same store read as a Dataset behaved differently from the same store read as a view. There is now
+     * no reason for anyone to concatenate their own {@code read_*(} call.
+     *
+     * @param source a SQL literal, already quoted/escaped (use {@link #pathList} for a list)
+     */
+    public static String readerOverLiteral(String format, String source, boolean hive) {
+        return over(format, source, hive);
+    }
+
+    /**
      * A file list as a DuckDB SQL literal — {@code ['a.parquet', 'b.parquet']} — or the quoted
      * {@link #NO_FILES_GLOB} when there is nothing in it. The one renderer for a selected read, so a caller
-     * that builds its own {@code read_parquet(...)} (there is one: {@code DatasetRelation}, which deliberately
-     * passes no other options) stays byte-compatible with {@link #reader(String, java.util.List, boolean)}.
+     * that renders its own source literal and passes it to {@link #readerOverLiteral} stays byte-compatible
+     * with {@link #reader(String, java.util.List, boolean)}.
      */
     public static String pathList(java.util.List<String> paths) {
         if (paths == null || paths.isEmpty()) return "'" + NO_FILES_GLOB + "'";

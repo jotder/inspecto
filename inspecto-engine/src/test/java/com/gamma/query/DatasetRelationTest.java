@@ -2,11 +2,15 @@ package com.gamma.query;
 
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.util.JdbcDrivers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,6 +54,44 @@ class DatasetRelationTest {
         // an explicit deeper ref is honoured as written
         String explicit = DatasetRelation.relationSql(Map.of("physicalRef", "orders/backup"), root, null);
         assertTrue(explicit.replace('\\', '/').contains("orders/backup/**/*.parquet"), explicit);
+    }
+
+    /**
+     * The bug this pins: a physicalRef read used to hand-build a bare {@code read_parquet(<glob>)} with no
+     * options, so a store that gained a column mid-life failed to read as a Dataset while a {@code view}-backed
+     * read of the SAME store unioned by name and succeeded. The relation SQL is executed, not just shaped —
+     * the option only matters if DuckDB actually honours it.
+     */
+    @Test
+    void physicalRefReadsAStoreWhoseSchemaDriftedAcrossPartitions(@TempDir Path root) throws Exception {
+        Path store = root.resolve("cdr");
+        // partition 1 predates the column; partition 2 has it — the additive drift union_by_name absorbs
+        writeParquet(store.resolve("dt=2026-01-01"), "a.parquet", "SELECT 1 AS id");
+        writeParquet(store.resolve("dt=2026-01-02"), "b.parquet", "SELECT 2 AS id, 'x' AS added_later");
+
+        String sql = DatasetRelation.relationSql(Map.of("physicalRef", "cdr"), root, null);
+        assertTrue(sql.contains("union_by_name=true"), "reads through SqlViews' shared options: " + sql);
+
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, added_later FROM (" + sql + ") ORDER BY id")) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt("id"));
+            assertNull(rs.getString("added_later"), "the older partition reads as NULL, not as a failure");
+            assertTrue(rs.next());
+            assertEquals(2, rs.getInt("id"));
+            assertEquals("x", rs.getString("added_later"));
+            assertFalse(rs.next());
+        }
+    }
+
+    private static void writeParquet(Path dir, String file, String selectSql) throws Exception {
+        Files.createDirectories(dir);
+        String path = dir.resolve(file).toString().replace("\\", "/");
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             Statement st = conn.createStatement()) {
+            st.execute("COPY (" + selectSql + ") TO '" + path + "' (FORMAT PARQUET)");
+        }
     }
 
     @Test

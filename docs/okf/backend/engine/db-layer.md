@@ -46,6 +46,17 @@ business data (the file lake) and config (TOON) are documented in
 | Business-data read-relation builder | [`sql/SqlViews.java`](../../../../inspecto-sql/src/main/java/com/gamma/sql/SqlViews.java) |
 | Dataset → physical store resolution | [`query/DatasetRelation.java`](../../../../inspecto-engine/src/main/java/com/gamma/query/DatasetRelation.java) |
 
+**`SqlViews` owns the read OPTIONS; nobody concatenates their own `read_*(`.** Three entry points, one
+option list (`over`): `reader(format, glob, hive)`, `reader(format, List<String>, hive)`, and
+`readerOverLiteral(format, sourceLiteral, hive)` for a caller that decides the *source* itself —
+`ConsignmentSelector.sourceLiteral` renders exactly that shape and `DatasetRelation` consumes it.
+The third overload exists because `DatasetRelation` was hand-building a bare `read_parquet(<glob>)`
+with no options: it omitted `union_by_name=true`, so a store that gained a column mid-life read fine
+as a `view`-backed Dataset and **failed** as a `physicalRef`-backed one — same store, two answers
+(fixed 2026-08-13, pinned by an executing mixed-schema-partition test). `hive_partitioning` stays
+**off** for datasets: turning it on would surface partition segments as new columns on every existing
+Dataset, which is a product decision, not a bug fix.
+
 ---
 
 ## 2. Operational store inventory

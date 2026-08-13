@@ -78,8 +78,13 @@ public final class DatasetRelation {
             // output, so it is the one that has to be filtered before a full recompute may leave an old
             // revision on disk (step 6). No connection is threaded here on purpose — relationSql has call
             // sites in three modules — so the selector walks the tree, as the storeReadRoot check above does.
-            return "SELECT * FROM read_parquet("
-                    + com.gamma.consignment.ConsignmentSelector.sourceLiteral(root, "parquet") + ")";
+            //
+            // The read OPTIONS come from SqlViews, never from here: a hand-built read_parquet(<literal>) omitted
+            // union_by_name, so a store that gained a column mid-life read fine as a view and failed as a
+            // Dataset. hive_partitioning stays off — turning it on would surface partition segments as new
+            // columns on every existing Dataset, which is a separate decision, not a bug fix.
+            String source = com.gamma.consignment.ConsignmentSelector.sourceLiteral(root, "parquet");
+            return "SELECT * FROM " + SqlViews.readerOverLiteral("PARQUET", source, false);
         }
         throw new IllegalArgumentException("dataset must declare a 'view' or a 'physicalRef'");
     }
