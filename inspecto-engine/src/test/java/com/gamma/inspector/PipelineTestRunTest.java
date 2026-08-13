@@ -140,6 +140,45 @@ class PipelineTestRunTest {
         assertTrue(Files.exists(f.good1()));
     }
 
+    /**
+     * 5a-ii — the parsed rows must come back in the shape {@code PipelineDryRun.run} seeds from, carrying
+     * the user's REAL values. This is what makes the graph preview reflect real data instead of synthetic
+     * sample rows.
+     */
+    @Test
+    void readsRealParsedRowsBackInTheShapeTheDryRunSeedsFrom(@TempDir Path dir) throws Exception {
+        Fixture f = fixture(dir);
+        Path scratch = dir.resolve("scratch");
+
+        PipelineTestRun.Result r = PipelineTestRun.run(f.cfg(), List.of(f.good1(), f.good2()), scratch);
+        List<java.util.Map<String, Object>> rows =
+                PipelineTestRun.sampleRows(r, f.cfg().output().format(), 10);
+
+        assertEquals(4, rows.size(), "all four accepted rows should read back");
+        // Real values from the real files — not placeholders.
+        var ids = rows.stream().map(m -> String.valueOf(m.get("ID"))).sorted().toList();
+        assertEquals(List.of("a1", "a2", "b1", "b2"), ids);
+        assertTrue(rows.get(0).containsKey("AMT"), "declared columns should survive the round trip");
+        assertTrue(rows.get(0).containsKey("EVENT_DATE"));
+    }
+
+    @Test
+    void sampleRowsIsBoundedAndEmptyWhenNothingWasWritten(@TempDir Path dir) throws Exception {
+        Fixture f = fixture(dir);
+        Path scratch = dir.resolve("scratch");
+
+        PipelineTestRun.Result r = PipelineTestRun.run(f.cfg(), List.of(f.good1(), f.good2()), scratch);
+        assertEquals(2, PipelineTestRun.sampleRows(r, f.cfg().output().format(), 2).size(),
+                "the limit must actually bound the read");
+        assertTrue(PipelineTestRun.sampleRows(r, f.cfg().output().format(), 0).isEmpty());
+
+        // A run that wrote nothing has nothing to sample — and must not blow up trying.
+        PipelineTestRun.Result empty = PipelineTestRun.run(
+                f.cfg(), List.of(f.bad()), dir.resolve("scratch2"));
+        assertTrue(PipelineTestRun.sampleRows(empty, f.cfg().output().format(), 10).isEmpty(),
+                "an all-quarantined run samples empty rather than throwing");
+    }
+
     @Test
     void refusesARunWithNoFiles(@TempDir Path dir) throws Exception {
         Fixture f = fixture(dir);

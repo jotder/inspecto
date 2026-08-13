@@ -289,16 +289,25 @@ half **are** separable — confirm that before designing against it.
   - **5a-i · the parse half — ✅ SHIPPED 2026-08-14.** `PipelineTestRun.run(cfg, pickedFiles, scratchRoot)`
     parses real files through the real ingest path with zero production side effects (6 tests, incl. a
     falsification probe). See the as-built note below.
-  - **5a-ii · feed the parsed rows into the graph — ⬜ NEXT.** Read the scratch outputs back and hand them
-    to `PipelineDryRun.run` in place of its synthetic `sampleRows`, so the existing per-relation counts +
-    sample table (which the UI already renders) are computed from real data. `PipelineTestRun.Result`
-    already returns the scratch `outputs` for exactly this; that is why scratch cleanup is caller-owned.
+  - **5a-ii · the bridge to the graph — ✅ SHIPPED 2026-08-14.** `PipelineTestRun.sampleRows(result,
+    outputFormat, limit)` reads the scratch outputs back as `List<Map<String,Object>>` — exactly the shape
+    `PipelineDryRun.run` seeds from — so the existing per-relation counts + sample table (which the UI
+    already renders) can be computed from real data. Reads through `SqlViews.reader` rather than a
+    hand-built `read_*(`, with `hive_partitioning` **off** for `DatasetRelation`'s reason: partition
+    columns are not part of the parsed row and would misrepresent what the pipeline produced. Bounded by
+    `limit`; an `EMPTY`/`FAILED` run samples to an empty list rather than throwing (the caller decides
+    whether that is a warning, since `PipelineDryRun` refuses an empty sample).
+    ⚠ **Scope, stated honestly: this is the bridge, not the composition.** Nothing yet *calls*
+    `PipelineDryRun` with these rows, because that needs a `PipelineGraph` — which is resolved at the
+    route. **That wiring is 5c's**, and it is now a few lines rather than a design problem.
 - **5b · stop-at-node cutoff.** Thread a target set through the `topoOrder` walk. ⚠ **That walk is shared
   with production `execute`** — add an overload whose default is "no cutoff" so the production path stays
   byte-identical, and pin that with a test. This is the slice most likely to cause a regression far from
   where it was edited.
 - **5c · route + ungate.** Register `POST /pipelines/authored/{id}/run?to={nodeId}`, then flip the
-  `environment.mockFlows` gate off for run-to-here. Two things to get right:
+  `environment.mockFlows` gate off for run-to-here. With 5a shipped the body is: resolve the graph,
+  `PipelineTestRun.run(...)` → `sampleRows(...)` → `PipelineDryRun.run(graph, rows, references)`, and
+  `deleteScratch` in a `finally`. Two things to get right:
   - ⚠ **Jail the `files` body to the pipeline's configured inbox.** As specified it accepts caller-supplied
     paths, so without containment this is an arbitrary-file-read over HTTP. This is the one place where the
     still-open "config-declared paths resolve unjailed" BACKLOG row becomes **reachable rather than

@@ -8,6 +8,9 @@ import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
 import com.gamma.etl.StepProgress;
+import com.gamma.sql.SqlViews;
+import com.gamma.util.DuckDbUtil;
+import com.gamma.util.JdbcRows;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,9 +20,14 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -149,6 +157,39 @@ public final class PipelineTestRun {
                 cfg.identity().pipelineName(), pickedFiles.size(), status, inputRows, written);
         return new Result(status, batches.size(), List.copyOf(files), inputRows, written, casts,
                 List.copyOf(outputs), error);
+    }
+
+    /**
+     * Read up to {@code limit} parsed rows back out of a run's scratch outputs, in the
+     * {@code List<Map<String,Object>>} shape {@link com.gamma.pipeline.exec.PipelineDryRun#run} seeds
+     * from — the bridge that lets the graph preview run over <b>real</b> data instead of synthetic
+     * sample rows (Step 5a-ii).
+     *
+     * <p>Reads through {@link SqlViews#reader} so the format's option list is the same one every other
+     * reader in the codebase uses, rather than a hand-built {@code read_*(}. ⚠ {@code hive_partitioning}
+     * stays <b>off</b>, matching {@code DatasetRelation}: enabling it would surface partition columns
+     * that are not part of the parsed row, which would misrepresent what the pipeline actually produced.
+     *
+     * <p>Returns an empty list when the run wrote nothing ({@code EMPTY}/{@code FAILED}) — the caller
+     * decides whether that is a warning, since {@link com.gamma.pipeline.exec.PipelineDryRun} refuses an
+     * empty sample.
+     *
+     * @param result      a result from {@link #run}, whose scratch root must still exist
+     * @param outputFormat {@code cfg.output().format()} — the format the run wrote
+     */
+    public static List<Map<String, Object>> sampleRows(Result result, String outputFormat, int limit)
+            throws SQLException, IOException {
+        if (result.outputs().isEmpty() || limit <= 0) return List.of();
+        List<String> paths = result.outputs().stream().map(PartitionOutput::outputFile).toList();
+        File db = DuckDbUtil.tempDbFile("testrun_sample_");
+        try (Connection conn = DuckDbUtil.openConnection(db);
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT * FROM " + SqlViews.reader(outputFormat, paths, false) + " LIMIT " + limit)) {
+            return JdbcRows.toMaps(rs);
+        } finally {
+            DuckDbUtil.deleteTempDb(db);
+        }
     }
 
     /**
