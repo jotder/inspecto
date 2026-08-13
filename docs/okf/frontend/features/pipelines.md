@@ -168,6 +168,36 @@ rather than guessed. Types without a schema fall back to the free-form key/value
 config", collapsed when a schema exists) — the conversion is non-lossy by design. Declared defaults **persist on save** even when untouched
 (product-confirmed 2026-07-02: configs stay explicit/self-documenting).
 
+### The enrichment wiring form's partition lists (2026-08-13)
+
+The `enrichment` node authors a **companion** `*_enrich.toon` rather than `node.config`, through
+`ENRICHMENT_WIRING_ATTRIBUTES` (`inspecto/enrichment/enrichment-attributes.ts`). Its two partition keys
+are specced as `list` chips, and the shape is load-bearing in three ways worth keeping:
+
+- **Both keys are engine-REQUIRED, and an empty list is the legal "unpartitioned" value.**
+  `EnrichmentConfig.fromMap` throws `Missing or invalid list` when either is absent, so while they were
+  unauthorable a **fresh** enrichment authored here wrote a config that could never load — it saved,
+  then failed to register under the misleading "it will load on the next service restart". They declare
+  `required: false` on the `required` tier with `default: []`, and the save sets both **explicitly** on
+  the draft rather than letting `nestKeys` emit them, because `nestKeys` **prunes an empty array**.
+- **Speccing a key makes it form-OWNED.** `ownedLeaves` is derived from the spec table itself, so an
+  owned leaf is deleted from the existing block and replaced wholesale. An `output.partitions` entry may
+  be the sink's `{column, source}` map (2026-08-11) where `source` declares event time and drives the
+  recorded bounds — so the naive chips spec would have silently dropped it. The round-trip is explicit:
+  hydrate flattens map entries to their `column`, save re-marries `source` onto a column the operator
+  kept (`remarryPartitionSources`); a new column writes bare, a removed one takes its `source` with it.
+- ⚠ **The `list` chips type does NOT compose with `flat-keys.ts`, which has its own older list
+  convention.** `flattenBlock` **joins any array to a comma string** and `nestKeys` splits back only for
+  a hardcoded `LIST_KEYS` leaf set. So a `list` control fed through this transport receives
+  `"year,month"`, not an array. Handled *inside the dialog* — the two partition flat keys are re-seeded
+  as real arrays after `flattenBlock` — deliberately NOT by making the shared plumbing spec-aware, which
+  would ripple into the parser dialog and Onboarding. **Any future `list` spec on a flat-key surface
+  needs the same treatment or a decision to unify the two conventions.**
+
+⛔ Known hole, not fixed here: `ConfigSpecs.enrichment()` declares both keys with `FieldSpec.of`
+(**optional**) while the parser requires them, so the write route's 422 gate does not fire and a non-UI
+client can still land a config that only fails at registration.
+
 ## A spec `key` *is* the engine's config key — there is no mapping layer (2026-08-03)
 
 `AttributeSpec.key` is written **verbatim** into `node.config` (`node-config.dialog.ts`), and the app has

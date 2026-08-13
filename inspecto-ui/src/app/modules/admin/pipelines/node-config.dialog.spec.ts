@@ -556,7 +556,7 @@ describe('NodeConfigDialog', () => {
         expect(closed?.node.config).toBeUndefined();
     });
 
-    it('hydrates a bound companion and preserves unmodeled keys (partitions) through a save', async () => {
+    it('hydrates a bound companion and round-trips its partition lists through a save', async () => {
         let closed: { node: AuthoredNode } | undefined;
         const read = vi.fn(() =>
             of({
@@ -601,11 +601,99 @@ describe('NodeConfigDialog', () => {
 
         c.save();
         const [, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
-        // The wiring form owns database/format/compression/triggers — partitions travel verbatim.
+        // The form now OWNS partitions (specced as `list` chips, 2026-08-13) — they survive because the
+        // form hydrated them, not because they were unmodeled and copied past it.
         expect((draft['input'] as Record<string, unknown>)['partitions']).toEqual(['year', 'month']);
         expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual(['year']);
         expect((draft['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders');
         expect(closed?.node.use).toBe('enrichment/orders_enrich');
+    });
+
+    // `EnrichmentConfig.fromMap` THROWS `Missing or invalid list` when either partitions key is absent,
+    // so before they were specced a fresh enrichment authored here wrote a config that could never load
+    // — it saved, then failed to register. An empty list is the legal "unpartitioned" value.
+    it('writes both partition keys for a fresh enrichment, so the config can load', async () => {
+        const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const fixture = await create(
+            { node: { id: 'enrich1', type: 'enrichment' }, typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null },
+            { write },
+        );
+        const c = fixture.componentInstance;
+        (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: () => {} };
+        editor(fixture).onSqlChange('SELECT 1 FROM input');
+        const wiring = fixture.debugElement.query(By.directive(InspectoSchemaFormComponent))
+            .componentInstance as InspectoSchemaFormComponent;
+        wiring.form.get('input__database')?.setValue('in/db');
+        wiring.form.get('output__database')?.setValue('out/db');
+
+        c.save();
+        const [, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
+        expect((draft['input'] as Record<string, unknown>)['partitions']).toEqual([]);
+        expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual([]);
+    });
+
+    // An `output.partitions` entry may be `{column, source}` (the sink shape, 2026-08-11) where `source`
+    // declares event time and drives the recorded bounds. The chips control is string[]-only, and a
+    // specced key is replaced wholesale — so without the re-marry, authoring the grain would silently
+    // drop `source` and the enrichment would stop recording bounds with no feedback.
+    it('keeps an output partition source across a save that only touches other fields', async () => {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'orders_enrich',
+                path: 'orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', partitions: ['day'] },
+                    output: {
+                        database: 'out/db',
+                        partitions: [{ column: 'day', source: 'event_ts' }, 'region'],
+                    },
+                    transform: 'SELECT 1 FROM input',
+                },
+            }),
+        );
+        const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const fixture = await create(
+            {
+                node: { id: 'e', type: 'enrichment', use: 'enrichment/orders_enrich' },
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
+            },
+            { read, write },
+        );
+        const c = fixture.componentInstance;
+        (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: () => {} };
+        fixture.detectChanges();
+
+        c.save();
+        const [, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
+        // The map entry keeps its source; the bare one stays bare.
+        expect((draft['output'] as Record<string, unknown>)['partitions']).toEqual([
+            { column: 'day', source: 'event_ts' },
+            'region',
+        ]);
     });
 
     it('refuses to overwrite a hand-authored transform_file config', async () => {

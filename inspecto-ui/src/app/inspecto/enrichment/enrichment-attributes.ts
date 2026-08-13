@@ -7,11 +7,18 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  * never renders it. Keys and defaults mirror `EnrichmentConfig.fromMap` exactly (engine-real:
  * `input.format`/`output.format` default PARQUET there).
  *
- * <p>⚠ `input.partitions` / `output.partitions` are still NOT specced, but the original reason is gone:
- * `AttributeSpec` gained a `list` type (string[]) with D7, 2026-08-03, and these are exactly string
- * lists. Speccing them is now a small, unblocked follow-up rather than a capability gap — it was left
- * out of D7 to keep that change scoped. Until then, hosts must carry existing partition lists through a
- * save verbatim, and a comma-string knob is still wrong here (`strList` rejects it at load).
+ * <p>`input.partitions` / `output.partitions` are specced as `list` (chips) since 2026-08-13. Both are
+ * REQUIRED by the engine — `EnrichmentConfig.fromMap` throws `Missing or invalid list` when either key
+ * is absent — but an EMPTY list is legal (an unpartitioned store), which is why they declare
+ * `required: false` on the `required` tier and default to `[]`: the key is always written, never forced
+ * to carry an entry. The `pattern` mirrors `Identifiers.validate` (`^[A-Za-z_][A-Za-z0-9_]*$`), the same
+ * guard the parser applies to every entry.
+ *
+ * <p>⚠ An `output.partitions` entry may be authored as a `{column, source}` map (the sink shape, 2026-08-11)
+ * where `source` declares event time and drives the recorded bounds. A `list` spec is `string[]` only, so
+ * the host MUST flatten map entries to their `column` when hydrating and re-marry the `source` back on
+ * save — see `node-config.dialog.ts`. Speccing this key without that round-trip silently drops `source`,
+ * because a specced key is form-OWNED and replaced wholesale.
  */
 export const ENRICHMENT_WIRING_ATTRIBUTES: AttributeSpec[] = [
     {
@@ -34,6 +41,16 @@ export const ENRICHMENT_WIRING_ATTRIBUTES: AttributeSpec[] = [
         ],
     },
     {
+        key: 'input__partitions',
+        label: 'Input partitions',
+        type: 'list',
+        tier: 'required',
+        required: false,
+        default: [],
+        pattern: '[A-Za-z_][A-Za-z0-9_]*',
+        help: 'Hive partition columns present on the Stage-1 output. Empty = unpartitioned.',
+    },
+    {
         key: 'output__database',
         label: 'Output store',
         type: 'string',
@@ -51,6 +68,16 @@ export const ENRICHMENT_WIRING_ATTRIBUTES: AttributeSpec[] = [
             { value: 'PARQUET', label: 'Parquet' },
             { value: 'CSV', label: 'CSV' },
         ],
+    },
+    {
+        key: 'output__partitions',
+        label: 'Output partitions',
+        type: 'list',
+        tier: 'required',
+        required: false,
+        default: [],
+        pattern: '[A-Za-z_][A-Za-z0-9_]*',
+        help: 'Output grain, which may differ from the input grain. Empty = unpartitioned.',
     },
     {
         key: 'output__compression',

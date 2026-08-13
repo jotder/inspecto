@@ -359,11 +359,22 @@ export class NodeConfigDialog {
     readonly wiringInitial = computed<Record<string, unknown>>(() => {
         const s = this.enrichSource();
         if (!s || s === 'loading') return {};
-        return flattenBlock({
-            input: (s['input'] as Record<string, unknown>) ?? {},
-            output: (s['output'] as Record<string, unknown>) ?? {},
+        const input = (s['input'] as Record<string, unknown>) ?? {};
+        const output = (s['output'] as Record<string, unknown>) ?? {};
+        const flat = flattenBlock({
+            input,
+            output,
             triggers: (s['triggers'] as Record<string, unknown>) ?? {},
         });
+        // `flattenBlock` joins any list to a comma string, but a `type: 'list'` control holds a real
+        // array — so hand the two partition chips their arrays back. `output.partitions` may carry
+        // `{column, source}` map entries (the sink shape, 2026-08-11); the chips are string[]-only, so
+        // show the columns and re-marry `source` in saveEnrichment().
+        flat[`input${KEY_SEP}partitions`] = authoredList(input['partitions']);
+        flat[`output${KEY_SEP}partitions`] = partitionColumns(
+            Array.isArray(output['partitions']) ? output['partitions'] : [],
+        );
+        return flat;
     });
     /** Produced Reference Datasets bindable by name (same source the Onboarding stage uses). */
     readonly refOptions = signal<{ id: string; label: string }[]>([]);
@@ -649,9 +660,9 @@ export class NodeConfigDialog {
 
         // Overlay the asked wiring onto the existing config's blocks: keys this form OWNS are
         // replaced wholesale (a cleared field deletes its key, never resurrects the old value),
-        // while unmodeled keys — `partitions` lists above all (no AttributeSpec list type) —
-        // survive the save verbatim.
-        const wiring = nestKeys(compact(this.schemaForm?.value() ?? {})) as Record<string, Record<string, unknown>>;
+        // while unmodeled keys survive the save verbatim.
+        const formValue = compact(this.schemaForm?.value() ?? {});
+        const wiring = nestKeys(formValue) as Record<string, Record<string, unknown>>;
         const existing = this.enrichSource();
         const ownedLeaves = (root: string): string[] =>
             this.wiringSpecs
@@ -666,10 +677,20 @@ export class NodeConfigDialog {
             for (const leaf of ownedLeaves(root)) delete base[leaf];
             return { ...base, ...(wiring[root] ?? {}) };
         };
+        // Both partition keys are set explicitly rather than left to `nestKeys`, which PRUNES an empty
+        // array — and an absent `partitions` makes `EnrichmentConfig.fromMap` throw, so a grain-less
+        // enrichment must still write `partitions: []`.
+        const input = block('input');
+        input['partitions'] = authoredList(formValue[`input${KEY_SEP}partitions`]);
+        const output = block('output');
+        output['partitions'] = remarryPartitionSources(
+            authoredList(formValue[`output${KEY_SEP}partitions`]),
+            existing,
+        );
         const draft: Record<string, unknown> = {
             name,
-            input: block('input'),
-            output: block('output'),
+            input,
+            output,
             transform: parts.transform,
         };
         const triggers = block('triggers');
@@ -727,4 +748,56 @@ export class NodeConfigDialog {
 /** Drop blank/null entries so the wiring overlay never writes an empty key over a real one. */
 function compact(m: Record<string, unknown>): Record<string, unknown> {
     return Object.fromEntries(Object.entries(m).filter(([, v]) => v !== '' && v != null));
+}
+
+/** A `type: 'list'` control's value as a real string list. Tolerates the comma string `flattenBlock`
+ *  produces for any list it was handed, so a value that skipped the chips control still lands right. */
+function authoredList(v: unknown): string[] {
+    if (Array.isArray(v)) return v.map((e) => String(e ?? '').trim()).filter((e) => e !== '');
+    if (typeof v === 'string')
+        return v
+            .split(',')
+            .map((s) => s.trim())
+            .filter((s) => s !== '');
+    return [];
+}
+
+/** The column names of `partitions` entries, which may be bare names or `{column, source}` maps —
+ *  the read half of the map-entry round-trip (mirrors `EnrichmentConfig.partitionColumns`). */
+function partitionColumns(entries: readonly unknown[]): string[] {
+    return entries
+        .map((e) => (e && typeof e === 'object' ? ((e as Record<string, unknown>)['column'] ?? '') : e))
+        .map((c) => String(c ?? '').trim())
+        .filter((c) => c !== '');
+}
+
+/**
+ * Re-attach the `source` an existing `output.partitions` entry declared, so authoring the grain
+ * through string-only chips cannot silently drop the event-time declaration that drives the recorded
+ * bounds. A column the operator kept keeps its map form; a newly-added one is written as a bare name;
+ * a removed one takes its `source` with it. Returns the authored list unchanged when nothing declared
+ * a `source`, so an enrichment that never used the map form keeps its plain shape.
+ */
+function remarryPartitionSources(authored: unknown, existingConfig: unknown): unknown {
+    if (!Array.isArray(authored)) return authored;
+    const output =
+        existingConfig && typeof existingConfig === 'object'
+            ? (existingConfig as Record<string, unknown>)['output']
+            : null;
+    const prior = output && typeof output === 'object' ? (output as Record<string, unknown>)['partitions'] : null;
+    if (!Array.isArray(prior)) return authored;
+
+    const sources = new Map<string, unknown>();
+    for (const e of prior) {
+        if (!e || typeof e !== 'object') continue;
+        const entry = e as Record<string, unknown>;
+        const column = String(entry['column'] ?? '').trim();
+        if (column !== '' && entry['source'] != null) sources.set(column, entry['source']);
+    }
+    if (sources.size === 0) return authored;
+
+    return authored.map((c) => {
+        const column = String(c ?? '').trim();
+        return sources.has(column) ? { column, source: sources.get(column) } : c;
+    });
 }
