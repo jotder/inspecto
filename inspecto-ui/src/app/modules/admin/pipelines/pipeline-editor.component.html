@@ -55,6 +55,17 @@
                         <mat-icon svgIcon="heroicons_outline:pencil"></mat-icon>
                         <span>Rename&hellip;</span>
                     </button>
+                    <!-- Gate on the open model's `active`, not the list row: setActive() updates the model
+                         but never patches the flows() summary, so the row is stale right after a toggle. -->
+                    <button
+                        mat-menu-item
+                        (click)="changePipelineId()"
+                        [disabled]="model()?.active"
+                        [matTooltip]="model()?.active ? 'Deactivate the pipeline before changing its id' : ''"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:identification"></mat-icon>
+                        <span>Change id&hellip;</span>
+                    </button>
                     <button mat-menu-item (click)="saveAsTemplate()">
                         <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
                         <span>Save as template&hellip;</span>

@@ -363,6 +363,55 @@ describe('pipelinesHandler — label relabels without moving the identity', () =
     });
 });
 
+describe('pipelinesHandler — rename moves the identity itself', () => {
+    const handler = pipelinesHandler({ mockPipelines: true, mockStudio: true });
+    const post = (url: string, body: unknown, store: MockStore) => handler(req('POST', url, body), store);
+
+    it('moves the record key, id and name, and the old id is no longer addressable', () => {
+        const store = seededStore();
+        // The seed is active — deactivate first, exactly as the server's gate demands of an operator.
+        const src = store.get<{ config: Record<string, unknown> }>('default', PIPELINE_CONFIGS_COLL, 'cdr_ingest')!;
+        store.put('default', PIPELINE_CONFIGS_COLL, 'cdr_ingest', {
+            ...src,
+            config: { ...src.config, active: false },
+        });
+        const res = post('/api/pipelines/cdr_ingest/rename', { newId: 'cdr_eu' }, store)?.body as {
+            written: boolean;
+            oldId: string;
+            id: string;
+        };
+        expect(res).toMatchObject({ written: true, oldId: 'cdr_ingest', id: 'cdr_eu' });
+
+        expect(store.get('default', PIPELINE_CONFIGS_COLL, 'cdr_ingest')).toBeUndefined();
+        expect(handler(req('GET', '/api/pipelines/cdr_ingest/graph/raw'), store)?.status).toBe(404);
+        expect(handler(req('GET', '/api/pipelines/cdr_eu/graph/raw'), store)?.status ?? 200).toBe(200);
+    });
+
+    it('refuses an unknown pipeline (404), a missing/bad newId (400/422) and an active source (409)', () => {
+        const store = seededStore();
+        expect(post('/api/pipelines/nope/rename', { newId: 'x' }, store)?.status).toBe(404);
+        expect(post('/api/pipelines/cdr_ingest/rename', {}, store)?.status).toBe(400);
+        for (const bad of ['Orders EU', 'orders-eu', '_x', 'x!']) {
+            expect(post('/api/pipelines/cdr_ingest/rename', { newId: bad }, store)?.status, `${bad} must be refused`).toBe(
+                422,
+            );
+        }
+        expect(post('/api/pipelines/cdr_ingest/rename', { newId: 'cdr_ingest_new' }, store)?.status).toBe(409); // active
+    });
+
+    it('refuses a taken newId (409) — the source must be inactive to reach this gate', () => {
+        const store = seededStore();
+        const src = store.get<{ config: Record<string, unknown> }>('default', PIPELINE_CONFIGS_COLL, 'cdr_ingest')!;
+        store.put('default', PIPELINE_CONFIGS_COLL, 'cdr_ingest_draft', {
+            id: 'cdr_ingest_draft',
+            path: 'cdr_ingest_draft_pipeline.toon',
+            config: { ...src.config, id: 'cdr_ingest_draft', name: 'cdr_ingest_draft', active: false },
+            registered: true,
+        });
+        expect(post('/api/pipelines/cdr_ingest_draft/rename', { newId: 'cdr_ingest' }, store)?.status).toBe(409);
+    });
+});
+
 /**
  * The dry-run mock used to ignore BOTH the candidate body and `sampleRows`, answering every request with
  * two canned CDR rows for every node. That is the textbook *mock more lenient than the server* trap in its

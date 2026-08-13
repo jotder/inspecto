@@ -280,6 +280,7 @@ const GRAPH_RAW = /\/pipelines\/([^/]+)\/graph\/raw$/;
 const PIPELINE_GRAPH = /\/pipelines\/([^/]+)\/graph$/;
 const SAVE_AS_TEMPLATE = /\/pipelines\/([^/]+)\/save-as-template$/;
 const LABEL = /\/pipelines\/([^/]+)\/label$/;
+const RENAME = /\/pipelines\/([^/]+)\/rename$/;
 const PROV_BATCHES = /\/provenance\/batches$/;
 const PROV = /\/provenance$/;
 const ICON_MAP_RE = /\/config\/icon-map$/;
@@ -340,6 +341,9 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
         }
         if (method === 'POST' && (m = match(url, LABEL))) {
             return relabel(store, space, m[1], req.body as { name?: string });
+        }
+        if (method === 'POST' && (m = match(url, RENAME))) {
+            return rename(store, space, m[1], req.body as { newId?: string; newName?: string });
         }
         if (method === 'PUT' && (m = match(url, PIPELINE_GRAPH))) {
             return saveGraph(store, space, m[1], req.body as AuthoredPipeline);
@@ -570,6 +574,55 @@ function relabel(store: MockStore, space: string, name: string, body: { name?: s
         config: { ...rec.config, name: label, id },
     });
     return json({ written: true, path: rec.path, id, name: label, stampedId, findings: [] });
+}
+
+/**
+ * `POST /pipelines/{name}/rename` — mirrors `PipelineRoutes.rename`'s gate order and response shape
+ * (active 409, id-shape 422, id-taken 409, then move). The mock has no ledger/audit-CSV/DuckDB-mirror
+ * models, so `ledgerRowsMoved`/`auditFilesRenamed`/`dependentsRewritten` are always 0 — real counts,
+ * not simulated ones, so the preview never claims work it didn't do.
+ */
+function rename(
+    store: MockStore,
+    space: string,
+    source: string,
+    body: { newId?: string; newName?: string },
+): MockResponse {
+    const src = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, source);
+    if (!src) return error(404, `no pipeline named '${source}'`);
+    const raw = (body?.newId ?? '').trim();
+    if (!raw) return error(400, "body must include 'newId'");
+    const newId = raw.toLowerCase();
+    if (!/^[a-z0-9][a-z0-9_]*$/.test(newId))
+        return error(422, `newId '${newId}' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)`);
+    if (src.config['active'] === true || src.config['active'] === 'true')
+        return error(409, `pipeline '${source}' is active; deactivate (active: false) before renaming`);
+    if (store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, newId))
+        return error(409, `pipeline id '${newId}' is already registered`);
+
+    const oldId = String(src.config['id'] ?? source);
+    const newName = (body.newName ?? '').trim() || String(src.config['name'] ?? oldId);
+    const cfg = { ...(src.config as Record<string, unknown>), id: newId, name: newName };
+
+    store.delete(space, PIPELINE_CONFIGS_COLL, source);
+    store.put(space, PIPELINE_CONFIGS_COLL, newId, {
+        id: newId,
+        path: `${newId}_pipeline.toon`,
+        config: cfg,
+        registered: true,
+    });
+    return json({
+        written: true,
+        oldId,
+        id: newId,
+        name: newName,
+        path: `${newId}_pipeline.toon`,
+        ledgerRowsMoved: 0,
+        auditFilesRenamed: 0,
+        dependentsRewritten: 0,
+        findings: [],
+        journal: [],
+    });
 }
 
 function summaryOf(f: AuthoredPipeline): PipelineSummary {

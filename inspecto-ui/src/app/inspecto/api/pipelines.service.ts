@@ -276,6 +276,19 @@ export interface PipelineLabelResult {
     stampedId: boolean;
 }
 
+/** The result of the full identity migration (POST /pipelines/{name}/rename) — every artifact keyed
+ *  by the old id moved to the new one; counts are informational, not a completeness guarantee. */
+export interface PipelineRenameResult {
+    written: boolean;
+    oldId: string;
+    id: string;
+    name: string;
+    path: string;
+    ledgerRowsMoved: number;
+    auditFilesRenamed: number;
+    dependentsRewritten: number;
+}
+
 /** Read-only pipeline-graph projection + authored-pipeline CRUD/dry-run for the editor (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class PipelinesService {
@@ -372,6 +385,22 @@ export class PipelinesService {
     label(name: string, displayName: string): Observable<PipelineLabelResult> {
         return this.http.post<PipelineLabelResult>(apiUrl(`/pipelines/${encodeURIComponent(name)}/label`), {
             name: displayName,
+        });
+    }
+
+    /**
+     * Change a pipeline's IDENTITY — the full migration (T3): the config filename, commit log, audit
+     * CSVs, DuckDB status mirror and acquisition ledger all move to `newId`. `dirs.*` are left where
+     * they are (the server 422s a `relocateDirs: true` request — not this route's job); dependent
+     * configs (enrichment/job triggers, expectation/decision-rule targets, dataset references) are
+     * best-effort rewritten unless `rewriteDependents` is explicitly `false`. 409 while the pipeline is
+     * active or currently running; 409 if `newId` is already taken.
+     */
+    rename(name: string, newId: string, opts: { newName?: string; rewriteDependents?: boolean } = {}) {
+        return this.http.post<PipelineRenameResult>(apiUrl(`/pipelines/${encodeURIComponent(name)}/rename`), {
+            newId,
+            ...(opts.newName ? { newName: opts.newName } : {}),
+            ...(opts.rewriteDependents === false ? { rewriteDependents: false } : {}),
         });
     }
 

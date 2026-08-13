@@ -105,10 +105,31 @@ step is appended to `<writeRoot>/rename.journal` — **evidence for manual recon
 resume mechanism.** A retried rename after a partial failure is a fresh call with its own gates; nothing
 reads the journal back.
 
+## UI wiring (shipped 2026-08-13)
+
+The ⋮ menu's **"Change id…"** entry (`PipelineChangeIdDialog`, `pipeline-change-id.dialog.ts`) calls the
+full migration — its own entry, deliberately separate from "Rename…" (`label`), whose "the identity
+stays…" copy is only accurate for the route it names. The dialog leads with a warning alert stating the
+migration scope, validates the new id inline (pattern + duplicate, the same checks the template dialog
+runs), and keeps the confirm button disabled until the operator types the *current* id — the
+`requireText` typed-confirmation shape, warranted by this being the one identity action with real risk.
+
+As-built notes worth keeping:
+
+- **The menu gate reads `model()?.active`, not the list row.** `setActive()` updates the open model but
+  never patches the `flows()` summary, so `selectedSummary()?.active` is stale immediately after a
+  deactivate — the first gate attempt used it and stayed disabled. The model is the authoritative
+  in-editor lifecycle state.
+- **An unlabelled pipeline's display name follows the id.** The server keeps `name` unless `newName` is
+  sent, and for a never-relabelled pipeline `name` IS the old id — so a bare migration leaves every
+  tab/list caption showing the retired identity (found in-browser, not by tests). The UI sends
+  `newName = newId` when the pipeline has no custom label; an explicit label survives untouched.
+- After success the editor rewrites the flow row + open-tab id and re-`select()`s the new id — the old id
+  is gone from the registry, so anything still addressing it would 404.
+- The mock (`pipelines.handler.ts` `rename()`) mirrors the server's gate order (404 unknown → 400 missing
+  → 422 shape → 409 active → 409 taken) and reports **real zero** counts for ledger/audit/dependents —
+  the mock has no model for those artifacts and must not claim work it didn't do.
+
 ## Backlog (not built)
 
-- **UI wiring for `rename`.** The Pipelines editor's ⋮ menu still only offers `label` (as "Rename…") and
-  `save-as-template`; there is no affordance for the full migration yet. The existing rename dialog's copy
-  ("the identity stays…") is accurate for what it calls, but a real "change id" action needs its own,
-  clearly distinguished entry — conflating the two in one dialog would misrepresent which artifacts move.
 - **Automated resumability from `rename.journal`.** Today it is an audit trail an operator reads by hand.

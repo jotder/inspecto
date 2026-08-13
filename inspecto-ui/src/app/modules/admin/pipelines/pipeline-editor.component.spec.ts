@@ -42,6 +42,7 @@ describe('PipelineEditorComponent', () => {
         provenance: ReturnType<typeof vi.fn>;
         saveAsTemplate: ReturnType<typeof vi.fn>;
         label: ReturnType<typeof vi.fn>;
+        rename: ReturnType<typeof vi.fn>;
         document: ReturnType<typeof vi.fn>;
         documentFingerprint: ReturnType<typeof vi.fn>;
     };
@@ -108,6 +109,18 @@ describe('PipelineEditorComponent', () => {
                 .mockReturnValue(
                     of({ written: true, path: 'demo_pipeline.toon', id: 'demo', name: 'Demo (EU)', stampedId: true }),
                 ),
+            rename: vi.fn().mockReturnValue(
+                of({
+                    written: true,
+                    oldId: 'demo',
+                    id: 'demo_eu',
+                    name: 'demo',
+                    path: 'demo_eu_pipeline.toon',
+                    ledgerRowsMoved: 0,
+                    auditFilesRenamed: 0,
+                    dependentsRewritten: 0,
+                }),
+            ),
             document: vi.fn().mockReturnValue(of({ body: new Blob(['# Pipeline: demo']) })),
             documentFingerprint: vi.fn().mockReturnValue('0123456789abcdef0123'),
         };
@@ -709,6 +722,106 @@ describe('PipelineEditorComponent', () => {
         expect(row.name).toBe('demo'); // identity unchanged — run URLs and history still resolve
         expect(row.displayName).toBe('Demo (EU)');
         expect(c.selectedId()).toBe('demo');
+    });
+
+    it('change-id moves the identity — unlike rename, the selection follows the new id', () => {
+        const c = make();
+        c.flows.set([{ name: 'demo', active: false, nodeCount: 2, edgeCount: 1, produces: [], consumes: [] }]);
+        c.openIds.set(['demo']);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of({ newId: 'demo_eu' }) });
+        api.rename.mockReturnValue(
+            of({
+                written: true,
+                oldId: 'demo',
+                id: 'demo_eu',
+                name: 'demo_eu',
+                path: 'demo_eu_pipeline.toon',
+                ledgerRowsMoved: 0,
+                auditFilesRenamed: 0,
+                dependentsRewritten: 0,
+            }),
+        );
+
+        c.changePipelineId();
+
+        // No custom label ⇒ the display name follows the id, or every tab/list row would keep
+        // captioning the pipeline with an identity that no longer exists.
+        expect(api.rename).toHaveBeenCalledWith('demo', 'demo_eu', { newName: 'demo_eu' });
+        expect(c.flows().some((f) => f.name === 'demo')).toBe(false);
+        const row = c.flows().find((f) => f.name === 'demo_eu')!;
+        expect(row.displayName).toBeUndefined(); // name === id — mirror configSummary's omission
+        expect(c.openIds()).toEqual(['demo_eu']);
+        expect(c.selectedId()).toBe('demo_eu');
+    });
+
+    it('change-id keeps an explicit label — only the identity moves', () => {
+        const c = make();
+        c.flows.set([
+            {
+                name: 'demo',
+                active: false,
+                displayName: 'Demo (EU)',
+                nodeCount: 2,
+                edgeCount: 1,
+                produces: [],
+                consumes: [],
+            },
+        ]);
+        c.openIds.set(['demo']);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of({ newId: 'demo_eu' }) });
+        api.rename.mockReturnValue(
+            of({
+                written: true,
+                oldId: 'demo',
+                id: 'demo_eu',
+                name: 'Demo (EU)',
+                path: 'demo_eu_pipeline.toon',
+                ledgerRowsMoved: 0,
+                auditFilesRenamed: 0,
+                dependentsRewritten: 0,
+            }),
+        );
+
+        c.changePipelineId();
+
+        expect(api.rename).toHaveBeenCalledWith('demo', 'demo_eu', {});
+        const row = c.flows().find((f) => f.name === 'demo_eu')!;
+        expect(row.displayName).toBe('Demo (EU)');
+    });
+
+    it('offers the existing ids to the change-id dialog so a duplicate is blocked before the server 409s', () => {
+        const c = make();
+        c.flows.set([
+            { name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+            { name: 'other', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+        ]);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+
+        c.changePipelineId();
+
+        expect(dialog.open.mock.calls[0][1].data).toEqual({
+            id: 'demo',
+            displayName: 'demo',
+            existingNames: ['demo', 'other'],
+        });
+        expect(api.rename).not.toHaveBeenCalled(); // cancelled
+    });
+
+    it('surfaces a failed change-id instead of leaving a phantom row', () => {
+        const c = make();
+        c.flows.set([{ name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]);
+        c.selectedId.set('demo');
+        dialog.open.mockReturnValue({ afterClosed: () => of({ newId: 'taken' }) });
+        api.rename.mockReturnValue(throwError(() => ({ status: 409, error: { error: { message: 'taken' } } })));
+
+        c.changePipelineId();
+
+        expect(toast.error).toHaveBeenCalled();
+        expect(c.flows().some((f) => f.name === 'taken')).toBe(false);
+        expect(c.flows().some((f) => f.name === 'demo')).toBe(true); // unchanged — nothing renamed
     });
 
     it('surfaces a failed template copy instead of leaving a phantom row', () => {

@@ -54,6 +54,7 @@ import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
+import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
@@ -1045,6 +1046,55 @@ export class PipelineEditorComponent implements OnInit {
                         this.toast.success(`Renamed to '${res.name}'`);
                     },
                     error: (err) => this.onWriteError(err, 'Rename failed'),
+                });
+            });
+    }
+
+    /**
+     * The full identity migration (T3) — distinct from {@link renamePipeline}'s display-only relabel.
+     * Moves the id itself, so every route addressing the pipeline by name must switch to `newId`
+     * afterwards: update `selectedId`/the flow list entry, and reselect so the editor keeps pointing at
+     * the (now-renamed) pipeline instead of 404ing on its old id.
+     */
+    changePipelineId(): void {
+        const id = this.selectedId();
+        if (!id) return;
+        this.dialog
+            .open(PipelineChangeIdDialog, {
+                width: '32rem',
+                data: {
+                    id,
+                    displayName: this.selectedSummary()?.displayName ?? id,
+                    existingNames: this.flows().map((f) => f.name),
+                },
+            })
+            .afterClosed()
+            .subscribe((res?: PipelineChangeIdResultData) => {
+                if (!res) return;
+                // The server keeps the display name unless told otherwise. For a pipeline that was never
+                // relabelled the display name IS the old id, so keeping it would leave every list/tab
+                // captioned with an identity that no longer exists — follow the id instead. An explicit
+                // label survives the migration untouched.
+                const hasOwnLabel = !!this.selectedSummary()?.displayName;
+                this.api.rename(id, res.newId, hasOwnLabel ? {} : { newName: res.newId }).subscribe({
+                    next: (written) => {
+                        this.flows.update((fs) =>
+                            fs.map((f) =>
+                                f.name === id
+                                    ? {
+                                          ...f,
+                                          name: written.id,
+                                          // mirror configSummary: displayName only when it differs from the id
+                                          displayName: written.name === written.id ? undefined : written.name,
+                                      }
+                                    : f,
+                            ),
+                        );
+                        this.openIds.update((ids) => ids.map((x) => (x === id ? written.id : x)));
+                        this.select(written.id); // reload the graph under the new id — the old one is gone
+                        this.toast.success(`Pipeline id changed to '${written.id}'`);
+                    },
+                    error: (err) => this.onWriteError(err, 'Change id failed'),
                 });
             });
     }
