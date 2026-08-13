@@ -189,11 +189,13 @@ final class InvRoutes implements RouteModule {
         int nextGroupIdx = 3;
         if (kindCol != null) groupBy.append(", ").append(nextGroupIdx++);
         for (int i = 0; i < attrCols.size(); i++) groupBy.append(", ").append(nextGroupIdx++);
-        // No bind-parameter support in QueryExecutor.Request — the value is a literal, SQL-escaped
-        // (doubled quotes), never caller SQL text; column identifiers are separately validated above.
+        // The value is bound, not interpolated: `Request` gained `binds` and `QueryExecutor` a
+        // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
+        // source order — binds are positional, and `wrap()` adds none of its own. Column identifiers are
+        // still built above from validated identifiers; JDBC cannot bind those.
         String neighborFilter = neighborsOf != null
-                ? " AND (CAST(" + src + " AS VARCHAR) = '" + sqlLiteral(neighborsOf) + "'"
-                + " OR CAST(" + tgt + " AS VARCHAR) = '" + sqlLiteral(neighborsOf) + "')" : "";
+                ? " AND (CAST(" + src + " AS VARCHAR) = ? OR CAST(" + tgt + " AS VARCHAR) = ?)" : "";
+        List<String> binds = neighborsOf != null ? List.of(neighborsOf, neighborsOf) : List.of();
         String sql = "SELECT CAST(" + src + " AS VARCHAR) AS source, CAST(" + tgt + " AS VARCHAR) AS target"
                 + kindSel + attrSel + ", COUNT(*) AS cnt FROM " + q(datasetId)
                 + " WHERE " + src + " IS NOT NULL AND " + tgt + " IS NOT NULL" + neighborFilter
@@ -202,7 +204,7 @@ final class InvRoutes implements RouteModule {
 
         try {
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                    datasetId, relationSql, sql, limit, 0, List.of(), List.of()));
+                    datasetId, relationSql, sql, limit, 0, List.of(), List.of(), binds));
             List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
             for (Map<String, Object> row : r.rows()) {
                 Map<String, Object> out = new LinkedHashMap<>();
@@ -224,11 +226,6 @@ final class InvRoutes implements RouteModule {
         } catch (SQLException e) {
             throw new ApiException(422, "projection failed: " + e.getMessage());
         }
-    }
-
-    /** SQL single-quote escaping for a literal value (doubled quotes) — never caller SQL text. */
-    private static String sqlLiteral(String value) {
-        return value.replace("'", "''");
     }
 
     /** Optional {@code attrCols: string[]} — each validated as a safe identifier. */

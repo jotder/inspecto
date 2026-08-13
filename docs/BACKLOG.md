@@ -726,13 +726,20 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     resolve-and-fail-fast helper → thread a root into the config layer → apply at (i), (ii), (iii).
   - **No test today** exercises `../../etc/passwd`-style escape for `schema_file`/`grammar`, or
     `Asn1RecordIngester`'s grammar path. `ConfigSafetyValidatorTest` covers only the primitive.
-- **`DatasetRelation.baseRelationSql` bypasses `SqlViews.reader`** (found 2026-07-30, Catalog lifecycle
-  review): it hand-builds `read_parquet(<glob>)` with no options
-  (`inspecto-engine/…/query/DatasetRelation.java:76-77`), while the engine-shared reader passes
-  `union_by_name=true` (`inspecto-sql/…/SqlViews.java:51-62`). Consequence: a `physicalRef`-backed Dataset
-  can fail on schema drift (columns added/reordered across partitions after a live schema edit) where a
-  `view`-backed read of the SAME store silently unions by name. Fix = route it through `SqlViews.reader`
-  (or add the option) + a mixed-schema partition test.
+- ~~**`DatasetRelation.baseRelationSql` bypasses `SqlViews.reader`**~~ **CLOSED 2026-08-13** (found
+  2026-07-30, Catalog lifecycle review). The defect was real and reproduced: a `physicalRef`-backed Dataset
+  failed on additive schema drift where a `view`-backed read of the SAME store unioned by name. Neither
+  existing overload fit — the site can't pass a glob (`ConsignmentSelector.sourceLiteral` may hand back a
+  bracketed *file list* instead) and threading a `Connection` in was rejected long ago, so a third entry
+  point `SqlViews.readerOverLiteral(format, sourceLiteral, hive)` takes an already-rendered source and
+  supplies the option list. There is now no caller anywhere that concatenates its own `read_*(`.
+  ⚠ The row's citation had drifted (`:76-77` → `:81-82`) and its premise was **half stale**: the site was no
+  longer a plain hand-built glob, it already went through `ConsignmentSelector`; only the *options* were
+  missing. `hive_partitioning` deliberately stays off — enabling it would add partition columns to every
+  existing Dataset, a product decision rather than a bug fix. Pinned by an **executing** mixed-schema
+  partition test (two partitions, one predating the column), not a string assertion.
+  ⚠ Noticed, NOT fixed: `DatasetRelation`'s class javadoc documents `{physicalRef, format}` but the code
+  ignores `format` and always reads Parquet. → `okf/backend/engine/db-layer.md`
 - **`SpacesService.reconcile` — ⚠ CONTAINED + INSTRUMENTED 2026-07-28, STILL OPEN, but the search space is
   now CLOSED.** ⚠ **Do not re-run the by-inspection hunt — all four candidate mechanisms in current source
   were positively ELIMINATED 2026-07-28:**
@@ -776,14 +783,18 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   committed two such files), and the TOON writer is not idempotent against what is checked in. **Fix the
   round-trip, not the samples** — re-committing the rewritten form just moves the diff. Until then: after a
   reactor run, `git checkout --` any tracked `spaces/**` file you did not deliberately edit.
-- **`InvRoutes`' hand-escaped literal can now become a bind** (found 2026-07-28 while building Rule Template
-  execution). `InvRoutes.java:192` carries the comment *"No bind-parameter support in
-  `QueryExecutor.Request` — the value is a literal, SQL-escaped"*. That premise is **no longer true**:
-  `Request` gained a `binds` component and `QueryExecutor` a `PreparedStatement` branch. Replacing that
-  hand-escape with a bind removes a hand-rolled escaping site. Small, self-contained, and strictly a
-  reduction in surface — but out of scope for the change that enabled it, so it is recorded rather than
-  bundled. ⚠ Check for other hand-escaped literals at the same time; the comment suggests this was a known
-  workaround, not a one-off.
+- ~~**`InvRoutes`' hand-escaped literal can now become a bind**~~ **CLOSED 2026-08-13** (found 2026-07-28
+  while building Rule Template execution). The stale *"No bind-parameter support in `QueryExecutor.Request`"*
+  comment is gone with the code it justified: `neighborsOf` is now two positional `?` binds passed through
+  the 8-arg `Request`, and the private `sqlLiteral` quote-doubler is deleted. Safe because `wrap()` injects
+  no placeholders of its own, so source order = bind order. The existing quote-carrying regression test
+  (`neighborsMatchesEitherEndpointWithAQuotedValue`) now pins the bind instead of the escaping.
+  ⚠ **The "check for other hand-escaped literals" audit is DONE — do not re-run it.** Three other sites
+  exist and **none is convertible**: `ExpectationEvaluator:109` and `ExchangeSnapshotWriter:70/71/89` escape
+  **file paths** inside `read_parquet(…)` / `COPY … TO`, which JDBC cannot bind; `ExpectationEvaluator:70`
+  (`regexp_matches` pattern) *is* a value, but that class executes on a raw `SqlSandbox` `Statement` and
+  exposes `countSql` as a `String`-returning seam with no binds channel — converting it means restructuring
+  the evaluator, not swapping a call. All three escape correctly today; none is a defect.
 - **`AiDraft.prerequisites` is modelled and rendered but never generically APPLIED** (found 2026-07-28 with the
   kpi host). `ai-draft.ts:107-129` populates it and `ai-assist.component.html:176-182` renders the sentence
   *"N dependent components will be applied first"*, but nothing applies them — each adopting pane must

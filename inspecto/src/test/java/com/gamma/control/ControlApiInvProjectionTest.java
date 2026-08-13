@@ -175,8 +175,13 @@ class ControlApiInvProjectionTest {
         }
     }
 
+    /**
+     * A value carrying a single quote matches as both endpoints. Written against the hand-rolled
+     * quote-doubling this route used to do; it now pins the bind that replaced it — the value never
+     * reaches the statement text, so it cannot alter its shape whatever it contains.
+     */
     @Test
-    void neighborsMatchesEitherEndpointAndEscapesQuotes(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void neighborsMatchesEitherEndpointWithAQuotedValue(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             new ViewStore(c.root.resolve("views")).write(new ViewDefinition("names_view", "flow-x", List.of(),
                     "SELECT * FROM (VALUES ('a''b','x'),('y','a''b')) AS t(caller,callee)",
