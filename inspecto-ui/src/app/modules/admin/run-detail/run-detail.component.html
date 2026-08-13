@@ -218,6 +218,12 @@
         }
 
         <!-- Generic audit-row grid (batches / lineage / quarantine / commits) -->
+        @if (activeTab === 'batches' && hasFailedBatches && !loading) {
+            <inspecto-alert class="mt-4 block" variant="info" title="Failed consignments retry automatically">
+                A FAILED consignment leaves no processed marker, so its files are rediscovered on the next inbox poll
+                and retried — they reappear as Pending on the Files tab without any action needed.
+            </inspecto-alert>
+        }
         @if (activeTab !== 'report' && activeTab !== 'files' && !loading) {
             <inspecto-data-table
                 class="mt-4 block"

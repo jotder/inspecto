@@ -218,6 +218,21 @@ describe('RunDetailComponent', () => {
         expect(c.stepAge('not-a-date')).toBe('0s');
     });
 
+    it('explains that FAILED consignments retry automatically — only when one is present', () => {
+        const fixture = create();
+        const el = fixture.nativeElement as HTMLElement;
+        const notice = () => el.textContent?.includes('retry automatically') ?? false;
+        expect(notice()).toBe(false); // all-SUCCESS ledger → no banner noise
+
+        vi.spyOn(TestBed.inject(RunsService), 'batches').mockReturnValue(
+            of([BATCH, { consignment_id: 'b2', status: 'FAILED' }]),
+        );
+        fixture.componentInstance.loadTab();
+        fixture.detectChanges();
+        expect(notice()).toBe(true);
+        expect(el.textContent).toContain('reappear as Pending');
+    });
+
     it('renders with no a11y violations', async () => {
         const fixture = create();
         await expectNoA11yViolations(fixture.nativeElement);

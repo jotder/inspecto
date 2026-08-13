@@ -23,6 +23,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { forkJoin, Observable } from 'rxjs';
 import { apiErrorMessage, AuditRow, BatchAuditReport, InboxStatus, LensService, RunsService } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { FmtPercentPipe } from 'app/inspecto/format';
@@ -59,6 +60,7 @@ type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
         MatTooltipModule,
         DataTableComponent,
         FmtPercentPipe,
+        InspectoAlertComponent,
         RouterLink,
     ],
     templateUrl: './run-detail.component.html',
@@ -112,6 +114,8 @@ export class RunDetailComponent implements OnInit {
     }
 
     rows: AuditRow[] = []; // generic grid (batches/lineage/quarantine/commits)
+    /** Batches tab only: whether any consignment is FAILED — gates the retry-is-automatic notice. */
+    hasFailedBatches = false;
     lineageBatchId = '';
 
     // files tab
@@ -162,6 +166,7 @@ export class RunDetailComponent implements OnInit {
                 this.rows = (data as unknown[]).map((d) =>
                     typeof d === 'string' ? ({ commit: d } as AuditRow) : (d as AuditRow),
                 );
+                this.hasFailedBatches = tab === 'batches' && this.rows.some((r) => r['status'] === 'FAILED');
                 this.loading = false;
             },
             error: () => {
