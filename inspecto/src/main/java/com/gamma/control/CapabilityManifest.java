@@ -107,6 +107,9 @@ final class CapabilityManifest {
             new Entry("POST", "/pipelines/([^/]+)/rename", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/rename/resume", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/pipelines/authored/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
+            // Run-to-here is a SIMULATE, not an operate: it writes only to a scratch root and never
+            // fires a production run — hence author, unlike its /trigger sibling below.
+            new Entry("POST", "/pipelines/authored/([^/]+)/run", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             // QueueRoutes
             new Entry("POST", "/queues", Roles.CAN_AUTHOR_WORKBENCH),
