@@ -29,7 +29,7 @@ the same files back the UI editors).
 ## Run it
 
 ```bash
-# 1. Build once (if inspecto/target/file-processor-*.jar is missing)
+# 1. Build once (if inspecto/target/inspecto-processor-*.jar is missing)
 mvn -o clean package -q
 
 # 2. Seed the inbox from the pristine samples (the poll dir is CONSUMED by the engine)
@@ -37,7 +37,7 @@ pwsh spaces/demo/data/samples/seed-inbox.ps1        # or: bash spaces/demo/data/
 
 # 3. Serve all spaces (control plane + UI on :8080)
 java --enable-native-access=ALL-UNNAMED -Dspaces.root=spaces \
-     -cp inspecto/target/file-processor-*.jar com.gamma.control.ControlApi
+     -cp inspecto/target/inspecto-processor-*.jar com.gamma.control.ControlApi
 ```
 
 Space-scoped API calls use the path prefix: `GET /spaces/demo/pipelines`, `POST /spaces/demo/bi/query`, …
