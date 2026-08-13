@@ -439,18 +439,17 @@ pipeline whether or not it already has an explicit `id` — (c) above is moot no
 - `ComponentKind.deriveParts` seam — formalize when a 3rd composite kind needs it.
 - Parser/node attribute tiers are a best guess pending firm backend specs — same call as **D13**, which was
   **confirmed parked** 2026-07-25 (needs a real onboarding-observation session, not an engineering guess).
-- **Consignment-chain residuals (plan shipped + archived 2026-08-13; as-built in
-  [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md)):**
-  (a) **the live step gauge has no UI renderer** — `InboxStatus.step` is served
-  (`{consignmentId, step, index, total, startedAt}`) but nothing displays "step 3/5 · transform"; the
-  natural hosts are Processing status and Run Detail, and the honest hang signal is a **stale
-  `startedAt`**, so render the age, not just the position. (b) ⚠ **the mock's Files/Quarantine rows use
-  fabricated field names** (`file_name`, `quarantined_at`) where the server sends `filename`/`file` +
-  `reason`/`path` — pre-existing drift, *worked around* in the rejected-rows affordance (it reads either
-  spelling) rather than corrected, because fixing the mock changes what those tabs display offline and
-  deserves its own slice. This violates mock-never-more-lenient in spirit: an offline rehearsal of those
-  tabs proves nothing about field names. (c) **no user-visible link between "FAILED" and "will retry
-  next poll"** — files reappear as pending with nothing saying retry is automatic; copy, not engine.
+- ~~**Consignment-chain residuals**~~ **(a)/(b)/(c) ALL SHIPPED 2026-08-13** (plan archived; as-built in
+  [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md) +
+  [`okf/frontend/features/run-detail.md`](okf/frontend/features/run-detail.md)): (a) the live step gauge
+  now renders on Run Detail's Files tab, AGE of `startedAt` and all (`312b733a`). (b) the mock's
+  Files/Quarantine rows now spell every field as the server does — this also surfaced that Quarantine
+  rows carry no `consignment_id` at all, so Lineage/Reprocess now correctly hide there (`c86a1917`,
+  `fba2e9e1`/PR #6). (c) the Batches tab now explains, only when a `FAILED` row is present, that its
+  files retry automatically on the next poll (`a427cdac`). **New residual found while fixing (b):** the
+  mock's **batches** rows still say `status: 'COMMITTED'`, a value the engine never writes (real values
+  are exactly `SUCCESS`/`EMPTY`/`FAILED`, `IngestOutcome`) — same drift class as (b), tracked separately
+  (in flight as a background session at handoff time).
 
 **Security module.** The RBAC/ABAC plan is **COMPLETE** (R0–R5 + A1–A5); the plan was archived and the
 durable as-builts now live in **`okf/backend/editions/auth-security.md`** — read them there, not the
