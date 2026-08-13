@@ -308,15 +308,48 @@ half **are** separable — confirm that before designing against it.
   `environment.mockFlows` gate off for run-to-here. With 5a shipped the body is: resolve the graph,
   `PipelineTestRun.run(...)` → `sampleRows(...)` → `PipelineDryRun.run(graph, rows, references)`, and
   `deleteScratch` in a `finally`. Two things to get right:
-  - ⚠ **Jail the `files` body to the pipeline's configured inbox.** As specified it accepts caller-supplied
-    paths, so without containment this is an arbitrary-file-read over HTTP. This is the one place where the
-    still-open "config-declared paths resolve unjailed" BACKLOG row becomes **reachable rather than
-    defence-in-depth** — do not ship 5c without it.
+  - ⚠ **Jail the `files` body.** As specified it accepts caller-supplied paths, so without containment this
+    is an arbitrary-file-read over HTTP. This is the one place where the still-open "config-declared paths
+    resolve unjailed" BACKLOG row becomes **reachable rather than defence-in-depth** — do not ship 5c
+    without it. **Contract settled 2026-08-14 by grounding the UI; build to this:**
+    - **The paths are connection-relative, NOT absolute and NOT inbox-relative.** The dialog fills them
+      from `probe.explore(connectionId, …)`, and `LocalConnectionWorkbench` builds each
+      `ResourceNode.path` as `root.relativize(p)` with forward slashes (`:96`). So they are relative to
+      the **connection's `base_path`**.
+    - **⇒ The jail root is that connection's `base_path`, and it MUST be derived server-side**, not taken
+      from the request. Fortunately that is already forced: `runToNode` sends only `{files}` + `?to=`
+      (`pipelines.service.ts:499-505`) — no connection id — and the editor derives `connectionId` from the
+      pipeline's own SOURCE node `use: connection/<id>` binding via `parseUseRef`
+      (`pipeline-editor.component.ts:1271-1274`). The route must do the same: pipeline id → config/graph →
+      source node's connection → profile `base_path`. **Never accept a client-supplied root.**
+    - **Reuse the existing containment, don't write a second one.** `LocalConnectionWorkbench.jail`
+      (`:102-107`) is `root.resolve(path).normalize().startsWith(root)` throwing
+      `ConnectionWorkbench.PathEscape`, which the HTTP edge already maps to **403**
+      (`ConnectionRoutes.exploreConnection`). Using the same primitive as the *picker* is what keeps the
+      two surfaces from disagreeing about what is reachable — a picker that allows X and a runner that
+      allows Y is how this kind of hole appears. ⚠ It is currently `private`; extracting it is the
+      "extract, don't copy" call, and it is not the same shape as
+      `ConfigSafetyValidator.checkPathValue`, which is **advisory** (returns `Finding`s for authoring)
+      rather than enforcing. Do not mistake one for the other.
+    - **Remote connections are out of scope for 5a/5c** — a non-local connector has no local path to
+      stage from; those files reach the inbox via acquisition first. Refuse them explicitly rather than
+      resolving to something surprising.
   - **Permission gate:** follow the `DecisionRoutes` precedent — `/simulate` is `canAuthorWorkbench`,
     `/apply` is `canOperateRuns`. A test run is a simulate, so **`canAuthorWorkbench`**.
   - **Response shape is already pinned by the mock** the UI renders against (per-relation counts + sample
     table). Match it, and pin it by spec the way Step 2 pinned the node-type list in
     `pipelines.handler.spec.ts` — a laxer mock is the exact failure mode that convention exists to kill.
+    The TS contract is `PipelineRunResult` (`pipelines.service.ts:238-245`):
+    `{seedNode, toNode, files[], relations[], output|null, warnings[]}`. ⚠ Note it **already has
+    `warnings[]`**, which is where the `to=` honesty below belongs — no new field is needed. The editor
+    consumes `relations[].{node, rel, rowCount}` and treats `rel === 'unmatched' && rowCount > 0` as a
+    per-node ✕ (`pipeline-editor.component.ts:1286-1290`), so those three keys are load-bearing.
+  - ⚠ **Decide what `to=` does while 5b is unbuilt — do not silently ignore it.** Without the cutoff the
+    run covers the whole graph, so a response that echoes `toNode` while having run past it is a lie the
+    canvas will render as ✓ on nodes that were never bounded. Either refuse a `to=` naming a
+    non-terminal node, or run full and **say so in `warnings[]`** (the DRYRUN-2 precedent: the warning
+    exists precisely for "this result is not what you would assume"). The second is preferred — it keeps
+    5c shippable ahead of 5b and keeps the affordance honest.
 
 **Sizing: multi-shift.** Three separable hard problems, not one task. 5a alone is a plausible shift.
 
