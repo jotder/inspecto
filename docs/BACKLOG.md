@@ -744,9 +744,9 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `MaterializeTask` registrars) writes a `format` key — the javadoc now says Parquet-always instead of
   advertising an option nobody can author. Build CSV support only when a real author needs it.
   → `okf/backend/engine/db-layer.md`
-- **`SpacesService.reconcile` — ⚠ CONTAINED + INSTRUMENTED 2026-07-28, STILL OPEN, but the search space is
-  now CLOSED.** ⚠ **Do not re-run the by-inspection hunt — all four candidate mechanisms in current source
-  were positively ELIMINATED 2026-07-28:**
+- ~~**`SpacesService.reconcile` — CONTAINED + INSTRUMENTED 2026-07-28**~~ **CLOSED 2026-08-14 (see the
+  verification block below).** ⚠ **Do not re-run the by-inspection hunt — all four candidate mechanisms in
+  current source were positively ELIMINATED 2026-07-28:**
   1. **Backend envelope** — `Envelope.success` (`inspecto/…/control/Envelope.java:30-47`) *unconditionally*
      puts `data` **and** `metadata.apiVersion="v1"`, so an enveloped success can never fail `isV1Envelope`;
      a legacy (non-`/api/v1`) response is the bare array. Neither shape is a non-array object.
@@ -766,7 +766,30 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   **not** a widening of `isV1Envelope`, which must keep declining text/blobs/unknown contracts. This is
   **global**, not `/spaces`-specific: a declined unwrap was previously silent in every service.
   **Close this row when that error is seen once (it names its own cause) — or when the `inspecto-deploy`
-  UI bundle is rebuilt and the symptom is confirmed gone.** Original finding follows.
+  UI bundle is rebuilt and the symptom is confirmed gone.**
+  ✅ **CLOSED 2026-08-14 by the second branch of that trigger — bundle rebuilt, symptom confirmed gone.**
+  The bundle was rebuilt from current source during the 2026-08-13 rename verification, and it demonstrably
+  carries the instrumentation: the `console.error` string literal (*"this bundle unwraps only"*) is present in
+  `inspecto-deploy/ui/main-XITYY5JM.js`. ⚠ Grep for `envelopeVersionSkew` **instead** and you get a false
+  negative — it is a module-internal function name and the production minifier mangles it; only string
+  literals survive, so a literal is what must be probed. Ran the bundle end-to-end (`inspecto.jar` +
+  `./ui`, port 8099, real `spaces/` root): `GET /api/v1/spaces` returned a correct
+  `{data:[…],metadata:{apiVersion:'v1'}}` envelope over 3 spaces, the app **bootstrapped fully** (nav, space
+  switcher reading "Default", 5 pipelines), and the console was **empty** — no `NG0201`, no skew error, no
+  non-array warn. `reconcile` provably executed rather than being skipped: the follow-on
+  `GET /api/v1/spaces/default/settings/branding` is *space-scoped*, so it can only have been issued after
+  reconcile selected `default` and `spaceInterceptor` prefixed it.
+  ⚠ **What this does and does not prove.** It is **not** proof the root cause was eliminated — the symptom
+  never reproduced on a freshly built server either, so a clean run was always the expected outcome and
+  absence of a non-reproducible symptom is weak evidence on its own. What is now true is that the leading
+  suspect (a stale deployed bundle disagreeing with the server) has had its remedy applied and verified, the
+  search space was already positively closed by the five eliminations above, and the tripwire is live in the
+  shipped bundle. **If it ever recurs the instrumentation names its own cause — reopen from that message, not
+  from a fresh by-inspection hunt.**
+  ✅ The guard the row called for is **also already in place** (`spaces.service.ts:132-139`): an
+  `Array.isArray` check that warns loudly and degrades to `[]`, carrying the row's own "containment, NOT a
+  fix" framing in a comment. **There is no buildable work left here** — a future shift should not re-add it.
+  Original finding follows.
   **`SpacesService.reconcile` is unguarded against a non-array `GET /spaces` body** (found 2026-07-27,
   `inspecto-ui/src/app/inspecto/api/spaces.service.ts`). `spaces.some(...)` runs on the raw response; the
   `catchError(() => of([]))` covers only a *failed* request, so a 200 with an unexpected shape throws during
