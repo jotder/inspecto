@@ -1,33 +1,39 @@
-import { Component, inject, OnInit, ViewEncapsulation } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog } from '@angular/material/dialog';
-import { MatIconModule } from '@angular/material/icon';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { ColDef } from 'ag-grid-community';
-import { ChartData } from 'chart.js';
 import {
-    AcquisitionMetrics,
-    AcquisitionMetricsService,
-    apiErrorMessage,
-    RunsService,
-    CollectorView,
-    CollectorsService,
-} from 'app/inspecto/api';
-import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { ToastrService } from 'ngx-toastr';
-import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
-import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { DataTableComponent } from 'app/inspecto/data-table';
-import { InspectoRowAction } from 'app/inspecto/grid';
-import { fmtBytes, fmtInt } from 'app/inspecto/format';
-import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
-import { CollectorDetailDialog } from './collector-detail.dialog';
-import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+  Component,
+  inject,
+  OnInit,
+  ViewEncapsulation,
+  ChangeDetectionStrategy,
+} from "@angular/core";
+import { MatButtonModule } from "@angular/material/button";
+import { MatDialog } from "@angular/material/dialog";
+import { MatIconModule } from "@angular/material/icon";
+import { MatTooltipModule } from "@angular/material/tooltip";
+import { ColDef } from "ag-grid-community";
+import { ChartData } from "chart.js";
+import {
+  AcquisitionMetrics,
+  AcquisitionMetricsService,
+  apiErrorMessage,
+  RunsService,
+  CollectorView,
+  CollectorsService,
+} from "app/inspecto/api";
+import { InspectoConfirmService } from "app/inspecto/confirm.service";
+import { ToastrService } from "ngx-toastr";
+import { InspectoChartComponent } from "app/inspecto/components/chart.component";
+import { InspectoEmptyStateComponent } from "app/inspecto/components/empty-state.component";
+import { DataTableComponent } from "app/inspecto/data-table";
+import { InspectoRowAction } from "app/inspecto/grid";
+import { fmtBytes, fmtInt } from "app/inspecto/format";
+import { CHART_SERIES } from "app/inspecto/theme/chart-tokens";
+import { CollectorDetailDialog } from "./collector-detail.dialog";
+import { AiExplainComponent } from "app/inspecto/ai-assist/ai-explain.component";
 
 /** A summary card above the grid. */
 interface MetricCard {
-    label: string;
-    value: string;
+  label: string;
+  value: string;
 }
 
 /**
@@ -36,143 +42,166 @@ interface MetricCard {
  * details action opens the full collector config + live inbox status.
  */
 @Component({
-    selector: 'app-collectors',
-    standalone: true,
-    imports: [
-        AiExplainComponent,
-        MatButtonModule,
-        MatIconModule,
-        MatTooltipModule,
-        DataTableComponent,
-        InspectoChartComponent,
-        InspectoEmptyStateComponent,
-    ],
-    templateUrl: './collectors.component.html',
-    encapsulation: ViewEncapsulation.None,
+  selector: "app-collectors",
+  standalone: true,
+  imports: [
+    AiExplainComponent,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+    DataTableComponent,
+    InspectoChartComponent,
+    InspectoEmptyStateComponent,
+  ],
+  templateUrl: "./collectors.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
+  encapsulation: ViewEncapsulation.None,
 })
 export class CollectorsComponent implements OnInit {
-    private api = inject(CollectorsService);
-    private metricsApi = inject(AcquisitionMetricsService);
-    private runs = inject(RunsService);
-    private dialog = inject(MatDialog);
-    private confirm = inject(InspectoConfirmService);
-    private toastr = inject(ToastrService);
+  private api = inject(CollectorsService);
+  private metricsApi = inject(AcquisitionMetricsService);
+  private runs = inject(RunsService);
+  private dialog = inject(MatDialog);
+  private confirm = inject(InspectoConfirmService);
+  private toastr = inject(ToastrService);
 
-    collectors: CollectorView[] = [];
-    loading = false;
-    unavailable = false;
+  collectors: CollectorView[] = [];
+  loading = false;
+  unavailable = false;
 
-    cards: MetricCard[] = [];
-    discoveredData: ChartData | null = null;
+  cards: MetricCard[] = [];
+  discoveredData: ChartData | null = null;
 
-    readonly columnDefs: ColDef<CollectorView>[] = [
-        { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
-        { field: 'id', headerName: 'Collector', flex: 1 },
-        { field: 'connector', headerName: 'Connector', width: 120 },
-        { field: 'connection', headerName: 'Connection', flex: 1, valueFormatter: (p) => p.value ?? '—' },
-        { field: 'duplicateMode', headerName: 'Dedup', width: 120 },
-        {
-            colId: 'watermark',
-            headerName: 'Watermark',
-            flex: 1,
-            valueGetter: (p) => {
-                const wm = p.data?.incrementalWatermark ?? '—';
-                const db = p.data?.dbWatermarkCurrent;
-                return db ? `${wm} (@ ${db})` : wm;
-            },
-        },
-        { field: 'fetchParallel', headerName: 'Parallel', width: 110 },
-        { field: 'guarantee', headerName: 'Guarantee', width: 140 },
+  readonly columnDefs: ColDef<CollectorView>[] = [
+    { field: "pipeline", headerName: "Pipeline", flex: 1 },
+    { field: "id", headerName: "Collector", flex: 1 },
+    { field: "connector", headerName: "Connector", width: 120 },
+    {
+      field: "connection",
+      headerName: "Connection",
+      flex: 1,
+      valueFormatter: (p) => p.value ?? "—",
+    },
+    { field: "duplicateMode", headerName: "Dedup", width: 120 },
+    {
+      colId: "watermark",
+      headerName: "Watermark",
+      flex: 1,
+      valueGetter: (p) => {
+        const wm = p.data?.incrementalWatermark ?? "—";
+        const db = p.data?.dbWatermarkCurrent;
+        return db ? `${wm} (@ ${db})` : wm;
+      },
+    },
+    { field: "fetchParallel", headerName: "Parallel", width: 110 },
+    { field: "guarantee", headerName: "Guarantee", width: 140 },
+  ];
+
+  readonly rowActions: InspectoRowAction<CollectorView>[] = [
+    {
+      icon: "heroicons_outline:play",
+      hint: "Run now",
+      onClick: (s) => this.trigger(s),
+    },
+    {
+      icon: "heroicons_outline:information-circle",
+      hint: "Details",
+      onClick: (s) => this.openDetail(s),
+    },
+  ];
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loading = true;
+    this.unavailable = false;
+    this.api.list().subscribe({
+      next: (s) => {
+        this.collectors = s;
+        this.loading = false;
+      },
+      error: (e) => {
+        this.loading = false;
+        this.collectors = [];
+        this.unavailable = e?.status === 404;
+      },
+    });
+    this.metricsApi.get().subscribe({
+      next: (m) => this.buildMetrics(m),
+      error: () => {
+        this.cards = [];
+        this.discoveredData = null;
+      },
+    });
+  }
+
+  /** Sum every label-series sample of a counter/gauge metric. */
+  private total(m: AcquisitionMetrics, name: string): number {
+    const series = m[name]?.series ?? [];
+    return series.reduce((acc, s) => acc + (s.value ?? s.sum ?? 0), 0);
+  }
+
+  private buildMetrics(m: AcquisitionMetrics): void {
+    const discovered = this.total(m, "inspecto_files_discovered_total");
+    const downloaded = this.total(m, "inspecto_files_downloaded_total");
+    const failed = this.total(m, "inspecto_downloads_failed_total");
+    const skipped = this.total(m, "inspecto_watermark_skipped_total");
+    const bytes = this.total(m, "inspecto_bytes_transferred_total");
+    const active = this.total(m, "inspecto_active_connections");
+
+    this.cards = [
+      { label: "Files discovered", value: fmtInt(discovered) },
+      { label: "Files downloaded", value: fmtInt(downloaded) },
+      { label: "Downloads failed", value: fmtInt(failed) },
+      { label: "Watermark skipped", value: fmtInt(skipped) },
+      { label: "Bytes transferred", value: fmtBytes(bytes) },
+      { label: "Active connections", value: fmtInt(active) },
     ];
 
-    readonly rowActions: InspectoRowAction<CollectorView>[] = [
+    this.discoveredData = {
+      labels: ["Discovered", "Downloaded", "Failed"],
+      datasets: [
         {
-            icon: 'heroicons_outline:play',
-            hint: 'Run now',
-            onClick: (s) => this.trigger(s),
+          label: "files",
+          data: [discovered, downloaded, failed],
+          backgroundColor: [
+            CHART_SERIES.primary,
+            CHART_SERIES.success,
+            CHART_SERIES.error,
+          ],
         },
-        {
-            icon: 'heroicons_outline:information-circle',
-            hint: 'Details',
-            onClick: (s) => this.openDetail(s),
-        },
-    ];
+      ],
+    };
+  }
 
-    ngOnInit(): void {
+  async trigger(collector: CollectorView): Promise<void> {
+    if (
+      !(await this.confirm.confirm(
+        `Run pipeline "${collector.pipeline}" now?`,
+        "Run now",
+      ))
+    )
+      return;
+    this.runs.trigger(collector.pipeline).subscribe({
+      // v1 async contract (W5b): the trigger returns 202 + runId; the refreshed list shows the outcome.
+      next: () => {
+        this.toastr.success(`Pipeline "${collector.pipeline}" run started.`);
         this.load();
-    }
+      },
+      error: (e) =>
+        this.toastr.error(
+          apiErrorMessage(e, `Run failed for ${collector.pipeline}`),
+        ),
+    });
+  }
 
-    load(): void {
-        this.loading = true;
-        this.unavailable = false;
-        this.api.list().subscribe({
-            next: (s) => {
-                this.collectors = s;
-                this.loading = false;
-            },
-            error: (e) => {
-                this.loading = false;
-                this.collectors = [];
-                this.unavailable = e?.status === 404;
-            },
-        });
-        this.metricsApi.get().subscribe({
-            next: (m) => this.buildMetrics(m),
-            error: () => {
-                this.cards = [];
-                this.discoveredData = null;
-            },
-        });
-    }
-
-    /** Sum every label-series sample of a counter/gauge metric. */
-    private total(m: AcquisitionMetrics, name: string): number {
-        const series = m[name]?.series ?? [];
-        return series.reduce((acc, s) => acc + (s.value ?? s.sum ?? 0), 0);
-    }
-
-    private buildMetrics(m: AcquisitionMetrics): void {
-        const discovered = this.total(m, 'inspecto_files_discovered_total');
-        const downloaded = this.total(m, 'inspecto_files_downloaded_total');
-        const failed = this.total(m, 'inspecto_downloads_failed_total');
-        const skipped = this.total(m, 'inspecto_watermark_skipped_total');
-        const bytes = this.total(m, 'inspecto_bytes_transferred_total');
-        const active = this.total(m, 'inspecto_active_connections');
-
-        this.cards = [
-            { label: 'Files discovered', value: fmtInt(discovered) },
-            { label: 'Files downloaded', value: fmtInt(downloaded) },
-            { label: 'Downloads failed', value: fmtInt(failed) },
-            { label: 'Watermark skipped', value: fmtInt(skipped) },
-            { label: 'Bytes transferred', value: fmtBytes(bytes) },
-            { label: 'Active connections', value: fmtInt(active) },
-        ];
-
-        this.discoveredData = {
-            labels: ['Discovered', 'Downloaded', 'Failed'],
-            datasets: [
-                {
-                    label: 'files',
-                    data: [discovered, downloaded, failed],
-                    backgroundColor: [CHART_SERIES.primary, CHART_SERIES.success, CHART_SERIES.error],
-                },
-            ],
-        };
-    }
-
-    async trigger(collector: CollectorView): Promise<void> {
-        if (!(await this.confirm.confirm(`Run pipeline "${collector.pipeline}" now?`, 'Run now'))) return;
-        this.runs.trigger(collector.pipeline).subscribe({
-            // v1 async contract (W5b): the trigger returns 202 + runId; the refreshed list shows the outcome.
-            next: () => {
-                this.toastr.success(`Pipeline "${collector.pipeline}" run started.`);
-                this.load();
-            },
-            error: (e) => this.toastr.error(apiErrorMessage(e, `Run failed for ${collector.pipeline}`)),
-        });
-    }
-
-    openDetail(collector: CollectorView): void {
-        this.dialog.open(CollectorDetailDialog, { data: collector, width: '680px', maxHeight: '85vh' });
-    }
+  openDetail(collector: CollectorView): void {
+    this.dialog.open(CollectorDetailDialog, {
+      data: collector,
+      width: "680px",
+      maxHeight: "85vh",
+    });
+  }
 }

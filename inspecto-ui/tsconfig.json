@@ -2,7 +2,16 @@
 {
     "compileOnSave": false,
     "compilerOptions": {
-        "baseUrl": "./src",
+        // TypeScript 6 hard-errors on `baseUrl` (TS5101) and TS 7 removes it, so the three
+        // src-local import roots are spelled explicitly instead. With no `baseUrl`, `paths`
+        // resolve relative to THIS file's directory. Everything else imported bare is a real
+        // package in node_modules and needs no mapping.
+        "paths": {
+            "app/*": ["./src/app/*"],
+            "environments/*": ["./src/environments/*"],
+            "@gamma": ["./src/@gamma"],
+            "@gamma/*": ["./src/@gamma/*"]
+        },
         "outDir": "./dist/out-tsc",
         "esModuleInterop": true,
         "sourceMap": true,

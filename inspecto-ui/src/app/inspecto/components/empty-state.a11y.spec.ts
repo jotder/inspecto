@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';

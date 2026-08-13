@@ -1,130 +1,136 @@
-import { Component, OnDestroy, OnInit, ViewEncapsulation, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { ActivatedRoute, Router, RouterOutlet } from '@angular/router';
-import { GammaLoadingBarComponent } from '@gamma/components/loading-bar';
 import {
-    GammaNavigationService,
-    GammaVerticalNavigationComponent,
-} from '@gamma/components/navigation';
-import { GammaMediaWatcherService } from '@gamma/services/media-watcher';
-import { NavigationService } from 'app/core/navigation/navigation.service';
-import { Navigation } from 'app/core/navigation/navigation.types';
+  Component,
+  OnDestroy,
+  OnInit,
+  ViewEncapsulation,
+  inject,
+  ChangeDetectionStrategy,
+} from "@angular/core";
+import { MatButtonModule } from "@angular/material/button";
+import { MatIconModule } from "@angular/material/icon";
+import { ActivatedRoute, Router, RouterOutlet } from "@angular/router";
+import { GammaLoadingBarComponent } from "@gamma/components/loading-bar";
+import {
+  GammaNavigationService,
+  GammaVerticalNavigationComponent,
+} from "@gamma/components/navigation";
+import { GammaMediaWatcherService } from "@gamma/services/media-watcher";
+import { NavigationService } from "app/core/navigation/navigation.service";
+import { Navigation } from "app/core/navigation/navigation.types";
 
-import { SearchComponent } from 'app/layout/common/search/search.component';
-import { UserComponent } from 'app/layout/common/user/user.component';
-import { BrandingService } from 'app/inspecto/api';
-import { Subject, takeUntil } from 'rxjs';
+import { SearchComponent } from "app/layout/common/search/search.component";
+import { UserComponent } from "app/layout/common/user/user.component";
+import { BrandingService } from "app/inspecto/api";
+import { Subject, takeUntil } from "rxjs";
 
 @Component({
-    selector: 'dense-layout',
-    templateUrl: './dense.component.html',
-    encapsulation: ViewEncapsulation.None,
-    imports: [
-        GammaLoadingBarComponent,
-        GammaVerticalNavigationComponent,
-        MatButtonModule,
-        MatIconModule,
-        SearchComponent,
-        UserComponent,
-        RouterOutlet,
-    ],
+  selector: "dense-layout",
+  templateUrl: "./dense.component.html",
+  encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [
+    GammaLoadingBarComponent,
+    GammaVerticalNavigationComponent,
+    MatButtonModule,
+    MatIconModule,
+    SearchComponent,
+    UserComponent,
+    RouterOutlet,
+  ],
 })
 export class DenseLayoutComponent implements OnInit, OnDestroy {
-    isScreenSmall: boolean;
-    navigation: Navigation;
-    navigationAppearance: 'default' | 'dense' = 'dense';
-    /** Active-space branding — the dense header shows the logo only. */
-    protected readonly branding = inject(BrandingService);
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+  isScreenSmall: boolean;
+  navigation: Navigation;
+  navigationAppearance: "default" | "dense" = "dense";
+  /** Active-space branding — the dense header shows the logo only. */
+  protected readonly branding = inject(BrandingService);
+  private _unsubscribeAll: Subject<any> = new Subject<any>();
 
-    /**
-     * Constructor
-     */
-    constructor(
-        private _activatedRoute: ActivatedRoute,
-        private _router: Router,
-        private _navigationService: NavigationService,
-        private _gammaMediaWatcherService: GammaMediaWatcherService,
-        private _gammaNavigationService: GammaNavigationService
-    ) {}
+  /**
+   * Constructor
+   */
+  constructor(
+    private _activatedRoute: ActivatedRoute,
+    private _router: Router,
+    private _navigationService: NavigationService,
+    private _gammaMediaWatcherService: GammaMediaWatcherService,
+    private _gammaNavigationService: GammaNavigationService,
+  ) {}
 
-    // -----------------------------------------------------------------------------------------------------
-    // @ Accessors
-    // -----------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------
+  // @ Accessors
+  // -----------------------------------------------------------------------------------------------------
 
-    /**
-     * Getter for current year
-     */
-    get currentYear(): number {
-        return new Date().getFullYear();
+  /**
+   * Getter for current year
+   */
+  get currentYear(): number {
+    return new Date().getFullYear();
+  }
+
+  // -----------------------------------------------------------------------------------------------------
+  // @ Lifecycle hooks
+  // -----------------------------------------------------------------------------------------------------
+
+  /**
+   * On init
+   */
+  ngOnInit(): void {
+    // Subscribe to navigation data
+    this._navigationService.navigation$
+      .pipe(takeUntil(this._unsubscribeAll))
+      .subscribe((navigation: Navigation) => {
+        this.navigation = navigation;
+      });
+
+    // Subscribe to media changes
+    this._gammaMediaWatcherService.onMediaChange$
+      .pipe(takeUntil(this._unsubscribeAll))
+      .subscribe(({ matchingAliases }) => {
+        // Check if the screen is small
+        this.isScreenSmall = !matchingAliases.includes("md");
+
+        // Change the navigation appearance
+        this.navigationAppearance = this.isScreenSmall ? "default" : "dense";
+      });
+  }
+
+  /**
+   * On destroy
+   */
+  ngOnDestroy(): void {
+    // Unsubscribe from all subscriptions
+    this._unsubscribeAll.next(null);
+    this._unsubscribeAll.complete();
+  }
+
+  // -----------------------------------------------------------------------------------------------------
+  // @ Public methods
+  // -----------------------------------------------------------------------------------------------------
+
+  /**
+   * Toggle navigation
+   *
+   * @param name
+   */
+  toggleNavigation(name: string): void {
+    // Get the navigation
+    const navigation =
+      this._gammaNavigationService.getComponent<GammaVerticalNavigationComponent>(
+        name,
+      );
+
+    if (navigation) {
+      // Toggle the opened status
+      navigation.toggle();
     }
+  }
 
-    // -----------------------------------------------------------------------------------------------------
-    // @ Lifecycle hooks
-    // -----------------------------------------------------------------------------------------------------
-
-    /**
-     * On init
-     */
-    ngOnInit(): void {
-        // Subscribe to navigation data
-        this._navigationService.navigation$
-            .pipe(takeUntil(this._unsubscribeAll))
-            .subscribe((navigation: Navigation) => {
-                this.navigation = navigation;
-            });
-
-        // Subscribe to media changes
-        this._gammaMediaWatcherService.onMediaChange$
-            .pipe(takeUntil(this._unsubscribeAll))
-            .subscribe(({ matchingAliases }) => {
-                // Check if the screen is small
-                this.isScreenSmall = !matchingAliases.includes('md');
-
-                // Change the navigation appearance
-                this.navigationAppearance = this.isScreenSmall
-                    ? 'default'
-                    : 'dense';
-            });
-    }
-
-    /**
-     * On destroy
-     */
-    ngOnDestroy(): void {
-        // Unsubscribe from all subscriptions
-        this._unsubscribeAll.next(null);
-        this._unsubscribeAll.complete();
-    }
-
-    // -----------------------------------------------------------------------------------------------------
-    // @ Public methods
-    // -----------------------------------------------------------------------------------------------------
-
-    /**
-     * Toggle navigation
-     *
-     * @param name
-     */
-    toggleNavigation(name: string): void {
-        // Get the navigation
-        const navigation =
-            this._gammaNavigationService.getComponent<GammaVerticalNavigationComponent>(
-                name
-            );
-
-        if (navigation) {
-            // Toggle the opened status
-            navigation.toggle();
-        }
-    }
-
-    /**
-     * Toggle the navigation appearance
-     */
-    toggleNavigationAppearance(): void {
-        this.navigationAppearance =
-            this.navigationAppearance === 'default' ? 'dense' : 'default';
-    }
+  /**
+   * Toggle the navigation appearance
+   */
+  toggleNavigationAppearance(): void {
+    this.navigationAppearance =
+      this.navigationAppearance === "default" ? "dense" : "default";
+  }
 }

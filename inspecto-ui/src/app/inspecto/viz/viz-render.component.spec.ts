@@ -1,133 +1,198 @@
-import { Component, input } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
-import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { describe, expect, it } from 'vitest';
-import { GammaConfigService } from '@gamma/services/config';
-import { of } from 'rxjs';
-import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { BAR_PLUGIN, BUBBLE_PLUGIN, GAUGE_PLUGIN, KPI_PLUGIN, PIE_PLUGIN, TABLE_PLUGIN } from './plugins';
-import { getVizComponentLoader, registerVizComponent } from './viz-components';
-import { VizPlugin, VizProps } from './viz-types';
-import { VizRenderComponent } from './viz-render.component';
+import { Component, input, ChangeDetectionStrategy } from "@angular/core";
+import { TestBed } from "@angular/core/testing";
+import { provideNoopAnimations } from "@angular/platform-browser/animations";
+import { describe, expect, it } from "vitest";
+import { GammaConfigService } from "@gamma/services/config";
+import { of } from "rxjs";
+import { expectNoA11yViolations } from "app/inspecto/testing/a11y";
+import {
+  BAR_PLUGIN,
+  BUBBLE_PLUGIN,
+  GAUGE_PLUGIN,
+  KPI_PLUGIN,
+  PIE_PLUGIN,
+  TABLE_PLUGIN,
+} from "./plugins";
+import { getVizComponentLoader, registerVizComponent } from "./viz-components";
+import { VizPlugin, VizProps } from "./viz-types";
+import { VizRenderComponent } from "./viz-render.component";
 
 /** Stub outlet for the loader-registry test — stands in for the lazily-loaded geo/link view hosts. */
-@Component({ selector: 'spec-view-stub', standalone: true, template: '' })
+@Component({
+  selector: "spec-view-stub",
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
+  template: "",
+})
 class ViewStubComponent {
-    readonly viewId = input<string | undefined>(undefined);
+  readonly viewId = input<string | undefined>(undefined);
 }
 
 function create(plugin: VizPlugin, props: VizProps) {
-    TestBed.configureTestingModule({
-        imports: [VizRenderComponent],
-        providers: [provideNoopAnimations(), { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }],
-    });
-    const fixture = TestBed.createComponent(VizRenderComponent);
-    fixture.componentRef.setInput('plugin', plugin);
-    fixture.componentRef.setInput('props', props);
-    return fixture;
+  TestBed.configureTestingModule({
+    imports: [VizRenderComponent],
+    providers: [
+      provideNoopAnimations(),
+      {
+        provide: GammaConfigService,
+        useValue: { config$: of({ scheme: "dark" }) },
+      },
+    ],
+  });
+  const fixture = TestBed.createComponent(VizRenderComponent);
+  fixture.componentRef.setInput("plugin", plugin);
+  fixture.componentRef.setInput("props", props);
+  return fixture;
 }
 
-describe('VizRenderComponent', () => {
-    it('builds Chart.js data (datasets) for a chartjs plugin', () => {
-        const props: VizProps = { labels: ['a', 'b'], series: [{ label: 'm', data: [1, 2] }] };
-        const c = create(BAR_PLUGIN, props).componentInstance;
-        expect(c.renderKind()).toBe('chartjs');
-        expect(c.chartType()).toBe('bar');
-        expect(c.chartData()?.datasets[0].data).toEqual([1, 2]);
-    });
+describe("VizRenderComponent", () => {
+  it("builds Chart.js data (datasets) for a chartjs plugin", () => {
+    const props: VizProps = {
+      labels: ["a", "b"],
+      series: [{ label: "m", data: [1, 2] }],
+    };
+    const c = create(BAR_PLUGIN, props).componentInstance;
+    expect(c.renderKind()).toBe("chartjs");
+    expect(c.chartType()).toBe("bar");
+    expect(c.chartData()?.datasets[0].data).toEqual([1, 2]);
+  });
 
-    it('uses one backgroundColor per slice for pie', () => {
-        const props: VizProps = { labels: ['a', 'b', 'c'], series: [{ label: 'm', data: [1, 2, 3] }] };
-        const c = create(PIE_PLUGIN, props).componentInstance;
-        const bg = c.chartData()?.datasets[0].backgroundColor as unknown[];
-        expect(Array.isArray(bg)).toBe(true);
-        expect(bg).toHaveLength(3);
-    });
+  it("uses one backgroundColor per slice for pie", () => {
+    const props: VizProps = {
+      labels: ["a", "b", "c"],
+      series: [{ label: "m", data: [1, 2, 3] }],
+    };
+    const c = create(PIE_PLUGIN, props).componentInstance;
+    const bg = c.chartData()?.datasets[0].backgroundColor as unknown[];
+    expect(Array.isArray(bg)).toBe(true);
+    expect(bg).toHaveLength(3);
+  });
 
-    it('derives colDefs for the table plugin', () => {
-        const props: VizProps = { labels: [], series: [], rows: [{ a: 1, b: 2 }], columns: ['a', 'b'] };
-        const c = create(TABLE_PLUGIN, props).componentInstance;
-        expect(c.renderKind()).toBe('aggrid');
-        expect(c.colDefs()).toEqual([{ field: 'a' }, { field: 'b' }]);
-    });
+  it("derives colDefs for the table plugin", () => {
+    const props: VizProps = {
+      labels: [],
+      series: [],
+      rows: [{ a: 1, b: 2 }],
+      columns: ["a", "b"],
+    };
+    const c = create(TABLE_PLUGIN, props).componentInstance;
+    expect(c.renderKind()).toBe("aggrid");
+    expect(c.colDefs()).toEqual([{ field: "a" }, { field: "b" }]);
+  });
 
-    it('resolves the KPI component for a component-render plugin and passes inputs', () => {
-        const props: VizProps = { labels: [], series: [], value: 99 };
-        const fixture = create(KPI_PLUGIN, props);
-        fixture.componentRef.setInput('title', 'Revenue');
-        const c = fixture.componentInstance;
-        expect(c.renderKind()).toBe('component');
-        expect(c.outletComponent()).toBeTruthy();
-        expect(c.outletInputs()).toEqual({ value: 99, label: 'Revenue' });
-    });
+  it("resolves the KPI component for a component-render plugin and passes inputs", () => {
+    const props: VizProps = { labels: [], series: [], value: 99 };
+    const fixture = create(KPI_PLUGIN, props);
+    fixture.componentRef.setInput("title", "Revenue");
+    const c = fixture.componentInstance;
+    expect(c.renderKind()).toBe("component");
+    expect(c.outletComponent()).toBeTruthy();
+    expect(c.outletInputs()).toEqual({ value: 99, label: "Revenue" });
+  });
 
-    it('resolves a view-bound plugin through the async loader registry and passes the viewId', async () => {
-        // A stub component through the loader seam — the real geo/link hosts are registered by widget.kind.
-        if (!getVizComponentLoader('spec-view-stub')) {
-            registerVizComponent('spec-view-stub', () => Promise.resolve(ViewStubComponent));
-        }
-        const plugin: VizPlugin = {
-            meta: { type: 'spec-view', label: 'Spec view', icon: 'heroicons_outline:map', fit: {}, viewKind: 'geo-map-view' },
-            controls: [],
-            buildQuery: () => ({ datasetId: '', sourceName: '', groupBy: [], measures: [] }),
-            transformProps: () => ({ labels: [], series: [] }),
-            render: { kind: 'component', componentKey: 'spec-view-stub' },
-        };
-        const fixture = create(plugin, { labels: [], series: [] });
-        fixture.componentRef.setInput('viewId', 'dhaka-network');
-        fixture.detectChanges();
-        await fixture.whenStable();
-        const c = fixture.componentInstance;
-        expect(c.outletComponent()).toBe(ViewStubComponent);
-        expect(c.outletInputs()).toEqual({ viewId: 'dhaka-network' });
-    });
+  it("resolves a view-bound plugin through the async loader registry and passes the viewId", async () => {
+    // A stub component through the loader seam — the real geo/link hosts are registered by widget.kind.
+    if (!getVizComponentLoader("spec-view-stub")) {
+      registerVizComponent("spec-view-stub", () =>
+        Promise.resolve(ViewStubComponent),
+      );
+    }
+    const plugin: VizPlugin = {
+      meta: {
+        type: "spec-view",
+        label: "Spec view",
+        icon: "heroicons_outline:map",
+        fit: {},
+        viewKind: "geo-map-view",
+      },
+      controls: [],
+      buildQuery: () => ({
+        datasetId: "",
+        sourceName: "",
+        groupBy: [],
+        measures: [],
+      }),
+      transformProps: () => ({ labels: [], series: [] }),
+      render: { kind: "component", componentKey: "spec-view-stub" },
+    };
+    const fixture = create(plugin, { labels: [], series: [] });
+    fixture.componentRef.setInput("viewId", "dhaka-network");
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const c = fixture.componentInstance;
+    expect(c.outletComponent()).toBe(ViewStubComponent);
+    expect(c.outletInputs()).toEqual({ viewId: "dhaka-network" });
+  });
 
-    it('renders the KPI arm with no a11y violations', async () => {
-        const props: VizProps = { labels: [], series: [], value: 99 };
-        const fixture = create(KPI_PLUGIN, props);
-        fixture.detectChanges();
-        await expectNoA11yViolations(fixture.nativeElement);
-    });
+  it("renders the KPI arm with no a11y violations", async () => {
+    const props: VizProps = { labels: [], series: [], value: 99 };
+    const fixture = create(KPI_PLUGIN, props);
+    fixture.detectChanges();
+    await expectNoA11yViolations(fixture.nativeElement);
+  });
 
-    it('zips x/y/size series into {x,y,r} points for bubble', () => {
-        const props: VizProps = {
-            labels: ['gold', 'silver'],
-            series: [{ label: 'x', data: [10, 20] }, { label: 'y', data: [1, 2] }, { label: 'size', data: [100, 50] }],
-        };
-        const c = create(BUBBLE_PLUGIN, props).componentInstance;
-        const points = c.chartData()?.datasets[0].data as { x: number; y: number; r: number }[];
-        expect(points).toEqual([
-            { x: 10, y: 1, r: 24 }, // the largest point gets the max radius (4 + 20)
-            { x: 20, y: 2, r: 14 }, // half the size → half the extra radius (4 + 10)
-        ]);
-    });
+  it("zips x/y/size series into {x,y,r} points for bubble", () => {
+    const props: VizProps = {
+      labels: ["gold", "silver"],
+      series: [
+        { label: "x", data: [10, 20] },
+        { label: "y", data: [1, 2] },
+        { label: "size", data: [100, 50] },
+      ],
+    };
+    const c = create(BUBBLE_PLUGIN, props).componentInstance;
+    const points = c.chartData()?.datasets[0].data as {
+      x: number;
+      y: number;
+      r: number;
+    }[];
+    expect(points).toEqual([
+      { x: 10, y: 1, r: 24 }, // the largest point gets the max radius (4 + 20)
+      { x: 20, y: 2, r: 14 }, // half the size → half the extra radius (4 + 10)
+    ]);
+  });
 
-    it('renders a gauge as a two-slice value/remainder doughnut, clamped to 0–100', () => {
-        const c = create(GAUGE_PLUGIN, { labels: [], series: [], value: 137 }).componentInstance;
-        expect(c.chartData()?.datasets[0].data).toEqual([100, 0]); // clamped
-    });
+  it("renders a gauge as a two-slice value/remainder doughnut, clamped to 0–100", () => {
+    const c = create(GAUGE_PLUGIN, {
+      labels: [],
+      series: [],
+      value: 137,
+    }).componentInstance;
+    expect(c.chartData()?.datasets[0].data).toEqual([100, 0]); // clamped
+  });
 
-    it("gauge's chart options fix the half-circle styling and hide the legend/tooltip by default", () => {
-        const c = create(GAUGE_PLUGIN, { labels: [], series: [], value: 42 }).componentInstance;
-        const opts = c.chartJsOptions() as Record<string, unknown>;
-        expect(opts['circumference']).toBe(180);
-        expect(opts['rotation']).toBe(270);
-    });
+  it("gauge's chart options fix the half-circle styling and hide the legend/tooltip by default", () => {
+    const c = create(GAUGE_PLUGIN, {
+      labels: [],
+      series: [],
+      value: 42,
+    }).componentInstance;
+    const opts = c.chartJsOptions() as Record<string, unknown>;
+    expect(opts["circumference"]).toBe(180);
+    expect(opts["rotation"]).toBe(270);
+  });
 
-    it('resolves a clicked point index to its category label and emits categoryClick', () => {
-        const props: VizProps = { labels: ['a', 'b'], series: [{ label: 'm', data: [1, 2] }] };
-        const c = create(BAR_PLUGIN, props).componentInstance;
-        let emitted: string | undefined;
-        c.categoryClick.subscribe((v) => (emitted = v));
-        c.onElementClick(1);
-        expect(emitted).toBe('b');
-    });
+  it("resolves a clicked point index to its category label and emits categoryClick", () => {
+    const props: VizProps = {
+      labels: ["a", "b"],
+      series: [{ label: "m", data: [1, 2] }],
+    };
+    const c = create(BAR_PLUGIN, props).componentInstance;
+    let emitted: string | undefined;
+    c.categoryClick.subscribe((v) => (emitted = v));
+    c.onElementClick(1);
+    expect(emitted).toBe("b");
+  });
 
-    it('never emits categoryClick for gauge (its slices are Value/Remaining, not filterable categories)', () => {
-        const c = create(GAUGE_PLUGIN, { labels: [], series: [], value: 42 }).componentInstance;
-        let emitted: string | undefined;
-        c.categoryClick.subscribe((v) => (emitted = v));
-        c.onElementClick(0);
-        expect(emitted).toBeUndefined();
-    });
+  it("never emits categoryClick for gauge (its slices are Value/Remaining, not filterable categories)", () => {
+    const c = create(GAUGE_PLUGIN, {
+      labels: [],
+      series: [],
+      value: 42,
+    }).componentInstance;
+    let emitted: string | undefined;
+    c.categoryClick.subscribe((v) => (emitted = v));
+    c.onElementClick(0);
+    expect(emitted).toBeUndefined();
+  });
 });

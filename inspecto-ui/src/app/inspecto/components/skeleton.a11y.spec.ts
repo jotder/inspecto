@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { InspectoSkeletonComponent } from './skeleton.component';

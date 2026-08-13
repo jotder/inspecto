@@ -1,19 +1,34 @@
-import { Component, OnInit, ViewEncapsulation, inject } from '@angular/core';
-import { MatButtonModule } from '@angular/material/button';
-import { MatDialog } from '@angular/material/dialog';
-import { MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { forkJoin } from 'rxjs';
-import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ComponentDef, ComponentsService, ComponentType, COMPONENT_TYPES } from 'app/inspecto/api';
-import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
-import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { ComponentFormDialog, ComponentFormResult } from './component-form.dialog';
-import { MappingEditorDialog } from './mapping-editor.dialog';
-import { SchemaEditorDialog } from './schema-editor.dialog';
+import {
+  Component,
+  OnInit,
+  ViewEncapsulation,
+  inject,
+  ChangeDetectionStrategy,
+} from "@angular/core";
+import { MatButtonModule } from "@angular/material/button";
+import { MatDialog } from "@angular/material/dialog";
+import { MatIconModule } from "@angular/material/icon";
+import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
+import { MatTooltipModule } from "@angular/material/tooltip";
+import { forkJoin } from "rxjs";
+import { ToastrService } from "ngx-toastr";
+import {
+  apiErrorMessage,
+  ComponentDef,
+  ComponentsService,
+  ComponentType,
+  COMPONENT_TYPES,
+} from "app/inspecto/api";
+import { InspectoConfirmService } from "app/inspecto/confirm.service";
+import { InspectoAlertComponent } from "app/inspecto/components/alert.component";
+import { ComponentHistoryDialog } from "app/inspecto/components/component-history.dialog";
+import { InspectoEmptyStateComponent } from "app/inspecto/components/empty-state.component";
+import {
+  ComponentFormDialog,
+  ComponentFormResult,
+} from "./component-form.dialog";
+import { MappingEditorDialog } from "./mapping-editor.dialog";
+import { SchemaEditorDialog } from "./schema-editor.dialog";
 
 /**
  * Component registry editor (T19) — create / edit / delete the reusable grammar / schema / transform / sink
@@ -21,119 +36,153 @@ import { SchemaEditorDialog } from './schema-editor.dialog';
  * are write-root gated; listing works regardless. The flow-topology editor is a separate (later) feature.
  */
 @Component({
-    selector: 'app-components',
-    standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, InspectoEmptyStateComponent, InspectoAlertComponent],
-    templateUrl: './components.component.html',
-    encapsulation: ViewEncapsulation.None,
+  selector: "app-components",
+  standalone: true,
+  imports: [
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    MatTooltipModule,
+    InspectoEmptyStateComponent,
+    InspectoAlertComponent,
+  ],
+  templateUrl: "./components.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
+  encapsulation: ViewEncapsulation.None,
 })
 export class ComponentsComponent implements OnInit {
-    private api = inject(ComponentsService);
-    private toastr = inject(ToastrService);
-    private dialog = inject(MatDialog);
-    private confirm = inject(InspectoConfirmService);
+  private api = inject(ComponentsService);
+  private toastr = inject(ToastrService);
+  private dialog = inject(MatDialog);
+  private confirm = inject(InspectoConfirmService);
 
-    readonly types = COMPONENT_TYPES;
-    byType: Record<string, ComponentDef[]> = {};
-    loading = false;
-    /** Flipped true once a mutate (create/update/delete) returns 503 — hides the mutate actions. */
-    writesDisabled = false;
+  readonly types = COMPONENT_TYPES;
+  byType: Record<string, ComponentDef[]> = {};
+  loading = false;
+  /** Flipped true once a mutate (create/update/delete) returns 503 — hides the mutate actions. */
+  writesDisabled = false;
 
-    ngOnInit(): void {
+  ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loading = true;
+    forkJoin(
+      Object.fromEntries(this.types.map((t) => [t, this.api.list(t)])),
+    ).subscribe({
+      next: (res) => {
+        this.byType = res as Record<string, ComponentDef[]>;
+        this.loading = false;
+      },
+      error: () => {
+        this.byType = {};
+        this.loading = false;
+        this.toastr.warning(
+          "Could not load components — is ControlApi running?",
+        );
+      },
+    });
+  }
+
+  countFor(type: ComponentType): number {
+    return this.byType[type]?.length ?? 0;
+  }
+
+  summary(def: ComponentDef): string {
+    const c = def.content ?? {};
+    switch (def.type) {
+      case "grammar":
+        return `delimiter ${disp(c["delimiter"], ",")}${c["has_header"] ? ", header" : ""}`;
+      case "schema": {
+        const fields =
+          ((c["raw"] as Record<string, unknown>)?.["fields"] as unknown[]) ??
+          [];
+        return `${fields.length} field${fields.length === 1 ? "" : "s"}`;
+      }
+      case "transform":
+        return String(c["type"] ?? "transform");
+      case "sink":
+        return `${disp(c["type"], "sink")} → ${disp(c["store"], "(no store)")}`;
+      default:
+        return "";
+    }
+  }
+
+  create(type: ComponentType): void {
+    this.openForm(type);
+  }
+
+  edit(type: ComponentType, def: ComponentDef): void {
+    this.openForm(type, def);
+  }
+
+  private openForm(kind: ComponentType, def?: ComponentDef): void {
+    // The mapping/schema kinds are flat row tables — they get the S5 grid editors, not the
+    // generic form (schema also saves through the gated /config/write, not the component CRUD).
+    const opened =
+      kind === "mapping"
+        ? this.dialog.open(MappingEditorDialog, {
+            data: { def },
+            width: "900px",
+            maxHeight: "88vh",
+          })
+        : kind === "schema"
+          ? this.dialog.open(SchemaEditorDialog, {
+              data: { def },
+              width: "1000px",
+              maxHeight: "88vh",
+            })
+          : this.dialog.open(ComponentFormDialog, {
+              data: { kind, def },
+              width: "760px",
+              maxHeight: "88vh",
+            });
+    opened.afterClosed().subscribe((r?: ComponentFormResult) => {
+      if (r?.writesDisabled) this.writesDisabled = true;
+      if (r?.saved) this.load();
+    });
+  }
+
+  /** Show version history for a registry component; reload the lists after a restore (MET-5). */
+  history(type: ComponentType, def: ComponentDef): void {
+    this.dialog
+      .open(ComponentHistoryDialog, {
+        data: { type, id: def.name, label: def.name },
+      })
+      .afterClosed()
+      .subscribe((restored) => {
+        if (restored) this.load();
+      });
+  }
+
+  async remove(type: ComponentType, def: ComponentDef): Promise<void> {
+    if (
+      !(await this.confirm.confirmDestructive(
+        `Delete ${type} "${def.name}"? This removes its component definition.`,
+        { title: `Delete ${type}` },
+      ))
+    )
+      return;
+    this.api.remove(type, def.name).subscribe({
+      next: () => {
+        this.toastr.success(`${type} "${def.name}" deleted`);
         this.load();
-    }
-
-    load(): void {
-        this.loading = true;
-        forkJoin(Object.fromEntries(this.types.map((t) => [t, this.api.list(t)]))).subscribe({
-            next: (res) => {
-                this.byType = res as Record<string, ComponentDef[]>;
-                this.loading = false;
-            },
-            error: () => {
-                this.byType = {};
-                this.loading = false;
-                this.toastr.warning('Could not load components — is ControlApi running?');
-            },
-        });
-    }
-
-    countFor(type: ComponentType): number {
-        return this.byType[type]?.length ?? 0;
-    }
-
-    summary(def: ComponentDef): string {
-        const c = def.content ?? {};
-        switch (def.type) {
-            case 'grammar': return `delimiter ${disp(c['delimiter'], ',')}${c['has_header'] ? ', header' : ''}`;
-            case 'schema': {
-                const fields = ((c['raw'] as Record<string, unknown>)?.['fields'] as unknown[]) ?? [];
-                return `${fields.length} field${fields.length === 1 ? '' : 's'}`;
-            }
-            case 'transform': return String(c['type'] ?? 'transform');
-            case 'sink': return `${disp(c['type'], 'sink')} → ${disp(c['store'], '(no store)')}`;
-            default: return '';
-        }
-    }
-
-    create(type: ComponentType): void {
-        this.openForm(type);
-    }
-
-    edit(type: ComponentType, def: ComponentDef): void {
-        this.openForm(type, def);
-    }
-
-    private openForm(kind: ComponentType, def?: ComponentDef): void {
-        // The mapping/schema kinds are flat row tables — they get the S5 grid editors, not the
-        // generic form (schema also saves through the gated /config/write, not the component CRUD).
-        const opened = kind === 'mapping'
-            ? this.dialog.open(MappingEditorDialog, { data: { def }, width: '900px', maxHeight: '88vh' })
-            : kind === 'schema'
-            ? this.dialog.open(SchemaEditorDialog, { data: { def }, width: '1000px', maxHeight: '88vh' })
-            : this.dialog.open(ComponentFormDialog, { data: { kind, def }, width: '760px', maxHeight: '88vh' });
-        opened.afterClosed()
-            .subscribe((r?: ComponentFormResult) => {
-                if (r?.writesDisabled) this.writesDisabled = true;
-                if (r?.saved) this.load();
-            });
-    }
-
-    /** Show version history for a registry component; reload the lists after a restore (MET-5). */
-    history(type: ComponentType, def: ComponentDef): void {
-        this.dialog
-            .open(ComponentHistoryDialog, { data: { type, id: def.name, label: def.name } })
-            .afterClosed()
-            .subscribe((restored) => {
-                if (restored) this.load();
-            });
-    }
-
-    async remove(type: ComponentType, def: ComponentDef): Promise<void> {
-        if (
-            !(await this.confirm.confirmDestructive(
-                `Delete ${type} "${def.name}"? This removes its component definition.`,
-                { title: `Delete ${type}` },
-            ))
-        )
-            return;
-        this.api.remove(type, def.name).subscribe({
-            next: () => {
-                this.toastr.success(`${type} "${def.name}" deleted`);
-                this.load();
-            },
-            error: (e) => {
-                if (e?.status === 503) this.writesDisabled = true;
-                const msg =
-                    e?.status === 503 ? 'Writes are disabled (no write root configured).'
-                    : e?.status === 409 ? `"${def.name}" is referenced by a flow and can't be deleted.`
-                    : apiErrorMessage(e, `Could not delete "${def.name}".`);
-                this.toastr.error(msg);
-            },
-        });
-    }
+      },
+      error: (e) => {
+        if (e?.status === 503) this.writesDisabled = true;
+        const msg =
+          e?.status === 503
+            ? "Writes are disabled (no write root configured)."
+            : e?.status === 409
+              ? `"${def.name}" is referenced by a flow and can't be deleted.`
+              : apiErrorMessage(e, `Could not delete "${def.name}".`);
+        this.toastr.error(msg);
+      },
+    });
+  }
 }
 
 function disp(v: unknown, dflt: string): string {
-    return v == null || v === '' ? dflt : String(v);
+  return v == null || v === "" ? dflt : String(v);
 }

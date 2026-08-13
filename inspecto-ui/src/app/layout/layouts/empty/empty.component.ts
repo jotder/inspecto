@@ -1,32 +1,38 @@
-import { Component, OnDestroy, ViewEncapsulation } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { GammaLoadingBarComponent } from '@gamma/components/loading-bar';
-import { Subject } from 'rxjs';
+import {
+  Component,
+  OnDestroy,
+  ViewEncapsulation,
+  ChangeDetectionStrategy,
+} from "@angular/core";
+import { RouterOutlet } from "@angular/router";
+import { GammaLoadingBarComponent } from "@gamma/components/loading-bar";
+import { Subject } from "rxjs";
 
 @Component({
-    selector: 'empty-layout',
-    templateUrl: './empty.component.html',
-    encapsulation: ViewEncapsulation.None,
-    imports: [GammaLoadingBarComponent, RouterOutlet],
+  selector: "empty-layout",
+  templateUrl: "./empty.component.html",
+  encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.Eager,
+  imports: [GammaLoadingBarComponent, RouterOutlet],
 })
 export class EmptyLayoutComponent implements OnDestroy {
-    private _unsubscribeAll: Subject<any> = new Subject<any>();
+  private _unsubscribeAll: Subject<any> = new Subject<any>();
 
-    /**
-     * Constructor
-     */
-    constructor() {}
+  /**
+   * Constructor
+   */
+  constructor() {}
 
-    // -----------------------------------------------------------------------------------------------------
-    // @ Lifecycle hooks
-    // -----------------------------------------------------------------------------------------------------
+  // -----------------------------------------------------------------------------------------------------
+  // @ Lifecycle hooks
+  // -----------------------------------------------------------------------------------------------------
 
-    /**
-     * On destroy
-     */
-    ngOnDestroy(): void {
-        // Unsubscribe from all subscriptions
-        this._unsubscribeAll.next(null);
-        this._unsubscribeAll.complete();
-    }
+  /**
+   * On destroy
+   */
+  ngOnDestroy(): void {
+    // Unsubscribe from all subscriptions
+    this._unsubscribeAll.next(null);
+    this._unsubscribeAll.complete();
+  }
 }
