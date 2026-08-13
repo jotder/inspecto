@@ -38,8 +38,8 @@ export interface RequestShareResult {
         <h2 mat-dialog-title>Request access</h2>
         <mat-dialog-content class="flex w-96 max-w-full flex-col gap-4">
             <div class="text-secondary text-sm">
-                {{ data.offer.kind }} <strong>{{ data.offer.owner }}/{{ data.offer.item }}</strong> — the
-                owner space reviews and approves your request before anything is shared.
+                {{ data.offer.kind }} <strong>{{ data.offer.owner }}/{{ data.offer.item }}</strong> — the owner space
+                reviews and approves your request before anything is shared.
             </div>
             <form [formGroup]="form" class="flex flex-col gap-2" (ngSubmit)="submit()">
                 <mat-form-field subscriptSizing="dynamic">

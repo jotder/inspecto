@@ -11,13 +11,18 @@ import { BundleItem } from './bundle';
 import { BundleTransferService } from './bundle-transfer.service';
 import { TransferMenuComponent } from './transfer-menu.component';
 
-const WIDGET: BundleItem = { kind: 'widget', id: 'cost_by_tariff', content: { vizType: 'bar', datasetId: 'cdr_sample', controls: {} } };
+const WIDGET: BundleItem = {
+    kind: 'widget',
+    id: 'cost_by_tariff',
+    content: { vizType: 'bar', datasetId: 'cdr_sample', controls: {} },
+};
 
 function create(opts: { afterClosed?: number; canAuthor?: boolean } = {}) {
     const download = vi.fn();
     // U-F (2026-08-01): export now goes through `POST /bundle/export`, so it is asynchronous.
     const buildExport = vi.fn((selected: BundleItem[]) =>
-        of({ bundle: { items: selected } as never, missing: [] as string[], absent: [] as string[] }));
+        of({ bundle: { items: selected } as never, missing: [] as string[], absent: [] as string[] }),
+    );
     const loadAll = vi.fn(() => of([WIDGET, { kind: 'dataset', id: 'cdr_sample', content: {} }] as BundleItem[]));
     const open = vi.fn(() => ({ afterClosed: () => of(opts.afterClosed ?? 0) }));
     TestBed.configureTestingModule({

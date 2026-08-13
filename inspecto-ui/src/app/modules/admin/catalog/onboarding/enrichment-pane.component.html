@@ -5,8 +5,7 @@
             message="Optional — join this stream with reference datasets on every committed batch."
         />
         <p class="text-secondary mx-auto m-0 max-w-lg text-center text-sm">
-            Skip it if the raw dataset is all you need; you can add an enrichment any time, even
-            after going live.
+            Skip it if the raw dataset is all you need; you can add an enrichment any time, even after going live.
         </p>
         <button
             mat-flat-button
@@ -19,8 +18,8 @@
         </button>
     } @else {
         <p class="text-secondary m-0">
-            Bind the reference datasets to join with, then write the transform. It runs after every
-            committed batch of this stream.
+            Bind the reference datasets to join with, then write the transform. It runs after every committed batch of
+            this stream.
         </p>
 
         <!-- References + transform: the ONE shared enrichment editor (W4b) -->
@@ -29,9 +28,16 @@
         <!-- Derived plumbing: shown, never asked -->
         <div class="text-secondary flex flex-col gap-1 rounded border p-3 text-sm">
             <span class="text-xs font-semibold uppercase tracking-wider">Wiring (derived)</span>
-            <span>Trigger — after every committed batch of <code>{{ state.normalizedName() }}</code></span>
-            <span>Input — <code>{{ inputBlock()['database'] }}</code> ({{ inputBlock()['format'] }})</span>
-            <span>Output — <code>{{ outputBlock()['database'] }}</code> ({{ outputBlock()['format'] }}, partitioned year/month/day)</span>
+            <span
+                >Trigger — after every committed batch of <code>{{ state.normalizedName() }}</code></span
+            >
+            <span
+                >Input — <code>{{ inputBlock()['database'] }}</code> ({{ inputBlock()['format'] }})</span
+            >
+            <span
+                >Output — <code>{{ outputBlock()['database'] }}</code> ({{ outputBlock()['format'] }}, partitioned
+                year/month/day)</span
+            >
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

@@ -75,28 +75,43 @@ function decl(p: Partial<JobParameterDecl> & { name: string; type: string }): Jo
  */
 const JOB_TYPE_DESCRIPTORS = [
     {
-        id: 'enrich', title: 'Enrichment',
+        id: 'enrich',
+        title: 'Enrichment',
         description: 'Runs a Stage-2 enrichment once (full recompute) and publishes a chain commit.',
-        parameters: [decl({ name: 'config', type: 'STRING', required: true, description: 'Path to the enrichment .toon' })],
-        emits: ['pipeline.commit'], artifacts: [],
+        parameters: [
+            decl({ name: 'config', type: 'STRING', required: true, description: 'Path to the enrichment .toon' }),
+        ],
+        emits: ['pipeline.commit'],
+        artifacts: [],
         // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
-        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
+        implClass: 'com.gamma.job.JobService',
+        source: 'builtin',
+        version: '',
     },
     {
-        id: 'report', title: 'Report',
+        id: 'report',
+        title: 'Report',
         description: 'Computes a report (status / batch / dataset export) and optionally delivers it.',
         parameters: [
             decl({ name: 'scope', type: 'STRING', default: 'status', description: 'status | batch | dataset' }),
-            decl({ name: 'out_dir', type: 'STRING', description: 'Delivery directory (enables artifact + REPORT_READY)' }),
+            decl({
+                name: 'out_dir',
+                type: 'STRING',
+                description: 'Delivery directory (enables artifact + REPORT_READY)',
+            }),
             decl({ name: 'format', type: 'STRING', description: 'json | csv' }),
             decl({ name: 'dataset', type: 'DATASET_REF', description: 'Dataset id (scope=dataset)' }),
         ],
-        emits: [], artifacts: [{ name: 'report', kind: 'report' }],
+        emits: [],
+        artifacts: [{ name: 'report', kind: 'report' }],
         // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
-        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
+        implClass: 'com.gamma.job.JobService',
+        source: 'builtin',
+        version: '',
     },
     {
-        id: 'maintenance', title: 'Maintenance',
+        id: 'maintenance',
+        title: 'Maintenance',
         description: 'Built-in housekeeping task (cleanup / ledger_prune / db_maintenance / compact / materialize).',
         parameters: [
             decl({ name: 'task', type: 'STRING', default: 'cleanup', description: 'Which maintenance task' }),
@@ -104,50 +119,107 @@ const JOB_TYPE_DESCRIPTORS = [
             decl({ name: 'retention_days', type: 'INTEGER', default: '7', description: 'Age threshold in days' }),
             decl({ name: 'store', type: 'STRING', description: 'Store(s) a delete task targets (fenced)' }),
         ],
-        emits: [], artifacts: [],
+        emits: [],
+        artifacts: [],
         // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
-        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
+        implClass: 'com.gamma.job.JobService',
+        source: 'builtin',
+        version: '',
     },
     {
-        id: 'pipeline', title: 'Pipeline',
+        id: 'pipeline',
+        title: 'Pipeline',
         description: 'Runs an authored Pipeline over data at rest; emits a commit downstream jobs can chain on.',
         parameters: [
             decl({ name: 'flow', type: 'STRING', required: true, description: 'Authored Pipeline id to run' }),
             decl({ name: 'incremental_column', type: 'STRING', description: 'Watermark column for incremental runs' }),
         ],
-        emits: ['pipeline.commit'], artifacts: [],
+        emits: ['pipeline.commit'],
+        artifacts: [],
         // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
-        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
+        implClass: 'com.gamma.job.JobService',
+        source: 'builtin',
+        version: '',
     },
     {
-        id: 'sql.template', title: 'Templated SQL',
-        description: 'Runs an authored SQL template over source Datasets and materializes the result as a queryable Dataset.',
+        id: 'sql.template',
+        title: 'Templated SQL',
+        description:
+            'Runs an authored SQL template over source Datasets and materializes the result as a queryable Dataset.',
         parameters: [
             // TEXT + expressions:false, exactly as SqlTemplateJobType declares it — the SQL body owns its
             // own $-namespace, and TEXT is what retires the old `name === 'sql'` multiline sniff.
-            decl({ name: 'sql', type: 'TEXT', required: true, expressions: false, description: 'SQL SELECT template; its $name tokens are the runtime parameters' }),
-            decl({ name: 'sink_dataset', type: 'STRING', required: true, description: 'Output Dataset (store dir under the data root)' }),
+            decl({
+                name: 'sql',
+                type: 'TEXT',
+                required: true,
+                expressions: false,
+                description: 'SQL SELECT template; its $name tokens are the runtime parameters',
+            }),
+            decl({
+                name: 'sink_dataset',
+                type: 'STRING',
+                required: true,
+                description: 'Output Dataset (store dir under the data root)',
+            }),
             decl({ name: 'sources', type: 'STRING', description: 'CSV of source store names to register as views' }),
         ],
-        emits: ['job.dataset.produced'], artifacts: [{ name: 'output', kind: 'dataset' }],
+        emits: ['job.dataset.produced'],
+        artifacts: [{ name: 'output', kind: 'dataset' }],
         // Provenance (§7.3): the registry assembles these, and every mock type is a built-in.
-        implClass: 'com.gamma.job.JobService', source: 'builtin', version: '',
+        implClass: 'com.gamma.job.JobService',
+        source: 'builtin',
+        version: '',
     },
     {
         // Mirrors `MailSendJobType.DESCRIPTOR` field for field (pinned server-side by
         // `MailSendJobTypeTest`). It is here because it is the only built-in declaring EMAIL, `multi` and
         // `group` — so without it the offline form can never rehearse a grouped, chip-edited, token-bearing
         // field, which is exactly the shape §9 authors.
-        id: 'mail.send', title: 'Send Mail',
+        id: 'mail.send',
+        title: 'Send Mail',
         description: 'Composes and sends an email to the configured recipients.',
         parameters: [
-            decl({ name: 'to', type: 'EMAIL', required: true, label: 'To', multi: true, group: 'Recipients', description: 'Recipient addresses' }),
-            decl({ name: 'cc', type: 'EMAIL', label: 'Cc', multi: true, group: 'Recipients', description: 'Additional recipients' }),
-            decl({ name: 'subject', type: 'STRING', required: true, label: 'Subject', group: 'Message', description: 'Message subject line' }),
-            decl({ name: 'body', type: 'TEXT', required: true, label: 'Body', group: 'Message', description: 'Message body' }),
+            decl({
+                name: 'to',
+                type: 'EMAIL',
+                required: true,
+                label: 'To',
+                multi: true,
+                group: 'Recipients',
+                description: 'Recipient addresses',
+            }),
+            decl({
+                name: 'cc',
+                type: 'EMAIL',
+                label: 'Cc',
+                multi: true,
+                group: 'Recipients',
+                description: 'Additional recipients',
+            }),
+            decl({
+                name: 'subject',
+                type: 'STRING',
+                required: true,
+                label: 'Subject',
+                group: 'Message',
+                description: 'Message subject line',
+            }),
+            decl({
+                name: 'body',
+                type: 'TEXT',
+                required: true,
+                label: 'Body',
+                group: 'Message',
+                description: 'Message body',
+            }),
         ],
-        emits: ['mail.sent'], artifacts: [], requires: ['mail'],
-        implClass: 'com.gamma.job.MailSendJobType', source: 'builtin', version: '',
+        emits: ['mail.sent'],
+        artifacts: [],
+        requires: ['mail'],
+        implClass: 'com.gamma.job.MailSendJobType',
+        source: 'builtin',
+        version: '',
     },
 ];
 
@@ -204,32 +276,118 @@ function expr(
  */
 function expressionCatalog(): JobExpressionDecl[] {
     return [
-        expr({ token: '$today', yields: 'DATE', description: "The date at fire time, in the Job's zone", example: '2026-08-07', preview: shiftedDate() }),
-        expr({ token: '$yesterday', yields: 'DATE', description: 'The day before the fire date', example: '2026-08-06', preview: shiftedDate(-1) }),
-        expr({ token: '$tomorrow', yields: 'DATE', description: 'The day after the fire date', example: '2026-08-08', preview: shiftedDate(1) }),
-        expr({ token: '$now', yields: 'INSTANT', description: 'The fire-time instant', example: '2026-08-07T06:00:00Z', preview: new Date().toISOString() }),
-        expr({ token: '$now.epoch_seconds', yields: 'INTEGER', description: 'Fire time as epoch seconds', example: '1785045600', preview: String(Math.floor(Date.now() / 1000)) }),
-        expr({ token: '$now.epoch_millis', yields: 'INTEGER', description: 'Fire time as epoch milliseconds', example: '1785045600000', preview: String(Date.now()) }),
-        // These three need a firing Run/Job, so they keep their sample as the preview (contextFree: false).
-        expr({ token: '$run.id', yields: 'STRING', description: "This Run's id", example: 'run-20260807-060000-1', contextFree: false }),
-        expr({ token: '$run.fire_time', yields: 'INSTANT', description: 'When this Run fired', example: '2026-08-07T06:00:00Z', preview: new Date().toISOString() }),
-        expr({ token: '$run.actor', yields: 'STRING', description: 'Who or what triggered this Run', example: 'cron', contextFree: false }),
         expr({
-            token: '$job.last_success_time', yields: 'INSTANT', contextFree: false,
+            token: '$today',
+            yields: 'DATE',
+            description: "The date at fire time, in the Job's zone",
+            example: '2026-08-07',
+            preview: shiftedDate(),
+        }),
+        expr({
+            token: '$yesterday',
+            yields: 'DATE',
+            description: 'The day before the fire date',
+            example: '2026-08-06',
+            preview: shiftedDate(-1),
+        }),
+        expr({
+            token: '$tomorrow',
+            yields: 'DATE',
+            description: 'The day after the fire date',
+            example: '2026-08-08',
+            preview: shiftedDate(1),
+        }),
+        expr({
+            token: '$now',
+            yields: 'INSTANT',
+            description: 'The fire-time instant',
+            example: '2026-08-07T06:00:00Z',
+            preview: new Date().toISOString(),
+        }),
+        expr({
+            token: '$now.epoch_seconds',
+            yields: 'INTEGER',
+            description: 'Fire time as epoch seconds',
+            example: '1785045600',
+            preview: String(Math.floor(Date.now() / 1000)),
+        }),
+        expr({
+            token: '$now.epoch_millis',
+            yields: 'INTEGER',
+            description: 'Fire time as epoch milliseconds',
+            example: '1785045600000',
+            preview: String(Date.now()),
+        }),
+        // These three need a firing Run/Job, so they keep their sample as the preview (contextFree: false).
+        expr({
+            token: '$run.id',
+            yields: 'STRING',
+            description: "This Run's id",
+            example: 'run-20260807-060000-1',
+            contextFree: false,
+        }),
+        expr({
+            token: '$run.fire_time',
+            yields: 'INSTANT',
+            description: 'When this Run fired',
+            example: '2026-08-07T06:00:00Z',
+            preview: new Date().toISOString(),
+        }),
+        expr({
+            token: '$run.actor',
+            yields: 'STRING',
+            description: 'Who or what triggered this Run',
+            example: 'cron',
+            contextFree: false,
+        }),
+        expr({
+            token: '$job.last_success_time',
+            yields: 'INSTANT',
+            contextFree: false,
             description: "This Job's success watermark — the incremental-window anchor; unset before the first success",
             example: '2026-08-06T06:00:04Z',
         }),
         // $signal.* is meaningless on a cron fire — the picker filters on exactly this.
         expr({
-            token: '$signal.', form: 'PREFIX', yields: 'STRING', availableIn: ['on_signal'], contextFree: false,
-            description: "A dotted field of the firing Signal's payload", example: '$signal.dataset',
+            token: '$signal.',
+            form: 'PREFIX',
+            yields: 'STRING',
+            availableIn: ['on_signal'],
+            contextFree: false,
+            description: "A dotted field of the firing Signal's payload",
+            example: '$signal.dataset',
         }),
-        expr({ token: '$day(n)', form: 'FUNCTION', yields: 'DATE', description: 'The fire date shifted by n days (negative = past)', example: '$day(-1)', preview: shiftedDate(-1) }),
-        expr({ token: '$month(n)', form: 'FUNCTION', yields: 'DATE', description: 'The fire date shifted by n months (negative = past)', example: '$month(-1)', preview: shiftedDate(0, -1) }),
-        expr({ token: '$year(n)', form: 'FUNCTION', yields: 'DATE', description: 'The fire date shifted by n years (negative = past)', example: '$year(-1)', preview: shiftedDate(0, 0, -1) }),
         expr({
-            token: '$upstream(<job>).artifact(<name>).<attr>', form: 'FUNCTION', yields: 'STRING', contextFree: false,
-            description: 'An attribute (ref | rows | bytes | watermark | event_time_min | event_time_max) of a predecessor Job\'s latest Run Artifact',
+            token: '$day(n)',
+            form: 'FUNCTION',
+            yields: 'DATE',
+            description: 'The fire date shifted by n days (negative = past)',
+            example: '$day(-1)',
+            preview: shiftedDate(-1),
+        }),
+        expr({
+            token: '$month(n)',
+            form: 'FUNCTION',
+            yields: 'DATE',
+            description: 'The fire date shifted by n months (negative = past)',
+            example: '$month(-1)',
+            preview: shiftedDate(0, -1),
+        }),
+        expr({
+            token: '$year(n)',
+            form: 'FUNCTION',
+            yields: 'DATE',
+            description: 'The fire date shifted by n years (negative = past)',
+            example: '$year(-1)',
+            preview: shiftedDate(0, 0, -1),
+        }),
+        expr({
+            token: '$upstream(<job>).artifact(<name>).<attr>',
+            form: 'FUNCTION',
+            yields: 'STRING',
+            contextFree: false,
+            description:
+                "An attribute (ref | rows | bytes | watermark | event_time_min | event_time_max) of a predecessor Job's latest Run Artifact",
             example: '$upstream(loader).artifact(output).ref',
         }),
     ];
@@ -262,10 +420,24 @@ export function jobsHandler(flags: MockFlags): MockHandler {
         // Name-keyed demo shapes: a *backup* job shows an archive, a *storage* job the axis series.
         if (method === 'GET' && (m = match(url, JOB_ARTIFACTS_LATEST))) {
             const job = m[1];
-            const base = { runId: `${job}-latest`, job, at: new Date().toISOString(), rows: 0, ref: null as string | null };
+            const base = {
+                runId: `${job}-latest`,
+                job,
+                at: new Date().toISOString(),
+                rows: 0,
+                ref: null as string | null,
+            };
             if (job.includes('backup')) {
-                return json([{ ...base, seq: 1, name: 'backup', kind: 'file',
-                    ref: `data/backups/${job}_20260712.zip`, bytes: 48_213 }]);
+                return json([
+                    {
+                        ...base,
+                        seq: 1,
+                        name: 'backup',
+                        kind: 'file',
+                        ref: `data/backups/${job}_20260712.zip`,
+                        bytes: 48_213,
+                    },
+                ]);
             }
             if (job.includes('storage')) {
                 return json([
@@ -285,7 +457,8 @@ export function jobsHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && (m = match(url, JOB_RUN_LOGS))) return json(runLogs(store, space, m[2]));
         if (method === 'GET' && (m = match(url, JOB_RUNS))) return json(runsOf(store, space, m[1]));
         if (method === 'POST' && (m = match(url, JOB_TRIGGER))) return json(trigger(store, space, m[1]), 202);
-        if (method === 'POST' && (m = match(url, JOB_TOGGLE))) return json(setEnabled(store, space, m[1], m[2] === 'enable'));
+        if (method === 'POST' && (m = match(url, JOB_TOGGLE)))
+            return json(setEnabled(store, space, m[1], m[2] === 'enable'));
         if (method === 'POST' && (m = match(url, JOB_RESCHEDULE))) {
             return json(reschedule(store, space, m[1], (req.body as { cron?: string })?.cron ?? ''));
         }
@@ -318,7 +491,13 @@ function runLogs(store: MockStore, space: string, runId: string): JobRunLogs {
     const run = store.get<JobRun>(space, JOB_RUNS_COLL, runId);
     if (run?.status === 'RUNNING') {
         const now = new Date();
-        return { ...base, logs: [...base.logs, { ts: now.toISOString(), level: 'INFO', message: `…still running (${now.toLocaleTimeString()})` }] };
+        return {
+            ...base,
+            logs: [
+                ...base.logs,
+                { ts: now.toISOString(), level: 'INFO', message: `…still running (${now.toLocaleTimeString()})` },
+            ],
+        };
     }
     return base;
 }
@@ -386,7 +565,16 @@ function runReportExport(store: MockStore, space: string, job: JobDetail): JobRu
     const startedAt = Date.now();
 
     if (!dashboard) {
-        return recordRun(store, space, job.name, 'MANUAL', 'FAILED', startedAt, 400, `Dashboard "${dashboardId}" no longer exists.`);
+        return recordRun(
+            store,
+            space,
+            job.name,
+            'MANUAL',
+            'FAILED',
+            startedAt,
+            400,
+            `Dashboard "${dashboardId}" no longer exists.`,
+        );
     }
 
     const run = recordRun(
@@ -406,7 +594,13 @@ function runReportExport(store: MockStore, space: string, job: JobDetail): JobRu
                   runId: run.runId,
                   filename: `${dashboardId}.csv`,
                   mime: 'text/csv',
-                  content: ['tile_index,widget_id,span', ...tiles.map((t, i) => `${i},${(t as { widgetId?: string }).widgetId ?? ''},${(t as { span?: number }).span ?? 1}`)].join('\n'),
+                  content: [
+                      'tile_index,widget_id,span',
+                      ...tiles.map(
+                          (t, i) =>
+                              `${i},${(t as { widgetId?: string }).widgetId ?? ''},${(t as { span?: number }).span ?? 1}`,
+                      ),
+                  ].join('\n'),
               }
             : {
                   runId: run.runId,
@@ -429,7 +623,12 @@ function runReportExport(store: MockStore, space: string, job: JobDetail): JobRu
     return run;
 }
 
-function setEnabled(store: MockStore, space: string, name: string, enabled: boolean): Record<string, unknown> | undefined {
+function setEnabled(
+    store: MockStore,
+    space: string,
+    name: string,
+    enabled: boolean,
+): Record<string, unknown> | undefined {
     const job = store.get<JobDetail>(space, JOBS_COLL, name);
     return job ? storedToWire(store.put(space, JOBS_COLL, name, { ...job, enabled })) : undefined;
 }
@@ -439,7 +638,14 @@ function reschedule(store: MockStore, space: string, name: string, cron: string)
     if (!job) return undefined;
     // A cron schedule supersedes an event or signal trigger.
     return storedToWire(
-        store.put(space, JOBS_COLL, name, { ...job, cron, onPipeline: null, onSignal: null, when: null, nextFire: nextFireFor(cron) }),
+        store.put(space, JOBS_COLL, name, {
+            ...job,
+            cron,
+            onPipeline: null,
+            onSignal: null,
+            when: null,
+            nextFire: nextFireFor(cron),
+        }),
     );
 }
 
@@ -447,7 +653,18 @@ function reschedule(store: MockStore, space: string, name: string, cron: string)
  * The job keys the server treats as config; everything else in a job body is a type-specific parameter.
  * Mirrors `JobConfig.fromMap`'s known-key set.
  */
-const WIRE_CONFIG_KEYS = new Set(['name', 'type', 'cron', 'on_pipeline', 'on_signal', 'when', 'enabled', 'catch_up', 'args', 'bind']);
+const WIRE_CONFIG_KEYS = new Set([
+    'name',
+    'type',
+    'cron',
+    'on_pipeline',
+    'on_signal',
+    'when',
+    'enabled',
+    'catch_up',
+    'args',
+    'bind',
+]);
 
 /**
  * Parse a job write body exactly as `JobConfig.fromMap` does: keys are **snake_case**, parameters are
@@ -489,7 +706,12 @@ function storedToWire(j: JobDetail): Record<string, unknown> {
     return out;
 }
 
-function upsert(store: MockStore, space: string, body: Record<string, unknown>, name?: string): Record<string, unknown> {
+function upsert(
+    store: MockStore,
+    space: string,
+    body: Record<string, unknown>,
+    name?: string,
+): Record<string, unknown> {
     const parsed = wireToStored(name ? { ...body, name } : body);
     const existing = store.get<JobDetail>(space, JOBS_COLL, parsed.name);
     const job: JobDetail = {
@@ -514,7 +736,17 @@ function deleteJob(store: MockStore, space: string, name: string): { deleted: bo
  *  them). Unlike the detail view this one IS camelCase: server-side it is a Java record, not the config
  *  section, so `onSignal` keeps its camel spelling here. */
 function toView(j: JobDetail): JobView {
-    return { name: j.name, type: j.type, cron: j.cron, onPipeline: j.onPipeline, onSignal: j.onSignal ?? null, enabled: j.enabled, lastStatus: j.lastStatus, lastRunTime: j.lastRunTime, nextFire: j.nextFire };
+    return {
+        name: j.name,
+        type: j.type,
+        cron: j.cron,
+        onPipeline: j.onPipeline,
+        onSignal: j.onSignal ?? null,
+        enabled: j.enabled,
+        lastStatus: j.lastStatus,
+        lastRunTime: j.lastRunTime,
+        nextFire: j.nextFire,
+    };
 }
 
 /** A plausible next-fire for a cron job (mock — the real backend uses CronExpression); null when not cron. */

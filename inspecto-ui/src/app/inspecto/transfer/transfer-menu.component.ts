@@ -99,7 +99,8 @@ export class TransferMenuComponent {
                 this.toastr.warning('Nothing to export yet — save the artifact first.');
                 return;
             }
-            this.transfer.buildExport(selected, available, includeDeps)
+            this.transfer
+                .buildExport(selected, available, includeDeps)
                 .pipe(catchError((err) => of(apiErrorMessage(err, 'Export failed.'))))
                 .subscribe((res) => {
                     this.busy.set(false);
@@ -109,8 +110,11 @@ export class TransferMenuComponent {
                     }
                     this.transfer.download(res.bundle);
                     const extra = res.bundle.items.length - selected.length;
-                    this.toastr.success(`Exported ${res.bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`);
-                    if (res.missing.length) this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
+                    this.toastr.success(
+                        `Exported ${res.bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`,
+                    );
+                    if (res.missing.length)
+                        this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
                     if (res.absent.length) this.toastr.warning(`Not found on this instance: ${res.absent.join(', ')}`);
                 });
         });

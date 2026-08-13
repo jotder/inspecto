@@ -50,9 +50,9 @@ export class ParsersService {
      * reason.
      */
     preview(id: string, grammar: Record<string, unknown>, sampleText: string): Observable<ParserPreview> {
-        return this.http.post<ParserPreview>(
-            apiUrl(`/parsers/${encodeURIComponent(id)}/preview`),
-            { grammar, sample_text: sampleText },
-        );
+        return this.http.post<ParserPreview>(apiUrl(`/parsers/${encodeURIComponent(id)}/preview`), {
+            grammar,
+            sample_text: sampleText,
+        });
     }
 }

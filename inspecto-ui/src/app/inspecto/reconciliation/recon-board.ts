@@ -1,7 +1,12 @@
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { TreeNode } from 'app/inspecto/tree-table';
 import {
-    CompareColumn, DEFAULT_BANDS, ReconBands, Reconciliation, ReconBreak, withinTolerance,
+    CompareColumn,
+    DEFAULT_BANDS,
+    ReconBands,
+    Reconciliation,
+    ReconBreak,
+    withinTolerance,
 } from './reconciliation-types';
 
 /**
@@ -88,8 +93,11 @@ interface SideGroup {
 }
 
 /** Group one side's rows at the key grain with per-measure sum/count + the implicit record count. */
-function groupSide(rows: Record<string, unknown>[], keyColumns: string[], compare: CompareColumn[]):
-        Map<string, SideGroup> {
+function groupSide(
+    rows: Record<string, unknown>[],
+    keyColumns: string[],
+    compare: CompareColumn[],
+): Map<string, SideGroup> {
     const groups = new Map<string, SideGroup>();
     for (const row of rows) {
         const id = keyColumns.map((k) => String(row[k] ?? '')).join(KEY_SEP);
@@ -237,7 +245,11 @@ export function aggregateRecon(
     if (threeWay) totals.c = sideTotals(grouped[2], compareColumns);
 
     return {
-        keyColumns, measures, rows, totals, summary,
+        keyColumns,
+        measures,
+        rows,
+        totals,
+        summary,
         statistics: { rowCount: rows.length, elapsedMs: Date.now() - t0, truncated: false },
     };
 }
@@ -270,7 +282,7 @@ export function reconBreakSets(
     thirdRows?: Record<string, unknown>[] | null,
 ): ReconBreakSets {
     const run = aggregateRecon(recon, leftRows, rightRows, thirdRows);
-    const otherOf = (r: ReconGrainRow) => (side === 'c' ? r.c ?? null : r.b);
+    const otherOf = (r: ReconGrainRow) => (side === 'c' ? (r.c ?? null) : r.b);
     const inOther = (r: ReconGrainRow) => (side === 'c' ? !!r.inC : r.inB);
     const inPath = (key: Record<string, unknown>): boolean =>
         !path || Object.entries(path).every(([dim, v]) => String(key[dim] ?? '') === v);
@@ -278,14 +290,25 @@ export function reconBreakSets(
 
     const out: ReconBreakSets = {};
     if (!type || type === 'missing_right')
-        out.missing_right = set(run.rows.filter((r) => r.inA && !inOther(r) && inPath(r.key)).map((r) => ({ key: r.key, a: r.a })));
+        out.missing_right = set(
+            run.rows.filter((r) => r.inA && !inOther(r) && inPath(r.key)).map((r) => ({ key: r.key, a: r.a })),
+        );
     if (!type || type === 'missing_left')
-        out.missing_left = set(run.rows.filter((r) => inOther(r) && !r.inA && inPath(r.key)).map((r) => ({ key: r.key, b: otherOf(r)! })));
+        out.missing_left = set(
+            run.rows.filter((r) => inOther(r) && !r.inA && inPath(r.key)).map((r) => ({ key: r.key, b: otherOf(r)! })),
+        );
     if (!type || type === 'value_break')
-        out.value_break = set(run.rows
-            .filter((r) => r.inA && inOther(r) && inPath(r.key)
-                && recon.compareColumns.some((c) => !aggWithin(r.a[c.column], otherOf(r)![c.column], c)))
-            .map((r) => ({ key: r.key, a: r.a, b: otherOf(r)! })));
+        out.value_break = set(
+            run.rows
+                .filter(
+                    (r) =>
+                        r.inA &&
+                        inOther(r) &&
+                        inPath(r.key) &&
+                        recon.compareColumns.some((c) => !aggWithin(r.a[c.column], otherOf(r)![c.column], c)),
+                )
+                .map((r) => ({ key: r.key, a: r.a, b: otherOf(r)! })),
+        );
     return out;
 }
 
@@ -524,7 +547,12 @@ export function boardColumns(
         if (values) cols.push({ field: `a_${m}`, headerName: `A ${label}`, width: 120, valueFormatter: measureCell });
         for (const s of sides) {
             if (values)
-                cols.push({ field: `${s}_${m}`, headerName: `${s.toUpperCase()} ${label}`, width: 120, valueFormatter: measureCell });
+                cols.push({
+                    field: `${s}_${m}`,
+                    headerName: `${s.toUpperCase()} ${label}`,
+                    width: 120,
+                    valueFormatter: measureCell,
+                });
             cols.push({
                 field: `pct_${s}_${m}`,
                 headerName: `Δ%${multi ? s.toUpperCase() : ''} ${label}`,

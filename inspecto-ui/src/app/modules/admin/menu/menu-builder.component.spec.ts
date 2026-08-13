@@ -21,7 +21,10 @@ describe('MenuBuilderComponent', () => {
                 provideNoopAnimations(),
                 { provide: SpacesService, useValue: { currentSpaceId: signal<string | null>(null) } },
                 { provide: NavigationService, useValue: { get: () => of(null) } },
-                { provide: NavMenusService, useValue: { get: () => of(emptyTree('default')), put: () => of(emptyTree('default')) } },
+                {
+                    provide: NavMenusService,
+                    useValue: { get: () => of(emptyTree('default')), put: () => of(emptyTree('default')) },
+                },
                 { provide: ToastrService, useValue: { error: () => {} } },
                 { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
                 { provide: LensService, useValue: { canCurateMenus: () => true } },
@@ -42,7 +45,9 @@ describe('MenuBuilderComponent', () => {
                 {
                     id: 'rev',
                     title: 'Revenue',
-                    children: [{ id: 'd1', title: 'Dash one', binding: { kind: 'dashboard' as const, componentId: 'c1' } }],
+                    children: [
+                        { id: 'd1', title: 'Dash one', binding: { kind: 'dashboard' as const, componentId: 'c1' } },
+                    ],
                 },
             ],
         };
@@ -86,7 +91,9 @@ describe('MenuBuilderComponent', () => {
                 {
                     id: 'rev',
                     title: 'Revenue',
-                    children: [{ id: 'd1', title: 'Dash one', binding: { kind: 'dashboard' as const, componentId: 'c1' } }],
+                    children: [
+                        { id: 'd1', title: 'Dash one', binding: { kind: 'dashboard' as const, componentId: 'c1' } },
+                    ],
                 },
             ],
         };
@@ -127,7 +134,10 @@ describe('MenuBuilderComponent', () => {
                 provideNoopAnimations(),
                 { provide: SpacesService, useValue: { currentSpaceId: signal<string | null>(null) } },
                 { provide: NavigationService, useValue: { get: () => of(null) } },
-                { provide: NavMenusService, useValue: { get: () => of(emptyTree('default')), put: () => of(emptyTree('default')) } },
+                {
+                    provide: NavMenusService,
+                    useValue: { get: () => of(emptyTree('default')), put: () => of(emptyTree('default')) },
+                },
                 { provide: ToastrService, useValue: { error: () => {} } },
                 { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
                 { provide: LensService, useValue: { canCurateMenus: () => false } },

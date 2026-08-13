@@ -20,11 +20,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { AttributeSpec, AttributeToken } from 'app/inspecto/component-model';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
-import {
-    statusBadgeHtml,
-    StatusBadgeComponent,
-    StatusTone,
-} from 'app/inspecto/components/status-badge.component';
+import { statusBadgeHtml, StatusBadgeComponent, StatusTone } from 'app/inspecto/components/status-badge.component';
 import {
     actionsColumn,
     INSPECTO_DEFAULT_COL_DEF,
@@ -137,7 +133,9 @@ export class DesignSystemComponent {
     ];
     readonly treeNodes: TreeNode[] = [
         {
-            id: 'north', label: 'Region North', icon: 'heroicons_outline:globe-americas',
+            id: 'north',
+            label: 'Region North',
+            icon: 'heroicons_outline:globe-americas',
             values: { e1: 100, e2: 120, delta: 20 },
             children: [
                 { id: 'north/a', label: 'Product A', values: { e1: 40, e2: 45, delta: 5 } },
@@ -145,7 +143,9 @@ export class DesignSystemComponent {
             ],
         },
         {
-            id: 'south', label: 'Region South', icon: 'heroicons_outline:globe-americas',
+            id: 'south',
+            label: 'Region South',
+            icon: 'heroicons_outline:globe-americas',
             values: { e1: 200, e2: 190, delta: -10 },
             children: [
                 { id: 'south/a', label: 'Product A', values: { e1: 120, e2: 110, delta: -10 } },
@@ -171,7 +171,11 @@ export class DesignSystemComponent {
     readonly schemaFormSpecs: AttributeSpec[] = [
         { key: 'name', label: 'Source id', type: 'identifier', tier: 'required', placeholder: 'e.g. cdr_sftp' },
         {
-            key: 'protocol', label: 'Protocol', type: 'select', tier: 'required', default: 'sftp',
+            key: 'protocol',
+            label: 'Protocol',
+            type: 'select',
+            tier: 'required',
+            default: 'sftp',
             options: [
                 { value: 'sftp', label: 'SFTP' },
                 { value: 'ftps', label: 'FTPS' },
@@ -179,15 +183,32 @@ export class DesignSystemComponent {
             ],
         },
         {
-            key: 'host', label: 'Host', type: 'string', tier: 'required',
-            dependsOn: { key: 'protocol', equals: 'sftp' }, help: 'Shown only while protocol = SFTP.',
+            key: 'host',
+            label: 'Host',
+            type: 'string',
+            tier: 'required',
+            dependsOn: { key: 'protocol', equals: 'sftp' },
+            help: 'Shown only while protocol = SFTP.',
         },
         { key: 'include', label: 'Include pattern', type: 'string', tier: 'optional', placeholder: 'glob:**/*.csv' },
         {
-            key: 'as_of', label: 'As of date', type: 'string', tier: 'required', pattern: '\d{4}-\d{2}-\d{2}',
-            placeholder: '2026-08-10', help: 'Has a token picker — a token replaces the whole value.',
+            key: 'as_of',
+            label: 'As of date',
+            type: 'string',
+            tier: 'required',
+            pattern: '\d{4}-\d{2}-\d{2}',
+            placeholder: '2026-08-10',
+            help: 'Has a token picker — a token replaces the whole value.',
         },
-        { key: 'parallel_fetch', label: 'Parallel fetch', type: 'number', tier: 'advanced', default: 4, min: 1, max: 32 },
+        {
+            key: 'parallel_fetch',
+            label: 'Parallel fetch',
+            type: 'number',
+            tier: 'advanced',
+            default: 4,
+            min: 1,
+            max: 32,
+        },
     ];
 
     /**
@@ -213,7 +234,12 @@ export class DesignSystemComponent {
         { field: 'msisdn', headerName: 'MSISDN', flex: 1 },
         { field: 'cell_id', headerName: 'Cell', width: 130 },
         { field: 'duration_s', headerName: 'Duration (s)', width: 130 },
-        { field: 'tariff', headerName: 'Tariff', width: 130, cellRenderer: (p: { value: string }) => statusBadgeHtml(p.value) },
+        {
+            field: 'tariff',
+            headerName: 'Tariff',
+            width: 130,
+            cellRenderer: (p: { value: string }) => statusBadgeHtml(p.value),
+        },
         { field: 'start_time', headerName: 'Start', flex: 1 },
     ];
     readonly querySource: QuerySource = {

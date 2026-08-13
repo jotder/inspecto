@@ -3,7 +3,12 @@ import { firstValueFrom, forkJoin, of } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ReconApiService, ReconServerConfig } from 'app/inspecto/api';
 import {
-    aggregateRecon, Reconciliation, ReconBreakSets, reconBreakSets, ReconRunResult, SideKey,
+    aggregateRecon,
+    Reconciliation,
+    ReconBreakSets,
+    reconBreakSets,
+    ReconRunResult,
+    SideKey,
 } from 'app/inspecto/reconciliation';
 import { evaluateRows } from 'app/inspecto/query';
 import { Dataset } from '../studio/datasets/dataset-types';
@@ -46,7 +51,9 @@ export class ReconExecService {
 
     /** Offline row resolution — the datasets' sample-source rows through their Query Core when virtual. */
     private async rows(recon: Reconciliation): Promise<{
-        left: Record<string, unknown>[]; right: Record<string, unknown>[]; third: Record<string, unknown>[] | null;
+        left: Record<string, unknown>[];
+        right: Record<string, unknown>[];
+        third: Record<string, unknown>[] | null;
     }> {
         const { left, right, third } = await firstValueFrom(
             forkJoin({

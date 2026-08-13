@@ -1,4 +1,13 @@
-import { ComponentKind, ConfigFinding, Ref, getKind, hasEditorRoute, queryRefs, registerEditorRoute, registerKind } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    ConfigFinding,
+    Ref,
+    getKind,
+    hasEditorRoute,
+    queryRefs,
+    registerEditorRoute,
+    registerKind,
+} from 'app/inspecto/component-model';
 import { QueryConfig } from './query-types';
 
 /**

@@ -5,7 +5,14 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
-import { AuthoredNode, ComponentDef, ComponentsService, ParserDef, ParserPreview, ParsersService } from 'app/inspecto/api';
+import {
+    AuthoredNode,
+    ComponentDef,
+    ComponentsService,
+    ParserDef,
+    ParserPreview,
+    ParsersService,
+} from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
@@ -13,14 +20,27 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GrammarEditorDialog, GrammarEditorDialogData } from './grammar-editor.dialog';
 
 const TABLE_PREVIEW: ParserPreview = {
-    kind: 'table', columns: ['id'], rows: [{ id: '1' }], rowCount: 1, rejectedRows: 0,
+    kind: 'table',
+    columns: ['id'],
+    rows: [{ id: '1' }],
+    rowCount: 1,
+    rejectedRows: 0,
 };
 
 /** A served catalog in the real shape (`GET /parsers`): a built-in + the preview-only XML plugin. */
 const CATALOG: ParserDef[] = [
-    { id: 'delimited', label: 'Delimited — CSV / TSV / pipe', hierarchical: false, ingestable: true, grammarSchema: [] },
     {
-        id: 'xml', label: 'XML — XML file format', hierarchical: true, ingestable: false,
+        id: 'delimited',
+        label: 'Delimited — CSV / TSV / pipe',
+        hierarchical: false,
+        ingestable: true,
+        grammarSchema: [],
+    },
+    {
+        id: 'xml',
+        label: 'XML — XML file format',
+        hierarchical: true,
+        ingestable: false,
         grammarSchema: [{ path: 'xml.record_element', label: 'Record element', type: 'STRING' }],
     },
 ];
@@ -29,7 +49,9 @@ function saved(name: string, content: Record<string, unknown> = {}): ComponentDe
     return { type: 'grammar', name, ref: `grammar/${name}`, content };
 }
 
-async function create(opts: { node?: AuthoredNode; grammars?: ComponentDef[]; dialogOpen?: ReturnType<typeof vi.fn> } = {}) {
+async function create(
+    opts: { node?: AuthoredNode; grammars?: ComponentDef[]; dialogOpen?: ReturnType<typeof vi.fn> } = {},
+) {
     const close = vi.fn();
     const components = {
         list: () => of(opts.grammars ?? []),
@@ -103,8 +125,11 @@ describe('GrammarEditorDialog', () => {
         expect(editor.frontend()).toBe('json');
 
         c.save();
-        expect(components.update).toHaveBeenCalledWith('grammar', 'cdr_csv',
-            expect.objectContaining({ frontend: 'json' }));
+        expect(components.update).toHaveBeenCalledWith(
+            'grammar',
+            'cdr_csv',
+            expect.objectContaining({ frontend: 'json' }),
+        );
         expect(close.mock.calls[0][0].node.use).toBe('grammar/cdr_csv');
     });
 
@@ -119,7 +144,11 @@ describe('GrammarEditorDialog', () => {
     });
 
     it('extract asks for a name, writes the component, and MOVES the block off the node', async () => {
-        const node: AuthoredNode = { id: 'parse', type: 'parser.dsv', config: { parsing: { frontend: 'delimited' }, schema_file: 'cdr.toon' } };
+        const node: AuthoredNode = {
+            id: 'parse',
+            type: 'parser.dsv',
+            config: { parsing: { frontend: 'delimited' }, schema_file: 'cdr.toon' },
+        };
         const { c, fixture, components, close } = await create({ node });
 
         c.extract();
@@ -128,8 +157,10 @@ describe('GrammarEditorDialog', () => {
         fixture.detectChanges();
 
         c.save();
-        expect(components.create).toHaveBeenCalledWith('grammar',
-            expect.objectContaining({ id: 'delimited_grammar', frontend: 'delimited' }));
+        expect(components.create).toHaveBeenCalledWith(
+            'grammar',
+            expect.objectContaining({ id: 'delimited_grammar', frontend: 'delimited' }),
+        );
         const closed = close.mock.calls[0][0];
         expect(closed.node.use).toBe('grammar/delimited_grammar');
         expect(closed.node.config['parsing']).toBeUndefined(); // one home, never two
@@ -148,7 +179,10 @@ describe('GrammarEditorDialog', () => {
 
     it('switching a bound node back to Inline drops the use: binding on save', async () => {
         const node: AuthoredNode = { id: 'parse', type: 'parser.dsv', use: 'grammar/cdr_csv' };
-        const { c, close, components, fixture } = await create({ node, grammars: [saved('cdr_csv', { frontend: 'json' })] });
+        const { c, close, components, fixture } = await create({
+            node,
+            grammars: [saved('cdr_csv', { frontend: 'json' })],
+        });
         fixture.detectChanges();
 
         c.onGrammarChange('');
@@ -179,8 +213,10 @@ describe('GrammarEditorDialog', () => {
         expect(c.previewRows()).toEqual([{ id: '1' }]);
 
         c.openSchemaEditor();
-        expect(open).toHaveBeenCalledWith(expect.anything(),
-            expect.objectContaining({ data: { sampleRows: [{ id: '1' }] } }));
+        expect(open).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ data: { sampleRows: [{ id: '1' }] } }),
+        );
 
         c.onPreviewed({ kind: 'tree', recordCount: 1, nodes: [] });
         expect(c.previewRows()).toEqual([]);

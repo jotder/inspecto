@@ -56,8 +56,7 @@ describe('onboarding stage model (W4a)', () => {
     });
 
     it('parsing resolves the per-frontend built-in tables', () => {
-        expect(stageAttributesFor('parsing', { frontend: 'json' }))
-            .toEqual(parsingAttributesFor('json'));
+        expect(stageAttributesFor('parsing', { frontend: 'json' })).toEqual(parsingAttributesFor('json'));
         expect(stageAttributesFor('parsing')).toEqual(parsingAttributesFor('delimited'));
     });
 

@@ -22,8 +22,14 @@ const EDGES: TagAssignment[] = [
 
 async function create(
     tagsApi: Partial<Record<keyof TagsService, unknown>> = {},
-    { canAuthor = true, confirmed = true, registry = REGISTRY }: {
-        canAuthor?: boolean; confirmed?: boolean; registry?: Tag[];
+    {
+        canAuthor = true,
+        confirmed = true,
+        registry = REGISTRY,
+    }: {
+        canAuthor?: boolean;
+        confirmed?: boolean;
+        registry?: Tag[];
     } = {},
 ) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
@@ -114,7 +120,8 @@ describe('TagsComponent', () => {
 
     it('a 409 from delete (a Tag Rule still applies it) surfaces the server message', async () => {
         const { fixture, toastr } = await create({
-            remove: () => throwError(() => ({ status: 409, error: { message: 'tag rule "r1" still applies tag "billing"' } })),
+            remove: () =>
+                throwError(() => ({ status: 409, error: { message: 'tag rule "r1" still applies tag "billing"' } })),
         });
         const c = fixture.componentInstance;
         await c.remove();

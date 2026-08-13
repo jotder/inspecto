@@ -15,7 +15,12 @@ import { AttributeSpec } from './attribute-spec';
  */
 export const OUTPUT_ATTRIBUTES: AttributeSpec[] = [
     {
-        key: 'format', label: 'Output format', type: 'select', tier: 'required', required: false, default: 'CSV',
+        key: 'format',
+        label: 'Output format',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'CSV',
         options: [
             { value: 'CSV', label: 'CSV' },
             { value: 'PARQUET', label: 'Parquet' },
@@ -23,7 +28,11 @@ export const OUTPUT_ATTRIBUTES: AttributeSpec[] = [
         help: 'Stage-1 output file format; absent = CSV (the engine default).',
     },
     {
-        key: 'compression', label: 'Compression', type: 'string', tier: 'optional',
-        placeholder: 'snappy', help: 'Codec for the output (e.g. snappy / zstd / gzip); blank = format default.',
+        key: 'compression',
+        label: 'Compression',
+        type: 'string',
+        tier: 'optional',
+        placeholder: 'snappy',
+        help: 'Codec for the output (e.g. snappy / zstd / gzip); blank = format default.',
     },
 ];

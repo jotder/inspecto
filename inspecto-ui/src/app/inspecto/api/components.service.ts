@@ -10,7 +10,22 @@ import { Finding } from './models';
  *  keep this union in lockstep with `WRITABLE_TYPES`, since a kind the server does not know 400s on every
  *  list/create/remove (that is exactly how `rule-template` stayed broken; the mock served it regardless).
  *  None of the extras are in {@link COMPONENT_TYPES} (not flow-node palette components). */
-export type ComponentType = 'grammar' | 'schema' | 'mapping' | 'transform' | 'sink' | 'rule-template' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'requirement' | 'reconciliation' | 'link-analysis-view' | 'geo-map-view' | 'pattern-pack';
+export type ComponentType =
+    | 'grammar'
+    | 'schema'
+    | 'mapping'
+    | 'transform'
+    | 'sink'
+    | 'rule-template'
+    | 'dataset'
+    | 'query'
+    | 'widget'
+    | 'dashboard'
+    | 'requirement'
+    | 'reconciliation'
+    | 'link-analysis-view'
+    | 'geo-map-view'
+    | 'pattern-pack';
 
 /** The component kinds, in palette order, for the list/editor. `schema`/`mapping` open the S5 grid
  *  editors (schema saves through the gated `/config/write`, never this service's CRUD). */
@@ -147,17 +162,23 @@ export class ComponentsService {
     /** Restore an archived version as the current component (write-root gated). Returns the restored component. */
     restore(type: ComponentType, id: string, version: number): Observable<ComponentDef> {
         return this.http.post<ComponentDef>(
-            apiUrl(`/components/${type}/${encodeURIComponent(id)}/versions/${version}/restore`), {});
+            apiUrl(`/components/${type}/${encodeURIComponent(id)}/versions/${version}/restore`),
+            {},
+        );
     }
 
     /** Parse raw `sampleText` with a grammar's dialect (scratch-only). */
     testGrammar(id: string, sampleText: string): Observable<GrammarPreview> {
-        return this.http.post<GrammarPreview>(apiUrl(`/components/grammar/${encodeURIComponent(id)}/test`), { sampleText });
+        return this.http.post<GrammarPreview>(apiUrl(`/components/grammar/${encodeURIComponent(id)}/test`), {
+            sampleText,
+        });
     }
 
     /** Run a transform over sample rows through the production RowShaper (scratch-only). */
     testTransform(id: string, sampleRows: Record<string, unknown>[]): Observable<RelationsPreview> {
-        return this.http.post<RelationsPreview>(apiUrl(`/components/transform/${encodeURIComponent(id)}/test`), { sampleRows });
+        return this.http.post<RelationsPreview>(apiUrl(`/components/transform/${encodeURIComponent(id)}/test`), {
+            sampleRows,
+        });
     }
 
     /** Scratch-validate a sink against sample rows (store/format/partition checks; no write). */
@@ -174,5 +195,4 @@ export class ComponentsService {
     validateMapping(rules: Record<string, unknown>[]): Observable<MappingValidation> {
         return this.http.post<MappingValidation>(apiUrl('/components/mapping/validate'), { rules });
     }
-
 }

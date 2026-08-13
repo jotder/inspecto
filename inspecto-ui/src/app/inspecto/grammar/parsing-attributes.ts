@@ -27,19 +27,73 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
     switch (frontend) {
         case 'delimited':
             return [
-                { key: 'delimited__delimiter', label: 'Delimiter', type: 'string', tier: 'required', required: false, default: ',', placeholder: ',' },
-                { key: 'delimited__has_header', label: 'First line is a header', type: 'boolean', tier: 'required', required: false, default: true },
-                { key: 'delimited__skip_header_lines', label: 'Skip leading lines', type: 'number', tier: 'optional', min: 0, help: 'Banner/preamble lines before the data (and header).' },
-                { key: 'delimited__null_strings', label: 'Null strings', type: 'string', tier: 'advanced', placeholder: 'NULL,N/A', help: 'Values read as NULL; comma-separate multiple.' },
+                {
+                    key: 'delimited__delimiter',
+                    label: 'Delimiter',
+                    type: 'string',
+                    tier: 'required',
+                    required: false,
+                    default: ',',
+                    placeholder: ',',
+                },
+                {
+                    key: 'delimited__has_header',
+                    label: 'First line is a header',
+                    type: 'boolean',
+                    tier: 'required',
+                    required: false,
+                    default: true,
+                },
+                {
+                    key: 'delimited__skip_header_lines',
+                    label: 'Skip leading lines',
+                    type: 'number',
+                    tier: 'optional',
+                    min: 0,
+                    help: 'Banner/preamble lines before the data (and header).',
+                },
+                {
+                    key: 'delimited__null_strings',
+                    label: 'Null strings',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'NULL,N/A',
+                    help: 'Values read as NULL; comma-separate multiple.',
+                },
                 { key: 'encoding', label: 'Encoding', type: 'string', tier: 'advanced', placeholder: 'UTF-8' },
-                { key: 'compression', label: 'Input compression', type: 'string', tier: 'advanced', placeholder: 'gzip' },
+                {
+                    key: 'compression',
+                    label: 'Input compression',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'gzip',
+                },
             ];
         case 'fixedwidth':
             return [
-                { key: 'delimited__has_header', label: 'First line is a header', type: 'boolean', tier: 'required', required: false, default: true, help: 'Header/banner line to skip before the records.' },
-                { key: 'fixedwidth__min_record_length', label: 'Minimum record length', type: 'number', tier: 'optional', min: 0, help: 'Shorter lines (footers, blanks) are dropped. Blank = the widest field end.' },
                 {
-                    key: 'fixedwidth__trim', label: 'Trim fields', type: 'select', tier: 'optional', default: 'BOTH',
+                    key: 'delimited__has_header',
+                    label: 'First line is a header',
+                    type: 'boolean',
+                    tier: 'required',
+                    required: false,
+                    default: true,
+                    help: 'Header/banner line to skip before the records.',
+                },
+                {
+                    key: 'fixedwidth__min_record_length',
+                    label: 'Minimum record length',
+                    type: 'number',
+                    tier: 'optional',
+                    min: 0,
+                    help: 'Shorter lines (footers, blanks) are dropped. Blank = the widest field end.',
+                },
+                {
+                    key: 'fixedwidth__trim',
+                    label: 'Trim fields',
+                    type: 'select',
+                    tier: 'optional',
+                    default: 'BOTH',
                     options: [
                         { value: 'BOTH', label: 'Both sides' },
                         { value: 'LEFT', label: 'Left' },
@@ -48,12 +102,23 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     ],
                 },
                 { key: 'encoding', label: 'Encoding', type: 'string', tier: 'advanced', placeholder: 'UTF-8' },
-                { key: 'compression', label: 'Input compression', type: 'string', tier: 'advanced', placeholder: 'gzip' },
+                {
+                    key: 'compression',
+                    label: 'Input compression',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'gzip',
+                },
             ];
         case 'json':
             return [
                 {
-                    key: 'json__format', label: 'Document shape', type: 'select', tier: 'required', required: false, default: 'newline',
+                    key: 'json__format',
+                    label: 'Document shape',
+                    type: 'select',
+                    tier: 'required',
+                    required: false,
+                    default: 'newline',
                     options: [
                         { value: 'newline', label: 'NDJSON — one object per line' },
                         { value: 'array', label: 'One JSON array of records' },
@@ -61,8 +126,12 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     ],
                 },
                 {
-                    key: 'json__records_path', label: 'Records path', type: 'string', tier: 'optional',
-                    default: '$', placeholder: 'payload.records',
+                    key: 'json__records_path',
+                    label: 'Records path',
+                    type: 'string',
+                    tier: 'optional',
+                    default: '$',
+                    placeholder: 'payload.records',
                     // Hidden for NDJSON on purpose: `parseJson` HARD-FAILS a nested path under
                     // `format: newline` (each line is already a record, so there is no enclosing
                     // document to walk). Offering the field there would author a config the parser
@@ -70,17 +139,38 @@ export function parsingAttributesFor(frontend: ParsingFrontend): AttributeSpec[]
                     dependsOn: { key: 'json__format', notEquals: 'newline' },
                     help: 'Dotted path to the array holding the records — same notation as a field selector. Blank or "$" = the whole document.',
                 },
-                { key: 'delimited__skip_header_lines', label: 'Skip leading lines', type: 'number', tier: 'advanced', min: 0 },
-                { key: 'compression', label: 'Input compression', type: 'string', tier: 'advanced', placeholder: 'gzip' },
+                {
+                    key: 'delimited__skip_header_lines',
+                    label: 'Skip leading lines',
+                    type: 'number',
+                    tier: 'advanced',
+                    min: 0,
+                },
+                {
+                    key: 'compression',
+                    label: 'Input compression',
+                    type: 'string',
+                    tier: 'advanced',
+                    placeholder: 'gzip',
+                },
             ];
         case 'text_regex':
             return [
                 {
-                    key: 'text_regex__pattern', label: 'Pattern', type: 'string', tier: 'required',
+                    key: 'text_regex__pattern',
+                    label: 'Pattern',
+                    type: 'string',
+                    tier: 'required',
                     placeholder: '(?P<level>[A-Z]+) (?P<msg>.+)',
                     help: 'At least one named capture group — group names become the columns. Non-matching lines are dropped.',
                 },
-                { key: 'delimited__skip_header_lines', label: 'Skip leading lines', type: 'number', tier: 'advanced', min: 0 },
+                {
+                    key: 'delimited__skip_header_lines',
+                    label: 'Skip leading lines',
+                    type: 'number',
+                    tier: 'advanced',
+                    min: 0,
+                },
                 { key: 'encoding', label: 'Encoding', type: 'string', tier: 'advanced', placeholder: 'UTF-8' },
             ];
     }

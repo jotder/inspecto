@@ -40,7 +40,9 @@ describe('ChannelFormDialog', () => {
         const { c, save } = create({});
         c.schemaForm.form.patchValue({ id: 'hook', kind: 'WEBHOOK', targetUrl: 'https://h.example.com/x' });
         c.save();
-        expect(save).toHaveBeenCalledWith(expect.objectContaining({ kind: 'WEBHOOK', target: 'https://h.example.com/x' }));
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: 'WEBHOOK', target: 'https://h.example.com/x' }),
+        );
     });
 
     it('blocks a duplicate id inline on create (case-insensitive)', () => {

@@ -16,46 +16,82 @@ import { AccessGrant, AccessNode } from '../api/access.service';
  * (denying it on one pane while the same capability drives three would lie).
  */
 export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
-    'workbench-group': [{
-        id: 'workbench.author', kind: 'action', capability: 'canAuthorWorkbench',
-        label: 'Author Workbench content (create / edit / delete)',
-    }],
-    runs: [{
-        id: 'runs.operate', kind: 'action', capability: 'canOperateRuns',
-        label: 'Operate runs (trigger / pause / resume / reprocess)',
-    }],
-    requirements: [{
-        id: 'requirements.triage', kind: 'action', capability: 'canTriageRequirements',
-        label: 'Triage requirements (accept / reject / deliver)',
-    }],
-    alerts: [{
-        id: 'alerts.author', kind: 'action', capability: 'canAuthorAlertRules',
-        label: 'Author alert rules',
-    }],
-    catalog: [{
-        id: 'exchange.offer', kind: 'action', capability: 'canOfferDatasets',
-        label: 'Offer datasets and widgets for sharing',
-    }, {
-        id: 'exchange.approve', kind: 'action', capability: 'canApproveShares',
-        label: 'Decide share requests (approve / deny / revoke)',
-    }, {
-        id: 'exchange.request', kind: 'action', capability: 'canRequestShares',
-        label: 'Request access to another space’s offer',
-    }],
-    settings: [{
-        id: 'access.configure', kind: 'action', capability: 'canConfigureAccess',
-        label: 'Configure lens access',
-    }, {
-        id: 'menus.curate', kind: 'action', capability: 'canCurateMenus',
-        label: 'Curate the space menu tree',
-    }, {
-        // Grafted here since Connections moved out of Workbench into a Settings section (2026-07-28).
-        // ⚠ An action node is keyed by the NAV id it hangs under, so a pane that stops being a nav
-        // item takes its capability out of the catalog with it — `canOnboardConnections` would
-        // silently become unconfigurable. Re-home the action whenever a pane moves.
-        id: 'connections.onboard', kind: 'action', capability: 'canOnboardConnections',
-        label: 'Onboard connections (create / edit / delete)',
-    }],
+    'workbench-group': [
+        {
+            id: 'workbench.author',
+            kind: 'action',
+            capability: 'canAuthorWorkbench',
+            label: 'Author Workbench content (create / edit / delete)',
+        },
+    ],
+    runs: [
+        {
+            id: 'runs.operate',
+            kind: 'action',
+            capability: 'canOperateRuns',
+            label: 'Operate runs (trigger / pause / resume / reprocess)',
+        },
+    ],
+    requirements: [
+        {
+            id: 'requirements.triage',
+            kind: 'action',
+            capability: 'canTriageRequirements',
+            label: 'Triage requirements (accept / reject / deliver)',
+        },
+    ],
+    alerts: [
+        {
+            id: 'alerts.author',
+            kind: 'action',
+            capability: 'canAuthorAlertRules',
+            label: 'Author alert rules',
+        },
+    ],
+    catalog: [
+        {
+            id: 'exchange.offer',
+            kind: 'action',
+            capability: 'canOfferDatasets',
+            label: 'Offer datasets and widgets for sharing',
+        },
+        {
+            id: 'exchange.approve',
+            kind: 'action',
+            capability: 'canApproveShares',
+            label: 'Decide share requests (approve / deny / revoke)',
+        },
+        {
+            id: 'exchange.request',
+            kind: 'action',
+            capability: 'canRequestShares',
+            label: 'Request access to another space’s offer',
+        },
+    ],
+    settings: [
+        {
+            id: 'access.configure',
+            kind: 'action',
+            capability: 'canConfigureAccess',
+            label: 'Configure lens access',
+        },
+        {
+            id: 'menus.curate',
+            kind: 'action',
+            capability: 'canCurateMenus',
+            label: 'Curate the space menu tree',
+        },
+        {
+            // Grafted here since Connections moved out of Workbench into a Settings section (2026-07-28).
+            // ⚠ An action node is keyed by the NAV id it hangs under, so a pane that stops being a nav
+            // item takes its capability out of the catalog with it — `canOnboardConnections` would
+            // silently become unconfigurable. Re-home the action whenever a pane moves.
+            id: 'connections.onboard',
+            kind: 'action',
+            capability: 'canOnboardConnections',
+            label: 'Onboard connections (create / edit / delete)',
+        },
+    ],
 };
 
 /**
@@ -119,8 +155,7 @@ export interface GrantState {
 }
 
 /** Walk self → root; the first explicit grant wins; no explicit ancestor = allow (today's behavior). */
-export function resolveGrant(
-    nodeId: string, grants: Record<string, AccessGrant>, idx: CatalogIndex): GrantState {
+export function resolveGrant(nodeId: string, grants: Record<string, AccessGrant>, idx: CatalogIndex): GrantState {
     const explicit = grants[nodeId] ?? null;
     let cursor: string | null = nodeId;
     while (cursor !== null) {
@@ -139,7 +174,10 @@ export function resolveGrant(
  * missing profile leaves the sidebar byte-identical.
  */
 export function filterNavByAccess(
-    items: GammaNavigationItem[], grants: Record<string, AccessGrant>, idx: CatalogIndex): GammaNavigationItem[] {
+    items: GammaNavigationItem[],
+    grants: Record<string, AccessGrant>,
+    idx: CatalogIndex,
+): GammaNavigationItem[] {
     if (!Object.keys(grants).length) return items;
     const keep = (item: GammaNavigationItem): GammaNavigationItem | null => {
         if (item.id && idx.byId.has(item.id) && resolveGrant(item.id, grants, idx).effective === 'deny') {

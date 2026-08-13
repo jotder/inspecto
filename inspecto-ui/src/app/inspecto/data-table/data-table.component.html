@@ -1,14 +1,25 @@
 @if (hasToolbar()) {
     <div class="mb-2 flex flex-wrap items-center gap-1">
         @if (showSearch()) {
-            <button mat-icon-button type="button" (click)="toggleSearch()" [class.text-primary]="searchOpen()"
-                    matTooltip="Search rows" aria-label="Search rows">
+            <button
+                mat-icon-button
+                type="button"
+                (click)="toggleSearch()"
+                [class.text-primary]="searchOpen()"
+                matTooltip="Search rows"
+                aria-label="Search rows"
+            >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
             </button>
             @if (searchOpen()) {
                 <mat-form-field subscriptSizing="dynamic" class="w-56">
-                    <input matInput [value]="search()" (input)="search.set($any($event.target).value)"
-                           placeholder="Search rows" aria-label="Search rows" />
+                    <input
+                        matInput
+                        [value]="search()"
+                        (input)="search.set($any($event.target).value)"
+                        placeholder="Search rows"
+                        aria-label="Search rows"
+                    />
                 </mat-form-field>
             }
         }
@@ -27,26 +38,48 @@
         }
 
         @if (canQuery()) {
-            <button mat-icon-button type="button" (click)="toggleSql()" [class.text-primary]="sqlOpen()"
-                    matTooltip="SQL editor" aria-label="SQL editor">
+            <button
+                mat-icon-button
+                type="button"
+                (click)="toggleSql()"
+                [class.text-primary]="sqlOpen()"
+                matTooltip="SQL editor"
+                aria-label="SQL editor"
+            >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:command-line"></mat-icon>
             </button>
-            <button mat-icon-button type="button" (click)="toggleFilter()" [class.text-primary]="filterOpen()"
-                    matTooltip="Filter builder" aria-label="Filter builder">
+            <button
+                mat-icon-button
+                type="button"
+                (click)="toggleFilter()"
+                [class.text-primary]="filterOpen()"
+                matTooltip="Filter builder"
+                aria-label="Filter builder"
+            >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:funnel"></mat-icon>
             </button>
         }
 
         @if (showSave()) {
-            <button mat-icon-button type="button" (click)="onSaveRule()"
-                    matTooltip="Save as rule" aria-label="Save query as a rule template">
+            <button
+                mat-icon-button
+                type="button"
+                (click)="onSaveRule()"
+                matTooltip="Save as rule"
+                aria-label="Save query as a rule template"
+            >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:bookmark-square"></mat-icon>
             </button>
         }
 
         @if (showExport()) {
-            <button mat-icon-button type="button" (click)="exportCsv()"
-                    matTooltip="Export CSV" aria-label="Export rows to CSV">
+            <button
+                mat-icon-button
+                type="button"
+                (click)="exportCsv()"
+                matTooltip="Export CSV"
+                aria-label="Export rows to CSV"
+            >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
             </button>
         }
@@ -85,14 +118,25 @@
                     (changed)="onWhereChanged()"
                 />
                 <div class="mt-2 flex items-center gap-2">
-                    <button mat-flat-button color="primary" type="button" (click)="onRunSql(currentSql())"
-                            [disabled]="running()" matTooltip="Run over the loaded rows">
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        type="button"
+                        (click)="onRunSql(currentSql())"
+                        [disabled]="running()"
+                        matTooltip="Run over the loaded rows"
+                    >
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
                         <span class="ml-1">Run</span>
                     </button>
                     @if (serverRun()) {
-                        <button mat-stroked-button type="button" (click)="onRunSqlBackend(currentSql())"
-                                [disabled]="running()" matTooltip="Run on the server over the full dataset">
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            (click)="onRunSqlBackend(currentSql())"
+                            [disabled]="running()"
+                            matTooltip="Run on the server over the full dataset"
+                        >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:circle-stack"></mat-icon>
                             <span class="ml-1">Run on server</span>
                         </button>

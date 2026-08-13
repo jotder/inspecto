@@ -49,7 +49,10 @@ function matchCondition(c: Condition, row: Record<string, unknown>, cols: Column
         case 'endsWith':
             return s.endsWith((c.value ?? '').toLowerCase());
         case 'in': {
-            const items = (c.value ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+            const items = (c.value ?? '')
+                .split(',')
+                .map((x) => x.trim())
+                .filter(Boolean);
             return items.some((x) => cmp(raw, x, t) === 0);
         }
         case 'between':

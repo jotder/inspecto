@@ -47,7 +47,7 @@ export function decisionRulesHandler(flags: MockFlags): MockHandler {
         if (method === 'POST' && (m = match(url, SIMULATE))) {
             const rule = store.get<MockDecisionRule>(space, DECISION_RULES_COLL, m[1]);
             if (!rule) return error(404, `decision rule ${m[1]} not found`);
-            const sampleRows = (((req.body ?? {}) as { sampleRows?: Record<string, unknown>[] }).sampleRows) ?? [];
+            const sampleRows = ((req.body ?? {}) as { sampleRows?: Record<string, unknown>[] }).sampleRows ?? [];
             const sim: DecisionSimulation = sampleRows.length
                 ? {
                       matched: evaluateRows(
@@ -72,9 +72,16 @@ export function decisionRulesHandler(flags: MockFlags): MockHandler {
             const b = (req.body ?? {}) as Partial<MockDecisionRule>;
             if (!b.name) return error(422, 'name is required');
             if (!b.consequences?.length) return error(422, 'at least one consequence is required');
-            if (store.get(space, DECISION_RULES_COLL, b.name)) return error(409, `decision rule "${b.name}" already exists`);
+            if (store.get(space, DECISION_RULES_COLL, b.name))
+                return error(409, `decision rule "${b.name}" already exists`);
             const now = Date.now();
-            const rule: MockDecisionRule = { ...normalize(b), name: b.name, lastSimulation: null, createdAt: now, updatedAt: now };
+            const rule: MockDecisionRule = {
+                ...normalize(b),
+                name: b.name,
+                lastSimulation: null,
+                createdAt: now,
+                updatedAt: now,
+            };
             return json(store.put(space, DECISION_RULES_COLL, rule.name, rule));
         }
         if (method === 'PUT' && (m = match(url, ONE))) {
@@ -96,7 +103,9 @@ export function decisionRulesHandler(flags: MockFlags): MockHandler {
 }
 
 /** Clamp an upsert body to the model's own fields. */
-function normalize(b: Partial<MockDecisionRule>): Omit<MockDecisionRule, 'name' | 'lastSimulation' | 'createdAt' | 'updatedAt'> {
+function normalize(
+    b: Partial<MockDecisionRule>,
+): Omit<MockDecisionRule, 'name' | 'lastSimulation' | 'createdAt' | 'updatedAt'> {
     return {
         description: b.description ?? '',
         targetType: b.targetType === 'job' ? 'job' : 'pipeline',

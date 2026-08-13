@@ -37,8 +37,8 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
                         Build your own menus and place reports under them for business users. These appear in the
                         sidebar alongside the platform navigation; the platform menus themselves aren’t changed.
                     } @else {
-                        The menus curated for this space. Star the reports you use most to pin them to the top of
-                        your sidebar — your favorites are personal and visible only to you.
+                        The menus curated for this space. Star the reports you use most to pin them to the top of your
+                        sidebar — your favorites are personal and visible only to you.
                     }
                 </p>
             </div>

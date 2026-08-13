@@ -3,8 +3,8 @@
     <div class="bg-card flex flex-col border-b p-6 sm:px-10 sm:py-8 dark:bg-transparent">
         <h1 class="text-3xl font-extrabold leading-none tracking-tight">Design System</h1>
         <div class="text-secondary mt-1.5">
-            Living reference for the shared Inspecto UI patterns. Reuse these instead of re-rolling status
-            colors, empty states, skeletons, grids or forms — the
+            Living reference for the shared Inspecto UI patterns. Reuse these instead of re-rolling status colors, empty
+            states, skeletons, grids or forms — the
             <code>npm run lint:tokens</code> guard enforces it in CI.
         </div>
     </div>
@@ -21,8 +21,8 @@
             </div>
             <p class="text-secondary mb-4 text-sm">
                 Single source of truth for status / severity / level colors
-                (<code>inspecto/components/status-badge.component.ts</code>). Maps any token to one of five
-                AA-contrast tones in both schemes.
+                (<code>inspecto/components/status-badge.component.ts</code>). Maps any token to one of five AA-contrast
+                tones in both schemes.
             </p>
 
             <div class="bg-card rounded-2xl p-6 shadow">
@@ -40,7 +40,9 @@
                 </div>
             </div>
 
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.badge }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.badge }}</code></pre>
         </section>
 
         <!-- ── Chip ─────────────────────────────────────────────────────────────────────── -->
@@ -53,12 +55,13 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-chip&gt;</code> — the shared tag / token / filter pill (widget tags &
-                type/tag toggles, the events correlation filter, glob patterns, query tokens). Two
-                <code>variant</code>s (<code>outline</code> / <code>soft</code>) × two
-                <code>tone</code>s (<code>neutral</code> / <code>primary</code>), with an optional
-                <code>removable</code> ✕. Content is projected — drop a <code>&lt;mat-icon&gt;</code> or
-                mono span inside.
+                <code>&lt;inspecto-chip&gt;</code> — the shared tag / token / filter pill (widget tags & type/tag
+                toggles, the events correlation filter, glob patterns, query tokens). Two <code>variant</code>s (<code
+                    >outline</code
+                >
+                / <code>soft</code>) × two <code>tone</code>s (<code>neutral</code> / <code>primary</code>), with an
+                optional <code>removable</code> ✕. Content is projected — drop a <code>&lt;mat-icon&gt;</code> or mono
+                span inside.
             </p>
             <div class="bg-card flex flex-col gap-4 rounded-2xl p-6 shadow">
                 <div class="flex flex-wrap items-center gap-2">
@@ -71,7 +74,9 @@
                     </inspecto-chip>
                 </div>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.chip }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.chip }}</code></pre>
         </section>
 
         <!-- ── Alert / banner ───────────────────────────────────────────────────────────── -->
@@ -83,6 +88,10 @@
                     <span class="ml-1">Copy snippet</span>
                 </button>
             </div>
+            <!-- prettier-ignore: keeps `bg-amber-100` and its `ds-allow` comment on one physical line —
+                 the lint:tokens guard checks per SOURCE line, and prettier's prose reflow would otherwise
+                 split them apart again on the next `--write` (it did once already). -->
+            <!-- prettier-ignore -->
             <p class="text-secondary mb-4 text-sm">
                 <code>&lt;inspecto-alert&gt;</code> for inline, per-screen notices (writes disabled, feature
                 unavailable, jar missing) — instead of re-rolling <code>bg-amber-100 …</code> boxes. The <!-- ds-allow: prose, not a real class -->
@@ -97,7 +106,9 @@
                 <inspecto-alert variant="error">Something failed and needs attention.</inspecto-alert>
                 <inspecto-alert variant="success">The operation completed.</inspecto-alert>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.alert }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.alert }}</code></pre>
         </section>
 
         <!-- ── Empty state ──────────────────────────────────────────────────────────────── -->
@@ -110,8 +121,8 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-empty-state&gt;</code> for "nothing here yet" / recoverable-error
-                placeholders — instead of ad-hoc dashed boxes.
+                <code>&lt;inspecto-empty-state&gt;</code> for "nothing here yet" / recoverable-error placeholders —
+                instead of ad-hoc dashed boxes.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <inspecto-empty-state
@@ -122,7 +133,9 @@
                     (action)="copy('refresh()')"
                 ></inspecto-empty-state>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.empty }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.empty }}</code></pre>
         </section>
 
         <!-- ── Skeleton ─────────────────────────────────────────────────────────────────── -->
@@ -135,8 +148,8 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-skeleton&gt;</code> shaped like the real layout for page / card / form
-                loading. Grids use ag-Grid <code>[loading]</code> instead.
+                <code>&lt;inspecto-skeleton&gt;</code> shaped like the real layout for page / card / form loading. Grids
+                use ag-Grid <code>[loading]</code> instead.
             </p>
             <div class="bg-card grid gap-8 rounded-2xl p-6 shadow sm:grid-cols-3">
                 <div>
@@ -152,7 +165,9 @@
                     <inspecto-skeleton height="6rem" />
                 </div>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.skeleton }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.skeleton }}</code></pre>
         </section>
 
         <!-- ── Grid / table ─────────────────────────────────────────────────────────────── -->
@@ -173,8 +188,8 @@
             <p class="text-secondary mb-4 text-sm">
                 Shared ag-Grid theme (<code>InspectoGridThemeService</code>, gamma tokens),
                 <code>INSPECTO_DEFAULT_COL_DEF</code>, <code>actionsColumn</code>, status via
-                <code>statusBadgeHtml</code>, and the <code>noRowsOverlay</code> empty state. Toggle "Show
-                empty" to see the overlay.
+                <code>statusBadgeHtml</code>, and the <code>noRowsOverlay</code> empty state. Toggle "Show empty" to see
+                the overlay.
             </p>
             <div class="bg-card rounded-2xl p-2 shadow">
                 <ag-grid-angular
@@ -188,7 +203,9 @@
                     (rowDataUpdated)="refreshActions($event)"
                 ></ag-grid-angular>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.grid }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.grid }}</code></pre>
         </section>
 
         <!-- ── Reactive form + inline mat-error ─────────────────────────────────────────── -->
@@ -201,9 +218,8 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                Reactive forms with inline <code>&lt;mat-error&gt;</code> and
-                <code>markAllAsTouched()</code> on invalid submit. Submit empty or with a bad character to see
-                the errors.
+                Reactive forms with inline <code>&lt;mat-error&gt;</code> and <code>markAllAsTouched()</code> on invalid
+                submit. Submit empty or with a bad character to see the errors.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <form [formGroup]="form" (ngSubmit)="submitForm()" class="flex flex-wrap items-start gap-3">
@@ -220,7 +236,9 @@
                     <button mat-flat-button color="primary" class="mt-1" type="submit">Validate</button>
                 </form>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.form }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.form }}</code></pre>
         </section>
 
         <!-- ── Schema-driven form (AttributeSpec → 3-tier disclosure) ────────────────────── -->
@@ -233,14 +251,13 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-schema-form&gt;</code> renders a Component Type's
-                <code>AttributeSpec[]</code> with the platform's three-tier disclosure: required fields up
-                front, optional collapsed, advanced behind the gear. <code>dependsOn</code> attributes show
-                (and validate) only while their controller matches — switch the protocol to see the Host
-                field appear and disappear. Prefer this over a hand-built form whenever the fields are
-                plain config attributes. <strong>As of date</strong> carries a
-                <code>[tokens]</code> picker: choosing one replaces the field's <em>whole</em> value, and
-                <code>[tokenSyntax]</code> exempts it from the field's date <code>pattern</code>.
+                <code>&lt;inspecto-schema-form&gt;</code> renders a Component Type's <code>AttributeSpec[]</code> with
+                the platform's three-tier disclosure: required fields up front, optional collapsed, advanced behind the
+                gear. <code>dependsOn</code> attributes show (and validate) only while their controller matches — switch
+                the protocol to see the Host field appear and disappear. Prefer this over a hand-built form whenever the
+                fields are plain config attributes. <strong>As of date</strong> carries a <code>[tokens]</code> picker:
+                choosing one replaces the field's <em>whole</em> value, and <code>[tokenSyntax]</code> exempts it from
+                the field's date <code>pattern</code>.
             </p>
             <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
                 <inspecto-schema-form
@@ -249,7 +266,9 @@
                     [tokenSyntax]="tokenSyntax"
                 ></inspecto-schema-form>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.schemaForm }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.schemaForm }}</code></pre>
         </section>
 
         <!-- ── Resizable dialog ([inspectoDialogResize]) ─────────────────────────────────── -->
@@ -263,14 +282,13 @@
             </div>
             <p class="text-secondary mb-4 text-sm">
                 <code>[inspectoDialogResize]</code>
-                (<code>inspecto/components/dialog-resize.directive.ts</code>) — the shared
-                resizable / maximizable dialog chrome, extracted from the grammar dialog so every dialog
-                resizes the same way. Put the attribute on the dialog title: it appends a drag grip to the
-                bottom-right corner (pointer drag, or arrow keys when focused), and big dialogs add a
-                maximize button calling <code>chrome.toggleMaximize()</code> — which reuses the existing
-                <code>.dialog-fullscreen</code> panel class. Once sized, the content flexes into the chosen
-                size instead of scrolling. Adopters: the Grammar editor and the Pipelines node-config
-                dialog. Never re-roll a per-dialog fullscreen toggle.
+                (<code>inspecto/components/dialog-resize.directive.ts</code>) — the shared resizable / maximizable
+                dialog chrome, extracted from the grammar dialog so every dialog resizes the same way. Put the attribute
+                on the dialog title: it appends a drag grip to the bottom-right corner (pointer drag, or arrow keys when
+                focused), and big dialogs add a maximize button calling <code>chrome.toggleMaximize()</code> — which
+                reuses the existing <code>.dialog-fullscreen</code> panel class. Once sized, the content flexes into the
+                chosen size instead of scrolling. Adopters: the Grammar editor and the Pipelines node-config dialog.
+                Never re-roll a per-dialog fullscreen toggle.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <button mat-flat-button color="primary" (click)="openResizeDemo()">
@@ -278,7 +296,9 @@
                     <span class="ml-1">Open sample dialog</span>
                 </button>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.dialogResize }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.dialogResize }}</code></pre>
         </section>
 
         <!-- ── Definition drawer (definition-surface P1) ─────────────────────────────────── -->
@@ -292,14 +312,13 @@
             </div>
             <p class="text-secondary mb-4 text-sm">
                 <code>&lt;inspecto-definition-drawer&gt;</code>
-                (<code>inspecto/components/definition-drawer.component.ts</code>) — the shared shell for
-                defining one pipeline object in an editor's right dock: title + kind header, an
+                (<code>inspecto/components/definition-drawer.component.ts</code>) — the shared shell for defining one
+                pipeline object in an editor's right dock: title + kind header, an
                 <em>unapplied</em> badge, projected definition content, and an Apply/Discard footer.
-                <b>Apply is always an in-memory patch</b> — persistence belongs to the host's toolbar Save
-                (one save path, definition-surface D2). A dirty close confirms first; the shell owns that
-                guard. Non-modal by design: it is a dock resized by the host's
-                <code>[inspectoSplit]</code> handle, never an overlay. Adopter: the Pipelines editor's
-                Collector definition.
+                <b>Apply is always an in-memory patch</b> — persistence belongs to the host's toolbar Save (one save
+                path, definition-surface D2). A dirty close confirms first; the shell owns that guard. Non-modal by
+                design: it is a dock resized by the host's <code>[inspectoSplit]</code> handle, never an overlay.
+                Adopter: the Pipelines editor's Collector definition.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="h-72 max-w-sm overflow-hidden rounded-lg border" style="border-color: var(--gamma-border)">
@@ -320,7 +339,9 @@
                     </inspecto-definition-drawer>
                 </div>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.definitionDrawer }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.definitionDrawer }}</code></pre>
         </section>
 
         <!-- ── Inline AI assist (AGT-6a A1) ──────────────────────────────────────────────── -->
@@ -333,14 +354,14 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-ai-assist&gt;</code> is the ONE inline authoring surface — panes adopt it,
-                never fork it. The pane names a non-mutating agent tool and passes its own context as the
-                tool's <code>args</code>, so the operator never re-states what the screen already knows. The
-                surface renders the returned draft with its anchored findings and a diff against the current
-                config; <code>(applyDraft)</code> fires only on an explicit click and <b>the pane</b> does the
-                write through its own validated route — the human is the actor. It persists nothing, the
-                backend refuses mutating tools with 403, and an absent intelligence module degrades to a
-                disabled affordance rather than breaking the pane. Gated on <code>canAuthorWorkbench</code>.
+                <code>&lt;inspecto-ai-assist&gt;</code> is the ONE inline authoring surface — panes adopt it, never fork
+                it. The pane names a non-mutating agent tool and passes its own context as the tool's <code>args</code>,
+                so the operator never re-states what the screen already knows. The surface renders the returned draft
+                with its anchored findings and a diff against the current config; <code>(applyDraft)</code> fires only
+                on an explicit click and <b>the pane</b> does the write through its own validated route — the human is
+                the actor. It persists nothing, the backend refuses mutating tools with 403, and an absent intelligence
+                module degrades to a disabled affordance rather than breaking the pane. Gated on
+                <code>canAuthorWorkbench</code>.
             </p>
             <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
                 <inspecto-ai-assist
@@ -349,7 +370,9 @@
                     label="Suggest expectations"
                 ></inspecto-ai-assist>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.aiAssist }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.aiAssist }}</code></pre>
         </section>
 
         <!-- ── Explain this screen (the read-only half, AGT-6a A4) ───────────────────────── -->
@@ -362,21 +385,22 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-ai-explain&gt;</code> is the read-only sibling of the authoring surface: one
-                icon button for a pane header that answers "what am I looking at" from
-                <code>docs/GLOSSARY.md</code>, the binding vocabulary. The <b>pane declares the terms</b> — a
-                free-text box would make it a docs search engine and would re-state what the screen already
-                knows. It has <b>no write path at all</b> (no draft, no diff, no Apply) and is deliberately
-                <b>not</b> gated on <code>canAuthorWorkbench</code>: a Business-lens user is exactly who needs
-                the vocabulary explained. Everything it renders lives in a dialog, so it cannot disturb the
-                header row it sits in. Backed by the non-mutating <code>glossary_lookup</code>, falling back to
-                <code>docs_search</code> for an undefined term; an absent intelligence module renders an
-                explanation instead of failing.
+                <code>&lt;inspecto-ai-explain&gt;</code> is the read-only sibling of the authoring surface: one icon
+                button for a pane header that answers "what am I looking at" from <code>docs/GLOSSARY.md</code>, the
+                binding vocabulary. The <b>pane declares the terms</b> — a free-text box would make it a docs search
+                engine and would re-state what the screen already knows. It has <b>no write path at all</b> (no draft,
+                no diff, no Apply) and is deliberately <b>not</b> gated on <code>canAuthorWorkbench</code>: a
+                Business-lens user is exactly who needs the vocabulary explained. Everything it renders lives in a
+                dialog, so it cannot disturb the header row it sits in. Backed by the non-mutating
+                <code>glossary_lookup</code>, falling back to <code>docs_search</code> for an undefined term; an absent
+                intelligence module renders an explanation instead of failing.
             </p>
             <div class="bg-card max-w-140 rounded-2xl p-6 shadow">
                 <inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline', 'Step', 'Trigger']" />
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.aiExplain }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.aiExplain }}</code></pre>
         </section>
 
         <!-- ── Data table (mini / standard / pro / pro max) ──────────────────────────────── -->
@@ -389,39 +413,49 @@
                 </button>
             </div>
             <p class="text-secondary mb-4 text-sm">
-                One <code>&lt;inspecto-data-table [tier]&gt;</code> (<code>inspecto/data-table</code>)
-                consolidates every grid. Tiers, like phone versions:
-                <b>mini</b> = the grid;
-                <b>standard</b> = + search · filter · sort · CSV export;
-                <b>pro</b> = + the offline SQL/query editor (projection, nested AND/OR, Advanced SQL);
-                <b>pro max</b> = + save the query as a reusable rule template. The heavy logic lives in
-                framework-free <code>core/</code> (csv · quick-filter · controller) + <code>inspecto/query</code>;
-                the component is a thin shell.
+                One <code>&lt;inspecto-data-table [tier]&gt;</code> (<code>inspecto/data-table</code>) consolidates
+                every grid. Tiers, like phone versions: <b>mini</b> = the grid; <b>standard</b> = + search · filter ·
+                sort · CSV export; <b>pro</b> = + the offline SQL/query editor (projection, nested AND/OR, Advanced
+                SQL); <b>pro max</b> = + save the query as a reusable rule template. The heavy logic lives in
+                framework-free <code>core/</code> (csv · quick-filter · controller) + <code>inspecto/query</code>; the
+                component is a thin shell.
             </p>
             <div class="mb-3">
-                <mat-button-toggle-group [value]="dtTier()" (change)="dtTier.set($event.value)"
-                                         hideSingleSelectionIndicator aria-label="Data-table tier">
+                <mat-button-toggle-group
+                    [value]="dtTier()"
+                    (change)="dtTier.set($event.value)"
+                    hideSingleSelectionIndicator
+                    aria-label="Data-table tier"
+                >
                     @for (t of dtTiers; track t) {
                         <mat-button-toggle [value]="t">{{ t }}</mat-button-toggle>
                     }
                 </mat-button-toggle-group>
             </div>
             <div class="bg-card rounded-2xl p-6 shadow">
-                <inspecto-data-table [tier]="dtTier()" [rows]="querySource.rows" [columns]="cdrColumns" sourceName="cdr_sample" exportName="cdr_sample" />
+                <inspecto-data-table
+                    [tier]="dtTier()"
+                    [rows]="querySource.rows"
+                    [columns]="cdrColumns"
+                    sourceName="cdr_sample"
+                    exportName="cdr_sample"
+                />
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.dataTable }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.dataTable }}</code></pre>
         </section>
 
         <!-- ── Tree table (aligned hierarchy) ───────────────────────────────────────────── -->
         <section>
             <h2 class="mb-3 text-xl font-semibold">Tree table (aligned hierarchy)</h2>
             <p class="text-secondary mb-4 text-sm">
-                <code>&lt;inspecto-tree-table&gt;</code> — an expandable indented hierarchy on the left with
-                aligned value columns on the right (Community ag-Grid; no Enterprise tree-data). One component
-                for breakdown-by-dimensions, multi-entry comparison, N-way reconciliation and file browsing.
-                Cell plugins are ordinary <code>columns</code> ColDefs (here the Δ column uses
-                <code>varianceCell()</code>); <code>[rowActions]</code> adds action icons and
-                <code>[multiSelect]</code> adds checkbox selection. See <code>tree-table-design.md</code>.
+                <code>&lt;inspecto-tree-table&gt;</code> — an expandable indented hierarchy on the left with aligned
+                value columns on the right (Community ag-Grid; no Enterprise tree-data). One component for
+                breakdown-by-dimensions, multi-entry comparison, N-way reconciliation and file browsing. Cell plugins
+                are ordinary <code>columns</code> ColDefs (here the Δ column uses <code>varianceCell()</code>);
+                <code>[rowActions]</code> adds action icons and <code>[multiSelect]</code> adds checkbox selection. See
+                <code>tree-table-design.md</code>.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <inspecto-tree-table
@@ -429,7 +463,8 @@
                     [columns]="treeColumns"
                     treeHeader="Region / Product"
                     [autoHeight]="true"
-                    [groupDefaultExpanded]="1" />
+                    [groupDefaultExpanded]="1"
+                />
             </div>
         </section>
 
@@ -438,25 +473,24 @@
             <h2 class="mb-3 text-xl font-semibold">Graph hosts (AntV G6)</h2>
             <p class="text-secondary mb-4 text-sm">
                 Two patterns for node-graph views — both reuse <code>canvasTheme()</code> +
-                <code>nodeColor/nodeShape</code> (never hardcode canvas colours). See the
-                <code>angular-ui</code> skill §4. Live examples are on the <b>Pipelines</b> pane
-                (Per-pipeline / Combined / Editor toggle) and the <b>Link Analysis</b> studio.
+                <code>nodeColor/nodeShape</code> (never hardcode canvas colours). See the <code>angular-ui</code> skill
+                §4. Live examples are on the <b>Pipelines</b> pane (Per-pipeline / Combined / Editor toggle) and the
+                <b>Link Analysis</b> studio.
             </p>
             <div class="bg-card grid gap-4 rounded-2xl p-6 shadow sm:grid-cols-2">
                 <div>
                     <div class="mb-1 text-sm font-medium">Read-only</div>
                     <p class="text-secondary text-sm">
-                        <code>catalog/graph-view.component</code> — rebuilds the graph on every data / scheme
-                        change. For static visualisations (catalog graph, Pipelines Per-pipeline / Combined).
-                        Opt-in inputs (all default off; hosts stay byte-identical without them):
-                        <code>[fill]</code> grow-to-container, <code>[display]</code> per-kind
-                        colour/shape/pattern/size overrides, <code>[tooltips]</code> hover details,
-                        <code>[emphasis]</code> highlight/dim + community grouping, and <code>[layout]</code> —
-                        11 selectable G6 layouts (<code>GRAPH_LAYOUTS</code>/<code>layoutConfig()</code>; the 3
-                        tree layouts gate on the pure <code>isForest()</code>). Live with all options: the
-                        <b>Link Analysis</b> studio, which pairs it with the pure algorithm library
-                        <code>inspecto/graph/graph-analysis.ts</code> (paths, centrality, LP + Louvain
-                        communities, motif pattern matching).
+                        <code>catalog/graph-view.component</code> — rebuilds the graph on every data / scheme change.
+                        For static visualisations (catalog graph, Pipelines Per-pipeline / Combined). Opt-in inputs (all
+                        default off; hosts stay byte-identical without them): <code>[fill]</code> grow-to-container,
+                        <code>[display]</code> per-kind colour/shape/pattern/size overrides,
+                        <code>[tooltips]</code> hover details, <code>[emphasis]</code> highlight/dim + community
+                        grouping, and <code>[layout]</code> — 11 selectable G6 layouts
+                        (<code>GRAPH_LAYOUTS</code>/<code>layoutConfig()</code>; the 3 tree layouts gate on the pure
+                        <code>isForest()</code>). Live with all options: the <b>Link Analysis</b> studio, which pairs it
+                        with the pure algorithm library <code>inspecto/graph/graph-analysis.ts</code> (paths,
+                        centrality, LP + Louvain communities, motif pattern matching).
                     </p>
                 </div>
                 <div>
@@ -474,33 +508,34 @@
         <section>
             <h2 class="mb-3 text-xl font-semibold">Map host (MapLibre GL)</h2>
             <p class="text-secondary mb-4 text-sm">
-                <code>inspecto/geo/map-view.component</code> — the Geo Map Analysis analog of the
-                read-only graph host: fully <b>offline</b> basemap (slimmed Natural Earth GeoJSON +
-                bundled glyphs under <code>assets/basemap/</code>, no tile server), scheme-aware via
-                <code>theme/map-tokens.ts</code> (the map's <code>chart-tokens</code>), pan/zoom,
-                scale bar, fit-to-data, PNG export. Data plane: <code>GeoData</code> points render
-                as circles; <code>(pointClick)</code> emits the point id. A
-                <code>pmtiles://</code> protocol is pre-registered for customer vector-tile
-                archives (Phase 4).
+                <code>inspecto/geo/map-view.component</code> — the Geo Map Analysis analog of the read-only graph host:
+                fully <b>offline</b> basemap (slimmed Natural Earth GeoJSON + bundled glyphs under
+                <code>assets/basemap/</code>, no tile server), scheme-aware via <code>theme/map-tokens.ts</code> (the
+                map's <code>chart-tokens</code>), pan/zoom, scale bar, fit-to-data, PNG export. Data plane:
+                <code>GeoData</code> points render as circles; <code>(pointClick)</code> emits the point id. A
+                <code>pmtiles://</code> protocol is pre-registered for customer vector-tile archives (Phase 4).
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <inspecto-map-view [data]="mapDemo" />
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.mapView }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.mapView }}</code></pre>
         </section>
 
         <!-- ── Menu favorites (personal client-local overlay) ───────────────────────────── -->
         <section>
             <h2 class="mb-3 text-xl font-semibold">Menu favorites</h2>
             <p class="text-secondary mb-4 text-sm">
-                A <b>personal, client-local</b> overlay (<code>inspecto/menu/menu-favorites.ts</code>,
-                localStorage <code>inspecto.menuFavorites.v1</code> keyed by space) — <b>never</b> PUT to
-                the server, distinct from the authored menu tree. A star toggle on each leaf row
-                (<code>aria-pressed</code>, mirroring the sql-editor favorites idiom) drives a virtual
-                top-of-sidebar “Favorites” group (<code>favoritesNavGroup</code> in
-                <code>menu-nav.ts</code>, prepended by <code>NavigationService</code>): it resolves
-                favorite ids against the current tree, drops stale/deleted leaves, and re-ids children
-                <code>fav-&lt;id&gt;</code> to avoid colliding with their <code>menu-&lt;id&gt;</code> origin.
+                A <b>personal, client-local</b> overlay (<code>inspecto/menu/menu-favorites.ts</code>, localStorage
+                <code>inspecto.menuFavorites.v1</code> keyed by space) — <b>never</b> PUT to the server, distinct from
+                the authored menu tree. A star toggle on each leaf row (<code>aria-pressed</code>, mirroring the
+                sql-editor favorites idiom) drives a virtual top-of-sidebar “Favorites” group (<code
+                    >favoritesNavGroup</code
+                >
+                in <code>menu-nav.ts</code>, prepended by <code>NavigationService</code>): it resolves favorite ids
+                against the current tree, drops stale/deleted leaves, and re-ids children <code>fav-&lt;id&gt;</code> to
+                avoid colliding with their <code>menu-&lt;id&gt;</code> origin.
             </p>
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-2 text-sm font-medium">Leaf rows (click the star to favorite)</div>
@@ -539,7 +574,9 @@
                     }
                 </div>
             </div>
-            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.menuFavorites }}</code></pre>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.menuFavorites }}</code></pre>
         </section>
     </div>
 </div>

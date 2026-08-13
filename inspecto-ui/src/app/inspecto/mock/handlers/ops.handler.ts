@@ -103,16 +103,27 @@ const CLOSING_STATUSES = new Set(['CLOSED', 'ARCHIVED']);
  */
 function defaultFindingsSpec(objectType: string): Record<string, unknown> {
     const dispositions = ['CONFIRMED', 'FALSE_POSITIVE', 'RECOVERED', 'WRITTEN_OFF', 'INCONCLUSIVE'];
-    const section = (key: string, label: string, type: string, options?: { value: string; label: string }[]) =>
-        ({ key, label, type, tier: 'required', required: false, ...(options ? { options } : {}) });
+    const section = (key: string, label: string, type: string, options?: { value: string; label: string }[]) => ({
+        key,
+        label,
+        type,
+        tier: 'required',
+        required: false,
+        ...(options ? { options } : {}),
+    });
     return {
         name: objectType,
         objectType,
         sections: [
-            section('disposition', 'Disposition', 'select', dispositions.map((d) => ({
-                value: d,
-                label: d.charAt(0) + d.slice(1).toLowerCase().replace(/_/g, ' '),
-            }))),
+            section(
+                'disposition',
+                'Disposition',
+                'select',
+                dispositions.map((d) => ({
+                    value: d,
+                    label: d.charAt(0) + d.slice(1).toLowerCase().replace(/_/g, ' '),
+                })),
+            ),
             section('impactAmount', 'Impact amount', 'string'),
             section('recordsAffected', 'Records affected', 'string'),
             section('summary', 'Summary', 'multiline'),
@@ -123,7 +134,8 @@ function defaultFindingsSpec(objectType: string): Record<string, unknown> {
 /** The effective lifecycles (GET /workflows/{type}) — mirrors the backend built-ins (C6). */
 const WORKFLOWS: Record<string, unknown> = {
     INCIDENT: {
-        type: 'INCIDENT', initial: 'IDENTIFIED',
+        type: 'INCIDENT',
+        initial: 'IDENTIFIED',
         states: ['IDENTIFIED', 'ARCHIVED', 'DIAGNOSING', 'RESOLVED'],
         terminal: ['ARCHIVED'],
         transitions: [
@@ -138,7 +150,8 @@ const WORKFLOWS: Record<string, unknown> = {
         ],
     },
     CASE: {
-        type: 'CASE', initial: 'OPEN',
+        type: 'CASE',
+        initial: 'OPEN',
         states: ['OPEN', 'INVESTIGATING', 'ESCALATED', 'RESOLVED', 'CLOSED'],
         terminal: ['CLOSED'],
         transitions: [
@@ -150,7 +163,8 @@ const WORKFLOWS: Record<string, unknown> = {
         ],
     },
     ALERT: {
-        type: 'ALERT', initial: 'OPEN',
+        type: 'ALERT',
+        initial: 'OPEN',
         states: ['OPEN', 'ACKNOWLEDGED', 'RESOLVED'],
         terminal: ['RESOLVED'],
         transitions: [
@@ -184,7 +198,11 @@ export function opsHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && EVENTS_VIEWS.test(url)) return json(store.list(space, EVENT_VIEWS_COLL));
         if (method === 'POST' && EVENTS_VIEWS.test(url)) {
             // The real API takes a FLATTENED body ({name, level, type, …}); tolerate a nested `filters` too.
-            const { name = 'view', filters, ...rest } = (req.body ?? {}) as {
+            const {
+                name = 'view',
+                filters,
+                ...rest
+            } = (req.body ?? {}) as {
                 name?: string;
                 filters?: Record<string, string>;
             } & Record<string, string>;
@@ -268,16 +286,22 @@ export function opsHandler(flags: MockFlags): MockHandler {
             const b = (req.body ?? {}) as Partial<CaseRule>;
             const filter = (b.filter ?? {}) as TagRuleFilter;
             if (!b.name || !b.title) return error(422, 'name and title are required');
-            const hasCriterion = ['type', 'q', 'status', 'priority', 'severity', 'category']
-                .some((k) => (filter as Record<string, string>)[k]);
+            const hasCriterion = ['type', 'q', 'status', 'priority', 'severity', 'category'].some(
+                (k) => (filter as Record<string, string>)[k],
+            );
             if (!hasCriterion) return error(422, 'a case rule needs at least one criterion');
-            return json(store.put(space, CASE_RULES_COLL, b.name, {
-                name: b.name, title: b.title, filter,
-                threshold: b.threshold ?? 2, windowMinutes: b.windowMinutes ?? 1440,
-                ...(b.category ? { category: b.category } : {}),
-                ...(b.tags ? { tags: b.tags } : {}),
-                createdAt: Date.now(),
-            } satisfies CaseRule));
+            return json(
+                store.put(space, CASE_RULES_COLL, b.name, {
+                    name: b.name,
+                    title: b.title,
+                    filter,
+                    threshold: b.threshold ?? 2,
+                    windowMinutes: b.windowMinutes ?? 1440,
+                    ...(b.category ? { category: b.category } : {}),
+                    ...(b.tags ? { tags: b.tags } : {}),
+                    createdAt: Date.now(),
+                } satisfies CaseRule),
+            );
         }
         if (method === 'POST' && (m = match(url, CASE_RULE_EVAL))) {
             const rule = store.get<CaseRule>(space, CASE_RULES_COLL, m[1]);
@@ -296,7 +320,8 @@ export function opsHandler(flags: MockFlags): MockHandler {
             const links = parseLinks(b['links']);
             if (!links.length) return error(422, 'at least one linked entity is required');
             for (const l of links)
-                if (!store.get<OperationalObject>(space, OPS_OBJECTS_COLL, l.to)) return error(422, `target object ${l.to} not found`);
+                if (!store.get<OperationalObject>(space, OPS_OBJECTS_COLL, l.to))
+                    return error(422, `target object ${l.to} not found`);
             const now = Date.now();
             const objectType = String(b['type'] ?? 'INCIDENT').toUpperCase();
             const obj: OperationalObject = {
@@ -356,7 +381,12 @@ export function opsHandler(flags: MockFlags): MockHandler {
             const status = OBJECT_ACTION_STATUS[action];
             if (!status) return error(422, `unknown action "${action}"`);
             const now = Date.now();
-            const next = { ...obj, status, updatedAt: now, closedAt: CLOSING_STATUSES.has(status) ? now : obj.closedAt };
+            const next = {
+                ...obj,
+                status,
+                updatedAt: now,
+                closedAt: CLOSING_STATUSES.has(status) ? now : obj.closedAt,
+            };
             store.put(space, OPS_OBJECTS_COLL, next.id, next);
             // A user action is a signal producer too (living-operational-system §5): the operator moved an object.
             emitSignal(store, space, {
@@ -366,7 +396,13 @@ export function opsHandler(flags: MockFlags): MockHandler {
                 source: { kind: 'user', id: 'operator', rel: 'emits' },
                 correlationId: obj.correlationId ?? next.id,
                 severity: 'info',
-                payload: { message: `${action} → ${status} on ${obj.title}`, objectId: obj.id, objectType: obj.objectType, action, status },
+                payload: {
+                    message: `${action} → ${status} on ${obj.title}`,
+                    objectId: obj.id,
+                    objectType: obj.objectType,
+                    action,
+                    status,
+                },
             });
             return json(next);
         }
@@ -406,45 +442,71 @@ export function opsHandler(flags: MockFlags): MockHandler {
             return mergeCases(store, space, m[1], (req.body ?? {}) as { sources?: string[]; actor?: string });
         }
         if (method === 'POST' && (m = match(url, OBJECT_SPLIT))) {
-            return splitCase(store, space, m[1], (req.body ?? {}) as {
-                title?: string; members?: string[]; assignee?: string; actor?: string;
-            });
+            return splitCase(
+                store,
+                space,
+                m[1],
+                (req.body ?? {}) as {
+                    title?: string;
+                    members?: string[];
+                    assignee?: string;
+                    actor?: string;
+                },
+            );
         }
         if (method === 'GET' && (m = match(url, OBJECT_GRAPH))) {
-            return json(objectGraph(
-                m[1],
-                Number(req.params['depth']) || 2,
-                store.list<OperationalObject>(space, OPS_OBJECTS_COLL),
-                store.list<ObjectLink>(space, OBJECT_LINKS_COLL),
-            ));
+            return json(
+                objectGraph(
+                    m[1],
+                    Number(req.params['depth']) || 2,
+                    store.list<OperationalObject>(space, OPS_OBJECTS_COLL),
+                    store.list<ObjectLink>(space, OBJECT_LINKS_COLL),
+                ),
+            );
         }
         if ((m = match(url, OBJECT_COMMENTS)) || (m = match(url, OBJECT_ATTACHMENTS))) {
             const id = m[1];
             const kind = OBJECT_COMMENTS.test(url) ? 'COMMENT' : 'ATTACHMENT';
             if (method === 'GET') {
-                return json(store.list<ObjectNote>(space, OBJECT_NOTES_COLL)
-                    .filter((n) => n.objectId === id && n.kind === kind)
-                    .sort((a, b) => a.createdAt - b.createdAt));
+                return json(
+                    store
+                        .list<ObjectNote>(space, OBJECT_NOTES_COLL)
+                        .filter((n) => n.objectId === id && n.kind === kind)
+                        .sort((a, b) => a.createdAt - b.createdAt),
+                );
             }
             if (method === 'POST') {
                 if (!store.get(space, OPS_OBJECTS_COLL, id)) return error(404, `object ${id} not found`);
                 const b = (req.body ?? {}) as Record<string, string>;
                 if (kind === 'COMMENT' && !b['body']) return error(422, 'body is required');
                 if (kind === 'ATTACHMENT' && (!b['name'] || !b['uri'])) return error(422, 'name and uri are required');
-                return json(putNote(store, space, id, kind, b['author'] ?? 'operator',
-                    kind === 'COMMENT' ? b['body'] : (b['caption'] ?? b['name']),
-                    kind === 'ATTACHMENT'
-                        ? { name: b['name'], uri: b['uri'], ...(b['contentType'] ? { contentType: b['contentType'] } : {}) }
-                        : undefined));
+                return json(
+                    putNote(
+                        store,
+                        space,
+                        id,
+                        kind,
+                        b['author'] ?? 'operator',
+                        kind === 'COMMENT' ? b['body'] : (b['caption'] ?? b['name']),
+                        kind === 'ATTACHMENT'
+                            ? {
+                                  name: b['name'],
+                                  uri: b['uri'],
+                                  ...(b['contentType'] ? { contentType: b['contentType'] } : {}),
+                              }
+                            : undefined,
+                    ),
+                );
             }
         }
         if (method === 'POST' && (m = match(url, OBJECT_RCA))) {
             const id = m[1];
             if (!store.get(space, OPS_OBJECTS_COLL, id)) return error(404, `object ${id} not found`);
             const t = (req.body as { template?: string | { name?: string; sections?: string[] } })?.template;
-            const sections = typeof t === 'string'
-                ? (RCA_TEMPLATE_CATALOG.find((c) => c.name === t)?.sections ?? [])
-                : (t?.sections ?? []);
+            const sections =
+                typeof t === 'string'
+                    ? (RCA_TEMPLATE_CATALOG.find((c) => c.name === t)?.sections ?? [])
+                    : (t?.sections ?? []);
             if (!sections.length) return error(422, 'unknown RCA template');
             // One comment per section, matching the pane's "seed an RCA skeleton" semantics.
             return json(sections.map((s) => putNote(store, space, id, 'COMMENT', 'rca', `## ${s}\n`)));
@@ -482,16 +544,22 @@ export function opsHandler(flags: MockFlags): MockHandler {
             const b = (req.body ?? {}) as Partial<TagRule>;
             const filter = b.filter ?? {};
             if (!b.name || !b.tag) return error(422, 'name and tag are required');
-            const hasCriterion = ['type', 'q', 'status', 'priority', 'severity', 'category']
-                .some((k) => (filter as Record<string, string>)[k]);
+            const hasCriterion = ['type', 'q', 'status', 'priority', 'severity', 'category'].some(
+                (k) => (filter as Record<string, string>)[k],
+            );
             if (!hasCriterion) return error(422, 'a Tag Rule needs at least one criterion');
             // Saving a rule implicitly registers its tag (Gmail creates the label with the filter).
             if (!store.has(space, TAGS_COLL, b.tag)) {
                 store.put(space, TAGS_COLL, b.tag, { name: b.tag, createdAt: Date.now() } satisfies Tag);
             }
-            return json(store.put(space, TAG_RULES_COLL, b.name, {
-                name: b.name, tag: b.tag, filter, createdAt: Date.now(),
-            } satisfies TagRule));
+            return json(
+                store.put(space, TAG_RULES_COLL, b.name, {
+                    name: b.name,
+                    tag: b.tag,
+                    filter,
+                    createdAt: Date.now(),
+                } satisfies TagRule),
+            );
         }
         if (method === 'DELETE' && (m = match(url, TAG_RULE_ONE))) {
             if (!store.has(space, TAG_RULES_COLL, m[1])) return error(404, `no tag rule "${m[1]}"`);
@@ -571,7 +639,10 @@ export function opsHandler(flags: MockFlags): MockHandler {
             const obj = store.get<OperationalObject>(space, OPS_OBJECTS_COLL, m[1]);
             if (!obj) return error(404, `object ${m[1]} not found`);
             const b = (req.body ?? {}) as {
-                priority?: string; severity?: string; assignee?: string; attributes?: Record<string, string>;
+                priority?: string;
+                severity?: string;
+                assignee?: string;
+                attributes?: Record<string, string>;
             };
             const next: OperationalObject = {
                 ...obj,
@@ -586,7 +657,8 @@ export function opsHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && ((m = match(url, ENRICH_RUNS)) || (m = match(url, ENRICH_LINEAGE)))) {
             return json(enrichRuns(m[1]));
         }
-        if (method === 'GET' && ENRICH_LIST.test(url)) return json(store.list<EnrichmentJobView>(space, ENRICHMENT_COLL));
+        if (method === 'GET' && ENRICH_LIST.test(url))
+            return json(store.list<EnrichmentJobView>(space, ENRICHMENT_COLL));
 
         return undefined;
     };
@@ -594,7 +666,10 @@ export function opsHandler(flags: MockFlags): MockHandler {
 
 /** Split the `attributes.tags` CSV. */
 function csvTags(csv: string | undefined): string[] {
-    return (csv ?? '').split(',').map((t) => t.trim()).filter(Boolean);
+    return (csv ?? '')
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
 }
 
 // ── cross-entity tag assignments (BACKLOG D7 — mirrors ops.tag.TagAssignmentStore) ───────────────
@@ -603,9 +678,7 @@ function csvTags(csv: string | undefined): string[] {
  * The annotation-target vocabulary, shared with notes (backend `AnnotationKinds.KINDS` = `"object"` +
  * `ComponentStore.WRITABLE_TYPES`). Keep the two in step — widening it widens both features.
  */
-export const TAG_TARGET_KINDS = [
-    'object', 'link-analysis-view', 'geo-map-view', 'dashboard', 'widget', 'dataset',
-];
+export const TAG_TARGET_KINDS = ['object', 'link-analysis-view', 'geo-map-view', 'dashboard', 'widget', 'dataset'];
 
 /** Composite key of an edge — identity is the `(tag, kind, id)` triple, which is what makes `add` idempotent. */
 function edgeKey(tag: string, kind: string, id: string): string {
@@ -628,7 +701,8 @@ function projectWidgetTags(store: MockStore, space: string, id: string): void {
     const coll = componentCollection('widget');
     const def = store.get<{ content?: Record<string, unknown> }>(space, coll, id);
     if (!def) return;
-    const tags = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+    const tags = store
+        .list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
         .filter((a) => a.targetKind === 'widget' && a.targetId === id)
         .map((a) => a.tag)
         .sort((a, b) => a.localeCompare(b));
@@ -649,7 +723,11 @@ function adoptWidgetTags(store: MockStore, space: string): void {
             const key = edgeKey(tag, 'widget', def.name);
             if (store.has(space, TAG_ASSIGNMENTS_COLL, key)) continue;
             store.put(space, TAG_ASSIGNMENTS_COLL, key, {
-                tag, targetKind: 'widget', targetId: def.name, actor: 'migration', createdAt: Date.now(),
+                tag,
+                targetKind: 'widget',
+                targetId: def.name,
+                actor: 'migration',
+                createdAt: Date.now(),
             } satisfies TagAssignment);
             // Seeded widget tags are free text; register the name too, or `/tags` cannot list them and
             // assigning one would 404. Mirrors TagRoutes.ensureTag.
@@ -667,22 +745,33 @@ function adoptWidgetTags(store: MockStore, space: string): void {
  */
 function tagTargets(store: MockStore, space: string, tag: string): TagAssignment[] {
     adoptWidgetTags(store, space);
-    const fromObjects = store.list<OperationalObject>(space, OPS_OBJECTS_COLL)
+    const fromObjects = store
+        .list<OperationalObject>(space, OPS_OBJECTS_COLL)
         .filter((o) => csvTags(o.attributes?.['tags']).includes(tag))
-        .map((o) => ({
-            tag, targetKind: 'object', targetId: o.id, createdAt: o.updatedAt ?? Date.now(),
-        } satisfies TagAssignment));
+        .map(
+            (o) =>
+                ({
+                    tag,
+                    targetKind: 'object',
+                    targetId: o.id,
+                    createdAt: o.updatedAt ?? Date.now(),
+                }) satisfies TagAssignment,
+        );
     const fromEdges = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL).filter((a) => a.tag === tag);
-    return [...fromObjects, ...fromEdges]
-        .sort((a, b) => a.targetKind.localeCompare(b.targetKind) || a.targetId.localeCompare(b.targetId));
+    return [...fromObjects, ...fromEdges].sort(
+        (a, b) => a.targetKind.localeCompare(b.targetKind) || a.targetId.localeCompare(b.targetId),
+    );
 }
 
 function tagsOnTarget(store: MockStore, space: string, kind: string, id: string): string[] {
     if (kind === 'widget') adoptWidgetTags(store, space);
-    const tags = kind === 'object'
-        ? csvTags(store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id)?.attributes?.['tags'])
-        : store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
-            .filter((a) => a.targetKind === kind && a.targetId === id).map((a) => a.tag);
+    const tags =
+        kind === 'object'
+            ? csvTags(store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id)?.attributes?.['tags'])
+            : store
+                  .list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+                  .filter((a) => a.targetKind === kind && a.targetId === id)
+                  .map((a) => a.tag);
     return [...tags].sort((a, b) => a.localeCompare(b));
 }
 
@@ -704,9 +793,13 @@ function assignTag(store: MockStore, space: string, kind: string, id: string, ta
     const existing = store.get<TagAssignment>(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id));
     if (existing) return json(existing);
     const edge = store.put(space, TAG_ASSIGNMENTS_COLL, edgeKey(tag, kind, id), {
-        tag, targetKind: kind, targetId: id, actor, createdAt: Date.now(),
+        tag,
+        targetKind: kind,
+        targetId: id,
+        actor,
+        createdAt: Date.now(),
     } satisfies TagAssignment);
-    if (kind === 'widget') projectWidgetTags(store, space, id);   // the chip row, not just the edge
+    if (kind === 'widget') projectWidgetTags(store, space, id); // the chip row, not just the edge
     return json(edge);
 }
 
@@ -740,8 +833,10 @@ function unassignTag(store: MockStore, space: string, kind: string, id: string, 
  */
 function renameTagEverywhere(store: MockStore, space: string, from: string, to: string) {
     adoptWidgetTags(store, space);
-    const widgets = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
-        .filter((a) => a.tag === from && a.targetKind === 'widget').map((a) => a.targetId);
+    const widgets = store
+        .list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+        .filter((a) => a.tag === from && a.targetKind === 'widget')
+        .map((a) => a.targetId);
     let assignments = 0;
     let objects = 0;
     let rules = 0;
@@ -753,7 +848,9 @@ function renameTagEverywhere(store: MockStore, space: string, from: string, to: 
         assignments++;
         const renamed = [...new Set(tags.map((t) => (t === from ? to : t)))];
         store.put(space, OPS_OBJECTS_COLL, o.id, {
-            ...o, attributes: { ...(o.attributes ?? {}), tags: renamed.join(',') }, updatedAt: Date.now(),
+            ...o,
+            attributes: { ...(o.attributes ?? {}), tags: renamed.join(',') },
+            updatedAt: Date.now(),
         });
     }
     for (const a of store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)) {
@@ -781,8 +878,10 @@ function renameTagEverywhere(store: MockStore, space: string, from: string, to: 
 /** Retire a tag and every assignment of it — deletion leaves no orphan edges. */
 function deleteTagEverywhere(store: MockStore, space: string, name: string) {
     adoptWidgetTags(store, space);
-    const widgets = store.list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
-        .filter((a) => a.tag === name && a.targetKind === 'widget').map((a) => a.targetId);
+    const widgets = store
+        .list<TagAssignment>(space, TAG_ASSIGNMENTS_COLL)
+        .filter((a) => a.tag === name && a.targetKind === 'widget')
+        .map((a) => a.targetId);
     let assignments = 0;
     let objects = 0;
 
@@ -811,14 +910,18 @@ function deleteTagEverywhere(store: MockStore, space: string, name: string) {
 
 /** The ids a case CONTAINS (its member incidents). */
 function membersOf(store: MockStore, space: string, caseId: string): string[] {
-    return store.list<ObjectLink>(space, OBJECT_LINKS_COLL)
+    return store
+        .list<ObjectLink>(space, OBJECT_LINKS_COLL)
         .filter((l) => l.from === caseId && l.relationship === 'CONTAINS')
         .map((l) => l.to);
 }
 
 /** A case usable in a group operation: exists, is a CASE, and is not closed/merged. */
-function activeCase(store: MockStore, space: string, id: string):
-    { ok: OperationalObject } | { err: ReturnType<typeof error> } {
+function activeCase(
+    store: MockStore,
+    space: string,
+    id: string,
+): { ok: OperationalObject } | { err: ReturnType<typeof error> } {
     const o = store.get<OperationalObject>(space, OPS_OBJECTS_COLL, id);
     if (!o) return { err: error(404, `object ${id} not found`) };
     if (o.objectType !== 'CASE') return { err: error(422, `${id} is not a CASE`) };
@@ -831,13 +934,16 @@ function activeCase(store: MockStore, space: string, id: string):
 function moveMember(store: MockStore, space: string, fromCase: string, toCase: string, member: string): void {
     store.delete(space, OBJECT_LINKS_COLL, `${fromCase}->${member}:CONTAINS`);
     store.put(space, OBJECT_LINKS_COLL, `${toCase}->${member}:CONTAINS`, {
-        from: toCase, fromType: 'CASE', to: member, toType: 'INCIDENT',
-        relationship: 'CONTAINS', createdAt: Date.now(),
+        from: toCase,
+        fromType: 'CASE',
+        to: member,
+        toType: 'INCIDENT',
+        relationship: 'CONTAINS',
+        createdAt: Date.now(),
     } satisfies ObjectLink);
 }
 
-function mergeCases(store: MockStore, space: string, survivorId: string,
-                    body: { sources?: string[]; actor?: string }) {
+function mergeCases(store: MockStore, space: string, survivorId: string, body: { sources?: string[]; actor?: string }) {
     const sources = (body.sources ?? []).filter(Boolean);
     if (!sources.length) return error(400, "body must include non-empty 'sources'");
     const survivorCheck = activeCase(store, space, survivorId);
@@ -859,27 +965,38 @@ function mergeCases(store: MockStore, space: string, survivorId: string,
         }
         csvTags(src.attributes?.['tags']).forEach((t) => tags.add(t));
         store.put(space, OBJECT_LINKS_COLL, `${src.id}->${survivorId}:MERGED_INTO`, {
-            from: src.id, fromType: 'CASE', to: survivorId, toType: 'CASE',
-            relationship: 'MERGED_INTO', createdAt: now,
+            from: src.id,
+            fromType: 'CASE',
+            to: survivorId,
+            toType: 'CASE',
+            relationship: 'MERGED_INTO',
+            createdAt: now,
         } satisfies ObjectLink);
         store.put(space, OPS_OBJECTS_COLL, src.id, {
-            ...src, status: 'CLOSED', closedAt: now, updatedAt: now,
+            ...src,
+            status: 'CLOSED',
+            closedAt: now,
+            updatedAt: now,
             attributes: { ...(src.attributes ?? {}), mergedInto: survivorId },
         });
         putNote(store, space, src.id, 'COMMENT', body.actor ?? 'operator', `Merged into ${survivorId}.`);
-        putNote(store, space, survivorId, 'COMMENT', body.actor ?? 'operator',
-            `Absorbed ${src.id} ("${src.title}").`);
+        putNote(store, space, survivorId, 'COMMENT', body.actor ?? 'operator', `Absorbed ${src.id} ("${src.title}").`);
     }
     const survivor = store.get<OperationalObject>(space, OPS_OBJECTS_COLL, survivorId)!;
     const updated = store.put(space, OPS_OBJECTS_COLL, survivorId, {
-        ...survivor, updatedAt: now,
+        ...survivor,
+        updatedAt: now,
         attributes: { ...(survivor.attributes ?? {}), ...(tags.size ? { tags: [...tags].join(',') } : {}) },
     });
     return json({ survivor: updated, merged: absorbed.map((s) => s.id), membersMoved: moved });
 }
 
-function splitCase(store: MockStore, space: string, caseId: string,
-                   body: { title?: string; members?: string[]; assignee?: string; actor?: string }) {
+function splitCase(
+    store: MockStore,
+    space: string,
+    caseId: string,
+    body: { title?: string; members?: string[]; assignee?: string; actor?: string },
+) {
     const title = (body.title ?? '').trim();
     const members = (body.members ?? []).filter(Boolean);
     if (!title) return error(400, "body must include 'title'");
@@ -914,11 +1031,21 @@ function splitCase(store: MockStore, space: string, caseId: string,
     store.put(space, OPS_OBJECTS_COLL, part.id, part);
     for (const memberId of members) moveMember(store, space, caseId, part.id, memberId);
     store.put(space, OBJECT_LINKS_COLL, `${part.id}->${caseId}:SPLIT_FROM`, {
-        from: part.id, fromType: 'CASE', to: caseId, toType: 'CASE',
-        relationship: 'SPLIT_FROM', createdAt: now,
+        from: part.id,
+        fromType: 'CASE',
+        to: caseId,
+        toType: 'CASE',
+        relationship: 'SPLIT_FROM',
+        createdAt: now,
     } satisfies ObjectLink);
-    putNote(store, space, caseId, 'COMMENT', body.actor ?? 'operator',
-        `Split ${members.length} member(s) out into ${part.id} ("${title}").`);
+    putNote(
+        store,
+        space,
+        caseId,
+        'COMMENT',
+        body.actor ?? 'operator',
+        `Split ${members.length} member(s) out into ${part.id} ("${title}").`,
+    );
     putNote(store, space, part.id, 'COMMENT', body.actor ?? 'operator', `Split from ${caseId}.`);
     return json({ case: part, membersMoved: members.length });
 }
@@ -1017,11 +1144,16 @@ function ledgerMetric(metric: string, rows: Record<string, string>[]): number {
 
 function breaches(rule: AlertRule, value: number): boolean {
     switch (rule.comparator) {
-        case 'gt': return value > rule.threshold;
-        case 'gte': return value >= rule.threshold;
-        case 'lt': return value < rule.threshold;
-        case 'lte': return value <= rule.threshold;
-        default: return false;
+        case 'gt':
+            return value > rule.threshold;
+        case 'gte':
+            return value >= rule.threshold;
+        case 'lt':
+            return value < rule.threshold;
+        case 'lte':
+            return value <= rule.threshold;
+        default:
+            return false;
     }
 }
 
@@ -1031,39 +1163,55 @@ function evaluateCaseRule(store: MockStore, space: string, rule: CaseRule): Retu
     const cutoff = rule.windowMinutes <= 0 ? 0 : now - rule.windowMinutes * 60_000;
     const allObjects = store.list<OperationalObject>(space, OPS_OBJECTS_COLL);
     const contained = new Set(
-        store.list<ObjectLink>(space, OBJECT_LINKS_COLL)
+        store
+            .list<ObjectLink>(space, OBJECT_LINKS_COLL)
             .filter((l) => l.relationship === 'CONTAINS')
             .map((l) => l.to),
     );
     const matches = allObjects.filter(
-        (o) => o.objectType === 'INCIDENT' && o.createdAt >= cutoff && filterMatches(rule.filter, o) && !contained.has(o.id),
+        (o) =>
+            o.objectType === 'INCIDENT' &&
+            o.createdAt >= cutoff &&
+            filterMatches(rule.filter, o) &&
+            !contained.has(o.id),
     );
     if (!matches.length) return json({ matched: 0, grouped: 0, caseId: null, opened: false });
 
-    let caseId = allObjects.find(
-        (o) => o.objectType === 'CASE' && o.attributes?.['raisedByRule'] === rule.name && o.closedAt === 0,
-    )?.id ?? null;
+    let caseId =
+        allObjects.find(
+            (o) => o.objectType === 'CASE' && o.attributes?.['raisedByRule'] === rule.name && o.closedAt === 0,
+        )?.id ?? null;
     let opened = false;
     if (!caseId) {
-        if (matches.length < rule.threshold) return json({ matched: matches.length, grouped: 0, caseId: null, opened: false });
+        if (matches.length < rule.threshold)
+            return json({ matched: matches.length, grouped: 0, caseId: null, opened: false });
         caseId = newObjId();
         store.put(space, OPS_OBJECTS_COLL, caseId, {
-            id: caseId, objectType: 'CASE', title: rule.title,
-            description: `Auto-raised by case rule '${rule.name}'`, status: 'OPEN',
+            id: caseId,
+            objectType: 'CASE',
+            title: rule.title,
+            description: `Auto-raised by case rule '${rule.name}'`,
+            status: 'OPEN',
             correlationId: matches[0].correlationId,
             attributes: {
                 raisedByRule: rule.name,
                 ...(rule.category ? { category: rule.category } : {}),
                 ...(rule.tags ? { tags: rule.tags } : {}),
             },
-            createdAt: now, updatedAt: now, closedAt: 0,
+            createdAt: now,
+            updatedAt: now,
+            closedAt: 0,
         } as OperationalObject);
         opened = true;
     }
     for (const inc of matches) {
         store.put(space, OBJECT_LINKS_COLL, `${caseId}->${inc.id}:CONTAINS`, {
-            from: caseId, fromType: 'CASE', to: inc.id, toType: 'INCIDENT',
-            relationship: 'CONTAINS', createdAt: now,
+            from: caseId,
+            fromType: 'CASE',
+            to: inc.id,
+            toType: 'INCIDENT',
+            relationship: 'CONTAINS',
+            createdAt: now,
         } satisfies ObjectLink);
     }
     return json({ matched: matches.length, grouped: matches.length, caseId, opened });
@@ -1101,7 +1249,12 @@ function pageSlice<T>(rows: T[], params: Record<string, string>): T[] {
 }
 
 /** Correlation subgraph via undirected BFS from `root` up to `depth` hops; edges among included nodes only. */
-export function objectGraph(root: string, depth: number, objects: OperationalObject[], links: ObjectLink[]): ObjectGraph {
+export function objectGraph(
+    root: string,
+    depth: number,
+    objects: OperationalObject[],
+    links: ObjectLink[],
+): ObjectGraph {
     const byId = new Map(objects.map((o) => [o.id, o]));
     const included = new Set<string>();
     let frontier = [root];
@@ -1117,9 +1270,15 @@ export function objectGraph(root: string, depth: number, objects: OperationalObj
         }
         frontier = next;
     }
-    const nodes = [...included].map((id) => byId.get(id)!).map((o) => ({
-        id: o.id, objectType: o.objectType, title: o.title, status: o.status, severity: o.severity,
-    }));
+    const nodes = [...included]
+        .map((id) => byId.get(id)!)
+        .map((o) => ({
+            id: o.id,
+            objectType: o.objectType,
+            title: o.title,
+            status: o.status,
+            severity: o.severity,
+        }));
     const edges = links.filter((l) => included.has(l.from) && included.has(l.to));
     return { root, depth, nodes, edges };
 }
@@ -1150,12 +1309,20 @@ function parseLinks(v: unknown): { to: string; relationship?: string }[] {
 let noteSeq = 0;
 
 function putNote(
-    store: MockStore, space: string, objectId: string, kind: string, author: string, body: string,
+    store: MockStore,
+    space: string,
+    objectId: string,
+    kind: string,
+    author: string,
+    body: string,
     attributes?: Record<string, string>,
 ): ObjectNote {
     const note: ObjectNote = {
         id: `note-${Date.now()}-${++noteSeq}`,
-        objectId, kind, author, body,
+        objectId,
+        kind,
+        author,
+        body,
         ...(attributes ? { attributes } : {}),
         createdAt: Date.now(),
     };
@@ -1173,7 +1340,10 @@ export function projectEvents(store: MockStore, space: string): EventRow[] {
  * entries that merely mention an alert, no structured fields), which still appear in the Events ledger.
  */
 export function projectAlerts(store: MockStore, space: string): FiredAlert[] {
-    return store.list<Signal>(space, SIGNALS_COLL).filter((s) => isAlertSignal(s) && s.payload['rule']).map(signalToAlert);
+    return store
+        .list<Signal>(space, SIGNALS_COLL)
+        .filter((s) => isAlertSignal(s) && s.payload['rule'])
+        .map(signalToAlert);
 }
 
 /**

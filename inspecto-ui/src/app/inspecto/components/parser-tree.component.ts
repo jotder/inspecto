@@ -18,16 +18,23 @@ import { ParserTreeNode } from 'app/inspecto/api';
     template: `
         <ul [attr.role]="root ? 'tree' : 'group'" class="m-0 list-none p-0" [class.pl-4]="!root">
             @for (n of nodes; track $index) {
-                <li role="treeitem" [attr.aria-expanded]="hasChildren(n) ? isOpen($index) : null"
-                    class="py-0.5">
+                <li role="treeitem" [attr.aria-expanded]="hasChildren(n) ? isOpen($index) : null" class="py-0.5">
                     <div class="flex items-start gap-1">
                         @if (hasChildren(n)) {
-                            <button type="button"
-                                    class="mt-0.5 shrink-0 opacity-70 hover:opacity-100"
-                                    (click)="toggle($index)"
-                                    [attr.aria-label]="(isOpen($index) ? 'Collapse ' : 'Expand ') + n.label">
-                                <mat-icon class="icon-size-4"
-                                          [svgIcon]="isOpen($index) ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"></mat-icon>
+                            <button
+                                type="button"
+                                class="mt-0.5 shrink-0 opacity-70 hover:opacity-100"
+                                (click)="toggle($index)"
+                                [attr.aria-label]="(isOpen($index) ? 'Collapse ' : 'Expand ') + n.label"
+                            >
+                                <mat-icon
+                                    class="icon-size-4"
+                                    [svgIcon]="
+                                        isOpen($index)
+                                            ? 'heroicons_outline:chevron-down'
+                                            : 'heroicons_outline:chevron-right'
+                                    "
+                                ></mat-icon>
                             </button>
                         } @else {
                             <span class="mt-0.5 inline-block w-4 shrink-0 text-center opacity-40">·</span>
@@ -35,8 +42,11 @@ import { ParserTreeNode } from 'app/inspecto/api';
                         <span class="min-w-0 break-words text-sm">
                             <span class="font-mono font-medium">{{ n.label }}</span>
                             @if (n.type) {
-                                <span class="ml-1.5 rounded px-1 py-0.5 text-xs uppercase opacity-70"
-                                      style="background: var(--gamma-bg-default)">{{ n.type }}</span>
+                                <span
+                                    class="ml-1.5 rounded px-1 py-0.5 text-xs uppercase opacity-70"
+                                    style="background: var(--gamma-bg-default)"
+                                    >{{ n.type }}</span
+                                >
                             }
                             @if (n.value != null) {
                                 <span class="ml-1.5 font-mono opacity-80">= {{ n.value }}</span>

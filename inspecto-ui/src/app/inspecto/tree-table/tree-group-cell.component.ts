@@ -27,10 +27,14 @@ type TreeCellParams = ICellRendererParams<FlatTreeRow> & { toggle?: (id: string)
                     class="!h-6 !w-6 shrink-0"
                     (click)="onToggle($event)"
                     [attr.aria-label]="row?.__expanded ? 'Collapse row' : 'Expand row'"
-                    [attr.aria-expanded]="row?.__expanded">
+                    [attr.aria-expanded]="row?.__expanded"
+                >
                     <mat-icon
                         class="icon-size-4"
-                        [svgIcon]="row?.__expanded ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"></mat-icon>
+                        [svgIcon]="
+                            row?.__expanded ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                        "
+                    ></mat-icon>
                 </button>
             } @else {
                 <span class="inline-block shrink-0" style="width: 1.5rem"></span>

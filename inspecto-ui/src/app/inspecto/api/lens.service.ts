@@ -88,8 +88,7 @@ export class LensService {
      *  load (`docs/superpower/lens-access-config-design.md` §7 — this is the "one file re-derives
      *  these signals" seam from rbac-groundwork, exercised with lens subjects). `null` = no config
      *  loaded ⇒ every action allowed, exactly the pre-profile behavior. */
-    private readonly actionGrants =
-        signal<Record<string, Partial<Record<Lens, boolean>>> | null>(null);
+    private readonly actionGrants = signal<Record<string, Partial<Record<Lens, boolean>>> | null>(null);
 
     /** Called by {@code AccessStateService} whenever lens Access Profiles (re)load. */
     setActionGrants(grants: Record<string, Partial<Record<Lens, boolean>>> | null): void {
@@ -142,8 +141,7 @@ export class LensService {
     /** May author in the Workbench (Pipelines / Jobs / Components create-edit-delete). RBAC: Pipeline
      *  Developer, Power user, Super user. (Connection onboarding split out to {@link canOnboardConnections}
      *  2026-07-22 — the credential/egress surface is Admin-owned, not Builder.) */
-    readonly canAuthorWorkbench = computed(
-        () => this.lensCapability('canAuthorWorkbench', 'workbench.author'));
+    readonly canAuthorWorkbench = computed(() => this.lensCapability('canAuthorWorkbench', 'workbench.author'));
 
     /** May onboard/configure Connections (create / edit / delete a connection profile) — its own
      *  authorization question because Connections are the credential + network-egress surface, a worse
@@ -152,13 +150,13 @@ export class LensService {
      *  lenses, exactly as Workbench authoring did before the split.
      *  {@link identityCapability}: the credential surface is Admin-owned, and admin never qualifies for
      *  a non-Business lens. */
-    readonly canOnboardConnections = computed(
-        () => this.identityCapability('canOnboardConnections', 'connections.onboard'));
+    readonly canOnboardConnections = computed(() =>
+        this.identityCapability('canOnboardConnections', 'connections.onboard'),
+    );
 
     /** May operate runs (trigger / pause / resume / reprocess) — the plan's "read-only observe"
      *  exception for Business on the Runs pane. RBAC: Operations, Pipeline Developer, Power/Super. */
-    readonly canOperateRuns = computed(
-        () => this.lensCapability('canOperateRuns', 'runs.operate'));
+    readonly canOperateRuns = computed(() => this.lensCapability('canOperateRuns', 'runs.operate'));
 
     /** May triage Requirements (accept / reject / deliver) — the Builder-facing intake queue (C1).
      *  RBAC: Pipeline Developer, Operations, Power/Super — **and the `business` seed role**, whose only
@@ -168,14 +166,14 @@ export class LensService {
      *  treating triage as lens-scoped revoked the one thing the role was given. Deciding it is identity
      *  (operator call 2026-07-25) means **"Business lens ⇒ read-only" is no longer true of the product**
      *  — intake triage is the deliberate exception. */
-    readonly canTriageRequirements = computed(
-        () => this.identityCapability('canTriageRequirements', 'requirements.triage'));
+    readonly canTriageRequirements = computed(() =>
+        this.identityCapability('canTriageRequirements', 'requirements.triage'),
+    );
 
     /** May author Alert Rules (create / edit / delete on the Alerts pane — audit C3). A distinct
      *  question from Workbench authoring: monitoring config is Ops-owned. RBAC: Operations,
      *  Power/Super. */
-    readonly canAuthorAlertRules = computed(
-        () => this.lensCapability('canAuthorAlertRules', 'alerts.author'));
+    readonly canAuthorAlertRules = computed(() => this.lensCapability('canAuthorAlertRules', 'alerts.author'));
 
     /** May curate the space's shared Menu tree (Settings ▸ Menu Builder, `PUT /nav/menus`). Split out
      *  of {@link canAuthorWorkbench} 2026-07-25 (BACKLOG D4): a nav change is visible to every business
@@ -183,28 +181,24 @@ export class LensService {
      *  subset of Workbench authoring, so a Pipeline Developer authors freely but no longer re-arranges
      *  everyone's sidebar. {@link identityCapability} — its own rationale says curation "is not a build
      *  activity", so no lens represents it. */
-    readonly canCurateMenus = computed(
-        () => this.identityCapability('canCurateMenus', 'menus.curate'));
+    readonly canCurateMenus = computed(() => this.identityCapability('canCurateMenus', 'menus.curate'));
 
     /** May configure lens access (the Settings ▸ Access matrix). RBAC: Admin, Super.
      *  {@link identityCapability} — and the sharpest case for it: while this was lens-scoped, a fresh
      *  OIDC deployment's admin saw the Access matrix read-only and could not author the roles that
      *  grant access. */
-    readonly canConfigureAccess = computed(
-        () => this.identityCapability('canConfigureAccess', 'access.configure'));
+    readonly canConfigureAccess = computed(() => this.identityCapability('canConfigureAccess', 'access.configure'));
 
     /** May offer a dataset or widget into the Exchange (`POST /exchange/offers|refresh`). RBAC: Admin,
      *  Super — `canOfferDatasets` moved Builder/Power → Admin on 2026-07-25 (BACKLOG D14) because
      *  cross-space data exposure has no second gate. {@link identityCapability} for that same reason:
      *  it is Admin-owned, and admin never qualifies for a non-Business lens. */
-    readonly canOfferDatasets = computed(
-        () => this.identityCapability('canOfferDatasets', 'exchange.offer'));
+    readonly canOfferDatasets = computed(() => this.identityCapability('canOfferDatasets', 'exchange.offer'));
 
     /** May decide share requests — approve / deny / revoke a grant and set its expiry
      *  (`POST /exchange/grants/…`). RBAC: Admin, Super. {@link identityCapability}: deciding who may
      *  read another space's data is governance, not an activity any lens represents. */
-    readonly canApproveShares = computed(
-        () => this.identityCapability('canApproveShares', 'exchange.approve'));
+    readonly canApproveShares = computed(() => this.identityCapability('canApproveShares', 'exchange.approve'));
 
     /** May request access to another Space's offer and pin a consumed snapshot
      *  (`POST /exchange/requests`, `POST /exchange/grants/…/pin`). RBAC: the builder roles, Operations,
@@ -215,8 +209,7 @@ export class LensService {
      *  non-Business lens and lens-scoping strands nobody — the deadlock that forced the Admin-owned
      *  capabilities to identity cannot arise here. The `business` seed pointedly does *not* hold it, and
      *  "I want this dataset to build with" is exactly an activity a lens represents. */
-    readonly canRequestShares = computed(
-        () => this.lensCapability('canRequestShares', 'exchange.request'));
+    readonly canRequestShares = computed(() => this.lensCapability('canRequestShares', 'exchange.request'));
 
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */

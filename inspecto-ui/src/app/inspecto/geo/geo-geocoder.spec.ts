@@ -43,8 +43,6 @@ describe('offlineGeocode', () => {
     it('OfflineGeocoder resolves asynchronously against its table', async () => {
         const g = new OfflineGeocoder(TABLE);
         expect(g.id).toBe('offline');
-        await expect(g.geocode('dubai')).resolves.toEqual([
-            { name: 'Dubai', lat: 25.2, lon: 55.27, context: 'UAE' },
-        ]);
+        await expect(g.geocode('dubai')).resolves.toEqual([{ name: 'Dubai', lat: 25.2, lon: 55.27, context: 'UAE' }]);
     });
 });

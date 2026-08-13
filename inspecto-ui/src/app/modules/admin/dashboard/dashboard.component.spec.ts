@@ -20,13 +20,28 @@ import { DashboardComponent } from './dashboard.component';
 
 const READY: ReadyStatus = { status: 'READY', pipelines: 2 };
 const STATUS: StatusReport = {
-    generatedAt: '2026-07-03T00:00:00Z', pipelineCount: 2, pausedCount: 0,
-    totalCommittedBatches: 10, totalQuarantineFiles: 0,
-    pipelines: [{ pipeline: 'cdr_ingest', paused: false, committedBatches: 10, quarantineFiles: 0, lastBatchStatus: 'SUCCESS' }],
+    generatedAt: '2026-07-03T00:00:00Z',
+    pipelineCount: 2,
+    pausedCount: 0,
+    totalCommittedBatches: 10,
+    totalQuarantineFiles: 0,
+    pipelines: [
+        { pipeline: 'cdr_ingest', paused: false, committedBatches: 10, quarantineFiles: 0, lastBatchStatus: 'SUCCESS' },
+    ],
 };
 const REPORT: ServiceReport = {
-    generatedAt: '2026-07-03T00:00:00Z', totalBatches: 10, success: 9, failed: 1, errorRate: 0.1, totalOutputRows: 1000,
-    p50DurationMs: 20, p95DurationMs: 40, p99DurationMs: 60, windowFrom: '', windowTo: '', pipelines: [],
+    generatedAt: '2026-07-03T00:00:00Z',
+    totalBatches: 10,
+    success: 9,
+    failed: 1,
+    errorRate: 0.1,
+    totalOutputRows: 1000,
+    p50DurationMs: 20,
+    p95DurationMs: 40,
+    p99DurationMs: 60,
+    windowFrom: '',
+    windowTo: '',
+    pipelines: [],
 };
 
 function create(overrides: { ready?: ReadyStatus | null; status?: StatusReport | null } = {}) {
@@ -75,8 +90,14 @@ describe('DashboardComponent', () => {
             imports: [DashboardComponent],
             providers: [
                 provideNoopAnimations(),
-                { provide: HealthService, useValue: { ready: () => throwError(() => ({})), metrics: () => throwError(() => ({})) } },
-                { provide: ReportsService, useValue: { status: () => throwError(() => ({})), serviceReport: () => throwError(() => ({})) } },
+                {
+                    provide: HealthService,
+                    useValue: { ready: () => throwError(() => ({})), metrics: () => throwError(() => ({})) },
+                },
+                {
+                    provide: ReportsService,
+                    useValue: { status: () => throwError(() => ({})), serviceReport: () => throwError(() => ({})) },
+                },
                 { provide: AcquisitionMetricsService, useValue: { get: () => throwError(() => ({})) } },
                 { provide: EventsService, useValue: { search: () => of([] as EventRow[]) } },
                 { provide: ToastrService, useValue: { error: (msg: string) => msg } },

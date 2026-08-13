@@ -14,7 +14,10 @@ const VIEW_DATA: PipelineViewData = {
     columns: ['id', 'gross'],
     rowCount: 2,
     capped: false,
-    rows: [{ id: 1, gross: 100 }, { id: 2, gross: 200 }],
+    rows: [
+        { id: 1, gross: 100 },
+        { id: 2, gross: 200 },
+    ],
 };
 
 function create(data: Partial<ViewPreviewData> = {}, api: Partial<ViewsService> = { data: () => of(VIEW_DATA) }) {
@@ -44,7 +47,9 @@ describe('ViewPreviewDialog', () => {
     it('surfaces a 409 (no derived_sql yet) as an error message', () => {
         const err = new HttpErrorResponse({
             status: 409,
-            error: { error: { message: "view 'orders_view' has no derived_sql; re-run flow 'orders_etl' to concretise it" } },
+            error: {
+                error: { message: "view 'orders_view' has no derived_sql; re-run flow 'orders_etl' to concretise it" },
+            },
         });
         const c = create({}, { data: () => throwError(() => err) }).componentInstance;
         expect(c.loading()).toBe(false);

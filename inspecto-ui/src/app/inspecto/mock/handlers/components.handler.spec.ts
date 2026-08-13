@@ -46,9 +46,13 @@ describe('componentsHandler', () => {
         const dup = handler(req('POST', '/api/components/grammar', { id: 'tsv', delimiter: ';' }), store);
         expect(dup?.status).toBe(409);
         // The stored copy is untouched by the rejected create; PUT replaces it.
-        expect((handler(req('GET', '/api/components/grammar/tsv'), store)?.body as ComponentDef).content['delimiter']).toBe('\t');
+        expect(
+            (handler(req('GET', '/api/components/grammar/tsv'), store)?.body as ComponentDef).content['delimiter'],
+        ).toBe('\t');
         handler(req('PUT', '/api/components/grammar/tsv', { delimiter: ';' }), store);
-        expect((handler(req('GET', '/api/components/grammar/tsv'), store)?.body as ComponentDef).content['delimiter']).toBe(';');
+        expect(
+            (handler(req('GET', '/api/components/grammar/tsv'), store)?.body as ComponentDef).content['delimiter'],
+        ).toBe(';');
     });
 
     it('404s a PUT to an id that does not exist — update requires the id to already exist, mirrors the real backend', () => {
@@ -96,8 +100,7 @@ describe('componentsHandler', () => {
 
     it('appends an AUDIT signal per mutation — the audit trail grows with mock authoring, not seed-only', () => {
         const store = seededStore();
-        const audits = (): Signal[] =>
-            store.list<Signal>('default', SIGNALS_COLL).filter((s) => s.type === 'AUDIT');
+        const audits = (): Signal[] => store.list<Signal>('default', SIGNALS_COLL).filter((s) => s.type === 'AUDIT');
         const seeded = audits().length;
 
         handler(req('POST', '/api/components/grammar', { id: 'tsv', delimiter: '\t' }), store);
@@ -106,15 +109,20 @@ describe('componentsHandler', () => {
 
         const mine = audits().filter((s) => (s.payload['attributes'] as Record<string, string>)['target_id'] === 'tsv');
         expect(audits().length).toBe(seeded + 3);
-        expect(mine.map((s) => (s.payload['attributes'] as Record<string, string>)['action']).sort())
-            .toEqual(['grammar.created', 'grammar.deleted', 'grammar.updated']);
+        expect(mine.map((s) => (s.payload['attributes'] as Record<string, string>)['action']).sort()).toEqual([
+            'grammar.created',
+            'grammar.deleted',
+            'grammar.updated',
+        ]);
         // Rejected mutations audit nothing: a 409 create and a referenced delete leave no trace.
         handler(req('POST', '/api/components/dataset/x', null), store); // no route match — sanity no-op
         handler(req('POST', '/api/components/widget', { id: 'cost_by_tariff' }), store); // 409 duplicate
         handler(req('DELETE', '/api/components/dataset/cdr_sample'), store); // 409 referenced
         expect(audits().length).toBe(seeded + 3);
         // The Audit-log pane's read path sees them: category + destructive classification carried.
-        const del = mine.find((s) => (s.payload['attributes'] as Record<string, string>)['action'] === 'grammar.deleted')!;
+        const del = mine.find(
+            (s) => (s.payload['attributes'] as Record<string, string>)['action'] === 'grammar.deleted',
+        )!;
         expect((del.payload['attributes'] as Record<string, string>)['action_category']).toBe('destructive');
     });
 
@@ -180,14 +188,16 @@ describe('componentsHandler', () => {
             expect(handler(req('POST', '/api/components/mapping', { id: 'm1', ...good }), store)?.status).toBe(200);
             expect(handler(req('PUT', '/api/components/mapping/m1', bad), store)?.status).toBe(422);
             // and the refused update did NOT overwrite the good rules
-            expect(store.get<ComponentDef>('default', componentCollection('mapping'), 'm1')?.content['rules'])
-                .toEqual(good.rules);
+            expect(store.get<ComponentDef>('default', componentCollection('mapping'), 'm1')?.content['rules']).toEqual(
+                good.rules,
+            );
         });
 
         it('leaves a body carrying no rules alone (other kinds and partial writes are untouched)', () => {
             const store = seededStore();
-            expect(handler(req('POST', '/api/components/mapping', { id: 'm2', description: 'later' }), store)?.status)
-                .toBe(200);
+            expect(
+                handler(req('POST', '/api/components/mapping', { id: 'm2', description: 'later' }), store)?.status,
+            ).toBe(200);
         });
     });
 

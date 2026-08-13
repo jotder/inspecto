@@ -6,13 +6,26 @@ import { ReconciliationsService } from './reconciliations.service';
 import { buildReconciliation } from './reconciliation-types';
 
 function setup() {
-    const create = vi.fn((_t: string, c: Record<string, unknown>) => of({ type: 'reconciliation', name: String(c['id']), ref: '', content: c }));
-    const update = vi.fn((_t: string, id: string, c: Record<string, unknown>) => of({ type: 'reconciliation', name: id, ref: '', content: c }));
+    const create = vi.fn((_t: string, c: Record<string, unknown>) =>
+        of({ type: 'reconciliation', name: String(c['id']), ref: '', content: c }),
+    );
+    const update = vi.fn((_t: string, id: string, c: Record<string, unknown>) =>
+        of({ type: 'reconciliation', name: id, ref: '', content: c }),
+    );
     const list = vi.fn(() =>
         of([
             {
-                type: 'reconciliation', name: 'switch_vs_billing', ref: '',
-                content: { name: 'switch vs billing', leftDataset: 'switch_cdr', rightDataset: 'billing_cdr', keyColumns: ['id'], compareColumns: [], breaks: [] },
+                type: 'reconciliation',
+                name: 'switch_vs_billing',
+                ref: '',
+                content: {
+                    name: 'switch vs billing',
+                    leftDataset: 'switch_cdr',
+                    rightDataset: 'billing_cdr',
+                    keyColumns: ['id'],
+                    compareColumns: [],
+                    breaks: [],
+                },
             },
         ]),
     );
@@ -26,14 +39,21 @@ describe('ReconciliationsService', () => {
     it('creates a reconciliation as a "reconciliation" registry component', () => {
         const { svc, create } = setup();
         svc.create(buildReconciliation('x', 'a', 'b', ['id'], [])).subscribe();
-        expect(create).toHaveBeenCalledWith('reconciliation', expect.objectContaining({ leftDataset: 'a', rightDataset: 'b', keyColumns: ['id'] }));
+        expect(create).toHaveBeenCalledWith(
+            'reconciliation',
+            expect.objectContaining({ leftDataset: 'a', rightDataset: 'b', keyColumns: ['id'] }),
+        );
     });
 
     it('saves (updates) an existing reconciliation via PUT', () => {
         const { svc, update } = setup();
         const r = { ...buildReconciliation('x', 'a', 'b', ['id'], []), lastRunAt: '2026-07-03T00:00:00Z' };
         svc.save(r).subscribe();
-        expect(update).toHaveBeenCalledWith('reconciliation', r.id, expect.objectContaining({ lastRunAt: '2026-07-03T00:00:00Z' }));
+        expect(update).toHaveBeenCalledWith(
+            'reconciliation',
+            r.id,
+            expect.objectContaining({ lastRunAt: '2026-07-03T00:00:00Z' }),
+        );
     });
 
     it('lists reconciliations back from the registry', () => {

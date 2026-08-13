@@ -43,7 +43,10 @@ function resolveCapabilities(): string[] {
     if (typeof localStorage !== 'undefined') {
         const override = localStorage.getItem('inspecto.mockCapabilities');
         if (override !== null) {
-            return override.split(',').map((c) => c.trim()).filter(Boolean);
+            return override
+                .split(',')
+                .map((c) => c.trim())
+                .filter(Boolean);
         }
     }
     return MOCK_CAPABILITIES;

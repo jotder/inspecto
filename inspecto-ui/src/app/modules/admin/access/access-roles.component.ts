@@ -13,14 +13,7 @@ import {
     indexCatalog,
     resolveGrant,
 } from 'app/inspecto/access/access-catalog';
-import {
-    AccessNode,
-    AccessProfile,
-    AccessService,
-    apiErrorMessage,
-    LensService,
-    RoleDef,
-} from 'app/inspecto/api';
+import { AccessNode, AccessProfile, AccessService, apiErrorMessage, LensService, RoleDef } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -93,11 +86,14 @@ export class AccessRolesComponent {
     readonly cards = computed(() =>
         this.rows().map((r) => ({
             role: r,
-            capabilities: r.capabilities.map((c): CapabilityState => ({
-                capability: c,
-                deniedByProfile: this.deniedCaps(r.name).has(c),
-            })),
-        })));
+            capabilities: r.capabilities.map(
+                (c): CapabilityState => ({
+                    capability: c,
+                    deniedByProfile: this.deniedCaps(r.name).has(c),
+                }),
+            ),
+        })),
+    );
 
     constructor() {
         this.load();
@@ -116,7 +112,8 @@ export class AccessRolesComponent {
         if (!this.canEdit() || this.saving()) return;
         const ok = await this.confirm.confirmDestructive(
             `Remove the authored definition of '${role.name}'? A seed role falls back to its shipped defaults; a custom role is removed. Grants change on the next request.`,
-            { title: 'Revert role?', confirmText: 'Revert' });
+            { title: 'Revert role?', confirmText: 'Revert' },
+        );
         if (!ok) return;
         this.persist(this.authoredOverlay().filter((r) => r.name !== role.name));
     }
@@ -178,7 +175,7 @@ export class AccessRolesComponent {
                 this.roleProfiles.set(byRole);
                 this.loading.set(false);
             },
-            error: () => this.loading.set(false),   // connectivity banner owns the unreachable case
+            error: () => this.loading.set(false), // connectivity banner owns the unreachable case
         });
     }
 

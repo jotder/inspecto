@@ -22,7 +22,9 @@ function create(opts: { registry?: Tag[]; assigned?: string[]; failLoad?: boolea
         of({ targetKind: 'link-analysis-view', targetId: 'triage-view', tags: opts.assigned ?? ['billing'] }),
     );
     const assign = vi.fn((k: string, i: string, t: string) =>
-        opts.failAssign ? throwError(() => new Error('boom')) : of({ tag: t, targetKind: k, targetId: i, createdAt: 1 }),
+        opts.failAssign
+            ? throwError(() => new Error('boom'))
+            : of({ tag: t, targetKind: k, targetId: i, createdAt: 1 }),
     );
     const unassign = vi.fn((_k: string, _i: string, t: string) => of({ tag: t, removed: true }));
     TestBed.configureTestingModule({

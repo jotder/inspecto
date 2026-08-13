@@ -20,7 +20,10 @@ function create(
         imports: [CollectorConfigComponent],
         providers: [
             provideNoopAnimations(),
-            { provide: ConnectionsService, useValue: { list: () => of(profiles), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) } },
+            {
+                provide: ConnectionsService,
+                useValue: { list: () => of(profiles), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) },
+            },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
         ],

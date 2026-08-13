@@ -37,7 +37,12 @@ export class ReconciliationsComponent implements OnInit {
         { field: 'leftDataset', headerName: 'Left', flex: 1 },
         { field: 'rightDataset', headerName: 'Right', flex: 1 },
         { headerName: 'Keys', width: 140, valueGetter: (p) => (p.data?.keyColumns ?? []).join(', ') },
-        { field: 'lastRunAt', headerName: 'Last run', width: 180, valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : 'never') },
+        {
+            field: 'lastRunAt',
+            headerName: 'Last run',
+            width: 180,
+            valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : 'never'),
+        },
     ];
 
     readonly rowActions: InspectoRowAction<Reconciliation>[] = [
@@ -83,7 +88,13 @@ export class ReconciliationsComponent implements OnInit {
             .subscribe((result?: ReconciliationFormResult) => {
                 if (!result) return;
                 const r: Reconciliation = {
-                    ...buildReconciliation(result.name, result.leftDataset, result.rightDataset, result.keyColumns, result.compareColumns),
+                    ...buildReconciliation(
+                        result.name,
+                        result.leftDataset,
+                        result.rightDataset,
+                        result.keyColumns,
+                        result.compareColumns,
+                    ),
                     thirdDataset: result.thirdDataset,
                     bands: result.bands,
                 };

@@ -26,7 +26,7 @@ function create(runs: RunView[] = [RUN], paramMap: Observable<ParamMap> = of(con
                 provide: RunsService,
                 useValue: {
                     list: () => of(runs),
-                    trigger: () => of({ runId: 'run-1' }),   // v1 async contract (W5b): 202 + runId
+                    trigger: () => of({ runId: 'run-1' }), // v1 async contract (W5b): 202 + runId
                     runAll: () => of({ cdr_ingest: RESULT }),
                     pause: () => of({ pipeline: 'cdr_ingest', paused: true }),
                     resume: () => of({ pipeline: 'cdr_ingest', paused: false }),
@@ -39,7 +39,10 @@ function create(runs: RunView[] = [RUN], paramMap: Observable<ParamMap> = of(con
             { provide: MatDialog, useValue: {} },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
         ],
     });
     const fixture = TestBed.createComponent(RunsComponent);
@@ -60,8 +63,9 @@ describe('RunsComponent', () => {
         const fixture = create();
         const el = fixture.nativeElement as HTMLElement;
         expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('Run all'))).toBe(true);
-        expect(fixture.componentInstance.rowActions.map((a) => (typeof a.hint === 'function' ? a.hint(RUN) : a.hint)))
-            .toEqual(['Trigger', 'Pause', 'Reprocess batch', 'Open detail']);
+        expect(
+            fixture.componentInstance.rowActions.map((a) => (typeof a.hint === 'function' ? a.hint(RUN) : a.hint)),
+        ).toEqual(['Trigger', 'Pause', 'Reprocess batch', 'Open detail']);
     });
 
     it('hides Run all and every action but Open detail in the Business (read-only) lens', () => {
@@ -70,8 +74,9 @@ describe('RunsComponent', () => {
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('Run all'))).toBe(false);
-        expect(fixture.componentInstance.rowActions.map((a) => (typeof a.hint === 'function' ? a.hint(RUN) : a.hint)))
-            .toEqual(['Open detail']);
+        expect(
+            fixture.componentInstance.rowActions.map((a) => (typeof a.hint === 'function' ? a.hint(RUN) : a.hint)),
+        ).toEqual(['Open detail']);
     });
 
     it('the Business lens blocks trigger/runAll/togglePause/openReprocess even when called directly', async () => {
@@ -94,13 +99,13 @@ describe('RunsComponent', () => {
         expect(c.detailName()).toBeNull();
         expect(el.querySelector('app-run-detail')).toBeNull();
 
-        params.next(convertToParamMap({ name: 'cdr_ingest' }));   // deep link /runs/cdr_ingest
+        params.next(convertToParamMap({ name: 'cdr_ingest' })); // deep link /runs/cdr_ingest
         fixture.detectChanges();
         expect(c.detailName()).toBe('cdr_ingest');
         expect(el.querySelector('app-run-detail')).toBeTruthy();
         expect(c.runs).toEqual([RUN]); // the list survives the detail opening
 
-        params.next(convertToParamMap({}));                       // back to /runs
+        params.next(convertToParamMap({})); // back to /runs
         fixture.detectChanges();
         expect(c.detailName()).toBeNull();
         expect(el.querySelector('app-run-detail')).toBeNull();

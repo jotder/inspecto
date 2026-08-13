@@ -1,6 +1,14 @@
 import { inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { CatalogService, ComponentsService, ConnectionsService, DbBrowserService, DecisionRulesService, JobsService, RunsService } from 'app/inspecto/api';
+import {
+    CatalogService,
+    ComponentsService,
+    ConnectionsService,
+    DbBrowserService,
+    DecisionRulesService,
+    JobsService,
+    RunsService,
+} from 'app/inspecto/api';
 import { AttributeOption } from 'app/inspecto/component-model';
 import { AttributeOptionLoader } from './schema-form.component';
 
@@ -45,7 +53,10 @@ export function columnOptionLoader(sourceKey: string): AttributeOptionLoader {
         const name = String(v[sourceKey] ?? '').trim();
         if (!name) return [];
         const res = await firstValueFrom(db.table({ name, limit: 1 }));
-        return res.columns.map((c) => ({ value: c.name, label: c.type ? `${c.name} (${c.type.toLowerCase()})` : c.name }));
+        return res.columns.map((c) => ({
+            value: c.name,
+            label: c.type ? `${c.name} (${c.type.toLowerCase()})` : c.name,
+        }));
     };
 }
 
@@ -80,10 +91,23 @@ export function componentRefOptionLoader(): AttributeOptionLoader {
     return async () => {
         const sources: Promise<AttributeOption[]>[] = [
             ...DELIVERABLE_KINDS.map(async (kind) =>
-                (await firstValueFrom(components.list(kind))).map((c) => ({ value: `${kind}/${c.name}`, label: `${kind}/${c.name}` }))),
-            (async () => (await firstValueFrom(runs.list())).map((r) => ({ value: `pipeline/${r.name}`, label: `pipeline/${r.name}` })))(),
-            (async () => (await firstValueFrom(jobs.list())).map((j) => ({ value: `job/${j.name}`, label: `job/${j.name}` })))(),
-            (async () => (await firstValueFrom(decisionRules.list())).map((d) => ({ value: `decision-rule/${d.name}`, label: `decision-rule/${d.name}` })))(),
+                (await firstValueFrom(components.list(kind))).map((c) => ({
+                    value: `${kind}/${c.name}`,
+                    label: `${kind}/${c.name}`,
+                })),
+            ),
+            (async () =>
+                (await firstValueFrom(runs.list())).map((r) => ({
+                    value: `pipeline/${r.name}`,
+                    label: `pipeline/${r.name}`,
+                })))(),
+            (async () =>
+                (await firstValueFrom(jobs.list())).map((j) => ({ value: `job/${j.name}`, label: `job/${j.name}` })))(),
+            (async () =>
+                (await firstValueFrom(decisionRules.list())).map((d) => ({
+                    value: `decision-rule/${d.name}`,
+                    label: `decision-rule/${d.name}`,
+                })))(),
         ];
         const settled = await Promise.allSettled(sources);
         return settled

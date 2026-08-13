@@ -16,7 +16,10 @@ type KpiMode = 'mini' | 'standard' | 'max';
     imports: [MatButtonModule, MatIconModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <div class="bg-card relative flex h-full flex-col justify-center rounded-2xl p-4 shadow" [class.items-center]="mode() !== 'standard'">
+        <div
+            class="bg-card relative flex h-full flex-col justify-center rounded-2xl p-4 shadow"
+            [class.items-center]="mode() !== 'standard'"
+        >
             <button
                 mat-icon-button
                 class="absolute right-1 top-1"

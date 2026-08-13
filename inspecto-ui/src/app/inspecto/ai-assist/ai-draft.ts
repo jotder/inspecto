@@ -115,7 +115,9 @@ export function adaptToolResult(tool: AiToolName, result: unknown): AiDraft[] {
                     config: draft,
                     clean: result['clean'] === true,
                     findings: findingsOf(result),
-                    note: widgets.length ? `${widgets.length} widget${widgets.length === 1 ? '' : 's'} applied first` : undefined,
+                    note: widgets.length
+                        ? `${widgets.length} widget${widgets.length === 1 ? '' : 's'} applied first`
+                        : undefined,
                     prerequisites: widgets
                         .filter((w) => isRecord(w['draft']))
                         .map((w) => ({

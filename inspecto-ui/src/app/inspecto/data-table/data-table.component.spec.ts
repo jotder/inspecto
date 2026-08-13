@@ -9,7 +9,10 @@ import { DataTableComponent, DataTableTier } from './data-table.component';
 async function create(tier: DataTableTier = 'standard') {
     TestBed.configureTestingModule({
         imports: [DataTableComponent],
-        providers: [provideNoopAnimations(), { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+        ],
     });
     await TestBed.compileComponents(); // the component has a @defer block (the SQL editor)
     const f = TestBed.createComponent(DataTableComponent);
@@ -84,7 +87,9 @@ describe('DataTableComponent', () => {
 
         let emitted = false;
         f.componentInstance.loadMore.subscribe(() => (emitted = true));
-        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Load more'))?.click();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Load more'))
+            ?.click();
         expect(emitted).toBe(true);
 
         f.componentRef.setInput('hasMore', false);
@@ -102,7 +107,10 @@ describe('DataTableComponent', () => {
 
     it('columnMeta overrides pure value-inference for the Pro filter/SQL builder', async () => {
         const f = await create('pro');
-        f.componentRef.setInput('columnMeta', [{ name: 'id', type: 'string' as const }, { name: 'name', type: 'string' as const }]);
+        f.componentRef.setInput('columnMeta', [
+            { name: 'id', type: 'string' as const },
+            { name: 'name', type: 'string' as const },
+        ]);
         f.detectChanges();
         expect(f.componentInstance.columnsCache()).toEqual([
             { name: 'id', type: 'string' },
@@ -114,7 +122,11 @@ describe('DataTableComponent', () => {
         const f = await create('pro');
         f.componentRef.setInput('initialModel', {
             projection: ['name'],
-            where: { kind: 'group' as const, op: 'AND' as const, items: [{ kind: 'condition' as const, field: 'name', operator: '=' as const, value: 'beta' }] },
+            where: {
+                kind: 'group' as const,
+                op: 'AND' as const,
+                items: [{ kind: 'condition' as const, field: 'name', operator: '=' as const, value: 'beta' }],
+            },
             sqlOverride: null,
         });
         f.detectChanges();
@@ -124,7 +136,11 @@ describe('DataTableComponent', () => {
 
         // Seeding is one-time: a later change to `initialModel` (e.g. the host resetting a form) is ignored.
         c.onChosen(['id']);
-        f.componentRef.setInput('initialModel', { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null });
+        f.componentRef.setInput('initialModel', {
+            projection: '*',
+            where: { kind: 'group', op: 'AND', items: [] },
+            sqlOverride: null,
+        });
         f.detectChanges();
         expect(c.chosen()).toEqual(['id']);
     });

@@ -1,4 +1,12 @@
-import { G6Edge, G6GraphData, G6Node, EntityProjection, GraphSource, GraphSourceQuery, mergeGraphs } from 'app/inspecto/graph';
+import {
+    G6Edge,
+    G6GraphData,
+    G6Node,
+    EntityProjection,
+    GraphSource,
+    GraphSourceQuery,
+    mergeGraphs,
+} from 'app/inspecto/graph';
 import { InvService, ProjectionTriple } from 'app/inspecto/api';
 import { evaluateRows, inferColumns } from 'app/inspecto/query';
 import { firstValueFrom } from 'rxjs';
@@ -68,13 +76,19 @@ export function isProjectionError(v: ProjectedGraph | ProjectionError): v is Pro
 }
 
 /** Pure row→graph fold. Rows with a blank source or target value are skipped. */
-export function projectEntities(rows: Record<string, unknown>[], p: EntityProjection): ProjectedGraph | ProjectionError {
+export function projectEntities(
+    rows: Record<string, unknown>[],
+    p: EntityProjection,
+): ProjectedGraph | ProjectionError {
     if (!p.sourceCol || !p.targetCol) return { error: 'The mapping needs a source and a target column.' };
     if (rows.length && !(p.sourceCol in rows[0])) return { error: `Column '${p.sourceCol}' is not in the dataset.` };
     if (rows.length && !(p.targetCol in rows[0])) return { error: `Column '${p.targetCol}' is not in the dataset.` };
 
     const nodes = new Map<string, G6Node>();
-    const edges = new Map<string, G6Edge & { data: { kind: string; count: number; attrs?: Record<string, string | null> } }>();
+    const edges = new Map<
+        string,
+        G6Edge & { data: { kind: string; count: number; attrs?: Record<string, string | null> } }
+    >();
     let truncated = false;
 
     const ensure = (value: string, column: string): string | null => {
@@ -119,7 +133,11 @@ export function projectEntities(rows: Record<string, unknown>[], p: EntityProjec
  * {@link projectEntities}: `entity:<value>` node ids, `sid->tid:kind` edge ids, `kind · count`
  * folded-edge labels, and the {@link PROJECTION_NODE_CAP} with a truncation flag.
  */
-export function projectTriples(triples: ProjectionTriple[], serverTruncated: boolean, p?: EntityProjection): ProjectedGraph {
+export function projectTriples(
+    triples: ProjectionTriple[],
+    serverTruncated: boolean,
+    p?: EntityProjection,
+): ProjectedGraph {
     const nodes = new Map<string, G6Node>();
     const edges: G6Edge[] = [];
     let truncated = serverTruncated;
@@ -187,13 +205,15 @@ export class EntityProjectionGraphSource implements GraphSource {
         if (!p.datasetId) throw new Error('The entity-projection source needs a Dataset mapping.');
         if (!p.sourceCol || !p.targetCol) throw new Error('The mapping needs a source and a target column.');
         try {
-            const res = await firstValueFrom(this.inv.project({
-                dataset: p.datasetId,
-                sourceCol: p.sourceCol,
-                targetCol: p.targetCol,
-                linkKindCol: p.linkKindCol || undefined,
-                attrCols: p.attrCols?.length ? p.attrCols : undefined,
-            }));
+            const res = await firstValueFrom(
+                this.inv.project({
+                    dataset: p.datasetId,
+                    sourceCol: p.sourceCol,
+                    targetCol: p.targetCol,
+                    linkKindCol: p.linkKindCol || undefined,
+                    attrCols: p.attrCols?.length ? p.attrCols : undefined,
+                }),
+            );
             return projectTriples(res.rows, res.truncated, p);
         } catch {
             // Offline / mock (501) or an older backend: the original client-side sample fold.
@@ -213,14 +233,16 @@ export class EntityProjectionGraphSource implements GraphSource {
     async expand(_nodeId: string, nodeLabel: string, q: GraphSourceQuery): Promise<ProjectedGraph> {
         const p = q.projection;
         if (!p) throw new Error('Incremental expand needs a single-mapping query.');
-        const res = await firstValueFrom(this.inv.neighbors({
-            dataset: p.datasetId,
-            sourceCol: p.sourceCol,
-            targetCol: p.targetCol,
-            linkKindCol: p.linkKindCol || undefined,
-            attrCols: p.attrCols?.length ? p.attrCols : undefined,
-            value: nodeLabel,
-        }));
+        const res = await firstValueFrom(
+            this.inv.neighbors({
+                dataset: p.datasetId,
+                sourceCol: p.sourceCol,
+                targetCol: p.targetCol,
+                linkKindCol: p.linkKindCol || undefined,
+                attrCols: p.attrCols?.length ? p.attrCols : undefined,
+                value: nodeLabel,
+            }),
+        );
         return projectTriples(res.rows, res.truncated, p);
     }
 }

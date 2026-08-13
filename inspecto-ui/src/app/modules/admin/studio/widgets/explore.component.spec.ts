@@ -40,13 +40,23 @@ function create() {
                 provide: ComponentsService,
                 useValue: {
                     list: () =>
-                        of([{ type: 'geo-map-view', name: 'dhaka-network', ref: '', content: { name: 'Example — Dhaka cell network' } }]),
+                        of([
+                            {
+                                type: 'geo-map-view',
+                                name: 'dhaka-network',
+                                ref: '',
+                                content: { name: 'Example — Dhaka cell network' },
+                            },
+                        ]),
                 },
             },
             // Pass-through to the offline runSpec (no cache, no HttpClient) — byte-identical M1 behaviour.
             { provide: DatasetResultService, useValue: { run: runSpec, clear: () => undefined } },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });

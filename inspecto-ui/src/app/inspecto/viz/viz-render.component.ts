@@ -29,11 +29,21 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = { kpi: KpiComponent };
         @switch (renderKind()) {
             @case ('chartjs') {
                 @if (chartData(); as data) {
-                    <inspecto-chart [type]="chartType()" [data]="data" [options]="chartJsOptions()" (elementClick)="onElementClick($event)" />
+                    <inspecto-chart
+                        [type]="chartType()"
+                        [data]="data"
+                        [options]="chartJsOptions()"
+                        (elementClick)="onElementClick($event)"
+                    />
                 }
             }
             @case ('aggrid') {
-                <inspecto-data-table tier="standard" [rows]="props().rows ?? []" [columns]="colDefs()" [sourceName]="title()" />
+                <inspecto-data-table
+                    tier="standard"
+                    [rows]="props().rows ?? []"
+                    [columns]="colDefs()"
+                    [sourceName]="title()"
+                />
             }
             @case ('component') {
                 @if (outletComponent(); as cmp) {
@@ -69,7 +79,7 @@ export class VizRenderComponent {
     /** The Angular component for a `component`-render plugin — static map first, then the loader registry. */
     readonly outletComponent = computed<Type<unknown> | null>(() => {
         const r = this.plugin().render;
-        return r.kind === 'component' ? COMPONENT_BY_KEY[r.componentKey] ?? this.loadedComponent() : null;
+        return r.kind === 'component' ? (COMPONENT_BY_KEY[r.componentKey] ?? this.loadedComponent()) : null;
     });
 
     constructor() {
@@ -124,19 +134,32 @@ export class VizRenderComponent {
 
         if (plugin.meta.type === 'gauge') {
             const value = Math.max(0, Math.min(100, this.props().value ?? 0));
-            return { labels: ['Value', 'Remaining'], datasets: [{ data: [value, 100 - value], backgroundColor: [color(0), GAUGE_TRACK] }] };
+            return {
+                labels: ['Value', 'Remaining'],
+                datasets: [{ data: [value, 100 - value], backgroundColor: [color(0), GAUGE_TRACK] }],
+            };
         }
         if (plugin.meta.type === 'scatter') {
             const [xs, ys] = p.series;
             const points = (xs?.data ?? []).map((x, i) => ({ x, y: ys?.data[i] ?? 0 }));
-            return { labels: p.labels, datasets: [{ label: 'Scatter', data: points, backgroundColor: p.labels.map((_, i) => color(i)) }] };
+            return {
+                labels: p.labels,
+                datasets: [{ label: 'Scatter', data: points, backgroundColor: p.labels.map((_, i) => color(i)) }],
+            };
         }
         if (plugin.meta.type === 'bubble') {
             const [xs, ys, sizes] = p.series;
             const maxSize = Math.max(1, ...(sizes?.data ?? [0]));
             const toRadius = (v: number): number => 4 + (Math.max(0, v) / maxSize) * 20; // 4–24px, relative to the largest point
-            const points = (xs?.data ?? []).map((x, i) => ({ x, y: ys?.data[i] ?? 0, r: toRadius(sizes?.data[i] ?? 0) }));
-            return { labels: p.labels, datasets: [{ label: 'Bubble', data: points, backgroundColor: p.labels.map((_, i) => color(i)) }] };
+            const points = (xs?.data ?? []).map((x, i) => ({
+                x,
+                y: ys?.data[i] ?? 0,
+                r: toRadius(sizes?.data[i] ?? 0),
+            }));
+            return {
+                labels: p.labels,
+                datasets: [{ label: 'Bubble', data: points, backgroundColor: p.labels.map((_, i) => color(i)) }],
+            };
         }
 
         const isPie = r.chartType === 'pie' || r.chartType === 'doughnut';
@@ -182,8 +205,14 @@ export class VizRenderComponent {
             scales:
                 axis?.xTitle || axis?.yTitle || stacked
                     ? {
-                          x: { stacked: !!stacked, title: axis?.xTitle ? { display: true, text: axis.xTitle } : undefined },
-                          y: { stacked: !!stacked, title: axis?.yTitle ? { display: true, text: axis.yTitle } : undefined },
+                          x: {
+                              stacked: !!stacked,
+                              title: axis?.xTitle ? { display: true, text: axis.xTitle } : undefined,
+                          },
+                          y: {
+                              stacked: !!stacked,
+                              title: axis?.yTitle ? { display: true, text: axis.yTitle } : undefined,
+                          },
                       }
                     : undefined,
         };

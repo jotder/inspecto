@@ -16,7 +16,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     imports: [MatButtonModule, MatCheckboxModule, MatIconModule, MatMenuModule, MatTooltipModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <button mat-icon-button type="button" [matMenuTriggerFor]="menu" [matTooltip]="label()" [attr.aria-label]="label()">
+        <button
+            mat-icon-button
+            type="button"
+            [matMenuTriggerFor]="menu"
+            [matTooltip]="label()"
+            [attr.aria-label]="label()"
+        >
             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:view-columns"></mat-icon>
         </button>
         <mat-menu #menu="matMenu">
@@ -26,8 +32,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
                     <button mat-button type="button" (click)="selectedChange.emit([])">None</button>
                     @if (resettable()) {
                         <span class="flex-1"></span>
-                        <button mat-button type="button" matTooltip="Restore default column layout, sort and search"
-                                (click)="resetRequested.emit()">Reset layout</button>
+                        <button
+                            mat-button
+                            type="button"
+                            matTooltip="Restore default column layout, sort and search"
+                            (click)="resetRequested.emit()"
+                        >
+                            Reset layout
+                        </button>
                     }
                 </div>
                 @for (c of columns(); track c) {

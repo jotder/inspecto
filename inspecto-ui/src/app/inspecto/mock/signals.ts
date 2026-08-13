@@ -41,7 +41,13 @@ let auditSeq = 0;
 export function emitAudit(
     store: MockStore,
     space: string,
-    opts: { action: string; category: 'config' | 'operate' | 'read' | 'destructive'; targetType: string; targetId: string; message: string },
+    opts: {
+        action: string;
+        category: 'config' | 'operate' | 'read' | 'destructive';
+        targetType: string;
+        targetId: string;
+        message: string;
+    },
 ): Signal {
     const at = Date.now();
     return emitSignal(store, space, {

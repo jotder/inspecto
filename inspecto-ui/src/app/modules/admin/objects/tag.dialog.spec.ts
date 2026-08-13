@@ -29,7 +29,16 @@ function create(targets: OperationalObject[]) {
         imports: [TagDialog],
         providers: [
             provideNoopAnimations(),
-            { provide: MAT_DIALOG_DATA, useValue: { targets, registry: [{ name: 'billing', createdAt: 1 }, { name: 'urgent', createdAt: 1 }] } },
+            {
+                provide: MAT_DIALOG_DATA,
+                useValue: {
+                    targets,
+                    registry: [
+                        { name: 'billing', createdAt: 1 },
+                        { name: 'urgent', createdAt: 1 },
+                    ],
+                },
+            },
             { provide: MatDialogRef, useValue: ref },
             { provide: ObjectsService, useValue: api },
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },

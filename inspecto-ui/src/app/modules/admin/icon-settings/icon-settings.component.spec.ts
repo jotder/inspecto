@@ -9,7 +9,15 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { IconSettingsComponent } from './icon-settings.component';
 
 const TYPES = [
-    { type: 'parser.dsv', category: 'PARSE', label: 'DSV', description: '', accepts: [], emits: [], emitsNamedRoutes: false },
+    {
+        type: 'parser.dsv',
+        category: 'PARSE',
+        label: 'DSV',
+        description: '',
+        accepts: [],
+        emits: [],
+        emitsNamedRoutes: false,
+    },
 ];
 
 function make() {
@@ -18,7 +26,13 @@ function make() {
         providers: [
             provideNoopAnimations(),
             { provide: PipelinesService, useValue: { nodeTypes: () => of(TYPES) } },
-            { provide: IconMapService, useValue: { get: () => of({ PARSE: { glyph: 'lines', color: NODE_KIND_COLORS.SCHEMA } }), save: (m: unknown) => of(m) } },
+            {
+                provide: IconMapService,
+                useValue: {
+                    get: () => of({ PARSE: { glyph: 'lines', color: NODE_KIND_COLORS.SCHEMA } }),
+                    save: (m: unknown) => of(m),
+                },
+            },
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
         ],
     });

@@ -51,12 +51,17 @@ export function dbBrowserHandler(flags: MockFlags): MockHandler {
             return json({
                 groups: [
                     {
-                        id: 'stores', label: 'Data Stores', kind: 'parquet',
+                        id: 'stores',
+                        label: 'Data Stores',
+                        kind: 'parquet',
                         tables: [{ name: 'orders', format: 'PARQUET', dataset: 'orders_ds' }],
                     },
                     {
-                        id: 'ops:objects', label: 'Operational · Objects', kind: 'operational',
-                        engine: 'duckdb', live: true,
+                        id: 'ops:objects',
+                        label: 'Operational · Objects',
+                        kind: 'operational',
+                        engine: 'duckdb',
+                        live: true,
                         tables: [{ name: 'inspecto_ops_objects' }],
                     },
                 ],

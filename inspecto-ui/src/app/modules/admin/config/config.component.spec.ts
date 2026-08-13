@@ -12,10 +12,24 @@ const SPEC: ConfigSpec = {
     type: 'pipeline',
     fields: [
         { path: 'pipeline', label: 'Pipeline', type: 'STRING', required: true, description: 'Pipeline name' },
-        { path: 'source.connector', label: 'Connector', type: 'ENUM', required: true, description: 'Connector', enumValues: ['sftp', 's3'] },
+        {
+            path: 'source.connector',
+            label: 'Connector',
+            type: 'ENUM',
+            required: true,
+            description: 'Connector',
+            enumValues: ['sftp', 's3'],
+        },
         { path: 'source.tags', label: 'Tags', type: 'LIST', required: false, description: 'Tags' },
         { path: 'source.enabled', label: 'Enabled', type: 'BOOL', required: false, description: 'Enabled' },
-        { path: 'source.threads', label: 'Threads', type: 'INT', required: false, description: 'Reader threads', defaultValue: 2 },
+        {
+            path: 'source.threads',
+            label: 'Threads',
+            type: 'INT',
+            required: false,
+            description: 'Reader threads',
+            defaultValue: 2,
+        },
     ],
     rules: [{ description: 'connector requires connection', affectedFields: ['source.connector'] }],
 } as ConfigSpec;
@@ -39,11 +53,20 @@ describe('config spec → attribute mapping', () => {
         const specs = toAttrSpecs(SPEC.fields);
         expect(specs.map((s) => s.key)).toEqual(['f0', 'f1', 'f2', 'f3', 'f4']);
         // The control label is the dotted .toon path; the human label rides in the help text.
-        expect(specs.map((s) => s.label)).toEqual(['pipeline', 'source.connector', 'source.tags', 'source.enabled', 'source.threads']);
+        expect(specs.map((s) => s.label)).toEqual([
+            'pipeline',
+            'source.connector',
+            'source.tags',
+            'source.enabled',
+            'source.threads',
+        ]);
         expect(specs[0].help).toBe('Pipeline — Pipeline name');
         expect(specs.map((s) => s.tier)).toEqual(['required', 'required', 'optional', 'optional', 'optional']);
         expect(specs[1].type).toBe('select');
-        expect(specs[1].options).toEqual([{ value: 'sftp', label: 'sftp' }, { value: 's3', label: 's3' }]);
+        expect(specs[1].options).toEqual([
+            { value: 'sftp', label: 'sftp' },
+            { value: 's3', label: 's3' },
+        ]);
         expect(specs[2].type).toBe('string'); // LIST edits as comma-separated text
         expect(specs[3].type).toBe('boolean');
         expect(specs[4].type).toBe('number');
@@ -52,7 +75,10 @@ describe('config spec → attribute mapping', () => {
 
     it('assembles the flat schema-form value into a nested config and splits LIST text', () => {
         const assembled = assembleConfig(SPEC.fields, { f0: 'cdr', f1: 'sftp', f2: ' a, b ,, ', f3: true, f4: 4 });
-        expect(assembled).toEqual({ pipeline: 'cdr', source: { connector: 'sftp', tags: ['a', 'b'], enabled: true, threads: 4 } });
+        expect(assembled).toEqual({
+            pipeline: 'cdr',
+            source: { connector: 'sftp', tags: ['a', 'b'], enabled: true, threads: 4 },
+        });
     });
 
     it('drops empties and empty LISTs from the assembled config', () => {
@@ -91,7 +117,9 @@ describe('ConfigComponent', () => {
             validateDraft: () =>
                 of({
                     clean: false,
-                    findings: [{ severity: 'ERROR', fieldPath: 'pipeline', message: 'Required field "pipeline" is missing.' }],
+                    findings: [
+                        { severity: 'ERROR', fieldPath: 'pipeline', message: 'Required field "pipeline" is missing.' },
+                    ],
                     warnings: [],
                     safetyChecked: false,
                 }),

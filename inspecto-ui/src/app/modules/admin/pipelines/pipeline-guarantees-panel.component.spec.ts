@@ -51,8 +51,9 @@ describe('PipelineGuaranteesPanelComponent', () => {
         const { fixture, c } = create({ model: MODEL, editable: true });
         const edited: AuthoredNode[] = [];
         c.edit.subscribe((n) => edited.push(n));
-        const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-            .find((b) => b.getAttribute('aria-label') === 'Edit File dedup');
+        const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+            (b) => b.getAttribute('aria-label') === 'Edit File dedup',
+        );
         btn!.click();
         expect(edited.map((n) => n.id)).toEqual(['acq']);
     });

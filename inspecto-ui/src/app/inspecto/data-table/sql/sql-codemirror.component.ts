@@ -1,4 +1,14 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, effect, input, output, viewChild } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    Component,
+    ElementRef,
+    OnDestroy,
+    effect,
+    input,
+    output,
+    viewChild,
+} from '@angular/core';
 import { EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { sqlEditorExtensions } from './codemirror-setup';

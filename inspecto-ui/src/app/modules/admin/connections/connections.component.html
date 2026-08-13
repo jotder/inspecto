@@ -25,7 +25,10 @@
     </div>
 
     <div class="relative mt-4 max-w-md">
-        <mat-icon class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+        <mat-icon
+            class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2"
+            svgIcon="heroicons_outline:magnifying-glass"
+        ></mat-icon>
         <input
             type="text"
             class="bg-card w-full rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
@@ -43,9 +46,9 @@
 
     @if (!loading && connections.length === 0) {
         <div class="text-secondary mt-8">
-            No connection profiles loaded. Author a <code>*_connection.toon</code> next to your pipeline
-            configs — a <code>connection</code> block with <code>id</code>, <code>connector</code>,
-            <code>host</code>, <code>port</code>, … and <code>$&#123;ENV:…&#125;</code> credential references.
+            No connection profiles loaded. Author a <code>*_connection.toon</code> next to your pipeline configs — a
+            <code>connection</code> block with <code>id</code>, <code>connector</code>, <code>host</code>,
+            <code>port</code>, … and <code>$&#123;ENV:…&#125;</code> credential references.
         </div>
     }
 
@@ -57,7 +60,10 @@
                     <div class="min-w-0">
                         <div class="break-all font-mono text-lg font-semibold">{{ c.id }}</div>
                         <div class="text-secondary mt-0.5 flex flex-wrap items-center gap-2 text-sm">
-                            <span class="inline-block rounded bg-gray-200 px-2 py-0.5 font-mono text-xs uppercase dark:bg-gray-700">{{ c.connector }}</span>
+                            <span
+                                class="inline-block rounded bg-gray-200 px-2 py-0.5 font-mono text-xs uppercase dark:bg-gray-700"
+                                >{{ c.connector }}</span
+                            >
                             <span>{{ endpoint(c) }}</span>
                             <inspecto-status-badge [value]="healthValue(c)" [label]="healthLabel(c)" />
                         </div>
@@ -72,7 +78,12 @@
                             }
                             Test
                         </button>
-                        <button mat-icon-button [routerLink]="[c.id]" matTooltip="Open workbench (explore + sample)" aria-label="Open workbench">
+                        <button
+                            mat-icon-button
+                            [routerLink]="[c.id]"
+                            matTooltip="Open workbench (explore + sample)"
+                            aria-label="Open workbench"
+                        >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:beaker"></mat-icon>
                         </button>
                         @if (!writesDisabled && lens.canOnboardConnections()) {
@@ -87,15 +98,29 @@
                 </div>
 
                 <div class="text-secondary mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                    @if (c.database) { <div><span class="font-medium">database:</span> {{ c.database }}</div> }
-                    @if (c.basePath) { <div><span class="font-medium">base path:</span> {{ c.basePath }}</div> }
-                    @if (c.username) { <div><span class="font-medium">username:</span> {{ c.username }}</div> }
-                    @if (c.password) { <div><span class="font-medium">password:</span> <span class="font-mono">{{ c.password }}</span></div> }
+                    @if (c.database) {
+                        <div><span class="font-medium">database:</span> {{ c.database }}</div>
+                    }
+                    @if (c.basePath) {
+                        <div><span class="font-medium">base path:</span> {{ c.basePath }}</div>
+                    }
+                    @if (c.username) {
+                        <div><span class="font-medium">username:</span> {{ c.username }}</div>
+                    }
+                    @if (c.password) {
+                        <div>
+                            <span class="font-medium">password:</span> <span class="font-mono">{{ c.password }}</span>
+                        </div>
+                    }
                     @for (o of optionEntries(c); track o.key) {
-                        <div><span class="font-medium">{{ o.key }}:</span> {{ o.value }}</div>
+                        <div>
+                            <span class="font-medium">{{ o.key }}:</span> {{ o.value }}
+                        </div>
                     }
                     @if (c.tunnel?.host) {
-                        <div class="sm:col-span-2"><span class="font-medium">tunnel:</span> {{ c.tunnel.host }}:{{ c.tunnel.port ?? '?' }}</div>
+                        <div class="sm:col-span-2">
+                            <span class="font-medium">tunnel:</span> {{ c.tunnel.host }}:{{ c.tunnel.port ?? '?' }}
+                        </div>
                     }
                 </div>
 
@@ -107,7 +132,9 @@
                         [icon]="r.reachable ? 'heroicons_outline:check-circle' : 'heroicons_outline:x-circle'"
                     >
                         <span class="font-semibold">{{ r.reachable ? 'Reachable' : 'Unreachable' }}</span>
-                        @if (r.latencyMs != null) { · {{ r.latencyMs }} ms }
+                        @if (r.latencyMs != null) {
+                            · {{ r.latencyMs }} ms
+                        }
                         · secrets {{ r.secretsResolved ? 'resolved' : 'unresolved' }}
                         <div class="text-secondary mt-0.5">{{ r.detail }}</div>
                     </inspecto-alert>

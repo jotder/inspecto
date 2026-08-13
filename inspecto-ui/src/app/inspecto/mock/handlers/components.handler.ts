@@ -14,7 +14,17 @@ import { emitAudit } from '../signals';
  * module library moved to the served parser framework — see `parsers.handler`.)
  */
 
-const STUDIO_KINDS = new Set(['dataset', 'query', 'widget', 'dashboard', 'requirement', 'reconciliation', 'link-analysis-view', 'geo-map-view', 'pattern-pack']);
+const STUDIO_KINDS = new Set([
+    'dataset',
+    'query',
+    'widget',
+    'dashboard',
+    'requirement',
+    'reconciliation',
+    'link-analysis-view',
+    'geo-map-view',
+    'pattern-pack',
+]);
 
 /** MockStore collection for a component kind. */
 export const componentCollection = (kind: string): string => `component:${kind}`;
@@ -24,7 +34,13 @@ const historyCollection = (kind: string): string => `component-history:${kind}`;
 const HISTORY_KEEP = 10;
 
 /** One archived copy as stored in the mock history collection. */
-interface StoredVersion { id: string; version: number; savedAt: string; contentHash: string; content: Record<string, unknown>; }
+interface StoredVersion {
+    id: string;
+    version: number;
+    savedAt: string;
+    contentHash: string;
+    content: Record<string, unknown>;
+}
 
 const COMPONENT_TEST = /\/components\/([^/]+)\/([^/]+)\/test$/;
 const COMPONENT_VERSIONS = /\/components\/([^/]+)\/([^/]+)\/versions$/;
@@ -44,7 +60,9 @@ const TRANSFORM_TYPES = new Set(['DIRECT', 'EXPR', 'CONCAT_DT', 'FILENAME_DATE']
  * `components.handler.spec.ts` pins the cases.
  */
 export function mappingRuleFindings(rules: Record<string, unknown>[]): {
-    severity: string; fieldPath: string; message: string;
+    severity: string;
+    fieldPath: string;
+    message: string;
 }[] {
     const err = (fieldPath: string, message: string) => ({ severity: 'ERROR', fieldPath, message });
     if (!rules.length) return [err('', 'A mapping needs at least one rule.')];
@@ -59,13 +77,22 @@ export function mappingRuleFindings(rules: Record<string, unknown>[]): {
 
         if (!target) out.push(err(`${at}targetColumn`, 'A target column is required.'));
         else if (seen.has(target))
-            out.push(err(`${at}targetColumn`,
-                `Duplicate target column '${target}' — rule ${seen.get(target)! + 1} already writes it.`));
+            out.push(
+                err(
+                    `${at}targetColumn`,
+                    `Duplicate target column '${target}' — rule ${seen.get(target)! + 1} already writes it.`,
+                ),
+            );
         else seen.set(target, i);
 
         if (type && !TRANSFORM_TYPES.has(type)) {
-            out.push(err(`${at}transformType`, `Unknown transform type '${str('transformType')}'. `
-                + `Valid: DIRECT (or leave blank), ${[...TRANSFORM_TYPES].sort().join(', ')}.`));
+            out.push(
+                err(
+                    `${at}transformType`,
+                    `Unknown transform type '${str('transformType')}'. ` +
+                        `Valid: DIRECT (or leave blank), ${[...TRANSFORM_TYPES].sort().join(', ')}.`,
+                ),
+            );
             return;
         }
         if (!source) {
@@ -75,15 +102,15 @@ export function mappingRuleFindings(rules: Record<string, unknown>[]): {
         if (type === 'CONCAT_DT' && !source.includes('|'))
             out.push(err(`${at}sourceExpression`, "CONCAT_DT needs '<dateColumn>|<timeColumn>'."));
         if (type === 'FILENAME_DATE' && target !== 'EVENT_DATE')
-            out.push(err(`${at}targetColumn`,
-                `FILENAME_DATE is only supported for the EVENT_DATE column, got '${target}'.`));
+            out.push(
+                err(`${at}targetColumn`, `FILENAME_DATE is only supported for the EVENT_DATE column, got '${target}'.`),
+            );
     });
     return out;
 }
 
 export function componentsHandler(flags: MockFlags): MockHandler {
-    const enabledFor = (kind: string): boolean =>
-        STUDIO_KINDS.has(kind) ? !!flags.mockStudio : !!flags.mockPipelines;
+    const enabledFor = (kind: string): boolean => (STUDIO_KINDS.has(kind) ? !!flags.mockStudio : !!flags.mockPipelines);
 
     return (req: MockRequest, store: MockStore) => {
         const { method, url, space } = req;
@@ -129,7 +156,10 @@ export function componentsHandler(flags: MockFlags): MockHandler {
                 if (refusal) return error(422, refusal);
                 const saved = putComponent(store, space, kind, req.body, id);
                 emitAudit(store, space, {
-                    action: `${kind}.updated`, category: 'config', targetType: kind, targetId: id,
+                    action: `${kind}.updated`,
+                    category: 'config',
+                    targetType: kind,
+                    targetId: id,
                     message: `Updated ${kind} ${id}`,
                 });
                 return json(saved);
@@ -140,9 +170,12 @@ export function componentsHandler(flags: MockFlags): MockHandler {
                     const by = refs.map((r) => `${r.collection.replace('component:', '')}/${r.id}`).join(', ');
                     return error(409, `${kind} "${id}" is still referenced by: ${by}`);
                 }
-                deleteComponent(store, space, kind, id);   // purges archived versions too (MET-5)
+                deleteComponent(store, space, kind, id); // purges archived versions too (MET-5)
                 emitAudit(store, space, {
-                    action: `${kind}.deleted`, category: 'destructive', targetType: kind, targetId: id,
+                    action: `${kind}.deleted`,
+                    category: 'destructive',
+                    targetType: kind,
+                    targetId: id,
                     message: `Deleted ${kind} ${id}`,
                 });
                 return json({ deleted: true });
@@ -162,7 +195,10 @@ export function componentsHandler(flags: MockFlags): MockHandler {
                 if (refusal) return error(422, refusal);
                 const created = putComponent(store, space, kind, req.body);
                 emitAudit(store, space, {
-                    action: `${kind}.created`, category: 'config', targetType: kind, targetId: created.name,
+                    action: `${kind}.created`,
+                    category: 'config',
+                    targetType: kind,
+                    targetId: created.name,
                     message: `Created ${kind} ${created.name}`,
                 });
                 return json(created);
@@ -186,14 +222,22 @@ function mappingWriteRefusal(kind: string, body: unknown): string | null {
         return "every entry of mapping 'rules' must be an object";
     const findings = mappingRuleFindings(rules as Record<string, unknown>[]);
     if (!findings.length) return null;
-    return 'mapping rules are invalid: '
-        + findings.map((f) => (f.fieldPath ? `${f.fieldPath}: ` : '') + f.message).join('; ');
+    return (
+        'mapping rules are invalid: ' +
+        findings.map((f) => (f.fieldPath ? `${f.fieldPath}: ` : '') + f.message).join('; ')
+    );
 }
 
 /** Create (POST, id in body) or replace (PUT, id in URL) — mirrors the real id→name split. Exported so
  *  sibling domain handlers persisting a component kind through their own routes (expectations) share the
  *  MET-5 archive-on-save behaviour instead of re-rolling it. */
-export function putComponent(store: MockStore, space: string, kind: string, body: unknown, idFromUrl?: string): ComponentDef {
+export function putComponent(
+    store: MockStore,
+    space: string,
+    kind: string,
+    body: unknown,
+    idFromUrl?: string,
+): ComponentDef {
     const content = { ...((body as Record<string, unknown>) ?? {}) };
     const name = String(idFromUrl ?? content['id'] ?? 'unnamed');
     delete content['id'];
@@ -206,7 +250,13 @@ export function putComponent(store: MockStore, space: string, kind: string, body
 
 /** Write a component WITHOUT archiving — for result-stamp updates (e.g. an Expectation's `lastResult`
  *  after a run-check), which are not authoring edits (mirrors the backend's `write(…, archive=false)`). */
-export function putComponentQuiet(store: MockStore, space: string, kind: string, content: Record<string, unknown>, name: string): ComponentDef {
+export function putComponentQuiet(
+    store: MockStore,
+    space: string,
+    kind: string,
+    content: Record<string, unknown>,
+    name: string,
+): ComponentDef {
     const def: ComponentDef = { type: kind, name, ref: `${kind}/${name}`, content };
     return store.put(space, componentCollection(kind), name, def);
 }
@@ -221,12 +271,22 @@ export function deleteComponent(store: MockStore, space: string, kind: string, i
 }
 
 /** Snapshot the prior content into the kind's history collection, then prune to {@link HISTORY_KEEP}. */
-function archiveVersion(store: MockStore, space: string, kind: string, id: string, content: Record<string, unknown>): void {
+function archiveVersion(
+    store: MockStore,
+    space: string,
+    kind: string,
+    id: string,
+    content: Record<string, unknown>,
+): void {
     const coll = historyCollection(kind);
     const mine = store.list<StoredVersion>(space, coll).filter((v) => v.id === id);
     const next = mine.reduce((mx, v) => Math.max(mx, v.version), 0) + 1;
     store.put(space, coll, `${id}~v${next}`, {
-        id, version: next, savedAt: new Date().toISOString(), contentHash: `mock-${id}-v${next}`, content,
+        id,
+        version: next,
+        savedAt: new Date().toISOString(),
+        contentHash: `mock-${id}-v${next}`,
+        content,
     });
     const kept = [...mine.map((v) => v.version), next].sort((a, b) => b - a);
     for (const v of kept.slice(HISTORY_KEEP)) store.delete(space, coll, `${id}~v${v}`);
@@ -234,10 +294,18 @@ function archiveVersion(store: MockStore, space: string, kind: string, id: strin
 
 /** Prior copies of a component, newest first (MET-5). */
 function listVersions(store: MockStore, space: string, kind: string, id: string): ComponentVersion[] {
-    return store.list<StoredVersion>(space, historyCollection(kind))
+    return store
+        .list<StoredVersion>(space, historyCollection(kind))
         .filter((v) => v.id === id)
         .sort((a, b) => b.version - a.version)
-        .map((v) => ({ type: kind, id, version: v.version, savedAt: v.savedAt, contentHash: v.contentHash, content: v.content }));
+        .map((v) => ({
+            type: kind,
+            id,
+            version: v.version,
+            savedAt: v.savedAt,
+            contentHash: v.contentHash,
+            content: v.content,
+        }));
 }
 
 /** Restore an archived version as current (which archives the outgoing copy); mirrors the backend. */
@@ -249,7 +317,10 @@ function restoreVersion(store: MockStore, space: string, kind: string, id: strin
     if (!v) return error(404, `no version ${version} of ${kind} '${id}'`);
     const restored = putComponent(store, space, kind, { ...v.content, id }, id);
     emitAudit(store, space, {
-        action: `${kind}.restored`, category: 'config', targetType: kind, targetId: id,
+        action: `${kind}.restored`,
+        category: 'config',
+        targetType: kind,
+        targetId: id,
         message: `Restored ${kind} ${id} to version ${version}`,
     });
     return json(restored);
@@ -268,4 +339,3 @@ function componentTest(type: string, idRef: string): unknown {
         ],
     };
 }
-

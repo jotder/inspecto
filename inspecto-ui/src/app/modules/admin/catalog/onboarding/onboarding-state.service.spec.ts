@@ -11,7 +11,10 @@ function create(configApi: Partial<ConfigService> = {}) {
     TestBed.configureTestingModule({
         providers: [
             OnboardingStateService,
-            { provide: ConfigService, useValue: { read: () => of({ config: {} }), patch: () => of({ findings: [] }), ...configApi } },
+            {
+                provide: ConfigService,
+                useValue: { read: () => of({ config: {} }), patch: () => of({ findings: [] }), ...configApi },
+            },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
@@ -76,9 +79,12 @@ describe('OnboardingStateService', () => {
         expect(patch).toHaveBeenCalledWith(
             'pipeline',
             'x',
-            { collector: { connector: 'sftp', connection: null } },   // undefined → null for the wire
+            { collector: { connector: 'sftp', connection: null } }, // undefined → null for the wire
         );
-        expect((s.config() as Record<string, unknown>)['collector']).toEqual({ fetch: { mode: 'seq' }, connector: 'sftp' });
+        expect((s.config() as Record<string, unknown>)['collector']).toEqual({
+            fetch: { mode: 'seq' },
+            connector: 'sftp',
+        });
     });
 
     it('marks the draft missing on a 404 read', () => {
@@ -91,8 +97,11 @@ describe('OnboardingStateService', () => {
     it('the Reference keys stage mirrors the schema readiness and is required for Ready', () => {
         const s = create();
         s.config.set({
-            name: 'region_dim', produces: 'reference',
-            collector: { connector: 'local' }, parsing: { frontend: 'delimited' }, output: { format: 'CSV' },
+            name: 'region_dim',
+            produces: 'reference',
+            collector: { connector: 'local' },
+            parsing: { frontend: 'delimited' },
+            output: { format: 'CSV' },
         });
         expect(s.stageStatus().keys).toBe('empty');
         expect(s.lifecycle()).toBe('Draft'); // no schema yet — a schema-less pipeline cannot arm
@@ -102,9 +111,11 @@ describe('OnboardingStateService', () => {
     });
 
     it('the enrichment stage reads the companion config and loads it for streams', () => {
-        const read = vi.fn((type: string) => type === 'enrichment'
-            ? of({ config: { name: 'x_enrich', transform: 'SELECT 1' } })
-            : of({ config: { name: 'x' } }));
+        const read = vi.fn((type: string) =>
+            type === 'enrichment'
+                ? of({ config: { name: 'x_enrich', transform: 'SELECT 1' } })
+                : of({ config: { name: 'x' } }),
+        );
         const s = create({ read } as unknown as Partial<ConfigService>);
         expect(s.stageStatus().enrichment).toBe('empty');
         s.load('x');
@@ -129,7 +140,8 @@ describe('OnboardingStateService', () => {
 
     it('discard succeeds even when the companions were never authored (404)', () => {
         const remove = vi.fn((type: string) =>
-            type === 'pipeline' ? of({ type, deleted: true }) : throwError(() => ({ status: 404 })));
+            type === 'pipeline' ? of({ type, deleted: true }) : throwError(() => ({ status: 404 })),
+        );
         const s = create({ remove } as unknown as Partial<ConfigService>);
         s.name.set('x');
         let result: unknown;
@@ -146,11 +158,16 @@ describe('OnboardingStateService', () => {
     });
 
     it('marks a stage blocked on an ERROR finding (never Ready), and clears it on a clean save', () => {
-        const patch = vi.fn(() => of({ findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }] }));
+        const patch = vi.fn(() =>
+            of({ findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }] }),
+        );
         const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({
-            name: 'x', collector: { connector: 'local' }, parsing: { frontend: 'delimited' },
-            processing: { schema_file: 's.toon' }, output: { format: 'CSV' },
+            name: 'x',
+            collector: { connector: 'local' },
+            parsing: { frontend: 'delimited' },
+            processing: { schema_file: 's.toon' },
+            output: { format: 'CSV' },
         });
         expect(s.lifecycle()).toBe('Ready'); // baseline: fully configured
 
@@ -168,15 +185,22 @@ describe('OnboardingStateService', () => {
     });
 
     it('routes findings to their stage by fieldPath prefix, not the stage that saved', () => {
-        const patch = vi.fn(() => of({ findings: [
-            { severity: 'ERROR', fieldPath: 'collector.connector', message: 'bad connector' },
-            { severity: 'ERROR', fieldPath: 'output.format', message: 'bad format' },
-            { severity: 'ERROR', fieldPath: '', message: 'cross-field' },
-        ] }));
+        const patch = vi.fn(() =>
+            of({
+                findings: [
+                    { severity: 'ERROR', fieldPath: 'collector.connector', message: 'bad connector' },
+                    { severity: 'ERROR', fieldPath: 'output.format', message: 'bad format' },
+                    { severity: 'ERROR', fieldPath: '', message: 'cross-field' },
+                ],
+            }),
+        );
         const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({
-            name: 'x', collector: { connector: 'local' }, parsing: { frontend: 'delimited' },
-            processing: { schema_file: 's.toon' }, output: { format: 'CSV' },
+            name: 'x',
+            collector: { connector: 'local' },
+            parsing: { frontend: 'delimited' },
+            processing: { schema_file: 's.toon' },
+            output: { format: 'CSV' },
         });
         s.activeStageId.set('parsing'); // the SAVE came from parsing…
         s.saveBlock({ parsing: { frontend: 'delimited' } }).subscribe();
@@ -196,9 +220,9 @@ describe('OnboardingStateService', () => {
     });
 
     it('processing findings land on keys for a Reference, schema for a Stream', () => {
-        const patch = vi.fn(() => of({ findings: [
-            { severity: 'ERROR', fieldPath: 'processing.schema_file', message: 'no schema' },
-        ] }));
+        const patch = vi.fn(() =>
+            of({ findings: [{ severity: 'ERROR', fieldPath: 'processing.schema_file', message: 'no schema' }] }),
+        );
         const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({ name: 'r', produces: 'reference', processing: { schema_file: 's.toon' } });
         s.activeStageId.set('collection');
@@ -208,7 +232,9 @@ describe('OnboardingStateService', () => {
     });
 
     it('a WARNING finding toasts but does not block the stage', () => {
-        const patch = vi.fn(() => of({ findings: [{ severity: 'WARNING', fieldPath: 'parsing.x', message: 'heads up' }] }));
+        const patch = vi.fn(() =>
+            of({ findings: [{ severity: 'WARNING', fieldPath: 'parsing.x', message: 'heads up' }] }),
+        );
         const s = create({ patch } as unknown as Partial<ConfigService>);
         s.config.set({ name: 'x', parsing: { frontend: 'delimited' } });
         s.activeStageId.set('parsing');

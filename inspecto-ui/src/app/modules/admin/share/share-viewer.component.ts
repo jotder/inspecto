@@ -41,7 +41,9 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
     const plugin = getViz(widget.vizType);
     if (!plugin) return null;
     const spec = plugin.buildQuery(widget.controls ?? {}, {
-        datasetId: widget.datasetId, sourceName: widget.datasetId, filters: null,
+        datasetId: widget.datasetId,
+        sourceName: widget.datasetId,
+        filters: null,
     });
     const byId = new Map<string, ChannelValue>();
     for (const values of Object.values(widget.controls ?? {})) {
@@ -50,7 +52,7 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
     const measures: PublicMeasure[] = [];
     for (const m of spec.measures) {
         const cv = byId.get(m.id);
-        if (!cv || cv.expression) return null;   // expression measures are not embeddable (no SQL crosses)
+        if (!cv || cv.expression) return null; // expression measures are not embeddable (no SQL crosses)
         measures.push(cv.agg === 'count' ? { agg: 'count' } : { agg: cv.agg ?? 'sum', field: cv.field });
     }
     const body: PublicQueryBody = { dataset: widget.datasetId };
@@ -106,13 +108,23 @@ export class ShareViewerComponent implements OnInit {
         const vms: TileVm[] = (content.tiles ?? []).map((tile) => {
             const widget = widgets.get(tile.widgetId);
             const span: 1 | 2 = tile.span === 2 ? 2 : 1;
-            if (!widget) return { title: tile.widgetId, span, state: 'unsupported' as const,
-                detail: 'This widget is no longer part of the shared dashboard.' };
+            if (!widget)
+                return {
+                    title: tile.widgetId,
+                    span,
+                    state: 'unsupported' as const,
+                    detail: 'This widget is no longer part of the shared dashboard.',
+                };
             const title = widget.name || tile.widgetId;
             const plugin = getViz(widget.vizType);
             const body = embedQueryBody(widget);
-            if (!plugin || !body) return { title, span, state: 'unsupported' as const,
-                detail: 'This widget type cannot be embedded in a shared view.' };
+            if (!plugin || !body)
+                return {
+                    title,
+                    span,
+                    state: 'unsupported' as const,
+                    detail: 'This widget type cannot be embedded in a shared view.',
+                };
             return { title, span, state: 'loading' as const, plugin };
         });
         this.tiles.set(vms);
@@ -123,10 +135,18 @@ export class ShareViewerComponent implements OnInit {
             if (vm.state !== 'loading') return;
             const widget = widgets.get(tile.widgetId)!;
             this.share.query(this.token(), embedQueryBody(widget)!).subscribe({
-                next: (r) => this.patchTile(i, { ...vm, state: 'ready',
-                    props: vm.plugin!.transformProps(r.rows, widget.controls ?? {}) }),
-                error: (err) => this.patchTile(i, { ...vm, state: 'error',
-                    detail: apiErrorMessage(err, 'Could not load this widget’s data.') }),
+                next: (r) =>
+                    this.patchTile(i, {
+                        ...vm,
+                        state: 'ready',
+                        props: vm.plugin!.transformProps(r.rows, widget.controls ?? {}),
+                    }),
+                error: (err) =>
+                    this.patchTile(i, {
+                        ...vm,
+                        state: 'error',
+                        detail: apiErrorMessage(err, 'Could not load this widget’s data.'),
+                    }),
             });
         });
     }

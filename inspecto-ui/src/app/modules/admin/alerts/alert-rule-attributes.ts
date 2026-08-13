@@ -10,12 +10,19 @@ import { AttributeSpec } from 'app/inspecto/component-model';
 // here; see AlertRuleFormDialog's `saveForm`.
 export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
     {
-        key: 'metric', label: 'Metric', type: 'autocomplete', tier: 'required',
+        key: 'metric',
+        label: 'Metric',
+        type: 'autocomplete',
+        tier: 'required',
         placeholder: 'e.g. error_rate, rejected_files, duration_ms',
         help: 'The observability metric to watch (as emitted by the engine).',
     },
     {
-        key: 'comparator', label: 'Comparator', type: 'select', tier: 'required', default: 'gt',
+        key: 'comparator',
+        label: 'Comparator',
+        type: 'select',
+        tier: 'required',
+        default: 'gt',
         options: [
             { value: 'gt', label: '> greater than' },
             { value: 'gte', label: '≥ at least' },
@@ -26,7 +33,11 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
     },
     { key: 'threshold', label: 'Threshold', type: 'number', tier: 'required', default: 0 },
     {
-        key: 'window', label: 'Window', type: 'select', tier: 'required', default: '15m',
+        key: 'window',
+        label: 'Window',
+        type: 'select',
+        tier: 'required',
+        default: '15m',
         options: [
             { value: '5m', label: '5 minutes' },
             { value: '15m', label: '15 minutes' },
@@ -36,7 +47,11 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         help: 'The evaluation window the metric is aggregated over.',
     },
     {
-        key: 'severity', label: 'Severity', type: 'select', tier: 'required', default: 'WARNING',
+        key: 'severity',
+        label: 'Severity',
+        type: 'select',
+        tier: 'required',
+        default: 'WARNING',
         options: [
             { value: 'INFO', label: 'Info' },
             { value: 'WARNING', label: 'Warning' },
@@ -44,7 +59,10 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         ],
     },
     {
-        key: 'onPipeline', label: 'Pipeline scope', type: 'autocomplete', tier: 'optional',
+        key: 'onPipeline',
+        label: 'Pipeline scope',
+        type: 'autocomplete',
+        tier: 'optional',
         placeholder: 'e.g. cdr_ingest',
         help: 'Limit the rule to one Pipeline; leave blank to watch every Pipeline.',
     },

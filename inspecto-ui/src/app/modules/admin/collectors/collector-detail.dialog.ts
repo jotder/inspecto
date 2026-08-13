@@ -1,20 +1,11 @@
-import {
-  Component,
-  inject,
-  OnInit,
-  ChangeDetectionStrategy,
-} from "@angular/core";
-import { RouterLink } from "@angular/router";
-import { MatButtonModule } from "@angular/material/button";
-import {
-  MAT_DIALOG_DATA,
-  MatDialogModule,
-  MatDialogRef,
-} from "@angular/material/dialog";
-import { MatIconModule } from "@angular/material/icon";
-import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
-import { InboxStatus, RunsService, CollectorView } from "app/inspecto/api";
-import { ChipComponent } from "app/inspecto/components/chip.component";
+import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { InboxStatus, RunsService, CollectorView } from 'app/inspecto/api';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 
 /**
  * Collector detail dialog — the full `/collectors` config for one collector, a link to its bound
@@ -22,173 +13,150 @@ import { ChipComponent } from "app/inspecto/components/chip.component";
  * running) from GET /runs/{name}/pending.
  */
 @Component({
-  selector: "app-collector-detail-dialog",
-  standalone: true,
-  imports: [
-    RouterLink,
-    MatDialogModule,
-    MatButtonModule,
-    MatIconModule,
-    MatProgressSpinnerModule,
-    ChipComponent,
-  ],
-  changeDetection: ChangeDetectionStrategy.Eager,
-  template: `
-    <h2 mat-dialog-title>
-      <span class="font-mono">{{ data.id }}</span>
-      <span class="text-secondary text-base font-normal">
-        · {{ data.pipeline }}</span
-      >
-    </h2>
-    <mat-dialog-content class="space-y-4">
-      <!-- Live inbox status -->
-      <div class="bg-card flex items-center gap-4 rounded-xl p-4 shadow-sm">
-        @if (statusLoading) {
-          <mat-progress-spinner
-            diameter="20"
-            mode="indeterminate"
-          ></mat-progress-spinner>
-          <span class="text-secondary">Loading inbox status…</span>
-        } @else if (status) {
-          <div class="flex items-center gap-2">
-            <mat-icon
-              class="icon-size-5"
-              [svgIcon]="
-                status.running
-                  ? 'heroicons_outline:bolt'
-                  : 'heroicons_outline:pause'
-              "
-            ></mat-icon>
-            <span class="font-medium">{{
-              status.running ? "Processing" : "Idle"
-            }}</span>
-          </div>
-          <div class="text-secondary">
-            Pending:
-            <span class="font-medium">{{
-              status.pending < 0 ? "—" : status.pending
-            }}</span>
-          </div>
-        } @else {
-          <span class="text-secondary">Inbox status unavailable.</span>
-        }
-      </div>
+    selector: 'app-collector-detail-dialog',
+    standalone: true,
+    imports: [RouterLink, MatDialogModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, ChipComponent],
+    changeDetection: ChangeDetectionStrategy.Eager,
+    template: `
+        <h2 mat-dialog-title>
+            <span class="font-mono">{{ data.id }}</span>
+            <span class="text-secondary text-base font-normal"> · {{ data.pipeline }}</span>
+        </h2>
+        <mat-dialog-content class="space-y-4">
+            <!-- Live inbox status -->
+            <div class="bg-card flex items-center gap-4 rounded-xl p-4 shadow-sm">
+                @if (statusLoading) {
+                    <mat-progress-spinner diameter="20" mode="indeterminate"></mat-progress-spinner>
+                    <span class="text-secondary">Loading inbox status…</span>
+                } @else if (status) {
+                    <div class="flex items-center gap-2">
+                        <mat-icon
+                            class="icon-size-5"
+                            [svgIcon]="status.running ? 'heroicons_outline:bolt' : 'heroicons_outline:pause'"
+                        ></mat-icon>
+                        <span class="font-medium">{{ status.running ? 'Processing' : 'Idle' }}</span>
+                    </div>
+                    <div class="text-secondary">
+                        Pending:
+                        <span class="font-medium">{{ status.pending < 0 ? '—' : status.pending }}</span>
+                    </div>
+                } @else {
+                    <span class="text-secondary">Inbox status unavailable.</span>
+                }
+            </div>
 
-      <!-- Config grid -->
-      <div class="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-        <div>
-          <span class="text-secondary font-medium">connector:</span>
-          {{ data.connector }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">connection:</span>
-          @if (data.connection) {
-            <a
-              class="text-primary hover:underline"
-              [routerLink]="['/connections']"
-              (click)="close()"
-              >{{ data.connection }}</a
-            >
-          } @else {
-            <span class="text-secondary">— (inline / local)</span>
-          }
-        </div>
-        <div>
-          <span class="text-secondary font-medium">dedup mode:</span>
-          {{ data.duplicateMode }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">on change:</span>
-          {{ data.duplicateOnChange }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">guarantee:</span>
-          {{ data.guarantee }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">recursive depth:</span>
-          {{ data.recursiveDepth }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">watermark:</span>
-          {{ data.incrementalWatermark ?? "— (full listing)" }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">db watermark:</span>
-          {{ data.dbWatermarkCurrent ?? "—" }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">fetch parallel:</span>
-          {{ data.fetchParallel }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">rate limit:</span>
-          {{ data.fetchRateLimit }}
-        </div>
-        <div>
-          <span class="text-secondary font-medium">post action:</span>
-          {{ data.postAction }}
-        </div>
-      </div>
+            <!-- Config grid -->
+            <div class="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                <div>
+                    <span class="text-secondary font-medium">connector:</span>
+                    {{ data.connector }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">connection:</span>
+                    @if (data.connection) {
+                        <a class="text-primary hover:underline" [routerLink]="['/connections']" (click)="close()">{{
+                            data.connection
+                        }}</a>
+                    } @else {
+                        <span class="text-secondary">— (inline / local)</span>
+                    }
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">dedup mode:</span>
+                    {{ data.duplicateMode }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">on change:</span>
+                    {{ data.duplicateOnChange }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">guarantee:</span>
+                    {{ data.guarantee }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">recursive depth:</span>
+                    {{ data.recursiveDepth }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">watermark:</span>
+                    {{ data.incrementalWatermark ?? '— (full listing)' }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">db watermark:</span>
+                    {{ data.dbWatermarkCurrent ?? '—' }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">fetch parallel:</span>
+                    {{ data.fetchParallel }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">rate limit:</span>
+                    {{ data.fetchRateLimit }}
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">post action:</span>
+                    {{ data.postAction }}
+                </div>
+            </div>
 
-      <!-- Includes / excludes -->
-      <div class="space-y-2 text-sm">
-        <div>
-          <span class="text-secondary font-medium">includes:</span>
-          @if (data.includes.length) {
-            <span class="inline-flex flex-wrap gap-1 align-middle">
-              @for (g of data.includes; track g) {
-                <inspecto-chip variant="soft"
-                  ><span class="font-mono">{{ g }}</span></inspecto-chip
-                >
-              }
-            </span>
-          } @else {
-            <span class="text-secondary">— (all)</span>
-          }
-        </div>
-        <div>
-          <span class="text-secondary font-medium">excludes:</span>
-          @if (data.excludes.length) {
-            <span class="inline-flex flex-wrap gap-1 align-middle">
-              @for (g of data.excludes; track g) {
-                <inspecto-chip variant="soft"
-                  ><span class="font-mono">{{ g }}</span></inspecto-chip
-                >
-              }
-            </span>
-          } @else {
-            <span class="text-secondary">—</span>
-          }
-        </div>
-      </div>
-    </mat-dialog-content>
-    <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close>Close</button>
-    </mat-dialog-actions>
-  `,
+            <!-- Includes / excludes -->
+            <div class="space-y-2 text-sm">
+                <div>
+                    <span class="text-secondary font-medium">includes:</span>
+                    @if (data.includes.length) {
+                        <span class="inline-flex flex-wrap gap-1 align-middle">
+                            @for (g of data.includes; track g) {
+                                <inspecto-chip variant="soft"
+                                    ><span class="font-mono">{{ g }}</span></inspecto-chip
+                                >
+                            }
+                        </span>
+                    } @else {
+                        <span class="text-secondary">— (all)</span>
+                    }
+                </div>
+                <div>
+                    <span class="text-secondary font-medium">excludes:</span>
+                    @if (data.excludes.length) {
+                        <span class="inline-flex flex-wrap gap-1 align-middle">
+                            @for (g of data.excludes; track g) {
+                                <inspecto-chip variant="soft"
+                                    ><span class="font-mono">{{ g }}</span></inspecto-chip
+                                >
+                            }
+                        </span>
+                    } @else {
+                        <span class="text-secondary">—</span>
+                    }
+                </div>
+            </div>
+        </mat-dialog-content>
+        <mat-dialog-actions align="end">
+            <button mat-button mat-dialog-close>Close</button>
+        </mat-dialog-actions>
+    `,
 })
 export class CollectorDetailDialog implements OnInit {
-  readonly data = inject<CollectorView>(MAT_DIALOG_DATA);
-  private runs = inject(RunsService);
-  private ref = inject(MatDialogRef<CollectorDetailDialog>);
+    readonly data = inject<CollectorView>(MAT_DIALOG_DATA);
+    private runs = inject(RunsService);
+    private ref = inject(MatDialogRef<CollectorDetailDialog>);
 
-  status: InboxStatus | null = null;
-  statusLoading = true;
+    status: InboxStatus | null = null;
+    statusLoading = true;
 
-  ngOnInit(): void {
-    this.runs.pending(this.data.pipeline).subscribe({
-      next: (s) => {
-        this.status = s;
-        this.statusLoading = false;
-      },
-      error: () => {
-        this.statusLoading = false;
-      },
-    });
-  }
+    ngOnInit(): void {
+        this.runs.pending(this.data.pipeline).subscribe({
+            next: (s) => {
+                this.status = s;
+                this.statusLoading = false;
+            },
+            error: () => {
+                this.statusLoading = false;
+            },
+        });
+    }
 
-  close(): void {
-    this.ref.close();
-  }
+    close(): void {
+        this.ref.close();
+    }
 }

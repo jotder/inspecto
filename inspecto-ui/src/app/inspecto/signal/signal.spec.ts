@@ -78,9 +78,21 @@ describe('signalToEvent projection', () => {
 
 describe('alert signals', () => {
     const alertSignal: Signal = {
-        signalId: 'alert-9', type: 'ALERT_FIRED', at: 1_700_000_000_000,
-        source: { kind: 'alert-rule', id: 'high_error_rate', rel: 'emits' }, severity: 'critical',
-        payload: { rule: 'high_error_rate', pipeline: 'cdr_ingest', metric: 'error_rate', value: 0.3, comparator: 'gt', threshold: 0.1, window: '15m', message: 'threshold exceeded' },
+        signalId: 'alert-9',
+        type: 'ALERT_FIRED',
+        at: 1_700_000_000_000,
+        source: { kind: 'alert-rule', id: 'high_error_rate', rel: 'emits' },
+        severity: 'critical',
+        payload: {
+            rule: 'high_error_rate',
+            pipeline: 'cdr_ingest',
+            metric: 'error_rate',
+            value: 0.3,
+            comparator: 'gt',
+            threshold: 0.1,
+            window: '15m',
+            message: 'threshold exceeded',
+        },
     };
 
     it('recognises an alert signal', () => {
@@ -101,7 +113,12 @@ describe('alert signals', () => {
     it('is a notify-worthy type with derived fanOut metadata', () => {
         expect(NOTIFY_TYPES.has('ALERT_FIRED')).toBe(true);
         const meta = notifyMeta(alertSignal);
-        expect(meta).toEqual({ category: 'OPS', title: 'Alert: high_error_rate', body: 'error_rate on cdr_ingest', sourceId: 'high_error_rate' });
+        expect(meta).toEqual({
+            category: 'OPS',
+            title: 'Alert: high_error_rate',
+            body: 'error_rate on cdr_ingest',
+            sourceId: 'high_error_rate',
+        });
         expect(notifyMeta(baseSignal)).toBeNull();
     });
 });
@@ -109,8 +126,16 @@ describe('alert signals', () => {
 describe('seed adapters round-trip', () => {
     it('eventToSignal → signalToEvent preserves the level/type/message/attributes', () => {
         const row: EventRow = {
-            eventId: 'evt-1', ts: 123, timestamp: new Date(123).toISOString(), level: 'WARN', type: 'FILE_QUARANTINED',
-            source: 'engine', pipeline: 'voucher_etl', correlationId: null, message: 'quarantined', attributes: { n: '1' },
+            eventId: 'evt-1',
+            ts: 123,
+            timestamp: new Date(123).toISOString(),
+            level: 'WARN',
+            type: 'FILE_QUARANTINED',
+            source: 'engine',
+            pipeline: 'voucher_etl',
+            correlationId: null,
+            message: 'quarantined',
+            attributes: { n: '1' },
         };
         const back = signalToEvent(eventToSignal(row));
         expect(back.level).toBe('WARN');
@@ -123,8 +148,16 @@ describe('seed adapters round-trip', () => {
 
     it('alertToSignal → signalToAlert preserves the alert fields and uses the given id', () => {
         const alert: FiredAlert = {
-            rule: 'slow_batch', severity: 'WARNING', pipeline: 'cdr_ingest', metric: 'duration_ms',
-            value: 45_000, comparator: 'gt', threshold: 30_000, window: '15m', epochMillis: 999, message: 'slow',
+            rule: 'slow_batch',
+            severity: 'WARNING',
+            pipeline: 'cdr_ingest',
+            metric: 'duration_ms',
+            value: 45_000,
+            comparator: 'gt',
+            threshold: 30_000,
+            window: '15m',
+            epochMillis: 999,
+            message: 'slow',
         };
         const sig = alertToSignal(alert, 'alert-ra-1');
         expect(sig.signalId).toBe('alert-ra-1');

@@ -84,14 +84,47 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     // without it), so it must be askable up front — but `required: false`, because a quarantine sink is
     // a `sink.persistent` too and sets `dir`, never `database`.
     'sink.persistent': [
-        { key: 'database', label: 'Database directory', type: 'string', tier: 'required', required: false, placeholder: 'data/<pipeline>/database', help: "Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead." },
+        {
+            key: 'database',
+            label: 'Database directory',
+            type: 'string',
+            tier: 'required',
+            required: false,
+            placeholder: 'data/<pipeline>/database',
+            help: "Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead.",
+        },
         ...OUTPUT_ATTRIBUTES,
         // Consignment Generation (the ConsignmentPlanner caps): batch__* nests to the node's `batch`
         // map, which lowers to the processing.batch: block the engine reads (G3 fix — the flat
         // batch_max_files spelling was write-only; never spec it).
-        { key: 'batch__max_files', label: 'Max files per consignment', type: 'number', tier: 'advanced', min: 1, help: 'Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment).' },
-        { key: 'batch__max_bytes', label: 'Max bytes per consignment', type: 'number', tier: 'advanced', min: 1, help: 'Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one.' },
-        { key: 'batch__order', label: 'Consignment order', type: 'select', tier: 'advanced', default: 'mtime', options: [{ value: 'mtime', label: 'By arrival (file time)' }, { value: 'name', label: 'By name (path order)' }], help: 'How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime.' },
+        {
+            key: 'batch__max_files',
+            label: 'Max files per consignment',
+            type: 'number',
+            tier: 'advanced',
+            min: 1,
+            help: 'Pack inbox files into one consignment until this many files. Blank = 1 (each file is its own consignment).',
+        },
+        {
+            key: 'batch__max_bytes',
+            label: 'Max bytes per consignment',
+            type: 'number',
+            tier: 'advanced',
+            min: 1,
+            help: 'Or until their summed size would exceed this many bytes. Whichever cap trips first ends the consignment; a single larger file forms a consignment of one.',
+        },
+        {
+            key: 'batch__order',
+            label: 'Consignment order',
+            type: 'select',
+            tier: 'advanced',
+            default: 'mtime',
+            options: [
+                { value: 'mtime', label: 'By arrival (file time)' },
+                { value: 'name', label: 'By name (path order)' },
+            ],
+            help: 'How inbox files are ordered before packing. Arrival (file time) is the default; name order is the opt-in for feeds whose stamps are unreliable — a copy resets mtime.',
+        },
     ],
     'sink.materialized': OUTPUT_ATTRIBUTES,
     'sink.view': OUTPUT_ATTRIBUTES,
@@ -99,33 +132,127 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
     // Neither is individually mandatory (a node may use either), so both are visible with
     // `required: false` rather than one being `tier: 'required'` and forcing the wrong choice.
     'transform.filter': [
-        { key: 'where', label: 'Row predicate (after parsing)', type: 'string', tier: 'required', required: false, placeholder: 'amount > 0', help: 'SQL over the mapped, typed columns. Rows matching are kept; NULL results are dropped.' },
-        { key: 'include_regex', label: 'Include matching (before parsing)', type: 'list', tier: 'optional', placeholder: '^CALL', help: 'Keep rows whose target column matches any of these regexes, checked on the raw text before parsing.' },
-        { key: 'exclude_regex', label: 'Exclude matching (before parsing)', type: 'list', tier: 'optional', placeholder: '^TEST', help: 'Drop rows whose target column matches any of these regexes.' },
-        { key: 'include_prefixes', label: 'Include by prefix (before parsing)', type: 'list', tier: 'optional', help: 'Keep rows whose target column starts with any of these.' },
-        { key: 'exclude_prefixes', label: 'Exclude by prefix (before parsing)', type: 'list', tier: 'optional', help: 'Drop rows whose target column starts with any of these.' },
-        { key: 'filter_target_column', label: 'Target column index', type: 'number', tier: 'advanced', min: 0, help: 'Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate.' },
+        {
+            key: 'where',
+            label: 'Row predicate (after parsing)',
+            type: 'string',
+            tier: 'required',
+            required: false,
+            placeholder: 'amount > 0',
+            help: 'SQL over the mapped, typed columns. Rows matching are kept; NULL results are dropped.',
+        },
+        {
+            key: 'include_regex',
+            label: 'Include matching (before parsing)',
+            type: 'list',
+            tier: 'optional',
+            placeholder: '^CALL',
+            help: 'Keep rows whose target column matches any of these regexes, checked on the raw text before parsing.',
+        },
+        {
+            key: 'exclude_regex',
+            label: 'Exclude matching (before parsing)',
+            type: 'list',
+            tier: 'optional',
+            placeholder: '^TEST',
+            help: 'Drop rows whose target column matches any of these regexes.',
+        },
+        {
+            key: 'include_prefixes',
+            label: 'Include by prefix (before parsing)',
+            type: 'list',
+            tier: 'optional',
+            help: 'Keep rows whose target column starts with any of these.',
+        },
+        {
+            key: 'exclude_prefixes',
+            label: 'Exclude by prefix (before parsing)',
+            type: 'list',
+            tier: 'optional',
+            help: 'Drop rows whose target column starts with any of these.',
+        },
+        {
+            key: 'filter_target_column',
+            label: 'Target column index',
+            type: 'number',
+            tier: 'advanced',
+            min: 0,
+            help: 'Which raw column (0-based) the four before-parsing lists above match against. Ignored by the row predicate.',
+        },
     ],
     // `branches` — the list of `{key, where}` that actually does the routing — has no spec: the `list`
     // type added with D7 is `string[]`, and these are MAPS, so it does not apply here. The named routes
     // are authored on the canvas edges anyway. `mode` is the only scalar.
     'transform.route': [
-        { key: 'mode', label: 'Route mode', type: 'select', tier: 'required', default: 'case', options: [{ value: 'case', label: 'case (exclusive)' }, { value: 'clone', label: 'clone (fan-out)' }], help: 'Named routes and their predicates are edited on the canvas edges.' },
+        {
+            key: 'mode',
+            label: 'Route mode',
+            type: 'select',
+            tier: 'required',
+            default: 'case',
+            options: [
+                { value: 'case', label: 'case (exclusive)' },
+                { value: 'clone', label: 'clone (fan-out)' },
+            ],
+            help: 'Named routes and their predicates are edited on the canvas edges.',
+        },
     ],
     // Record-grain dedup (→ processing.dedup) — distinct from the file-level duplicate Guarantees.
     'transform.dedup': [
-        { key: 'keys', label: 'Dedup keys', type: 'list', tier: 'required', help: 'Rows sharing these column values are duplicates; the first (per "Order by") is kept.', placeholder: 'call_id' },
-        { key: 'order_by', label: 'Order by', type: 'string', tier: 'optional', help: 'Which duplicate wins — SQL ordering over the typed columns; blank = input order.', placeholder: 'event_ts DESC' },
+        {
+            key: 'keys',
+            label: 'Dedup keys',
+            type: 'list',
+            tier: 'required',
+            help: 'Rows sharing these column values are duplicates; the first (per "Order by") is kept.',
+            placeholder: 'call_id',
+        },
+        {
+            key: 'order_by',
+            label: 'Order by',
+            type: 'string',
+            tier: 'optional',
+            help: 'Which duplicate wins — SQL ordering over the typed columns; blank = input order.',
+            placeholder: 'event_ts DESC',
+        },
     ],
     // Group-by rollup (→ processing.summarize) — authoring-only until the branch-aware executor arms it.
     'transform.summarize': [
-        { key: 'group_by', label: 'Group by', type: 'list', tier: 'required', help: 'Grouping columns of the rollup.', placeholder: 'region' },
-        { key: 'measures', label: 'Measures', type: 'list', tier: 'required', help: 'Aggregate expressions computed per group.', placeholder: 'sum(amount)' },
+        {
+            key: 'group_by',
+            label: 'Group by',
+            type: 'list',
+            tier: 'required',
+            help: 'Grouping columns of the rollup.',
+            placeholder: 'region',
+        },
+        {
+            key: 'measures',
+            label: 'Measures',
+            type: 'list',
+            tier: 'required',
+            help: 'Aggregate expressions computed per group.',
+            placeholder: 'sum(amount)',
+        },
     ],
     // Reference join (→ processing.join, D-4) — `reference` names a registered Reference component.
     'transform.join': [
-        { key: 'reference', label: 'Reference', type: 'autocomplete', tier: 'required', help: 'The registered Reference component joined onto the row set.', placeholder: 'reference/rates' },
-        { key: 'on', label: 'Join keys', type: 'list', tier: 'required', help: 'Column(s) equated between the rows and the Reference.', placeholder: 'currency' },
+        {
+            key: 'reference',
+            label: 'Reference',
+            type: 'autocomplete',
+            tier: 'required',
+            help: 'The registered Reference component joined onto the row set.',
+            placeholder: 'reference/rates',
+        },
+        {
+            key: 'on',
+            label: 'Join keys',
+            type: 'list',
+            tier: 'required',
+            help: 'Column(s) equated between the rows and the Reference.',
+            placeholder: 'currency',
+        },
     ],
 };
 

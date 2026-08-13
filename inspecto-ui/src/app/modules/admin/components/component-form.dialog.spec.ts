@@ -51,7 +51,10 @@ describe('ComponentFormDialog', () => {
 
         c.form.patchValue({ id: 'csv-basic', hasHeader: true });
         c.submit();
-        expect(api.create).toHaveBeenCalledWith('grammar', expect.objectContaining({ id: 'csv-basic', has_header: true }));
+        expect(api.create).toHaveBeenCalledWith(
+            'grammar',
+            expect.objectContaining({ id: 'csv-basic', has_header: true }),
+        );
         expect(ref.close).toHaveBeenCalledWith({ saved: SAVED });
     });
 
@@ -145,18 +148,26 @@ describe('ComponentFormDialog', () => {
         expect(c.form.controls['partitions'].value).toEqual(['tenant', 'day']);
 
         c.submit();
-        expect(api.update).toHaveBeenCalledWith('sink', 'my-sink', expect.objectContaining({
-            partitions: ['tenant', { column: 'day', source: 'event_time' }],
-        }));
+        expect(api.update).toHaveBeenCalledWith(
+            'sink',
+            'my-sink',
+            expect.objectContaining({
+                partitions: ['tenant', { column: 'day', source: 'event_time' }],
+            }),
+        );
 
         // A newly typed chip is still a bare string, and dropping the mapped chip drops its map with it.
         api.update.mockClear();
         c.removePartition('day');
         c.addPartition({ value: 'region', chipInput: { clear: vi.fn() } } as never);
         c.submit();
-        expect(api.update).toHaveBeenCalledWith('sink', 'my-sink', expect.objectContaining({
-            partitions: ['tenant', 'region'],
-        }));
+        expect(api.update).toHaveBeenCalledWith(
+            'sink',
+            'my-sink',
+            expect.objectContaining({
+                partitions: ['tenant', 'region'],
+            }),
+        );
     });
 
     // AI drafting was offered ONLY for the `schema` kind and was removed with it (unification W1,
@@ -167,5 +178,4 @@ describe('ComponentFormDialog', () => {
     it('offers no AI drafting on a kind component_draft cannot validate', () => {
         expect(create('grammar').fixture.nativeElement.querySelector('inspecto-ai-assist')).toBeNull();
     });
-
 });

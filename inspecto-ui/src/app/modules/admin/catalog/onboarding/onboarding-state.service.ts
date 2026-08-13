@@ -1,7 +1,15 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Observable, catchError, forkJoin, map, of, switchMap, tap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ConfigDeleteResult, ConfigService, ConfigWriteResult, Finding, ParsingPreview, SchemaPreview } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    ConfigDeleteResult,
+    ConfigService,
+    ConfigWriteResult,
+    Finding,
+    ParsingPreview,
+    SchemaPreview,
+} from 'app/inspecto/api';
 import { mergeBlock, nullifyDeletes } from 'app/inspecto/component-model';
 
 /** Stage ids across both kinds — a Stream uses schema/enrichment, a Reference keys. */
@@ -35,20 +43,84 @@ export interface OnboardingStage {
 }
 
 export const STREAM_STAGES: OnboardingStage[] = [
-    { id: 'collection', nodeType: 'acquisition', block: 'collector', label: 'Collection', icon: 'heroicons_outline:inbox-arrow-down', hint: 'Where the files come from' },
-    { id: 'parsing', nodeType: 'parser', block: 'parsing', label: 'Parsing', icon: 'heroicons_outline:code-bracket', hint: 'How raw bytes become rows' },
-    { id: 'schema', nodeType: 'parser', block: 'processing', label: 'Schema & Mapping', icon: 'heroicons_outline:table-cells', hint: 'Names, types and casts' },
-    { id: 'enrichment', nodeType: 'enrichment', block: null, label: 'Enrichment', icon: 'heroicons_outline:sparkles', hint: 'Joins and aggregations', optional: true },
-    { id: 'publish', nodeType: 'sink.persistent', block: 'output', label: 'Dataset & Go-live', icon: 'heroicons_outline:rocket-launch', hint: 'Output format and activation' },
+    {
+        id: 'collection',
+        nodeType: 'acquisition',
+        block: 'collector',
+        label: 'Collection',
+        icon: 'heroicons_outline:inbox-arrow-down',
+        hint: 'Where the files come from',
+    },
+    {
+        id: 'parsing',
+        nodeType: 'parser',
+        block: 'parsing',
+        label: 'Parsing',
+        icon: 'heroicons_outline:code-bracket',
+        hint: 'How raw bytes become rows',
+    },
+    {
+        id: 'schema',
+        nodeType: 'parser',
+        block: 'processing',
+        label: 'Schema & Mapping',
+        icon: 'heroicons_outline:table-cells',
+        hint: 'Names, types and casts',
+    },
+    {
+        id: 'enrichment',
+        nodeType: 'enrichment',
+        block: null,
+        label: 'Enrichment',
+        icon: 'heroicons_outline:sparkles',
+        hint: 'Joins and aggregations',
+        optional: true,
+    },
+    {
+        id: 'publish',
+        nodeType: 'sink.persistent',
+        block: 'output',
+        label: 'Dataset & Go-live',
+        icon: 'heroicons_outline:rocket-launch',
+        hint: 'Output format and activation',
+    },
 ];
 
 export const REFERENCE_STAGES: OnboardingStage[] = [
-    { id: 'collection', nodeType: 'acquisition', block: 'collector', label: 'Collection', icon: 'heroicons_outline:inbox-arrow-down', hint: 'Where the dumps come from' },
-    { id: 'parsing', nodeType: 'parser', block: 'parsing', label: 'Parsing', icon: 'heroicons_outline:code-bracket', hint: 'How raw bytes become rows' },
+    {
+        id: 'collection',
+        nodeType: 'acquisition',
+        block: 'collector',
+        label: 'Collection',
+        icon: 'heroicons_outline:inbox-arrow-down',
+        hint: 'Where the dumps come from',
+    },
+    {
+        id: 'parsing',
+        nodeType: 'parser',
+        block: 'parsing',
+        label: 'Parsing',
+        icon: 'heroicons_outline:code-bracket',
+        hint: 'How raw bytes become rows',
+    },
     // Required, not optional: a pipeline cannot arm without a schema — the keys stage IS where a
     // Reference gets its columns/types (plus the honest full-replace load-policy note).
-    { id: 'keys', nodeType: 'parser', block: 'processing', label: 'Keys & Load', icon: 'heroicons_outline:key', hint: 'Columns, types and the full-replace load' },
-    { id: 'publish', nodeType: 'sink.persistent', block: 'output', label: 'Publish', icon: 'heroicons_outline:rocket-launch', hint: 'Make it bindable by name' },
+    {
+        id: 'keys',
+        nodeType: 'parser',
+        block: 'processing',
+        label: 'Keys & Load',
+        icon: 'heroicons_outline:key',
+        hint: 'Columns, types and the full-replace load',
+    },
+    {
+        id: 'publish',
+        nodeType: 'sink.persistent',
+        block: 'output',
+        label: 'Publish',
+        icon: 'heroicons_outline:rocket-launch',
+        hint: 'Make it bindable by name',
+    },
 ];
 
 /**
@@ -103,7 +175,9 @@ export class OnboardingStateService {
     /** The engine's normalized pipeline id (`Identity.pipelineName`) — what `BatchEvent.pipeline()`
      *  carries and what an enrichment's `triggers.on_pipeline` must therefore use. */
     readonly normalizedName = computed(() =>
-        String((this.config() ?? {})['name'] ?? this.name()).toLowerCase().replace(/ /g, '_'),
+        String((this.config() ?? {})['name'] ?? this.name())
+            .toLowerCase()
+            .replace(/ /g, '_'),
     );
     /** Companion enrichment identity, mirroring the schema convention (`<pipeline>_schema`). */
     enrichName(): string {
@@ -124,10 +198,13 @@ export class OnboardingStateService {
         const hasSchema =
             !!proc['schema_file'] ||
             (Array.isArray(proc['schemas']) && proc['schemas'].length > 0) ||
-            !!proc['ingester'] || !!parsing['plugin'];
+            !!proc['ingester'] ||
+            !!parsing['plugin'];
         const parsingConfigured = 'parsing' in cfg;
         const schemaStatus: StageStatus = hasSchema
-            ? this.schemaPreview() && !this.schemaError() ? 'validated' : 'configured'
+            ? this.schemaPreview() && !this.schemaError()
+                ? 'validated'
+                : 'configured'
             : 'empty';
         // A stage whose last save returned an ERROR finding is `blocked`, overriding its base readiness.
         const sf = this.stageFindings();
@@ -135,9 +212,10 @@ export class OnboardingStateService {
             (sf[id] ?? []).some((f) => f.severity === 'ERROR') ? 'blocked' : base;
         return {
             collection: at('collection', 'collector' in cfg ? 'configured' : 'empty'),
-            parsing: at('parsing', parsingConfigured
-                ? this.parsePreview() && !this.parseError() ? 'validated' : 'configured'
-                : 'empty'),
+            parsing: at(
+                'parsing',
+                parsingConfigured ? (this.parsePreview() && !this.parseError() ? 'validated' : 'configured') : 'empty',
+            ),
             schema: at('schema', schemaStatus),
             // The Reference "Keys & Load" stage authors the same schema artifact.
             keys: at('keys', schemaStatus),
@@ -215,7 +293,11 @@ export class OnboardingStateService {
                     // replace every pipeline-stage bucket — the save validated the whole config.
                     const findings = r.findings ?? [];
                     const buckets: Partial<Record<OnboardingStageId, Finding[]>> = {
-                        collection: [], parsing: [], schema: [], keys: [], publish: [],
+                        collection: [],
+                        parsing: [],
+                        schema: [],
+                        keys: [],
+                        publish: [],
                     };
                     for (const f of findings) {
                         const stage = this.stageForPath(f.fieldPath ?? '') ?? this.activeStageId();
@@ -258,14 +340,16 @@ export class OnboardingStateService {
      */
     discardDraft(): Observable<ConfigDeleteResult> {
         const name = this.name();
-        return this.configApi.remove('pipeline', name).pipe(
-            switchMap((res) =>
-                forkJoin([
-                    this.configApi.remove('schema', `${name}_schema`).pipe(catchError(() => of(null))),
-                    this.configApi.remove('enrichment', `${name}_enrich`).pipe(catchError(() => of(null))),
-                ]).pipe(map(() => res)),
-            ),
-        );
+        return this.configApi
+            .remove('pipeline', name)
+            .pipe(
+                switchMap((res) =>
+                    forkJoin([
+                        this.configApi.remove('schema', `${name}_schema`).pipe(catchError(() => of(null))),
+                        this.configApi.remove('enrichment', `${name}_enrich`).pipe(catchError(() => of(null))),
+                    ]).pipe(map(() => res)),
+                ),
+            );
     }
 
     captureSample(name: string, text: string): void {

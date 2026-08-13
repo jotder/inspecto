@@ -16,16 +16,16 @@ import { ConnectivityService } from './connectivity.service';
  * react (e.g. assist 503).
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
-  const connectivity = inject(ConnectivityService);
-  return next(req).pipe(
-    tap((event) => {
-      if (event instanceof HttpResponse) connectivity.reportReachable();
-    }),
-    catchError((err: HttpErrorResponse) => {
-      if (err.status === 0) {
-        connectivity.reportUnreachable();
-      }
-      return throwError(() => err);
-    })
-  );
+    const connectivity = inject(ConnectivityService);
+    return next(req).pipe(
+        tap((event) => {
+            if (event instanceof HttpResponse) connectivity.reportReachable();
+        }),
+        catchError((err: HttpErrorResponse) => {
+            if (err.status === 0) {
+                connectivity.reportUnreachable();
+            }
+            return throwError(() => err);
+        }),
+    );
 };

@@ -82,6 +82,10 @@ export function compileSpec(spec: QuerySpec, cols: ColumnMeta[] = []): string {
 }
 
 /** Compile + run the spec over the supplied rows via offline AlaSQL. */
-export function runSpec(spec: QuerySpec, rows: Record<string, unknown>[], cols: ColumnMeta[] = []): Promise<SqlRunResult> {
+export function runSpec(
+    spec: QuerySpec,
+    rows: Record<string, unknown>[],
+    cols: ColumnMeta[] = [],
+): Promise<SqlRunResult> {
     return runSql(compileSpec(spec, cols), spec.sourceName, rows);
 }

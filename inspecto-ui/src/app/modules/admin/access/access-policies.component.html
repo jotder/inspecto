@@ -4,9 +4,9 @@
         <div class="flex flex-col gap-1">
             <h2 class="text-lg font-medium">Effective policies</h2>
             <p class="text-secondary max-w-3xl text-sm">
-                Authored policies plus the engine's built-in denies (space isolation), which are never in
-                the authored document. Authoring is done in <code>access-policies.toon</code> or via the API;
-                this view is read-only. Policies are enforced only on the Enterprise edition.
+                Authored policies plus the engine's built-in denies (space isolation), which are never in the authored
+                document. Authoring is done in <code>access-policies.toon</code> or via the API; this view is read-only.
+                Policies are enforced only on the Enterprise edition.
             </p>
         </div>
 
@@ -22,7 +22,8 @@
             <inspecto-empty-state
                 icon="heroicons_outline:shield-check"
                 title="No access policies"
-                message="Nothing is authored and no built-in policies are in force on this edition." />
+                message="Nothing is authored and no built-in policies are in force on this edition."
+            />
         } @else {
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm">
@@ -43,9 +44,12 @@
                                     <span class="inline-flex items-center gap-1">
                                         <mat-icon
                                             class="icon-size-4"
-                                            [svgIcon]="p.effect === 'deny'
-                                                ? 'heroicons_outline:no-symbol'
-                                                : 'heroicons_outline:check-circle'"></mat-icon>
+                                            [svgIcon]="
+                                                p.effect === 'deny'
+                                                    ? 'heroicons_outline:no-symbol'
+                                                    : 'heroicons_outline:check-circle'
+                                            "
+                                        ></mat-icon>
                                         {{ p.effect }}
                                     </span>
                                 </td>
@@ -58,9 +62,7 @@
                                     }
                                 </td>
                                 <td class="py-2 pr-4">
-                                    <inspecto-chip
-                                        variant="soft"
-                                        [tone]="p.source === 'seed' ? 'primary' : 'neutral'">
+                                    <inspecto-chip variant="soft" [tone]="p.source === 'seed' ? 'primary' : 'neutral'">
                                         {{ p.source === 'seed' ? 'built-in' : 'authored' }}
                                     </inspecto-chip>
                                 </td>
@@ -77,8 +79,8 @@
         <div class="flex flex-col gap-1">
             <h2 class="text-lg font-medium">Why denied?</h2>
             <p class="text-secondary max-w-3xl text-sm">
-                Evaluate an action against the policies for your own session, without performing it. Enter the
-                API route and method you were denied and see which policy decided.
+                Evaluate an action against the policies for your own session, without performing it. Enter the API route
+                and method you were denied and see which policy decided.
             </p>
         </div>
 
@@ -102,12 +104,7 @@
                 <mat-label>Resource kind (optional)</mat-label>
                 <input matInput formControlName="resourceKind" placeholder="incident" />
             </mat-form-field>
-            <button
-                mat-flat-button
-                color="primary"
-                type="submit"
-                class="mt-1"
-                [disabled]="explaining()">
+            <button mat-flat-button color="primary" type="submit" class="mt-1" [disabled]="explaining()">
                 {{ explaining() ? 'Evaluating…' : 'Explain' }}
             </button>
         </form>
@@ -118,13 +115,13 @@
                     {{ r.reason || 'Access policies are enforced only on the Enterprise edition.' }}
                 </inspecto-alert>
             } @else {
-                <inspecto-alert
-                    [variant]="decisionVariant(r.decision)"
-                    [title]="'Decision: ' + r.decision">
+                <inspecto-alert [variant]="decisionVariant(r.decision)" [title]="'Decision: ' + r.decision">
                     Evaluated <code>{{ r.action }}</code> on <code>{{ r.route }}</code> as
-                    <strong>{{ r.subject }}</strong>.
+                    <strong>{{ r.subject }}</strong
+                    >.
                     @if (r.matchedPolicy) {
-                        Matched policy <strong>{{ r.matchedPolicy }}</strong>.
+                        Matched policy <strong>{{ r.matchedPolicy }}</strong
+                        >.
                     } @else {
                         No policy matched — the standard capability and sharing gates decide.
                     }
@@ -152,7 +149,8 @@
                                         <td class="py-2 pr-4">
                                             <inspecto-chip
                                                 variant="soft"
-                                                [tone]="e.source === 'seed' ? 'primary' : 'neutral'">
+                                                [tone]="e.source === 'seed' ? 'primary' : 'neutral'"
+                                            >
                                                 {{ e.source === 'seed' ? 'built-in' : 'authored' }}
                                             </inspecto-chip>
                                         </td>

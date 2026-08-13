@@ -11,6 +11,10 @@ export function quickFilterRows<T extends Record<string, unknown>>(
     if (!q) return [...rows];
     return rows.filter((r) => {
         const cols = columns?.length ? columns : Object.keys(r);
-        return cols.some((c) => String(r[c] ?? '').toLowerCase().includes(q));
+        return cols.some((c) =>
+            String(r[c] ?? '')
+                .toLowerCase()
+                .includes(q),
+        );
     });
 }

@@ -24,18 +24,27 @@ export function lensHomeRedirect(): string {
 /* eslint-disable max-len */
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 export const appRoutes: Route[] = [
-
     // Default landing route — per-lens home page (W4).
     { path: '', pathMatch: 'full', redirectTo: lensHomeRedirect },
 
     // Standard-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
     // session (authGuard bounces here). No app shell, no guard. On Personal/offline these are simply
     // never navigated to. sign-in kicks off Auth-Code+PKCE; auth/callback redeems the returned code.
-    { path: 'sign-in', loadComponent: () => import('app/modules/admin/session/sign-in.component').then((m) => m.SignInComponent) },
-    { path: 'auth/callback', loadComponent: () => import('app/modules/admin/session/callback.component').then((m) => m.CallbackComponent) },
+    {
+        path: 'sign-in',
+        loadComponent: () => import('app/modules/admin/session/sign-in.component').then((m) => m.SignInComponent),
+    },
+    {
+        path: 'auth/callback',
+        loadComponent: () => import('app/modules/admin/session/callback.component').then((m) => m.CallbackComponent),
+    },
 
     // Public dashboard embed (BI-6) — the share token IS the credential; no shell, no guard, read-only.
-    { path: 'share/:token', loadComponent: () => import('app/modules/admin/share/share-viewer.component').then((m) => m.ShareViewerComponent) },
+    {
+        path: 'share/:token',
+        loadComponent: () =>
+            import('app/modules/admin/share/share-viewer.component').then((m) => m.ShareViewerComponent),
+    },
 
     // Template OAuth flow, kept for reference (Inspecto uses operator tokens instead):
     // { path: 'signed-in-redirect', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -70,7 +79,7 @@ export const appRoutes: Route[] = [
         component: LayoutComponent,
         canActivate: [authGuard],
         resolve: {
-            initialData: initialDataResolver
+            initialData: initialDataResolver,
         },
         children: [
             { path: 'overview', loadChildren: () => import('app/modules/admin/dashboard/dashboard.routes') },
@@ -90,16 +99,25 @@ export const appRoutes: Route[] = [
             { path: 'collectors', loadChildren: () => import('app/modules/admin/collectors/collectors.routes') },
             { path: 'kpi-reports', loadChildren: () => import('app/modules/admin/kpi-reports/kpi-reports.routes') },
             { path: 'requirements', loadChildren: () => import('app/modules/admin/requirements/requirements.routes') },
-            { path: 'reconciliation', loadChildren: () => import('app/modules/admin/reconciliation/reconciliation.routes') },
+            {
+                path: 'reconciliation',
+                loadChildren: () => import('app/modules/admin/reconciliation/reconciliation.routes'),
+            },
             { path: 'connections', loadChildren: () => import('app/modules/admin/connections/connections.routes') },
             { path: 'expectations', loadChildren: () => import('app/modules/admin/expectations/expectations.routes') },
-            { path: 'decision-rules', loadChildren: () => import('app/modules/admin/decision-rules/decision-rules.routes') },
+            {
+                path: 'decision-rules',
+                loadChildren: () => import('app/modules/admin/decision-rules/decision-rules.routes'),
+            },
             { path: 'maintenance', loadChildren: () => import('app/modules/admin/maintenance/maintenance.routes') },
             { path: 'jobs', loadChildren: () => import('app/modules/admin/jobs/jobs.routes') }, // also matches jobs/:name (side-panel detail, R5)
             { path: 'enrichment', loadChildren: () => import('app/modules/admin/enrichment/enrichment.routes') },
             { path: 'catalog', loadChildren: () => import('app/modules/admin/catalog/catalog.routes') },
             { path: 'data-browser', loadChildren: () => import('app/modules/admin/data-browser/data-browser.routes') },
-            { path: 'processing-status', loadChildren: () => import('app/modules/admin/processing-status/processing-status.routes') },
+            {
+                path: 'processing-status',
+                loadChildren: () => import('app/modules/admin/processing-status/processing-status.routes'),
+            },
             { path: 'studio', loadChildren: () => import('app/modules/admin/studio/studio.routes') },
             // Registry folded into Catalog's Usage tab (IA reorg phase B.4).
             { path: 'registry', redirectTo: 'catalog' },
@@ -111,15 +129,26 @@ export const appRoutes: Route[] = [
             { path: 'approvals', loadChildren: () => import('app/modules/admin/approvals/approvals.routes') }, // AGT-5 P3 approvals inbox
             { path: 'autonomy', loadChildren: () => import('app/modules/admin/autonomy/autonomy.routes') }, // AGT-5 P4 autonomy dashboard
             { path: 'learning', loadChildren: () => import('app/modules/admin/learning/learning.routes') }, // AGT-5 P5 learning dashboard
-            { path: 'notification-center', loadChildren: () => import('app/modules/admin/notification-center/notification-center.routes') },
+            {
+                path: 'notification-center',
+                loadChildren: () => import('app/modules/admin/notification-center/notification-center.routes'),
+            },
             // Menu Builder: the authoring pane + the dynamic host every custom menu leaf links to (`/w/<nodeId>`).
             // Registered BEFORE the settings matcher so /settings/menus stays a standalone page.
-            { path: 'settings/menus', loadComponent: () => import('app/modules/admin/menu/menu-builder.component').then((m) => m.MenuBuilderComponent) },
-            { path: 'w/:nodeId', loadComponent: () => import('app/modules/admin/menu/menu-item-host.component').then((m) => m.MenuItemHostComponent) },
+            {
+                path: 'settings/menus',
+                loadComponent: () =>
+                    import('app/modules/admin/menu/menu-builder.component').then((m) => m.MenuBuilderComponent),
+            },
+            {
+                path: 'w/:nodeId',
+                loadComponent: () =>
+                    import('app/modules/admin/menu/menu-item-host.component').then((m) => m.MenuItemHostComponent),
+            },
             // Settings master-detail (R5): /settings/<section> deep-links into the pane — the old
             // standalone /settings/models|icons|map|transfer|access|notifications routes are gone;
             // those URLs now open the same components inside the Settings pane.
             { path: 'settings', loadChildren: () => import('app/modules/admin/settings/settings.routes') },
-        ]
-    }
+        ],
+    },
 ];

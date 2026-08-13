@@ -9,8 +9,15 @@ import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
 
 const DS = (id: string): Dataset => ({
-    id, name: id, kind: 'physical', sourceName: id, physicalRef: id,
-    columns: [{ name: 'id', type: 'number', role: 'dimension' }, { name: 'cost_usd', type: 'number', role: 'measure' }],
+    id,
+    name: id,
+    kind: 'physical',
+    sourceName: id,
+    physicalRef: id,
+    columns: [
+        { name: 'id', type: 'number', role: 'dimension' },
+        { name: 'cost_usd', type: 'number', role: 'measure' },
+    ],
     measures: [],
     calculated: [],
 });
@@ -43,7 +50,9 @@ describe('ReconciliationFormDialog', () => {
         c.submit();
         const result = ref.close.mock.calls[0][0] as ReconciliationFormResult;
         expect(result).toEqual({
-            name: 'switch vs billing', leftDataset: 'switch_cdr', rightDataset: 'billing_cdr',
+            name: 'switch vs billing',
+            leftDataset: 'switch_cdr',
+            rightDataset: 'billing_cdr',
             keyColumns: ['id'],
             compareColumns: [{ column: 'cost_usd', agg: 'sum', toleranceType: 'absolute', tolerance: 0.02 }],
             bands: { warnPct: 1, breachPct: 2 },
@@ -70,10 +79,17 @@ describe('ReconciliationFormDialog', () => {
                     provide: MAT_DIALOG_DATA,
                     useValue: {
                         recon: {
-                            id: 'r1', name: 'edit me', leftDataset: 'switch_cdr', rightDataset: 'billing_cdr',
+                            id: 'r1',
+                            name: 'edit me',
+                            leftDataset: 'switch_cdr',
+                            rightDataset: 'billing_cdr',
                             keyColumns: ['id'],
-                            compareColumns: [{ column: 'cost_usd', agg: 'count', toleranceType: 'percent', tolerance: 0.5 }],
-                            bands: { warnPct: 0.5, breachPct: 3 }, breaks: [], lastRunAt: null,
+                            compareColumns: [
+                                { column: 'cost_usd', agg: 'count', toleranceType: 'percent', tolerance: 0.5 },
+                            ],
+                            bands: { warnPct: 0.5, breachPct: 3 },
+                            breaks: [],
+                            lastRunAt: null,
                         },
                     },
                 },

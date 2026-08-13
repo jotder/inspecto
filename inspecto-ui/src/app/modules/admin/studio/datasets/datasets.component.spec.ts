@@ -32,11 +32,21 @@ function create(datasets: Dataset[] = [D1], opts: { canShare?: boolean; offerRes
             provideNoopAnimations(),
             provideRouter([]),
             { provide: DatasetsService, useValue: { list: () => of(datasets), remove } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
             { provide: MatDialog, useValue: dialog },
             // authMode 'none' keeps LensService on the honor system (R2 grant checks bypassed).
-            { provide: SessionService, useValue: { exchangeEnabled: () => opts.canShare ?? false, authMode: () => 'none', capabilities: () => [] } },
+            {
+                provide: SessionService,
+                useValue: {
+                    exchangeEnabled: () => opts.canShare ?? false,
+                    authMode: () => 'none',
+                    capabilities: () => [],
+                },
+            },
             { provide: ExchangeService, useValue: { offer } },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
         ],
@@ -74,7 +84,12 @@ describe('DatasetsComponent', () => {
         fixture.detectChanges();
         expect(fixture.componentInstance.canShare()).toBe(true);
         fixture.componentInstance.offer(D1);
-        expect(offer).toHaveBeenCalledWith({ kind: 'dataset', owner: 'default', item: 'cdr_view', description: 'ref rates' });
+        expect(offer).toHaveBeenCalledWith({
+            kind: 'dataset',
+            owner: 'default',
+            item: 'cdr_view',
+            description: 'ref rates',
+        });
     });
 
     it('does not offer when the share dialog is cancelled', () => {
@@ -85,7 +100,12 @@ describe('DatasetsComponent', () => {
     });
 
     it('flags a dataset bound to a shared ref with its owner', () => {
-        const shared: Dataset = { ...D1, id: 'fx_local', kind: 'physical', physicalRef: 'shared/analytics-hub/fx_rates_daily' };
+        const shared: Dataset = {
+            ...D1,
+            id: 'fx_local',
+            kind: 'physical',
+            physicalRef: 'shared/analytics-hub/fx_rates_daily',
+        };
         const { fixture } = create([shared, D1]);
         fixture.detectChanges();
         const c = fixture.componentInstance;

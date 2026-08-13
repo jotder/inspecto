@@ -3,7 +3,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AgGridAngular } from 'ag-grid-angular';
-import { CellClassParams, CellValueChangedEvent, ColDef, GridApi, GridReadyEvent, ITooltipParams } from 'ag-grid-community';
+import {
+    CellClassParams,
+    CellValueChangedEvent,
+    ColDef,
+    GridApi,
+    GridReadyEvent,
+    ITooltipParams,
+} from 'ag-grid-community';
 import { INSPECTO_DEFAULT_COL_DEF, InspectoGridThemeService, noRowsOverlay } from 'app/inspecto/grid';
 
 /** One column of an editable flat table. `options` set ⇒ a select editor over exactly those values. */
@@ -68,7 +75,14 @@ export interface CsvImport {
                 <button mat-stroked-button type="button" (click)="fileInput.click()" aria-label="Import rows from CSV">
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon> Import CSV
                 </button>
-                <input #fileInput type="file" accept=".csv,text/csv" class="hidden" aria-label="Import rows from CSV" (change)="importCsv($event)" />
+                <input
+                    #fileInput
+                    type="file"
+                    accept=".csv,text/csv"
+                    class="hidden"
+                    aria-label="Import rows from CSV"
+                    (change)="importCsv($event)"
+                />
             </div>
         }
         <ag-grid-angular
@@ -124,9 +138,7 @@ export class EditableGridComponent {
             headerName: c.label,
             editable: this.editable,
             flex: 1,
-            ...(c.options
-                ? { cellEditor: 'agSelectCellEditor', cellEditorParams: { values: c.options } }
-                : {}),
+            ...(c.options ? { cellEditor: 'agSelectCellEditor', cellEditorParams: { values: c.options } } : {}),
             cellClassRules: {
                 'inspecto-cell-error': (p: CellClassParams) => this.findingFor(p)?.severity === 'error',
                 'inspecto-cell-warning': (p: CellClassParams) => this.findingFor(p)?.severity === 'warning',
@@ -197,14 +209,15 @@ export class EditableGridComponent {
         const parsed = parseCsv(await file.text());
         if (!parsed.length) return;
 
-        const norm = (s: string): string => s.trim().toLowerCase().replace(/[\s_]+/g, '');
+        const norm = (s: string): string =>
+            s
+                .trim()
+                .toLowerCase()
+                .replace(/[\s_]+/g, '');
         const header = parsed[0];
         const cols = this.colSpec();
         const indexOf = new Map<string, number>(
-            cols.map((c) => [
-                c.key,
-                header.findIndex((h) => norm(h) === norm(c.key) || norm(h) === norm(c.label)),
-            ]),
+            cols.map((c) => [c.key, header.findIndex((h) => norm(h) === norm(c.key) || norm(h) === norm(c.label))]),
         );
         const matched = cols.filter((c) => (indexOf.get(c.key) ?? -1) >= 0);
         const missingColumns = cols.filter((c) => (indexOf.get(c.key) ?? -1) < 0).map((c) => c.key);
@@ -214,10 +227,13 @@ export class EditableGridComponent {
         const applied = matched.length > 0;
         const rows = applied
             ? parsed.slice(1).map((cells) =>
-                  Object.fromEntries(cols.map((c) => {
-                      const idx = indexOf.get(c.key) ?? -1;
-                      return [c.key, idx >= 0 ? (cells[idx] ?? '') : ''];
-                  })))
+                  Object.fromEntries(
+                      cols.map((c) => {
+                          const idx = indexOf.get(c.key) ?? -1;
+                          return [c.key, idx >= 0 ? (cells[idx] ?? '') : ''];
+                      }),
+                  ),
+              )
             : [];
         if (applied) {
             this.gridRows.set(rows);
@@ -236,21 +252,29 @@ export function parseCsv(text: string): string[][] {
     for (let i = 0; i < text.length; i++) {
         const ch = text[i];
         if (quoted) {
-            if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-            else if (ch === '"') quoted = false;
+            if (ch === '"' && text[i + 1] === '"') {
+                cell += '"';
+                i++;
+            } else if (ch === '"') quoted = false;
             else cell += ch;
         } else if (ch === '"') {
             quoted = true;
         } else if (ch === ',') {
-            row.push(cell); cell = '';
+            row.push(cell);
+            cell = '';
         } else if (ch === '\n' || ch === '\r') {
             if (ch === '\r' && text[i + 1] === '\n') i++;
-            row.push(cell); cell = '';
-            rows.push(row); row = [];
+            row.push(cell);
+            cell = '';
+            rows.push(row);
+            row = [];
         } else {
             cell += ch;
         }
     }
-    if (cell.length || row.length) { row.push(cell); rows.push(row); }
+    if (cell.length || row.length) {
+        row.push(cell);
+        rows.push(row);
+    }
     return rows.filter((r) => r.some((c) => c.trim().length));
 }

@@ -44,11 +44,13 @@ type GrantCellParams = ICellRendererParams<FlatTreeRow> & {
             [disabled]="!state.editable"
             (click)="onCycle($event)"
             [matTooltip]="tooltip"
-            [attr.aria-label]="aria">
+            [attr.aria-label]="aria"
+        >
             <span class="flex items-center gap-1.5" [class.opacity-40]="!state.explicit">
                 <mat-icon
                     class="icon-size-4"
-                    [svgIcon]="shown ? 'heroicons_outline:eye' : 'heroicons_outline:eye-slash'"></mat-icon>
+                    [svgIcon]="shown ? 'heroicons_outline:eye' : 'heroicons_outline:eye-slash'"
+                ></mat-icon>
                 <span class="text-sm font-normal">{{ shown ? 'Shown' : 'Hidden' }}</span>
             </span>
         </button>
@@ -88,7 +90,7 @@ export class AccessGrantCell implements ICellRendererAngularComp {
         e.stopPropagation();
         if (!this.state.editable) return;
         this.cycleFn?.(this.nodeId, this.subject);
-        this.read();   // repaint self immediately; dependents repaint via the host's node rebuild
+        this.read(); // repaint self immediately; dependents repaint via the host's node rebuild
     }
 
     private read(): void {
@@ -100,7 +102,8 @@ export class AccessGrantCell implements ICellRendererAngularComp {
               ? `inherited from ${this.state.sourceLabel}`
               : 'default';
         this.tooltip = `${word} (${origin})${this.state.editable ? ' — click to change' : ''}`;
-        this.aria = `${this.label} for ${this.subjectLabel}: ${word}, ${origin}.`
-            + (this.state.editable ? ' Activate to change.' : '');
+        this.aria =
+            `${this.label} for ${this.subjectLabel}: ${word}, ${origin}.` +
+            (this.state.editable ? ' Activate to change.' : '');
     }
 }

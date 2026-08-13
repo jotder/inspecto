@@ -21,9 +21,8 @@ import { stageAttributesFor } from './stage-attributes';
     template: `
         <div class="flex max-w-3xl flex-col gap-4">
             <p class="text-secondary m-0">
-                Where this {{ state.kind() }}'s files come from — the pipeline's local inbox folder,
-                or a saved Connection. A Connection carries its own connector type, so it is never
-                asked twice.
+                Where this {{ state.kind() }}'s files come from — the pipeline's local inbox folder, or a saved
+                Connection. A Connection carries its own connector type, so it is never asked twice.
             </p>
 
             <inspecto-collector-config

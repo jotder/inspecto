@@ -23,7 +23,7 @@ describe('checkCalculatedExpr', () => {
     });
 
     it('rejects a statement keyword even as a bare identifier (scalar-subquery smuggling)', () => {
-        expect(checkCalculatedExpr("(select secret from t)")).toMatch(/not allowed/i);
+        expect(checkCalculatedExpr('(select secret from t)')).toMatch(/not allowed/i);
     });
 
     it('rejects a non-whitelisted function call (file/UDF access)', () => {

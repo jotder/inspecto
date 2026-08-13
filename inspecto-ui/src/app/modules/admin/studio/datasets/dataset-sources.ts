@@ -5,11 +5,56 @@
  */
 export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     cdr: [
-        { id: 1001, msisdn: '8801700000001', cell_id: 'CELL-101', tariff: 'premium', duration_s: 320, bytes_used: 5_200_000, cost_usd: 1.8, event_time: '2026-06-24 09:00:00' },
-        { id: 1002, msisdn: '8801700000002', cell_id: 'CELL-101', tariff: 'standard', duration_s: 45, bytes_used: 800_000, cost_usd: 0.3, event_time: '2026-06-24 09:01:30' },
-        { id: 1003, msisdn: '8801700000003', cell_id: 'CELL-204', tariff: 'premium', duration_s: 512, bytes_used: 9_100_000, cost_usd: 2.6, event_time: '2026-06-24 09:03:11' },
-        { id: 1004, msisdn: '8801700000004', cell_id: 'CELL-204', tariff: 'standard', duration_s: 12, bytes_used: 150_000, cost_usd: 0.1, event_time: '2026-06-24 09:05:42' },
-        { id: 1005, msisdn: '8801700000005', cell_id: 'CELL-309', tariff: 'premium', duration_s: 287, bytes_used: 6_700_000, cost_usd: 2.1, event_time: '2026-06-24 09:08:09' },
+        {
+            id: 1001,
+            msisdn: '8801700000001',
+            cell_id: 'CELL-101',
+            tariff: 'premium',
+            duration_s: 320,
+            bytes_used: 5_200_000,
+            cost_usd: 1.8,
+            event_time: '2026-06-24 09:00:00',
+        },
+        {
+            id: 1002,
+            msisdn: '8801700000002',
+            cell_id: 'CELL-101',
+            tariff: 'standard',
+            duration_s: 45,
+            bytes_used: 800_000,
+            cost_usd: 0.3,
+            event_time: '2026-06-24 09:01:30',
+        },
+        {
+            id: 1003,
+            msisdn: '8801700000003',
+            cell_id: 'CELL-204',
+            tariff: 'premium',
+            duration_s: 512,
+            bytes_used: 9_100_000,
+            cost_usd: 2.6,
+            event_time: '2026-06-24 09:03:11',
+        },
+        {
+            id: 1004,
+            msisdn: '8801700000004',
+            cell_id: 'CELL-204',
+            tariff: 'standard',
+            duration_s: 12,
+            bytes_used: 150_000,
+            cost_usd: 0.1,
+            event_time: '2026-06-24 09:05:42',
+        },
+        {
+            id: 1005,
+            msisdn: '8801700000005',
+            cell_id: 'CELL-309',
+            tariff: 'premium',
+            duration_s: 287,
+            bytes_used: 6_700_000,
+            cost_usd: 2.1,
+            event_time: '2026-06-24 09:08:09',
+        },
     ],
     // Two sides of a Revenue-Assurance reconciliation — the network/switch record of truth vs. what
     // billing actually rated. Keyed on `id`; the deliberate discrepancies drive the C9 demo:
@@ -31,24 +76,123 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     ],
     // ── Fraud-Management template (W5): scored usage events; risk_score > 0.8 drives the high-risk demo ──
     fraud_events: [
-        { id: 3001, msisdn: '8801700000011', event_type: 'call', dest_country: 'LV', duration_s: 1810, risk_score: 0.94, event_time: '2026-06-26 02:11:00' },
-        { id: 3002, msisdn: '8801700000011', event_type: 'call', dest_country: 'LV', duration_s: 1795, risk_score: 0.91, event_time: '2026-06-26 02:44:00' },
-        { id: 3003, msisdn: '8801700000012', event_type: 'call', dest_country: 'GB', duration_s: 120, risk_score: 0.12, event_time: '2026-06-26 09:05:00' },
-        { id: 3004, msisdn: '8801700000013', event_type: 'sms', dest_country: 'BD', duration_s: 0, risk_score: 0.05, event_time: '2026-06-26 09:30:00' },
-        { id: 3005, msisdn: '8801700000014', event_type: 'call', dest_country: 'SL', duration_s: 2400, risk_score: 0.88, event_time: '2026-06-26 03:02:00' },
-        { id: 3006, msisdn: '8801700000015', event_type: 'data', dest_country: 'BD', duration_s: 0, risk_score: 0.02, event_time: '2026-06-26 10:15:00' },
-        { id: 3007, msisdn: '8801700000011', event_type: 'call', dest_country: 'LV', duration_s: 1750, risk_score: 0.96, event_time: '2026-06-26 03:17:00' },
-        { id: 3008, msisdn: '8801700000016', event_type: 'call', dest_country: 'BD', duration_s: 300, risk_score: 0.2, event_time: '2026-06-26 11:40:00' },
+        {
+            id: 3001,
+            msisdn: '8801700000011',
+            event_type: 'call',
+            dest_country: 'LV',
+            duration_s: 1810,
+            risk_score: 0.94,
+            event_time: '2026-06-26 02:11:00',
+        },
+        {
+            id: 3002,
+            msisdn: '8801700000011',
+            event_type: 'call',
+            dest_country: 'LV',
+            duration_s: 1795,
+            risk_score: 0.91,
+            event_time: '2026-06-26 02:44:00',
+        },
+        {
+            id: 3003,
+            msisdn: '8801700000012',
+            event_type: 'call',
+            dest_country: 'GB',
+            duration_s: 120,
+            risk_score: 0.12,
+            event_time: '2026-06-26 09:05:00',
+        },
+        {
+            id: 3004,
+            msisdn: '8801700000013',
+            event_type: 'sms',
+            dest_country: 'BD',
+            duration_s: 0,
+            risk_score: 0.05,
+            event_time: '2026-06-26 09:30:00',
+        },
+        {
+            id: 3005,
+            msisdn: '8801700000014',
+            event_type: 'call',
+            dest_country: 'SL',
+            duration_s: 2400,
+            risk_score: 0.88,
+            event_time: '2026-06-26 03:02:00',
+        },
+        {
+            id: 3006,
+            msisdn: '8801700000015',
+            event_type: 'data',
+            dest_country: 'BD',
+            duration_s: 0,
+            risk_score: 0.02,
+            event_time: '2026-06-26 10:15:00',
+        },
+        {
+            id: 3007,
+            msisdn: '8801700000011',
+            event_type: 'call',
+            dest_country: 'LV',
+            duration_s: 1750,
+            risk_score: 0.96,
+            event_time: '2026-06-26 03:17:00',
+        },
+        {
+            id: 3008,
+            msisdn: '8801700000016',
+            event_type: 'call',
+            dest_country: 'BD',
+            duration_s: 300,
+            risk_score: 0.2,
+            event_time: '2026-06-26 11:40:00',
+        },
     ],
     // ── Financial-Audit template (W5): GL postings vs. bank payments, keyed on id.
     //    Breaks: 4003 amount 1200.00 vs 1250.00 → value break · 4004 posted, never paid → missing_right
     //    4006 paid, never posted → missing_left · 4002 differs by 0.005 → clean under the $0.01 tolerance ──
     gl_entries: [
-        { id: 4001, account: 'revenue', entry_type: 'credit', amount_usd: 5000.0, posted_by: 'sap_batch', posting_date: '2026-06-20 18:00:00' },
-        { id: 4002, account: 'receivables', entry_type: 'debit', amount_usd: 320.5, posted_by: 'sap_batch', posting_date: '2026-06-21 18:00:00' },
-        { id: 4003, account: 'revenue', entry_type: 'credit', amount_usd: 1200.0, posted_by: 'manual', posting_date: '2026-06-22 10:12:00' },
-        { id: 4004, account: 'expenses', entry_type: 'debit', amount_usd: 87.25, posted_by: 'sap_batch', posting_date: '2026-06-23 18:00:00' },
-        { id: 4005, account: 'revenue', entry_type: 'credit', amount_usd: 940.1, posted_by: 'sap_batch', posting_date: '2026-06-24 18:00:00' },
+        {
+            id: 4001,
+            account: 'revenue',
+            entry_type: 'credit',
+            amount_usd: 5000.0,
+            posted_by: 'sap_batch',
+            posting_date: '2026-06-20 18:00:00',
+        },
+        {
+            id: 4002,
+            account: 'receivables',
+            entry_type: 'debit',
+            amount_usd: 320.5,
+            posted_by: 'sap_batch',
+            posting_date: '2026-06-21 18:00:00',
+        },
+        {
+            id: 4003,
+            account: 'revenue',
+            entry_type: 'credit',
+            amount_usd: 1200.0,
+            posted_by: 'manual',
+            posting_date: '2026-06-22 10:12:00',
+        },
+        {
+            id: 4004,
+            account: 'expenses',
+            entry_type: 'debit',
+            amount_usd: 87.25,
+            posted_by: 'sap_batch',
+            posting_date: '2026-06-23 18:00:00',
+        },
+        {
+            id: 4005,
+            account: 'revenue',
+            entry_type: 'credit',
+            amount_usd: 940.1,
+            posted_by: 'sap_batch',
+            posting_date: '2026-06-24 18:00:00',
+        },
     ],
     payments: [
         { id: 4001, account: 'revenue', amount_usd: 5000.0, method: 'wire', value_date: '2026-06-20 18:30:00' },
@@ -67,11 +211,46 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
         { id: 'acc-02', label: 'Account A-1003', entity_type: 'account', risk_score: 0.6, community: 3 },
     ],
     links: [
-        { id: 'l-01', source: 'sub-01', target: 'dev-01', link_type: 'shared_device', weight: 5, first_seen: '2026-06-10 08:00:00' },
-        { id: 'l-02', source: 'sub-02', target: 'dev-01', link_type: 'shared_device', weight: 4, first_seen: '2026-06-12 21:00:00' },
-        { id: 'l-03', source: 'sub-01', target: 'sub-02', link_type: 'calls', weight: 17, first_seen: '2026-06-01 12:00:00' },
-        { id: 'l-04', source: 'sub-01', target: 'acc-02', link_type: 'payment', weight: 2, first_seen: '2026-06-15 16:00:00' },
-        { id: 'l-05', source: 'sub-03', target: 'acc-01', link_type: 'payment', weight: 1, first_seen: '2026-06-18 10:00:00' },
+        {
+            id: 'l-01',
+            source: 'sub-01',
+            target: 'dev-01',
+            link_type: 'shared_device',
+            weight: 5,
+            first_seen: '2026-06-10 08:00:00',
+        },
+        {
+            id: 'l-02',
+            source: 'sub-02',
+            target: 'dev-01',
+            link_type: 'shared_device',
+            weight: 4,
+            first_seen: '2026-06-12 21:00:00',
+        },
+        {
+            id: 'l-03',
+            source: 'sub-01',
+            target: 'sub-02',
+            link_type: 'calls',
+            weight: 17,
+            first_seen: '2026-06-01 12:00:00',
+        },
+        {
+            id: 'l-04',
+            source: 'sub-01',
+            target: 'acc-02',
+            link_type: 'payment',
+            weight: 2,
+            first_seen: '2026-06-15 16:00:00',
+        },
+        {
+            id: 'l-05',
+            source: 'sub-03',
+            target: 'acc-01',
+            link_type: 'payment',
+            weight: 1,
+            first_seen: '2026-06-18 10:00:00',
+        },
     ],
     // ── Link Analysis example graphs (C5 user testing): four link tables at rising complexity.
     //    Each projects source → target (+ link_type); the default space seeds a dataset + a saved
@@ -156,7 +335,11 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
         const rows: Record<string, unknown>[] = [];
         const add = (site: string, site_type: string, lat: number | null, lon: number | null, hour: number): void => {
             rows.push({
-                id: `g-${rows.length + 1}`, site, site_type, lat, lon,
+                id: `g-${rows.length + 1}`,
+                site,
+                site_type,
+                lat,
+                lon,
                 seen_time: `2026-06-01T${String(hour).padStart(2, '0')}:00:00Z`,
             });
         };
@@ -184,22 +367,47 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     // (repeat legs fold into weighted routes; one leg has a broken destination → skipped).
     money_moves: (() => {
         const cities: Record<string, [number, number]> = {
-            Dhaka: [23.8103, 90.4125], Chattogram: [22.3569, 91.7832], Sylhet: [24.8949, 91.8687],
-            Dubai: [25.2048, 55.2708], Singapore: [1.3521, 103.8198], London: [51.5074, -0.1278],
+            Dhaka: [23.8103, 90.4125],
+            Chattogram: [22.3569, 91.7832],
+            Sylhet: [24.8949, 91.8687],
+            Dubai: [25.2048, 55.2708],
+            Singapore: [1.3521, 103.8198],
+            London: [51.5074, -0.1278],
         };
         const legs: [string, string, string, number][] = [
-            ['Dhaka', 'Dubai', 'hundi', 9], ['Dhaka', 'Dubai', 'hundi', 11], ['Dhaka', 'Dubai', 'hundi', 14],
-            ['Dubai', 'London', 'wire', 12], ['Dubai', 'London', 'wire', 16],
-            ['Chattogram', 'Singapore', 'wire', 10], ['Singapore', 'London', 'wire', 15],
-            ['Sylhet', 'Dhaka', 'cash', 8], ['Sylhet', 'Dhaka', 'cash', 9], ['Dhaka', 'Chattogram', 'cash', 10],
+            ['Dhaka', 'Dubai', 'hundi', 9],
+            ['Dhaka', 'Dubai', 'hundi', 11],
+            ['Dhaka', 'Dubai', 'hundi', 14],
+            ['Dubai', 'London', 'wire', 12],
+            ['Dubai', 'London', 'wire', 16],
+            ['Chattogram', 'Singapore', 'wire', 10],
+            ['Singapore', 'London', 'wire', 15],
+            ['Sylhet', 'Dhaka', 'cash', 8],
+            ['Sylhet', 'Dhaka', 'cash', 9],
+            ['Dhaka', 'Chattogram', 'cash', 10],
         ];
         const rows: Record<string, unknown>[] = legs.map(([from, to, channel, hour], i) => ({
             id: `m-${i + 1}`,
-            from_city: from, from_lat: cities[from][0], from_lon: cities[from][1],
-            to_city: to, to_lat: cities[to][0], to_lon: cities[to][1],
-            channel, moved_at: `2026-06-02T${String(hour).padStart(2, '0')}:30:00Z`,
+            from_city: from,
+            from_lat: cities[from][0],
+            from_lon: cities[from][1],
+            to_city: to,
+            to_lat: cities[to][0],
+            to_lon: cities[to][1],
+            channel,
+            moved_at: `2026-06-02T${String(hour).padStart(2, '0')}:30:00Z`,
         }));
-        rows.push({ id: 'm-bad', from_city: 'Dhaka', from_lat: 23.8103, from_lon: 90.4125, to_city: 'Nowhere', to_lat: null, to_lon: null, channel: 'wire', moved_at: '2026-06-02T20:30:00Z' });
+        rows.push({
+            id: 'm-bad',
+            from_city: 'Dhaka',
+            from_lat: 23.8103,
+            from_lon: 90.4125,
+            to_city: 'Nowhere',
+            to_lat: null,
+            to_lon: null,
+            channel: 'wire',
+            moved_at: '2026-06-02T20:30:00Z',
+        });
         return rows;
     })(),
 
@@ -216,17 +424,32 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
         const rows: Record<string, unknown>[] = [];
         const at = (min: number): string => new Date(Date.UTC(2026, 5, 3, 0, Math.round(min))).toISOString();
         for (let b = 0; b < 25; b++) {
-            rows.push({ id: `sb-bad-${b}`, msisdn: `SIM-BAD-${b}`, role: 'simbox', lat: b % 2 ? null : 999, lon: 90.4, event_time: at(60) });
+            rows.push({
+                id: `sb-bad-${b}`,
+                msisdn: `SIM-BAD-${b}`,
+                role: 'simbox',
+                lat: b % 2 ? null : 999,
+                lon: 90.4,
+                event_time: at(60),
+            });
         }
-        const farms: [number, number][] = [[23.7104, 90.4074], [23.7806, 90.2792], [23.8759, 90.3795]];
+        const farms: [number, number][] = [
+            [23.7104, 90.4074],
+            [23.7806, 90.2792],
+            [23.8759, 90.3795],
+        ];
         farms.forEach((f, fi) => {
             for (let s = 0; s < 40; s++) {
                 const lat = f[0] + (rand() - 0.5) * 0.0008;
                 const lon = f[1] + (rand() - 0.5) * 0.0008;
                 for (let e = 0; e < 12; e++) {
                     rows.push({
-                        id: `sb-${rows.length}`, msisdn: `SIM-F${fi + 1}-${String(s + 1).padStart(2, '0')}`,
-                        role: 'simbox', lat, lon, event_time: at(360 + e * 90 + rand() * 30),
+                        id: `sb-${rows.length}`,
+                        msisdn: `SIM-F${fi + 1}-${String(s + 1).padStart(2, '0')}`,
+                        role: 'simbox',
+                        lat,
+                        lon,
+                        event_time: at(360 + e * 90 + rand() * 30),
                     });
                 }
             }
@@ -238,8 +461,12 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
                 lat += (rand() - 0.5) * 0.02;
                 lon += (rand() - 0.5) * 0.02;
                 rows.push({
-                    id: `sb-${rows.length}`, msisdn: `MS-${String(u + 1).padStart(3, '0')}`,
-                    role: 'subscriber', lat, lon, event_time: at(300 + e * 100 + rand() * 60),
+                    id: `sb-${rows.length}`,
+                    msisdn: `MS-${String(u + 1).padStart(3, '0')}`,
+                    role: 'subscriber',
+                    lat,
+                    lon,
+                    event_time: at(300 + e * 100 + rand() * 60),
                 });
             }
         }
@@ -252,24 +479,54 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
         const rand = lcg(22);
         const rows: Record<string, unknown>[] = [];
         const homes: [string, number, number][] = [
-            ['ACC-001', 51.5074, -0.1278], ['ACC-002', 40.7128, -74.006], ['ACC-003', 23.8103, 90.4125],
-            ['ACC-004', 1.3521, 103.8198], ['ACC-005', 25.2048, 55.2708], ['ACC-006', 48.8566, 2.3522],
-            ['ACC-008', 35.6762, 139.6503], ['ACC-009', -33.8688, 151.2093], ['ACC-010', 19.076, 72.8777],
+            ['ACC-001', 51.5074, -0.1278],
+            ['ACC-002', 40.7128, -74.006],
+            ['ACC-003', 23.8103, 90.4125],
+            ['ACC-004', 1.3521, 103.8198],
+            ['ACC-005', 25.2048, 55.2708],
+            ['ACC-006', 48.8566, 2.3522],
+            ['ACC-008', 35.6762, 139.6503],
+            ['ACC-009', -33.8688, 151.2093],
+            ['ACC-010', 19.076, 72.8777],
         ];
         const at = (h: number, m: number): string => new Date(Date.UTC(2026, 5, 4, h, m)).toISOString();
         for (const [account, lat, lon] of homes) {
             for (let e = 0; e < 12; e++) {
                 rows.push({
-                    id: `it-${rows.length}`, account, channel: rand() > 0.4 ? 'mobile' : 'web',
-                    lat: lat + (rand() - 0.5) * 0.15, lon: lon + (rand() - 0.5) * 0.15,
+                    id: `it-${rows.length}`,
+                    account,
+                    channel: rand() > 0.4 ? 'mobile' : 'web',
+                    lat: lat + (rand() - 0.5) * 0.15,
+                    lon: lon + (rand() - 0.5) * 0.15,
                     login_time: at(6 + Math.floor(e * 1.4), Math.floor(rand() * 59)),
                 });
             }
         }
         // The anomaly: same account, two continents, 65 minutes apart.
-        rows.push({ id: 'it-x1', account: 'ACC-007', channel: 'web', lat: 40.7128, lon: -74.006, login_time: at(13, 0) });
-        rows.push({ id: 'it-x2', account: 'ACC-007', channel: 'web', lat: 1.3521, lon: 103.8198, login_time: at(14, 5) });
-        rows.push({ id: 'it-x3', account: 'ACC-007', channel: 'mobile', lat: 1.3548, lon: 103.822, login_time: at(15, 30) });
+        rows.push({
+            id: 'it-x1',
+            account: 'ACC-007',
+            channel: 'web',
+            lat: 40.7128,
+            lon: -74.006,
+            login_time: at(13, 0),
+        });
+        rows.push({
+            id: 'it-x2',
+            account: 'ACC-007',
+            channel: 'web',
+            lat: 1.3521,
+            lon: 103.8198,
+            login_time: at(14, 5),
+        });
+        rows.push({
+            id: 'it-x3',
+            account: 'ACC-007',
+            channel: 'mobile',
+            lat: 1.3548,
+            lon: 103.822,
+            login_time: at(15, 30),
+        });
         return rows;
     })(),
 
@@ -278,35 +535,81 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     mule_corridors: (() => {
         const rand = lcg(33);
         const c: Record<string, [number, number]> = {
-            Dhaka: [23.8103, 90.4125], Chattogram: [22.3569, 91.7832], Dubai: [25.2048, 55.2708],
-            Singapore: [1.3521, 103.8198], London: [51.5074, -0.1278], 'New York': [40.7128, -74.006],
-            Mumbai: [19.076, 72.8777], Karachi: [24.8607, 67.0011], Riyadh: [24.7136, 46.6753],
-            'Kuala Lumpur': [3.139, 101.6869], 'Hong Kong': [22.3193, 114.1694], Lagos: [6.5244, 3.3792],
-            Nairobi: [-1.2921, 36.8219], Toronto: [43.6532, -79.3832], Sydney: [-33.8688, 151.2093],
-            Frankfurt: [50.1109, 8.6821], Istanbul: [41.0082, 28.9784], Doha: [25.2854, 51.531],
+            Dhaka: [23.8103, 90.4125],
+            Chattogram: [22.3569, 91.7832],
+            Dubai: [25.2048, 55.2708],
+            Singapore: [1.3521, 103.8198],
+            London: [51.5074, -0.1278],
+            'New York': [40.7128, -74.006],
+            Mumbai: [19.076, 72.8777],
+            Karachi: [24.8607, 67.0011],
+            Riyadh: [24.7136, 46.6753],
+            'Kuala Lumpur': [3.139, 101.6869],
+            'Hong Kong': [22.3193, 114.1694],
+            Lagos: [6.5244, 3.3792],
+            Nairobi: [-1.2921, 36.8219],
+            Toronto: [43.6532, -79.3832],
+            Sydney: [-33.8688, 151.2093],
+            Frankfurt: [50.1109, 8.6821],
+            Istanbul: [41.0082, 28.9784],
+            Doha: [25.2854, 51.531],
         };
         const corridors: [string, string, string, number][] = [
-            ['Dhaka', 'Dubai', 'hundi', 150], ['Dhaka', 'Riyadh', 'hundi', 110], ['Dhaka', 'Kuala Lumpur', 'hundi', 60],
-            ['Chattogram', 'Singapore', 'wire', 45], ['Dubai', 'London', 'wire', 95], ['Dubai', 'Istanbul', 'crypto', 38],
-            ['Mumbai', 'Dubai', 'hundi', 70], ['Karachi', 'Dubai', 'hundi', 48], ['Singapore', 'Hong Kong', 'wire', 42],
-            ['Hong Kong', 'London', 'wire', 30], ['London', 'New York', 'wire', 33], ['New York', 'Toronto', 'wire', 25],
-            ['Lagos', 'London', 'crypto', 28], ['Nairobi', 'Dubai', 'crypto', 22], ['Doha', 'Frankfurt', 'wire', 18],
-            ['Istanbul', 'Frankfurt', 'cash', 15], ['Kuala Lumpur', 'Sydney', 'wire', 12], ['Dhaka', 'Singapore', 'crypto', 20],
-            ['Frankfurt', 'London', 'wire', 10], ['Dubai', 'Doha', 'cash', 8], ['Mumbai', 'Singapore', 'wire', 9],
-            ['Riyadh', 'Istanbul', 'cash', 6], ['Toronto', 'Sydney', 'crypto', 4], ['Nairobi', 'Lagos', 'cash', 3],
+            ['Dhaka', 'Dubai', 'hundi', 150],
+            ['Dhaka', 'Riyadh', 'hundi', 110],
+            ['Dhaka', 'Kuala Lumpur', 'hundi', 60],
+            ['Chattogram', 'Singapore', 'wire', 45],
+            ['Dubai', 'London', 'wire', 95],
+            ['Dubai', 'Istanbul', 'crypto', 38],
+            ['Mumbai', 'Dubai', 'hundi', 70],
+            ['Karachi', 'Dubai', 'hundi', 48],
+            ['Singapore', 'Hong Kong', 'wire', 42],
+            ['Hong Kong', 'London', 'wire', 30],
+            ['London', 'New York', 'wire', 33],
+            ['New York', 'Toronto', 'wire', 25],
+            ['Lagos', 'London', 'crypto', 28],
+            ['Nairobi', 'Dubai', 'crypto', 22],
+            ['Doha', 'Frankfurt', 'wire', 18],
+            ['Istanbul', 'Frankfurt', 'cash', 15],
+            ['Kuala Lumpur', 'Sydney', 'wire', 12],
+            ['Dhaka', 'Singapore', 'crypto', 20],
+            ['Frankfurt', 'London', 'wire', 10],
+            ['Dubai', 'Doha', 'cash', 8],
+            ['Mumbai', 'Singapore', 'wire', 9],
+            ['Riyadh', 'Istanbul', 'cash', 6],
+            ['Toronto', 'Sydney', 'crypto', 4],
+            ['Nairobi', 'Lagos', 'cash', 3],
         ];
         const rows: Record<string, unknown>[] = [];
         for (const [from, to, channel, legs] of corridors) {
             for (let l = 0; l < legs; l++) {
                 rows.push({
-                    id: `mc-${rows.length}`, from_city: from, from_lat: c[from][0], from_lon: c[from][1],
-                    to_city: to, to_lat: c[to][0], to_lon: c[to][1], channel,
-                    moved_at: new Date(Date.UTC(2026, 5, 1 + Math.floor(rand() * 7), Math.floor(rand() * 24), Math.floor(rand() * 59))).toISOString(),
+                    id: `mc-${rows.length}`,
+                    from_city: from,
+                    from_lat: c[from][0],
+                    from_lon: c[from][1],
+                    to_city: to,
+                    to_lat: c[to][0],
+                    to_lon: c[to][1],
+                    channel,
+                    moved_at: new Date(
+                        Date.UTC(2026, 5, 1 + Math.floor(rand() * 7), Math.floor(rand() * 24), Math.floor(rand() * 59)),
+                    ).toISOString(),
                 });
             }
         }
         for (let b = 0; b < 5; b++) {
-            rows.push({ id: `mc-bad-${b}`, from_city: 'Dhaka', from_lat: 23.8103, from_lon: 90.4125, to_city: 'Unknown', to_lat: '', to_lon: '', channel: 'wire', moved_at: '2026-06-05T12:00:00Z' });
+            rows.push({
+                id: `mc-bad-${b}`,
+                from_city: 'Dhaka',
+                from_lat: 23.8103,
+                from_lon: 90.4125,
+                to_city: 'Unknown',
+                to_lat: '',
+                to_lon: '',
+                channel: 'wire',
+                moved_at: '2026-06-05T12:00:00Z',
+            });
         }
         return rows;
     })(),
@@ -317,8 +620,10 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     fleet_breadcrumbs: (() => {
         const rand = lcg(44);
         const depots: Record<string, [number, number]> = {
-            'Depot Dhaka': [23.8103, 90.4125], 'Depot Comilla': [23.4607, 91.1809],
-            'Depot Jessore': [23.1667, 89.2089], 'Depot Bogra': [24.8465, 89.3773],
+            'Depot Dhaka': [23.8103, 90.4125],
+            'Depot Comilla': [23.4607, 91.1809],
+            'Depot Jessore': [23.1667, 89.2089],
+            'Depot Bogra': [24.8465, 89.3773],
         };
         const names = Object.keys(depots);
         const rows: Record<string, unknown>[] = [];
@@ -331,18 +636,36 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
             const stop: [number, number] = [home[0] * 0.45 + away[0] * 0.55, home[1] * 0.45 + away[1] * 0.55];
             const hasStop = t === 1 || t === 4;
             for (let min = 0; min < 1440; min += 15) {
-                let lat: number, lon: number, status = 'moving';
-                const lerp = (a: [number, number], b: [number, number], f: number): [number, number] =>
-                    [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
-                if (min < 120) { [lat, lon] = home; status = 'idle'; }
-                else if (min < 360) { [lat, lon] = lerp(home, away, (min - 120) / 240); }
-                else if (min < 600) { [lat, lon] = away; status = 'idle'; }
-                else if (hasStop && min < 660) { [lat, lon] = stop; status = 'idle'; }
-                else if (min < 900) { [lat, lon] = lerp(away, home, (min - (hasStop ? 660 : 600)) / (hasStop ? 240 : 300)); }
-                else { [lat, lon] = home; status = 'idle'; }
+                let lat: number,
+                    lon: number,
+                    status = 'moving';
+                const lerp = (a: [number, number], b: [number, number], f: number): [number, number] => [
+                    a[0] + (b[0] - a[0]) * f,
+                    a[1] + (b[1] - a[1]) * f,
+                ];
+                if (min < 120) {
+                    [lat, lon] = home;
+                    status = 'idle';
+                } else if (min < 360) {
+                    [lat, lon] = lerp(home, away, (min - 120) / 240);
+                } else if (min < 600) {
+                    [lat, lon] = away;
+                    status = 'idle';
+                } else if (hasStop && min < 660) {
+                    [lat, lon] = stop;
+                    status = 'idle';
+                } else if (min < 900) {
+                    [lat, lon] = lerp(away, home, (min - (hasStop ? 660 : 600)) / (hasStop ? 240 : 300));
+                } else {
+                    [lat, lon] = home;
+                    status = 'idle';
+                }
                 rows.push({
-                    id: `fb-${rows.length}`, truck, status,
-                    lat: lat + (rand() - 0.5) * 0.0006, lon: lon + (rand() - 0.5) * 0.0006,
+                    id: `fb-${rows.length}`,
+                    truck,
+                    status,
+                    lat: lat + (rand() - 0.5) * 0.0006,
+                    lon: lon + (rand() - 0.5) * 0.0006,
                     ping_time: new Date(Date.UTC(2026, 5, 5, 0, min)).toISOString(),
                 });
             }
@@ -355,7 +678,11 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     // (co-location) and dense revisits (heatmap hotspots).
     border_roamers: (() => {
         const rand = lcg(55);
-        const crossings: [number, number][] = [[23.0435, 88.8940], [23.0821, 88.9152], [23.0119, 88.8731]];
+        const crossings: [number, number][] = [
+            [23.0435, 88.894],
+            [23.0821, 88.9152],
+            [23.0119, 88.8731],
+        ];
         const rows: Record<string, unknown>[] = [];
         for (let d = 0; d < 12; d++) {
             const imei = `IMEI-B${String(d + 1).padStart(2, '0')}`;
@@ -365,16 +692,36 @@ export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
                 const lat = cross[0] + (rand() - 0.5) * 0.02;
                 const lon = cross[1] + (west ? -1 : 1) * (0.002 + rand() * 0.03);
                 rows.push({
-                    id: `br-${rows.length}`, imei, side: lon < cross[1] ? 'india' : 'bangladesh', lat, lon,
-                    seen_at: new Date(Date.UTC(2026, 5, 6 + Math.floor(e / 20), Math.floor((e % 20) * 1.2), Math.floor(rand() * 59))).toISOString(),
+                    id: `br-${rows.length}`,
+                    imei,
+                    side: lon < cross[1] ? 'india' : 'bangladesh',
+                    lat,
+                    lon,
+                    seen_at: new Date(
+                        Date.UTC(2026, 5, 6 + Math.floor(e / 20), Math.floor((e % 20) * 1.2), Math.floor(rand() * 59)),
+                    ).toISOString(),
                 });
             }
         }
         // Staged meetings: pairs at the same crossing within minutes (found by co-location).
         const meet = (a: string, b: string, ci: number, day: number, h: number): void => {
             const [lat, lon] = crossings[ci];
-            rows.push({ id: `br-${rows.length}`, imei: a, side: 'bangladesh', lat: lat + 0.0002, lon: lon + 0.001, seen_at: new Date(Date.UTC(2026, 5, day, h, 10)).toISOString() });
-            rows.push({ id: `br-${rows.length}`, imei: b, side: 'bangladesh', lat: lat + 0.0003, lon: lon + 0.0012, seen_at: new Date(Date.UTC(2026, 5, day, h, 25)).toISOString() });
+            rows.push({
+                id: `br-${rows.length}`,
+                imei: a,
+                side: 'bangladesh',
+                lat: lat + 0.0002,
+                lon: lon + 0.001,
+                seen_at: new Date(Date.UTC(2026, 5, day, h, 10)).toISOString(),
+            });
+            rows.push({
+                id: `br-${rows.length}`,
+                imei: b,
+                side: 'bangladesh',
+                lat: lat + 0.0003,
+                lon: lon + 0.0012,
+                seen_at: new Date(Date.UTC(2026, 5, day, h, 25)).toISOString(),
+            });
         };
         meet('IMEI-B01', 'IMEI-B07', 0, 6, 9);
         meet('IMEI-B01', 'IMEI-B07', 0, 7, 9);

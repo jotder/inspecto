@@ -23,18 +23,46 @@ import { NamedMeasure } from './dataset-types';
                 <div class="grid grid-cols-[1fr_1fr_1.5fr_auto_auto] items-end gap-2">
                     <mat-form-field subscriptSizing="dynamic">
                         <mat-label>Id</mat-label>
-                        <input matInput [ngModel]="m.id" (ngModelChange)="patch(i, { id: $event })" [attr.aria-label]="'Measure id ' + (i + 1)" />
+                        <input
+                            matInput
+                            [ngModel]="m.id"
+                            (ngModelChange)="patch(i, { id: $event })"
+                            [attr.aria-label]="'Measure id ' + (i + 1)"
+                        />
                     </mat-form-field>
                     <mat-form-field subscriptSizing="dynamic">
                         <mat-label>Label</mat-label>
-                        <input matInput [ngModel]="m.label" (ngModelChange)="patch(i, { label: $event })" [attr.aria-label]="'Measure label ' + (i + 1)" />
+                        <input
+                            matInput
+                            [ngModel]="m.label"
+                            (ngModelChange)="patch(i, { label: $event })"
+                            [attr.aria-label]="'Measure label ' + (i + 1)"
+                        />
                     </mat-form-field>
                     <mat-form-field subscriptSizing="dynamic">
                         <mat-label>Expression</mat-label>
-                        <input matInput [ngModel]="m.expression" (ngModelChange)="patch(i, { expression: $event })" placeholder="e.g. sum(duration_s) / count(*)" [attr.aria-label]="'Measure expression ' + (i + 1)" />
+                        <input
+                            matInput
+                            [ngModel]="m.expression"
+                            (ngModelChange)="patch(i, { expression: $event })"
+                            placeholder="e.g. sum(duration_s) / count(*)"
+                            [attr.aria-label]="'Measure expression ' + (i + 1)"
+                        />
                     </mat-form-field>
-                    <button mat-stroked-button type="button" (click)="test(i)" [attr.aria-label]="'Test measure ' + (i + 1)">Test</button>
-                    <button mat-icon-button type="button" (click)="remove(i)" [attr.aria-label]="'Remove measure ' + (i + 1)">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        (click)="test(i)"
+                        [attr.aria-label]="'Test measure ' + (i + 1)"
+                    >
+                        Test
+                    </button>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="remove(i)"
+                        [attr.aria-label]="'Remove measure ' + (i + 1)"
+                    >
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                     </button>
                 </div>
@@ -73,7 +101,10 @@ export class DatasetMeasuresComponent {
     }
 
     add(): void {
-        const next = [...this.rows(), { id: `measure_${this.rows().length + 1}`, label: 'New measure', expression: 'count(*)' }];
+        const next = [
+            ...this.rows(),
+            { id: `measure_${this.rows().length + 1}`, label: 'New measure', expression: 'count(*)' },
+        ];
         this.rows.set(next);
         this.measuresChange.emit(next);
     }

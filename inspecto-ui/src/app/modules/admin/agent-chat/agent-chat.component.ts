@@ -110,7 +110,11 @@ export class AgentChatComponent {
     private stream(sessionId: string, question: string): void {
         this.question.setValue('');
         this.busy.set(true);
-        this.messages.update((list) => [...list, { role: 'user', text: question }, { role: 'agent', text: '', streaming: true }]);
+        this.messages.update((list) => [
+            ...list,
+            { role: 'user', text: question },
+            { role: 'agent', text: '', streaming: true },
+        ]);
         const controller = new AbortController();
         this.controller = controller;
         void this.api.askStream(
@@ -148,7 +152,9 @@ export class AgentChatComponent {
      *  route config — anything that doesn't resolve is dropped (fail closed, spike §4.4). */
     private validNavigationTarget(result: AgentAskResult): string | undefined {
         if (result.kind !== 'NAVIGATION' || !result.navigationTarget) return undefined;
-        const target = result.navigationTarget.startsWith('/') ? result.navigationTarget : `/${result.navigationTarget}`;
+        const target = result.navigationTarget.startsWith('/')
+            ? result.navigationTarget
+            : `/${result.navigationTarget}`;
         return isNavigableTarget(this.router.config, target) ? target : undefined;
     }
 

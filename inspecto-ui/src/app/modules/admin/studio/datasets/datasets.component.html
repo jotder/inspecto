@@ -4,8 +4,8 @@
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Datasets</h1>
             <div class="text-secondary mt-1">
-                Reusable data sources — physical tables, virtual SQL views, or materialized results — that
-                widgets and dashboards build on.
+                Reusable data sources — physical tables, virtual SQL views, or materialized results — that widgets and
+                dashboards build on.
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -13,7 +13,12 @@
             @if (loading()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['dataset']" (changed)="load()" label="Import / export datasets" />
+            <inspecto-transfer-menu
+                [items]="transferItems()"
+                [allowedKinds]="['dataset']"
+                (changed)="load()"
+                label="Import / export datasets"
+            />
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
@@ -33,7 +38,10 @@
     </div>
 
     <div class="relative mt-4 max-w-md">
-        <mat-icon class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+        <mat-icon
+            class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2"
+            svgIcon="heroicons_outline:magnifying-glass"
+        ></mat-icon>
         <input
             type="text"
             class="bg-card w-full rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
@@ -74,7 +82,9 @@
                                     matTooltip="Bound to a dataset shared by another space"
                                 />
                             }
-                            <span>source: <span class="font-mono">{{ d.sourceName }}</span></span>
+                            <span
+                                >source: <span class="font-mono">{{ d.sourceName }}</span></span
+                            >
                             <span>· {{ columnCount(d) }} columns</span>
                         </div>
                     </div>
@@ -83,12 +93,22 @@
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                         </button>
                         @if (canShare()) {
-                            <button mat-icon-button (click)="offer(d)" matTooltip="Offer for sharing" aria-label="Offer for sharing">
+                            <button
+                                mat-icon-button
+                                (click)="offer(d)"
+                                matTooltip="Offer for sharing"
+                                aria-label="Offer for sharing"
+                            >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:share"></mat-icon>
                             </button>
                         }
                         @if (!writesDisabled()) {
-                            <button mat-icon-button (click)="openTags(d)" [attr.aria-label]="'Tags for ' + d.id" matTooltip="Tags">
+                            <button
+                                mat-icon-button
+                                (click)="openTags(d)"
+                                [attr.aria-label]="'Tags for ' + d.id"
+                                matTooltip="Tags"
+                            >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
                             </button>
                             <button mat-icon-button (click)="remove(d)" matTooltip="Delete" aria-label="Delete">

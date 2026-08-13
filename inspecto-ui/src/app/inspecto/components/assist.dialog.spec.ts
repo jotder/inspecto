@@ -35,7 +35,7 @@ function create() {
 describe('AssistDialog', () => {
     it('renders the title and seeds the assist panel with the user text', async () => {
         const { fixture } = create();
-        await fixture.whenStable();   // ngModel writes the textarea value asynchronously
+        await fixture.whenStable(); // ngModel writes the textarea value asynchronously
         fixture.detectChanges();
         const el: HTMLElement = fixture.nativeElement;
         expect(el.querySelector('h2')?.textContent).toContain('New schedule');

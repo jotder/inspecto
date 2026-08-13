@@ -22,7 +22,8 @@ export function flattenBlock(block: Record<string, unknown> | undefined, prefix 
     for (const [k, v] of Object.entries(block ?? {})) {
         const key = prefix ? `${prefix}${KEY_SEP}${k}` : k;
         if (Array.isArray(v)) out[key] = v.join(',');
-        else if (v !== null && typeof v === 'object') Object.assign(out, flattenBlock(v as Record<string, unknown>, key));
+        else if (v !== null && typeof v === 'object')
+            Object.assign(out, flattenBlock(v as Record<string, unknown>, key));
         else out[key] = v;
     }
     return out;
@@ -93,8 +94,12 @@ export function mergeBlock(
         if (v === undefined) {
             delete out[k];
         } else if (
-            v !== null && typeof v === 'object' && !Array.isArray(v) &&
-            out[k] !== null && typeof out[k] === 'object' && !Array.isArray(out[k])
+            v !== null &&
+            typeof v === 'object' &&
+            !Array.isArray(v) &&
+            out[k] !== null &&
+            typeof out[k] === 'object' &&
+            !Array.isArray(out[k])
         ) {
             out[k] = mergeBlock(out[k] as Record<string, unknown>, v as Record<string, unknown>);
         } else {

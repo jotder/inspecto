@@ -23,7 +23,11 @@ const UPSERT = {
     name: 'route_apac',
     targetType: 'pipeline',
     target: 'cdr_ingest',
-    when: { kind: 'group', op: 'AND', items: [{ kind: 'condition', field: 'tariff', operator: 'startsWith', value: 'APAC_' }] },
+    when: {
+        kind: 'group',
+        op: 'AND',
+        items: [{ kind: 'condition', field: 'tariff', operator: 'startsWith', value: 'APAC_' }],
+    },
     consequences: [{ action: 'route', destination: 'apac' }],
     priority: 15,
 };
@@ -44,9 +48,12 @@ describe('decisionRulesHandler', () => {
         expect(created.priority).toBe(15);
 
         expect(handler(req('POST', '/api/decision-rules', UPSERT), store)?.status).toBe(409);
-        expect(handler(req('POST', '/api/decision-rules', { ...UPSERT, name: 'x', consequences: [] }), store)?.status).toBe(422);
+        expect(
+            handler(req('POST', '/api/decision-rules', { ...UPSERT, name: 'x', consequences: [] }), store)?.status,
+        ).toBe(422);
 
-        const updated = handler(req('PUT', '/api/decision-rules/route_apac', { ...UPSERT, priority: 5 }), store)?.body as DecisionRule;
+        const updated = handler(req('PUT', '/api/decision-rules/route_apac', { ...UPSERT, priority: 5 }), store)
+            ?.body as DecisionRule;
         expect(updated.priority).toBe(5);
 
         handler(req('DELETE', '/api/decision-rules/route_apac'), store);
@@ -55,12 +62,14 @@ describe('decisionRulesHandler', () => {
 
     it('simulate with no sample falls back to the seeded demo counts, no side effects', () => {
         const store = seededStore();
-        const sim = handler(req('POST', '/api/decision-rules/quarantine_high_cost/simulate'), store)?.body as DecisionRule;
+        const sim = handler(req('POST', '/api/decision-rules/quarantine_high_cost/simulate'), store)
+            ?.body as DecisionRule;
         expect(sim.lastSimulation?.matched).toBe(7);
         expect(sim.lastSimulation?.total).toBe(1000);
         // routing is not a failure — no incident may appear
         expect(
-            store.list<{ correlationId?: string }>('default', 'ops-object')
+            store
+                .list<{ correlationId?: string }>('default', 'ops-object')
                 .some((o) => (o.correlationId ?? '').startsWith('decision')),
         ).toBe(false);
 
@@ -79,10 +88,8 @@ describe('decisionRulesHandler', () => {
             { cost_usd: 50, duration_s: 10 }, // cost too low
             { cost_usd: 999, duration_s: 5 }, // match
         ];
-        const sim = handler(
-            req('POST', '/api/decision-rules/quarantine_high_cost/simulate', { sampleRows }),
-            store,
-        )?.body as DecisionRule;
+        const sim = handler(req('POST', '/api/decision-rules/quarantine_high_cost/simulate', { sampleRows }), store)
+            ?.body as DecisionRule;
         expect(sim.lastSimulation?.matched).toBe(2);
         expect(sim.lastSimulation?.total).toBe(4);
     });

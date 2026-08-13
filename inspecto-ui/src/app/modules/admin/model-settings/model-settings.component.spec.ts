@@ -28,7 +28,10 @@ function create() {
         providers: [
             provideNoopAnimations(),
             { provide: AssistService, useValue: api },
-            { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined, warning: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { success: () => undefined, error: () => undefined, warning: () => undefined },
+            },
         ],
     });
     const fixture = TestBed.createComponent(ModelSettingsComponent);

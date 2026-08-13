@@ -27,11 +27,7 @@
     >
         <div class="flex items-center space-x-2 pr-2">
             <!-- Navigation toggle button -->
-            <button
-                mat-icon-button
-                aria-label="Toggle navigation"
-                (click)="toggleNavigation('mainNavigation')"
-            >
+            <button mat-icon-button aria-label="Toggle navigation" (click)="toggleNavigation('mainNavigation')">
                 <mat-icon [svgIcon]="'heroicons_outline:bars-3'"></mat-icon>
             </button>
             <!-- Navigation appearance toggle button -->
@@ -41,9 +37,7 @@
                 aria-label="Toggle navigation appearance"
                 (click)="toggleNavigationAppearance()"
             >
-                <mat-icon
-                    [svgIcon]="'heroicons_outline:arrows-right-left'"
-                ></mat-icon>
+                <mat-icon [svgIcon]="'heroicons_outline:arrows-right-left'"></mat-icon>
             </button>
         </div>
         <!-- Components -->
@@ -67,9 +61,7 @@
     <div
         class="bg-card relative z-49 flex h-14 w-full flex-0 items-center justify-start border-t px-4 dark:bg-transparent md:px-6 print:hidden"
     >
-        <span class="text-secondary font-medium"
-            >Gamma &copy; {{ currentYear }}</span
-        >
+        <span class="text-secondary font-medium">Gamma &copy; {{ currentYear }}</span>
     </div>
 </div>
 

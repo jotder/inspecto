@@ -1,10 +1,13 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent">
+    <div
+        class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+    >
         <div>
             <h1 class="text-3xl font-extrabold leading-none tracking-tight">Notification center</h1>
             <div class="text-secondary mt-1.5">
-                Where alert &amp; incident notifications go — delivery channels, the delivery ledger, and your preferences
+                Where alert &amp; incident notifications go — delivery channels, the delivery ledger, and your
+                preferences
             </div>
         </div>
     </div>
@@ -16,7 +19,12 @@
             <mat-tab label="Channels">
                 <div class="flex flex-col gap-4 pt-6">
                     <div class="flex items-center justify-end gap-2">
-                        <button mat-icon-button (click)="loadChannels()" matTooltip="Refresh" aria-label="Refresh channels">
+                        <button
+                            mat-icon-button
+                            (click)="loadChannels()"
+                            matTooltip="Refresh"
+                            aria-label="Refresh channels"
+                        >
                             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                         </button>
                         <button mat-flat-button color="primary" (click)="openForm()">
@@ -68,7 +76,12 @@
             <mat-tab label="Deliveries">
                 <div class="flex flex-col gap-4 pt-6">
                     <div class="flex items-center justify-end">
-                        <button mat-icon-button (click)="loadDeliveries()" matTooltip="Refresh" aria-label="Refresh deliveries">
+                        <button
+                            mat-icon-button
+                            (click)="loadDeliveries()"
+                            matTooltip="Refresh"
+                            aria-label="Refresh deliveries"
+                        >
                             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                         </button>
                     </div>

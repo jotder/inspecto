@@ -15,17 +15,26 @@ import { OnboardingStateService } from './onboarding-state.service';
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 const WRITE_OK = (type: string, name: string) => ({
     // Mirrors the real fileBase convention: suffix once, never double.
-    type, written: true, path: name.endsWith('_enrich') ? `${name}.toon` : `${name}_enrich.toon`,
-    name, bytes: 1, overwritten: false, findings: [],
+    type,
+    written: true,
+    path: name.endsWith('_enrich') ? `${name}.toon` : `${name}_enrich.toon`,
+    name,
+    bytes: 1,
+    overwritten: false,
+    findings: [],
 });
 const REGISTER_OK = { registered: true, name: 'orders_feed_enrich', path: 'orders_feed_enrich.toon', findings: [] };
 
 const PRODUCED_REF: MetadataNode = {
-    id: 'ref:region_dim', kind: 'REFERENCE_DATASET', label: 'REGION_DIM',
+    id: 'ref:region_dim',
+    kind: 'REFERENCE_DATASET',
+    label: 'REGION_DIM',
     attrs: { pipeline: 'region_dim', active: true },
 } as MetadataNode;
 const PATH_REF: MetadataNode = {
-    id: 'ref:daily/zones', kind: 'REFERENCE_DATASET', label: 'zones',
+    id: 'ref:daily/zones',
+    kind: 'REFERENCE_DATASET',
+    label: 'zones',
     attrs: { path: 'data/zones.csv', format: 'CSV' },
 } as MetadataNode;
 
@@ -41,7 +50,8 @@ async function create(
     const table = vi.fn(() =>
         opts.sample === 'error'
             ? throwError(() => ({ status: 404 }))
-            : of({ columns: [], rows: opts.sample ?? [], statistics: { rowCount: 0, elapsedMs: 0, truncated: false } }));
+            : of({ columns: [], rows: opts.sample ?? [], statistics: { rowCount: 0, elapsedMs: 0, truncated: false } }),
+    );
     TestBed.configureTestingModule({
         imports: [OnboardingEnrichmentPaneComponent],
         providers: [
@@ -52,7 +62,8 @@ async function create(
                 provide: ConfigService,
                 useValue: {
                     write: vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
-                        of(WRITE_OK(type, String(cfg['name'] ?? 'x')))),
+                        of(WRITE_OK(type, String(cfg['name'] ?? 'x'))),
+                    ),
                     read: vi.fn(() => throwError(() => ({ status: 404 }))),
                     registerEnrichment: vi.fn((_path: string) => of(REGISTER_OK)),
                     previewEnrichment: vi.fn(() => of({ columns: ['ID'], rows: [{ ID: 'x' }], truncated: false })),
@@ -110,13 +121,13 @@ describe('OnboardingEnrichmentPaneComponent', () => {
 
     it('offers only pipeline-produced references, excluding this pipeline itself', async () => {
         const self: MetadataNode = {
-            id: 'ref:orders_feed', kind: 'REFERENCE_DATASET', label: 'self',
+            id: 'ref:orders_feed',
+            kind: 'REFERENCE_DATASET',
+            label: 'self',
             attrs: { pipeline: 'orders_feed' },
         } as MetadataNode;
         const { fixture } = await create(PIPELINE, { refs: [PRODUCED_REF, PATH_REF, self] });
-        expect(fixture.componentInstance.referenceOptions()).toEqual([
-            { id: 'region_dim', label: 'REGION_DIM' },
-        ]);
+        expect(fixture.componentInstance.referenceOptions()).toEqual([{ id: 'region_dim', label: 'REGION_DIM' }]);
     });
 
     it('hydrates the shared editor from an existing companion config, pristine', async () => {
@@ -148,7 +159,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
 
     it('save writes the companion with derived wiring, then hot-registers it', async () => {
         const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
-            of(WRITE_OK(type, String(cfg['name'] ?? 'x'))));
+            of(WRITE_OK(type, String(cfg['name'] ?? 'x'))),
+        );
         const registerEnrichment = vi.fn((_path: string) => of(REGISTER_OK));
         const { fixture, state } = await create(PIPELINE, { api: { write, registerEnrichment } });
         const c = fixture.componentInstance;
@@ -164,10 +176,10 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect(draft['name']).toBe('orders_feed_enrich');
         expect(draft['references']).toEqual({ region_dim: { ref: 'region_dim' } });
         expect((draft['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders_feed');
-        expect((draft['input'] as Record<string, unknown>)['database'])
-            .toBe('spaces/demo/data/orders_feed/database');
-        expect((draft['output'] as Record<string, unknown>)['database'])
-            .toBe('spaces/demo/data/enriched/orders_feed_enrich');
+        expect((draft['input'] as Record<string, unknown>)['database']).toBe('spaces/demo/data/orders_feed/database');
+        expect((draft['output'] as Record<string, unknown>)['database']).toBe(
+            'spaces/demo/data/enriched/orders_feed_enrich',
+        );
         expect(registerEnrichment).toHaveBeenCalledWith('orders_feed_enrich.toon');
         expect(state.enrichmentConfig()).toEqual(draft);
         expect(TOASTR.success).toHaveBeenCalled();
@@ -184,7 +196,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
 
     it('blocks save on a duplicate reference alias', async () => {
         const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
-            of(WRITE_OK(type, String(cfg['name'] ?? 'x'))));
+            of(WRITE_OK(type, String(cfg['name'] ?? 'x'))),
+        );
         const { fixture } = await create(PIPELINE, { api: { write } });
         const ed = editor(fixture);
         ed.addReference();
@@ -200,9 +213,11 @@ describe('OnboardingEnrichmentPaneComponent', () => {
 
     it('preview samples the stream output and runs the draft transform over it', async () => {
         const previewEnrichment = vi.fn((_cfg: Record<string, unknown>, _rows: Record<string, unknown>[]) =>
-            of({ columns: ['ID', 'ZONE'], rows: [{ ID: '1', ZONE: 'north' }], truncated: true }));
+            of({ columns: ['ID', 'ZONE'], rows: [{ ID: '1', ZONE: 'north' }], truncated: true }),
+        );
         const { fixture, table } = await create(PIPELINE, {
-            api: { previewEnrichment }, sample: [{ ID: '1', REGION: 'r1' }],
+            api: { previewEnrichment },
+            sample: [{ ID: '1', REGION: 'r1' }],
         });
         const c = fixture.componentInstance;
         editor(fixture).onSqlChange('SELECT * FROM input');
@@ -238,10 +253,14 @@ describe('OnboardingEnrichmentPaneComponent', () => {
     });
 
     it('preview surfaces a transform error from the sample', async () => {
-        const previewEnrichment = vi.fn(() => throwError(() =>
-            new HttpErrorResponse({ status: 422, error: { error: { message: 'no such column: BOGUS' } } })));
+        const previewEnrichment = vi.fn(() =>
+            throwError(
+                () => new HttpErrorResponse({ status: 422, error: { error: { message: 'no such column: BOGUS' } } }),
+            ),
+        );
         const { fixture } = await create(PIPELINE, {
-            api: { previewEnrichment }, sample: [{ ID: '1' }],
+            api: { previewEnrichment },
+            sample: [{ ID: '1' }],
         });
         const c = fixture.componentInstance;
         editor(fixture).onSqlChange('SELECT BOGUS FROM input');

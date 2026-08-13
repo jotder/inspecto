@@ -12,11 +12,14 @@ const PUBLIC_DASHBOARD = /\/public\/dashboards\/[^/]+(\/query)?$/;
  * against the backend when mocks are off.
  */
 export function publicDashboardsHandler(flags: MockFlags): MockHandler {
-  return (req: MockRequest) => {
-    if (!flags.mockStudio) return undefined;
-    if (match(req.url, PUBLIC_DASHBOARD)) {
-      return error(501, 'Share links resolve on the real backend (HMAC-verified); offline mode cannot validate tokens.');
-    }
-    return undefined;
-  };
+    return (req: MockRequest) => {
+        if (!flags.mockStudio) return undefined;
+        if (match(req.url, PUBLIC_DASHBOARD)) {
+            return error(
+                501,
+                'Share links resolve on the real backend (HMAC-verified); offline mode cannot validate tokens.',
+            );
+        }
+        return undefined;
+    };
 }

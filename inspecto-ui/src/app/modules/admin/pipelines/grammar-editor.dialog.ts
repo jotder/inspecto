@@ -9,7 +9,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, AuthoredNode, ComponentDef, ComponentsService, ParserDef, ParserPreview } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    AuthoredNode,
+    ComponentDef,
+    ComponentsService,
+    ParserDef,
+    ParserPreview,
+} from 'app/inspecto/api';
 import { parseUseRef } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';

@@ -13,11 +13,14 @@ const PROJECTION = /\/inv\/projection$/;
  * serves `/inv/projection` when mocks are off.
  */
 export function invHandler(flags: MockFlags): MockHandler {
-  return (req: MockRequest) => {
-    if (!flags.mockStudio) return undefined;
-    if (req.method === 'POST' && match(req.url, PROJECTION)) {
-      return error(501, 'Entity projection runs on the real backend; offline mode folds sample rows client-side.');
-    }
-    return undefined;
-  };
+    return (req: MockRequest) => {
+        if (!flags.mockStudio) return undefined;
+        if (req.method === 'POST' && match(req.url, PROJECTION)) {
+            return error(
+                501,
+                'Entity projection runs on the real backend; offline mode folds sample rows client-side.',
+            );
+        }
+        return undefined;
+    };
 }

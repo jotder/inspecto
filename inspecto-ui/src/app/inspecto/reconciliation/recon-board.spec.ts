@@ -2,8 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { ICellRendererParams } from 'ag-grid-community';
 import { CompareColumn } from './reconciliation-types';
 import {
-    aggregateRecon, bandCell, bandFor, buildBoardTree, comparedSides, decodePath, deltaPct, encodePath,
-    markBreachesExpanded, RECON_RECORDS, reconBreakSets, ReconRunResult,
+    aggregateRecon,
+    bandCell,
+    bandFor,
+    buildBoardTree,
+    comparedSides,
+    decodePath,
+    deltaPct,
+    encodePath,
+    markBreachesExpanded,
+    RECON_RECORDS,
+    reconBreakSets,
+    ReconRunResult,
 } from './recon-board';
 
 /**
@@ -69,8 +79,12 @@ describe('aggregateRecon (backend ReconService parity)', () => {
     it('ports withinTolerance over aggregates: boundaries are within, zero anchor requires equality', () => {
         const vb = (a: number, b: number, c: Partial<CompareColumn>): number =>
             aggregateRecon(
-                { keyColumns: ['k'], compareColumns: [{ column: 'v', toleranceType: 'exact', tolerance: 0, ...c } as CompareColumn] },
-                [{ k: 'x', v: a }], [{ k: 'x', v: b }],
+                {
+                    keyColumns: ['k'],
+                    compareColumns: [{ column: 'v', toleranceType: 'exact', tolerance: 0, ...c } as CompareColumn],
+                },
+                [{ k: 'x', v: a }],
+                [{ k: 'x', v: b }],
             ).summary.byType.value_break;
         expect(vb(100, 105, { toleranceType: 'absolute', tolerance: 5 })).toBe(0);
         expect(vb(100, 106, { toleranceType: 'absolute', tolerance: 5 })).toBe(1);
@@ -83,7 +97,10 @@ describe('aggregateRecon (backend ReconService parity)', () => {
     it('groups NULL key values together (both-null keys match)', () => {
         const r = aggregateRecon(
             { keyColumns: ['k'], compareColumns: [{ column: 'v', toleranceType: 'exact', tolerance: 0 }] },
-            [{ k: null, v: 1 }, { k: 'x', v: 2 }],
+            [
+                { k: null, v: 1 },
+                { k: 'x', v: 2 },
+            ],
             [{ k: null, v: 1 }],
         );
         expect(r.summary.groups).toBe(2);
@@ -105,8 +122,8 @@ describe('aggregateRecon 3-way (anchor model, backend parity)', () => {
     it('compares each non-anchor side against the anchor and reports per-pair summaries', () => {
         const r = aggregateRecon(CONFIG, LEFT, RIGHT, THIRD);
         expect(comparedSides(r)).toEqual(['b', 'c']);
-        expect(r.summary.groups).toBe(6);            // union: EU/voice, EU/data, US/voice, MEA/voice, APAC/sms, LATAM/voice
-        expect(r.totals.c!['amount']).toBe(368);     // 195 + 118 + 50 + 5
+        expect(r.summary.groups).toBe(6); // union: EU/voice, EU/data, US/voice, MEA/voice, APAC/sms, LATAM/voice
+        expect(r.totals.c!['amount']).toBe(368); // 195 + 118 + 50 + 5
 
         const latam = r.rows.find((x) => x.key['region'] === 'LATAM')!;
         expect(latam.inA).toBe(false);
@@ -116,9 +133,9 @@ describe('aggregateRecon 3-way (anchor model, backend parity)', () => {
         const [ab, ac] = r.summary.pairs!;
         expect(ab.side).toBe('b');
         expect(ac.side).toBe('c');
-        expect(ac.byType.missing_right).toBe(1);     // MEA in A, not C
-        expect(ac.byType.missing_left).toBe(1);      // LATAM only in C
-        expect(ac.byType.value_break).toBe(1);       // EU/voice 200 vs 195 outside 0.5%
+        expect(ac.byType.missing_right).toBe(1); // MEA in A, not C
+        expect(ac.byType.missing_left).toBe(1); // LATAM only in C
+        expect(ac.byType.value_break).toBe(1); // EU/voice 200 vs 195 outside 0.5%
         // the flat top-level summary mirrors pair A↔B (2-way consumers unchanged)
         expect(r.summary.matchedKeys).toBe(ab.matchedKeys);
     });
@@ -128,7 +145,7 @@ describe('aggregateRecon 3-way (anchor model, backend parity)', () => {
         expect(c.missing_right!.rows.map((r) => r.key['region'])).toEqual(['MEA']);
         expect(c.missing_left!.rows.map((r) => r.key['region'])).toEqual(['LATAM']);
         expect(c.value_break!.rows[0].key['product']).toBe('voice');
-        expect(c.value_break!.rows[0].b!['amount']).toBe(195);   // compared side rides the 'b' role slot
+        expect(c.value_break!.rows[0].b!['amount']).toBe(195); // compared side rides the 'b' role slot
     });
 
     it('the Board tree adds c columns and per-side structural marks', () => {
@@ -138,7 +155,7 @@ describe('aggregateRecon 3-way (anchor model, backend parity)', () => {
         expect(voice.values!['c_amount']).toBe(195);
         expect(voice.values!['pct_c_amount']).toBeCloseTo(-2.5);
         const latam = nodes.find((n) => n.label === 'LATAM')!;
-        expect(latam.values!['__miss_c']).toBe('c');       // present only in C
+        expect(latam.values!['__miss_c']).toBe('c'); // present only in C
         expect(latam.values!['__anchorMissing']).toBe(true); // no anchor row under this node
     });
 });
@@ -165,8 +182,8 @@ describe('buildBoardTree', () => {
     it('rolls parents up from SUMS (never averaged child Δ%s) and marks one-sided nodes structural', () => {
         const nodes = buildBoardTree(run());
         const eu = nodes.find((n) => n.label === 'EU')!;
-        expect(eu.values!['a_amount']).toBe(318);   // 200 + 118
-        expect(eu.values!['b_amount']).toBe(314);   // 200 + 114
+        expect(eu.values!['a_amount']).toBe(318); // 200 + 118
+        expect(eu.values!['b_amount']).toBe(314); // 200 + 114
         // Δ% from rolled sums: (314-318)/318·100 = −1.258… — NOT the child average (0 + −3.39)/2.
         expect(eu.values!['pct_b_amount']).toBeCloseTo(-1.2579, 3);
         expect(eu.values!['__miss_b']).toBeNull();
@@ -188,8 +205,8 @@ describe('buildBoardTree', () => {
         const marked = markBreachesExpanded(buildBoardTree(run()));
         const eu = marked.find((n) => n.label === 'EU')!;
         const us = marked.find((n) => n.label === 'US')!;
-        expect(eu.expanded).toBe(true);        // contains the EU/data breach
-        expect(us.expanded).toBeUndefined();   // all-ok subtree stays collapsed
+        expect(eu.expanded).toBe(true); // contains the EU/data breach
+        expect(us.expanded).toBeUndefined(); // all-ok subtree stays collapsed
     });
 });
 

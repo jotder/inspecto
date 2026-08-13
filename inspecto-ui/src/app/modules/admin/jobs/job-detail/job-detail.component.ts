@@ -1,4 +1,15 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    OnDestroy,
+    OnInit,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -81,7 +92,9 @@ export class JobDetailComponent implements OnInit, OnDestroy {
 
     readonly whatScheduled = computed(() => (this.job() ? whatScheduled(this.job()!) : ''));
     readonly scheduleSummary = computed(() => (this.job() ? scheduleSummary(this.job()!) : ''));
-    readonly paramRows = computed(() => Object.entries(this.job()?.params ?? {}).map(([key, value]) => ({ key, value: String(value) })));
+    readonly paramRows = computed(() =>
+        Object.entries(this.job()?.params ?? {}).map(([key, value]) => ({ key, value: String(value) })),
+    );
     readonly selectedRun = computed(() => this.runs().find((r) => r.runId === this.selectedRunId()) ?? null);
 
     readonly fmtDateTime = fmtDateTime;
@@ -89,15 +102,30 @@ export class JobDetailComponent implements OnInit, OnDestroy {
 
     readonly runColumns: ColDef<JobRun>[] = [
         { field: 'startTime', headerName: 'Started', width: 180, valueFormatter: (p) => fmtDateTime(p.value) },
-        { field: 'status', headerName: 'Status', width: 110, cellRenderer: (p: ICellRendererParams<JobRun>) => statusBadgeHtml(p.value as string) },
+        {
+            field: 'status',
+            headerName: 'Status',
+            width: 110,
+            cellRenderer: (p: ICellRendererParams<JobRun>) => statusBadgeHtml(p.value as string),
+        },
         { field: 'triggerType', headerName: 'Trigger', width: 110 },
-        { field: 'durationMs', headerName: 'Duration', width: 110, valueFormatter: (p) => fmtDuration(p.value as number) },
+        {
+            field: 'durationMs',
+            headerName: 'Duration',
+            width: 110,
+            valueFormatter: (p) => fmtDuration(p.value as number),
+        },
         { field: 'error', headerName: 'Message', flex: 1, minWidth: 240, valueFormatter: (p) => p.value ?? '—' },
     ];
 
     readonly logColumns: ColDef<JobLogLine>[] = [
         { field: 'ts', headerName: 'Time', width: 180, valueFormatter: (p) => fmtDateTime(p.value) },
-        { field: 'level', headerName: 'Level', width: 90, cellRenderer: (p: ICellRendererParams<JobLogLine>) => statusBadgeHtml(p.value as string) },
+        {
+            field: 'level',
+            headerName: 'Level',
+            width: 90,
+            cellRenderer: (p: ICellRendererParams<JobLogLine>) => statusBadgeHtml(p.value as string),
+        },
         { field: 'message', headerName: 'Message', flex: 1, minWidth: 280 },
     ];
 
@@ -236,7 +264,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
 
     async remove(): Promise<void> {
         const j = this.job();
-        if (!j || !(await this.confirm.confirmDestructive(`Delete scheduled job "${j.name}"?`, { title: 'Delete job' }))) return;
+        if (
+            !j ||
+            !(await this.confirm.confirmDestructive(`Delete scheduled job "${j.name}"?`, { title: 'Delete job' }))
+        )
+            return;
         this.api.remove(j.name).subscribe({
             next: () => {
                 this.toastr.success(`Job "${j.name}" deleted`);

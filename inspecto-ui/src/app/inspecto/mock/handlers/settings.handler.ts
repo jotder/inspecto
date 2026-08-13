@@ -49,8 +49,12 @@ export function settingsHandler(flags: MockFlags): MockHandler {
 
         if (method === 'GET' && BRANDING.test(url)) {
             return json(
-                store.get<BrandingDoc>(space, SETTINGS_COLL, 'branding') ??
-                    { id: 'branding', logoDataUrl: null, caption: null, footerText: null },
+                store.get<BrandingDoc>(space, SETTINGS_COLL, 'branding') ?? {
+                    id: 'branding',
+                    logoDataUrl: null,
+                    caption: null,
+                    footerText: null,
+                },
             );
         }
         if (method === 'PUT' && BRANDING.test(url)) {

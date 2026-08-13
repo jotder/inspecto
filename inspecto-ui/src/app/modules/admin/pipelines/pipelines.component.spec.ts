@@ -20,8 +20,26 @@ import { PipelineEditorComponent } from './pipeline-editor.component';
 import { PipelinesComponent } from './pipelines.component';
 
 const TYPES: PipelineNodeType[] = [
-    { type: 'acquisition', category: 'SOURCE', label: 'Acquisition', description: 'collect', accepts: [], emits: [], emitsNamedRoutes: false, lowerable: true },
-    { type: 'sink.view', category: 'SINK', label: 'Sink (view)', description: 'logical', accepts: [], emits: [], emitsNamedRoutes: false, lowerable: false },
+    {
+        type: 'acquisition',
+        category: 'SOURCE',
+        label: 'Acquisition',
+        description: 'collect',
+        accepts: [],
+        emits: [],
+        emitsNamedRoutes: false,
+        lowerable: true,
+    },
+    {
+        type: 'sink.view',
+        category: 'SINK',
+        label: 'Sink (view)',
+        description: 'logical',
+        accepts: [],
+        emits: [],
+        emitsNamedRoutes: false,
+        lowerable: false,
+    },
 ];
 
 /**
@@ -60,7 +78,15 @@ function build() {
             { provide: ToastrService, useValue: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
             { provide: LensService, useValue: { canAuthorWorkbench: signal(true) } },
-            { provide: BundleTransferService, useValue: { loadAll: () => of([]), buildExport: () => ({ bundle: { items: [] }, missing: [] }), download: vi.fn(), write: () => of({}) } },
+            {
+                provide: BundleTransferService,
+                useValue: {
+                    loadAll: () => of([]),
+                    buildExport: () => ({ bundle: { items: [] }, missing: [] }),
+                    download: vi.fn(),
+                    write: () => of({}),
+                },
+            },
         ],
     });
     return TestBed.createComponent(PipelinesComponent);

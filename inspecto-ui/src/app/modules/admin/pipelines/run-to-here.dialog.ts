@@ -60,14 +60,18 @@ export interface RunToHereData {
             >
                 <mat-icon
                     class="icon-size-5"
-                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                    [svgIcon]="
+                        chrome.maximized()
+                            ? 'heroicons_outline:arrows-pointing-in'
+                            : 'heroicons_outline:arrows-pointing-out'
+                    "
                 ></mat-icon>
             </button>
         </h2>
         <mat-dialog-content>
             <p class="text-secondary mb-3 text-sm">
-                Runs the pipeline up to this Step over the files you pick and lands the result as scratch
-                Parquet — nothing is written to production.
+                Runs the pipeline up to this Step over the files you pick and lands the result as scratch Parquet —
+                nothing is written to production.
             </p>
 
             <!-- inbox file picker (reuses the connection Explore tree) -->
@@ -109,10 +113,16 @@ export interface RunToHereData {
                 @if (selectedFiles().length) {
                     <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Selected files">
                         @for (p of selectedFiles(); track p) {
-                            <span class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 font-mono text-xs dark:bg-gray-800">
+                            <span
+                                class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 font-mono text-xs dark:bg-gray-800"
+                            >
                                 {{ basename(p) }}
-                                <button type="button" class="opacity-60 hover:opacity-100"
-                                        (click)="removeFile(p)" [attr.aria-label]="'Remove ' + p">
+                                <button
+                                    type="button"
+                                    class="opacity-60 hover:opacity-100"
+                                    (click)="removeFile(p)"
+                                    [attr.aria-label]="'Remove ' + p"
+                                >
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </span>
@@ -123,7 +133,9 @@ export interface RunToHereData {
 
             <div class="mt-3 flex items-center gap-3">
                 <button mat-flat-button color="primary" (click)="run()" [disabled]="running()">
-                    @if (running()) { <mat-spinner diameter="16" class="mr-2"></mat-spinner> }
+                    @if (running()) {
+                        <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                    }
                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
                     <span class="ml-1">Run to here</span>
                 </button>
@@ -161,9 +173,12 @@ export interface RunToHereData {
                         <div class="bg-card rounded-xl border p-3" style="border-color: var(--gamma-border)">
                             <div class="flex flex-wrap items-baseline gap-x-2">
                                 <span class="font-mono text-sm font-semibold">{{ rel.node }}</span>
-                                <span class="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
-                                      [class.opacity-70]="isReject(rel.rel)"
-                                      style="background: var(--gamma-bg-default)">{{ rel.rel }}</span>
+                                <span
+                                    class="rounded px-1.5 py-0.5 text-xs font-semibold uppercase"
+                                    [class.opacity-70]="isReject(rel.rel)"
+                                    style="background: var(--gamma-bg-default)"
+                                    >{{ rel.rel }}</span
+                                >
                                 <span class="text-secondary text-xs">{{ rel.rowCount }} row(s)</span>
                             </div>
                             @if (rel.rows.length) {

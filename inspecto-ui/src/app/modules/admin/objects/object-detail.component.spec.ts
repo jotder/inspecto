@@ -63,7 +63,9 @@ describe('ObjectDetailComponent', () => {
 
     it('offers "what happened" only when the object carries a correlation id', () => {
         const { fixture } = create();
-        expect(fixture.nativeElement.querySelector('inspecto-ai-status button[aria-label="What happened to obj-9"]')).toBeTruthy();
+        expect(
+            fixture.nativeElement.querySelector('inspecto-ai-status button[aria-label="What happened to obj-9"]'),
+        ).toBeTruthy();
 
         // Same fixture, no correlation id: nothing the timeline could be addressed by.
         fixture.componentInstance.obj = { ...CASE, correlationId: undefined };
@@ -98,7 +100,8 @@ describe('ObjectDetailComponent', () => {
 
     it('builds the member timeline: CONTAINS members merged, comments newest-first, attributed', () => {
         const graph = {
-            root: 'obj-9', depth: 1,
+            root: 'obj-9',
+            depth: 1,
             nodes: [
                 { id: 'obj-9', objectType: 'CASE', title: 'Fraud ring', status: 'INVESTIGATING' },
                 { id: 'inc-1', objectType: 'INCIDENT', title: 'Redemption spike', status: 'OPEN' },
@@ -130,7 +133,13 @@ describe('ObjectDetailComponent', () => {
 
     it('member timeline empty-states when the object contains nothing', () => {
         const { fixture } = create({
-            graph: () => of({ root: 'obj-9', depth: 1, nodes: [{ id: 'obj-9', objectType: 'CASE', title: 'X', status: 'OPEN' }], edges: [] }),
+            graph: () =>
+                of({
+                    root: 'obj-9',
+                    depth: 1,
+                    nodes: [{ id: 'obj-9', objectType: 'CASE', title: 'X', status: 'OPEN' }],
+                    edges: [],
+                }),
         });
         const c = fixture.componentInstance;
         c.loadMemberTimeline();

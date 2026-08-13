@@ -42,14 +42,17 @@ export function widgetRefs(config: Record<string, unknown>): Ref[] {
     const viewId = config['viewId'] as string | undefined;
     const vizType = config['vizType'] as string | undefined;
     if (viewId && vizType === 'geo-map') refs.push({ kind: 'geo-map-view', id: viewId, rel: 'renders', via: 'view' });
-    if (viewId && vizType === 'link-analysis') refs.push({ kind: 'link-analysis-view', id: viewId, rel: 'renders', via: 'view' });
+    if (viewId && vizType === 'link-analysis')
+        refs.push({ kind: 'link-analysis-view', id: viewId, rel: 'renders', via: 'view' });
     return refs;
 }
 
 /** A dashboard tiles widgets — one edge per tile, anchored `tile<i>` (matches the layout wiring ids). */
 export function dashboardRefs(config: Record<string, unknown>): Ref[] {
     const tiles = (config['tiles'] as { widgetId?: string }[] | undefined) ?? [];
-    return tiles.flatMap((t, i) => (t?.widgetId ? [{ kind: 'widget', id: t.widgetId, rel: 'tiles' as const, via: `tile${i}` }] : []));
+    return tiles.flatMap((t, i) =>
+        t?.widgetId ? [{ kind: 'widget', id: t.widgetId, rel: 'tiles' as const, via: `tile${i}` }] : [],
+    );
 }
 
 /** A saved investigation view projects dataset(s) — every `datasetId` inside its query config. */
@@ -88,7 +91,8 @@ export function decisionRuleRefs(config: Record<string, unknown>): Ref[] {
     if (target && (targetType === 'pipeline' || targetType === 'job')) {
         refs.push({ kind: targetType, id: target, rel: 'binds', via: 'target' });
     }
-    const consequences = (config['consequences'] as { action?: string; target?: { kind?: string; id?: string } }[] | undefined) ?? [];
+    const consequences =
+        (config['consequences'] as { action?: string; target?: { kind?: string; id?: string } }[] | undefined) ?? [];
     consequences.forEach((c, i) => {
         const t = c?.target;
         if (t?.id && t?.kind) refs.push({ kind: t.kind, id: t.id, rel: 'invokes', via: `consequence${i}` });

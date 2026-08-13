@@ -24,8 +24,8 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
                 <img class="mx-auto h-10" src="assets/images/logo/inspecto-logo.svg" alt="Inspecto" />
                 <h1 class="mt-6 text-2xl font-semibold">Sign in</h1>
                 <p class="mt-2 text-secondary">
-                    This is a secured (Standard-edition) workspace. Continue with your organization's
-                    single sign-on to access it.
+                    This is a secured (Standard-edition) workspace. Continue with your organization's single sign-on to
+                    access it.
                 </p>
 
                 @if (failed()) {
@@ -34,13 +34,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
                     </inspecto-alert>
                 }
 
-                <button
-                    mat-flat-button
-                    color="primary"
-                    class="mt-6 w-full"
-                    [disabled]="busy()"
-                    (click)="signIn()"
-                >
+                <button mat-flat-button color="primary" class="mt-6 w-full" [disabled]="busy()" (click)="signIn()">
                     @if (busy()) {
                         <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
                     } @else {

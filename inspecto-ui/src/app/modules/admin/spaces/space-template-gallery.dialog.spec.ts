@@ -9,13 +9,32 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 
 const TEMPLATES: SpaceTemplateInfo[] = [
-    { id: 'telecom-ra', name: 'Telecom Revenue Assurance', tagline: 'Find leakage.', description: 'RA.', icon: 'heroicons_outline:banknotes', contents: ['2 pipelines'] },
-    { id: 'fraud-mgmt', name: 'Fraud Management', tagline: 'Score traffic.', description: 'FMS.', icon: 'heroicons_outline:shield-exclamation', contents: ['1 pipeline'] },
+    {
+        id: 'telecom-ra',
+        name: 'Telecom Revenue Assurance',
+        tagline: 'Find leakage.',
+        description: 'RA.',
+        icon: 'heroicons_outline:banknotes',
+        contents: ['2 pipelines'],
+    },
+    {
+        id: 'fraud-mgmt',
+        name: 'Fraud Management',
+        tagline: 'Score traffic.',
+        description: 'FMS.',
+        icon: 'heroicons_outline:shield-exclamation',
+        contents: ['1 pipeline'],
+    },
 ];
 
 function create(existingIds: string[] = ['default']) {
     const created = vi.fn((req: CreateSpaceRequest) =>
-        of({ id: req.id, displayName: req.display_name ?? req.id, description: req.description ?? '', createdAt: '' } as Space),
+        of({
+            id: req.id,
+            displayName: req.display_name ?? req.id,
+            description: req.description ?? '',
+            createdAt: '',
+        } as Space),
     );
     const closed = vi.fn();
     TestBed.configureTestingModule({

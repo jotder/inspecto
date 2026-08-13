@@ -41,15 +41,24 @@ export function error(status: number, message: string, details?: Record<string, 
 /** Port of the backend `ErrorCodes.defaultFor(status)` map (403 = the core's structural PATH_JAIL_VIOLATION). */
 function defaultErrorCode(status: number): V1ErrorCode {
     switch (status) {
-        case 400: return 'MALFORMED_REQUEST';
-        case 401: return 'UNAUTHENTICATED';
-        case 403: return 'PATH_JAIL_VIOLATION';
-        case 404: return 'NOT_FOUND';
-        case 405: return 'METHOD_NOT_ALLOWED';
-        case 409: return 'CONFLICT';
-        case 422: return 'CONFIG_VALIDATION_FAILED';
-        case 503: return 'CAPABILITY_UNAVAILABLE';
-        default: return 'INTERNAL';
+        case 400:
+            return 'MALFORMED_REQUEST';
+        case 401:
+            return 'UNAUTHENTICATED';
+        case 403:
+            return 'PATH_JAIL_VIOLATION';
+        case 404:
+            return 'NOT_FOUND';
+        case 405:
+            return 'METHOD_NOT_ALLOWED';
+        case 409:
+            return 'CONFLICT';
+        case 422:
+            return 'CONFIG_VALIDATION_FAILED';
+        case 503:
+            return 'CAPABILITY_UNAVAILABLE';
+        default:
+            return 'INTERNAL';
     }
 }
 

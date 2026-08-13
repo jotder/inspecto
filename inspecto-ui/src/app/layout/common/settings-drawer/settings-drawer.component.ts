@@ -34,7 +34,15 @@ interface SettingsLink {
     selector: 'inspecto-settings-drawer',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [OverlayModule, A11yModule, MatButtonModule, MatIconModule, MatTooltipModule, RouterLink, RouterLinkActive],
+    imports: [
+        OverlayModule,
+        A11yModule,
+        MatButtonModule,
+        MatIconModule,
+        MatTooltipModule,
+        RouterLink,
+        RouterLinkActive,
+    ],
     template: `
         <button
             mat-icon-button
@@ -88,15 +96,30 @@ export class SettingsDrawerComponent implements OnDestroy {
 
     /** The former "Settings" nav group — one entry per admin/config page. */
     readonly items: readonly SettingsLink[] = [
-        { id: 'menus',               title: 'Menus',          icon: 'heroicons_outline:bars-3',                 link: '/settings/menus' },
-        { id: 'config',              title: 'Config',         icon: 'heroicons_outline:adjustments-horizontal', link: '/config' },
-        { id: 'notification-center', title: 'Notifications',  icon: 'heroicons_outline:bell',                   link: '/notification-center' },
-        { id: 'spaces',              title: 'Spaces',         icon: 'heroicons_outline:square-3-stack-3d',      link: '/spaces' },
-        { id: 'model-settings',      title: 'Model Settings', icon: 'heroicons_outline:cpu-chip',               link: '/settings/models' },
-        { id: 'icon-settings',       title: 'Processor Icons', icon: 'heroicons_outline:paint-brush',           link: '/settings/icons' },
-        { id: 'map-settings',        title: 'Map Settings',   icon: 'heroicons_outline:map',                    link: '/settings/map' },
-        { id: 'transfer',            title: 'Import & Export', icon: 'heroicons_outline:arrow-up-tray',         link: '/settings/transfer' },
-        { id: 'design-system',       title: 'Design System',  icon: 'heroicons_outline:swatch',                 link: '/design' },
+        { id: 'menus', title: 'Menus', icon: 'heroicons_outline:bars-3', link: '/settings/menus' },
+        { id: 'config', title: 'Config', icon: 'heroicons_outline:adjustments-horizontal', link: '/config' },
+        {
+            id: 'notification-center',
+            title: 'Notifications',
+            icon: 'heroicons_outline:bell',
+            link: '/notification-center',
+        },
+        { id: 'spaces', title: 'Spaces', icon: 'heroicons_outline:square-3-stack-3d', link: '/spaces' },
+        { id: 'model-settings', title: 'Model Settings', icon: 'heroicons_outline:cpu-chip', link: '/settings/models' },
+        {
+            id: 'icon-settings',
+            title: 'Processor Icons',
+            icon: 'heroicons_outline:paint-brush',
+            link: '/settings/icons',
+        },
+        { id: 'map-settings', title: 'Map Settings', icon: 'heroicons_outline:map', link: '/settings/map' },
+        {
+            id: 'transfer',
+            title: 'Import & Export',
+            icon: 'heroicons_outline:arrow-up-tray',
+            link: '/settings/transfer',
+        },
+        { id: 'design-system', title: 'Design System', icon: 'heroicons_outline:swatch', link: '/design' },
     ];
 
     openDrawer(): void {

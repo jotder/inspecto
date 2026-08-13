@@ -74,7 +74,14 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         ],
     },
     { key: 'exclude', label: 'Exclude patterns', type: 'string', tier: 'advanced', placeholder: '*.tmp' },
-    { key: 'recursive_depth', label: 'Recursive depth', type: 'number', tier: 'advanced', min: 0, help: 'Blank = unbounded.' },
+    {
+        key: 'recursive_depth',
+        label: 'Recursive depth',
+        type: 'number',
+        tier: 'advanced',
+        min: 0,
+        help: 'Blank = unbounded.',
+    },
     {
         key: 'duplicate__on_change',
         label: 'On changed duplicate',
@@ -97,8 +104,21 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
             { value: 'EXACTLY_ONCE', label: 'Exactly once' },
         ],
     },
-    { key: 'stability__window', label: 'Stability window', type: 'string', tier: 'advanced', placeholder: '5s', help: 'Wait for a file to stop growing before collecting it.' },
-    { key: 'post_action__archive_path', label: 'Archive path', type: 'string', tier: 'advanced', help: 'Target directory when "After success" is Move.' },
+    {
+        key: 'stability__window',
+        label: 'Stability window',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '5s',
+        help: 'Wait for a file to stop growing before collecting it.',
+    },
+    {
+        key: 'post_action__archive_path',
+        label: 'Archive path',
+        type: 'string',
+        tier: 'advanced',
+        help: 'Target directory when "After success" is Move.',
+    },
 ];
 
 /**

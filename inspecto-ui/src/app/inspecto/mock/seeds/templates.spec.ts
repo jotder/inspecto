@@ -50,7 +50,9 @@ describe('space template seed packs', () => {
                     expect(rows, `source ${d.content.sourceName}`).toBeDefined();
                     expect(rows.length).toBeGreaterThan(0);
                     for (const col of d.content.columns) {
-                        expect(Object.keys(rows[0]), `column ${col.name} of ${d.content.sourceName}`).toContain(col.name);
+                        expect(Object.keys(rows[0]), `column ${col.name} of ${d.content.sourceName}`).toContain(
+                            col.name,
+                        );
                     }
                 }
             });

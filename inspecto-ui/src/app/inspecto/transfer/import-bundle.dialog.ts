@@ -13,7 +13,18 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { BundleTransferService, ImportAction, ImportStatus } from './bundle-transfer.service';
-import { BUNDLE_KINDS, BundleKind, ImportRow, MetadataBundle, RequireStatus, TargetIndex, parseBundle, planImport, resolveRequires, targetIndex } from './bundle';
+import {
+    BUNDLE_KINDS,
+    BundleKind,
+    ImportRow,
+    MetadataBundle,
+    RequireStatus,
+    TargetIndex,
+    parseBundle,
+    planImport,
+    resolveRequires,
+    targetIndex,
+} from './bundle';
 
 export interface ImportBundleData {
     /** When set, only these kind names are importable here (a library scopes its import); absent = all. */
@@ -37,7 +48,17 @@ interface Row extends ImportRow {
 @Component({
     selector: 'app-import-bundle-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatFormFieldModule, MatSelectModule, MatIconModule, MatProgressSpinnerModule, InspectoAlertComponent, InspectoEmptyStateComponent, StatusBadgeComponent],
+    imports: [
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatSelectModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        InspectoAlertComponent,
+        InspectoEmptyStateComponent,
+        StatusBadgeComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './import-bundle.dialog.html',
 })
@@ -155,7 +176,8 @@ export class ImportBundleDialog {
                 this.importedCount.set(written);
                 if (outcome.failed) {
                     this.toastr.warning(
-                        `Imported ${written} artifact(s); ${outcome.failed} failed — see the result column.`);
+                        `Imported ${written} artifact(s); ${outcome.failed} failed — see the result column.`,
+                    );
                 } else if (outcome.unchanged && !written) {
                     // Worth its own message: an identical re-promotion is a SUCCESS that wrote nothing,
                     // and "Imported 0 artifact(s)" would read as a failure.

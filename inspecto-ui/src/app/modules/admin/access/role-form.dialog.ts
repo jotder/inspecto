@@ -48,8 +48,11 @@ export interface RoleFormData {
                             matInput
                             formControlName="name"
                             placeholder="e.g. fraud-analyst"
-                            aria-label="Role name" />
-                        <mat-hint>The IdP role claim value — lowercase; assignment stays in your identity provider.</mat-hint>
+                            aria-label="Role name"
+                        />
+                        <mat-hint
+                            >The IdP role claim value — lowercase; assignment stays in your identity provider.</mat-hint
+                        >
                         @if (form.controls.name.hasError('required')) {
                             <mat-error>A role name is required.</mat-error>
                         } @else if (form.controls.name.hasError('pattern')) {
@@ -63,9 +66,7 @@ export interface RoleFormData {
                 <fieldset class="flex flex-col gap-1">
                     <legend class="text-secondary mb-1 text-sm font-medium">Capabilities</legend>
                     @for (cap of data.vocabulary; track cap) {
-                        <mat-checkbox
-                            [checked]="selected.has(cap)"
-                            (change)="toggle(cap, $event.checked)">
+                        <mat-checkbox [checked]="selected.has(cap)" (change)="toggle(cap, $event.checked)">
                             {{ cap }}
                         </mat-checkbox>
                     }
@@ -77,7 +78,8 @@ export interface RoleFormData {
                         matInput
                         formControlName="dataScopes"
                         placeholder="e.g. fraud, billing"
-                        aria-label="Data scopes, comma-separated" />
+                        aria-label="Data scopes, comma-separated"
+                    />
                     <mat-hint>Comma-separated case types this role may see (SEC-7d); empty = unscoped.</mat-hint>
                 </mat-form-field>
             </mat-dialog-content>

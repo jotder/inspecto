@@ -30,10 +30,12 @@ describe('embedQueryBody', () => {
 
     it('declares view-bound and expression-measure widgets not embeddable', () => {
         expect(embedQueryBody({ ...BAR_WIDGET, viewId: 'geo-1' })).toBeNull();
-        expect(embedQueryBody({
-            ...BAR_WIDGET,
-            controls: { x: [{ field: 'region' }], y: [{ field: 'm', expression: 'sum(a)/sum(b)' }] },
-        })).toBeNull();
+        expect(
+            embedQueryBody({
+                ...BAR_WIDGET,
+                controls: { x: [{ field: 'region' }], y: [{ field: 'm', expression: 'sum(a)/sum(b)' }] },
+            }),
+        ).toBeNull();
         expect(embedQueryBody({ ...BAR_WIDGET, vizType: 'no-such-viz' })).toBeNull();
     });
 });
@@ -70,14 +72,21 @@ describe('ShareViewerComponent', () => {
 
     it('renders tiles read-only: unsupported widgets degrade to an inline notice (and passes axe)', async () => {
         const fixture = await create({
-            resolve: () => of({
-                dashboard: { id: 'ops-dash', content: {
-                    name: 'Ops Dashboard',
-                    tiles: [{ widgetId: 'w-view', span: 2 }, { widgetId: 'w-gone', span: 1 }],
-                } },
-                widgets: [{ id: 'w-view', content: { ...BAR_WIDGET, viewId: 'geo-1' } }],
-                expiresAt: '2026-12-31T00:00:00Z',
-            }),
+            resolve: () =>
+                of({
+                    dashboard: {
+                        id: 'ops-dash',
+                        content: {
+                            name: 'Ops Dashboard',
+                            tiles: [
+                                { widgetId: 'w-view', span: 2 },
+                                { widgetId: 'w-gone', span: 1 },
+                            ],
+                        },
+                    },
+                    widgets: [{ id: 'w-view', content: { ...BAR_WIDGET, viewId: 'geo-1' } }],
+                    expiresAt: '2026-12-31T00:00:00Z',
+                }),
         } as Partial<ShareService>);
         const el: HTMLElement = fixture.nativeElement;
         expect(el.querySelector('h1')!.textContent).toContain('Ops Dashboard');
@@ -91,11 +100,12 @@ describe('ShareViewerComponent', () => {
     it('fetches tile data through the token-fenced public query', async () => {
         const bodies: unknown[] = [];
         const fixture = await create({
-            resolve: () => of({
-                dashboard: { id: 'd', content: { name: 'D', tiles: [{ widgetId: 'w1', span: 1 }] } },
-                widgets: [{ id: 'w1', content: BAR_WIDGET }],
-                expiresAt: '2026-12-31T00:00:00Z',
-            }),
+            resolve: () =>
+                of({
+                    dashboard: { id: 'd', content: { name: 'D', tiles: [{ widgetId: 'w1', span: 1 }] } },
+                    widgets: [{ id: 'w1', content: BAR_WIDGET }],
+                    expiresAt: '2026-12-31T00:00:00Z',
+                }),
             query: (_token: string, body: unknown) => {
                 bodies.push(body);
                 return of({ rows: [{ region: 'EU', sum_amount: 40 }], rowCount: 1, truncated: false });

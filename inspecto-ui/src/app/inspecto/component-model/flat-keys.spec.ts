@@ -10,17 +10,31 @@ describe('flat-keys', () => {
 
     it('nests flat keys, splits list keys and prunes blanks', () => {
         expect(
-            nestKeys({ connector: 'sftp', duplicate__mode: 'checksum', include: ' *.csv , *.txt ', exclude: '', connection: null }),
+            nestKeys({
+                connector: 'sftp',
+                duplicate__mode: 'checksum',
+                include: ' *.csv , *.txt ',
+                exclude: '',
+                connection: null,
+            }),
         ).toEqual({ connector: 'sftp', duplicate: { mode: 'checksum' }, include: ['*.csv', '*.txt'] });
     });
 
     it('round-trips flatten → nest', () => {
-        const block = { connector: 'local', discovery: 'poll', post_action: { on_success: 'MOVE', archive_path: 'arch' } };
+        const block = {
+            connector: 'local',
+            discovery: 'poll',
+            post_action: { on_success: 'MOVE', archive_path: 'arch' },
+        };
         expect(nestKeys(flattenBlock(block))).toEqual(block);
     });
 
     it('deep-merges patches, deletes undefined keys, keeps unknown keys', () => {
-        const base = { name: 'x', collector: { connector: 'sftp', fetch: { mode: 'parallel' } }, parsing: { frontend: 'json' } };
+        const base = {
+            name: 'x',
+            collector: { connector: 'sftp', fetch: { mode: 'parallel' } },
+            parsing: { frontend: 'json' },
+        };
         const next = mergeBlock(base, { collector: { connector: 'local', connection: undefined }, parsing: undefined });
         expect(next).toEqual({ name: 'x', collector: { connector: 'local', fetch: { mode: 'parallel' } } });
         expect(base.parsing).toEqual({ frontend: 'json' }); // input untouched

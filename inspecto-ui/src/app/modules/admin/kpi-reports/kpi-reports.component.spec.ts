@@ -29,15 +29,32 @@ const REPORT_JOB: JobDetail = {
     params: { dashboardId: 'cdr_overview', format: 'csv', recipients: ['ops@x.com'] },
 };
 
-function create(opts: { dashboards?: Dashboard[]; reportJobs?: JobDetail[]; canAuthor?: boolean; dashboardsError?: boolean } = {}) {
+function create(
+    opts: { dashboards?: Dashboard[]; reportJobs?: JobDetail[]; canAuthor?: boolean; dashboardsError?: boolean } = {},
+) {
     const dashboards = opts.dashboards ?? DASHBOARDS;
     const reportJobs = opts.reportJobs ?? [];
     const toastr = { success: vi.fn(), warning: vi.fn(), error: vi.fn() };
     const jobsApi = {
-        list: vi.fn(() => of(reportJobs.map((j) => ({ name: j.name, type: j.type, cron: j.cron, onPipeline: j.onPipeline, enabled: j.enabled, lastStatus: j.lastStatus, lastRunTime: j.lastRunTime, nextFire: j.nextFire })))),
+        list: vi.fn(() =>
+            of(
+                reportJobs.map((j) => ({
+                    name: j.name,
+                    type: j.type,
+                    cron: j.cron,
+                    onPipeline: j.onPipeline,
+                    enabled: j.enabled,
+                    lastStatus: j.lastStatus,
+                    lastRunTime: j.lastRunTime,
+                    nextFire: j.nextFire,
+                })),
+            ),
+        ),
         get: vi.fn((name: string) => of(reportJobs.find((j) => j.name === name)!)),
         trigger: vi.fn(() => of({ runId: 'run-1' })),
-        runs: vi.fn(() => of([{ runId: 'run-1', jobName: '', status: 'SUCCESS', triggerType: 'MANUAL', startTime: '' }])),
+        runs: vi.fn(() =>
+            of([{ runId: 'run-1', jobName: '', status: 'SUCCESS', triggerType: 'MANUAL', startTime: '' }]),
+        ),
         runArtifact: vi.fn(() => of({ runId: 'run-1', filename: 'x.csv', mime: 'text/csv', content: 'a,b\n1,2' })),
         remove: vi.fn(() => of(undefined)),
     } as unknown as JobsService;

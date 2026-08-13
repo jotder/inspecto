@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    ElementRef,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -43,10 +53,17 @@ export interface DrillEvent {
                 <div class="mb-0.5 flex items-start justify-between gap-2">
                     <div class="min-w-0">
                         <div class="truncate text-sm font-semibold">{{ widget.options?.title || widget.name }}</div>
-                        @if (widget.options?.subtitle) { <div class="text-secondary text-xs">{{ widget.options?.subtitle }}</div> }
+                        @if (widget.options?.subtitle) {
+                            <div class="text-secondary text-xs">{{ widget.options?.subtitle }}</div>
+                        }
                     </div>
                     @if (canExport()) {
-                        <button mat-icon-button (click)="exportPng()" matTooltip="Export as PNG" aria-label="Export as PNG">
+                        <button
+                            mat-icon-button
+                            (click)="exportPng()"
+                            matTooltip="Export as PNG"
+                            aria-label="Export as PNG"
+                        >
                             <mat-icon class="icon-size-4" svgIcon="heroicons_outline:download"></mat-icon>
                         </button>
                     }
@@ -54,7 +71,12 @@ export interface DrillEvent {
                 @if (plugin(); as p) {
                     @if (viewBound()) {
                         <!-- View-bound (geo-map / link-analysis): the saved view is the binding — no dataset/query. -->
-                        <inspecto-viz-render [plugin]="p" [props]="props()" [title]="widget.name" [viewId]="widget.viewId" />
+                        <inspecto-viz-render
+                            [plugin]="p"
+                            [props]="props()"
+                            [title]="widget.name"
+                            [viewId]="widget.viewId"
+                        />
                     } @else if (resolvedDataset(); as dataset) {
                         @if (showRevoked()) {
                             <!-- A shared-bound dataset whose grant was revoked/expired no longer resolves (fail-closed). -->
@@ -105,7 +127,7 @@ export class WidgetHostComponent {
 
     readonly plugin = computed<VizPlugin | null>(() => {
         const w = this.resolvedWidget();
-        return w ? getViz(w.vizType) ?? null : null;
+        return w ? (getViz(w.vizType) ?? null) : null;
     });
     /** View-bound widget (`meta.viewKind`) — renders a saved investigation view; no dataset, no query run. */
     readonly viewBound = computed(() => !!this.plugin()?.meta.viewKind);
@@ -130,7 +152,9 @@ export class WidgetHostComponent {
         effect(() => {
             const w = this.resolvedWidget();
             if (!w || !w.datasetId || this.dataset()) return; // view-bound widgets have no dataset
-            this.datasetsApi.get(w.datasetId).subscribe({ next: (d) => this.fetchedDataset.set(d), error: () => undefined });
+            this.datasetsApi
+                .get(w.datasetId)
+                .subscribe({ next: (d) => this.fetchedDataset.set(d), error: () => undefined });
         });
 
         // Run the query whenever the resolved widget/dataset/filter change — deduped: two hosts (e.g. two
@@ -146,7 +170,9 @@ export class WidgetHostComponent {
                 filters: this.filter(),
             });
             const x = widget.controls.x?.[0];
-            const rows = x ? bucketRows(SAMPLE_SOURCES[dataset.sourceName] ?? [], x.field, x.grain) : SAMPLE_SOURCES[dataset.sourceName] ?? [];
+            const rows = x
+                ? bucketRows(SAMPLE_SOURCES[dataset.sourceName] ?? [], x.field, x.grain)
+                : (SAMPLE_SOURCES[dataset.sourceName] ?? []);
             this.datasetResult
                 .run(spec, rows, this.colMetas())
                 .then((res) => {

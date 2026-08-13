@@ -6,7 +6,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ExchangeService, LensService, parseSharedRef, SessionService, SpacesService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    ExchangeService,
+    LensService,
+    parseSharedRef,
+    SessionService,
+    SpacesService,
+} from 'app/inspecto/api';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
@@ -94,7 +101,10 @@ export class WidgetsComponent implements OnInit {
         if (tag) all = all.filter((w) => w.tags?.includes(tag));
         if (!q) return all;
         return all.filter((w) =>
-            [w.id, w.vizType, w.datasetId, w.viewId ?? '', w.description ?? '', ...(w.tags ?? [])].join(' ').toLowerCase().includes(q),
+            [w.id, w.vizType, w.datasetId, w.viewId ?? '', w.description ?? '', ...(w.tags ?? [])]
+                .join(' ')
+                .toLowerCase()
+                .includes(q),
         );
     });
 
@@ -127,9 +137,12 @@ export class WidgetsComponent implements OnInit {
      * chips until the list is refetched. Dashboards have no chip row and so need no reload.
      */
     openTags(w: Widget): void {
-        this.dialog.open(TagAssignmentDialog, {
-            data: { targetKind: 'widget', targetId: w.id, label: w.id },
-        }).afterClosed().subscribe(() => this.load());
+        this.dialog
+            .open(TagAssignmentDialog, {
+                data: { targetKind: 'widget', targetId: w.id, label: w.id },
+            })
+            .afterClosed()
+            .subscribe(() => this.load());
     }
 
     onFilter(ev: Event): void {

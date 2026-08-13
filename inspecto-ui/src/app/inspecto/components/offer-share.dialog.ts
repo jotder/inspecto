@@ -33,18 +33,17 @@ export interface OfferShareResult {
         <h2 mat-dialog-title>Offer for sharing</h2>
         <mat-dialog-content class="flex w-96 max-w-full flex-col gap-4">
             <div class="text-secondary text-sm">
-                List {{ label }} <strong>{{ data.item }}</strong> in the shareable catalog. Other spaces
-                can then request access; nothing is shared until you approve a request.
+                List {{ label }} <strong>{{ data.item }}</strong> in the shareable catalog. Other spaces can then
+                request access; nothing is shared until you approve a request.
                 @if (data.kind !== 'dataset') {
                     <span class="mt-1 block">
-                        Every dataset this {{ label }} reads must already be offered — offer those first if
-                        they aren't.
+                        Every dataset this {{ label }} reads must already be offered — offer those first if they aren't.
                     </span>
                 }
                 @if (data.kind === 'link-analysis-view') {
                     <span class="mt-1 block">
-                        A saved view is shared <strong>live</strong>: it holds no rows of its own, so
-                        consumers always read current data through its datasets' grants.
+                        A saved view is shared <strong>live</strong>: it holds no rows of its own, so consumers always
+                        read current data through its datasets' grants.
                     </span>
                 }
             </div>

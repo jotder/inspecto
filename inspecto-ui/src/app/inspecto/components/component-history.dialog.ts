@@ -28,11 +28,13 @@ export interface ComponentHistoryData {
         <h2 mat-dialog-title>Version history</h2>
         <mat-dialog-content class="w-[34rem] max-w-full">
             <div class="text-secondary mb-3 text-sm">
-                Prior saved copies of {{ data.type }} <strong>{{ data.label || data.id }}</strong>. Restoring
-                makes a copy current — the current version is archived first, so it stays reversible.
+                Prior saved copies of {{ data.type }} <strong>{{ data.label || data.id }}</strong
+                >. Restoring makes a copy current — the current version is archived first, so it stays reversible.
             </div>
             @if (loading()) {
-                <div class="flex items-center gap-3 py-2 text-sm"><mat-spinner diameter="20"></mat-spinner><span>Loading history…</span></div>
+                <div class="flex items-center gap-3 py-2 text-sm">
+                    <mat-spinner diameter="20"></mat-spinner><span>Loading history…</span>
+                </div>
             } @else if (!versions().length) {
                 <inspecto-empty-state
                     icon="heroicons_outline:clock"
@@ -56,7 +58,9 @@ export interface ComponentHistoryData {
                                 <td class="py-1.5 pr-3">{{ savedAt(v) }}</td>
                                 <td class="py-1.5 pr-3 font-mono text-xs">{{ v.contentHash.slice(0, 12) }}</td>
                                 <td class="py-1.5 text-right">
-                                    <button mat-stroked-button [disabled]="restoring()" (click)="restore(v)">Restore</button>
+                                    <button mat-stroked-button [disabled]="restoring()" (click)="restore(v)">
+                                        Restore
+                                    </button>
                                 </td>
                             </tr>
                         }

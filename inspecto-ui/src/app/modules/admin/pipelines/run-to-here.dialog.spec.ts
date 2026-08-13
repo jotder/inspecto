@@ -15,7 +15,12 @@ const RUN_RESULT: PipelineRunResult = {
         { node: 'parse', rel: 'success', rowCount: 3, rows: [{ id: 1 }, { id: 2 }, { id: 3 }] },
         { node: 'parse', rel: 'unmatched', rowCount: 1, rows: [{ line: 7 }] },
     ],
-    output: { store: 'Parse CSV', format: 'PARQUET', path: 'data/_scratch/cdr_ingest/parse/part-0001.parquet', rowCount: 3 },
+    output: {
+        store: 'Parse CSV',
+        format: 'PARQUET',
+        path: 'data/_scratch/cdr_ingest/parse/part-0001.parquet',
+        rowCount: 3,
+    },
     warnings: [],
 };
 
@@ -25,7 +30,15 @@ function create(data: Partial<RunToHereData> = {}) {
         providers: [
             provideNoopAnimations(),
             { provide: MatDialogRef, useValue: { close: () => {} } },
-            { provide: MAT_DIALOG_DATA, useValue: { pipelineId: 'cdr_ingest', node: { id: 'parse', type: 'parser.dsv' }, connectionId: null, ...data } },
+            {
+                provide: MAT_DIALOG_DATA,
+                useValue: {
+                    pipelineId: 'cdr_ingest',
+                    node: { id: 'parse', type: 'parser.dsv' },
+                    connectionId: null,
+                    ...data,
+                },
+            },
             { provide: PipelinesService, useValue: { runToNode: () => of(RUN_RESULT) } },
             { provide: ConnectionProbeService, useValue: { explore: () => of([]) } },
         ],
@@ -45,7 +58,12 @@ describe('RunToHereDialog', () => {
 
     it('toggles a file into and out of the selection', () => {
         const c = create().componentInstance;
-        const file: ResourceNode = { name: 'feed_001.csv.gz', path: 'inbox/feed_001.csv.gz', kind: 'file', hasChildren: false };
+        const file: ResourceNode = {
+            name: 'feed_001.csv.gz',
+            path: 'inbox/feed_001.csv.gz',
+            kind: 'file',
+            hasChildren: false,
+        };
         c.onSelect(file);
         expect(c.selectedFiles()).toEqual(['inbox/feed_001.csv.gz']);
         c.onSelect(file);

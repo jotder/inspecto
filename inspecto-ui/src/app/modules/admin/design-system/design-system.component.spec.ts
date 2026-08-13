@@ -14,7 +14,15 @@ async function create() {
         providers: [
             provideNoopAnimations(),
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
-            { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined, warning: () => undefined, info: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: {
+                    success: () => undefined,
+                    error: () => undefined,
+                    warning: () => undefined,
+                    info: () => undefined,
+                },
+            },
             // the embedded map host tracks the colour scheme
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],

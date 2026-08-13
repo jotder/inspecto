@@ -24,7 +24,12 @@ const COMPARE: OperatorDef[] = [
 
 /** Operators offered per column type. */
 export const OPERATORS: Record<ColumnType, OperatorDef[]> = {
-    number: [...COMPARE, { op: 'between', label: 'between', arity: 2 }, { op: 'in', label: 'in', arity: 'list' }, ...NULLS],
+    number: [
+        ...COMPARE,
+        { op: 'between', label: 'between', arity: 2 },
+        { op: 'in', label: 'in', arity: 'list' },
+        ...NULLS,
+    ],
     date: [...COMPARE, { op: 'between', label: 'between', arity: 2 }, ...NULLS],
     string: [
         { op: '=', label: '=', arity: 1 },

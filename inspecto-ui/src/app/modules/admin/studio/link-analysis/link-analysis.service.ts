@@ -49,13 +49,24 @@ export class LinkAnalysisService {
 }
 
 function toContent(v: LinkAnalysisView): Record<string, unknown> {
-    return { name: v.name, description: v.description, sourceId: v.sourceId, query: v.query, display: v.display, layout: v.layout };
+    return {
+        name: v.name,
+        description: v.description,
+        sourceId: v.sourceId,
+        query: v.query,
+        display: v.display,
+        layout: v.layout,
+    };
 }
 
 function fromContent(id: string, content: Record<string, unknown>): LinkAnalysisView {
     const c = content as {
-        name?: string; description?: string; sourceId?: GraphSourceId; query?: GraphSourceQuery;
-        display?: GraphDisplayOptions; layout?: GraphLayoutId;
+        name?: string;
+        description?: string;
+        sourceId?: GraphSourceId;
+        query?: GraphSourceQuery;
+        display?: GraphDisplayOptions;
+        layout?: GraphLayoutId;
     };
     return {
         id,

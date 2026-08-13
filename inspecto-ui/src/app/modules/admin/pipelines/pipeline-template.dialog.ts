@@ -47,9 +47,9 @@ export interface PipelineTemplateResultData {
         <h2 mat-dialog-title inspectoDialogResize>Save '{{ data.source }}' as a template</h2>
         <mat-dialog-content>
             <inspecto-alert variant="info" title="A template is not runnable">
-                The copy keeps this pipeline's shape — parsing, schema, output format and settings — but
-                collects from its own folder and writes to its own tables, so it can never touch
-                '{{ data.source }}'. It stays unrunnable until you clear the template flag.
+                The copy keeps this pipeline's shape — parsing, schema, output format and settings — but collects from
+                its own folder and writes to its own tables, so it can never touch '{{ data.source }}'. It stays
+                unrunnable until you clear the template flag.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -60,7 +60,9 @@ export interface PipelineTemplateResultData {
                         <mat-error>An id is required.</mat-error>
                     }
                     @if (form.controls.id.hasError('pattern')) {
-                        <mat-error>Lowercase letters, digits and underscores only; start with a letter or digit.</mat-error>
+                        <mat-error
+                            >Lowercase letters, digits and underscores only; start with a letter or digit.</mat-error
+                        >
                     }
                     @if (form.controls.id.hasError('duplicate')) {
                         <mat-error>A pipeline with this id already exists.</mat-error>

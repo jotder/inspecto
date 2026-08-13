@@ -6,13 +6,29 @@ import { ParserDef, ParserPreview, ParsersService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GrammarEditorComponent } from './grammar-editor.component';
 
-const XML: ParserDef = { id: 'xml', label: 'XML — XML file format', hierarchical: true, ingestable: false, grammarSchema: [] };
+const XML: ParserDef = {
+    id: 'xml',
+    label: 'XML — XML file format',
+    hierarchical: true,
+    ingestable: false,
+    grammarSchema: [],
+};
 const ASN1: ParserDef = {
-    id: 'asn1', label: 'ASN.1 — vendor CDR', hierarchical: true, ingestable: true,
-    ingesterClass: 'com.gamma.asn.Asn1Ingester', grammarSchema: [],
+    id: 'asn1',
+    label: 'ASN.1 — vendor CDR',
+    hierarchical: true,
+    ingestable: true,
+    ingesterClass: 'com.gamma.asn.Asn1Ingester',
+    grammarSchema: [],
 };
 
-const TABLE: ParserPreview = { kind: 'table', columns: ['id', 'msisdn'], rows: [{ id: 1, msisdn: 'x' }], rowCount: 1, rejectedRows: 0 };
+const TABLE: ParserPreview = {
+    kind: 'table',
+    columns: ['id', 'msisdn'],
+    rows: [{ id: 1, msisdn: 'x' }],
+    rowCount: 1,
+    rejectedRows: 0,
+};
 
 function create(
     initial: Record<string, unknown> = {},
@@ -28,7 +44,9 @@ function create(
                 useValue: {
                     list: () => (served === 'fail' ? throwError(() => new Error('offline')) : of(served)),
                     preview: vi.fn(() =>
-                        preview === 'fail' ? throwError(() => ({ status: 422, error: { error: { message: 'nope' } } })) : of(preview),
+                        preview === 'fail'
+                            ? throwError(() => ({ status: 422, error: { error: { message: 'nope' } } }))
+                            : of(preview),
                     ),
                 },
             },

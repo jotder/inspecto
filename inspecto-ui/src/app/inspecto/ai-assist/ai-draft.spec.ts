@@ -18,11 +18,25 @@ describe('adaptToolResult', () => {
     });
 
     it('prefers the id as the label and falls back to the kind', () => {
-        expect(adaptToolResult('query_author', { kind: 'query', id: 'costly_calls', clean: true, findings: [], draft: { type: 'sql' } })[0].label)
-            .toBe('costly_calls');
+        expect(
+            adaptToolResult('query_author', {
+                kind: 'query',
+                id: 'costly_calls',
+                clean: true,
+                findings: [],
+                draft: { type: 'sql' },
+            })[0].label,
+        ).toBe('costly_calls');
         // The real tool returns id: null when the caller supplied no name.
-        expect(adaptToolResult('query_author', { kind: 'query', id: null, clean: true, findings: [], draft: { type: 'sql' } })[0].label)
-            .toBe('query');
+        expect(
+            adaptToolResult('query_author', {
+                kind: 'query',
+                id: null,
+                clean: true,
+                findings: [],
+                draft: { type: 'sql' },
+            })[0].label,
+        ).toBe('query');
     });
 
     it('normalizes a projection_author draft through the shared envelope branch', () => {
@@ -30,7 +44,10 @@ describe('adaptToolResult', () => {
         // silently rendering as "no suggestion" — so assert the candidate is really produced.
         const projections = [{ datasetId: 'cdr', sourceCol: 'caller_id', targetCol: 'callee_id' }];
         const drafts = adaptToolResult('projection_author', {
-            kind: 'link-analysis-view', id: 'cdr', clean: true, findings: [],
+            kind: 'link-analysis-view',
+            id: 'cdr',
+            clean: true,
+            findings: [],
             draft: { query: { projections } },
         });
         expect(drafts).toHaveLength(1);
@@ -125,7 +142,10 @@ describe('configDiff', () => {
     });
 
     it('flattens nested objects to dotted paths and compares arrays whole', () => {
-        const rows = configDiff({ target: { type: 'pipeline' }, cols: ['a'] }, { target: { type: 'dataset' }, cols: ['a', 'b'] });
+        const rows = configDiff(
+            { target: { type: 'pipeline' }, cols: ['a'] },
+            { target: { type: 'dataset' }, cols: ['a', 'b'] },
+        );
         const byPath = Object.fromEntries(rows.map((r) => [r.path, r.change]));
 
         expect(byPath['target.type']).toBe('changed');

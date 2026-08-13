@@ -9,7 +9,15 @@ import { DECISION_RULES_COLL, MockDecisionRule } from '../handlers/decision-rule
 import { MockExpectation, seedExpectation } from '../handlers/expectations.handler';
 import { NOTIFICATIONS_COLL, seedNotifications } from '../handlers/demo.handler';
 import { JOBS_COLL, recordRun } from '../handlers/jobs.handler';
-import { ALERT_RULES_COLL, CASE_RULES_COLL, ENRICHMENT_COLL, OBJECT_LINKS_COLL, OPS_OBJECTS_COLL, TAG_RULES_COLL, TAGS_COLL } from '../handlers/ops.handler';
+import {
+    ALERT_RULES_COLL,
+    CASE_RULES_COLL,
+    ENRICHMENT_COLL,
+    OBJECT_LINKS_COLL,
+    OPS_OBJECTS_COLL,
+    TAG_RULES_COLL,
+    TAGS_COLL,
+} from '../handlers/ops.handler';
 import { alertToSignal, eventToSignal } from '../../signal/signal';
 import { SIGNALS_COLL } from '../signals';
 import { MockStore } from '../mock-store';
@@ -33,27 +41,99 @@ export function seedOperations(store: MockStore, space: string): void {
         }
     };
     seedJob(
-        { name: 'cdr_ingest_daily', type: 'ingest', cron: '0 0 6 * * *', onPipeline: null, enabled: true, lastStatus: 'RUNNING', lastRunTime: iso(-5), nextFire: iso(60 * 18), catchUp: true, params: { source: 'cdr_sftp_prod', scope: 'roaming' } },
-        [['CRON', 'RUNNING', -5, 0, 'Discovering files on cdr_sftp_prod…'], ['CRON', 'SUCCESS', -60 * 24, 142_000, 'Ingested 1,204 files.'], ['CRON', 'SUCCESS', -60 * 48, 138_500, 'Ingested 1,180 files.']],
+        {
+            name: 'cdr_ingest_daily',
+            type: 'ingest',
+            cron: '0 0 6 * * *',
+            onPipeline: null,
+            enabled: true,
+            lastStatus: 'RUNNING',
+            lastRunTime: iso(-5),
+            nextFire: iso(60 * 18),
+            catchUp: true,
+            params: { source: 'cdr_sftp_prod', scope: 'roaming' },
+        },
+        [
+            ['CRON', 'RUNNING', -5, 0, 'Discovering files on cdr_sftp_prod…'],
+            ['CRON', 'SUCCESS', -60 * 24, 142_000, 'Ingested 1,204 files.'],
+            ['CRON', 'SUCCESS', -60 * 48, 138_500, 'Ingested 1,180 files.'],
+        ],
     );
     seedJob(
-        { name: 'enrich_roaming', type: 'enrich', cron: null, onPipeline: 'cdr_ingest', enabled: true, lastStatus: 'SUCCESS', lastRunTime: iso(-30), nextFire: null, params: { task: 'roaming_enrichment' } },
-        [['EVENT', 'SUCCESS', -30, 9_200, 'Enriched 1,204 rows.'], ['EVENT', 'SUCCESS', -60 * 24, 8_900, 'Enriched 1,180 rows.']],
+        {
+            name: 'enrich_roaming',
+            type: 'enrich',
+            cron: null,
+            onPipeline: 'cdr_ingest',
+            enabled: true,
+            lastStatus: 'SUCCESS',
+            lastRunTime: iso(-30),
+            nextFire: null,
+            params: { task: 'roaming_enrichment' },
+        },
+        [
+            ['EVENT', 'SUCCESS', -30, 9_200, 'Enriched 1,204 rows.'],
+            ['EVENT', 'SUCCESS', -60 * 24, 8_900, 'Enriched 1,180 rows.'],
+        ],
     );
     seedJob(
-        { name: 'daily_summary_report', type: 'report', cron: '0 30 6 * * *', onPipeline: null, enabled: true, lastStatus: 'FAILED', lastRunTime: iso(-60 * 6), nextFire: iso(60 * 18), params: { report: 'daily_summary', store: 'reports' } },
-        [['CRON', 'FAILED', -60 * 6, 4_300, 'Report query failed: store "reports" not found.'], ['CRON', 'SUCCESS', -60 * 30, 5_100, 'Wrote daily_summary.parquet.']],
+        {
+            name: 'daily_summary_report',
+            type: 'report',
+            cron: '0 30 6 * * *',
+            onPipeline: null,
+            enabled: true,
+            lastStatus: 'FAILED',
+            lastRunTime: iso(-60 * 6),
+            nextFire: iso(60 * 18),
+            params: { report: 'daily_summary', store: 'reports' },
+        },
+        [
+            ['CRON', 'FAILED', -60 * 6, 4_300, 'Report query failed: store "reports" not found.'],
+            ['CRON', 'SUCCESS', -60 * 30, 5_100, 'Wrote daily_summary.parquet.'],
+        ],
     );
     seedJob(
-        { name: 'catalog_maintenance', type: 'maintenance', cron: '0 0 2 * * 0', onPipeline: null, enabled: true, lastStatus: 'SUCCESS', lastRunTime: iso(-60 * 50), nextFire: iso(60 * 110), catchUp: true, params: { task: 'vacuum' } },
+        {
+            name: 'catalog_maintenance',
+            type: 'maintenance',
+            cron: '0 0 2 * * 0',
+            onPipeline: null,
+            enabled: true,
+            lastStatus: 'SUCCESS',
+            lastRunTime: iso(-60 * 50),
+            nextFire: iso(60 * 110),
+            catchUp: true,
+            params: { task: 'vacuum' },
+        },
         [['CRON', 'SUCCESS', -60 * 50, 61_000, 'Vacuumed 12 tables.']],
     );
     seedJob(
-        { name: 'weekly_billing', type: 'report', cron: '0 0 1 * * 1', onPipeline: null, enabled: false, lastStatus: 'SUCCESS', lastRunTime: iso(-60 * 24 * 5), nextFire: null, params: { report: 'billing' } },
+        {
+            name: 'weekly_billing',
+            type: 'report',
+            cron: '0 0 1 * * 1',
+            onPipeline: null,
+            enabled: false,
+            lastStatus: 'SUCCESS',
+            lastRunTime: iso(-60 * 24 * 5),
+            nextFire: null,
+            params: { report: 'billing' },
+        },
         [['CRON', 'SUCCESS', -60 * 24 * 5, 22_000, 'Wrote billing.csv.']],
     );
     seedJob(
-        { name: 'adhoc_export', type: 'flow', cron: null, onPipeline: null, enabled: true, lastStatus: undefined, lastRunTime: undefined, nextFire: null, params: { flow: 'cdr_export' } },
+        {
+            name: 'adhoc_export',
+            type: 'flow',
+            cron: null,
+            onPipeline: null,
+            enabled: true,
+            lastStatus: undefined,
+            lastRunTime: undefined,
+            nextFire: null,
+            params: { flow: 'cdr_export' },
+        },
         [],
     );
 
@@ -61,7 +141,14 @@ export function seedOperations(store: MockStore, space: string): void {
     const pipelines = ['cdr_ingest', 'subscriber_load', 'voucher_etl'];
     for (let i = 0; i < 30; i++) {
         const ts = now - i * 600_000;
-        const type = ['BATCH_COMMITTED', 'FILE_RECEIVED', 'FILE_QUARANTINED', 'BATCH_FAILED', 'ALERT_FIRED', 'JOB_SUCCEEDED'][i % 6];
+        const type = [
+            'BATCH_COMMITTED',
+            'FILE_RECEIVED',
+            'FILE_QUARANTINED',
+            'BATCH_FAILED',
+            'ALERT_FIRED',
+            'JOB_SUCCEEDED',
+        ][i % 6];
         const pipeline = pipelines[i % 3];
         const event: EventRow = {
             eventId: 'evt-' + (1000 + i),
@@ -82,14 +169,28 @@ export function seedOperations(store: MockStore, space: string): void {
     const auditEntries: Array<[string, string, string, string, string, string]> = [
         // [type, actor, action, category, target_type:target_id, message]
         ['AUDIT', 'ops.admin', 'pipeline.created', 'config', 'pipeline:cdr_ingest', 'Created pipeline cdr_ingest'],
-        ['AUDIT', 'ops.admin', 'connection.updated', 'config', 'connection:cdr_sftp_prod', 'Rotated credentials reference'],
+        [
+            'AUDIT',
+            'ops.admin',
+            'connection.updated',
+            'config',
+            'connection:cdr_sftp_prod',
+            'Rotated credentials reference',
+        ],
         ['AUDIT', 'builder.rita', 'job.triggered', 'operate', 'job:daily_summary_report', 'Manual run requested'],
         ['AUDIT', 'builder.rita', 'dataset.updated', 'config', 'dataset:cdr_enriched', 'Added column roaming_flag'],
         ['AUDIT', 'ops.admin', 'pipeline.paused', 'operate', 'pipeline:voucher_etl', 'Paused for maintenance window'],
         ['AUDIT', 'ops.admin', 'pipeline.resumed', 'operate', 'pipeline:voucher_etl', 'Maintenance complete'],
         ['AUDIT', 'business.amol', 'report.exported', 'read', 'report:daily_summary', 'Exported daily_summary.csv'],
         ['AUDIT', 'ops.admin', 'job.deleted', 'destructive', 'job:legacy_reconcile', 'Removed retired job'],
-        ['ACCESS_DENIED', 'business.amol', 'pipeline.delete', 'destructive', 'pipeline:cdr_ingest', 'Denied: business lens cannot delete pipelines'],
+        [
+            'ACCESS_DENIED',
+            'business.amol',
+            'pipeline.delete',
+            'destructive',
+            'pipeline:cdr_ingest',
+            'Denied: business lens cannot delete pipelines',
+        ],
         ['ACCESS_DENIED', 'unknown', 'config.read', 'read', 'space:default', 'Denied: unauthenticated request'],
     ];
     auditEntries.forEach(([type, actor, action, category, target, message], i) => {
@@ -140,9 +241,33 @@ export function seedOperations(store: MockStore, space: string): void {
     // an exact multiple of the grid) so the row count is robust to the few-ms clock drift between
     // when this deterministic ledger was generated and when `evaluate()` reads `Date.now()`.
     const rules: AlertRule[] = [
-        { name: 'high_error_rate', metric: 'error_rate', comparator: 'gt', threshold: 0.05, window: '30m', severity: 'CRITICAL', onPipeline: 'cdr_ingest' },
-        { name: 'rejected_spike', metric: 'rejected_files', comparator: 'gt', threshold: 1, window: '510m', severity: 'WARNING', onPipeline: 'subscriber_load' },
-        { name: 'slow_batch', metric: 'duration_ms', comparator: 'gt', threshold: 1500, window: '750m', severity: 'WARNING', onPipeline: 'voucher_etl' },
+        {
+            name: 'high_error_rate',
+            metric: 'error_rate',
+            comparator: 'gt',
+            threshold: 0.05,
+            window: '30m',
+            severity: 'CRITICAL',
+            onPipeline: 'cdr_ingest',
+        },
+        {
+            name: 'rejected_spike',
+            metric: 'rejected_files',
+            comparator: 'gt',
+            threshold: 1,
+            window: '510m',
+            severity: 'WARNING',
+            onPipeline: 'subscriber_load',
+        },
+        {
+            name: 'slow_batch',
+            metric: 'duration_ms',
+            comparator: 'gt',
+            threshold: 1500,
+            window: '750m',
+            severity: 'WARNING',
+            onPipeline: 'voucher_etl',
+        },
     ];
     for (const r of rules) store.put(space, ALERT_RULES_COLL, r.name, r);
 
@@ -183,7 +308,12 @@ export function seedOperations(store: MockStore, space: string): void {
         ],
         actions: [
             { done: true, text: 'Roll back parser to v1.4.2', owner: 'ops', due: '2026-07-10' },
-            { done: false, text: 'Add optional-column expectation to the feed schema', owner: 'data', due: '2026-07-20' },
+            {
+                done: false,
+                text: 'Add optional-column expectation to the feed schema',
+                owner: 'data',
+                due: '2026-07-20',
+            },
         ],
     });
     // A resolved case's Findings (C3) + an overdue-target investigating case with a team (C6).
@@ -240,8 +370,12 @@ export function seedOperations(store: MockStore, space: string): void {
     ];
     for (const [caseId, incidentId] of memberships) {
         store.put(space, OBJECT_LINKS_COLL, `${caseId}->${incidentId}:CONTAINS`, {
-            from: caseId, fromType: 'CASE', to: incidentId, toType: 'INCIDENT',
-            relationship: 'CONTAINS', createdAt: now,
+            from: caseId,
+            fromType: 'CASE',
+            to: incidentId,
+            toType: 'INCIDENT',
+            relationship: 'CONTAINS',
+            createdAt: now,
         });
     }
 
@@ -270,7 +404,14 @@ export function seedOperations(store: MockStore, space: string): void {
 
     // ── Enrichment jobs ─────────────────────────────────────────────────────────────────────────
     const enrich: EnrichmentJobView[] = [
-        { name: 'events_daily_kpi', onPipeline: 'events', eventTriggered: true, runCount: 42, lastRunStatus: 'SUCCESS', lastRunTime: new Date(now).toISOString() },
+        {
+            name: 'events_daily_kpi',
+            onPipeline: 'events',
+            eventTriggered: true,
+            runCount: 42,
+            lastRunStatus: 'SUCCESS',
+            lastRunTime: new Date(now).toISOString(),
+        },
         { name: 'subscriber_rollup', scheduleTriggered: true, runCount: 18, lastRunStatus: 'SUCCESS' },
     ];
     for (const e of enrich) store.put(space, ENRICHMENT_COLL, e.name, e);
@@ -278,15 +419,44 @@ export function seedOperations(store: MockStore, space: string): void {
     // ── Connection profiles (workbench + list navigable with no backend) ────────────────────────
     const connections: ConnectionProfile[] = [
         {
-            id: 'cdr_sftp_prod', connector: 'sftp', host: 'sftp.example.com', port: 22, basePath: '/cdr/outbox',
-            username: 'cdruser', password: '${ENV:CDR_SFTP_PASSWORD}', options: { auth_method: 'key' },
+            id: 'cdr_sftp_prod',
+            connector: 'sftp',
+            host: 'sftp.example.com',
+            port: 22,
+            basePath: '/cdr/outbox',
+            username: 'cdruser',
+            password: '${ENV:CDR_SFTP_PASSWORD}',
+            options: { auth_method: 'key' },
             tunnel: { host: 'bastion.example.com', port: 22, username: 'jump', password: '${ENV:BASTION_PASSWORD}' },
             description: 'Production CDR drop zone (via bastion)',
         },
-        { id: 'pg_warehouse', connector: 'db', host: 'pg.example.com', port: 5432, database: 'warehouse', username: 'etl', password: '${ENV:PG_PASSWORD}', options: { sslmode: 'require' }, description: 'Reporting warehouse (Postgres)' },
-        { id: 's3_archive', connector: 's3', host: 's3.amazonaws.com', basePath: 'cdr-archive', options: { region: 'eu-west-1' } },
+        {
+            id: 'pg_warehouse',
+            connector: 'db',
+            host: 'pg.example.com',
+            port: 5432,
+            database: 'warehouse',
+            username: 'etl',
+            password: '${ENV:PG_PASSWORD}',
+            options: { sslmode: 'require' },
+            description: 'Reporting warehouse (Postgres)',
+        },
+        {
+            id: 's3_archive',
+            connector: 's3',
+            host: 's3.amazonaws.com',
+            basePath: 'cdr-archive',
+            options: { region: 'eu-west-1' },
+        },
         { id: 'local_inbox', connector: 'local', basePath: '/data/inbox' },
-        { id: 'legacy_ftp_down', connector: 'ftp', host: 'ftp.legacy.example.com', port: 21, username: 'ops', password: '${ENV:FTP_PW}' },
+        {
+            id: 'legacy_ftp_down',
+            connector: 'ftp',
+            host: 'ftp.legacy.example.com',
+            port: 21,
+            username: 'ops',
+            password: '${ENV:FTP_PW}',
+        },
     ];
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
@@ -297,29 +467,77 @@ export function seedOperations(store: MockStore, space: string): void {
     //    mock-only deterministic outcome: > 0 ⇒ that check FAILS on evaluation and raises an Incident. ──
     const expectations: MockExpectation[] = [
         {
-            name: 'cdr_msisdn_not_null', description: 'Every CDR must carry a subscriber number',
-            targetType: 'pipeline', target: 'cdr_ingest', column: 'msisdn', kind: 'non_null',
-            min: null, max: null, pattern: null, refDataset: null, refColumn: null,
-            severity: 'CRITICAL', enabled: true, lastResult: null, createdAt: min(-600), updatedAt: min(-600),
+            name: 'cdr_msisdn_not_null',
+            description: 'Every CDR must carry a subscriber number',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            column: 'msisdn',
+            kind: 'non_null',
+            min: null,
+            max: null,
+            pattern: null,
+            refDataset: null,
+            refColumn: null,
+            severity: 'CRITICAL',
+            enabled: true,
+            lastResult: null,
+            createdAt: min(-600),
+            updatedAt: min(-600),
         },
         {
-            name: 'cdr_duration_range', description: 'Call duration must be 0–86400 s',
-            targetType: 'pipeline', target: 'cdr_ingest', column: 'duration_s', kind: 'range',
-            min: 0, max: 86_400, pattern: null, refDataset: null, refColumn: null,
-            severity: 'MAJOR', enabled: true, lastResult: null, createdAt: min(-580), updatedAt: min(-580),
+            name: 'cdr_duration_range',
+            description: 'Call duration must be 0–86400 s',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            column: 'duration_s',
+            kind: 'range',
+            min: 0,
+            max: 86_400,
+            pattern: null,
+            refDataset: null,
+            refColumn: null,
+            severity: 'MAJOR',
+            enabled: true,
+            lastResult: null,
+            createdAt: min(-580),
+            updatedAt: min(-580),
             demoViolations: 12,
         },
         {
-            name: 'cdr_msisdn_format', description: 'Subscriber numbers are E.164',
-            targetType: 'job', target: 'cdr_ingest_daily', column: 'msisdn', kind: 'regex',
-            min: null, max: null, pattern: '^\\+?[1-9]\\d{6,14}$', refDataset: null, refColumn: null,
-            severity: 'MINOR', enabled: true, lastResult: null, createdAt: min(-560), updatedAt: min(-560),
+            name: 'cdr_msisdn_format',
+            description: 'Subscriber numbers are E.164',
+            targetType: 'job',
+            target: 'cdr_ingest_daily',
+            column: 'msisdn',
+            kind: 'regex',
+            min: null,
+            max: null,
+            pattern: '^\\+?[1-9]\\d{6,14}$',
+            refDataset: null,
+            refColumn: null,
+            severity: 'MINOR',
+            enabled: true,
+            lastResult: null,
+            createdAt: min(-560),
+            updatedAt: min(-560),
         },
         {
-            name: 'cdr_tariff_known', description: 'Tariff codes must exist in the tariff reference',
-            targetType: 'pipeline', target: 'cdr_ingest', column: 'tariff', kind: 'referential',
-            min: null, max: null, pattern: null, refDataset: 'tariff_ref', refColumn: 'code',
-            severity: 'MAJOR', enabled: false, lastResult: null, createdAt: min(-540), updatedAt: min(-540),
+            name: 'cdr_tariff_known',
+            description: 'Tariff codes must exist in the tariff reference',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            column: 'tariff',
+            kind: 'referential',
+            min: null,
+            max: null,
+            pattern: null,
+            refDataset: 'tariff_ref',
+            refColumn: 'code',
+            severity: 'MAJOR',
+            enabled: false,
+            lastResult: null,
+            createdAt: min(-540),
+            updatedAt: min(-540),
         },
     ];
     for (const e of expectations) seedExpectation(store, space, e);
@@ -328,21 +546,34 @@ export function seedOperations(store: MockStore, space: string): void {
     //    mock-only deterministic simulation outcome (no real records to route). ───────────────────
     const decisionRules: MockDecisionRule[] = [
         {
-            name: 'route_emea_traffic', description: 'EMEA tariffs branch to the regional sink',
-            targetType: 'pipeline', target: 'cdr_ingest', priority: 10, enabled: true,
+            name: 'route_emea_traffic',
+            description: 'EMEA tariffs branch to the regional sink',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            priority: 10,
+            enabled: true,
             when: {
-                kind: 'group', op: 'AND',
+                kind: 'group',
+                op: 'AND',
                 items: [{ kind: 'condition', field: 'tariff', operator: 'startsWith', value: 'EMEA_' }],
             },
             consequences: [{ action: 'route', destination: 'emea' }],
-            lastSimulation: null, createdAt: min(-500), updatedAt: min(-500),
-            demoMatched: 412, demoTotal: 1000,
+            lastSimulation: null,
+            createdAt: min(-500),
+            updatedAt: min(-500),
+            demoMatched: 412,
+            demoTotal: 1000,
         },
         {
-            name: 'quarantine_high_cost', description: 'Suspicious high-cost calls held for review and flagged',
-            targetType: 'pipeline', target: 'cdr_ingest', priority: 20, enabled: true,
+            name: 'quarantine_high_cost',
+            description: 'Suspicious high-cost calls held for review and flagged',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            priority: 20,
+            enabled: true,
             when: {
-                kind: 'group', op: 'AND',
+                kind: 'group',
+                op: 'AND',
                 items: [
                     { kind: 'condition', field: 'cost_usd', operator: '>', value: '100' },
                     { kind: 'condition', field: 'duration_s', operator: '<', value: '60' },
@@ -352,22 +583,39 @@ export function seedOperations(store: MockStore, space: string): void {
                 { action: 'quarantine', destination: 'possible fraud pattern' },
                 { action: 'tag', destination: 'high_risk' },
                 // R5 platform consequences — Apply writes these into the Signal Ledger; start-job adds an `invokes` edge.
-                { action: 'emit-signal', params: { type: 'FRAUD_REVIEW', severity: 'warn', message: 'High-cost short call flagged for review' } },
+                {
+                    action: 'emit-signal',
+                    params: {
+                        type: 'FRAUD_REVIEW',
+                        severity: 'warn',
+                        message: 'High-cost short call flagged for review',
+                    },
+                },
                 { action: 'create-alert', params: { rule: 'high_cost_review', metric: 'cost_usd', severity: 'warn' } },
                 { action: 'start-job', target: { kind: 'job', id: 'daily_summary_report' } },
             ],
-            lastSimulation: null, createdAt: min(-490), updatedAt: min(-490),
-            demoMatched: 7, demoTotal: 1000,
+            lastSimulation: null,
+            createdAt: min(-490),
+            updatedAt: min(-490),
+            demoMatched: 7,
+            demoTotal: 1000,
         },
         {
-            name: 'drop_zero_duration', description: 'Zero-duration technical records are noise',
-            targetType: 'pipeline', target: 'cdr_ingest', priority: 30, enabled: false,
+            name: 'drop_zero_duration',
+            description: 'Zero-duration technical records are noise',
+            targetType: 'pipeline',
+            target: 'cdr_ingest',
+            priority: 30,
+            enabled: false,
             when: {
-                kind: 'group', op: 'AND',
+                kind: 'group',
+                op: 'AND',
                 items: [{ kind: 'condition', field: 'duration_s', operator: '=', value: '0' }],
             },
             consequences: [{ action: 'drop' }],
-            lastSimulation: null, createdAt: min(-480), updatedAt: min(-480),
+            lastSimulation: null,
+            createdAt: min(-480),
+            updatedAt: min(-480),
         },
     ];
     for (const r of decisionRules) store.put(space, DECISION_RULES_COLL, r.name, r);

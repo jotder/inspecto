@@ -24,7 +24,14 @@ export interface ScheduleExportResult {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -40,7 +47,11 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
-            {{ isEdit ? 'Edit scheduled export "' + data.job!.name + '"' : 'Schedule export of "' + data.dashboardName + '"' }}
+            {{
+                isEdit
+                    ? 'Edit scheduled export "' + data.job!.name + '"'
+                    : 'Schedule export of "' + data.dashboardName + '"'
+            }}
         </h2>
         <mat-dialog-content>
             @if (writesDisabled()) {

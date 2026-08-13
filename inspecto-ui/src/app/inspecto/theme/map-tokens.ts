@@ -65,7 +65,14 @@ export function basemapStyle(dark: boolean, assetBase?: string, tileServerUrl?: 
             // The Phase 4 tile-server seam (Settings → Map): a customer {z}/{x}/{y} raster template
             // (satellite etc.) replaces the offline land/lake fills; boundaries/labels stay on top.
             ...(tileServerUrl
-                ? { imagery: { type: 'raster' as const, tiles: [tileServerUrl], tileSize: 256, attribution: 'Customer tile server' } }
+                ? {
+                      imagery: {
+                          type: 'raster' as const,
+                          tiles: [tileServerUrl],
+                          tileSize: 256,
+                          attribution: 'Customer tile server',
+                      },
+                  }
                 : {}),
         },
         layers: [

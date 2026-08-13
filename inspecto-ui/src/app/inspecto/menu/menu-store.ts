@@ -125,20 +125,34 @@ export class MenuStore {
     seedExample(): string {
         const revenue = this.addMenu('Revenue', 'heroicons_outline:banknotes');
         const overview = this.addSubMenu(revenue, 'Overview', 'heroicons_outline:chart-bar');
-        this.attach(overview, 'Revenue dashboard', { kind: 'dashboard', componentId: 'revenue_overview' },
-            'heroicons_outline:presentation-chart-line');
+        this.attach(
+            overview,
+            'Revenue dashboard',
+            { kind: 'dashboard', componentId: 'revenue_overview' },
+            'heroicons_outline:presentation-chart-line',
+        );
         const topx = this.addSubMenu(revenue, 'TopX', 'heroicons_outline:arrow-trending-up');
-        this.attach(topx, 'Top usages', { kind: 'widget', componentId: 'top_usages' },
-            'heroicons_outline:signal');
-        this.attach(topx, 'Top billed', { kind: 'widget', componentId: 'top_billed' },
-            'heroicons_outline:receipt-percent');
-        this.attach(topx, 'Top roamers', { kind: 'widget', componentId: 'top_roamers' },
-            'heroicons_outline:globe-alt');
+        this.attach(topx, 'Top usages', { kind: 'widget', componentId: 'top_usages' }, 'heroicons_outline:signal');
+        this.attach(
+            topx,
+            'Top billed',
+            { kind: 'widget', componentId: 'top_billed' },
+            'heroicons_outline:receipt-percent',
+        );
+        this.attach(topx, 'Top roamers', { kind: 'widget', componentId: 'top_roamers' }, 'heroicons_outline:globe-alt');
         const fms = this.addMenu('FMS', 'heroicons_outline:shield-exclamation');
-        this.attach(fms, 'Fraud categories', { kind: 'dashboard', componentId: 'fraud_categories' },
-            'heroicons_outline:chart-pie');
-        this.attach(fms, 'Suspicious usage', { kind: 'widget', componentId: 'suspicious_usage' },
-            'heroicons_outline:eye');
+        this.attach(
+            fms,
+            'Fraud categories',
+            { kind: 'dashboard', componentId: 'fraud_categories' },
+            'heroicons_outline:chart-pie',
+        );
+        this.attach(
+            fms,
+            'Suspicious usage',
+            { kind: 'widget', componentId: 'suspicious_usage' },
+            'heroicons_outline:eye',
+        );
         return revenue;
     }
 

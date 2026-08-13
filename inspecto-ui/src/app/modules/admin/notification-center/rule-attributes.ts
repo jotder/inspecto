@@ -8,18 +8,28 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  */
 export const RULE_ATTRIBUTES: AttributeSpec[] = [
     {
-        key: 'id', label: 'Rule id', type: 'string', tier: 'required',
+        key: 'id',
+        label: 'Rule id',
+        type: 'string',
+        tier: 'required',
         pattern: '[A-Za-z0-9][A-Za-z0-9._-]*',
         placeholder: 'e.g. custom_batch_failed',
         help: 'Letters, digits, dot, dash, underscore; start alphanumeric.',
     },
     {
-        key: 'eventType', label: 'Event type', type: 'string', tier: 'required',
+        key: 'eventType',
+        label: 'Event type',
+        type: 'string',
+        tier: 'required',
         placeholder: 'e.g. BATCH_FAILED or job.custom',
         help: 'The event this rule fires on (case-insensitive). An authored rule overrides the built-in for the same type.',
     },
     {
-        key: 'minLevel', label: 'Minimum severity', type: 'select', tier: 'optional', default: '',
+        key: 'minLevel',
+        label: 'Minimum severity',
+        type: 'select',
+        tier: 'optional',
+        default: '',
         options: [
             { value: '', label: 'Any' },
             { value: 'INFO', label: 'Info' },
@@ -29,7 +39,11 @@ export const RULE_ATTRIBUTES: AttributeSpec[] = [
         help: 'Events below this severity do not fire the rule.',
     },
     {
-        key: 'category', label: 'Category', type: 'select', tier: 'required', default: 'ops',
+        key: 'category',
+        label: 'Category',
+        type: 'select',
+        tier: 'required',
+        default: 'ops',
         options: [
             { value: 'pipeline', label: 'Pipeline' },
             { value: 'ops', label: 'Operations' },
@@ -38,16 +52,25 @@ export const RULE_ATTRIBUTES: AttributeSpec[] = [
         help: 'The preference key gating delivery (the Preferences tab).',
     },
     {
-        key: 'titleTemplate', label: 'Title template', type: 'multiline', tier: 'optional',
+        key: 'titleTemplate',
+        label: 'Title template',
+        type: 'multiline',
+        tier: 'optional',
         placeholder: '{{type}}',
         help: '{{var}} interpolation over the event: type, level, pipeline, message, attributes.*, payload.*, time.',
     },
     {
-        key: 'bodyTemplate', label: 'Body template', type: 'multiline', tier: 'optional',
+        key: 'bodyTemplate',
+        label: 'Body template',
+        type: 'multiline',
+        tier: 'optional',
         placeholder: '{{message}}',
     },
     {
-        key: 'dedupeKeyTemplate', label: 'Dedupe key template', type: 'multiline', tier: 'advanced',
+        key: 'dedupeKeyTemplate',
+        label: 'Dedupe key template',
+        type: 'multiline',
+        tier: 'advanced',
         placeholder: '{{type}}:{{correlationId}}',
         help: 'Identical unread notifications collapse on this rendered key.',
     },

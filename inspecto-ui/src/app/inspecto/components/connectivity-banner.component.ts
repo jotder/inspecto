@@ -50,12 +50,7 @@ import { ConnectivityService } from 'app/inspecto/api/connectivity.service';
                     }
                 </span>
                 @if (conn.reason() === 'backend') {
-                    <button
-                        mat-stroked-button
-                        class="shrink-0"
-                        [disabled]="conn.retrying()"
-                        (click)="conn.retry()"
-                    >
+                    <button mat-stroked-button class="shrink-0" [disabled]="conn.retrying()" (click)="conn.retry()">
                         @if (conn.retrying()) {
                             <mat-progress-spinner diameter="16" mode="indeterminate" />
                             <span class="ml-2">Retrying…</span>

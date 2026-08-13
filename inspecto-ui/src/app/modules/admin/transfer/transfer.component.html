@@ -7,7 +7,9 @@
                 saved views, pipelines and their registry pieces. Metadata only, never data rows.
             </div>
         </div>
-        @if (loading()) { <mat-spinner diameter="24"></mat-spinner> }
+        @if (loading()) {
+            <mat-spinner diameter="24"></mat-spinner>
+        }
     </div>
 
     <mat-tab-group class="mt-4" animationDuration="0ms">
@@ -15,7 +17,12 @@
         <mat-tab label="Export">
             <div class="mt-4 flex flex-col gap-4">
                 <div class="flex flex-wrap items-center gap-4">
-                    <button mat-flat-button color="primary" [disabled]="!selectedCount() || loading()" (click)="exportBundle()">
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        [disabled]="!selectedCount() || loading()"
+                        (click)="exportBundle()"
+                    >
                         <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
                         <span class="ml-2">Export {{ selectedCount() || '' }} selected</span>
                     </button>
@@ -36,12 +43,15 @@
                     @for (g of groups(); track g.kind) {
                         <div class="bg-card rounded-2xl p-4 shadow">
                             <div class="flex items-center justify-between">
-                                <div class="font-semibold">{{ g.label }} <span class="text-secondary text-sm">({{ g.items.length }})</span></div>
+                                <div class="font-semibold">
+                                    {{ g.label }} <span class="text-secondary text-sm">({{ g.items.length }})</span>
+                                </div>
                                 <mat-checkbox
                                     [checked]="kindAllSelected(g.kind)"
                                     (change)="toggleKind(g.kind)"
                                     [aria-label]="'Select all ' + g.label"
-                                >All</mat-checkbox>
+                                    >All</mat-checkbox
+                                >
                             </div>
                             <div class="mt-2 flex max-h-48 flex-col gap-1 overflow-y-auto">
                                 @for (i of g.items; track i.id) {
@@ -65,12 +75,21 @@
                         <span class="ml-1">Choose bundle (.json)</span>
                     </button>
                     <span class="text-secondary truncate">{{ fileName() || 'No file selected' }}</span>
-                    <input #picker type="file" accept=".json,application/json" class="hidden" aria-label="Bundle file (.json)" (change)="onFile($event)" />
+                    <input
+                        #picker
+                        type="file"
+                        accept=".json,application/json"
+                        class="hidden"
+                        aria-label="Bundle file (.json)"
+                        (change)="onFile($event)"
+                    />
                 </div>
 
                 @if (parseErrors().length) {
                     <inspecto-alert variant="error" title="This file is not a valid metadata bundle">
-                        @for (e of parseErrors(); track e) { <div>{{ e }}</div> }
+                        @for (e of parseErrors(); track e) {
+                            <div>{{ e }}</div>
+                        }
                     </inspecto-alert>
                 }
 
@@ -81,15 +100,20 @@
                             {{ existingCount() }} already on this instance
                         </span>
                         @if (existingCount()) {
-                            <button type="button" mat-stroked-button (click)="overwriteAllExisting()">Overwrite all existing</button>
-                            <button type="button" mat-stroked-button (click)="skipAllExisting()">Skip all existing</button>
+                            <button type="button" mat-stroked-button (click)="overwriteAllExisting()">
+                                Overwrite all existing
+                            </button>
+                            <button type="button" mat-stroked-button (click)="skipAllExisting()">
+                                Skip all existing
+                            </button>
                         }
                     </div>
 
                     @if (bundleHasConnections()) {
                         <inspecto-alert variant="info">
-                            Connections carry masked secrets (<code>***</code> / <code>${{ '{' }}ENV:…{{ '}' }}</code> references) —
-                            after import, provide the environment values or re-enter secrets on this instance.
+                            Connections carry masked secrets (<code>***</code> /
+                            <code>${{ '{' }}ENV:…{{ '}' }}</code> references) — after import, provide the environment
+                            values or re-enter secrets on this instance.
                         </inspecto-alert>
                     }
 
@@ -116,7 +140,10 @@
                                         <td class="py-1.5 pr-4">{{ kindLabel(r.item.kind) }}</td>
                                         <td class="py-1.5 pr-4 font-mono">{{ r.item.id }}</td>
                                         <td class="py-1.5 pr-4">
-                                            <inspecto-status-badge [value]="r.exists ? 'WARNING' : 'OK'" [label]="r.exists ? 'Exists' : 'New'" />
+                                            <inspecto-status-badge
+                                                [value]="r.exists ? 'WARNING' : 'OK'"
+                                                [label]="r.exists ? 'Exists' : 'New'"
+                                            />
                                         </td>
                                         <td class="py-1.5 pr-4">
                                             <mat-form-field subscriptSizing="dynamic" class="w-36">
@@ -142,7 +169,9 @@
                                                     [value]="r.result === 'failed' ? 'ERROR' : 'OK'"
                                                     [label]="r.result"
                                                 />
-                                                @if (r.message) { <span class="text-secondary ml-2 text-xs">{{ r.message }}</span> }
+                                                @if (r.message) {
+                                                    <span class="text-secondary ml-2 text-xs">{{ r.message }}</span>
+                                                }
                                             }
                                         </td>
                                     </tr>
@@ -158,11 +187,16 @@
                             [disabled]="applying() || !actionableCount() || !lens.canAuthorWorkbench()"
                             (click)="apply()"
                         >
-                            @if (applying()) { <mat-spinner diameter="18" class="mr-2"></mat-spinner> }
+                            @if (applying()) {
+                                <mat-spinner diameter="18" class="mr-2"></mat-spinner>
+                            }
                             <span>Apply import ({{ actionableCount() }})</span>
                         </button>
                         @if (applied()) {
-                            <span class="text-secondary ml-3 text-sm">Done — imported artifacts are live (see Viz Library, Dashboard Builder, Pipelines).</span>
+                            <span class="text-secondary ml-3 text-sm"
+                                >Done — imported artifacts are live (see Viz Library, Dashboard Builder,
+                                Pipelines).</span
+                            >
                         }
                     </div>
                 } @else if (!parseErrors().length) {

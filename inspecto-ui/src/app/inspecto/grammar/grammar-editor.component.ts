@@ -19,7 +19,13 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Observable } from 'rxjs';
 import { ParserDef, ParserPreview, ParserTreeNode, ParsersService, apiErrorMessage } from 'app/inspecto/api';
-import { AttributeSpec, fieldSpecsToAttributes, flattenBlock, nestKeys, clearMissingRoots } from 'app/inspecto/component-model';
+import {
+    AttributeSpec,
+    fieldSpecsToAttributes,
+    flattenBlock,
+    nestKeys,
+    clearMissingRoots,
+} from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -29,7 +35,16 @@ import { PARSING_FRONTENDS, ParsingFrontend, parsingAttributesFor } from './pars
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
 
 /** The `parsing:` roots this editor owns — switching frontend clears the others' sub-blocks. */
-export const PARSING_ROOTS = ['frontend', 'delimited', 'fixedwidth', 'json', 'text_regex', 'encoding', 'compression', 'plugin'];
+export const PARSING_ROOTS = [
+    'frontend',
+    'delimited',
+    'fixedwidth',
+    'json',
+    'text_regex',
+    'encoding',
+    'compression',
+    'plugin',
+];
 
 /** Sample cap — a scratch preview, not a data upload. */
 const MAX_SAMPLE_BYTES = 256 * 1024;
@@ -379,7 +394,11 @@ export class GrammarEditorComponent {
     /** Validate the property sheet and (for fixed width) the slice table. */
     validate(): boolean {
         if (!this.schemaForm?.validate()) return false;
-        if (!this.pluginDef() && this.frontend() === 'fixedwidth' && (this.fwForm.invalid || this.fwFields.length === 0)) {
+        if (
+            !this.pluginDef() &&
+            this.frontend() === 'fixedwidth' &&
+            (this.fwForm.invalid || this.fwFields.length === 0)
+        ) {
             this.fwForm.markAllAsTouched();
             this.error.set('Fixed width needs at least one field (name, start, length).');
             return false;
@@ -451,7 +470,9 @@ export class GrammarEditorComponent {
 
 /** `fixed_width` is the engine's legacy spelling of the same frontend; anything unknown is delimited. */
 function normalizeFrontend(raw: unknown): ParsingFrontend {
-    const f = String(raw ?? 'delimited').trim().toLowerCase();
+    const f = String(raw ?? 'delimited')
+        .trim()
+        .toLowerCase();
     if (f === 'fixed_width' || f === 'fixedwidth') return 'fixedwidth';
     if (f === 'json') return 'json';
     if (f === 'text_regex') return 'text_regex';

@@ -10,7 +10,11 @@ describe('buildRuleTemplate', () => {
             op: 'AND',
             items: [{ kind: 'condition', field: 'severity', operator: '=', value: 'CRITICAL' }],
         };
-        const r = buildRuleTemplate('high_sev', 'alerts', { projection: ['rule', 'severity'], where, sqlOverride: null });
+        const r = buildRuleTemplate('high_sev', 'alerts', {
+            projection: ['rule', 'severity'],
+            where,
+            sqlOverride: null,
+        });
         expect(r).toEqual({
             id: 'high_sev',
             name: 'high_sev',

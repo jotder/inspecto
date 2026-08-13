@@ -1,4 +1,12 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, inject, signal, ViewChild } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    inject,
+    signal,
+    ViewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
@@ -7,13 +15,24 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, DbBrowserService, Expectation, ExpectationKind, ExpectationsService, ExpectationUpsert } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    DbBrowserService,
+    Expectation,
+    ExpectationKind,
+    ExpectationsService,
+    ExpectationUpsert,
+} from 'app/inspecto/api';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { columnOptionLoader, datasetOptionLoader, pipelineOrJobOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import {
+    columnOptionLoader,
+    datasetOptionLoader,
+    pipelineOrJobOptionLoader,
+} from 'app/inspecto/components/entity-option-loaders';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { dbColumnType } from 'app/inspecto/query/query-columns';
@@ -46,7 +65,14 @@ export interface ExpectationFormResult {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -72,7 +98,13 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
-            {{ isEdit ? 'Edit expectation "' + data.expectation!.name + '"' : step() === 'save' ? 'Save expectation' : 'New expectation' }}
+            {{
+                isEdit
+                    ? 'Edit expectation "' + data.expectation!.name + '"'
+                    : step() === 'save'
+                      ? 'Save expectation'
+                      : 'New expectation'
+            }}
         </h2>
         <mat-dialog-content>
             @if (writesDisabled()) {
@@ -83,7 +115,12 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
             <!-- Config step content stays mounted (not @if'd) so the schema-form ViewChild survives the
                  step transition — only visually hidden via [hidden], never destroyed. -->
             <div [hidden]="step() === 'save'">
-                <inspecto-schema-form [specs]="attributes" [initial]="initialValue" [optionLoaders]="optionLoaders" (submitted)="save()"></inspecto-schema-form>
+                <inspecto-schema-form
+                    [specs]="attributes"
+                    [initial]="initialValue"
+                    [optionLoaders]="optionLoaders"
+                    (submitted)="save()"
+                ></inspecto-schema-form>
 
                 <!-- AGT-6a A2/A3: profile the chosen target+column and fill the check in from what the data
                      actually shows. The dialog already knows both, so nothing is re-stated. -->
@@ -100,11 +137,20 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
 
                 @if (kind() === 'condition') {
                     <div class="mt-4 font-semibold">Records violate this check when</div>
-                    <inspecto-query-condition-group class="mt-2 block" [group]="when" [columns]="columns()" [root]="true" />
+                    <inspecto-query-condition-group
+                        class="mt-2 block"
+                        [group]="when"
+                        [columns]="columns()"
+                        [root]="true"
+                    />
                     @if (!columns().length) {
-                        <div class="text-secondary mt-1 text-sm">Field choices load from the target's records — set Target above first.</div>
+                        <div class="text-secondary mt-1 text-sm">
+                            Field choices load from the target's records — set Target above first.
+                        </div>
                     } @else if (whenEmpty()) {
-                        <div class="text-secondary mt-1 text-sm">No conditions yet — every record would violate this check.</div>
+                        <div class="text-secondary mt-1 text-sm">
+                            No conditions yet — every record would violate this check.
+                        </div>
                     }
                 }
             </div>
@@ -119,7 +165,10 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                             @if (c.hasError('required')) {
                                 <mat-error>An id is required.</mat-error>
                             } @else if (c.hasError('pattern')) {
-                                <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
+                                <mat-error
+                                    >Start with a letter or digit; then letters, digits,
+                                    <code>. _ -</code> only.</mat-error
+                                >
                             } @else if (c.hasError('duplicate')) {
                                 <mat-error>An expectation with this id already exists.</mat-error>
                             }
@@ -245,7 +294,10 @@ export class ExpectationFormDialog implements AfterViewInit {
 
     ngAfterViewInit(): void {
         if (this.isEdit) {
-            this.saveForm.patchValue({ name: this.data.expectation!.name, description: this.data.expectation!.description ?? '' });
+            this.saveForm.patchValue({
+                name: this.data.expectation!.name,
+                description: this.data.expectation!.description ?? '',
+            });
         }
         const target = this.schemaForm.form.get('target');
         target?.valueChanges
@@ -253,8 +305,9 @@ export class ExpectationFormDialog implements AfterViewInit {
             .subscribe((t) => this.loadColumns(String(t ?? '')));
         this.loadColumns(String(target?.value ?? ''));
 
-        this.schemaForm.form.get('kind')?.valueChanges
-            .pipe(takeUntilDestroyed(this.destroyRef))
+        this.schemaForm.form
+            .get('kind')
+            ?.valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((k) => this.kind.set(k as ExpectationKind));
 
         // AGT-6a A3: mirror target/column into signals so the inline surface's args stay reactive

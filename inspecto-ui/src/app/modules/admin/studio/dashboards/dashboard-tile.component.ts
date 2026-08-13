@@ -15,7 +15,12 @@ import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.componen
     standalone: true,
     imports: [WidgetHostComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
-    template: `<app-widget-host [widget]="widget()" [dataset]="dataset()" [filter]="filter()" (drill)="drill.emit($event)" />`,
+    template: `<app-widget-host
+        [widget]="widget()"
+        [dataset]="dataset()"
+        [filter]="filter()"
+        (drill)="drill.emit($event)"
+    />`,
 })
 export class DashboardTileComponent {
     readonly widget = input.required<Widget>();

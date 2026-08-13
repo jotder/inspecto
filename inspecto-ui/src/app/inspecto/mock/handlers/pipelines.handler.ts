@@ -43,36 +43,215 @@ import { PIPELINE_CONFIGS_COLL, type StoredPipelineConfig } from './onboarding.h
  * file/database/stream split — **which connector a source uses is carried by its Connection profile
  * (`collector.connection`), not by the node type** — and `alert` is CONTROL, not a transform.
  */
-export const NODE_TYPES: PipelineNodeType[] = ([
-    // entry / acquisition (the collector role)
-    { type: 'acquisition', category: 'SOURCE', label: 'Collect', description: 'Collects files (poll/listing); the pipeline entry.', accepts: [], emits: ['data', 'gap', 'failure'], emitsNamedRoutes: false },
-    { type: 'adapter', category: 'SOURCE', label: 'Adapter', description: 'Windows a stream/push source into intermediate files (by time/count/size), then lands them.', accepts: [], emits: ['data'], emitsNamedRoutes: false },
-    // parse — one type; the frontend (delimited / ASN.1 / JSON / …) is CONFIG, not a separate type
-    { type: 'parser', category: 'PARSE', label: 'Parser', description: 'Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.', accepts: ['data'], emits: ['data', 'unmatched'], emitsNamedRoutes: true },
-    // transform family
-    { type: 'transform.map', category: 'TRANSFORM', label: 'Map', description: 'Maps raw fields onto the canonical schema.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: 'Keeps/drops rows by predicate; index-anchored CSV row-filter.', accepts: ['data'], emits: ['data', 'dropped'], emitsNamedRoutes: false },
-    { type: 'transform.select', category: 'TRANSFORM', label: 'Select', description: 'Projects a subset / reorder of columns.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'transform.derive', category: 'TRANSFORM', label: 'Derive', description: 'Adds computed columns (SQL-expression registry).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'transform.validate', category: 'TRANSFORM', label: 'Validate', description: 'Splits rows into valid / invalid by rule.', accepts: ['data'], emits: ['data', 'invalid'], emitsNamedRoutes: false },
-    // marker vs fingerprint are DIFFERENT subsystems — never flatten them into one "dedup"
-    { type: 'transform.dedup.marker', category: 'TRANSFORM', label: 'Dedup (marker)', description: 'File-level dedup via marker files.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
-    { type: 'transform.dedup', category: 'TRANSFORM', label: 'Dedup (record)', description: 'Record-grain dedup by business key (QUALIFY); duplicates are a counted reject stream.', accepts: ['data'], emits: ['data', 'duplicate'], emitsNamedRoutes: false },
-    { type: 'transform.route', category: 'TRANSFORM', label: 'Route', description: 'Content-based routing into operator-defined branches (case / clone).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: true },
-    { type: 'transform.join', category: 'TRANSFORM', label: 'Join', description: 'Joins against a Reference Dataset by key.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'transform.summarize', category: 'TRANSFORM', label: 'Summarize', description: 'Group-by rollup with algebraically-composable measures.', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'transform.split', category: 'TRANSFORM', label: 'Split', description: 'Explodes one row into many (UNNEST).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'transform.merge', category: 'TRANSFORM', label: 'Merge', description: 'Joins / unions multiple inbound data edges (fan-in).', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false },
-    { type: 'enrichment', category: 'TRANSFORM', label: 'Enrichment', description: 'Joins against reference data (post-commit stage-2 join).', accepts: ['data', 'on_commit'], emits: ['data', 'on_commit'], emitsNamedRoutes: false },
-    // sink family — one family, three materialisation behaviours
-    { type: 'sink.persistent', category: 'SINK', label: 'Sink (persistent)', description: 'Writes the batch to a resting store — a Parquet file / DuckDB table.', accepts: ['data'], emits: ['success', 'failure', 'on_commit'], emitsNamedRoutes: false },
-    { type: 'sink.materialized', category: 'SINK', label: 'Sink (materialized)', description: 'Maintains a managed/temp table, upserted per batch — an incremental rollup / summary.', accepts: ['data'], emits: ['success', 'failure', 'on_commit'], emitsNamedRoutes: false },
-    { type: 'sink.view', category: 'SINK', label: 'Sink (view)', description: 'A non-persistent logical store; jobs / KPI / report / alert APIs bind to it by store name.', accepts: ['data'], emits: ['on_commit'], emitsNamedRoutes: false },
-    // reporting / notification — CONTROL: side-tasks with no downstream data edge
-    { type: 'alert', category: 'CONTROL', label: 'Alert', description: 'Raises an alert from rule / gap / failure outcomes.', accepts: ['data', 'gap', 'failure'], emits: [], emitsNamedRoutes: false },
-    { type: 'gap', category: 'CONTROL', label: 'Gap detection', description: 'Reports sequence gaps as SEQUENCE_GAP events.', accepts: ['gap'], emits: [], emitsNamedRoutes: false },
-    { type: 'event', category: 'CONTROL', label: 'Event', description: 'Emits a notification / event.', accepts: ['data', 'success', 'failure', 'gap'], emits: [], emitsNamedRoutes: false },
-] as Omit<PipelineNodeType, 'lowerable'>[]).map((t) => ({
+export const NODE_TYPES: PipelineNodeType[] = (
+    [
+        // entry / acquisition (the collector role)
+        {
+            type: 'acquisition',
+            category: 'SOURCE',
+            label: 'Collect',
+            description: 'Collects files (poll/listing); the pipeline entry.',
+            accepts: [],
+            emits: ['data', 'gap', 'failure'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'adapter',
+            category: 'SOURCE',
+            label: 'Adapter',
+            description: 'Windows a stream/push source into intermediate files (by time/count/size), then lands them.',
+            accepts: [],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        // parse — one type; the frontend (delimited / ASN.1 / JSON / …) is CONFIG, not a separate type
+        {
+            type: 'parser',
+            category: 'PARSE',
+            label: 'Parser',
+            description:
+                'Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
+        // transform family
+        {
+            type: 'transform.map',
+            category: 'TRANSFORM',
+            label: 'Map',
+            description: 'Maps raw fields onto the canonical schema.',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.filter',
+            category: 'TRANSFORM',
+            label: 'Filter',
+            description: 'Keeps/drops rows by predicate; index-anchored CSV row-filter.',
+            accepts: ['data'],
+            emits: ['data', 'dropped'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.select',
+            category: 'TRANSFORM',
+            label: 'Select',
+            description: 'Projects a subset / reorder of columns.',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.derive',
+            category: 'TRANSFORM',
+            label: 'Derive',
+            description: 'Adds computed columns (SQL-expression registry).',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.validate',
+            category: 'TRANSFORM',
+            label: 'Validate',
+            description: 'Splits rows into valid / invalid by rule.',
+            accepts: ['data'],
+            emits: ['data', 'invalid'],
+            emitsNamedRoutes: false,
+        },
+        // marker vs fingerprint are DIFFERENT subsystems — never flatten them into one "dedup"
+        {
+            type: 'transform.dedup.marker',
+            category: 'TRANSFORM',
+            label: 'Dedup (marker)',
+            description: 'File-level dedup via marker files.',
+            accepts: ['data'],
+            emits: ['data', 'duplicate'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.dedup',
+            category: 'TRANSFORM',
+            label: 'Dedup (record)',
+            description: 'Record-grain dedup by business key (QUALIFY); duplicates are a counted reject stream.',
+            accepts: ['data'],
+            emits: ['data', 'duplicate'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.route',
+            category: 'TRANSFORM',
+            label: 'Route',
+            description: 'Content-based routing into operator-defined branches (case / clone).',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: true,
+        },
+        {
+            type: 'transform.join',
+            category: 'TRANSFORM',
+            label: 'Join',
+            description: 'Joins against a Reference Dataset by key.',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.summarize',
+            category: 'TRANSFORM',
+            label: 'Summarize',
+            description: 'Group-by rollup with algebraically-composable measures.',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.split',
+            category: 'TRANSFORM',
+            label: 'Split',
+            description: 'Explodes one row into many (UNNEST).',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'transform.merge',
+            category: 'TRANSFORM',
+            label: 'Merge',
+            description: 'Joins / unions multiple inbound data edges (fan-in).',
+            accepts: ['data'],
+            emits: ['data'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'enrichment',
+            category: 'TRANSFORM',
+            label: 'Enrichment',
+            description: 'Joins against reference data (post-commit stage-2 join).',
+            accepts: ['data', 'on_commit'],
+            emits: ['data', 'on_commit'],
+            emitsNamedRoutes: false,
+        },
+        // sink family — one family, three materialisation behaviours
+        {
+            type: 'sink.persistent',
+            category: 'SINK',
+            label: 'Sink (persistent)',
+            description: 'Writes the batch to a resting store — a Parquet file / DuckDB table.',
+            accepts: ['data'],
+            emits: ['success', 'failure', 'on_commit'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'sink.materialized',
+            category: 'SINK',
+            label: 'Sink (materialized)',
+            description: 'Maintains a managed/temp table, upserted per batch — an incremental rollup / summary.',
+            accepts: ['data'],
+            emits: ['success', 'failure', 'on_commit'],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'sink.view',
+            category: 'SINK',
+            label: 'Sink (view)',
+            description: 'A non-persistent logical store; jobs / KPI / report / alert APIs bind to it by store name.',
+            accepts: ['data'],
+            emits: ['on_commit'],
+            emitsNamedRoutes: false,
+        },
+        // reporting / notification — CONTROL: side-tasks with no downstream data edge
+        {
+            type: 'alert',
+            category: 'CONTROL',
+            label: 'Alert',
+            description: 'Raises an alert from rule / gap / failure outcomes.',
+            accepts: ['data', 'gap', 'failure'],
+            emits: [],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'gap',
+            category: 'CONTROL',
+            label: 'Gap detection',
+            description: 'Reports sequence gaps as SEQUENCE_GAP events.',
+            accepts: ['gap'],
+            emits: [],
+            emitsNamedRoutes: false,
+        },
+        {
+            type: 'event',
+            category: 'CONTROL',
+            label: 'Event',
+            description: 'Emits a notification / event.',
+            accepts: ['data', 'success', 'failure', 'gap'],
+            emits: [],
+            emitsNamedRoutes: false,
+        },
+    ] as Omit<PipelineNodeType, 'lowerable'>[]
+).map((t) => ({
     ...t,
     lowerable: LOWERABLE.has(t.type),
     // §3.1: the mock must publish the SAME attribute vocabulary the server does, straight from the
@@ -141,9 +320,7 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
             // A candidate body previews that DRAFT graph and never consults the stored one — including
             // for an id with no stored pipeline at all (the server skips the lookup entirely, so no 404).
             // W5: otherwise the editor dry-runs registered pipelines — fall back to the lifted config.
-            const f = body.pipeline
-                ?? store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1])
-                ?? graphOfName(m[1]);
+            const f = body.pipeline ?? store.get<AuthoredPipeline>(space, PIPELINES_COLL, m[1]) ?? graphOfName(m[1]);
             return json(dryRun(f, body.sampleRows));
         }
         if (method === 'POST' && (m = match(url, RUN_TO))) {
@@ -171,8 +348,10 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
             return json(graphOf(graphOfName(m[1])));
         }
         // POST/PUT /pipelines/authored* retired with W5 — 405 where the path still serves reads.
-        if (method === 'POST' && AUTHORED.test(url)) return error(405, 'authored-flow writes retired (W5) — edit the pipeline graph');
-        if (method === 'PUT' && match(url, AUTHORED_ID)) return error(405, 'authored-flow writes retired (W5) — PUT /pipelines/{name}/graph');
+        if (method === 'POST' && AUTHORED.test(url))
+            return error(405, 'authored-flow writes retired (W5) — edit the pipeline graph');
+        if (method === 'PUT' && match(url, AUTHORED_ID))
+            return error(405, 'authored-flow writes retired (W5) — PUT /pipelines/{name}/graph');
         if (method === 'DELETE' && (m = match(url, AUTHORED_ID))) {
             // Referential integrity (R2) — e.g. a job triggering on this pipeline blocks the delete.
             const refs = store.referencesTo(space, PIPELINES_COLL, m[1]);
@@ -193,10 +372,18 @@ export function pipelinesHandler(flags: MockFlags): MockHandler {
 
         if (method === 'GET' && (PROV_BATCHES.test(url) || PROV.test(url))) return json([]);
 
-        if (method === 'GET' && VIEWS.test(url)) return json(all().flatMap((f) => viewsOf(f)).map(viewSummaryOf));
-        if (method === 'GET' && (m = match(url, VIEW_DATA))) return viewData(all(), m[1], Number(req.params['limit']) || 1000);
+        if (method === 'GET' && VIEWS.test(url))
+            return json(
+                all()
+                    .flatMap((f) => viewsOf(f))
+                    .map(viewSummaryOf),
+            );
+        if (method === 'GET' && (m = match(url, VIEW_DATA)))
+            return viewData(all(), m[1], Number(req.params['limit']) || 1000);
         if (method === 'GET' && (m = match(url, VIEW_NAME))) {
-            const view = all().flatMap((f) => viewsOf(f)).find((v) => v.node.name === m![1]);
+            const view = all()
+                .flatMap((f) => viewsOf(f))
+                .find((v) => v.node.name === m![1]);
             return view ? json(viewSummaryOf(view)) : error(404, `no view '${m[1]}'`);
         }
 
@@ -216,11 +403,17 @@ function saveGraph(store: MockStore, space: string, name: string, body: Authored
     const strict = g.active || !existing;
     const result = lowerGraph(g, existing?.config ?? {}, strict);
     if ('refusals' in result) {
-        return error(422, `graph cannot be lowered: ${result.refusals[0].code}`, { written: false, refusals: result.refusals });
+        return error(422, `graph cannot be lowered: ${result.refusals[0].code}`, {
+            written: false,
+            refusals: result.refusals,
+        });
     }
     const path = name.endsWith('_pipeline') ? `${name}.toon` : `${name}_pipeline.toon`;
     store.put(space, PIPELINE_CONFIGS_COLL, name, {
-        id: name, path, config: result.config, registered: existing?.registered ?? true,
+        id: name,
+        path,
+        config: result.config,
+        registered: existing?.registered ?? true,
     } satisfies StoredPipelineConfig);
     return json({ written: true, path, name, findings: [] });
 }
@@ -453,7 +646,11 @@ const DRY_RUN_SAMPLE: Record<string, unknown>[] = [
  * One mapping rule as the map node carries it — inline `rules`, or a lifted config's legacy
  * `schema.mapping.rules`. Both shapes reach the server ({@code RowShaper.mappingSchemaOf}).
  */
-interface MapRule { targetColumn?: string; sourceExpression?: string; transformType?: string }
+interface MapRule {
+    targetColumn?: string;
+    sourceExpression?: string;
+    transformType?: string;
+}
 
 function mapRulesOf(node: AuthoredNode): MapRule[] {
     const cfg = node.config ?? {};
@@ -478,12 +675,16 @@ function projectThrough(node: AuthoredNode, rows: Record<string, unknown>[]): Re
     if (node.type !== 'transform.map') return rows;
     const rules = mapRulesOf(node).filter((r) => (r.targetColumn ?? '').trim().length);
     if (!rules.length) return rows;
-    return rows.map((row) => Object.fromEntries(rules.map((rule) => [
-        rule.targetColumn as string,
-        (rule.transformType ?? '').trim().toUpperCase() === 'EXPR'
-            ? null
-            : row[(rule.sourceExpression ?? '').trim()] ?? null,
-    ])));
+    return rows.map((row) =>
+        Object.fromEntries(
+            rules.map((rule) => [
+                rule.targetColumn as string,
+                (rule.transformType ?? '').trim().toUpperCase() === 'EXPR'
+                    ? null
+                    : (row[(rule.sourceExpression ?? '').trim()] ?? null),
+            ]),
+        ),
+    );
 }
 
 /**
@@ -491,10 +692,7 @@ function projectThrough(node: AuthoredNode, rows: Record<string, unknown>[]): Re
  * each sink's input. `rel` is **`data`**, matching the server's `PipelineRel.DATA` — this said `success`
  * until 2026-08-06, a name no dry-run response has ever carried.
  */
-function dryRun(
-    f: AuthoredPipeline | undefined,
-    sampleRows?: Record<string, unknown>[],
-): PipelineDryRunResult {
+function dryRun(f: AuthoredPipeline | undefined, sampleRows?: Record<string, unknown>[]): PipelineDryRunResult {
     const seed = sampleRows?.length ? sampleRows : DRY_RUN_SAMPLE;
     const seedNode = f?.nodes.find((n) => n.type.startsWith('collector'))?.id ?? f?.nodes[0]?.id ?? '';
     const nodes: PipelineDryRunResult['nodes'] = [];
@@ -547,11 +745,19 @@ function runToNode(name: string, f: AuthoredPipeline | undefined, toNode: string
     for (const n of path) {
         const cat = CATEGORY_OF.get(n.type);
         if (cat === 'SOURCE') {
-            const rows = (files.length ? files : ['(built-in sample)']).map((p, i) => ({ file: p, bytes: 10240 + i * 512 }));
+            const rows = (files.length ? files : ['(built-in sample)']).map((p, i) => ({
+                file: p,
+                bytes: 10240 + i * 512,
+            }));
             relations.push({ node: n.id, rel: 'success', rowCount: rows.length, rows });
         } else if (cat === 'PARSE') {
             relations.push({ node: n.id, rel: 'success', rowCount: matched.length, rows: matched });
-            relations.push({ node: n.id, rel: 'unmatched', rowCount: 1, rows: [{ line: 7, raw: '##trailer,checksum,0xdeadbeef' }] });
+            relations.push({
+                node: n.id,
+                rel: 'unmatched',
+                rowCount: 1,
+                rows: [{ line: 7, raw: '##trailer,checksum,0xdeadbeef' }],
+            });
         } else if (cat === 'TRANSFORM') {
             relations.push({ node: n.id, rel: 'kept', rowCount: 2, rows: matched.slice(0, 2) });
             relations.push({ node: n.id, rel: 'dropped', rowCount: 1, rows: matched.slice(2) });

@@ -105,9 +105,7 @@ export class AuditLogsComponent implements OnInit {
                 this.deniedCount = denied.length;
                 this.hasMore.set(audit.length >= lim || denied.length >= lim);
                 this.rows.set(
-                    [...audit, ...denied]
-                        .sort((a, b) => b.ts - a.ts)
-                        .map((e) => AuditLogsComponent.toRow(e)),
+                    [...audit, ...denied].sort((a, b) => b.ts - a.ts).map((e) => AuditLogsComponent.toRow(e)),
                 );
                 this.loading.set(false);
             },
@@ -131,9 +129,7 @@ export class AuditLogsComponent implements OnInit {
                 this.auditCount += audit.length;
                 this.deniedCount += denied.length;
                 this.hasMore.set(audit.length >= lim || denied.length >= lim);
-                const page = [...audit, ...denied]
-                    .sort((a, b) => b.ts - a.ts)
-                    .map((e) => AuditLogsComponent.toRow(e));
+                const page = [...audit, ...denied].sort((a, b) => b.ts - a.ts).map((e) => AuditLogsComponent.toRow(e));
                 this.rows.update((r) => [...r, ...page]);
                 this.loading.set(false);
             },

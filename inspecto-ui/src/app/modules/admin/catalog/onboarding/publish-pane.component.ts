@@ -150,10 +150,13 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
                         next: () =>
                             this.toastr.success(`Dataset "${store}" registered — queryable under Catalog ▸ Datasets`),
                         error: () =>
-                            this.toastr.warning(`The stream is live, but its Dataset could not be registered — ${manualHint}`),
+                            this.toastr.warning(
+                                `The stream is live, but its Dataset could not be registered — ${manualHint}`,
+                            ),
                     });
             },
-            error: () => this.toastr.warning(`The stream is live, but the Dataset registry could not be read — ${manualHint}`),
+            error: () =>
+                this.toastr.warning(`The stream is live, but the Dataset registry could not be read — ${manualHint}`),
         });
     }
 

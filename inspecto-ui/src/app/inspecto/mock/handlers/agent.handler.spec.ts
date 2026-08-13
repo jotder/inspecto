@@ -62,11 +62,17 @@ describe('agentHandler · pipeline_author', () => {
 
     it('derives a topology from a sentence and reports the turn count', () => {
         const res = handler(
-            req('/api/agent/tools/pipeline_author/derive',
-                { prompt: 'collect orders, drop rows under 100 and write them to the store', args: {} }),
+            req('/api/agent/tools/pipeline_author/derive', {
+                prompt: 'collect orders, drop rows under 100 and write them to the store',
+                args: {},
+            }),
             store,
         );
-        const body = res?.body as { value: Record<string, unknown>; derivedArgs: Record<string, unknown>; turns: number };
+        const body = res?.body as {
+            value: Record<string, unknown>;
+            derivedArgs: Record<string, unknown>;
+            turns: number;
+        };
 
         expect(res?.status ?? 200).toBe(200);
         expect(body.turns).toBe(1);
@@ -169,8 +175,7 @@ describe('agentHandler · component_draft', () => {
     const handler = agentHandler({ mockOps: true });
     const store = new MockStore();
 
-    const call = (args: Record<string, unknown>) =>
-        handler(req('/api/agent/tools/component_draft', { args }), store);
+    const call = (args: Record<string, unknown>) => handler(req('/api/agent/tools/component_draft', { args }), store);
 
     it('refuses a kind with no structural spec instead of echoing it back as clean', () => {
         const res = call({ kind: 'grammar', config: { delimiter: ',' } });
@@ -194,8 +199,10 @@ describe('agentHandler · component_draft', () => {
     });
 
     it('resolves dotted paths through nested maps, so a satisfied nested field is not re-reported', () => {
-        expect((call({ kind: 'job', config: { job: { name: 'nightly', type: 'sql' } } })?.body as { clean: boolean }).clean)
-            .toBe(true);
+        expect(
+            (call({ kind: 'job', config: { job: { name: 'nightly', type: 'sql' } } })?.body as { clean: boolean })
+                .clean,
+        ).toBe(true);
         const partial = call({ kind: 'job', config: { job: { name: 'nightly' } } })?.body as {
             findings: { fieldPath: string }[];
         };
@@ -208,13 +215,16 @@ describe('agentHandler · component_draft', () => {
         // word has one meaning again and this mock must mirror `ConfigSpecs.forType('schema')`. A bare
         // `fields` list was the component's shape and must NOT validate clean any more.
         const ok = call({ kind: 'schema', config: { raw: { name: 'events' } } })?.body as {
-            clean: boolean; findings: { fieldPath: string }[];
+            clean: boolean;
+            findings: { fieldPath: string }[];
         };
         expect(ok.clean).toBe(true);
         expect(ok.findings).toEqual([]);
 
-        const componentShape = call({ kind: 'schema', config: { fields: [{ name: 'id', type: 'integer' }] } })?.body as {
-            clean: boolean; findings: { fieldPath: string }[];
+        const componentShape = call({ kind: 'schema', config: { fields: [{ name: 'id', type: 'integer' }] } })
+            ?.body as {
+            clean: boolean;
+            findings: { fieldPath: string }[];
         };
         expect(componentShape.clean).toBe(false);
         expect(componentShape.findings.map((f) => f.fieldPath)).toEqual(['raw.name']);

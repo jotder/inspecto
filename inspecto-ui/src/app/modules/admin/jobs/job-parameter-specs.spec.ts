@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { JobExpressionDecl, JobParameterDecl } from 'app/inspecto/api';
-import { paramDeclToSpec, paramDeclsToSpecs, paramTokens, paramValueToApi, paramValueToForm, tokensForParam } from './job-parameter-specs';
+import {
+    paramDeclToSpec,
+    paramDeclsToSpecs,
+    paramTokens,
+    paramValueToApi,
+    paramValueToForm,
+    tokensForParam,
+} from './job-parameter-specs';
 
 /**
  * The decl → widget generation contract (job-parameter-contract §7.4). One case per row of that table:
@@ -15,12 +22,22 @@ function decl(p: Partial<JobParameterDecl> & { name: string; type: string }): Jo
 
 describe('paramDeclToSpec', () => {
     it('maps a required STRING param to a required-tier string field with a humanised label', () => {
-        const s = paramDeclToSpec(decl({ name: 'sink_dataset', type: 'STRING', required: true, description: 'Output' }));
-        expect(s).toMatchObject({ key: 'sink_dataset', label: 'Sink dataset', type: 'string', tier: 'required', required: true });
+        const s = paramDeclToSpec(
+            decl({ name: 'sink_dataset', type: 'STRING', required: true, description: 'Output' }),
+        );
+        expect(s).toMatchObject({
+            key: 'sink_dataset',
+            label: 'Sink dataset',
+            type: 'string',
+            tier: 'required',
+            required: true,
+        });
     });
 
     it('prefers the declared label over the humanised name', () => {
-        expect(paramDeclToSpec(decl({ name: 'out_dir', type: 'STRING', label: 'Delivery folder' })).label).toBe('Delivery folder');
+        expect(paramDeclToSpec(decl({ name: 'out_dir', type: 'STRING', label: 'Delivery folder' })).label).toBe(
+            'Delivery folder',
+        );
     });
 
     describe('the §7.4 type → widget rows', () => {
@@ -85,16 +102,24 @@ describe('paramDeclToSpec', () => {
 
     describe('placeholder precedence', () => {
         it('prefers an explicit placeholder, then the format example, then the deduce', () => {
-            expect(paramDeclToSpec(decl({ name: 'd', type: 'DATE', placeholder: 'pick a day', deduce: '$day(-1)' })).placeholder)
-                .toBe('pick a day');
+            expect(
+                paramDeclToSpec(decl({ name: 'd', type: 'DATE', placeholder: 'pick a day', deduce: '$day(-1)' }))
+                    .placeholder,
+            ).toBe('pick a day');
             // The format example beats the deduce: `help` already states the deduce in words, and
             // spending the one hint slot on a repeat would cost the author the format.
-            expect(paramDeclToSpec(decl({ name: 'd', type: 'DATE', deduce: '$day(-1)' })).placeholder).toBe('2026-08-06');
-            expect(paramDeclToSpec(decl({ name: 's', type: 'STRING', deduce: '$day(-1)' })).placeholder).toBe('$day(-1)');
+            expect(paramDeclToSpec(decl({ name: 'd', type: 'DATE', deduce: '$day(-1)' })).placeholder).toBe(
+                '2026-08-06',
+            );
+            expect(paramDeclToSpec(decl({ name: 's', type: 'STRING', deduce: '$day(-1)' })).placeholder).toBe(
+                '$day(-1)',
+            );
         });
 
         it('still surfaces the deduce in the help text alongside the description', () => {
-            const s = paramDeclToSpec(decl({ name: 'event_date', type: 'DATE', deduce: '$day(-1)', description: 'Business date' }));
+            const s = paramDeclToSpec(
+                decl({ name: 'event_date', type: 'DATE', deduce: '$day(-1)', description: 'Business date' }),
+            );
             expect(s.help).toContain('$day(-1)');
             expect(s.help).toContain('Business date');
         });
@@ -154,8 +179,9 @@ describe('paramDeclToSpec', () => {
         it("splits a multi param's CSV default into chips", () => {
             // The resolver reads a list-valued param as CSV (§7.5); bound verbatim it would render as
             // ONE chip containing a comma.
-            expect(paramDeclToSpec(decl({ name: 'to', type: 'EMAIL', multi: true, default: 'a@x.io, b@x.io' })).default)
-                .toEqual(['a@x.io', 'b@x.io']);
+            expect(
+                paramDeclToSpec(decl({ name: 'to', type: 'EMAIL', multi: true, default: 'a@x.io, b@x.io' })).default,
+            ).toEqual(['a@x.io', 'b@x.io']);
         });
     });
 
@@ -203,19 +229,47 @@ describe('tokensForParam', () => {
     /** A catalog entry with the wire defaults `ExpressionDecl.toMap()` sends, overridden per case. */
     function ex(p: Partial<JobExpressionDecl> & { token: string; yields: string }): JobExpressionDecl {
         return {
-            form: 'LITERAL', description: '', example: '', contextFree: true, preview: '',
+            form: 'LITERAL',
+            description: '',
+            example: '',
+            contextFree: true,
+            preview: '',
             availableIn: ['cron', 'manual', 'on_pipeline', 'on_signal'],
             ...p,
         };
     }
 
-    const today = ex({ token: '$today', yields: 'DATE', description: 'The fire date', example: '2026-08-07', preview: '2026-08-10' });
-    const now = ex({ token: '$now', yields: 'INSTANT', example: '2026-08-07T06:00:00Z', preview: '2026-08-10T13:00:00Z' });
-    const signal = ex({
-        token: '$signal.', form: 'PREFIX', yields: 'STRING', availableIn: ['on_signal'], contextFree: false,
-        description: "A field of the firing Signal's payload", example: '$signal.dataset', preview: '$signal.dataset',
+    const today = ex({
+        token: '$today',
+        yields: 'DATE',
+        description: 'The fire date',
+        example: '2026-08-07',
+        preview: '2026-08-10',
     });
-    const day = ex({ token: '$day(n)', form: 'FUNCTION', yields: 'DATE', description: 'Shifted by n days', example: '$day(-1)', preview: '2026-08-09' });
+    const now = ex({
+        token: '$now',
+        yields: 'INSTANT',
+        example: '2026-08-07T06:00:00Z',
+        preview: '2026-08-10T13:00:00Z',
+    });
+    const signal = ex({
+        token: '$signal.',
+        form: 'PREFIX',
+        yields: 'STRING',
+        availableIn: ['on_signal'],
+        contextFree: false,
+        description: "A field of the firing Signal's payload",
+        example: '$signal.dataset',
+        preview: '$signal.dataset',
+    });
+    const day = ex({
+        token: '$day(n)',
+        form: 'FUNCTION',
+        yields: 'DATE',
+        description: 'Shifted by n days',
+        example: '$day(-1)',
+        preview: '2026-08-09',
+    });
     const catalog = [today, now, signal, day];
 
     const param = (p: Partial<JobParameterDecl> & { name: string; type: string }) => decl(p);
@@ -245,28 +299,36 @@ describe('tokensForParam', () => {
 
     it('offers every token on a STRING or TEXT field, because everything resolves to text', () => {
         for (const type of ['STRING', 'TEXT']) {
-            expect(tokensForParam(param({ name: 'x', type }), catalog, 'cron').map((t) => t.token))
-                .toEqual(['$today', '$now', '$day(-1)']);
+            expect(tokensForParam(param({ name: 'x', type }), catalog, 'cron').map((t) => t.token)).toEqual([
+                '$today',
+                '$now',
+                '$day(-1)',
+            ]);
         }
     });
 
     it('offers a STRING-yielding token on a typed field, as the engine cannot pre-judge one either', () => {
         // $signal.<field> legitimately carries an address; only the resolved value can be judged, and
         // ParameterResolver re-validates it after resolution.
-        expect(tokensForParam(param({ name: 'to', type: 'EMAIL' }), catalog, 'on_signal').map((t) => t.token))
-            .toEqual(['$signal.dataset']);
+        expect(tokensForParam(param({ name: 'to', type: 'EMAIL' }), catalog, 'on_signal').map((t) => t.token)).toEqual([
+            '$signal.dataset',
+        ]);
     });
 
     it('offers the TYPEABLE form of a shaped token, never the shape itself', () => {
         // `$day(n)` is a shape the registry cannot evaluate — inserting it authors an unknown expression.
-        const t = tokensForParam(param({ name: 'd', type: 'DATE' }), catalog, 'cron').find((x) => x.token.startsWith('$day'));
+        const t = tokensForParam(param({ name: 'd', type: 'DATE' }), catalog, 'cron').find((x) =>
+            x.token.startsWith('$day'),
+        );
         expect(t!.token).toBe('$day(-1)');
         expect(t!.description).toContain('shape: $day(n)');
     });
 
     it('drops the preview line when it would only repeat the token being offered', () => {
         // A context-bound token previews AS its sample: "$signal.dataset → $signal.dataset" is noise.
-        const [t] = tokensForParam(param({ name: 'x', type: 'STRING' }), catalog, 'on_signal').filter((x) => x.token === '$signal.dataset');
+        const [t] = tokensForParam(param({ name: 'x', type: 'STRING' }), catalog, 'on_signal').filter(
+            (x) => x.token === '$signal.dataset',
+        );
         expect(t.preview).toBeUndefined();
         const [d] = tokensForParam(param({ name: 'x', type: 'DATE' }), catalog, 'cron');
         expect(d.preview).toBe('2026-08-10');
@@ -274,10 +336,18 @@ describe('tokensForParam', () => {
 });
 
 describe('paramTokens', () => {
-    const catalog: JobExpressionDecl[] = [{
-        token: '$today', form: 'LITERAL', yields: 'DATE', description: 'The fire date', example: '2026-08-07',
-        availableIn: ['cron', 'manual', 'on_pipeline', 'on_signal'], contextFree: true, preview: '2026-08-10',
-    }];
+    const catalog: JobExpressionDecl[] = [
+        {
+            token: '$today',
+            form: 'LITERAL',
+            yields: 'DATE',
+            description: 'The fire date',
+            example: '2026-08-07',
+            availableIn: ['cron', 'manual', 'on_pipeline', 'on_signal'],
+            contextFree: true,
+            preview: '2026-08-10',
+        },
+    ];
 
     it('omits a parameter with nothing to offer, so the renderer draws no picker there', () => {
         const map = paramTokens(

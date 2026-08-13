@@ -11,8 +11,14 @@ import { Reconciliation, ReconciliationsService } from 'app/inspecto/reconciliat
 import { ReconciliationsComponent } from './reconciliations.component';
 
 const RECON: Reconciliation = {
-    id: 'switch_vs_billing', name: 'switch vs billing', leftDataset: 'switch_cdr', rightDataset: 'billing_cdr',
-    keyColumns: ['id'], compareColumns: [], breaks: [], lastRunAt: null,
+    id: 'switch_vs_billing',
+    name: 'switch vs billing',
+    leftDataset: 'switch_cdr',
+    rightDataset: 'billing_cdr',
+    keyColumns: ['id'],
+    compareColumns: [],
+    breaks: [],
+    lastRunAt: null,
 };
 
 function create(list: Reconciliation[] = [RECON], dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }))) {

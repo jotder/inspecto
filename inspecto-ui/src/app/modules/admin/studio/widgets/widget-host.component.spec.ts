@@ -32,7 +32,11 @@ const WIDGET: Widget = {
 function create(providers: unknown[] = []) {
     TestBed.configureTestingModule({
         imports: [WidgetHostComponent],
-        providers: [provideNoopAnimations(), { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }, ...providers],
+        providers: [
+            provideNoopAnimations(),
+            { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+            ...providers,
+        ],
     });
     return TestBed.createComponent(WidgetHostComponent);
 }
@@ -43,7 +47,10 @@ describe('WidgetHostComponent', () => {
     beforeEach(() => registerBuiltinViz());
 
     it('pre-loaded mode: resolves the plugin from an already-supplied widget/dataset, no fetch', () => {
-        const fixture = create([{ provide: WidgetsService, useValue: {} }, { provide: DatasetsService, useValue: {} }]);
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+        ]);
         fixture.componentRef.setInput('widget', WIDGET);
         fixture.componentRef.setInput('dataset', DS);
         fixture.detectChanges();
@@ -63,13 +70,19 @@ describe('WidgetHostComponent', () => {
     });
 
     it('renders the empty (loading) state with no a11y violations', async () => {
-        const fixture = create([{ provide: WidgetsService, useValue: {} }, { provide: DatasetsService, useValue: {} }]);
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+        ]);
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('canExport is true for a chartjs-rendered widget, false for KPI (its component escape hatch)', () => {
-        const fixture = create([{ provide: WidgetsService, useValue: {} }, { provide: DatasetsService, useValue: {} }]);
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+        ]);
         fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar' });
         fixture.componentRef.setInput('dataset', DS);
         expect(fixture.componentInstance.canExport()).toBe(true);
@@ -78,7 +91,14 @@ describe('WidgetHostComponent', () => {
     });
 
     it('view-bound widget: no dataset fetch, no query — renders the saved-view arm', () => {
-        const viewWidget: Widget = { id: 'w', name: 'Dhaka map', datasetId: '', vizType: 'geo-map', controls: {}, viewId: 'dhaka-network' };
+        const viewWidget: Widget = {
+            id: 'w',
+            name: 'Dhaka map',
+            datasetId: '',
+            vizType: 'geo-map',
+            controls: {},
+            viewId: 'dhaka-network',
+        };
         let datasetFetched = false;
         const fixture = create([
             { provide: WidgetsService, useValue: {} },
@@ -131,8 +151,15 @@ describe('WidgetHostComponent', () => {
     });
 
     it('resolves a category click to the widget’s x-channel field and emits a drill event', () => {
-        const barWidget: Widget = { ...WIDGET, vizType: 'bar', controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }] } };
-        const fixture = create([{ provide: WidgetsService, useValue: {} }, { provide: DatasetsService, useValue: {} }]);
+        const barWidget: Widget = {
+            ...WIDGET,
+            vizType: 'bar',
+            controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }] },
+        };
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+        ]);
         fixture.componentRef.setInput('widget', barWidget);
         fixture.componentRef.setInput('dataset', DS);
         let emitted: { field: string; value: string } | undefined;

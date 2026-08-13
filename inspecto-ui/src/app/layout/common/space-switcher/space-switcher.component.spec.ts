@@ -24,11 +24,7 @@ function create(show: boolean) {
     } as unknown as SpacesService;
     TestBed.configureTestingModule({
         imports: [SpaceSwitcherComponent],
-        providers: [
-            provideNoopAnimations(),
-            provideRouter([]),
-            { provide: SpacesService, useValue: stub },
-        ],
+        providers: [provideNoopAnimations(), provideRouter([]), { provide: SpacesService, useValue: stub }],
     });
     const fixture = TestBed.createComponent(SpaceSwitcherComponent);
     fixture.detectChanges();

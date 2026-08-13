@@ -31,7 +31,9 @@ describe('SseFrameParser', () => {
         const parser = new SseFrameParser();
         const artifact = '{"kind":"chart","config":{"type":"bar"}}';
         const complete = '{"kind":"TEXT","text":"done"}';
-        const frames = parser.push(`event: artifact\ndata: ${artifact}\n\nevent: complete\ndata: ${complete}\n\nevent: error\ndata: boom\n\n`);
+        const frames = parser.push(
+            `event: artifact\ndata: ${artifact}\n\nevent: complete\ndata: ${complete}\n\nevent: error\ndata: boom\n\n`,
+        );
         expect(frames).toEqual([
             { event: 'artifact', data: artifact },
             { event: 'complete', data: complete },

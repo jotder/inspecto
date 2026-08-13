@@ -142,8 +142,7 @@ export class OnboardingSegmentsEditorComponent {
         if (new Set(keys).size !== keys.length) return false;
         return this.value().every((s) => {
             const names = s.columns.map((c) => c.name);
-            return names.length > 0 && new Set(names).size === names.length
-                && !names.includes(EVENT_TYPE_COLUMN);   // the ingester derives this one
+            return names.length > 0 && new Set(names).size === names.length && !names.includes(EVENT_TYPE_COLUMN); // the ingester derives this one
         });
     }
 

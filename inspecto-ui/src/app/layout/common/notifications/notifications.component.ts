@@ -80,12 +80,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
             >
                 <div class="flex items-center justify-between border-b px-4 py-3">
                     <h2 class="text-base font-semibold">Notifications</h2>
-                    <button
-                        mat-button
-                        type="button"
-                        (click)="svc.markAllRead()"
-                        [disabled]="svc.unreadCount() === 0"
-                    >
+                    <button mat-button type="button" (click)="svc.markAllRead()" [disabled]="svc.unreadCount() === 0">
                         Mark all read
                     </button>
                 </div>
@@ -131,7 +126,10 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                                                 aria-label="Mark as read"
                                                 (click)="svc.markRead(n.id)"
                                             >
-                                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:check"></mat-icon>
+                                                <mat-icon
+                                                    class="icon-size-4"
+                                                    svgIcon="heroicons_outline:check"
+                                                ></mat-icon>
                                             </button>
                                         }
                                         <button

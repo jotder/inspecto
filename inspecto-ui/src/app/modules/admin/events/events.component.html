@@ -1,18 +1,31 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent">
+    <div
+        class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+    >
         <div>
             <h1 class="text-3xl font-extrabold leading-none tracking-tight">Signal Ledger</h1>
-            <div class="text-secondary mt-1.5">The unified signal stream — every run, job, alert, expectation and operator action, with its emitting source and severity</div>
+            <div class="text-secondary mt-1.5">
+                The unified signal stream — every run, job, alert, expectation and operator action, with its emitting
+                source and severity
+            </div>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
-            <mat-slide-toggle [checked]="live" (change)="toggleLive($event.checked)" [matTooltip]="'Auto-refresh the newest events every ' + liveSeconds + 's'">
+            <mat-slide-toggle
+                [checked]="live"
+                (change)="toggleLive($event.checked)"
+                [matTooltip]="'Auto-refresh the newest events every ' + liveSeconds + 's'"
+            >
                 Live tail
             </mat-slide-toggle>
             @if (live) {
                 <mat-form-field class="gamma-mat-dense w-24" subscriptSizing="dynamic">
                     <mat-label>Every</mat-label>
-                    <mat-select [(ngModel)]="liveSeconds" (ngModelChange)="restartLiveTail()" aria-label="Live-tail refresh cadence">
+                    <mat-select
+                        [(ngModel)]="liveSeconds"
+                        (ngModelChange)="restartLiveTail()"
+                        aria-label="Live-tail refresh cadence"
+                    >
                         @for (s of liveSecondsOptions; track s) {
                             <mat-option [value]="s">{{ s }}s</mat-option>
                         }
@@ -86,7 +99,13 @@
             </button>
 
             @if (fCorrelation) {
-                <inspecto-chip variant="soft" tone="primary" removable removeLabel="Clear correlation filter" (removed)="clearCorrelation()">
+                <inspecto-chip
+                    variant="soft"
+                    tone="primary"
+                    removable
+                    removeLabel="Clear correlation filter"
+                    (removed)="clearCorrelation()"
+                >
                     correlation: <span class="font-mono">{{ fCorrelation }}</span>
                 </inspecto-chip>
             }

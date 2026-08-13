@@ -52,8 +52,14 @@ describe('jobToWire', () => {
 describe('jobFromWire', () => {
     it('maps the flat section back, treating every non-config key as a parameter', () => {
         const d = jobFromWire({
-            name: 'on_dataset_write', type: 'maintenance', on_signal: 'dataset.write',
-            when: "$signal.dataset == 'x'", enabled: true, catch_up: true, task: 'cleanup', retention_days: '30',
+            name: 'on_dataset_write',
+            type: 'maintenance',
+            on_signal: 'dataset.write',
+            when: "$signal.dataset == 'x'",
+            enabled: true,
+            catch_up: true,
+            task: 'cleanup',
+            retention_days: '30',
         });
         expect(d.onSignal).toBe('dataset.write');
         expect(d.when).toBe("$signal.dataset == 'x'");
@@ -63,13 +69,23 @@ describe('jobFromWire', () => {
 
     it('round-trips an upsert through the wire and back', () => {
         const original: JobUpsert = {
-            name: 'j', type: 'maintenance', onSignal: 'dataset.*', when: '$signal.rows > 0',
-            enabled: true, catchUp: true, params: { task: 'cleanup' },
+            name: 'j',
+            type: 'maintenance',
+            onSignal: 'dataset.*',
+            when: '$signal.rows > 0',
+            enabled: true,
+            catchUp: true,
+            params: { task: 'cleanup' },
         };
         const back = jobFromWire(jobToWire(original));
         expect(back).toMatchObject({
-            name: 'j', type: 'maintenance', onSignal: 'dataset.*', when: '$signal.rows > 0',
-            enabled: true, catchUp: true, params: { task: 'cleanup' },
+            name: 'j',
+            type: 'maintenance',
+            onSignal: 'dataset.*',
+            when: '$signal.rows > 0',
+            enabled: true,
+            catchUp: true,
+            params: { task: 'cleanup' },
         });
     });
 
@@ -85,9 +101,16 @@ describe('jobFromWire', () => {
  * Mirrors `ExpressionDecl.sampleExpression()`, the same rule the server previews through.
  */
 describe('typeableForm', () => {
-    const decl = (p: Partial<JobExpressionDecl> & { token: string; form: string }): JobExpressionDecl => ({
-        yields: 'STRING', description: '', example: '', availableIn: [], contextFree: true, preview: '', ...p,
-    } as JobExpressionDecl);
+    const decl = (p: Partial<JobExpressionDecl> & { token: string; form: string }): JobExpressionDecl =>
+        ({
+            yields: 'STRING',
+            description: '',
+            example: '',
+            availableIn: [],
+            contextFree: true,
+            preview: '',
+            ...p,
+        }) as JobExpressionDecl;
 
     it('is a literal token itself', () => {
         expect(typeableForm(decl({ token: '$today', form: 'LITERAL', example: '2026-08-07' }))).toBe('$today');
@@ -95,6 +118,8 @@ describe('typeableForm', () => {
 
     it('is the worked example for a shaped token, never the shape', () => {
         expect(typeableForm(decl({ token: '$day(n)', form: 'FUNCTION', example: '$day(-1)' }))).toBe('$day(-1)');
-        expect(typeableForm(decl({ token: '$signal.', form: 'PREFIX', example: '$signal.dataset' }))).toBe('$signal.dataset');
+        expect(typeableForm(decl({ token: '$signal.', form: 'PREFIX', example: '$signal.dataset' }))).toBe(
+            '$signal.dataset',
+        );
     });
 });

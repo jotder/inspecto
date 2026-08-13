@@ -17,7 +17,8 @@
                     class="flex items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-hover"
                     [class.bg-hover]="selected()?.id === drawer.id"
                     [attr.aria-current]="selected()?.id === drawer.id ? 'true' : null"
-                    (click)="select(drawer)">
+                    (click)="select(drawer)"
+                >
                     <mat-icon class="icon-size-5 text-hint mt-0.5" [svgIcon]="drawer.icon"></mat-icon>
                     <span class="flex min-w-0 flex-col">
                         <span class="font-medium">{{ drawer.title }}</span>
@@ -36,7 +37,8 @@
                     class="block p-6"
                     icon="heroicons_outline:cog-6-tooth"
                     title="Choose a setting"
-                    message="Pick an option from the menu to configure it here." />
+                    message="Pick an option from the menu to configure it here."
+                />
             }
         </section>
     </div>

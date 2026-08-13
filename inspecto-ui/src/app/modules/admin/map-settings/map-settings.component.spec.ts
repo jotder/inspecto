@@ -8,9 +8,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { MapSettingsComponent } from './map-settings.component';
 
 function create(opts: { current?: string | null; failSave?: number } = {}) {
-    const save = vi.fn((s: GeoSettings) =>
-        opts.failSave ? throwError(() => ({ status: opts.failSave })) : of(s),
-    );
+    const save = vi.fn((s: GeoSettings) => (opts.failSave ? throwError(() => ({ status: opts.failSave })) : of(s)));
     TestBed.configureTestingModule({
         imports: [MapSettingsComponent],
         providers: [

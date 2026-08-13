@@ -25,7 +25,14 @@ const KINDS: { value: RequirementKind; label: string }[] = [
 @Component({
     selector: 'app-requirement-form-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+    imports: [
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>New requirement</h2>
@@ -33,7 +40,12 @@ const KINDS: { value: RequirementKind; label: string }[] = [
             <form [formGroup]="form" class="flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Title</mat-label>
-                    <input matInput formControlName="title" placeholder="e.g. daily churn KPI by region" cdkFocusInitial />
+                    <input
+                        matInput
+                        formControlName="title"
+                        placeholder="e.g. daily churn KPI by region"
+                        cdkFocusInitial
+                    />
                     @if (form.controls.title.hasError('required') && form.controls.title.touched) {
                         <mat-error>Title is required</mat-error>
                     }
@@ -41,12 +53,19 @@ const KINDS: { value: RequirementKind; label: string }[] = [
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Kind</mat-label>
                     <mat-select formControlName="kind">
-                        @for (k of kinds; track k.value) { <mat-option [value]="k.value">{{ k.label }}</mat-option> }
+                        @for (k of kinds; track k.value) {
+                            <mat-option [value]="k.value">{{ k.label }}</mat-option>
+                        }
                     </mat-select>
                 </mat-form-field>
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Description</mat-label>
-                    <textarea matInput rows="4" formControlName="description" placeholder="What do you need, and why?"></textarea>
+                    <textarea
+                        matInput
+                        rows="4"
+                        formControlName="description"
+                        placeholder="What do you need, and why?"
+                    ></textarea>
                     @if (form.controls.description.hasError('required') && form.controls.description.touched) {
                         <mat-error>A description is required</mat-error>
                     }

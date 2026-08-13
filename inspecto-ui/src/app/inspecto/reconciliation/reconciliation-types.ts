@@ -178,9 +178,16 @@ export function resolveBreak(breaks: ReconBreak[], target: ReconBreak, resolved:
 }
 
 /** Roll a break set up into the report cards. */
-export function summarize(breaks: ReconBreak[], leftRows: number, rightRows: number, matchedKeys: number): ReconSummary {
+export function summarize(
+    breaks: ReconBreak[],
+    leftRows: number,
+    rightRows: number,
+    matchedKeys: number,
+): ReconSummary {
     const byType: Record<BreakType, number> = { missing_left: 0, missing_right: 0, value_break: 0 };
-    let open = 0, resolved = 0, autoClosed = 0;
+    let open = 0,
+        resolved = 0,
+        autoClosed = 0;
     for (const b of breaks) {
         if (b.status === 'auto_closed') autoClosed++;
         else {
@@ -212,7 +219,21 @@ export function buildReconciliation(
     keyColumns: string[],
     compareColumns: CompareColumn[],
 ): Reconciliation {
-    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'reconciliation';
+    const slug =
+        name
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'reconciliation';
     const suffix = Math.random().toString(36).slice(2, 6);
-    return { id: `${slug}_${suffix}`, name: name.trim(), leftDataset, rightDataset, keyColumns, compareColumns, breaks: [], lastRunAt: null };
+    return {
+        id: `${slug}_${suffix}`,
+        name: name.trim(),
+        leftDataset,
+        rightDataset,
+        keyColumns,
+        compareColumns,
+        breaks: [],
+        lastRunAt: null,
+    };
 }

@@ -37,7 +37,11 @@ function create(
             { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap(params)) } },
             {
                 provide: ConfigService,
-                useValue: { read: () => of({ type: 'pipeline', name: params['name'], path: 'p', config: { name: params['name'] } }), ...api },
+                useValue: {
+                    read: () =>
+                        of({ type: 'pipeline', name: params['name'], path: 'p', config: { name: params['name'] } }),
+                    ...api,
+                },
             },
             { provide: ConnectionsService, useValue: { list: () => of([]), test: () => of({}) } },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
@@ -76,7 +80,9 @@ describe('OnboardingShellComponent', () => {
             {
                 read: () =>
                     of({
-                        type: 'pipeline', name: 'x', path: 'p',
+                        type: 'pipeline',
+                        name: 'x',
+                        path: 'p',
                         config: { name: 'x', collector: { connector: 'local' } },
                     }),
             },
@@ -113,7 +119,12 @@ describe('OnboardingShellComponent', () => {
             { name: 'region_dim' },
             {
                 read: () =>
-                    of({ type: 'pipeline', name: 'region_dim', path: 'p', config: { name: 'region_dim', produces: 'reference' } }),
+                    of({
+                        type: 'pipeline',
+                        name: 'region_dim',
+                        path: 'p',
+                        config: { name: 'region_dim', produces: 'reference' },
+                    }),
             },
         );
         const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
@@ -130,11 +141,23 @@ describe('OnboardingShellComponent', () => {
         const fixture = create(
             { name: 'x', stage: 'parsing' },
             {
-                read: () => of({ type: 'pipeline', name: 'x', path: 'p', config: { name: 'x', parsing: { frontend: 'delimited' } } }),
-                patch: () => of({
-                    type: 'pipeline', written: true, path: 'p', name: 'x', bytes: 1, overwritten: true,
-                    findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }],
-                }),
+                read: () =>
+                    of({
+                        type: 'pipeline',
+                        name: 'x',
+                        path: 'p',
+                        config: { name: 'x', parsing: { frontend: 'delimited' } },
+                    }),
+                patch: () =>
+                    of({
+                        type: 'pipeline',
+                        written: true,
+                        path: 'p',
+                        name: 'x',
+                        bytes: 1,
+                        overwritten: true,
+                        findings: [{ severity: 'ERROR', fieldPath: 'parsing.frontend', message: 'bad parser' }],
+                    }),
             },
         );
         const state = fixture.debugElement.injector.get(OnboardingStateService);
@@ -170,17 +193,23 @@ describe('OnboardingShellComponent', () => {
     });
 
     it('names an unreadable satellite instead of shipping a silently partial export', () => {
-        const fixture = create({ name: 'orders_feed' }, {}, {
-            buildExport: vi.fn(() => of({
-                bundle: exportedBundle('orders_feed'),
-                missing: ['schema "orders_feed_schema"'],
-            })),
-        });
+        const fixture = create(
+            { name: 'orders_feed' },
+            {},
+            {
+                buildExport: vi.fn(() =>
+                    of({
+                        bundle: exportedBundle('orders_feed'),
+                        missing: ['schema "orders_feed_schema"'],
+                    }),
+                ),
+            },
+        );
         const transfer = fixture.debugElement.injector.get(StreamTransferService);
         fixture.componentInstance.exportConfig();
-        expect(transfer.download).toHaveBeenCalled();   // still downloads…
+        expect(transfer.download).toHaveBeenCalled(); // still downloads…
         expect(TOASTR.warning).toHaveBeenCalledWith(
-            expect.stringContaining('orders_feed_schema'),   // …but says what is missing
+            expect.stringContaining('orders_feed_schema'), // …but says what is missing
         );
     });
 });

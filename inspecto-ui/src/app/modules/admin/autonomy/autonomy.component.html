@@ -4,8 +4,8 @@
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Autonomy</h1>
             <div class="text-secondary mt-1">
-                Bounded autonomy (L3): the agent may remediate seeded failures on its own, within limits you set
-                here. Each action class is off until you enable it; the kill switch halts everything at once.
+                Bounded autonomy (L3): the agent may remediate seeded failures on its own, within limits you set here.
+                Each action class is off until you enable it; the kill switch halts everything at once.
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -20,8 +20,8 @@
 
     @if (unavailable) {
         <div class="mt-6 rounded-lg border border-warn-200 bg-warn-50 p-4 text-secondary">
-            The autonomy policy is unavailable — the intelligence module may be absent or its L3 tier is not
-            configured. The controls below are disabled.
+            The autonomy policy is unavailable — the intelligence module may be absent or its L3 tier is not configured.
+            The controls below are disabled.
         </div>
     }
 
@@ -72,9 +72,8 @@
             </button>
         </div>
         <div class="text-secondary mt-1 text-sm">
-            <b>Off</b>: never autonomous (falls back to the approvals inbox). <b>Shadow</b>: log what it
-            would do, but don't act. <b>Auto</b>: act within budget. Budgets are executions per rolling
-            window; 0 means no limit.
+            <b>Off</b>: never autonomous (falls back to the approvals inbox). <b>Shadow</b>: log what it would do, but
+            don't act. <b>Auto</b>: act within budget. Budgets are executions per rolling window; 0 means no limit.
         </div>
 
         <div class="mt-4 overflow-x-auto">
@@ -133,7 +132,9 @@
     <!-- Action ledger -->
     <div class="mt-6">
         <div class="text-lg font-semibold">Recent actions</div>
-        <div class="text-secondary text-sm">What the agent did, why, and the outcome — including shadow and skipped decisions.</div>
+        <div class="text-secondary text-sm">
+            What the agent did, why, and the outcome — including shadow and skipped decisions.
+        </div>
         <div class="mt-3 flex-auto">
             <inspecto-data-table
                 tier="pro"

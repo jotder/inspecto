@@ -71,8 +71,10 @@ export class BrandingService {
     saveFor(spaceId: string, branding: Branding): Observable<Branding> {
         return this.http
             .put<Branding>(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/settings/branding`), branding)
-            .pipe(tap((saved) => {
-                if (spaceId === (this.spaces.currentSpaceId() ?? 'default')) this.brand.set(saved);
-            }));
+            .pipe(
+                tap((saved) => {
+                    if (spaceId === (this.spaces.currentSpaceId() ?? 'default')) this.brand.set(saved);
+                }),
+            );
     }
 }

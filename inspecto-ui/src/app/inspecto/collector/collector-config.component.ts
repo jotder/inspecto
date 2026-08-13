@@ -100,7 +100,9 @@ export type CollectorMode = 'local' | 'connection';
                 @if (testResult(); as t) {
                     <inspecto-alert [variant]="t.reachable ? 'success' : 'error'">
                         {{ t.reachable ? 'Reachable' : 'Unreachable' }} — {{ t.detail }}
-                        @if (t.latencyMs != null) { ({{ t.latencyMs }} ms) }
+                        @if (t.latencyMs != null) {
+                            ({{ t.latencyMs }} ms)
+                        }
                     </inspecto-alert>
                 }
             } @else {
@@ -142,7 +144,11 @@ export class CollectorConfigComponent {
      * {@link resolveConnector} when a non-local connector was authored without a Connection.
      */
     @Input() set storedConnector(value: string | null | undefined) {
-        this.stored.set(String(value ?? '').trim().toLowerCase());
+        this.stored.set(
+            String(value ?? '')
+                .trim()
+                .toLowerCase(),
+        );
         this.deriveMode();
     }
 

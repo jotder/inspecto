@@ -27,12 +27,10 @@ const outcome = (results: { kind: string; id: string; status: string; message?: 
     results,
 });
 
-function create(
-    data: ImportBundleData = {},
-    opts: { canAuthor?: boolean; outcome?: ReturnType<typeof outcome> } = {},
-) {
-    const applyImport = vi.fn(() => of(opts.outcome
-        ?? outcome([{ kind: 'dataset', id: 'new_ds', status: 'imported' }])));
+function create(data: ImportBundleData = {}, opts: { canAuthor?: boolean; outcome?: ReturnType<typeof outcome> } = {}) {
+    const applyImport = vi.fn(() =>
+        of(opts.outcome ?? outcome([{ kind: 'dataset', id: 'new_ds', status: 'imported' }])),
+    );
     TestBed.configureTestingModule({
         imports: [ImportBundleDialog],
         providers: [
@@ -89,15 +87,20 @@ describe('ImportBundleDialog', () => {
      */
     it('applies actionable rows as ONE backend call and counts what the server says it wrote', async () => {
         const { c, applyImport } = create();
-        await c.onFile(fileEvent(JSON.stringify(buildBundle([{ kind: 'dataset', id: 'new_ds', content: { name: 'new_ds' } }], null))));
+        await c.onFile(
+            fileEvent(
+                JSON.stringify(buildBundle([{ kind: 'dataset', id: 'new_ds', content: { name: 'new_ds' } }], null)),
+            ),
+        );
         c.apply();
 
         expect(applyImport).toHaveBeenCalledTimes(1);
         const [envelope, actions] = applyImport.mock.calls[0] as unknown as [
-            { items: { id: string }[] }, Record<string, string>,
+            { items: { id: string }[] },
+            Record<string, string>,
         ];
         expect(envelope.items.map((i) => i.id)).toEqual(['new_ds']);
-        expect(actions).toEqual({});   // nothing existed, so nothing needed an overwrite opt-in
+        expect(actions).toEqual({}); // nothing existed, so nothing needed an overwrite opt-in
         expect(c.rows()[0].result).toBe('imported');
         expect(c.importedCount()).toBe(1);
     });
@@ -105,7 +108,13 @@ describe('ImportBundleDialog', () => {
     it('counts an identical re-promotion as nothing written, not as an import', async () => {
         const { c } = create({}, { outcome: outcome([{ kind: 'dataset', id: 'cdr_sample', status: 'unchanged' }]) });
         // cdr_sample is on the target already; the operator opts into overwrite, the server says unchanged.
-        await c.onFile(fileEvent(JSON.stringify(buildBundle([{ kind: 'dataset', id: 'cdr_sample', content: { name: 'cdr_sample' } }], null))));
+        await c.onFile(
+            fileEvent(
+                JSON.stringify(
+                    buildBundle([{ kind: 'dataset', id: 'cdr_sample', content: { name: 'cdr_sample' } }], null),
+                ),
+            ),
+        );
         c.overwriteAllExisting();
         c.apply();
 

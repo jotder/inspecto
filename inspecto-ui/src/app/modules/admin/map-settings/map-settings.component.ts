@@ -25,14 +25,21 @@ function tileTemplateValidator(c: AbstractControl): ValidationErrors | null {
 @Component({
     selector: 'app-map-settings',
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatIconModule, MatInputModule, InspectoAlertComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        InspectoAlertComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Map settings</h1>
             <p class="text-secondary mt-1 max-w-xl text-sm">
-                Maps render a fully-bundled offline basemap by default. Point Inspecto at your own tile server to
-                add imagery (satellite, terrain) — used by the Geo Map studio and geo widgets.
+                Maps render a fully-bundled offline basemap by default. Point Inspecto at your own tile server to add
+                imagery (satellite, terrain) — used by the Geo Map studio and geo widgets.
             </p>
 
             @if (writesDisabled()) {
@@ -44,10 +51,20 @@ function tileTemplateValidator(c: AbstractControl): ValidationErrors | null {
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-6 flex max-w-xl flex-col gap-2">
                 <mat-form-field subscriptSizing="dynamic">
                     <mat-label>Tile server URL (optional)</mat-label>
-                    <input matInput formControlName="tileServerUrl" placeholder="https://tiles.example.com/{z}/{x}/{y}.png" />
-                    <mat-hint>A raster template with {{ '{' }}z{{ '}' }}/{{ '{' }}x{{ '}' }}/{{ '{' }}y{{ '}' }}, or a pmtiles:// archive. Leave empty for the offline basemap.</mat-hint>
+                    <input
+                        matInput
+                        formControlName="tileServerUrl"
+                        placeholder="https://tiles.example.com/{z}/{x}/{y}.png"
+                    />
+                    <mat-hint
+                        >A raster template with {{ '{' }}z{{ '}' }}/{{ '{' }}x{{ '}' }}/{{ '{' }}y{{ '}' }}, or a
+                        pmtiles:// archive. Leave empty for the offline basemap.</mat-hint
+                    >
                     @if (form.controls.tileServerUrl.hasError('tileTemplate')) {
-                        <mat-error>Must contain {{ '{' }}z{{ '}' }}, {{ '{' }}x{{ '}' }} and {{ '{' }}y{{ '}' }} placeholders, or start with pmtiles://</mat-error>
+                        <mat-error
+                            >Must contain {{ '{' }}z{{ '}' }}, {{ '{' }}x{{ '}' }} and {{ '{' }}y{{ '}' }} placeholders,
+                            or start with pmtiles://</mat-error
+                        >
                     }
                 </mat-form-field>
                 <div>
@@ -94,7 +111,9 @@ export class MapSettingsComponent implements OnInit {
             error: (e) => {
                 this.saving.set(false);
                 if (e?.status === 503) this.writesDisabled.set(true);
-                this.toastr.error(e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, 'Could not save map settings'));
+                this.toastr.error(
+                    e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, 'Could not save map settings'),
+                );
             },
         });
     }

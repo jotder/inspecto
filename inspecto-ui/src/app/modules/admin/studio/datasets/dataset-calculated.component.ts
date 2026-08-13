@@ -35,7 +35,12 @@ interface TestOutcome {
                     <div>
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Name</mat-label>
-                            <input matInput [ngModel]="c.name" (ngModelChange)="patch(i, { name: $event })" [attr.aria-label]="'Calculated column name ' + (i + 1)" />
+                            <input
+                                matInput
+                                [ngModel]="c.name"
+                                (ngModelChange)="patch(i, { name: $event })"
+                                [attr.aria-label]="'Calculated column name ' + (i + 1)"
+                            />
                         </mat-form-field>
                         @if (nameError(c.name); as err) {
                             <div class="mt-1 text-xs text-red-600 dark:text-red-400">{{ err }}</div>
@@ -44,14 +49,32 @@ interface TestOutcome {
                     <div>
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Expression</mat-label>
-                            <input matInput [ngModel]="c.expr" (ngModelChange)="patch(i, { expr: $event })" placeholder="e.g. round(amt * 1.1, 2)" [attr.aria-label]="'Calculated column expression ' + (i + 1)" />
+                            <input
+                                matInput
+                                [ngModel]="c.expr"
+                                (ngModelChange)="patch(i, { expr: $event })"
+                                placeholder="e.g. round(amt * 1.1, 2)"
+                                [attr.aria-label]="'Calculated column expression ' + (i + 1)"
+                            />
                         </mat-form-field>
                         @if (c.expr.trim() && exprError(c.expr); as err) {
                             <div class="mt-1 text-xs text-red-600 dark:text-red-400">{{ err }}</div>
                         }
                     </div>
-                    <button mat-stroked-button type="button" (click)="test(i)" [attr.aria-label]="'Test calculated column ' + (i + 1)">Test</button>
-                    <button mat-icon-button type="button" (click)="remove(i)" [attr.aria-label]="'Remove calculated column ' + (i + 1)">
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        (click)="test(i)"
+                        [attr.aria-label]="'Test calculated column ' + (i + 1)"
+                    >
+                        Test
+                    </button>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="remove(i)"
+                        [attr.aria-label]="'Remove calculated column ' + (i + 1)"
+                    >
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                     </button>
                 </div>

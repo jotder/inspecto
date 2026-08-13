@@ -1,5 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormArray,
+    FormBuilder,
+    FormGroup,
+    ReactiveFormsModule,
+    ValidationErrors,
+    ValidatorFn,
+    Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -8,7 +17,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { Dataset } from '../studio/datasets/dataset-types';
 import { DatasetsService } from '../studio/datasets/datasets.service';
-import { CompareColumn, DEFAULT_BANDS, MeasureAgg, ReconBands, Reconciliation, ToleranceType } from 'app/inspecto/reconciliation';
+import {
+    CompareColumn,
+    DEFAULT_BANDS,
+    MeasureAgg,
+    ReconBands,
+    Reconciliation,
+    ToleranceType,
+} from 'app/inspecto/reconciliation';
 
 export interface ReconciliationFormResult {
     name: string;
@@ -39,32 +55,52 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
 @Component({
     selector: 'app-reconciliation-form-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatIconModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+    imports: [
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatIconModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title>{{ editing ? 'Edit reconciliation' : duplicating ? 'Duplicate reconciliation' : 'New reconciliation' }}</h2>
+        <h2 mat-dialog-title>
+            {{ editing ? 'Edit reconciliation' : duplicating ? 'Duplicate reconciliation' : 'New reconciliation' }}
+        </h2>
         <form [formGroup]="form" (ngSubmit)="submit()">
             <mat-dialog-content class="flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Name</mat-label>
                     <input matInput formControlName="name" placeholder="e.g. switch vs billing" cdkFocusInitial />
-                    @if (form.controls.name.hasError('required')) { <mat-error>A name is required.</mat-error> }
+                    @if (form.controls.name.hasError('required')) {
+                        <mat-error>A name is required.</mat-error>
+                    }
                 </mat-form-field>
 
                 <div class="flex gap-3">
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
                         <mat-label>Left dataset (anchor / source of truth)</mat-label>
                         <mat-select formControlName="leftDataset" (selectionChange)="onLeftChange($event.value)">
-                            @for (d of datasets(); track d.id) { <mat-option [value]="d.id">{{ d.name }}</mat-option> }
+                            @for (d of datasets(); track d.id) {
+                                <mat-option [value]="d.id">{{ d.name }}</mat-option>
+                            }
                         </mat-select>
-                        @if (form.controls.leftDataset.hasError('required')) { <mat-error>Choose a left dataset.</mat-error> }
+                        @if (form.controls.leftDataset.hasError('required')) {
+                            <mat-error>Choose a left dataset.</mat-error>
+                        }
                     </mat-form-field>
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
                         <mat-label>Right dataset</mat-label>
                         <mat-select formControlName="rightDataset">
-                            @for (d of datasets(); track d.id) { <mat-option [value]="d.id">{{ d.name }}</mat-option> }
+                            @for (d of datasets(); track d.id) {
+                                <mat-option [value]="d.id">{{ d.name }}</mat-option>
+                            }
                         </mat-select>
-                        @if (form.controls.rightDataset.hasError('required')) { <mat-error>Choose a right dataset.</mat-error> }
+                        @if (form.controls.rightDataset.hasError('required')) {
+                            <mat-error>Choose a right dataset.</mat-error>
+                        }
                     </mat-form-field>
                 </div>
 
@@ -72,16 +108,22 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                     <mat-label>Third dataset (optional — 3-way vs the anchor)</mat-label>
                     <mat-select formControlName="thirdDataset">
                         <mat-option [value]="''">— none (2-way) —</mat-option>
-                        @for (d of datasets(); track d.id) { <mat-option [value]="d.id">{{ d.name }}</mat-option> }
+                        @for (d of datasets(); track d.id) {
+                            <mat-option [value]="d.id">{{ d.name }}</mat-option>
+                        }
                     </mat-select>
                 </mat-form-field>
 
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Key column(s) — selection order is the Board tree</mat-label>
                     <mat-select formControlName="keyColumns" multiple>
-                        @for (c of leftColumns(); track c) { <mat-option [value]="c">{{ c }}</mat-option> }
+                        @for (c of leftColumns(); track c) {
+                            <mat-option [value]="c">{{ c }}</mat-option>
+                        }
                     </mat-select>
-                    @if (form.controls.keyColumns.hasError('required')) { <mat-error>Pick at least one key column.</mat-error> }
+                    @if (form.controls.keyColumns.hasError('required')) {
+                        <mat-error>Pick at least one key column.</mat-error>
+                    }
                 </mat-form-field>
 
                 <div class="flex items-center justify-between">
@@ -96,9 +138,13 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                             <mat-form-field class="flex-1" subscriptSizing="dynamic">
                                 <mat-label>Column</mat-label>
                                 <mat-select formControlName="column">
-                                    @for (c of leftColumns(); track c) { <mat-option [value]="c">{{ c }}</mat-option> }
+                                    @for (c of leftColumns(); track c) {
+                                        <mat-option [value]="c">{{ c }}</mat-option>
+                                    }
                                 </mat-select>
-                                @if (row.get('column')?.hasError('required')) { <mat-error>Required</mat-error> }
+                                @if (row.get('column')?.hasError('required')) {
+                                    <mat-error>Required</mat-error>
+                                }
                             </mat-form-field>
                             <mat-form-field class="w-24" subscriptSizing="dynamic">
                                 <mat-label>Agg</mat-label>
@@ -121,7 +167,12 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                                     <input matInput type="number" formControlName="tolerance" />
                                 </mat-form-field>
                             }
-                            <button mat-icon-button type="button" (click)="removeCompare(i)" aria-label="Remove compare column">
+                            <button
+                                mat-icon-button
+                                type="button"
+                                (click)="removeCompare(i)"
+                                aria-label="Remove compare column"
+                            >
                                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                             </button>
                         </div>
@@ -133,7 +184,9 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                     <mat-form-field class="w-32" subscriptSizing="dynamic">
                         <mat-label>Warn from %</mat-label>
                         <input matInput type="number" min="0" formControlName="warnPct" />
-                        @if (form.controls.warnPct.hasError('min')) { <mat-error>Must be ≥ 0.</mat-error> }
+                        @if (form.controls.warnPct.hasError('min')) {
+                            <mat-error>Must be ≥ 0.</mat-error>
+                        }
                     </mat-form-field>
                     <mat-form-field class="w-32" subscriptSizing="dynamic">
                         <mat-label>Breach over %</mat-label>
@@ -194,7 +247,8 @@ export class ReconciliationFormDialog {
                 warnPct: r.bands?.warnPct ?? DEFAULT_BANDS.warnPct,
                 breachPct: r.bands?.breachPct ?? DEFAULT_BANDS.breachPct,
             });
-            for (const c of r.compareColumns) this.pushCompareRow(c.column, c.agg ?? 'sum', c.toleranceType, c.tolerance);
+            for (const c of r.compareColumns)
+                this.pushCompareRow(c.column, c.agg ?? 'sum', c.toleranceType, c.tolerance);
         }
         this.datasetsApi.list().subscribe((d) => {
             this.datasets.set(d);
@@ -208,7 +262,11 @@ export class ReconciliationFormDialog {
     }
 
     onLeftChange(id: string): void {
-        this.leftColumns.set(this.datasets().find((d) => d.id === id)?.columns.map((c) => c.name) ?? []);
+        this.leftColumns.set(
+            this.datasets()
+                .find((d) => d.id === id)
+                ?.columns.map((c) => c.name) ?? [],
+        );
         // drop key/compare picks no longer valid for the new left dataset
         const cols = new Set(this.leftColumns());
         const keyCtrl = this.form.controls['keyColumns'];
@@ -227,12 +285,14 @@ export class ReconciliationFormDialog {
     }
 
     private pushCompareRow(column: string, agg: MeasureAgg, toleranceType: ToleranceType, tolerance: number): void {
-        this.compareRowsArray.push(this.fb.group({
-            column: [column, [Validators.required]],
-            agg: [agg, [Validators.required]],
-            toleranceType: [toleranceType, [Validators.required]],
-            tolerance: [tolerance],
-        }));
+        this.compareRowsArray.push(
+            this.fb.group({
+                column: [column, [Validators.required]],
+                agg: [agg, [Validators.required]],
+                toleranceType: [toleranceType, [Validators.required]],
+                tolerance: [tolerance],
+            }),
+        );
     }
 
     submit(): void {

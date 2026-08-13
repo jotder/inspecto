@@ -17,7 +17,14 @@ export interface WidgetSaveData {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 export interface WidgetSaveResult {
@@ -45,7 +52,13 @@ export interface WidgetSaveResult {
             <form [formGroup]="form" (ngSubmit)="save()" class="flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Widget id</mat-label>
-                    <input matInput formControlName="name" [readonly]="data.lockId" placeholder="e.g. duration_by_tariff" cdkFocusInitial />
+                    <input
+                        matInput
+                        formControlName="name"
+                        [readonly]="data.lockId"
+                        placeholder="e.g. duration_by_tariff"
+                        cdkFocusInitial
+                    />
                     @if (form.controls.name.hasError('pattern')) {
                         <mat-error>Letters, digits, dot, dash, underscore; start alphanumeric.</mat-error>
                     }

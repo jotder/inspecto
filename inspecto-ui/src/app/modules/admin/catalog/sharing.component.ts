@@ -74,9 +74,7 @@ export class SharingComponent implements OnInit {
 
     /** with-me: grants my space consumes. by-me: grants on my space's offers. */
     readonly myGrants = computed(() =>
-        this.grants().filter((g) =>
-            this.view() === 'with-me' ? g.consumer === this.me() : g.owner === this.me(),
-        ),
+        this.grants().filter((g) => (this.view() === 'with-me' ? g.consumer === this.me() : g.owner === this.me())),
     );
     /** with-me: other spaces' offers (the requestable catalog). by-me: my listed offers. */
     readonly myOffers = computed(() =>
@@ -107,7 +105,12 @@ export class SharingComponent implements OnInit {
         { field: 'owner', headerName: 'Owner', width: 150 },
         { field: 'consumer', headerName: 'Consumer', width: 150 },
         { field: 'mode', headerName: 'Mode', width: 110 },
-        { field: 'status', headerName: 'Status', width: 120, cellRenderer: (p: { value: string }) => statusBadgeHtml(p.value) },
+        {
+            field: 'status',
+            headerName: 'Status',
+            width: 120,
+            cellRenderer: (p: { value: string }) => statusBadgeHtml(p.value),
+        },
         { field: 'purpose', headerName: 'Purpose', flex: 1 },
         {
             field: 'pin',
@@ -122,7 +125,12 @@ export class SharingComponent implements OnInit {
                       ? `<span title="Current snapshot is ${p.data.behind} — re-pin or clear the pin to update">${p.value} ${statusBadgeHtml('warning', 'Behind')}</span>`
                       : p.value,
         },
-        { field: 'expiresAt', headerName: 'Expires', width: 170, valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—') },
+        {
+            field: 'expiresAt',
+            headerName: 'Expires',
+            width: 170,
+            valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
+        },
         { field: 'requestedAt', headerName: 'Requested', width: 170, valueFormatter: (p) => fmtDateTime(p.value) },
     ];
 
@@ -132,8 +140,18 @@ export class SharingComponent implements OnInit {
         { field: 'owner', headerName: 'Owner', width: 150 },
         { field: 'description', headerName: 'Description', flex: 2 },
         { field: 'freshness.version', headerName: 'Snapshot', width: 110, valueFormatter: (p) => p.value ?? '—' },
-        { field: 'freshness.rows', headerName: 'Rows', width: 100, valueFormatter: (p) => (p.value == null ? '—' : Number(p.value).toLocaleString()) },
-        { field: 'freshness.refreshedAt', headerName: 'Refreshed', width: 170, valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—') },
+        {
+            field: 'freshness.rows',
+            headerName: 'Rows',
+            width: 100,
+            valueFormatter: (p) => (p.value == null ? '—' : Number(p.value).toLocaleString()),
+        },
+        {
+            field: 'freshness.refreshedAt',
+            headerName: 'Refreshed',
+            width: 170,
+            valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
+        },
     ];
 
     /** Owner-side decisions: the by-me view **and** the capability the server enforces. */
@@ -231,7 +249,9 @@ export class SharingComponent implements OnInit {
     private act(g: ExchangeGrant, action: 'approve' | 'deny' | 'revoke'): void {
         this.exchange.actOnGrant(g.id, action).subscribe({
             next: () => {
-                this.toastr.success(`${action === 'approve' ? 'Approved' : action === 'deny' ? 'Denied' : 'Revoked'} ${g.kind} ${g.item} for ${g.consumer}.`);
+                this.toastr.success(
+                    `${action === 'approve' ? 'Approved' : action === 'deny' ? 'Denied' : 'Revoked'} ${g.kind} ${g.item} for ${g.consumer}.`,
+                );
                 this.reload();
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not ${action} the grant.`)),
@@ -241,7 +261,9 @@ export class SharingComponent implements OnInit {
     private refresh(o: ExchangeOffer): void {
         this.exchange.refresh(o.owner, o.item).subscribe({
             next: (meta) => {
-                this.toastr.success(`Snapshot of ${o.item} refreshed → ${meta.version} (${meta.rows.toLocaleString()} rows).`);
+                this.toastr.success(
+                    `Snapshot of ${o.item} refreshed → ${meta.version} (${meta.rows.toLocaleString()} rows).`,
+                );
                 this.reload();
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not refresh "${o.item}".`)),
@@ -275,10 +297,19 @@ export class SharingComponent implements OnInit {
             .subscribe((r: RequestShareResult | undefined) => {
                 if (!r) return;
                 this.exchange
-                    .request({ kind: o.kind, owner: o.owner, consumer: this.me(), item: o.item, purpose: r.purpose, mode: r.mode })
+                    .request({
+                        kind: o.kind,
+                        owner: o.owner,
+                        consumer: this.me(),
+                        item: o.item,
+                        purpose: r.purpose,
+                        mode: r.mode,
+                    })
                     .subscribe({
                         next: () => {
-                            this.toastr.success(`Requested ${o.kind} ${o.owner}/${o.item} — awaiting the owner's approval.`);
+                            this.toastr.success(
+                                `Requested ${o.kind} ${o.owner}/${o.item} — awaiting the owner's approval.`,
+                            );
                             this.reload();
                         },
                         error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not send the request.')),
@@ -290,7 +321,10 @@ export class SharingComponent implements OnInit {
     private inFlight(o: ExchangeOffer): boolean {
         return this.grants().some(
             (g) =>
-                g.consumer === this.me() && g.owner === o.owner && g.kind === o.kind && g.item === o.item &&
+                g.consumer === this.me() &&
+                g.owner === o.owner &&
+                g.kind === o.kind &&
+                g.item === o.item &&
                 (g.status === 'requested' || g.status === 'active'),
         );
     }

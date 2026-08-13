@@ -39,9 +39,13 @@ describe('jobsHandler', () => {
     it('serves the Job Type descriptors (R3) — the list and one by id, 404 for unknown', () => {
         const store = seededStore();
         const types = handler(req('GET', '/api/jobs/types'), store)?.body as { id: string }[];
-        expect(types.map((t) => t.id)).toEqual(expect.arrayContaining(['enrich', 'report', 'maintenance', 'pipeline', 'sql.template']));
+        expect(types.map((t) => t.id)).toEqual(
+            expect.arrayContaining(['enrich', 'report', 'maintenance', 'pipeline', 'sql.template']),
+        );
 
-        const sql = handler(req('GET', '/api/jobs/types/sql.template'), store)?.body as { parameters: { name: string; required: boolean }[] };
+        const sql = handler(req('GET', '/api/jobs/types/sql.template'), store)?.body as {
+            parameters: { name: string; required: boolean }[];
+        };
         expect(sql.parameters.map((p) => p.name)).toEqual(['sql', 'sink_dataset', 'sources']);
         expect(sql.parameters.find((p) => p.name === 'sql')?.required).toBe(true);
 
@@ -50,13 +54,17 @@ describe('jobsHandler', () => {
 
     it('upserts, toggles, reschedules and deletes a job (with its runs)', () => {
         const store = seededStore();
-        handler(req('POST', '/api/jobs', { name: 'nightly_export', type: 'flow', cron: '0 0 3 * * *', enabled: true }), store);
+        handler(
+            req('POST', '/api/jobs', { name: 'nightly_export', type: 'flow', cron: '0 0 3 * * *', enabled: true }),
+            store,
+        );
         expect((handler(req('GET', '/api/jobs/nightly_export'), store)?.body as JobDetail).cron).toBe('0 0 3 * * *');
 
         const disabled = handler(req('POST', '/api/jobs/nightly_export/disable'), store)?.body as JobDetail;
         expect(disabled.enabled).toBe(false);
 
-        const rescheduled = handler(req('POST', '/api/jobs/nightly_export/reschedule', { cron: '0 0 4 * * *' }), store)?.body as Record<string, unknown>;
+        const rescheduled = handler(req('POST', '/api/jobs/nightly_export/reschedule', { cron: '0 0 4 * * *' }), store)
+            ?.body as Record<string, unknown>;
         expect(rescheduled['cron']).toBe('0 0 4 * * *');
         // the config section carries no run state — the server's own response has no nextFire either
         expect(rescheduled['nextFire']).toBeUndefined();
@@ -73,37 +81,54 @@ describe('jobsHandler', () => {
     // starts greenlighting a body the real backend drops on the floor — the whole point of the mock.
     it('reads the snake_case trigger keys and flattens params, exactly as JobConfig.fromMap does', () => {
         const store = seededStore();
-        handler(req('POST', '/api/jobs', {
-            name: 'after_ingest', type: 'maintenance', task: 'cleanup',
-            on_pipeline: 'cdr_ingest', retention_days: '30',
-        }), store);
+        handler(
+            req('POST', '/api/jobs', {
+                name: 'after_ingest',
+                type: 'maintenance',
+                task: 'cleanup',
+                on_pipeline: 'cdr_ingest',
+                retention_days: '30',
+            }),
+            store,
+        );
 
         const detail = handler(req('GET', '/api/jobs/after_ingest'), store)?.body as Record<string, unknown>;
         expect(detail['on_pipeline']).toBe('cdr_ingest');
         expect(detail['retention_days']).toBe('30');
 
         // the LIST projection is camelCase — server-side it is a Java record, not the config section
-        const row = (handler(req('GET', '/api/jobs'), store)?.body as JobView[]).find((j) => j.name === 'after_ingest')!;
+        const row = (handler(req('GET', '/api/jobs'), store)?.body as JobView[]).find(
+            (j) => j.name === 'after_ingest',
+        )!;
         expect(row.onPipeline).toBe('cdr_ingest');
     });
 
     it('authors a signal-triggered job end-to-end, guard and all', () => {
         const store = seededStore();
-        handler(req('POST', '/api/jobs', {
-            name: 'on_dataset_write', type: 'maintenance', task: 'cleanup',
-            on_signal: 'dataset.write', when: "$signal.dataset == 'premium_cdr_view'",
-        }), store);
+        handler(
+            req('POST', '/api/jobs', {
+                name: 'on_dataset_write',
+                type: 'maintenance',
+                task: 'cleanup',
+                on_signal: 'dataset.write',
+                when: "$signal.dataset == 'premium_cdr_view'",
+            }),
+            store,
+        );
 
         const detail = handler(req('GET', '/api/jobs/on_dataset_write'), store)?.body as Record<string, unknown>;
         expect(detail['on_signal']).toBe('dataset.write');
         expect(detail['when']).toBe("$signal.dataset == 'premium_cdr_view'");
 
         // and it is distinguishable from a manual job in the list
-        const row = (handler(req('GET', '/api/jobs'), store)?.body as JobView[]).find((j) => j.name === 'on_dataset_write')!;
+        const row = (handler(req('GET', '/api/jobs'), store)?.body as JobView[]).find(
+            (j) => j.name === 'on_dataset_write',
+        )!;
         expect(row.onSignal).toBe('dataset.write');
 
         // a cron supersedes it, dropping the guard with the trigger it narrowed
-        const moved = handler(req('POST', '/api/jobs/on_dataset_write/reschedule', { cron: '0 0 5 * * *' }), store)?.body as Record<string, unknown>;
+        const moved = handler(req('POST', '/api/jobs/on_dataset_write/reschedule', { cron: '0 0 5 * * *' }), store)
+            ?.body as Record<string, unknown>;
         expect(moved['on_signal']).toBeUndefined();
         expect(moved['when']).toBeUndefined();
     });
@@ -129,7 +154,8 @@ describe('jobsHandler', () => {
         const runs = handler(req('GET', '/api/jobs/weekly_billing/runs'), store)?.body as JobRun[];
         expect(runs[0].runId).toBe(res.runId);
         expect(runs[0].triggerType).toBe('MANUAL'); // newest first
-        const logs = handler(req('GET', `/api/jobs/weekly_billing/runs/${runs[0].runId}/logs`), store)?.body as JobRunLogs;
+        const logs = handler(req('GET', `/api/jobs/weekly_billing/runs/${runs[0].runId}/logs`), store)
+            ?.body as JobRunLogs;
         expect(logs.logs.some((l) => l.message.includes('Manual run'))).toBe(true);
     });
 
@@ -137,7 +163,8 @@ describe('jobsHandler', () => {
         const store = seededStore();
         const runs = handler(req('GET', '/api/jobs/cdr_ingest_daily/runs'), store)?.body as JobRun[];
         const running = runs.find((r) => r.status === 'RUNNING')!;
-        const logs = handler(req('GET', `/api/jobs/cdr_ingest_daily/runs/${running.runId}/logs`), store)?.body as JobRunLogs;
+        const logs = handler(req('GET', `/api/jobs/cdr_ingest_daily/runs/${running.runId}/logs`), store)
+            ?.body as JobRunLogs;
         expect(logs.logs[logs.logs.length - 1].message).toContain('still running');
     });
 
@@ -164,9 +191,16 @@ describe('jobsHandler — the Expression catalog', () => {
     it('serves the fifteen built-in tokens with every key the server sends', () => {
         const all = catalog();
         expect(all).toHaveLength(15);
-        expect(Object.keys(byToken('$today')).sort()).toEqual(
-            ['availableIn', 'contextFree', 'description', 'example', 'form', 'preview', 'token', 'yields'],
-        );
+        expect(Object.keys(byToken('$today')).sort()).toEqual([
+            'availableIn',
+            'contextFree',
+            'description',
+            'example',
+            'form',
+            'preview',
+            'token',
+            'yields',
+        ]);
     });
 
     it('declares the shapes and the trigger scoping the picker filters on', () => {

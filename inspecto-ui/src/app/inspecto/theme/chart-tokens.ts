@@ -31,14 +31,21 @@ const WARN = '#f59e0b';
  * catalog kind accents so the platform's chart palette stays consistent.
  */
 export const CHART_CATEGORICAL: readonly string[] = [
-    '#5B8FF9', '#61DDAA', '#F6BD16', '#7262FD', '#F6903D', '#78D3F8', '#EF4444', '#65789B', '#22C55E', '#A855F7',
+    '#5B8FF9',
+    '#61DDAA',
+    '#F6BD16',
+    '#7262FD',
+    '#F6903D',
+    '#78D3F8',
+    '#EF4444',
+    '#65789B',
+    '#22C55E',
+    '#A855F7',
 ];
 
 /** A muted single-hue ramp (indigo) — the curated alternative to {@link CHART_CATEGORICAL} for widgets that
  *  want a calmer look (e.g. a single dominant series). */
-const CHART_MONOCHROME: readonly string[] = [
-    '#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff',
-];
+const CHART_MONOCHROME: readonly string[] = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'];
 
 /** Named, curated widget color palettes (`WidgetOptions.palette`) — never a free-form color list, so widgets
  *  stay visually consistent. Add a new entry here to offer another curated option. */
@@ -69,11 +76,16 @@ export const SVG_EXPORT_COLORS = {
  */
 export function nodeStatusStroke(status: string): string | null {
     switch (status) {
-        case 'tested':       return CHART_SERIES.success;
-        case 'rejects':      return WARN;
-        case 'unconfigured': return WARN;
-        case 'dangling':     return CHART_SERIES.error;
-        default:             return null; // 'configured' → keep the category colour
+        case 'tested':
+            return CHART_SERIES.success;
+        case 'rejects':
+            return WARN;
+        case 'unconfigured':
+            return WARN;
+        case 'dangling':
+            return CHART_SERIES.error;
+        default:
+            return null; // 'configured' → keep the category colour
     }
 }
 
@@ -92,8 +104,18 @@ export const NODE_KIND_FALLBACK = '#9AA0A6';
 
 /** Curated colour palette offered in the configurable-icon picker (the kind accents + a few extras). */
 export const ICON_COLOR_SWATCHES: readonly string[] = [
-    '#5B8FF9', '#61DDAA', '#65789B', '#F6BD16', '#7262FD', '#78D3F8', '#F6903D',
-    '#EF4444', '#22C55E', '#A855F7', '#0EA5E9', '#94A3B8',
+    '#5B8FF9',
+    '#61DDAA',
+    '#65789B',
+    '#F6BD16',
+    '#7262FD',
+    '#78D3F8',
+    '#F6903D',
+    '#EF4444',
+    '#22C55E',
+    '#A855F7',
+    '#0EA5E9',
+    '#94A3B8',
 ];
 
 /** Scheme-dependent colours shared by the chart and graph hosts. */

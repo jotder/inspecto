@@ -37,7 +37,9 @@ import { Lens, LensService } from 'app/inspecto/api';
                     (click)="lens.selectLens(l.id)"
                     [attr.aria-current]="l.id === lens.currentLens() ? 'true' : null"
                 >
-                    <mat-icon [svgIcon]="l.id === lens.currentLens() ? 'heroicons_outline:check-circle' : l.icon"></mat-icon>
+                    <mat-icon
+                        [svgIcon]="l.id === lens.currentLens() ? 'heroicons_outline:check-circle' : l.icon"
+                    ></mat-icon>
                     <span>{{ l.label }}</span>
                 </button>
             }

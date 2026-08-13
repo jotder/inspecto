@@ -26,8 +26,13 @@ export interface RejectedRowsData {
     selector: 'app-rejected-rows-dialog',
     standalone: true,
     imports: [
-        MatDialogModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule,
-        DataTableComponent, InspectoAlertComponent, InspectoEmptyStateComponent,
+        MatDialogModule,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        DataTableComponent,
+        InspectoAlertComponent,
+        InspectoEmptyStateComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -56,9 +61,9 @@ export interface RejectedRowsData {
                 </div>
             } @else {
                 <p class="text-secondary mb-2 text-sm">
-                    {{ rowCount() }} rejected row(s) from <span class="font-mono">{{ errorsFile() }}</span>.
-                    These rows were <strong>not</strong> ingested; the line number is the position in the
-                    source file.
+                    {{ rowCount() }} rejected row(s) from <span class="font-mono">{{ errorsFile() }}</span
+                    >. These rows were <strong>not</strong> ingested; the line number is the position in the source
+                    file.
                 </p>
                 @if (truncated()) {
                     <inspecto-alert class="mb-2 block" variant="warning" title="Showing a sample">

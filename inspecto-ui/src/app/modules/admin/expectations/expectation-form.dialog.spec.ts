@@ -1,260 +1,253 @@
-import { provideHttpClient, withXhr } from "@angular/common/http";
-import { TestBed } from "@angular/core/testing";
-import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
-import { provideNoopAnimations } from "@angular/platform-browser/animations";
-import { ToastrService } from "ngx-toastr";
-import { describe, expect, it } from "vitest";
-import { ExpectationsService } from "app/inspecto/api";
-import { expectNoA11yViolations } from "app/inspecto/testing/a11y";
-import {
-  ExpectationFormData,
-  ExpectationFormDialog,
-} from "./expectation-form.dialog";
+import { provideHttpClient, withXhr } from '@angular/common/http';
+import { TestBed } from '@angular/core/testing';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ToastrService } from 'ngx-toastr';
+import { describe, expect, it } from 'vitest';
+import { ExpectationsService } from 'app/inspecto/api';
+import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { ExpectationFormData, ExpectationFormDialog } from './expectation-form.dialog';
 
 function create(data: ExpectationFormData) {
-  TestBed.configureTestingModule({
-    imports: [ExpectationFormDialog],
-    providers: [
-      provideNoopAnimations(),
-      provideHttpClient(withXhr()), // the autocomplete option loaders inject root HTTP services
-      { provide: MatDialogRef, useValue: { close: () => {} } },
-      { provide: MAT_DIALOG_DATA, useValue: data },
-      { provide: ExpectationsService, useValue: {} },
-      { provide: ToastrService, useValue: {} },
-    ],
-  });
-  const fixture = TestBed.createComponent(ExpectationFormDialog);
-  fixture.detectChanges();
-  return fixture;
+    TestBed.configureTestingModule({
+        imports: [ExpectationFormDialog],
+        providers: [
+            provideNoopAnimations(),
+            provideHttpClient(withXhr()), // the autocomplete option loaders inject root HTTP services
+            { provide: MatDialogRef, useValue: { close: () => {} } },
+            { provide: MAT_DIALOG_DATA, useValue: data },
+            { provide: ExpectationsService, useValue: {} },
+            { provide: ToastrService, useValue: {} },
+        ],
+    });
+    const fixture = TestBed.createComponent(ExpectationFormDialog);
+    fixture.detectChanges();
+    return fixture;
 }
 
-describe("ExpectationFormDialog", () => {
-  it("create mode blocks a duplicate id inline (asked at the save step) and has no a11y violations", async () => {
-    const fixture = create({ existingNames: ["cdr_msisdn_not_null"] });
-    const c = fixture.componentInstance;
-    const name = c.saveForm.get("name")!;
-    name.setValue("cdr_msisdn_not_null");
-    expect(name.hasError("duplicate")).toBe(true);
-    name.setValue("fresh_check");
-    expect(name.hasError("duplicate")).toBe(false);
-    await expectNoA11yViolations(fixture.nativeElement);
-  });
+describe('ExpectationFormDialog', () => {
+    it('create mode blocks a duplicate id inline (asked at the save step) and has no a11y violations', async () => {
+        const fixture = create({ existingNames: ['cdr_msisdn_not_null'] });
+        const c = fixture.componentInstance;
+        const name = c.saveForm.get('name')!;
+        name.setValue('cdr_msisdn_not_null');
+        expect(name.hasError('duplicate')).toBe(true);
+        name.setValue('fresh_check');
+        expect(name.hasError('duplicate')).toBe(false);
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
 
-  it("kind-specific parameters appear via dependsOn (range shows min/max, regex shows pattern)", () => {
-    const fixture = create({});
-    const c = fixture.componentInstance;
-    c.schemaForm.form.get("kind")!.setValue("range");
-    fixture.detectChanges();
-    expect(c.schemaForm.form.get("min")!.enabled).toBe(true);
-    expect(c.schemaForm.form.get("pattern")!.disabled).toBe(true);
+    it('kind-specific parameters appear via dependsOn (range shows min/max, regex shows pattern)', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.get('kind')!.setValue('range');
+        fixture.detectChanges();
+        expect(c.schemaForm.form.get('min')!.enabled).toBe(true);
+        expect(c.schemaForm.form.get('pattern')!.disabled).toBe(true);
 
-    c.schemaForm.form.get("kind")!.setValue("regex");
-    fixture.detectChanges();
-    expect(c.schemaForm.form.get("pattern")!.enabled).toBe(true);
-    expect(c.schemaForm.form.get("min")!.disabled).toBe(true);
-  });
+        c.schemaForm.form.get('kind')!.setValue('regex');
+        fixture.detectChanges();
+        expect(c.schemaForm.form.get('pattern')!.enabled).toBe(true);
+        expect(c.schemaForm.form.get('min')!.disabled).toBe(true);
+    });
 
-  it("create flow advances to the save step once the config is valid, then creates", () => {
-    const created: unknown[] = [];
-    TestBed.configureTestingModule({
-      imports: [ExpectationFormDialog],
-      providers: [
-        provideNoopAnimations(),
-        provideHttpClient(withXhr()),
-        { provide: MatDialogRef, useValue: { close: () => {} } },
-        { provide: MAT_DIALOG_DATA, useValue: {} },
-        {
-          provide: ExpectationsService,
-          useValue: {
-            create: (b: unknown) => {
-              created.push(b);
-              return { subscribe: () => {} };
+    it('create flow advances to the save step once the config is valid, then creates', () => {
+        const created: unknown[] = [];
+        TestBed.configureTestingModule({
+            imports: [ExpectationFormDialog],
+            providers: [
+                provideNoopAnimations(),
+                provideHttpClient(withXhr()),
+                { provide: MatDialogRef, useValue: { close: () => {} } },
+                { provide: MAT_DIALOG_DATA, useValue: {} },
+                {
+                    provide: ExpectationsService,
+                    useValue: {
+                        create: (b: unknown) => {
+                            created.push(b);
+                            return { subscribe: () => {} };
+                        },
+                    },
+                },
+                { provide: ToastrService, useValue: {} },
+            ],
+        });
+        const fixture = TestBed.createComponent(ExpectationFormDialog);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({
+            target: 'cdr_ingest',
+            column: 'msisdn',
+            kind: 'non_null',
+        });
+        c.save();
+        expect(c.step()).toBe('save');
+        c.saveForm.patchValue({ name: 'cdr_msisdn_not_null' });
+        c.save();
+        expect(created[0]).toMatchObject({
+            name: 'cdr_msisdn_not_null',
+            target: 'cdr_ingest',
+            column: 'msisdn',
+        });
+    });
+
+    it('condition kind hides the column field and shows the condition-tree editor', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.get('kind')!.setValue('condition');
+        fixture.detectChanges();
+        expect(c.schemaForm.form.get('column')!.disabled).toBe(true);
+        expect(c.kind()).toBe('condition');
+        expect(fixture.nativeElement.textContent).toContain('Records violate this check when');
+    });
+
+    it('condition kind posts the when tree and omits column on create', () => {
+        const created: unknown[] = [];
+        TestBed.configureTestingModule({
+            imports: [ExpectationFormDialog],
+            providers: [
+                provideNoopAnimations(),
+                provideHttpClient(withXhr()),
+                { provide: MatDialogRef, useValue: { close: () => {} } },
+                { provide: MAT_DIALOG_DATA, useValue: {} },
+                {
+                    provide: ExpectationsService,
+                    useValue: {
+                        create: (b: unknown) => {
+                            created.push(b);
+                            return { subscribe: () => {} };
+                        },
+                    },
+                },
+                { provide: ToastrService, useValue: {} },
+            ],
+        });
+        const fixture = TestBed.createComponent(ExpectationFormDialog);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'orders', kind: 'condition' });
+        c.when.items.push({
+            kind: 'condition',
+            field: 'amount',
+            operator: '>',
+            value: '500',
+        });
+        c.save();
+        c.saveForm.patchValue({ name: 'orders_condition' });
+        c.save();
+        expect(created[0]).toMatchObject({
+            name: 'orders_condition',
+            target: 'orders',
+            kind: 'condition',
+            column: undefined,
+            when: {
+                kind: 'group',
+                op: 'AND',
+                items: [{ kind: 'condition', field: 'amount', operator: '>', value: '500' }],
             },
-          },
-        },
-        { provide: ToastrService, useValue: {} },
-      ],
+        });
     });
-    const fixture = TestBed.createComponent(ExpectationFormDialog);
-    fixture.detectChanges();
-    const c = fixture.componentInstance;
-    c.schemaForm.form.patchValue({
-      target: "cdr_ingest",
-      column: "msisdn",
-      kind: "non_null",
-    });
-    c.save();
-    expect(c.step()).toBe("save");
-    c.saveForm.patchValue({ name: "cdr_msisdn_not_null" });
-    c.save();
-    expect(created[0]).toMatchObject({
-      name: "cdr_msisdn_not_null",
-      target: "cdr_ingest",
-      column: "msisdn",
-    });
-  });
 
-  it("condition kind hides the column field and shows the condition-tree editor", () => {
-    const fixture = create({});
-    const c = fixture.componentInstance;
-    c.schemaForm.form.get("kind")!.setValue("condition");
-    fixture.detectChanges();
-    expect(c.schemaForm.form.get("column")!.disabled).toBe(true);
-    expect(c.kind()).toBe("condition");
-    expect(fixture.nativeElement.textContent).toContain(
-      "Records violate this check when",
-    );
-  });
-
-  it("condition kind posts the when tree and omits column on create", () => {
-    const created: unknown[] = [];
-    TestBed.configureTestingModule({
-      imports: [ExpectationFormDialog],
-      providers: [
-        provideNoopAnimations(),
-        provideHttpClient(withXhr()),
-        { provide: MatDialogRef, useValue: { close: () => {} } },
-        { provide: MAT_DIALOG_DATA, useValue: {} },
-        {
-          provide: ExpectationsService,
-          useValue: {
-            create: (b: unknown) => {
-              created.push(b);
-              return { subscribe: () => {} };
+    it('edit mode stays on the config step and shows the (immutable) name in the title', () => {
+        const fixture = create({
+            expectation: {
+                name: 'cdr_duration_range',
+                targetType: 'pipeline',
+                target: 'cdr_ingest',
+                column: 'duration_s',
+                kind: 'range',
+                min: 0,
+                max: 86_400,
+                pattern: null,
+                refDataset: null,
+                refColumn: null,
+                severity: 'MAJOR',
+                enabled: true,
+                lastResult: null,
+                createdAt: 1,
+                updatedAt: 1,
             },
-          },
-        },
-        { provide: ToastrService, useValue: {} },
-      ],
+        });
+        const c = fixture.componentInstance;
+        expect(c.isEdit).toBe(true);
+        expect(c.step()).toBe('config');
+        expect(fixture.nativeElement.textContent).toContain('cdr_duration_range');
     });
-    const fixture = TestBed.createComponent(ExpectationFormDialog);
-    fixture.detectChanges();
-    const c = fixture.componentInstance;
-    c.schemaForm.form.patchValue({ target: "orders", kind: "condition" });
-    c.when.items.push({
-      kind: "condition",
-      field: "amount",
-      operator: ">",
-      value: "500",
+
+    // ─── AGT-6a A2/A3: the inline suggestion surface ───
+
+    it('passes the chosen target and column through as the tool args (A3)', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr', column: 'cost_usd' });
+        fixture.detectChanges();
+
+        // The operator re-states nothing — the dialog already knows both.
+        expect(c.aiArgs()).toEqual({
+            table: 'cdr',
+            target: 'cdr',
+            column: 'cost_usd',
+        });
     });
-    c.save();
-    c.saveForm.patchValue({ name: "orders_condition" });
-    c.save();
-    expect(created[0]).toMatchObject({
-      name: "orders_condition",
-      target: "orders",
-      kind: "condition",
-      column: undefined,
-      when: {
-        kind: "group",
-        op: "AND",
-        items: [
-          { kind: "condition", field: "amount", operator: ">", value: "500" },
-        ],
-      },
+
+    it('applies a range suggestion with kind and min/max in one patch', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr', column: 'cost_usd' });
+        fixture.detectChanges();
+
+        c.applySuggestion({
+            label: 'cdr_cost_usd_range',
+            clean: true,
+            findings: [],
+            config: {
+                name: 'cdr_cost_usd_range',
+                description: 'Auto-suggested from profiling: observed bounds',
+                targetType: 'pipeline',
+                target: 'cdr',
+                column: 'cost_usd',
+                kind: 'range',
+                min: '0.0',
+                max: '412.75',
+                severity: 'MAJOR',
+                enabled: true,
+            },
+        });
+        fixture.detectChanges();
+
+        // min/max are only enabled while kind === 'range', so they survive only if kind landed with
+        // them — this is the regression guard for that ordering trap.
+        const value = c.schemaForm.value() as Record<string, unknown>;
+        expect(value['kind']).toBe('range');
+        expect(value['min']).toBe('0.0');
+        expect(value['max']).toBe('412.75');
+        // An applied suggestion is an unsaved edit, so the dirty-close guard must see it.
+        expect(c.schemaForm.isDirty()).toBe(true);
+        // name/description are save-step fields (R9), not schema attributes.
+        expect(c.saveForm.controls.name.value).toBe('cdr_cost_usd_range');
     });
-  });
 
-  it("edit mode stays on the config step and shows the (immutable) name in the title", () => {
-    const fixture = create({
-      expectation: {
-        name: "cdr_duration_range",
-        targetType: "pipeline",
-        target: "cdr_ingest",
-        column: "duration_s",
-        kind: "range",
-        min: 0,
-        max: 86_400,
-        pattern: null,
-        refDataset: null,
-        refColumn: null,
-        severity: "MAJOR",
-        enabled: true,
-        lastResult: null,
-        createdAt: 1,
-        updatedAt: 1,
-      },
+    it('applying persists nothing — the operator still completes the existing save flow (D2)', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr', column: 'cost_usd' });
+        fixture.detectChanges();
+
+        c.applySuggestion({
+            label: 'cdr_cost_usd_not_null',
+            clean: true,
+            findings: [],
+            config: {
+                name: 'cdr_cost_usd_not_null',
+                kind: 'non_null',
+                target: 'cdr',
+                column: 'cost_usd',
+            },
+        });
+        fixture.detectChanges();
+
+        // Still on the config step, nothing saved — ExpectationsService was stubbed with NO methods, so
+        // any write attempt would have thrown.
+        expect(c.step()).toBe('config');
     });
-    const c = fixture.componentInstance;
-    expect(c.isEdit).toBe(true);
-    expect(c.step()).toBe("config");
-    expect(fixture.nativeElement.textContent).toContain("cdr_duration_range");
-  });
-
-  // ─── AGT-6a A2/A3: the inline suggestion surface ───
-
-  it("passes the chosen target and column through as the tool args (A3)", () => {
-    const fixture = create({});
-    const c = fixture.componentInstance;
-    c.schemaForm.form.patchValue({ target: "cdr", column: "cost_usd" });
-    fixture.detectChanges();
-
-    // The operator re-states nothing — the dialog already knows both.
-    expect(c.aiArgs()).toEqual({
-      table: "cdr",
-      target: "cdr",
-      column: "cost_usd",
-    });
-  });
-
-  it("applies a range suggestion with kind and min/max in one patch", () => {
-    const fixture = create({});
-    const c = fixture.componentInstance;
-    c.schemaForm.form.patchValue({ target: "cdr", column: "cost_usd" });
-    fixture.detectChanges();
-
-    c.applySuggestion({
-      label: "cdr_cost_usd_range",
-      clean: true,
-      findings: [],
-      config: {
-        name: "cdr_cost_usd_range",
-        description: "Auto-suggested from profiling: observed bounds",
-        targetType: "pipeline",
-        target: "cdr",
-        column: "cost_usd",
-        kind: "range",
-        min: "0.0",
-        max: "412.75",
-        severity: "MAJOR",
-        enabled: true,
-      },
-    });
-    fixture.detectChanges();
-
-    // min/max are only enabled while kind === 'range', so they survive only if kind landed with
-    // them — this is the regression guard for that ordering trap.
-    const value = c.schemaForm.value() as Record<string, unknown>;
-    expect(value["kind"]).toBe("range");
-    expect(value["min"]).toBe("0.0");
-    expect(value["max"]).toBe("412.75");
-    // An applied suggestion is an unsaved edit, so the dirty-close guard must see it.
-    expect(c.schemaForm.isDirty()).toBe(true);
-    // name/description are save-step fields (R9), not schema attributes.
-    expect(c.saveForm.controls.name.value).toBe("cdr_cost_usd_range");
-  });
-
-  it("applying persists nothing — the operator still completes the existing save flow (D2)", () => {
-    const fixture = create({});
-    const c = fixture.componentInstance;
-    c.schemaForm.form.patchValue({ target: "cdr", column: "cost_usd" });
-    fixture.detectChanges();
-
-    c.applySuggestion({
-      label: "cdr_cost_usd_not_null",
-      clean: true,
-      findings: [],
-      config: {
-        name: "cdr_cost_usd_not_null",
-        kind: "non_null",
-        target: "cdr",
-        column: "cost_usd",
-      },
-    });
-    fixture.detectChanges();
-
-    // Still on the config step, nothing saved — ExpectationsService was stubbed with NO methods, so
-    // any write attempt would have thrown.
-    expect(c.step()).toBe("config");
-  });
 });

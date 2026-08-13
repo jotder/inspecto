@@ -333,7 +333,9 @@ export class PipelineEditorComponent implements OnInit {
     /** The selected flow's editable model mapped to G6 data — fed to the host only on a flow switch. */
     readonly g6Data = computed<G6GraphData | null>(() => {
         const m = this.model();
-        return m ? authoredToG6(m, this.typeCat(), (n) => this.statusOf(n), this.iconMap(), this.lastRunCounts()) : null;
+        return m
+            ? authoredToG6(m, this.typeCat(), (n) => this.statusOf(n), this.iconMap(), this.lastRunCounts())
+            : null;
     });
 
     // ── Recipe view (ELT amendment UI plan §1, S1) ──────────────────────────────────────────────────
@@ -364,9 +366,7 @@ export class PipelineEditorComponent implements OnInit {
     });
 
     /** The mode actually shown: the user's preference, unless the open graph forces Canvas. */
-    readonly effectiveMode = computed<'recipe' | 'canvas'>(() =>
-        this.stepChain() ? this.viewMode() : 'canvas',
-    );
+    readonly effectiveMode = computed<'recipe' | 'canvas'>(() => (this.stepChain() ? this.viewMode() : 'canvas'));
 
     /** Whether the preference is Recipe but the open graph forced a Canvas fallback — drives the alert. */
     readonly forcedToCanvas = computed(() => this.viewMode() === 'recipe' && !this.stepChain() && !!this.model());
@@ -400,7 +400,9 @@ export class PipelineEditorComponent implements OnInit {
             };
             const next = insertRouteAfter(m, node, e.afterId);
             if (!next) {
-                this.toast.warning('Cannot insert a Route here — it needs exactly one downstream Step. Use the Canvas.');
+                this.toast.warning(
+                    'Cannot insert a Route here — it needs exactly one downstream Step. Use the Canvas.',
+                );
                 return;
             }
             this.model.set(next);
@@ -518,7 +520,13 @@ export class PipelineEditorComponent implements OnInit {
 
     /** A node's authoring status — the canvas outline cue and the inspector chip. */
     statusOf(n: AuthoredNode): NodeStatus {
-        return computeNodeStatus(n, this.typeCategory(n.type), this.validRefs(), this.testedStatus(), this.refsLoaded());
+        return computeNodeStatus(
+            n,
+            this.typeCategory(n.type),
+            this.validRefs(),
+            this.testedStatus(),
+            this.refsLoaded(),
+        );
     }
 
     /** Bound reference to {@link statusOf} for the step-cards `@Input` (a plain method reference would lose `this`). */
@@ -581,8 +589,9 @@ export class PipelineEditorComponent implements OnInit {
                 this.typeLowerable.set(new Map(ts.map((t) => [t.type, t.lowerable])));
                 // Only types the server actually specced — a type whose `attributes` the payload omits
                 // entirely (an older server) must stay absent so the dialog uses its fallback table.
-                this.typeAttributes.set(new Map(
-                    ts.filter((t) => t.attributes !== undefined).map((t) => [t.type, t.attributes!])));
+                this.typeAttributes.set(
+                    new Map(ts.filter((t) => t.attributes !== undefined).map((t) => [t.type, t.attributes!])),
+                );
             },
             error: () => this.paletteGroups.set([]),
         });
@@ -661,7 +670,9 @@ export class PipelineEditorComponent implements OnInit {
                     );
                 }
                 for (const id of this.openIds()) if (!keep.has(id)) this.forgetTab(id);
-                this.openIds.set(next.filter((id) => keep.has(id)).concat([...keep].filter((id) => !next.includes(id))));
+                this.openIds.set(
+                    next.filter((id) => keep.has(id)).concat([...keep].filter((id) => !next.includes(id))),
+                );
 
                 const active = this.selectedId();
                 if (!active || !keep.has(active)) {
@@ -812,7 +823,10 @@ export class PipelineEditorComponent implements OnInit {
                 this.configApi.registerPipeline(written.path).subscribe({
                     next: () => {
                         this.creating.set(false);
-                        this.flows.update((fs) => [...fs, { name, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]);
+                        this.flows.update((fs) => [
+                            ...fs,
+                            { name, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+                        ]);
                         this.select(name);
                     },
                     error: () => {
@@ -905,14 +919,16 @@ export class PipelineEditorComponent implements OnInit {
      * toast turned an n-problem graph into n save→fix→save cycles.
      */
     private showRefusals(err: unknown): boolean {
-        const refusals = (err as { error?: { error?: { details?: { refusals?: PipelineRefusal[] } } } })
-            ?.error?.error?.details?.refusals;
+        const refusals = (err as { error?: { error?: { details?: { refusals?: PipelineRefusal[] } } } })?.error?.error
+            ?.details?.refusals;
         if (!refusals?.length) return false;
-        this.findings.set(refusals.map((r) => ({
-            severity: 'error' as const,
-            nodeId: r.nodeId,
-            message: r.message,
-        })));
+        this.findings.set(
+            refusals.map((r) => ({
+                severity: 'error' as const,
+                nodeId: r.nodeId,
+                message: r.message,
+            })),
+        );
         this.bottomTab.set('validation');
         this.toast.error(
             refusals.length === 1
@@ -953,7 +969,7 @@ export class PipelineEditorComponent implements OnInit {
                                 consumes: [],
                             },
                         ]);
-                        this.select(res.id);   // reloads the real graph, correcting the optimistic counts
+                        this.select(res.id); // reloads the real graph, correcting the optimistic counts
                         this.toast.success(`Created template '${res.id}'`);
                         // e.g. the schema could not be copied — the operator must repoint it before editing.
                         written.notes?.forEach((n) => this.toast.info(n));
@@ -1025,9 +1041,7 @@ export class PipelineEditorComponent implements OnInit {
                 if (!res) return;
                 this.api.label(id, res.name).subscribe({
                     next: () => {
-                        this.flows.update((fs) =>
-                            fs.map((f) => (f.name === id ? { ...f, displayName: res.name } : f)),
-                        );
+                        this.flows.update((fs) => fs.map((f) => (f.name === id ? { ...f, displayName: res.name } : f)));
                         this.toast.success(`Renamed to '${res.name}'`);
                     },
                     error: (err) => this.onWriteError(err, 'Rename failed'),
@@ -1038,10 +1052,10 @@ export class PipelineEditorComponent implements OnInit {
     async deletePipeline(): Promise<void> {
         const id = this.selectedId();
         if (!id) return;
-        const ok = await this.confirm.confirmDestructive(
-            `Permanently delete the authored pipeline '${id}'?`,
-            { title: 'Delete pipeline', confirmText: 'Delete' },
-        );
+        const ok = await this.confirm.confirmDestructive(`Permanently delete the authored pipeline '${id}'?`, {
+            title: 'Delete pipeline',
+            confirmText: 'Delete',
+        });
         if (!ok) return;
         // W5: deleting a registered pipeline discards its canonical config (the server refuses an
         // active pipeline — deactivate first).
@@ -1379,8 +1393,7 @@ export class PipelineEditorComponent implements OnInit {
     });
 
     /** The distinct offending types, for the banner text. */
-    readonly unsupportedTypeList = computed(() =>
-        [...new Set(this.unsupportedNodes().map((n) => n.type))].join(', '));
+    readonly unsupportedTypeList = computed(() => [...new Set(this.unsupportedNodes().map((n) => n.type))].join(', '));
 
     /** Click a finding to select its node on the canvas. */
     selectFinding(nodeId?: string): void {

@@ -10,7 +10,7 @@ describe('lensHomeRedirect (W4 per-lens home page)', () => {
         expect(LENS_HOME).toEqual({ business: 'kpi-reports', builder: 'pipelines', ops: 'events' });
     });
 
-    it('redirects to the current lens\'s home route', () => {
+    it("redirects to the current lens's home route", () => {
         const lens = TestBed.inject(LensService);
         lens.selectLens('business');
         expect(TestBed.runInInjectionContext(() => lensHomeRedirect())).toBe('kpi-reports');

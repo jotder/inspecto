@@ -7,7 +7,7 @@ import { environment } from '../../../environments/environment';
  * the `v1Interceptor` unwraps, so callers still see plain DTOs).
  */
 export function apiUrl(path: string): string {
-  return `${environment.apiBaseUrl}/v1${path}`;
+    return `${environment.apiBaseUrl}/v1${path}`;
 }
 
 /**
@@ -23,25 +23,25 @@ export function apiUrl(path: string): string {
  * the caller's fallback instead.
  */
 export function apiErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof HttpErrorResponse) {
-    // A status-0 / parse failure means we never got a real JSON body — use the fallback.
-    if (err.status === 0) return fallback;
-    const e = err.error?.error;
-    if (typeof e === 'string' && e.trim()) return e; // legacy: { error: 'msg' }
-    const msg = e?.message; // v1: { error: { message, … } }
-    if (typeof msg === 'string' && msg.trim()) return msg;
+    if (err instanceof HttpErrorResponse) {
+        // A status-0 / parse failure means we never got a real JSON body — use the fallback.
+        if (err.status === 0) return fallback;
+        const e = err.error?.error;
+        if (typeof e === 'string' && e.trim()) return e; // legacy: { error: 'msg' }
+        const msg = e?.message; // v1: { error: { message, … } }
+        if (typeof msg === 'string' && msg.trim()) return msg;
+        return fallback;
+    }
     return fallback;
-  }
-  return fallback;
 }
 
 /** Build HttpParams from a plain object, skipping null/undefined/'' values. */
 export function toParams(obj: Record<string, unknown>): HttpParams {
-  let p = new HttpParams();
-  for (const [k, v] of Object.entries(obj)) {
-    if (v !== undefined && v !== null && v !== '') {
-      p = p.set(k, Array.isArray(v) ? v.join(',') : String(v));
+    let p = new HttpParams();
+    for (const [k, v] of Object.entries(obj)) {
+        if (v !== undefined && v !== null && v !== '') {
+            p = p.set(k, Array.isArray(v) ? v.join(',') : String(v));
+        }
     }
-  }
-  return p;
+    return p;
 }

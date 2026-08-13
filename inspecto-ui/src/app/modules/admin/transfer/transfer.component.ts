@@ -142,7 +142,8 @@ export class TransferComponent implements OnInit {
         const all = this.allItems();
         const selected = all.filter((i) => this.isSelected(i));
         if (!selected.length) return;
-        this.transfer.buildExport(selected, all, this.includeDeps())
+        this.transfer
+            .buildExport(selected, all, this.includeDeps())
             .pipe(catchError((err) => of(apiErrorMessage(err, 'Export failed.'))))
             .subscribe((res) => {
                 if (typeof res === 'string') {
@@ -151,8 +152,11 @@ export class TransferComponent implements OnInit {
                 }
                 this.transfer.download(res.bundle);
                 const extra = res.bundle.items.length - selected.length;
-                this.toastr.success(`Exported ${res.bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`);
-                if (res.missing.length) this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
+                this.toastr.success(
+                    `Exported ${res.bundle.items.length} artifact(s)${extra > 0 ? ` (${extra} pulled in as dependencies)` : ''}`,
+                );
+                if (res.missing.length)
+                    this.toastr.warning(`Unresolved references left out: ${res.missing.join(', ')}`);
                 if (res.absent.length) this.toastr.warning(`Not found on this instance: ${res.absent.join(', ')}`);
             });
     }
@@ -222,7 +226,8 @@ export class TransferComponent implements OnInit {
                 const written = outcome.imported + outcome.overwritten;
                 if (outcome.failed) {
                     this.toastr.warning(
-                        `Imported ${written} artifact(s); ${outcome.failed} failed — see the result column.`);
+                        `Imported ${written} artifact(s); ${outcome.failed} failed — see the result column.`,
+                    );
                 } else if (outcome.unchanged && !written) {
                     this.toastr.info(`Already up to date — ${outcome.unchanged} artifact(s) unchanged.`);
                 } else {

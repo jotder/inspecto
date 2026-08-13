@@ -67,7 +67,9 @@ export function sha256Hex(message: string): string {
     buf[total - 2] = (lo >>> 8) & 0xff;
     buf[total - 1] = lo & 0xff;
 
-    const H = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    const H = new Uint32Array([
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+    ]);
     const w = new Uint32Array(64);
     for (let off = 0; off < total; off += 64) {
         for (let i = 0; i < 16; i++) {
@@ -79,7 +81,14 @@ export function sha256Hex(message: string): string {
             const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
             w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
         }
-        let a = H[0], b = H[1], c = H[2], d = H[3], e = H[4], f = H[5], g = H[6], h = H[7];
+        let a = H[0],
+            b = H[1],
+            c = H[2],
+            d = H[3],
+            e = H[4],
+            f = H[5],
+            g = H[6],
+            h = H[7];
         for (let i = 0; i < 64; i++) {
             const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
             const ch = (e & f) ^ (~e & g);
@@ -87,10 +96,23 @@ export function sha256Hex(message: string): string {
             const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
             const maj = (a & b) ^ (a & c) ^ (b & c);
             const t2 = (S0 + maj) >>> 0;
-            h = g; g = f; f = e; e = (d + t1) >>> 0; d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+            h = g;
+            g = f;
+            f = e;
+            e = (d + t1) >>> 0;
+            d = c;
+            c = b;
+            b = a;
+            a = (t1 + t2) >>> 0;
         }
-        H[0] = (H[0] + a) >>> 0; H[1] = (H[1] + b) >>> 0; H[2] = (H[2] + c) >>> 0; H[3] = (H[3] + d) >>> 0;
-        H[4] = (H[4] + e) >>> 0; H[5] = (H[5] + f) >>> 0; H[6] = (H[6] + g) >>> 0; H[7] = (H[7] + h) >>> 0;
+        H[0] = (H[0] + a) >>> 0;
+        H[1] = (H[1] + b) >>> 0;
+        H[2] = (H[2] + c) >>> 0;
+        H[3] = (H[3] + d) >>> 0;
+        H[4] = (H[4] + e) >>> 0;
+        H[5] = (H[5] + f) >>> 0;
+        H[6] = (H[6] + g) >>> 0;
+        H[7] = (H[7] + h) >>> 0;
     }
     let hex = '';
     for (let i = 0; i < 8; i++) hex += H[i].toString(16).padStart(8, '0');

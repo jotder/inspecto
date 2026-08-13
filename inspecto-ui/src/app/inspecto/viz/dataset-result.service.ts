@@ -47,8 +47,9 @@ export class DatasetResultService {
             return {
                 ok: false,
                 rows: [],
-                error: 'This widget uses offline-only features (a named-measure SQL expression, an OR filter, '
-                    + 'or an empty projection) that the live BI endpoint cannot run.',
+                error:
+                    'This widget uses offline-only features (a named-measure SQL expression, an OR filter, ' +
+                    'or an empty projection) that the live BI endpoint cannot run.',
             };
         }
         try {
@@ -110,7 +111,12 @@ function flattenFilters(group: ConditionGroup | null, cols: ColumnMeta[]): BiFil
 function filterTerms(c: Condition, cols: ColumnMeta[]): BiFilter[] | null {
     const typed = (raw: string | undefined): unknown => typedValue(raw, columnType(cols, c.field));
     switch (c.operator) {
-        case '=': case '!=': case '<': case '<=': case '>': case '>=':
+        case '=':
+        case '!=':
+        case '<':
+        case '<=':
+        case '>':
+        case '>=':
             return [{ field: c.field, op: c.operator, value: typed(c.value) }];
         case 'contains':
             return [{ field: c.field, op: 'like', value: `%${c.value ?? ''}%` }];

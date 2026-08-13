@@ -1,4 +1,11 @@
-import { ComponentKind, ConfigFinding, getKind, hasEditorRoute, registerEditorRoute, registerKind } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    ConfigFinding,
+    getKind,
+    hasEditorRoute,
+    registerEditorRoute,
+    registerKind,
+} from 'app/inspecto/component-model';
 import { DatasetConfig } from './dataset-types';
 
 /**

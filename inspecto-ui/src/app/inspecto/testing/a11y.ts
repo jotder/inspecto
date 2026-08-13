@@ -37,8 +37,6 @@ export async function expectNoA11yViolations(root: Element): Promise<void> {
                     `    ${v.helpUrl}`,
             )
             .join('\n');
-        throw new Error(
-            `axe-core found ${results.violations.length} accessibility violation(s):\n${summary}`,
-        );
+        throw new Error(`axe-core found ${results.violations.length} accessibility violation(s):\n${summary}`);
     }
 }

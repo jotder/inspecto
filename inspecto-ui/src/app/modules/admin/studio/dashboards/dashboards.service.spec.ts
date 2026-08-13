@@ -10,10 +10,20 @@ function setup() {
         of({ type: 'dashboard', name: String(c['id']), ref: `dashboard/${c['id']}`, content: c }),
     );
     const list = vi.fn(() =>
-        of([{ type: 'dashboard', name: 'd1', ref: 'dashboard/d1', content: { name: 'd1', tiles: [{ widgetId: 'c1', span: 1 }] } }]),
+        of([
+            {
+                type: 'dashboard',
+                name: 'd1',
+                ref: 'dashboard/d1',
+                content: { name: 'd1', tiles: [{ widgetId: 'c1', span: 1 }] },
+            },
+        ]),
     );
     TestBed.configureTestingModule({
-        providers: [DashboardsService, { provide: ComponentsService, useValue: { create, list, remove: vi.fn(() => of(null)) } }],
+        providers: [
+            DashboardsService,
+            { provide: ComponentsService, useValue: { create, list, remove: vi.fn(() => of(null)) } },
+        ],
     });
     return { svc: TestBed.inject(DashboardsService), create, list };
 }

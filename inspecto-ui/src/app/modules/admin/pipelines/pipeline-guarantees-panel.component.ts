@@ -38,7 +38,9 @@ interface GuaranteeRow {
                     <li class="flex items-center gap-2 text-sm">
                         <mat-icon
                             class="icon-size-4 shrink-0"
-                            [svgIcon]="row.summary ? 'heroicons_outline:check-circle' : 'heroicons_outline:minus-circle'"
+                            [svgIcon]="
+                                row.summary ? 'heroicons_outline:check-circle' : 'heroicons_outline:minus-circle'
+                            "
                             [style.color]="row.summary ? 'var(--gamma-primary)' : ''"
                         ></mat-icon>
                         <span class="font-medium">{{ row.label }}</span>
@@ -80,9 +82,7 @@ export class PipelineGuaranteesPanelComponent {
         const quarantine = m.nodes.find(
             (n) => n.type === 'sink.persistent' && n.config?.['dir'] != null && n.config?.['database'] == null,
         );
-        const sink = m.nodes.find(
-            (n) => n.type === 'sink.persistent' && n.config?.['database'] != null,
-        );
+        const sink = m.nodes.find((n) => n.type === 'sink.persistent' && n.config?.['database'] != null);
 
         const dup = acq?.config?.['duplicate'] as { mode?: string } | undefined;
         const rows: GuaranteeRow[] = [

@@ -14,12 +14,27 @@ import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
-import { ColumnMeta, QueryChange, QueryModel, QueryPanelComponent, QuerySource, inferColumns } from 'app/inspecto/query';
+import {
+    ColumnMeta,
+    QueryChange,
+    QueryModel,
+    QueryPanelComponent,
+    QuerySource,
+    inferColumns,
+} from 'app/inspecto/query';
 import { DatasetCalculatedComponent } from './dataset-calculated.component';
 import { DatasetColumnsComponent } from './dataset-columns.component';
 import { DatasetMeasuresComponent } from './dataset-measures.component';
 import { SAMPLE_SOURCES, SAMPLE_SOURCE_NAMES } from './dataset-sources';
-import { buildDataset, CalculatedColumn, Dataset, DatasetColumn, DatasetKind, NamedMeasure, inferRoles } from './dataset-types';
+import {
+    buildDataset,
+    CalculatedColumn,
+    Dataset,
+    DatasetColumn,
+    DatasetKind,
+    NamedMeasure,
+    inferRoles,
+} from './dataset-types';
 import { DatasetsService } from './datasets.service';
 
 const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
@@ -27,7 +42,14 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -106,7 +128,9 @@ export class DatasetEditorComponent implements OnInit {
         const rows = SAMPLE_SOURCES[name] ?? [];
         return { name, rows, columns: this.inferredColumns() };
     });
-    private readonly inferredColumns = computed<ColumnMeta[]>(() => inferColumns(SAMPLE_SOURCES[this.sourceName()] ?? []));
+    private readonly inferredColumns = computed<ColumnMeta[]>(() =>
+        inferColumns(SAMPLE_SOURCES[this.sourceName()] ?? []),
+    );
 
     readonly isVirtual = computed(() => this.kind() === 'virtual');
 
@@ -115,13 +139,11 @@ export class DatasetEditorComponent implements OnInit {
         this.form.controls.kind.valueChanges
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((k) => this.kind.set(k));
-        this.form.controls.sourceName.valueChanges
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe((s) => {
-                this.sourceName.set(s);
-                this.columns.set(inferRoles(this.inferredColumns()));
-                this.model.set(null);
-            });
+        this.form.controls.sourceName.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s) => {
+            this.sourceName.set(s);
+            this.columns.set(inferRoles(this.inferredColumns()));
+            this.model.set(null);
+        });
 
         if (this.id) {
             this.editing.set(true);
@@ -154,7 +176,8 @@ export class DatasetEditorComponent implements OnInit {
     history(): void {
         if (!this.id) return;
         const id = this.id;
-        this.matDialog.open(ComponentHistoryDialog, { data: { type: 'dataset', id, label: id } })
+        this.matDialog
+            .open(ComponentHistoryDialog, { data: { type: 'dataset', id, label: id } })
             .afterClosed()
             .subscribe((restored) => {
                 if (restored) this.loadExisting(id);
@@ -162,7 +185,12 @@ export class DatasetEditorComponent implements OnInit {
     }
 
     private seed(d: Dataset): void {
-        this.form.patchValue({ name: d.name, kind: d.kind, sourceName: d.sourceName, physicalRef: d.physicalRef ?? '' });
+        this.form.patchValue({
+            name: d.name,
+            kind: d.kind,
+            sourceName: d.sourceName,
+            physicalRef: d.physicalRef ?? '',
+        });
         this.form.controls.name.disable(); // id is immutable on edit
         this.kind.set(d.kind);
         this.sourceName.set(d.sourceName);

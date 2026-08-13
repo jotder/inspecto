@@ -2,7 +2,16 @@ import { ChangeDetectionStrategy, Component, OnDestroy, ViewChild, computed, inj
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, LensService, ParserDef, ParserPreview, ParserTreeNode, ParsersService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
+import {
+    ConfigService,
+    LensService,
+    ParserDef,
+    ParserPreview,
+    ParserTreeNode,
+    ParsersService,
+    SpacesService,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import { Observable, catchError, forkJoin, map, of, switchMap, tap, throwError } from 'rxjs';
 import { GrammarEditorComponent, PARSING_FRONTENDS } from 'app/inspecto/grammar';
 import { mergeBlock } from 'app/inspecto/component-model';
@@ -116,13 +125,15 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
                 this.state.schemaPreview.set(null);
                 this.state.schemaError.set(null);
             }),
-            map((p): ParserPreview => ({
-                kind: 'table',
-                columns: p.columns,
-                rows: p.rows,
-                rowCount: p.rowCount,
-                rejectedRows: p.rejectedRows,
-            })),
+            map(
+                (p): ParserPreview => ({
+                    kind: 'table',
+                    columns: p.columns,
+                    rows: p.rows,
+                    rowCount: p.rowCount,
+                    rejectedRows: p.rejectedRows,
+                }),
+            ),
             catchError((e) => {
                 this.state.parsePreview.set(null);
                 this.state.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));

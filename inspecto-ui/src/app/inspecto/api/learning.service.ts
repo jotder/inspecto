@@ -34,19 +34,18 @@ export class LearningService {
 
     /** Rate a Case helpful / not-helpful (+ optional note). 404 when the case id is unknown. */
     rateCase(caseId: string, rating: FeedbackRating, note?: string): Observable<CaseFeedback> {
-        return this.http.post<CaseFeedback>(
-            apiUrl(`/agent/cases/${encodeURIComponent(caseId)}/feedback`),
-            { rating, note },
-        );
+        return this.http.post<CaseFeedback>(apiUrl(`/agent/cases/${encodeURIComponent(caseId)}/feedback`), {
+            rating,
+            note,
+        });
     }
 
     /** Prior Cases similar to `caseId` (recall), each with a `similarity` score. */
     similarCases(caseId: string, k = 5): Observable<Record<string, unknown>[]> {
         return this.http
-            .get<{ similar: Record<string, unknown>[] }>(
-                apiUrl(`/agent/cases/${encodeURIComponent(caseId)}/similar`),
-                { params: toParams({ k }) },
-            )
+            .get<{
+                similar: Record<string, unknown>[];
+            }>(apiUrl(`/agent/cases/${encodeURIComponent(caseId)}/similar`), { params: toParams({ k }) })
             .pipe(map((r) => r.similar ?? []));
     }
 }

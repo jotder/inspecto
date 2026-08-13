@@ -20,16 +20,29 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
     const now = Date.now();
     const iso = (offsetMin: number): string => new Date(now + offsetMin * 60_000).toISOString();
     seedIconMap(store, space);
-    seedPatternPacks(store, space);   // V2 (c): the six shipped motifs, authored per Space
+    seedPatternPacks(store, space); // V2 (c): the six shipped motifs, authored per Space
 
     // ── Workbench ───────────────────────────────────────────────────────────────────────────────
     const connections: ConnectionProfile[] = [
-        { id: 'xdr_warehouse', connector: 'db', host: 'dwh.telco.example', port: 5432, database: 'xdr', username: 'graph_ro', password: '${ENV:DWH_PW}', description: 'xDR warehouse (entity/link build source)' },
+        {
+            id: 'xdr_warehouse',
+            connector: 'db',
+            host: 'dwh.telco.example',
+            port: 5432,
+            database: 'xdr',
+            username: 'graph_ro',
+            password: '${ENV:DWH_PW}',
+            description: 'xDR warehouse (entity/link build source)',
+        },
     ];
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
     putComponent(store, space, 'transform', 'min_link_weight', { type: 'transform.filter', where: 'weight >= 1' });
-    putComponent(store, space, 'sink', 'graph_store', { type: 'sink.persistent', format: 'parquet', partitions: ['link_type'] });
+    putComponent(store, space, 'sink', 'graph_store', {
+        type: 'sink.persistent',
+        format: 'parquet',
+        partitions: ['link_type'],
+    });
 
     store.put(space, PIPELINES_COLL, 'entity_link_build', {
         name: 'entity_link_build',
@@ -49,7 +62,9 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
 
     // ── Studio ──────────────────────────────────────────────────────────────────────────────────
     putComponent(store, space, 'dataset', 'entities', {
-        name: 'entities', kind: 'virtual', sourceName: 'entities',
+        name: 'entities',
+        kind: 'virtual',
+        sourceName: 'entities',
         query: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null },
         physicalRef: null,
         columns: [
@@ -63,7 +78,9 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
         viz: null,
     });
     putComponent(store, space, 'dataset', 'links', {
-        name: 'links', kind: 'virtual', sourceName: 'links',
+        name: 'links',
+        kind: 'virtual',
+        sourceName: 'links',
         query: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null },
         physicalRef: null,
         columns: [
@@ -74,23 +91,33 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
             { name: 'weight', type: 'number', role: 'measure' },
             { name: 'first_seen', type: 'date', role: 'temporal' },
         ],
-        measures: [], viz: null,
+        measures: [],
+        viz: null,
     });
 
     putComponent(store, space, 'widget', 'entity_count', {
-        name: 'entity_count', datasetId: 'entities', vizType: 'kpi',
+        name: 'entity_count',
+        datasetId: 'entities',
+        vizType: 'kpi',
         controls: { value: [{ field: 'risk_score', agg: 'count' }] },
-        description: 'Entities in the current graph build', tags: ['graph'],
+        description: 'Entities in the current graph build',
+        tags: ['graph'],
     });
     putComponent(store, space, 'widget', 'links_by_type', {
-        name: 'links_by_type', datasetId: 'links', vizType: 'pie',
+        name: 'links_by_type',
+        datasetId: 'links',
+        vizType: 'pie',
         controls: { x: [{ field: 'link_type' }], y: [{ field: 'weight', agg: 'sum' }] },
-        description: 'Relationship mix (calls / shared devices / payments)', tags: ['graph'],
+        description: 'Relationship mix (calls / shared devices / payments)',
+        tags: ['graph'],
     });
     putComponent(store, space, 'widget', 'risk_by_entity_type', {
-        name: 'risk_by_entity_type', datasetId: 'entities', vizType: 'bar',
+        name: 'risk_by_entity_type',
+        datasetId: 'entities',
+        vizType: 'bar',
         controls: { x: [{ field: 'entity_type' }], y: [{ field: 'risk_score', agg: 'avg' }] },
-        description: 'Average risk per entity type', tags: ['graph', 'risk'],
+        description: 'Average risk per entity type',
+        tags: ['graph', 'risk'],
     });
     putComponent(store, space, 'dashboard', 'link_overview', {
         name: 'link_overview',
@@ -108,7 +135,8 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
         id: 'fraud_ring_detection_graph',
         title: 'Fraud-ring detection graph',
         kind: 'report',
-        description: 'Interactive entity/link graph over subscriber-device-account relationships, with community detection to surface ring candidates.',
+        description:
+            'Interactive entity/link graph over subscriber-device-account relationships, with community detection to surface ring candidates.',
         status: 'accepted',
         submittedAt: iso(-60 * 24 * 10),
         decisionNote: 'Accepted — delivery blocked on the Entity/Link Graph Visualization Type (C5).',
@@ -117,11 +145,27 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
 
     // ── Ops ─────────────────────────────────────────────────────────────────────────────────────
     store.put<JobDetail>(space, JOBS_COLL, 'graph_build_nightly', {
-        name: 'graph_build_nightly', type: 'ingest', cron: '0 0 3 * * *', onPipeline: null, enabled: true,
-        lastStatus: 'SUCCESS', lastRunTime: iso(-60 * 9), nextFire: iso(60 * 15), catchUp: false,
+        name: 'graph_build_nightly',
+        type: 'ingest',
+        cron: '0 0 3 * * *',
+        onPipeline: null,
+        enabled: true,
+        lastStatus: 'SUCCESS',
+        lastRunTime: iso(-60 * 9),
+        nextFire: iso(60 * 15),
+        catchUp: false,
         params: { pipeline: 'entity_link_build' },
     });
-    recordRun(store, space, 'graph_build_nightly', 'CRON', 'SUCCESS', now - 9 * 3_600_000, 187_000, 'Built 6 entities, 5 links; 1 new community flagged.');
+    recordRun(
+        store,
+        space,
+        'graph_build_nightly',
+        'CRON',
+        'SUCCESS',
+        now - 9 * 3_600_000,
+        187_000,
+        'Built 6 entities, 5 links; 1 new community flagged.',
+    );
 
     const laEvents: Array<[string, string, string]> = [
         ['JOB_SUCCEEDED', 'INFO', 'Nightly graph build completed (6 entities / 5 links).'],
@@ -130,17 +174,40 @@ export function seedLinkAnalysis(store: MockStore, space: string): void {
     ];
     laEvents.forEach(([type, level, message], i) => {
         const ts = now - i * 3_600_000;
-        store.put(space, SIGNALS_COLL, `evt-la-${i}`, eventToSignal({
-            eventId: `evt-la-${i}`, ts, timestamp: new Date(ts).toISOString(), level, type,
-            source: 'engine', pipeline: 'entity_link_build', correlationId: i === 1 ? 'corr-la-1' : null, message, attributes: {},
-        }));
+        store.put(
+            space,
+            SIGNALS_COLL,
+            `evt-la-${i}`,
+            eventToSignal({
+                eventId: `evt-la-${i}`,
+                ts,
+                timestamp: new Date(ts).toISOString(),
+                level,
+                type,
+                source: 'engine',
+                pipeline: 'entity_link_build',
+                correlationId: i === 1 ? 'corr-la-1' : null,
+                message,
+                attributes: {},
+            }),
+        );
     });
 
     store.put<OperationalObject>(space, OPS_OBJECTS_COLL, 'case-la-0', {
-        id: 'case-la-0', objectType: 'CASE', title: 'Ring candidate: community 3 (shared device, LV traffic)',
-        description: 'Two high-risk subscribers share IMEI 356938035643809 and route payments through account A-1003. Seeded by the Link Analysis space template.',
-        status: 'OPEN', severity: 'CRITICAL', priority: 'HIGH', owner: 'graph-ops', assignee: 'dana',
-        correlationId: 'corr-la-1', attributes: { pipeline: 'entity_link_build', community: '3' },
-        createdAt: now - 8 * 3_600_000, updatedAt: now - 7 * 3_600_000, closedAt: 0,
+        id: 'case-la-0',
+        objectType: 'CASE',
+        title: 'Ring candidate: community 3 (shared device, LV traffic)',
+        description:
+            'Two high-risk subscribers share IMEI 356938035643809 and route payments through account A-1003. Seeded by the Link Analysis space template.',
+        status: 'OPEN',
+        severity: 'CRITICAL',
+        priority: 'HIGH',
+        owner: 'graph-ops',
+        assignee: 'dana',
+        correlationId: 'corr-la-1',
+        attributes: { pipeline: 'entity_link_build', community: '3' },
+        createdAt: now - 8 * 3_600_000,
+        updatedAt: now - 7 * 3_600_000,
+        closedAt: 0,
     });
 }

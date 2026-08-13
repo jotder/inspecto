@@ -26,10 +26,14 @@ import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'ap
 /** The registry component a node category binds (parser→grammar, transform, sink); null for sources/control. */
 export function bindKindFor(category: string): ComponentType | null {
     switch (category) {
-        case 'PARSE':     return 'grammar';
-        case 'TRANSFORM': return 'transform';
-        case 'SINK':      return 'sink';
-        default:          return null;
+        case 'PARSE':
+            return 'grammar';
+        case 'TRANSFORM':
+            return 'transform';
+        case 'SINK':
+            return 'sink';
+        default:
+            return null;
     }
 }
 
@@ -44,22 +48,32 @@ export type TestOutcome = 'tested' | 'rejects';
 /** Glyph prefixed to a node's canvas label so status reads as text, not colour alone ('' = none). */
 export function statusGlyph(status: NodeStatus): string {
     switch (status) {
-        case 'unconfigured': return '⚠ ';
-        case 'dangling':     return '⚠ ';
-        case 'tested':       return '✓ ';
-        case 'rejects':      return '✕ ';
-        default:             return '';
+        case 'unconfigured':
+            return '⚠ ';
+        case 'dangling':
+            return '⚠ ';
+        case 'tested':
+            return '✓ ';
+        case 'rejects':
+            return '✕ ';
+        default:
+            return '';
     }
 }
 
 /** Human label for a node status (the inspector chip). */
 export function statusLabel(status: NodeStatus): string {
     switch (status) {
-        case 'unconfigured': return 'Needs config';
-        case 'dangling':     return 'Missing component';
-        case 'configured':   return 'Configured';
-        case 'tested':       return 'Tested';
-        case 'rejects':      return 'Has rejects';
+        case 'unconfigured':
+            return 'Needs config';
+        case 'dangling':
+            return 'Missing component';
+        case 'configured':
+            return 'Configured';
+        case 'tested':
+            return 'Tested';
+        case 'rejects':
+            return 'Has rejects';
     }
 }
 
@@ -119,11 +133,19 @@ export function validatePipeline(
         if (status === 'unconfigured') {
             findings.push({ severity: 'error', nodeId: n.id, message: `${name}: needs configuration.` });
         } else if (status === 'dangling') {
-            findings.push({ severity: 'error', nodeId: n.id, message: `${name}: references a missing ${bindKindFor(cat)} (${n.use}).` });
+            findings.push({
+                severity: 'error',
+                nodeId: n.id,
+                message: `${name}: references a missing ${bindKindFor(cat)} (${n.use}).`,
+            });
         } else if (status === 'configured') {
             findings.push({ severity: 'info', nodeId: n.id, message: `${name}: not yet tested.` });
         } else if (status === 'rejects') {
-            findings.push({ severity: 'warning', nodeId: n.id, message: `${name}: last run had unmatched/dropped rows.` });
+            findings.push({
+                severity: 'warning',
+                nodeId: n.id,
+                message: `${name}: last run had unmatched/dropped rows.`,
+            });
         }
         if (cat !== 'SOURCE' && !incoming.has(n.id)) {
             findings.push({ severity: 'warning', nodeId: n.id, message: `${name}: has no input connection.` });
@@ -155,13 +177,20 @@ export function resolveNodeIcon(
 /** Map a flow node category onto a catalog NodeKind for shape/colour reuse (cosmetic only). */
 export function categoryVisualKind(category: string): NodeKind {
     switch (category) {
-        case 'SOURCE':    return 'STREAM';
-        case 'PARSE':     return 'SCHEMA';
-        case 'TRANSFORM': return 'ENRICHMENT';
-        case 'SINK':      return 'TABLE';
-        case 'CONTROL':   return 'KPI';
-        case 'STORE':     return 'TABLE';   // the synthetic shared-store join node (combined view) reads as a table
-        default:          return category as NodeKind;   // NodeKind includes string ⇒ falls back gracefully
+        case 'SOURCE':
+            return 'STREAM';
+        case 'PARSE':
+            return 'SCHEMA';
+        case 'TRANSFORM':
+            return 'ENRICHMENT';
+        case 'SINK':
+            return 'TABLE';
+        case 'CONTROL':
+            return 'KPI';
+        case 'STORE':
+            return 'TABLE'; // the synthetic shared-store join node (combined view) reads as a table
+        default:
+            return category as NodeKind; // NodeKind includes string ⇒ falls back gracefully
     }
 }
 
@@ -176,13 +205,20 @@ export function categoryLabel(category: string): string {
         // GLOSSARY §2/§3 is binding: the acquisition entity is a Collector ('Source' is banned), and the
         // write end is a Sink ('Writer' was never canonical). The served node-type label agrees — it is
         // 'Collect', not 'Acquisition' — so a card's caption and its category group name one concept once.
-        case 'SOURCE':    return 'Collector';
-        case 'PARSE':     return 'Parser';
-        case 'TRANSFORM': return 'Transformer';
-        case 'SINK':      return 'Sink';
-        case 'CONTROL':   return 'Control';
-        case 'STORE':     return 'Store';
-        default:          return category;
+        case 'SOURCE':
+            return 'Collector';
+        case 'PARSE':
+            return 'Parser';
+        case 'TRANSFORM':
+            return 'Transformer';
+        case 'SINK':
+            return 'Sink';
+        case 'CONTROL':
+            return 'Control';
+        case 'STORE':
+            return 'Store';
+        default:
+            return category;
     }
 }
 
@@ -216,9 +252,7 @@ export function toPipelineG6Data(g: PipelineGraph, counts?: Map<string, number>,
                 id: `${e.from}->${e.to}:${e.rel}:${i}`,
                 source: e.from,
                 target: e.to,
-                data: count == null
-                    ? { kind: rel }
-                    : { kind: `${rel} · ${count.toLocaleString()}`, weight: count },
+                data: count == null ? { kind: rel } : { kind: `${rel} · ${count.toLocaleString()}`, weight: count },
             };
         }),
     };
@@ -303,9 +337,7 @@ export function authoredToG6(
                 id: `${e.from}->${e.to}:${e.rel}:${i}`,
                 source: e.from,
                 target: e.to,
-                data: count == null
-                    ? { kind: e.rel }
-                    : { kind: `${e.rel} · ${count.toLocaleString()}`, weight: count },
+                data: count == null ? { kind: e.rel } : { kind: `${e.rel} · ${count.toLocaleString()}`, weight: count },
             };
         }),
     };
@@ -358,41 +390,58 @@ export function groupByCategory(types: PipelineNodeType[]): NodeTypeGroup[] {
 /** Heroicon per palette category for the compact toolbar chips / palette buttons. */
 export function paletteHeroIcon(category: string): string {
     switch (category) {
-        case 'SOURCE':    return 'heroicons_outline:arrow-down-on-square';
-        case 'PARSE':     return 'heroicons_outline:document-text';
-        case 'TRANSFORM': return 'heroicons_outline:arrows-right-left';
-        case 'SINK':      return 'heroicons_outline:circle-stack';
-        case 'CONTROL':   return 'heroicons_outline:bell-alert';
-        default:          return 'heroicons_outline:cube';
+        case 'SOURCE':
+            return 'heroicons_outline:arrow-down-on-square';
+        case 'PARSE':
+            return 'heroicons_outline:document-text';
+        case 'TRANSFORM':
+            return 'heroicons_outline:arrows-right-left';
+        case 'SINK':
+            return 'heroicons_outline:circle-stack';
+        case 'CONTROL':
+            return 'heroicons_outline:bell-alert';
+        default:
+            return 'heroicons_outline:cube';
     }
 }
 
 /** Heroicon for a node status (text + icon + colour → never colour alone). */
 export function statusIcon(s: NodeStatus): string {
     switch (s) {
-        case 'unconfigured': return 'heroicons_outline:exclamation-triangle';
-        case 'dangling':     return 'heroicons_outline:x-circle';
-        case 'tested':       return 'heroicons_outline:check-circle';
-        case 'rejects':      return 'heroicons_outline:exclamation-triangle';
-        default:             return 'heroicons_outline:check';
+        case 'unconfigured':
+            return 'heroicons_outline:exclamation-triangle';
+        case 'dangling':
+            return 'heroicons_outline:x-circle';
+        case 'tested':
+            return 'heroicons_outline:check-circle';
+        case 'rejects':
+            return 'heroicons_outline:exclamation-triangle';
+        default:
+            return 'heroicons_outline:check';
     }
 }
 
 /** Token colour for a node status ('' = inherit, for the neutral `configured` state). */
 export function statusTint(s: NodeStatus): string {
     switch (s) {
-        case 'tested':     return 'var(--gamma-primary)';
-        case 'configured': return '';
-        default:           return 'var(--gamma-warn)';
+        case 'tested':
+            return 'var(--gamma-primary)';
+        case 'configured':
+            return '';
+        default:
+            return 'var(--gamma-warn)';
     }
 }
 
 /** Icon for a validation finding's severity. */
 export function findingIcon(sev: PipelineFinding['severity']): string {
     switch (sev) {
-        case 'error':   return 'heroicons_outline:x-circle';
-        case 'warning': return 'heroicons_outline:exclamation-triangle';
-        default:        return 'heroicons_outline:information-circle';
+        case 'error':
+            return 'heroicons_outline:x-circle';
+        case 'warning':
+            return 'heroicons_outline:exclamation-triangle';
+        default:
+            return 'heroicons_outline:information-circle';
     }
 }
 
@@ -447,7 +496,12 @@ export function addNodeToModel(model: AuthoredPipeline, node: AuthoredNode): Aut
 }
 
 /** Append an edge, or `null` if an identical `(from, to, rel)` edge already exists. */
-export function addEdgeToModel(model: AuthoredPipeline, from: string, to: string, rel: string): AuthoredPipeline | null {
+export function addEdgeToModel(
+    model: AuthoredPipeline,
+    from: string,
+    to: string,
+    rel: string,
+): AuthoredPipeline | null {
     if (model.edges.some((e) => e.from === from && e.to === to && e.rel === rel)) return null;
     return { ...model, edges: [...model.edges, { from, rel, to }] };
 }
@@ -540,8 +594,7 @@ export function detectStepChain(model: AuthoredPipeline): StepChain | null {
     }
     // guarantee side-nodes are not entry candidates and never part of the walk
     const sideNodes = new Set<string>();
-    for (const edges of outBy.values())
-        for (const e of edges) if (isGuaranteeSideEdge(e, outBy)) sideNodes.add(e.to);
+    for (const edges of outBy.values()) for (const e of edges) if (isGuaranteeSideEdge(e, outBy)) sideNodes.add(e.to);
     const roots = model.nodes.filter((n) => (inCount.get(n.id) ?? 0) === 0 && !sideNodes.has(n.id));
     if (roots.length !== 1) return null;
     return walkStepChain(roots[0], nodeById, outBy, inCount, new Set());
@@ -619,7 +672,11 @@ export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
  * node with anything other than exactly one outgoing `data` edge (a route/branch point — S2 edits the
  * trunk only) — the caller treats that as "not insertable here", never a silent no-op.
  */
-export function insertStepAfter(model: AuthoredPipeline, node: AuthoredNode, afterId: string | null): AuthoredPipeline | null {
+export function insertStepAfter(
+    model: AuthoredPipeline,
+    node: AuthoredNode,
+    afterId: string | null,
+): AuthoredPipeline | null {
     if (model.nodes.some((n) => n.id === node.id)) return null;
     const outBy = new Map<string, AuthoredEdge[]>();
     for (const e of model.edges) outBy.set(e.from, [...(outBy.get(e.from) ?? []), e]);
@@ -676,9 +733,10 @@ export function removeStepFromChain(model: AuthoredPipeline, id: string): Author
  * node is already at that end of the trunk.
  */
 export function moveStepInChain(model: AuthoredPipeline, id: string, dir: 'up' | 'down'): AuthoredPipeline | null {
-    const target = dir === 'up'
-        ? model.edges.find((e) => e.to === id && e.rel === 'data')?.from
-        : model.edges.find((e) => e.from === id && e.rel === 'data')?.to;
+    const target =
+        dir === 'up'
+            ? model.edges.find((e) => e.to === id && e.rel === 'data')?.from
+            : model.edges.find((e) => e.from === id && e.rel === 'data')?.to;
     if (!target) return null;
     const first = dir === 'up' ? target : id;
     const second = dir === 'up' ? id : target;
@@ -688,8 +746,8 @@ export function moveStepInChain(model: AuthoredPipeline, id: string, dir: 'up' |
         if (model.edges.filter((e) => e.to === n).length > 1) return null;
         if (model.edges.some((e) => (e.from === n || e.to === n) && e.rel !== 'data')) return null;
     }
-    const before = model.edges.find((e) => e.to === first)?.from;   // may be undefined (entry)
-    const after = model.edges.find((e) => e.from === second)?.to;   // may be undefined (tail)
+    const before = model.edges.find((e) => e.to === first)?.from; // may be undefined (entry)
+    const after = model.edges.find((e) => e.from === second)?.to; // may be undefined (tail)
     const untouched = model.edges.filter(
         (e) => e.from !== first && e.to !== first && e.from !== second && e.to !== second,
     );
@@ -707,7 +765,15 @@ export function moveStepInChain(model: AuthoredPipeline, id: string, dir: 'up' |
 /** One row of a flattened {@link StepChain} for a simple indented list render (no recursive component). */
 export type StepRow =
     | { kind: 'node'; rowId: string; node: AuthoredNode; depth: number }
-    | { kind: 'branch'; rowId: string; routeId: string; key: string; where?: string; isDefault: boolean; depth: number };
+    | {
+          kind: 'branch';
+          rowId: string;
+          routeId: string;
+          key: string;
+          where?: string;
+          isDefault: boolean;
+          depth: number;
+      };
 
 /** Flatten a {@link StepChain} into an ordered, indented row list — depth-first, branches after their trunk. */
 export function flattenStepChain(chain: StepChain, depth = 0): StepRow[] {
@@ -781,7 +847,10 @@ export function removeRouteBranch(model: AuthoredPipeline, routeId: string, key:
     while (grew) {
         grew = false;
         for (const e of model.edges)
-            if (doomed.has(e.from) && !doomed.has(e.to)) { doomed.add(e.to); grew = true; }
+            if (doomed.has(e.from) && !doomed.has(e.to)) {
+                doomed.add(e.to);
+                grew = true;
+            }
     }
     // refuse when the subtree is reachable from outside it (other than the branch edge itself)
     for (const e of model.edges)
@@ -798,7 +867,12 @@ export function removeRouteBranch(model: AuthoredPipeline, routeId: string, key:
 }
 
 /** Set (or clear, with `''`) a branch's `when`/`where` predicate on the route node's config. */
-export function setRouteBranchWhere(model: AuthoredPipeline, routeId: string, key: string, where: string): AuthoredPipeline | null {
+export function setRouteBranchWhere(
+    model: AuthoredPipeline,
+    routeId: string,
+    key: string,
+    where: string,
+): AuthoredPipeline | null {
     const route = model.nodes.find((n) => n.id === routeId);
     if (!route || route.type !== 'transform.route') return null;
     const branches = routeBranchesOf(route);
@@ -830,7 +904,11 @@ export function setRouteDefault(model: AuthoredPipeline, routeId: string, key: s
  * {@link insertStepAfter} a downstream is required, and the node must arrive carrying at least one
  * branch entry. Returns `null` otherwise, or when `afterId` isn't strictly linear.
  */
-export function insertRouteAfter(model: AuthoredPipeline, node: AuthoredNode, afterId: string): AuthoredPipeline | null {
+export function insertRouteAfter(
+    model: AuthoredPipeline,
+    node: AuthoredNode,
+    afterId: string,
+): AuthoredPipeline | null {
     if (model.nodes.some((n) => n.id === node.id)) return null;
     const key = (node.config?.['branches'] as { key?: string }[] | undefined)?.[0]?.key;
     if (node.type !== 'transform.route' || !key) return null;

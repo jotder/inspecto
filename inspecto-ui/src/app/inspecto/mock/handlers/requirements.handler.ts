@@ -29,7 +29,8 @@ export function requirementsHandler(flags: MockFlags): MockHandler {
 
         if (method === 'GET' && LIST.test(url)) {
             return json(
-                store.list<ComponentDef>(space, COLL)
+                store
+                    .list<ComponentDef>(space, COLL)
                     .map((d) => view(d))
                     .sort((a, b) => (a.submittedAt ?? '').localeCompare(b.submittedAt ?? '')),
             );
@@ -37,27 +38,37 @@ export function requirementsHandler(flags: MockFlags): MockHandler {
         if (method === 'POST' && (m = match(url, DECISION))) {
             const d = store.get<ComponentDef>(space, COLL, m[1]);
             if (!d) return error(404, `requirement ${m[1]} not found`);
-            if (d.content['status'] !== 'submitted') return error(409, `requirement ${m[1]} is not awaiting a decision`);
+            if (d.content['status'] !== 'submitted')
+                return error(409, `requirement ${m[1]} is not awaiting a decision`);
             const b = (req.body ?? {}) as { accept?: boolean; note?: string };
-            return json(patch(store, space, d, {
-                status: b.accept ? 'accepted' : 'rejected',
-                decisionNote: b.note ?? null,
-                decidedAt: new Date().toISOString(),
-            }));
+            return json(
+                patch(store, space, d, {
+                    status: b.accept ? 'accepted' : 'rejected',
+                    decisionNote: b.note ?? null,
+                    decidedAt: new Date().toISOString(),
+                }),
+            );
         }
         if (method === 'POST' && (m = match(url, DELIVER))) {
             const d = store.get<ComponentDef>(space, COLL, m[1]);
             if (!d) return error(404, `requirement ${m[1]} not found`);
             if (d.content['status'] !== 'accepted') return error(409, `only an accepted requirement can be delivered`);
             const b = (req.body ?? {}) as { note?: string };
-            return json(patch(store, space, d, { status: 'delivered', deliveredNote: b.note ?? null, deliveredAt: new Date().toISOString() }));
+            return json(
+                patch(store, space, d, {
+                    status: 'delivered',
+                    deliveredNote: b.note ?? null,
+                    deliveredAt: new Date().toISOString(),
+                }),
+            );
         }
         if (method === 'POST' && LIST.test(url)) {
             const b = (req.body ?? {}) as Partial<Requirement>;
             const id = String(b.id ?? '');
             if (!id) return error(422, 'requirement id is required');
             if (!b.title) return error(422, 'requirement title is required');
-            if (!b.kind || !KINDS.has(b.kind)) return error(422, `requirement kind must be one of ${[...KINDS].join(', ')}`);
+            if (!b.kind || !KINDS.has(b.kind))
+                return error(422, `requirement kind must be one of ${[...KINDS].join(', ')}`);
             if (store.get(space, COLL, id)) return error(409, `requirement "${id}" already exists`);
             const content: Record<string, unknown> = {
                 title: b.title,

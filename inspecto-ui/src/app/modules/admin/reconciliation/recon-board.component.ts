@@ -13,9 +13,22 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { FlatTreeRow, TreeNode, TreeTableComponent } from 'app/inspecto/tree-table';
 import {
-    bandFor, bandGlyph, bandTone, boardColumns, breaksFromSets, buildBoardTree, comparedSides,
-    DEFAULT_BANDS, deltaPct, fmtMeasure, markBreachesExpanded, mergeBreaks, Reconciliation,
-    ReconciliationsService, ReconRunResult, RECON_RECORDS,
+    bandFor,
+    bandGlyph,
+    bandTone,
+    boardColumns,
+    breaksFromSets,
+    buildBoardTree,
+    comparedSides,
+    DEFAULT_BANDS,
+    deltaPct,
+    fmtMeasure,
+    markBreachesExpanded,
+    mergeBreaks,
+    Reconciliation,
+    ReconciliationsService,
+    ReconRunResult,
+    RECON_RECORDS,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
@@ -40,8 +53,16 @@ interface TotalLine {
 @Component({
     selector: 'app-recon-board',
     standalone: true,
-    imports: [RouterLink, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatSlideToggleModule,
-        MatTooltipModule, TreeTableComponent, InspectoEmptyStateComponent],
+    imports: [
+        RouterLink,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        MatSlideToggleModule,
+        MatTooltipModule,
+        TreeTableComponent,
+        InspectoEmptyStateComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './recon-board.component.html',
 })

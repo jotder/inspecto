@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, ElementRef, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    ElementRef,
+    OnInit,
+    ViewChild,
+    computed,
+    inject,
+    signal,
+} from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators, AbstractControl, ValidatorFn } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -76,7 +85,9 @@ import { LinkAnalysisQueryPanelComponent, QuerySummaryItem } from './link-analys
 /** Inline duplicate-name guard (house form rule) — blocks saving a view under a taken name. */
 function uniqueNameValidator(taken: () => string[]): ValidatorFn {
     return (c: AbstractControl) => {
-        const v = String(c.value ?? '').trim().toLowerCase();
+        const v = String(c.value ?? '')
+            .trim()
+            .toLowerCase();
         return taken().some((t) => t.trim().toLowerCase() === v) ? { duplicate: true } : null;
     };
 }
@@ -109,11 +120,26 @@ interface PresentationSnapshot {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        ReactiveFormsModule, MatButtonModule, MatButtonToggleModule, MatCheckboxModule, MatDialogModule,
-        MatFormFieldModule, MatIconModule, MatInputModule, MatMenuModule, MatSelectModule, MatSliderModule,
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatCheckboxModule,
+        MatDialogModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatMenuModule,
+        MatSelectModule,
+        MatSliderModule,
         MatTooltipModule,
-        InspectoAlertComponent, InspectoEmptyStateComponent, InspectoSkeletonComponent, GraphViewComponent,
-        DataTableComponent, TransferMenuComponent, LinkAnalysisToolboxComponent, LinkAnalysisQueryPanelComponent,
+        InspectoAlertComponent,
+        InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
+        GraphViewComponent,
+        DataTableComponent,
+        TransferMenuComponent,
+        LinkAnalysisToolboxComponent,
+        LinkAnalysisQueryPanelComponent,
         AiExplainComponent,
     ],
     templateUrl: './link-analysis.component.html',
@@ -195,30 +221,46 @@ export class LinkAnalysisComponent implements OnInit {
                 const ds = this.datasets().find((d) => d.id === p.datasetId);
                 const items: QuerySummaryItem[] = [
                     { icon: 'heroicons_outline:table-cells', label: 'Dataset', value: ds?.name ?? p.datasetId },
-                    { icon: 'heroicons_outline:arrow-long-right', label: 'Mapping', value: `${p.sourceCol} → ${p.targetCol}` },
+                    {
+                        icon: 'heroicons_outline:arrow-long-right',
+                        label: 'Mapping',
+                        value: `${p.sourceCol} → ${p.targetCol}`,
+                    },
                 ];
-                if (p.linkKindCol) items.push({ icon: 'heroicons_outline:hashtag', label: 'Link type', value: p.linkKindCol });
-                if (p.attrCols?.length) items.push({ icon: 'heroicons_outline:tag', label: 'Attributes', value: p.attrCols.join(', ') });
+                if (p.linkKindCol)
+                    items.push({ icon: 'heroicons_outline:hashtag', label: 'Link type', value: p.linkKindCol });
+                if (p.attrCols?.length)
+                    items.push({ icon: 'heroicons_outline:tag', label: 'Attributes', value: p.attrCols.join(', ') });
                 return items;
             }
             case 'lineage':
                 return [
                     {
-                        icon: 'heroicons_outline:viewfinder-circle', label: q.roots?.length ? 'Roots' : 'Root',
-                        value: q.roots?.length ? q.roots.join(', ') : (q.from || 'whole graph'),
+                        icon: 'heroicons_outline:viewfinder-circle',
+                        label: q.roots?.length ? 'Roots' : 'Root',
+                        value: q.roots?.length ? q.roots.join(', ') : q.from || 'whole graph',
                     },
                     { icon: 'heroicons_outline:hashtag', label: 'Depth', value: String(q.depth ?? 2) },
                     {
-                        icon: 'heroicons_outline:arrows-right-left', label: 'Direction',
+                        icon: 'heroicons_outline:arrows-right-left',
+                        label: 'Direction',
                         value: q.direction === 'in' ? 'Upstream' : q.direction === 'out' ? 'Downstream' : 'Both',
                     },
                 ];
             case 'provenance': {
-                const items: QuerySummaryItem[] = [{
-                    icon: 'heroicons_outline:queue-list', label: q.roots?.length ? 'Pipelines' : 'Pipeline',
-                    value: q.roots?.length ? q.roots.join(', ') : (q.from ?? ''),
-                }];
-                if (q.counts) items.push({ icon: 'heroicons_outline:chart-bar', label: 'Edges', value: 'weighted by record counts' });
+                const items: QuerySummaryItem[] = [
+                    {
+                        icon: 'heroicons_outline:queue-list',
+                        label: q.roots?.length ? 'Pipelines' : 'Pipeline',
+                        value: q.roots?.length ? q.roots.join(', ') : (q.from ?? ''),
+                    },
+                ];
+                if (q.counts)
+                    items.push({
+                        icon: 'heroicons_outline:chart-bar',
+                        label: 'Edges',
+                        value: 'weighted by record counts',
+                    });
                 return items;
             }
             default:
@@ -256,9 +298,7 @@ export class LinkAnalysisComponent implements OnInit {
         const g = this.graph();
         const col = this.timeColumn();
         if (!g || !col) return null;
-        const times = g.edges
-            .map((e) => Date.parse(e.data.attrs?.[col] ?? ''))
-            .filter((t) => Number.isFinite(t));
+        const times = g.edges.map((e) => Date.parse(e.data.attrs?.[col] ?? '')).filter((t) => Number.isFinite(t));
         return times.length ? [Math.min(...times), Math.max(...times)] : null;
     });
     /** The kind- and time-filtered graph BEFORE branch collapsing (collapse/expand decisions read this). */
@@ -298,10 +338,14 @@ export class LinkAnalysisComponent implements OnInit {
     readonly sizeOptions = GRAPH_EDGE_SIZES;
     /** True when any display option deviates from the defaults (tints the paint-brush button). */
     readonly displayCustomized = computed<boolean>(
-        () => !this.nodeLabels() || !this.edgeLabels()
-            || Object.keys(this.nodeColors()).length > 0 || Object.keys(this.edgeColors()).length > 0
-            || Object.keys(this.nodeShapes()).length > 0 || Object.keys(this.edgePatterns()).length > 0
-            || Object.keys(this.edgeSizes()).length > 0,
+        () =>
+            !this.nodeLabels() ||
+            !this.edgeLabels() ||
+            Object.keys(this.nodeColors()).length > 0 ||
+            Object.keys(this.edgeColors()).length > 0 ||
+            Object.keys(this.nodeShapes()).length > 0 ||
+            Object.keys(this.edgePatterns()).length > 0 ||
+            Object.keys(this.edgeSizes()).length > 0,
     );
 
     // ── layout (the Layout toolbox; persisted with a saved view) ──
@@ -360,7 +404,9 @@ export class LinkAnalysisComponent implements OnInit {
     readonly views = signal<LinkAnalysisView[]>([]);
 
     /** The saved Link Analysis views as transfer references — what the export/import menu offers. */
-    readonly transferItems = computed(() => this.views().map((v) => ({ kind: 'link-analysis-view' as const, id: v.id })));
+    readonly transferItems = computed(() =>
+        this.views().map((v) => ({ kind: 'link-analysis-view' as const, id: v.id })),
+    );
 
     readonly saveForm = this.fb.nonNullable.group({
         name: ['', [Validators.required, uniqueNameValidator(() => this.views().map((v) => v.name))]],
@@ -398,8 +444,7 @@ export class LinkAnalysisComponent implements OnInit {
 
     /** Node-id → label over the full loaded graph. An arrow field so it can be passed to the toolbox
      *  child as an `[labelOf]` input without losing its `this` binding. */
-    readonly labelOf = (id: string): string =>
-        this.graph()?.nodes.find((n) => n.id === id)?.data.label ?? id;
+    readonly labelOf = (id: string): string => this.graph()?.nodes.find((n) => n.id === id)?.data.label ?? id;
 
     async run(): Promise<void> {
         const q = this.queryPanel?.buildQuery() ?? { error: 'The query form is not ready.' };
@@ -513,12 +558,18 @@ export class LinkAnalysisComponent implements OnInit {
 
     private snapshotPresentation(): PresentationSnapshot {
         return {
-            search: this.search(), kindFilter: this.kindFilter(),
-            timeColumn: this.timeColumn(), timeCutoff: this.timeCutoff(),
+            search: this.search(),
+            kindFilter: this.kindFilter(),
+            timeColumn: this.timeColumn(),
+            timeCutoff: this.timeCutoff(),
             collapsedRoots: this.collapsedRoots(),
-            nodeLabels: this.nodeLabels(), edgeLabels: this.edgeLabels(),
-            nodeColors: this.nodeColors(), edgeColors: this.edgeColors(),
-            nodeShapes: this.nodeShapes(), edgePatterns: this.edgePatterns(), edgeSizes: this.edgeSizes(),
+            nodeLabels: this.nodeLabels(),
+            edgeLabels: this.edgeLabels(),
+            nodeColors: this.nodeColors(),
+            edgeColors: this.edgeColors(),
+            nodeShapes: this.nodeShapes(),
+            edgePatterns: this.edgePatterns(),
+            edgeSizes: this.edgeSizes(),
             layoutId: this.layoutId(),
         };
     }
@@ -563,8 +614,10 @@ export class LinkAnalysisComponent implements OnInit {
         const target = e.target as HTMLElement | null;
         if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
         if (!(e.ctrlKey || e.metaKey)) return;
-        if (e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undoPresentation(); }
-        else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
+        if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            this.undoPresentation();
+        } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
             e.preventDefault();
             this.redoPresentation();
         }
@@ -597,9 +650,11 @@ export class LinkAnalysisComponent implements OnInit {
     onFullscreenChange(): void {
         const fs = document.fullscreenElement;
         this.fullscreen.set(
-            fs && fs === this.studioRoot?.nativeElement ? 'app'
-            : fs && fs === this.canvasZone?.nativeElement ? 'graph'
-            : null,
+            fs && fs === this.studioRoot?.nativeElement
+                ? 'app'
+                : fs && fs === this.canvasZone?.nativeElement
+                  ? 'graph'
+                  : null,
         );
     }
 
@@ -627,8 +682,9 @@ export class LinkAnalysisComponent implements OnInit {
         if (!g || !node) return;
         const outgoing = g.edges.filter((e) => e.source === id);
         const incoming = g.edges.filter((e) => e.target === id);
-        const neighbors = [...new Set([...outgoing.map((e) => e.target), ...incoming.map((e) => e.source)])]
-            .map((n) => this.labelOf(n));
+        const neighbors = [...new Set([...outgoing.map((e) => e.target), ...incoming.map((e) => e.source)])].map((n) =>
+            this.labelOf(n),
+        );
         const collapsed = this.collapsedRoots().includes(id);
         const objectRef = node.data.objectRef;
         const source = this.graphSources.byId(this.sourceId());
@@ -640,8 +696,16 @@ export class LinkAnalysisComponent implements OnInit {
                     subtitle: node.data.kind,
                     rows: [
                         { label: 'ID', value: id },
-                        { label: 'Links', value: `${outgoing.length + incoming.length} (${outgoing.length} out · ${incoming.length} in)` },
-                        { label: 'Neighbors', value: neighbors.slice(0, 8).join(', ') + (neighbors.length > 8 ? ` … +${neighbors.length - 8}` : '') },
+                        {
+                            label: 'Links',
+                            value: `${outgoing.length + incoming.length} (${outgoing.length} out · ${incoming.length} in)`,
+                        },
+                        {
+                            label: 'Neighbors',
+                            value:
+                                neighbors.slice(0, 8).join(', ') +
+                                (neighbors.length > 8 ? ` … +${neighbors.length - 8}` : ''),
+                        },
                     ],
                     branch: collapsed ? 'expand' : descendants(g, id).size ? 'collapse' : undefined,
                     objectRef,
@@ -779,7 +843,10 @@ export class LinkAnalysisComponent implements OnInit {
     exportJson(): void {
         const g = this.displayed();
         if (!g) return;
-        this.download(URL.createObjectURL(new Blob([JSON.stringify(g, null, 2)], { type: 'application/json' })), 'link-analysis.json');
+        this.download(
+            URL.createObjectURL(new Blob([JSON.stringify(g, null, 2)], { type: 'application/json' })),
+            'link-analysis.json',
+        );
     }
 
     /** Download the rendered canvas as `link-analysis.png`. */
@@ -800,7 +867,10 @@ export class LinkAnalysisComponent implements OnInit {
     exportGraphml(): void {
         const g = this.displayed();
         if (!g) return;
-        this.download(URL.createObjectURL(new Blob([toGraphml(g)], { type: 'application/xml' })), 'link-analysis.graphml');
+        this.download(
+            URL.createObjectURL(new Blob([toGraphml(g)], { type: 'application/xml' })),
+            'link-analysis.graphml',
+        );
     }
 
     private download(href: string, filename: string): void {
@@ -823,7 +893,10 @@ export class LinkAnalysisComponent implements OnInit {
         }
         const { name, description } = this.saveForm.getRawValue();
         const view: LinkAnalysisView = {
-            id: name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            id: name
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-'),
             name: name.trim(),
             description: description.trim() || undefined,
             sourceId: this.sourceId(),
@@ -895,8 +968,7 @@ export class LinkAnalysisComponent implements OnInit {
                     .offer({ kind: 'link-analysis-view', owner, item: view.id, description: r.description })
                     .subscribe({
                         next: () => this.toastr.success(`View "${view.name}" offered for sharing.`),
-                        error: (e) =>
-                            this.toastr.error(apiErrorMessage(e, `Could not offer "${view.name}".`)),
+                        error: (e) => this.toastr.error(apiErrorMessage(e, `Could not offer "${view.name}".`)),
                     });
             });
     }

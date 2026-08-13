@@ -27,7 +27,14 @@ export interface OnboardingCreateResult {
 
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -101,7 +108,12 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
             }
 
             @if (imported(); as b) {
-                <inspecto-alert class="mb-4 block" variant="info" icon="heroicons_outline:document-arrow-up" title="Importing a configuration">
+                <inspecto-alert
+                    class="mb-4 block"
+                    variant="info"
+                    icon="heroicons_outline:document-arrow-up"
+                    title="Importing a configuration"
+                >
                     <p class="m-0">
                         From <span class="font-semibold">{{ b.source.name }}</span>
                         @if (b.source.space) {
@@ -144,7 +156,9 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                         @if (c.hasError('required')) {
                             <mat-error>A name is required.</mat-error>
                         } @else if (c.hasError('pattern')) {
-                            <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
+                            <mat-error
+                                >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
+                            >
                         } @else if (c.hasError('duplicate')) {
                             <mat-error>A pipeline with this name already exists.</mat-error>
                         }
@@ -164,7 +178,9 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 >
                     <mat-icon
                         class="icon-size-4"
-                        [svgIcon]="advancedOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
+                        [svgIcon]="
+                            advancedOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                        "
                     ></mat-icon>
                     Advanced — directories
                 </button>
@@ -258,8 +274,10 @@ export class OnboardingCreateDialog {
             this.nameValue.set(slug);
             if (!slug) return;
             const base = this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
-            if (this.form.controls.poll.pristine) this.form.controls.poll.setValue(`${base}/data/inbox/${slug}`, { emitEvent: false });
-            if (this.form.controls.database.pristine) this.form.controls.database.setValue(`${base}/data/${slug}/database`, { emitEvent: false });
+            if (this.form.controls.poll.pristine)
+                this.form.controls.poll.setValue(`${base}/data/inbox/${slug}`, { emitEvent: false });
+            if (this.form.controls.database.pristine)
+                this.form.controls.database.setValue(`${base}/data/${slug}/database`, { emitEvent: false });
         });
     }
 
@@ -267,7 +285,7 @@ export class OnboardingCreateDialog {
     onFilePicked(event: Event): void {
         const input = event.target as HTMLInputElement;
         const file = input.files?.[0];
-        input.value = '';   // allow re-picking the same file after a failed parse
+        input.value = ''; // allow re-picking the same file after a failed parse
         if (!file) return;
         this.imported.set(null);
         this.importErrors.set([]);
@@ -381,7 +399,9 @@ export class OnboardingCreateDialog {
             next: () => {
                 const extras = [
                     plan.schema ? 'schema' : null,
-                    plan.segments.length ? `${plan.segments.length} segment schema${plan.segments.length === 1 ? '' : 's'}` : null,
+                    plan.segments.length
+                        ? `${plan.segments.length} segment schema${plan.segments.length === 1 ? '' : 's'}`
+                        : null,
                     plan.enrichment ? 'enrichment' : null,
                 ].filter(Boolean);
                 this.toastr.success(

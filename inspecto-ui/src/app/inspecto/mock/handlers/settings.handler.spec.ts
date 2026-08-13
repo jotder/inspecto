@@ -35,7 +35,10 @@ describe('settingsHandler', () => {
         const handle = settingsHandler(flags);
         handle(req('PUT', '/settings/branding', { logoDataUrl: 'data:x', caption: 'Hi', footerText: '  ' }), store);
         expect(handle(req('GET', '/settings/branding'), store)?.body).toEqual({
-            id: 'branding', logoDataUrl: 'data:x', caption: 'Hi', footerText: null,
+            id: 'branding',
+            logoDataUrl: 'data:x',
+            caption: 'Hi',
+            footerText: null,
         });
     });
 
@@ -47,7 +50,9 @@ describe('settingsHandler', () => {
         // 's1' (active, plain path) is untouched
         expect(handle(req('GET', '/settings/branding'), store)?.body).toMatchObject({ caption: null });
         // 'beta' carries its own doc
-        expect(handle(req('GET', '/api/v1/spaces/beta/settings/branding'), store)?.body).toMatchObject({ caption: 'Beta brand' });
+        expect(handle(req('GET', '/api/v1/spaces/beta/settings/branding'), store)?.body).toMatchObject({
+            caption: 'Beta brand',
+        });
     });
 
     it('stays out of the way when the studio mock is off', () => {

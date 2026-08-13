@@ -4,8 +4,8 @@
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Tags</h1>
             <div class="text-secondary mt-1">
-                Labels shared across incidents, cases and saved views. Pick a tag to see everything
-                carrying it — the list shows only targets you have access to, so counts are per-viewer.
+                Labels shared across incidents, cases and saved views. Pick a tag to see everything carrying it — the
+                list shows only targets you have access to, so counts are per-viewer.
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -13,12 +13,7 @@
             @if (loadingTags() || loadingTargets()) {
                 <mat-spinner diameter="24"></mat-spinner>
             }
-            <button
-                mat-icon-button
-                (click)="loadRegistry()"
-                [disabled]="loadingTags()"
-                aria-label="Refresh tags"
-            >
+            <button mat-icon-button (click)="loadRegistry()" [disabled]="loadingTags()" aria-label="Refresh tags">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
         </div>
@@ -37,10 +32,7 @@
                                 [attr.aria-current]="tag.name === selected() ? 'true' : null"
                                 (click)="select(tag.name)"
                             >
-                                <mat-icon
-                                    class="icon-size-4"
-                                    [svgIcon]="'heroicons_outline:tag'"
-                                ></mat-icon>
+                                <mat-icon class="icon-size-4" [svgIcon]="'heroicons_outline:tag'"></mat-icon>
                                 <span class="min-w-0 truncate">{{ tag.name }}</span>
                             </button>
                         </li>
@@ -92,8 +84,8 @@
                 </div>
 
                 <p class="text-secondary mt-1 text-sm">
-                    Renaming moves the label everywhere at once — assignments, object attributes and any
-                    Tag Rule. Renaming onto a tag that already exists merges the two.
+                    Renaming moves the label everywhere at once — assignments, object attributes and any Tag Rule.
+                    Renaming onto a tag that already exists merges the two.
                 </p>
 
                 <div class="mt-4 flex-auto">

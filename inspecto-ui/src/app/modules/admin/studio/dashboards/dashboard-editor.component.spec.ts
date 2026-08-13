@@ -15,12 +15,24 @@ import { DashboardsService } from './dashboards.service';
 import { DashboardEditorComponent } from './dashboard-editor.component';
 
 const DS: Dataset = {
-    id: 'cdr_sample', name: 'cdr_sample', kind: 'virtual', sourceName: 'cdr',
-    columns: [{ name: 'tariff', type: 'string', role: 'dimension' }, { name: 'duration_s', type: 'number', role: 'measure' }],
+    id: 'cdr_sample',
+    name: 'cdr_sample',
+    kind: 'virtual',
+    sourceName: 'cdr',
+    columns: [
+        { name: 'tariff', type: 'string', role: 'dimension' },
+        { name: 'duration_s', type: 'number', role: 'measure' },
+    ],
     measures: [],
     calculated: [],
 };
-const WIDGET: Widget = { id: 'bar1', name: 'Bar 1', datasetId: 'cdr_sample', vizType: 'bar', controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }] } };
+const WIDGET: Widget = {
+    id: 'bar1',
+    name: 'Bar 1',
+    datasetId: 'cdr_sample',
+    vizType: 'bar',
+    controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }] },
+};
 
 function create(
     save = vi.fn((d: Dashboard) => of(d)),
@@ -35,7 +47,10 @@ function create(
             { provide: WidgetsService, useValue: { list: () => of([WIDGET]), ...widgets } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: DashboardsService, useValue: { get: () => of(null), list: () => of(existing), save } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
@@ -92,7 +107,11 @@ describe('DashboardEditorComponent — kpi_report_builder host', () => {
         const widgetSave = vi.fn(() => {
             throw { status: 500 };
         });
-        const fixture = create(vi.fn((d: Dashboard) => of(d)), [], { save: widgetSave } as Partial<WidgetsService>);
+        const fixture = create(
+            vi.fn((d: Dashboard) => of(d)),
+            [],
+            { save: widgetSave } as Partial<WidgetsService>,
+        );
         fixture.detectChanges();
         const c = fixture.componentInstance;
 

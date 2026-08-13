@@ -16,12 +16,14 @@ export class NotesService {
 
     comments(targetKind: string, targetId: string): Observable<ObjectNote[]> {
         return this.http.get<ObjectNote[]>(
-            apiUrl(`/notes/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}/comments`));
+            apiUrl(`/notes/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}/comments`),
+        );
     }
 
     addComment(targetKind: string, targetId: string, body: string, author?: string): Observable<ObjectNote> {
         return this.http.post<ObjectNote>(
             apiUrl(`/notes/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}/comments`),
-            { body, author });
+            { body, author },
+        );
     }
 }

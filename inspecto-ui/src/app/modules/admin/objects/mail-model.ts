@@ -194,8 +194,15 @@ export function findingsAttributes(spec: FindingsSpecDef | null): AttributeSpec[
     return out;
 }
 
-const ATTRIBUTE_TYPES: AttributeType[] =
-    ['string', 'identifier', 'number', 'boolean', 'select', 'autocomplete', 'multiline'];
+const ATTRIBUTE_TYPES: AttributeType[] = [
+    'string',
+    'identifier',
+    'number',
+    'boolean',
+    'select',
+    'autocomplete',
+    'multiline',
+];
 const ATTRIBUTE_TIERS: AttributeTier[] = ['required', 'optional', 'advanced'];
 
 /** The served `{key, equals|notEquals}` clause, kept as exactly one sense (`AttributeSpec.dependsOn`). */
@@ -241,12 +248,42 @@ const notArchived = (o: OperationalObject): boolean => !['ARCHIVED', 'CLOSED'].i
 
 /** Important → My Cases · Starred → Escalated · Inbox → Identified · Draft → Diagnosing · Sent → Resolved · Trash → Archived. */
 export const INCIDENT_FOLDERS: MailFolder[] = [
-    { id: 'mine', label: 'My Cases', icon: 'heroicons_outline:user', match: (o, me) => o.assignee === me && notArchived(o) },
-    { id: 'escalated', label: 'Escalated', icon: 'heroicons_outline:arrow-trending-up', match: (o) => isEscalated(o) && notArchived(o) },
-    { id: 'identified', label: 'Identified', icon: 'heroicons_outline:inbox', match: (o) => displayStatus(o) === 'IDENTIFIED' },
-    { id: 'diagnosing', label: 'Diagnosing', icon: 'heroicons_outline:document-text', match: (o) => displayStatus(o) === 'DIAGNOSING' },
-    { id: 'resolved', label: 'Resolved', icon: 'heroicons_outline:paper-airplane', match: (o) => displayStatus(o) === 'RESOLVED' },
-    { id: 'archived', label: 'Archived', icon: 'heroicons_outline:archive-box', match: (o) => displayStatus(o) === 'ARCHIVED' },
+    {
+        id: 'mine',
+        label: 'My Cases',
+        icon: 'heroicons_outline:user',
+        match: (o, me) => o.assignee === me && notArchived(o),
+    },
+    {
+        id: 'escalated',
+        label: 'Escalated',
+        icon: 'heroicons_outline:arrow-trending-up',
+        match: (o) => isEscalated(o) && notArchived(o),
+    },
+    {
+        id: 'identified',
+        label: 'Identified',
+        icon: 'heroicons_outline:inbox',
+        match: (o) => displayStatus(o) === 'IDENTIFIED',
+    },
+    {
+        id: 'diagnosing',
+        label: 'Diagnosing',
+        icon: 'heroicons_outline:document-text',
+        match: (o) => displayStatus(o) === 'DIAGNOSING',
+    },
+    {
+        id: 'resolved',
+        label: 'Resolved',
+        icon: 'heroicons_outline:paper-airplane',
+        match: (o) => displayStatus(o) === 'RESOLVED',
+    },
+    {
+        id: 'archived',
+        label: 'Archived',
+        icon: 'heroicons_outline:archive-box',
+        match: (o) => displayStatus(o) === 'ARCHIVED',
+    },
 ];
 
 /**
@@ -290,13 +327,20 @@ export function stateLabel(state: string): string {
  */
 export function caseFoldersFrom(wf: WorkflowDef): MailFolder[] {
     return [
-        { id: 'mine', label: 'My Cases', icon: 'heroicons_outline:user', match: (o, me) => o.assignee === me && notArchived(o) },
-        ...wf.states.map((state): MailFolder => ({
-            id: state.toLowerCase(),
-            label: stateLabel(state),
-            icon: STATE_ICONS[state] ?? 'heroicons_outline:folder',
-            match: (o) => displayStatus(o) === state,
-        })),
+        {
+            id: 'mine',
+            label: 'My Cases',
+            icon: 'heroicons_outline:user',
+            match: (o, me) => o.assignee === me && notArchived(o),
+        },
+        ...wf.states.map(
+            (state): MailFolder => ({
+                id: state.toLowerCase(),
+                label: stateLabel(state),
+                icon: STATE_ICONS[state] ?? 'heroicons_outline:folder',
+                match: (o) => displayStatus(o) === state,
+            }),
+        ),
     ];
 }
 

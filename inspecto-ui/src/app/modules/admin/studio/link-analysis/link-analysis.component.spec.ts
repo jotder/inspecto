@@ -18,13 +18,24 @@ import { LinkAnalysisComponent } from './link-analysis.component';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 import { LinkAnalysisService, LinkAnalysisView } from './link-analysis.service';
 
-const DS: Dataset = { id: 'links-ds', name: 'Links', kind: 'physical', sourceName: 'links', columns: [], measures: [], calculated: [] };
+const DS: Dataset = {
+    id: 'links-ds',
+    name: 'Links',
+    kind: 'physical',
+    sourceName: 'links',
+    columns: [],
+    measures: [],
+    calculated: [],
+};
 
 const TEST_COLOR = '#ff0000'; // a literal test value passed to setNodeColor(), not app styling — ds-allow
 
 /** A tiny two-cluster graph: a–b–c plus d–e. */
 const GRAPH: G6GraphData = {
-    nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, data: { label: id.toUpperCase(), kind: id < 'd' ? 'entity' : 'other' } })),
+    nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({
+        id,
+        data: { label: id.toUpperCase(), kind: id < 'd' ? 'entity' : 'other' },
+    })),
     edges: [
         { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link' } },
         { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link' } },
@@ -32,7 +43,15 @@ const GRAPH: G6GraphData = {
     ],
 };
 
-function create(opts: { fail?: boolean; views?: LinkAnalysisView[]; expand?: GraphSource['expand']; graph?: G6GraphData; queryParams?: Record<string, string> } = {}) {
+function create(
+    opts: {
+        fail?: boolean;
+        views?: LinkAnalysisView[];
+        expand?: GraphSource['expand'];
+        graph?: G6GraphData;
+        queryParams?: Record<string, string>;
+    } = {},
+) {
     const queried: unknown[] = [];
     const fakeSource: GraphSource = {
         id: 'entity-projection',
@@ -54,7 +73,10 @@ function create(opts: { fail?: boolean; views?: LinkAnalysisView[]; expand?: Gra
             { provide: PipelinesService, useValue: { list: () => of([]) } },
             { provide: LinkAnalysisService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
-            { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined, info: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { success: () => undefined, error: () => undefined, info: () => undefined },
+            },
             {
                 provide: ActivatedRoute,
                 useValue: { snapshot: { queryParamMap: convertToParamMap(opts.queryParams ?? {}) } },
@@ -108,8 +130,18 @@ describe('LinkAnalysisComponent', () => {
         const timedGraph: G6GraphData = {
             nodes: GRAPH.nodes,
             edges: [
-                { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link', attrs: { when: '2026-01-01T00:00:00Z' } } },
-                { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link', attrs: { when: '2026-06-01T00:00:00Z' } } },
+                {
+                    id: 'a->b',
+                    source: 'a',
+                    target: 'b',
+                    data: { kind: 'link', attrs: { when: '2026-01-01T00:00:00Z' } },
+                },
+                {
+                    id: 'b->c',
+                    source: 'b',
+                    target: 'c',
+                    data: { kind: 'link', attrs: { when: '2026-06-01T00:00:00Z' } },
+                },
                 { id: 'd->e', source: 'd', target: 'e', data: { kind: 'link' } }, // no attrs
             ],
         };
@@ -140,7 +172,10 @@ describe('LinkAnalysisComponent', () => {
 
     it('offers a pivot to the map for a node carrying an objectRef (ui-design-review R8)', async () => {
         const graphWithRef: G6GraphData = {
-            nodes: [...GRAPH.nodes, { id: 'f', data: { label: 'F', kind: 'entity', objectRef: { id: 'case-1', type: 'CASE' } } }],
+            nodes: [
+                ...GRAPH.nodes,
+                { id: 'f', data: { label: 'F', kind: 'entity', objectRef: { id: 'case-1', type: 'CASE' } } },
+            ],
             edges: GRAPH.edges,
         };
         const { fixture } = create({ graph: graphWithRef });
@@ -149,7 +184,8 @@ describe('LinkAnalysisComponent', () => {
         const c = fixture.componentInstance;
         const dialog = fixture.debugElement.injector.get(MatDialog);
         const openSpy = vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(undefined) } as never);
-        const dataOf = (call: number): ElementDetailData => (openSpy.mock.calls[call][1] as { data: ElementDetailData }).data;
+        const dataOf = (call: number): ElementDetailData =>
+            (openSpy.mock.calls[call][1] as { data: ElementDetailData }).data;
 
         c.onNodeClick('a'); // plain node — no objectRef, no pivot offered
         expect(dataOf(0).pivotViews).toBeUndefined();
@@ -161,7 +197,10 @@ describe('LinkAnalysisComponent', () => {
 
     it('resolves an incoming investigation pivot against the loaded graph, or toasts if absent', async () => {
         const graphWithRef: G6GraphData = {
-            nodes: [...GRAPH.nodes, { id: 'f', data: { label: 'F', kind: 'entity', objectRef: { id: 'case-1', type: 'CASE' } } }],
+            nodes: [
+                ...GRAPH.nodes,
+                { id: 'f', data: { label: 'F', kind: 'entity', objectRef: { id: 'case-1', type: 'CASE' } } },
+            ],
             edges: GRAPH.edges,
         };
         const { fixture } = create({ graph: graphWithRef, queryParams: { pivotId: 'case-1', pivotType: 'CASE' } });
@@ -183,7 +222,7 @@ describe('LinkAnalysisComponent', () => {
     // Analysis-toolbox logic (shortest path, explain, centrality, communities, all-paths, components,
     // patterns, tool badges) lives in LinkAnalysisToolboxComponent — see its own spec.
 
-    it('expandNode (Phase E): merges the source\'s one-hop neighborhood into the loaded graph, filters intact', async () => {
+    it("expandNode (Phase E): merges the source's one-hop neighborhood into the loaded graph, filters intact", async () => {
         const expand = vi.fn(async () => ({
             nodes: [{ id: 'f', data: { label: 'F', kind: 'entity' } }],
             edges: [{ id: 'c->f', source: 'c', target: 'f', data: { kind: 'link' } }],
@@ -196,7 +235,12 @@ describe('LinkAnalysisComponent', () => {
 
         await c.expandNode('c', 'C');
         expect(expand).toHaveBeenCalledWith('c', 'C', expect.objectContaining({ projection: expect.anything() }));
-        expect(c.graph()?.nodes.map((n) => n.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
+        expect(
+            c
+                .graph()
+                ?.nodes.map((n) => n.id)
+                .sort(),
+        ).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
         expect(c.graph()?.edges.map((e) => e.id)).toContain('c->f');
         expect(c.emphasis()?.nodeIds).toEqual(['a']); // untouched by the merge
     });
@@ -271,7 +315,10 @@ describe('LinkAnalysisComponent', () => {
 
         expect(c.queryOpen()).toBe(false); // collapsed — the summary + status bar take over
         expect(c.sourceLabel()).toBe('Entity/Link (from a Dataset)');
-        expect(c.querySummary().map((i) => `${i.label}: ${i.value}`)).toEqual(['Dataset: Links', 'Mapping: source → target']);
+        expect(c.querySummary().map((i) => `${i.label}: ${i.value}`)).toEqual([
+            'Dataset: Links',
+            'Mapping: source → target',
+        ]);
 
         c.bottomTab.set('data');
         c.editQuery(); // the status-bar pencil jumps back to the Query tab, form expanded
@@ -341,9 +388,13 @@ describe('LinkAnalysisComponent', () => {
         await c.saveView();
         const saved = save.mock.calls[0][0];
         expect(saved.display).toEqual({
-            nodeLabels: true, edgeLabels: false,
-            nodeColors: { entity: c.swatches[1] }, edgeColors: { link: c.swatches[2] },
-            nodeShapes: { entity: 'diamond' }, edgePatterns: { link: 'dashed' }, edgeSizes: { link: 3 },
+            nodeLabels: true,
+            edgeLabels: false,
+            nodeColors: { entity: c.swatches[1] },
+            edgeColors: { link: c.swatches[2] },
+            nodeShapes: { entity: 'diamond' },
+            edgePatterns: { link: 'dashed' },
+            edgeSizes: { link: 3 },
         });
 
         c.setNodeColor('entity', null); // drift away, then load restores the captured styling
@@ -440,7 +491,9 @@ describe('LinkAnalysisComponent', () => {
         const openSpy = vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(true) } as never);
         c.openHistory(view);
         expect((openSpy.mock.calls[0][1] as { data: unknown }).data).toEqual({
-            type: 'link-analysis-view', id: 'ring', label: 'Ring',
+            type: 'link-analysis-view',
+            id: 'ring',
+            label: 'Ring',
         });
         expect(reloadSpy).toHaveBeenCalledTimes(1);
 

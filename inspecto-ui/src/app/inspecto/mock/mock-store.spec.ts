@@ -63,9 +63,7 @@ describe('MockStore', () => {
         store.put('default', 'dataset', 'cdr', { name: 'cdr' });
         store.put('default', 'widget', 'calls-by-day', { name: 'calls-by-day', datasetRef: 'cdr' });
         store.put('default', 'widget', 'unbound', { name: 'unbound' });
-        expect(store.referencesTo('default', 'dataset', 'cdr')).toEqual([
-            { collection: 'widget', id: 'calls-by-day' },
-        ]);
+        expect(store.referencesTo('default', 'dataset', 'cdr')).toEqual([{ collection: 'widget', id: 'calls-by-day' }]);
         expect(store.referencesTo('default', 'dataset', 'other')).toEqual([]);
         // References are space-scoped too.
         expect(store.referencesTo('space2', 'dataset', 'cdr')).toEqual([]);

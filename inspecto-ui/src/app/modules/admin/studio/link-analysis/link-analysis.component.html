@@ -1,15 +1,29 @@
-<div #studioRoot class="flex h-full min-h-0 flex-auto flex-col p-4"
-     [style.background]="fullscreen() === 'app' ? 'var(--gamma-bg-default)' : null">
+<div
+    #studioRoot
+    class="flex h-full min-h-0 flex-auto flex-col p-4"
+    [style.background]="fullscreen() === 'app' ? 'var(--gamma-bg-default)' : null"
+>
     <!-- ── compact header (the canvas gets the space) ── -->
     <div class="flex flex-wrap items-center gap-2">
         <h1 class="text-2xl font-semibold tracking-tight">Link Analysis</h1>
         <span class="text-secondary hidden text-sm md:inline">
-            project a Dataset — or the lineage / component / pipeline planes — into an Entity/Link graph, then analyze it.
+            project a Dataset — or the lineage / component / pipeline planes — into an Entity/Link graph, then analyze
+            it.
         </span>
-        <button mat-icon-button class="ml-auto" (click)="toggleFullscreen('app')"
-                [matTooltip]="fullscreen() === 'app' ? 'Exit full screen' : 'Full screen'"
-                [attr.aria-label]="fullscreen() === 'app' ? 'Exit full screen' : 'Open the studio in full screen'">
-            <mat-icon [svgIcon]="fullscreen() === 'app' ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"></mat-icon>
+        <button
+            mat-icon-button
+            class="ml-auto"
+            (click)="toggleFullscreen('app')"
+            [matTooltip]="fullscreen() === 'app' ? 'Exit full screen' : 'Full screen'"
+            [attr.aria-label]="fullscreen() === 'app' ? 'Exit full screen' : 'Open the studio in full screen'"
+        >
+            <mat-icon
+                [svgIcon]="
+                    fullscreen() === 'app'
+                        ? 'heroicons_outline:arrows-pointing-in'
+                        : 'heroicons_outline:arrows-pointing-out'
+                "
+            ></mat-icon>
         </button>
     </div>
 
@@ -27,45 +41,79 @@
         <div class="flex flex-wrap items-center gap-2">
             @if (graph()) {
                 <!-- search nodes (icon → popover) -->
-                <button mat-icon-button [matMenuTriggerFor]="searchMenu" [color]="search() ? 'primary' : undefined"
-                        matTooltip="Search nodes" aria-label="Search nodes">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="searchMenu"
+                    [color]="search() ? 'primary' : undefined"
+                    matTooltip="Search nodes"
+                    aria-label="Search nodes"
+                >
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                 </button>
                 <mat-menu #searchMenu="matMenu">
                     <div class="p-3" (click)="$event.stopPropagation()">
                         <mat-form-field subscriptSizing="dynamic" class="w-64">
                             <mat-label>Search nodes</mat-label>
-                            <input matInput [value]="search()" (input)="onSearch($any($event.target).value)" aria-label="Search nodes" />
+                            <input
+                                matInput
+                                [value]="search()"
+                                (input)="onSearch($any($event.target).value)"
+                                aria-label="Search nodes"
+                            />
                             <mat-icon matSuffix svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                         </mat-form-field>
                     </div>
                 </mat-menu>
 
                 <!-- node-type filter -->
-                <button mat-icon-button [matMenuTriggerFor]="kindMenu" [color]="kindFilter().length ? 'primary' : undefined"
-                        matTooltip="Filter node types"
-                        [attr.aria-label]="'Filter node types' + (kindFilter().length ? ' (filter active)' : '')">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="kindMenu"
+                    [color]="kindFilter().length ? 'primary' : undefined"
+                    matTooltip="Filter node types"
+                    [attr.aria-label]="'Filter node types' + (kindFilter().length ? ' (filter active)' : '')"
+                >
                     <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
                 </button>
                 <mat-menu #kindMenu="matMenu">
-                    <div class="flex flex-col gap-1 px-4 py-2" (click)="$event.stopPropagation()" aria-label="Node types">
+                    <div
+                        class="flex flex-col gap-1 px-4 py-2"
+                        (click)="$event.stopPropagation()"
+                        aria-label="Node types"
+                    >
                         @for (k of nodeKinds(); track k) {
-                            <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">{{ k }}</mat-checkbox>
+                            <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">{{
+                                k
+                            }}</mat-checkbox>
                         }
                     </div>
                 </mat-menu>
 
                 <!-- layout toolbox -->
-                <button mat-icon-button [matMenuTriggerFor]="layoutMenu"
-                        [color]="layoutId() !== 'dagre' ? 'primary' : undefined"
-                        matTooltip="Layout" aria-label="Graph layout">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="layoutMenu"
+                    [color]="layoutId() !== 'dagre' ? 'primary' : undefined"
+                    matTooltip="Layout"
+                    aria-label="Graph layout"
+                >
                     <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
                 </button>
                 <mat-menu #layoutMenu="matMenu">
                     @for (l of layouts; track l.id) {
-                        <button mat-menu-item (click)="setLayout(l.id)" [disabled]="l.tree && !isTreeShaped()"
-                                [attr.aria-label]="l.label + (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')">
-                            <mat-icon [svgIcon]="layoutId() === l.id ? 'heroicons_outline:check' : 'heroicons_outline:squares-2x2'"></mat-icon>
+                        <button
+                            mat-menu-item
+                            (click)="setLayout(l.id)"
+                            [disabled]="l.tree && !isTreeShaped()"
+                            [attr.aria-label]="
+                                l.label + (l.tree && !isTreeShaped() ? ' (needs a tree-shaped graph)' : '')
+                            "
+                        >
+                            <mat-icon
+                                [svgIcon]="
+                                    layoutId() === l.id ? 'heroicons_outline:check' : 'heroicons_outline:squares-2x2'
+                                "
+                            ></mat-icon>
                             <span>{{ l.label }}</span>
                         </button>
                     }
@@ -73,12 +121,21 @@
 
                 <!-- timeline: filter edges by a temporal `attrs` column cut off at a point in time -->
                 @if (attrColumns().length) {
-                    <button mat-icon-button [matMenuTriggerFor]="timelineMenu" [color]="timeColumn() ? 'primary' : undefined"
-                            matTooltip="Timeline" [attr.aria-label]="'Filter edges by time' + (timeColumn() ? ' (filter active)' : '')">
+                    <button
+                        mat-icon-button
+                        [matMenuTriggerFor]="timelineMenu"
+                        [color]="timeColumn() ? 'primary' : undefined"
+                        matTooltip="Timeline"
+                        [attr.aria-label]="'Filter edges by time' + (timeColumn() ? ' (filter active)' : '')"
+                    >
                         <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
                     </button>
                     <mat-menu #timelineMenu="matMenu">
-                        <div class="flex w-80 flex-col gap-2 px-4 py-2" (click)="$event.stopPropagation()" aria-label="Timeline filter">
+                        <div
+                            class="flex w-80 flex-col gap-2 px-4 py-2"
+                            (click)="$event.stopPropagation()"
+                            aria-label="Timeline filter"
+                        >
                             <mat-form-field subscriptSizing="dynamic">
                                 <mat-label>Time column</mat-label>
                                 <mat-select [value]="timeColumn()" (selectionChange)="setTimeColumn($event.value)">
@@ -89,10 +146,22 @@
                                 </mat-select>
                             </mat-form-field>
                             @if (timeColumn() && timeExtent(); as ext) {
-                                <span class="text-secondary text-xs">Up to {{ timeLabel(timeCutoff() ?? ext[1]) }}</span>
-                                <mat-slider [min]="ext[0]" [max]="ext[1]" [step]="60000" discrete [displayWith]="timeLabel">
-                                    <input matSliderThumb [value]="timeCutoff() ?? ext[1]"
-                                           (valueChange)="setTimeCutoff($event)" aria-label="Timeline cutoff" />
+                                <span class="text-secondary text-xs"
+                                    >Up to {{ timeLabel(timeCutoff() ?? ext[1]) }}</span
+                                >
+                                <mat-slider
+                                    [min]="ext[0]"
+                                    [max]="ext[1]"
+                                    [step]="60000"
+                                    discrete
+                                    [displayWith]="timeLabel"
+                                >
+                                    <input
+                                        matSliderThumb
+                                        [value]="timeCutoff() ?? ext[1]"
+                                        (valueChange)="setTimeCutoff($event)"
+                                        aria-label="Timeline cutoff"
+                                    />
                                 </mat-slider>
                             }
                         </div>
@@ -100,19 +169,32 @@
                 }
 
                 <!-- graph-algorithms toolbox (opens the bottom Analysis tab) -->
-                <button mat-icon-button (click)="openAnalysis()"
-                        [color]="bottomOpen() && bottomTab() === 'analysis' ? 'primary' : undefined"
-                        matTooltip="Graph algorithms" aria-label="Open the graph-algorithms toolbox">
+                <button
+                    mat-icon-button
+                    (click)="openAnalysis()"
+                    [color]="bottomOpen() && bottomTab() === 'analysis' ? 'primary' : undefined"
+                    matTooltip="Graph algorithms"
+                    aria-label="Open the graph-algorithms toolbox"
+                >
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                 </button>
 
                 @if (search() || kindFilter().length || timeColumn()) {
-                    <button mat-icon-button (click)="clearFilters()" matTooltip="Clear search & filters" aria-label="Clear search and filters">
+                    <button
+                        mat-icon-button
+                        (click)="clearFilters()"
+                        matTooltip="Clear search & filters"
+                        aria-label="Clear search and filters"
+                    >
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
                 }
                 @if (collapsedRoots().length) {
-                    <button mat-button (click)="expandAll()" [attr.aria-label]="'Expand ' + collapsedRoots().length + ' collapsed branches'">
+                    <button
+                        mat-button
+                        (click)="expandAll()"
+                        [attr.aria-label]="'Expand ' + collapsedRoots().length + ' collapsed branches'"
+                    >
                         <mat-icon svgIcon="heroicons_outline:plus-circle"></mat-icon>
                         {{ collapsedRoots().length }} collapsed
                     </button>
@@ -127,14 +209,23 @@
             />
 
             <!-- saved views (open) — always available -->
-            <button mat-icon-button [matMenuTriggerFor]="viewsMenu" matTooltip="Saved views" aria-label="Open saved views">
+            <button
+                mat-icon-button
+                [matMenuTriggerFor]="viewsMenu"
+                matTooltip="Saved views"
+                aria-label="Open saved views"
+            >
                 <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
             </button>
             <mat-menu #viewsMenu="matMenu">
                 @if (views().length) {
                     @for (v of views(); track v.id) {
-                        <button mat-menu-item [matMenuTriggerFor]="viewActions" [matMenuTriggerData]="{ view: v }"
-                                [attr.aria-label]="'Actions for view ' + v.name">
+                        <button
+                            mat-menu-item
+                            [matMenuTriggerFor]="viewActions"
+                            [matMenuTriggerData]="{ view: v }"
+                            [attr.aria-label]="'Actions for view ' + v.name"
+                        >
                             <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
                             <span>{{ v.name }}</span>
                         </button>
@@ -151,7 +242,11 @@
                         <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
                         <span>Load view</span>
                     </button>
-                    <button mat-menu-item (click)="openHistory(view)" [attr.aria-label]="'Version history for ' + view.name">
+                    <button
+                        mat-menu-item
+                        (click)="openHistory(view)"
+                        [attr.aria-label]="'Version history for ' + view.name"
+                    >
                         <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
                         <span>Version history</span>
                     </button>
@@ -164,7 +259,11 @@
                         <span>Tags</span>
                     </button>
                     @if (shareable(view)) {
-                        <button mat-menu-item (click)="offer(view)" [attr.aria-label]="'Offer view ' + view.name + ' for sharing'">
+                        <button
+                            mat-menu-item
+                            (click)="offer(view)"
+                            [attr.aria-label]="'Offer view ' + view.name + ' for sharing'"
+                        >
                             <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                             <span>Offer for sharing</span>
                         </button>
@@ -172,16 +271,32 @@
                 </ng-template>
             </mat-menu>
 
-            <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['link-analysis-view']" (changed)="reloadViews()" label="Import / export saved views" />
+            <inspecto-transfer-menu
+                [items]="transferItems()"
+                [allowedKinds]="['link-analysis-view']"
+                (changed)="reloadViews()"
+                label="Import / export saved views"
+            />
 
             <!-- save view — needs a rendered graph -->
-            <button mat-icon-button #saveTrigger="matMenuTrigger" [matMenuTriggerFor]="saveMenu" [disabled]="!graph()"
-                    matTooltip="Save view" aria-label="Save the current view">
+            <button
+                mat-icon-button
+                #saveTrigger="matMenuTrigger"
+                [matMenuTriggerFor]="saveMenu"
+                [disabled]="!graph()"
+                matTooltip="Save view"
+                aria-label="Save the current view"
+            >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
             </button>
             <mat-menu #saveMenu="matMenu">
-                <form [formGroup]="saveForm" (ngSubmit)="saveView()" class="flex w-72 flex-col p-3"
-                      (click)="$event.stopPropagation()" aria-label="Save this view">
+                <form
+                    [formGroup]="saveForm"
+                    (ngSubmit)="saveView()"
+                    class="flex w-72 flex-col p-3"
+                    (click)="$event.stopPropagation()"
+                    aria-label="Save this view"
+                >
                     <mat-form-field>
                         <mat-label>Name</mat-label>
                         <input matInput formControlName="name" />
@@ -205,28 +320,48 @@
 
             @if (graph()) {
                 <!-- display options -->
-                <button mat-icon-button [matMenuTriggerFor]="displayMenu"
-                        [color]="displayCustomized() ? 'primary' : undefined"
-                        matTooltip="Display options" aria-label="Display options (labels, colors, shapes and line styles)">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="displayMenu"
+                    [color]="displayCustomized() ? 'primary' : undefined"
+                    matTooltip="Display options"
+                    aria-label="Display options (labels, colors, shapes and line styles)"
+                >
                     <mat-icon svgIcon="heroicons_outline:paint-brush"></mat-icon>
                 </button>
                 <mat-menu #displayMenu="matMenu">
-                    <div class="flex max-h-96 flex-col gap-2 overflow-y-auto px-4 py-2" (click)="$event.stopPropagation()" aria-label="Display options">
-                        <mat-checkbox [checked]="nodeLabels()" (change)="nodeLabels.set($event.checked)">Node labels</mat-checkbox>
-                        <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">Link labels</mat-checkbox>
+                    <div
+                        class="flex max-h-96 flex-col gap-2 overflow-y-auto px-4 py-2"
+                        (click)="$event.stopPropagation()"
+                        aria-label="Display options"
+                    >
+                        <mat-checkbox [checked]="nodeLabels()" (change)="nodeLabels.set($event.checked)"
+                            >Node labels</mat-checkbox
+                        >
+                        <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)"
+                            >Link labels</mat-checkbox
+                        >
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node colors</span>
                         @for (k of nodeKinds(); track k) {
                             <div class="flex items-center gap-1.5">
                                 <span class="w-24 truncate text-sm" [title]="k">{{ k }}</span>
                                 @for (s of swatches; track s) {
-                                    <button type="button" class="h-4 w-4 rounded-full border" [style.background]="s"
-                                            [class.ring-2]="nodeColors()[k] === s"
-                                            (click)="setNodeColor(k, s)"
-                                            [attr.aria-pressed]="nodeColors()[k] === s"
-                                            [attr.aria-label]="'Color nodes of type ' + k"></button>
+                                    <button
+                                        type="button"
+                                        class="h-4 w-4 rounded-full border"
+                                        [style.background]="s"
+                                        [class.ring-2]="nodeColors()[k] === s"
+                                        (click)="setNodeColor(k, s)"
+                                        [attr.aria-pressed]="nodeColors()[k] === s"
+                                        [attr.aria-label]="'Color nodes of type ' + k"
+                                    ></button>
                                 }
-                                <button mat-icon-button class="!h-6 !w-6" (click)="setNodeColor(k, null)"
-                                        [attr.aria-label]="'Reset the color of ' + k">
+                                <button
+                                    mat-icon-button
+                                    class="!h-6 !w-6"
+                                    (click)="setNodeColor(k, null)"
+                                    [attr.aria-label]="'Reset the color of ' + k"
+                                >
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </div>
@@ -236,14 +371,23 @@
                             <div class="flex items-center gap-1.5">
                                 <span class="w-24 truncate text-sm" [title]="k">{{ k }}</span>
                                 @for (sh of shapeOptions; track sh.value) {
-                                    <button type="button" class="flex h-5 w-5 items-center justify-center rounded border text-xs leading-none"
-                                            [class.ring-2]="nodeShapes()[k] === sh.value"
-                                            (click)="setNodeShape(k, sh.value)"
-                                            [attr.aria-pressed]="nodeShapes()[k] === sh.value"
-                                            [attr.aria-label]="sh.label + ' shape for ' + k">{{ sh.glyph }}</button>
+                                    <button
+                                        type="button"
+                                        class="flex h-5 w-5 items-center justify-center rounded border text-xs leading-none"
+                                        [class.ring-2]="nodeShapes()[k] === sh.value"
+                                        (click)="setNodeShape(k, sh.value)"
+                                        [attr.aria-pressed]="nodeShapes()[k] === sh.value"
+                                        [attr.aria-label]="sh.label + ' shape for ' + k"
+                                    >
+                                        {{ sh.glyph }}
+                                    </button>
                                 }
-                                <button mat-icon-button class="!h-6 !w-6" (click)="setNodeShape(k, null)"
-                                        [attr.aria-label]="'Reset the shape of ' + k">
+                                <button
+                                    mat-icon-button
+                                    class="!h-6 !w-6"
+                                    (click)="setNodeShape(k, null)"
+                                    [attr.aria-label]="'Reset the shape of ' + k"
+                                >
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </div>
@@ -253,31 +397,50 @@
                             <div class="flex items-center gap-1.5">
                                 <span class="w-24 truncate text-sm" [title]="k">{{ k }}</span>
                                 @for (s of swatches; track s) {
-                                    <button type="button" class="h-4 w-4 rounded-full border" [style.background]="s"
-                                            [class.ring-2]="edgeColors()[k] === s"
-                                            (click)="setEdgeColor(k, s)"
-                                            [attr.aria-pressed]="edgeColors()[k] === s"
-                                            [attr.aria-label]="'Color links of type ' + k"></button>
+                                    <button
+                                        type="button"
+                                        class="h-4 w-4 rounded-full border"
+                                        [style.background]="s"
+                                        [class.ring-2]="edgeColors()[k] === s"
+                                        (click)="setEdgeColor(k, s)"
+                                        [attr.aria-pressed]="edgeColors()[k] === s"
+                                        [attr.aria-label]="'Color links of type ' + k"
+                                    ></button>
                                 }
-                                <button mat-icon-button class="!h-6 !w-6" (click)="setEdgeColor(k, null)"
-                                        [attr.aria-label]="'Reset the color of ' + k">
+                                <button
+                                    mat-icon-button
+                                    class="!h-6 !w-6"
+                                    (click)="setEdgeColor(k, null)"
+                                    [attr.aria-label]="'Reset the color of ' + k"
+                                >
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </div>
                         }
-                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Link pattern</span>
+                        <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide"
+                            >Link pattern</span
+                        >
                         @for (k of edgeKinds(); track k) {
                             <div class="flex items-center gap-1.5">
                                 <span class="w-24 truncate text-sm" [title]="k">{{ k }}</span>
                                 @for (p of patternOptions; track p.value) {
-                                    <button type="button" class="flex h-5 w-7 items-center justify-center rounded border text-xs leading-none"
-                                            [class.ring-2]="edgePatterns()[k] === p.value"
-                                            (click)="setEdgePattern(k, p.value)"
-                                            [attr.aria-pressed]="edgePatterns()[k] === p.value"
-                                            [attr.aria-label]="p.label + ' pattern for ' + k">{{ p.glyph }}</button>
+                                    <button
+                                        type="button"
+                                        class="flex h-5 w-7 items-center justify-center rounded border text-xs leading-none"
+                                        [class.ring-2]="edgePatterns()[k] === p.value"
+                                        (click)="setEdgePattern(k, p.value)"
+                                        [attr.aria-pressed]="edgePatterns()[k] === p.value"
+                                        [attr.aria-label]="p.label + ' pattern for ' + k"
+                                    >
+                                        {{ p.glyph }}
+                                    </button>
                                 }
-                                <button mat-icon-button class="!h-6 !w-6" (click)="setEdgePattern(k, null)"
-                                        [attr.aria-label]="'Reset the pattern of ' + k">
+                                <button
+                                    mat-icon-button
+                                    class="!h-6 !w-6"
+                                    (click)="setEdgePattern(k, null)"
+                                    [attr.aria-label]="'Reset the pattern of ' + k"
+                                >
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </div>
@@ -287,14 +450,23 @@
                             <div class="flex items-center gap-1.5">
                                 <span class="w-24 truncate text-sm" [title]="k">{{ k }}</span>
                                 @for (z of sizeOptions; track z.value) {
-                                    <button type="button" class="flex h-5 w-5 items-center justify-center rounded border text-xs leading-none"
-                                            [class.ring-2]="edgeSizes()[k] === z.value"
-                                            (click)="setEdgeSize(k, z.value)"
-                                            [attr.aria-pressed]="edgeSizes()[k] === z.value"
-                                            [attr.aria-label]="z.label + ' width for ' + k">{{ z.label }}</button>
+                                    <button
+                                        type="button"
+                                        class="flex h-5 w-5 items-center justify-center rounded border text-xs leading-none"
+                                        [class.ring-2]="edgeSizes()[k] === z.value"
+                                        (click)="setEdgeSize(k, z.value)"
+                                        [attr.aria-pressed]="edgeSizes()[k] === z.value"
+                                        [attr.aria-label]="z.label + ' width for ' + k"
+                                    >
+                                        {{ z.label }}
+                                    </button>
                                 }
-                                <button mat-icon-button class="!h-6 !w-6" (click)="setEdgeSize(k, null)"
-                                        [attr.aria-label]="'Reset the width of ' + k">
+                                <button
+                                    mat-icon-button
+                                    class="!h-6 !w-6"
+                                    (click)="setEdgeSize(k, null)"
+                                    [attr.aria-label]="'Reset the width of ' + k"
+                                >
                                     <mat-icon class="icon-size-3" svgIcon="heroicons_outline:x-mark"></mat-icon>
                                 </button>
                             </div>
@@ -302,21 +474,47 @@
                     </div>
                 </mat-menu>
 
-                <button mat-icon-button (click)="undoPresentation()" [disabled]="!canUndo()"
-                        matTooltip="Undo (Ctrl+Z)" aria-label="Undo the last display/filter change">
+                <button
+                    mat-icon-button
+                    (click)="undoPresentation()"
+                    [disabled]="!canUndo()"
+                    matTooltip="Undo (Ctrl+Z)"
+                    aria-label="Undo the last display/filter change"
+                >
                     <mat-icon svgIcon="heroicons_outline:arrow-uturn-left"></mat-icon>
                 </button>
-                <button mat-icon-button (click)="redoPresentation()" [disabled]="!canRedo()"
-                        matTooltip="Redo (Ctrl+Y)" aria-label="Redo the last undone display/filter change">
+                <button
+                    mat-icon-button
+                    (click)="redoPresentation()"
+                    [disabled]="!canRedo()"
+                    matTooltip="Redo (Ctrl+Y)"
+                    aria-label="Redo the last undone display/filter change"
+                >
                     <mat-icon svgIcon="heroicons_outline:arrow-uturn-right"></mat-icon>
                 </button>
-                <button mat-icon-button (click)="fitToScreen()" matTooltip="Fit to screen" aria-label="Fit the graph to the screen">
+                <button
+                    mat-icon-button
+                    (click)="fitToScreen()"
+                    matTooltip="Fit to screen"
+                    aria-label="Fit the graph to the screen"
+                >
                     <mat-icon svgIcon="heroicons_outline:viewfinder-circle"></mat-icon>
                 </button>
-                <button mat-icon-button (click)="toggleFullscreen('graph')"
-                        [matTooltip]="fullscreen() === 'graph' ? 'Exit graph full screen' : 'Graph full screen'"
-                        [attr.aria-label]="fullscreen() === 'graph' ? 'Exit graph full screen' : 'View the graph in full screen'">
-                    <mat-icon [svgIcon]="fullscreen() === 'graph' ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"></mat-icon>
+                <button
+                    mat-icon-button
+                    (click)="toggleFullscreen('graph')"
+                    [matTooltip]="fullscreen() === 'graph' ? 'Exit graph full screen' : 'Graph full screen'"
+                    [attr.aria-label]="
+                        fullscreen() === 'graph' ? 'Exit graph full screen' : 'View the graph in full screen'
+                    "
+                >
+                    <mat-icon
+                        [svgIcon]="
+                            fullscreen() === 'graph'
+                                ? 'heroicons_outline:arrows-pointing-in'
+                                : 'heroicons_outline:arrows-pointing-out'
+                        "
+                    ></mat-icon>
                 </button>
                 <button mat-icon-button (click)="exportPng()" matTooltip="Export PNG" aria-label="Export as PNG">
                     <mat-icon svgIcon="heroicons_outline:photo"></mat-icon>
@@ -327,16 +525,24 @@
                 <button mat-icon-button (click)="exportSvg()" matTooltip="Export SVG" aria-label="Export as SVG">
                     <mat-icon svgIcon="heroicons_outline:photo"></mat-icon>
                 </button>
-                <button mat-icon-button (click)="exportGraphml()" matTooltip="Export GraphML" aria-label="Export as GraphML">
+                <button
+                    mat-icon-button
+                    (click)="exportGraphml()"
+                    matTooltip="Export GraphML"
+                    aria-label="Export as GraphML"
+                >
                     <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                 </button>
             }
         </div>
 
         <!-- ══ canvas zone (graph + states) — the graph-fullscreen target ══ -->
-        <div #canvasZone class="flex min-h-0 flex-auto flex-col gap-2"
-             [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
-             [class.p-3]="fullscreen() === 'graph'">
+        <div
+            #canvasZone
+            class="flex min-h-0 flex-auto flex-col gap-2"
+            [style.background]="fullscreen() === 'graph' ? 'var(--gamma-bg-default)' : null"
+            [class.p-3]="fullscreen() === 'graph'"
+        >
             @if (graph(); as g) {
                 <!-- top status panel: the active query as chips, with edit-to-change -->
                 <div class="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-1.5" aria-label="Active query">
@@ -349,7 +555,12 @@
                             {{ item.value }}
                         </span>
                     }
-                    <button mat-icon-button (click)="editQuery()" matTooltip="Change the query" aria-label="Change the query">
+                    <button
+                        mat-icon-button
+                        (click)="editQuery()"
+                        matTooltip="Change the query"
+                        aria-label="Change the query"
+                    >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                     </button>
                     <span class="text-secondary ml-auto text-xs">
@@ -357,9 +568,16 @@
                     </span>
                 </div>
 
-                <inspecto-graph-view [fill]="true" [data]="displayed()" [emphasis]="emphasis()"
-                                     [display]="displayOptions()" [tooltips]="true" [layout]="layoutId()"
-                                     (nodeClick)="onNodeClick($event)" (edgeClick)="onEdgeClick($event)"></inspecto-graph-view>
+                <inspecto-graph-view
+                    [fill]="true"
+                    [data]="displayed()"
+                    [emphasis]="emphasis()"
+                    [display]="displayOptions()"
+                    [tooltips]="true"
+                    [layout]="layoutId()"
+                    (nodeClick)="onNodeClick($event)"
+                    (edgeClick)="onEdgeClick($event)"
+                ></inspecto-graph-view>
             } @else if (loading()) {
                 <inspecto-skeleton [lines]="6" height="2rem"></inspecto-skeleton>
             } @else {
@@ -376,54 +594,90 @@
         <!-- ══ bottom panel: Query · Analysis · Data ══ -->
         <div class="rounded-lg border">
             <div class="flex flex-wrap items-center gap-2 px-3 py-1">
-                <mat-button-toggle-group [value]="bottomTab()" (change)="selectBottomTab($event.value)" aria-label="Bottom panel">
+                <mat-button-toggle-group
+                    [value]="bottomTab()"
+                    (change)="selectBottomTab($event.value)"
+                    aria-label="Bottom panel"
+                >
                     <mat-button-toggle value="query">Query</mat-button-toggle>
                     <mat-button-toggle value="analysis" [disabled]="!graph()">Analysis</mat-button-toggle>
                     <mat-button-toggle value="data" [disabled]="!graph()">Data</mat-button-toggle>
                 </mat-button-toggle-group>
                 @if (bottomOpen() && bottomTab() === 'data') {
-                    <mat-button-toggle-group class="ml-2" [value]="tableMode()" (change)="tableMode.set($event.value)"
-                                             aria-label="Table contents">
+                    <mat-button-toggle-group
+                        class="ml-2"
+                        [value]="tableMode()"
+                        (change)="tableMode.set($event.value)"
+                        aria-label="Table contents"
+                    >
                         <mat-button-toggle value="links">Links</mat-button-toggle>
                         <mat-button-toggle value="nodes">Nodes</mat-button-toggle>
                     </mat-button-toggle-group>
                     <span class="text-secondary text-xs">{{ tableRows().length }} rows</span>
                 }
-                <button mat-icon-button class="ml-auto" (click)="bottomOpen.set(!bottomOpen())"
-                        [attr.aria-expanded]="bottomOpen()" aria-controls="bottom-panel-body"
-                        [matTooltip]="bottomOpen() ? 'Hide the panel' : 'Show the panel'"
-                        [attr.aria-label]="bottomOpen() ? 'Hide the panel' : 'Show the panel'">
-                    <mat-icon [svgIcon]="bottomOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-up'"></mat-icon>
+                <button
+                    mat-icon-button
+                    class="ml-auto"
+                    (click)="bottomOpen.set(!bottomOpen())"
+                    [attr.aria-expanded]="bottomOpen()"
+                    aria-controls="bottom-panel-body"
+                    [matTooltip]="bottomOpen() ? 'Hide the panel' : 'Show the panel'"
+                    [attr.aria-label]="bottomOpen() ? 'Hide the panel' : 'Show the panel'"
+                >
+                    <mat-icon
+                        [svgIcon]="bottomOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-up'"
+                    ></mat-icon>
                 </button>
             </div>
 
             <!-- body: panes are `[hidden]`-gated (not `@if`/`@switch`) so the toolbox child keeps its
                  result state across tab switches and panel collapse (angular-ui skill idiom). -->
-            <div id="bottom-panel-body" [hidden]="!bottomOpen()" class="max-h-[45vh] overflow-y-auto border-t px-3 py-3">
+            <div
+                id="bottom-panel-body"
+                [hidden]="!bottomOpen()"
+                class="max-h-[45vh] overflow-y-auto border-t px-3 py-3"
+            >
                 <!-- ── Query — extracted to the query-panel child (owns the form + buildQuery; the host
                      keeps sourceId and the run/save/load lifecycle, reached via a ViewChild). ── -->
-                <inspecto-link-analysis-query-panel [hidden]="bottomTab() !== 'query'"
-                                                    [sources]="sources" [datasets]="datasets()"
-                                                    [pipelines]="pipelines()" [sourceId]="sourceId()"
-                                                    [queryOpen]="queryOpen()" [loading]="loading()"
-                                                    [querySummary]="querySummary()" [sourceLabel]="sourceLabel()"
-                                                    (sourceIdChange)="sourceId.set($event)"
-                                                    (run)="run()" (edit)="editQuery()"></inspecto-link-analysis-query-panel>
+                <inspecto-link-analysis-query-panel
+                    [hidden]="bottomTab() !== 'query'"
+                    [sources]="sources"
+                    [datasets]="datasets()"
+                    [pipelines]="pipelines()"
+                    [sourceId]="sourceId()"
+                    [queryOpen]="queryOpen()"
+                    [loading]="loading()"
+                    [querySummary]="querySummary()"
+                    [sourceLabel]="sourceLabel()"
+                    (sourceIdChange)="sourceId.set($event)"
+                    (run)="run()"
+                    (edit)="editQuery()"
+                ></inspecto-link-analysis-query-panel>
 
                 <!-- ── Analysis (the graph-algorithms toolbox) — extracted to a smart child. Kept mounted
                      via `[hidden]` so its results survive tab switches; emits emphasis for the canvas. ── -->
-                <inspecto-link-analysis-toolbox [hidden]="bottomTab() !== 'analysis'"
-                                                [graph]="displayed()" [nodeOptions]="nodeOptions()"
-                                                [nodeKinds]="nodeKinds()" [edgeKinds]="edgeKinds()"
-                                                [labelOf]="labelOf"
-                                                (emphasisChange)="emphasis.set($event)"></inspecto-link-analysis-toolbox>
+                <inspecto-link-analysis-toolbox
+                    [hidden]="bottomTab() !== 'analysis'"
+                    [graph]="displayed()"
+                    [nodeOptions]="nodeOptions()"
+                    [nodeKinds]="nodeKinds()"
+                    [edgeKinds]="edgeKinds()"
+                    [labelOf]="labelOf"
+                    (emphasisChange)="emphasis.set($event)"
+                ></inspecto-link-analysis-toolbox>
 
                 <!-- ── Data ── -->
                 <div [hidden]="bottomTab() !== 'data'">
-                    <inspecto-data-table tier="standard" [rows]="tableRows()" height="15rem" [pageSize]="10"
-                                         exportName="link-analysis" sourceName="link-analysis"
-                                         noRowsTitle="Nothing matches the current graph"
-                                         (rowClick)="onTableRow($event)"></inspecto-data-table>
+                    <inspecto-data-table
+                        tier="standard"
+                        [rows]="tableRows()"
+                        height="15rem"
+                        [pageSize]="10"
+                        exportName="link-analysis"
+                        sourceName="link-analysis"
+                        noRowsTitle="Nothing matches the current graph"
+                        (rowClick)="onTableRow($event)"
+                    ></inspecto-data-table>
                 </div>
             </div>
         </div>

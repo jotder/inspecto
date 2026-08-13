@@ -1,9 +1,13 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent">
+    <div
+        class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+    >
         <div>
             <h1 class="text-3xl font-extrabold leading-none tracking-tight">Processing Status</h1>
-            <div class="text-secondary mt-1.5">Every pipeline's committed/quarantine counts and last-batch outcome, at a glance</div>
+            <div class="text-secondary mt-1.5">
+                Every pipeline's committed/quarantine counts and last-batch outcome, at a glance
+            </div>
         </div>
         <div class="mt-4 flex items-center gap-3 sm:mt-0">
             <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">

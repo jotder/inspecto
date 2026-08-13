@@ -15,7 +15,10 @@ function create(inputs: Partial<EditableGridComponent>) {
     TestBed.configureTestingModule({
         imports: [EditableGridComponent],
         // the real theme service walks up to GAMMA_APP_CONFIG — stub it like data-table's spec does
-        providers: [provideNoopAnimations(), { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+        ],
     });
     const fixture = TestBed.createComponent(EditableGridComponent);
     Object.assign(fixture.componentInstance, inputs);
@@ -111,6 +114,9 @@ describe('parseCsv', () => {
     });
 
     it('drops blank lines and handles a missing trailing newline', () => {
-        expect(parseCsv('a,b\n\n1,2')).toEqual([['a', 'b'], ['1', '2']]);
+        expect(parseCsv('a,b\n\n1,2')).toEqual([
+            ['a', 'b'],
+            ['1', '2'],
+        ]);
     });
 });

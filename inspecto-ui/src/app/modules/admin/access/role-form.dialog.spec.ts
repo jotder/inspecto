@@ -38,14 +38,14 @@ describe('RoleFormDialog', () => {
         c.save();
         expect(ref.close).toHaveBeenCalledWith({
             name: 'fraud-analyst',
-            capabilities: ['canAuthorWorkbench', 'canOperateRuns'],   // vocabulary order, not click order
+            capabilities: ['canAuthorWorkbench', 'canOperateRuns'], // vocabulary order, not click order
             dataScopes: ['fraud', 'billing'],
         });
     });
 
     it('rejects a duplicate or malformed name inline and does not close', () => {
         const { c, ref } = create();
-        c.form.controls.name.setValue('operations');   // already exists
+        c.form.controls.name.setValue('operations'); // already exists
         c.save();
         expect(c.form.controls.name.hasError('duplicate')).toBe(true);
         c.form.controls.name.setValue('bad name!');
@@ -54,7 +54,7 @@ describe('RoleFormDialog', () => {
         expect(ref.close).not.toHaveBeenCalled();
     });
 
-    it('edit mode keeps the name immutable and pre-selects the role\'s grants', () => {
+    it("edit mode keeps the name immutable and pre-selects the role's grants", () => {
         const { fixture, c, ref } = create({
             role: { name: 'operations', capabilities: ['canOperateRuns'], dataScopes: ['billing'] },
         });

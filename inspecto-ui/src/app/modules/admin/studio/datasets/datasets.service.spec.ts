@@ -23,7 +23,10 @@ function setup() {
         ]),
     );
     TestBed.configureTestingModule({
-        providers: [DatasetsService, { provide: ComponentsService, useValue: { create, update, list, remove: vi.fn(() => of(null)) } }],
+        providers: [
+            DatasetsService,
+            { provide: ComponentsService, useValue: { create, update, list, remove: vi.fn(() => of(null)) } },
+        ],
     });
     return { svc: TestBed.inject(DatasetsService), create, update, list };
 }
@@ -33,7 +36,10 @@ describe('DatasetsService', () => {
         const { svc, create } = setup();
         let saved: { id: string } | undefined;
         svc.save(buildDataset('d1', 'virtual', 'cdr')).subscribe((d) => (saved = d));
-        expect(create).toHaveBeenCalledWith('dataset', expect.objectContaining({ id: 'd1', kind: 'virtual', sourceName: 'cdr' }));
+        expect(create).toHaveBeenCalledWith(
+            'dataset',
+            expect.objectContaining({ id: 'd1', kind: 'virtual', sourceName: 'cdr' }),
+        );
         expect(saved?.id).toBe('d1');
     });
 
@@ -41,7 +47,11 @@ describe('DatasetsService', () => {
         const { svc, create, update } = setup();
         svc.save(buildDataset('d1', 'virtual', 'cdr'), { update: true }).subscribe();
         expect(create).not.toHaveBeenCalled();
-        expect(update).toHaveBeenCalledWith('dataset', 'd1', expect.objectContaining({ kind: 'virtual', sourceName: 'cdr' }));
+        expect(update).toHaveBeenCalledWith(
+            'dataset',
+            'd1',
+            expect.objectContaining({ kind: 'virtual', sourceName: 'cdr' }),
+        );
     });
 
     it('lists datasets back from the registry', () => {

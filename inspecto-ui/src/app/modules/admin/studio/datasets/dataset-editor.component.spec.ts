@@ -17,7 +17,10 @@ function create(save = vi.fn((d: Dataset) => of(d)), list: Dataset[] = []) {
             provideNoopAnimations(),
             provideRouter([]),
             { provide: DatasetsService, useValue: { get: () => of(null), list: () => of(list), save } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
@@ -67,7 +70,14 @@ describe('DatasetEditorComponent', () => {
 
     it('blocks save on a duplicate id (case-insensitive) per the product-wide rule', () => {
         const save = vi.fn((d: Dataset) => of(d));
-        const existing = { id: 'cdr_view', name: 'cdr_view', kind: 'virtual', sourceName: 'cdr', columns: [], measures: [] } as Dataset;
+        const existing = {
+            id: 'cdr_view',
+            name: 'cdr_view',
+            kind: 'virtual',
+            sourceName: 'cdr',
+            columns: [],
+            measures: [],
+        } as Dataset;
         const fixture = create(save, [existing]);
         fixture.detectChanges(); // ngOnInit loads the list + attaches the unique validator
         fixture.componentInstance.form.controls.name.setValue('CDR_View');
@@ -80,13 +90,9 @@ describe('DatasetEditorComponent', () => {
     // fixture in the suite. axe finishes in ~1-2s in isolation, but under full-suite multi-worker
     // CPU contention it can occasionally cross vitest's 5s default and time out (never a real
     // violation — those throw immediately). Give it explicit headroom.
-    it(
-        'renders with no a11y violations',
-        async () => {
-            const fixture = create();
-            fixture.detectChanges();
-            await expectNoA11yViolations(fixture.nativeElement);
-        },
-        15_000,
-    );
+    it('renders with no a11y violations', async () => {
+        const fixture = create();
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
+    }, 15_000);
 });

@@ -120,7 +120,9 @@ export class AccessService {
 
     saveProfile(profile: AccessProfile): Observable<AccessProfile> {
         return this.http.put<AccessProfile>(
-            apiUrl(`/access/profiles/${encodeURIComponent(accessProfileId(profile))}`), profile);
+            apiUrl(`/access/profiles/${encodeURIComponent(accessProfileId(profile))}`),
+            profile,
+        );
     }
 
     deleteProfile(id: string): Observable<{ deleted: string }> {

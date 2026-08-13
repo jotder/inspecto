@@ -51,8 +51,8 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
             </div>
             @if (grants().length === 0) {
                 <div class="text-secondary text-sm">
-                    No active dataset grants yet — request access to an offered dataset in the Catalog's
-                    “Shared with me” tab, and bind it here once the owner approves.
+                    No active dataset grants yet — request access to an offered dataset in the Catalog's “Shared with
+                    me” tab, and bind it here once the owner approves.
                 </div>
             } @else {
                 <form [formGroup]="form" class="flex flex-col gap-2">
@@ -83,14 +83,7 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button mat-dialog-close>Cancel</button>
-            <button
-                mat-flat-button
-                color="primary"
-                [disabled]="grants().length === 0"
-                (click)="submit()"
-            >
-                Bind
-            </button>
+            <button mat-flat-button color="primary" [disabled]="grants().length === 0" (click)="submit()">Bind</button>
         </mat-dialog-actions>
     `,
 })

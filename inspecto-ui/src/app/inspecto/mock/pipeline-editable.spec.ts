@@ -72,13 +72,14 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
         const res = lowerGraph(g, existing, true);
 
         expect('refusals' in res).toBe(true);
-        expect((res as { refusals: { code: string }[] }).refusals.map((r) => r.code)).toContain(
-            'PARSER_NO_SCHEMA',
-        );
+        expect((res as { refusals: { code: string }[] }).refusals.map((r) => r.code)).toContain('PARSER_NO_SCHEMA');
     });
 
     it('presents a bound Grammar as use:, not as a config key', () => {
-        const existing = { ...parsingBlockConfig(), parsing: { frontend: 'delimited', grammar: 'grammar/pipe_delimited' } };
+        const existing = {
+            ...parsingBlockConfig(),
+            parsing: { frontend: 'delimited', grammar: 'grammar/pipe_delimited' },
+        };
 
         const parser = liftConfig(existing).nodes.find((n) => n.type === 'parser')!;
 
@@ -160,9 +161,18 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
         expect(join).toBeGreaterThan(-1);
         expect(dedup).toBeGreaterThan(join);
         expect(summarize).toBeGreaterThan(dedup);
-        expect(g.nodes.find((n) => n.type === 'transform.join')!.config).toEqual({ reference: 'reference/rates', on: 'currency' });
-        expect(g.nodes.find((n) => n.type === 'transform.dedup')!.config).toEqual({ keys: ['call_id'], order_by: 'event_ts DESC' });
-        expect(g.nodes.find((n) => n.type === 'transform.summarize')!.config).toEqual({ group_by: ['region'], measures: ['sum(amount)'] });
+        expect(g.nodes.find((n) => n.type === 'transform.join')!.config).toEqual({
+            reference: 'reference/rates',
+            on: 'currency',
+        });
+        expect(g.nodes.find((n) => n.type === 'transform.dedup')!.config).toEqual({
+            keys: ['call_id'],
+            order_by: 'event_ts DESC',
+        });
+        expect(g.nodes.find((n) => n.type === 'transform.summarize')!.config).toEqual({
+            group_by: ['region'],
+            measures: ['sum(amount)'],
+        });
     });
 
     it('lowers all three back verbatim — no UNSUPPORTED_NODE, keys byte-stable', () => {
@@ -209,8 +219,12 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
      * mock more *lenient* than the server. This is the mirror image: a mock still refusing a second
      * dedup would block, offline, a graph the backend now saves happily — same bug, other sign.
      */
-    const expectSecondLowersToTheChain = (type: string, kind: string, config: Record<string, unknown>,
-                                          from: Record<string, unknown> = processedConfig()): void => {
+    const expectSecondLowersToTheChain = (
+        type: string,
+        kind: string,
+        config: Record<string, unknown>,
+        from: Record<string, unknown> = processedConfig(),
+    ): void => {
         const existing = from;
         const g = liftConfig(existing);
         const first = g.nodes.find((n) => n.type === type)!;
@@ -243,8 +257,12 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
     // Its own fixture: a transform.route node is lifted only from a top-level `route:` block, which the
     // shared processedConfig() (processing-key transforms) deliberately has none of.
     it('lowers a SECOND route into the chain', () => {
-        expectSecondLowersToTheChain('transform.route', 'route', { on: 'second' },
-            { ...processedConfig(), route: { on: 'first', branches: [] } });
+        expectSecondLowersToTheChain(
+            'transform.route',
+            'route',
+            { on: 'second' },
+            { ...processedConfig(), route: { on: 'first', branches: [] } },
+        );
     });
 
     it('lowers a SECOND summarize into the chain', () => {

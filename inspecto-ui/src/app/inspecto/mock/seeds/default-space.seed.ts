@@ -41,7 +41,8 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
     //    widget→query→dataset lineage chain (reuse-graph, delete-protection, bundle closure) ────────
     putComponent(store, space, 'query', 'recent_high_cost', {
         name: 'recent_high_cost',
-        description: 'High-cost CDRs up to today — the $today built-in and the $min_cost parameter resolve at run time.',
+        description:
+            'High-cost CDRs up to today — the $today built-in and the $min_cost parameter resolve at run time.',
         type: 'sql',
         datasetId: 'cdr_sample',
         sourceName: 'cdr',
@@ -72,19 +73,23 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
     //    loads them one-click under Saved views ────────────────────────────────────────────────
     const exampleGraphs: Array<{ id: string; name: string; description: string }> = [
         {
-            id: 'graph_simple', name: 'Example 1 — Simple star',
+            id: 'graph_simple',
+            name: 'Example 1 — Simple star',
             description: 'One hub calling five subscribers — a first look at the canvas.',
         },
         {
-            id: 'graph_moderate', name: 'Example 2 — Two clusters',
+            id: 'graph_moderate',
+            name: 'Example 2 — Two clusters',
             description: 'A call ring and a chain joined by one bridge — try Shortest path and the type filter.',
         },
         {
-            id: 'graph_mindmap', name: 'Example 3 — Mind map',
+            id: 'graph_mindmap',
+            name: 'Example 3 — Mind map',
             description: 'A Data Quality topic tree — try Explain node on a branch.',
         },
         {
-            id: 'graph_complex', name: 'Example 4 — Fraud network',
+            id: 'graph_complex',
+            name: 'Example 4 — Fraud network',
             description: 'Three rings, mule accounts and a cash-out hub — try Centrality and Communities.',
         },
     ];
@@ -108,10 +113,12 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
             name: g.name,
             description: g.description,
             sourceId: 'entity-projection',
-            query: { projection: { datasetId: g.id, sourceCol: 'source', targetCol: 'target', linkKindCol: 'link_type' } },
+            query: {
+                projection: { datasetId: g.id, sourceCol: 'source', targetCol: 'target', linkKindCol: 'link_type' },
+            },
         });
     }
-    seedPatternPacks(store, space);   // V2 (c): the six shipped motifs, authored per Space
+    seedPatternPacks(store, space); // V2 (c): the six shipped motifs, authored per Space
 
     // ── Geo Map Analysis: a coordinate-bearing dataset + a saved Geo View, so /studio/geo-map
     //    demos one-click under Saved views ────────────────────────────────────────────────────
@@ -154,13 +161,20 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
     });
     putComponent(store, space, 'geo-map-view', 'remittance-corridors', {
         name: 'Example — Remittance corridors',
-        description: 'Origin→destination money movements folding into weighted routes — click a corridor for its distance.',
+        description:
+            'Origin→destination money movements folding into weighted routes — click a corridor for its distance.',
         sourceId: 'od-routes',
         query: {
             routes: {
-                datasetId: 'money_moves', fromLatCol: 'from_lat', fromLonCol: 'from_lon',
-                toLatCol: 'to_lat', toLonCol: 'to_lon', fromCol: 'from_city', toCol: 'to_city',
-                kindCol: 'channel', timeCol: 'moved_at',
+                datasetId: 'money_moves',
+                fromLatCol: 'from_lat',
+                fromLonCol: 'from_lon',
+                toLatCol: 'to_lat',
+                toLonCol: 'to_lon',
+                fromCol: 'from_city',
+                toCol: 'to_city',
+                kindCol: 'channel',
+                timeCol: 'moved_at',
             },
         },
     });
@@ -170,22 +184,82 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         sourceId: 'dataset',
         query: {
             projection: {
-                datasetId: 'cell_sites', latCol: 'lat', lonCol: 'lon',
-                entityCol: 'site', kindCol: 'site_type', timeCol: 'seen_time',
+                datasetId: 'cell_sites',
+                latCol: 'lat',
+                lonCol: 'lon',
+                entityCol: 'site',
+                kindCol: 'site_type',
+                timeCol: 'seen_time',
             },
         },
     });
 
     // ── Geo Map Analysis case studies CS1–CS5 (docs/superpower/geo-map-case-studies.md):
     //    five boundary-pushing datasets + one-click saved Geo Views ──────────────────────────
-    const geoCol = (name: string, type: 'string' | 'number' | 'date', role: 'dimension' | 'temporal' = 'dimension') =>
-        ({ name, type, role });
+    const geoCol = (
+        name: string,
+        type: 'string' | 'number' | 'date',
+        role: 'dimension' | 'temporal' = 'dimension',
+    ) => ({ name, type, role });
     const geoCaseDatasets: Array<{ id: string; columns: ReturnType<typeof geoCol>[] }> = [
-        { id: 'simbox_sweep', columns: [geoCol('id', 'string'), geoCol('msisdn', 'string'), geoCol('role', 'string'), geoCol('lat', 'number'), geoCol('lon', 'number'), geoCol('event_time', 'date', 'temporal')] },
-        { id: 'impossible_travel', columns: [geoCol('id', 'string'), geoCol('account', 'string'), geoCol('channel', 'string'), geoCol('lat', 'number'), geoCol('lon', 'number'), geoCol('login_time', 'date', 'temporal')] },
-        { id: 'mule_corridors', columns: [geoCol('id', 'string'), geoCol('from_city', 'string'), geoCol('from_lat', 'number'), geoCol('from_lon', 'number'), geoCol('to_city', 'string'), geoCol('to_lat', 'number'), geoCol('to_lon', 'number'), geoCol('channel', 'string'), geoCol('moved_at', 'date', 'temporal')] },
-        { id: 'fleet_breadcrumbs', columns: [geoCol('id', 'string'), geoCol('truck', 'string'), geoCol('status', 'string'), geoCol('lat', 'number'), geoCol('lon', 'number'), geoCol('ping_time', 'date', 'temporal')] },
-        { id: 'border_roamers', columns: [geoCol('id', 'string'), geoCol('imei', 'string'), geoCol('side', 'string'), geoCol('lat', 'number'), geoCol('lon', 'number'), geoCol('seen_at', 'date', 'temporal')] },
+        {
+            id: 'simbox_sweep',
+            columns: [
+                geoCol('id', 'string'),
+                geoCol('msisdn', 'string'),
+                geoCol('role', 'string'),
+                geoCol('lat', 'number'),
+                geoCol('lon', 'number'),
+                geoCol('event_time', 'date', 'temporal'),
+            ],
+        },
+        {
+            id: 'impossible_travel',
+            columns: [
+                geoCol('id', 'string'),
+                geoCol('account', 'string'),
+                geoCol('channel', 'string'),
+                geoCol('lat', 'number'),
+                geoCol('lon', 'number'),
+                geoCol('login_time', 'date', 'temporal'),
+            ],
+        },
+        {
+            id: 'mule_corridors',
+            columns: [
+                geoCol('id', 'string'),
+                geoCol('from_city', 'string'),
+                geoCol('from_lat', 'number'),
+                geoCol('from_lon', 'number'),
+                geoCol('to_city', 'string'),
+                geoCol('to_lat', 'number'),
+                geoCol('to_lon', 'number'),
+                geoCol('channel', 'string'),
+                geoCol('moved_at', 'date', 'temporal'),
+            ],
+        },
+        {
+            id: 'fleet_breadcrumbs',
+            columns: [
+                geoCol('id', 'string'),
+                geoCol('truck', 'string'),
+                geoCol('status', 'string'),
+                geoCol('lat', 'number'),
+                geoCol('lon', 'number'),
+                geoCol('ping_time', 'date', 'temporal'),
+            ],
+        },
+        {
+            id: 'border_roamers',
+            columns: [
+                geoCol('id', 'string'),
+                geoCol('imei', 'string'),
+                geoCol('side', 'string'),
+                geoCol('lat', 'number'),
+                geoCol('lon', 'number'),
+                geoCol('seen_at', 'date', 'temporal'),
+            ],
+        },
     ];
     for (const d of geoCaseDatasets) {
         putComponent(store, space, 'dataset', d.id, {
@@ -201,33 +275,86 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
     }
     putComponent(store, space, 'geo-map-view', 'cs1-simbox-farms', {
         name: 'CS1 — SIM-box farms (stress: 5.6k events)',
-        description: 'Three static SIM farms among 350 roaming subscribers. Deliberately trips the 5,000-point cap AND the invalid-row banner. Try: type filter → simbox, Stay points, then Co-location on a filtered view.',
+        description:
+            'Three static SIM farms among 350 roaming subscribers. Deliberately trips the 5,000-point cap AND the invalid-row banner. Try: type filter → simbox, Stay points, then Co-location on a filtered view.',
         sourceId: 'dataset',
-        query: { projection: { datasetId: 'simbox_sweep', latCol: 'lat', lonCol: 'lon', entityCol: 'msisdn', kindCol: 'role', timeCol: 'event_time' } },
+        query: {
+            projection: {
+                datasetId: 'simbox_sweep',
+                latCol: 'lat',
+                lonCol: 'lon',
+                entityCol: 'msisdn',
+                kindCol: 'role',
+                timeCol: 'event_time',
+            },
+        },
     });
     putComponent(store, space, 'geo-map-view', 'cs2-impossible-travel', {
         name: 'CS2 — Impossible travel',
-        description: 'Ten accounts logging in around their home cities — one jumps New York → Singapore in 65 minutes. Try: search ACC-007, then press Play on the timeline.',
+        description:
+            'Ten accounts logging in around their home cities — one jumps New York → Singapore in 65 minutes. Try: search ACC-007, then press Play on the timeline.',
         sourceId: 'dataset',
-        query: { projection: { datasetId: 'impossible_travel', latCol: 'lat', lonCol: 'lon', entityCol: 'account', kindCol: 'channel', timeCol: 'login_time' } },
+        query: {
+            projection: {
+                datasetId: 'impossible_travel',
+                latCol: 'lat',
+                lonCol: 'lon',
+                entityCol: 'account',
+                kindCol: 'channel',
+                timeCol: 'login_time',
+            },
+        },
     });
     putComponent(store, space, 'geo-map-view', 'cs3-mule-corridors', {
         name: 'CS3 — Mule corridors (900 legs → 24 routes)',
-        description: 'A week of money movements over 18 cities folding into weighted great-circle corridors across 4 channels. Try: click the thickest corridor, filter by channel, time-slide the week.',
+        description:
+            'A week of money movements over 18 cities folding into weighted great-circle corridors across 4 channels. Try: click the thickest corridor, filter by channel, time-slide the week.',
         sourceId: 'od-routes',
-        query: { routes: { datasetId: 'mule_corridors', fromLatCol: 'from_lat', fromLonCol: 'from_lon', toLatCol: 'to_lat', toLonCol: 'to_lon', fromCol: 'from_city', toCol: 'to_city', kindCol: 'channel', timeCol: 'moved_at' } },
+        query: {
+            routes: {
+                datasetId: 'mule_corridors',
+                fromLatCol: 'from_lat',
+                fromLonCol: 'from_lon',
+                toLatCol: 'to_lat',
+                toLonCol: 'to_lon',
+                fromCol: 'from_city',
+                toCol: 'to_city',
+                kindCol: 'channel',
+                timeCol: 'moved_at',
+            },
+        },
     });
     putComponent(store, space, 'geo-map-view', 'cs4-fleet-dwell-audit', {
         name: 'CS4 — Fleet dwell audit (24h breadcrumbs)',
-        description: 'Six trucks, 15-minute GPS pings for a day; two take unscheduled roadside stops. Try: Stay points (radius 300 m, dwell 45 min), Frequent locations for the depots, Play for the day.',
+        description:
+            'Six trucks, 15-minute GPS pings for a day; two take unscheduled roadside stops. Try: Stay points (radius 300 m, dwell 45 min), Frequent locations for the depots, Play for the day.',
         sourceId: 'dataset',
-        query: { projection: { datasetId: 'fleet_breadcrumbs', latCol: 'lat', lonCol: 'lon', entityCol: 'truck', kindCol: 'status', timeCol: 'ping_time' } },
+        query: {
+            projection: {
+                datasetId: 'fleet_breadcrumbs',
+                latCol: 'lat',
+                lonCol: 'lon',
+                entityCol: 'truck',
+                kindCol: 'status',
+                timeCol: 'ping_time',
+            },
+        },
     });
     putComponent(store, space, 'geo-map-view', 'cs5-border-hotspots', {
         name: 'CS5 — Border roamers (heatmap)',
-        description: 'Twelve devices oscillating across a border strip for three days, with staged meetings at the crossings. Opens as a heatmap over the strip. Try: Co-location (radius 300 m / 30 min), switch back to markers, filter to view.',
+        description:
+            'Twelve devices oscillating across a border strip for three days, with staged meetings at the crossings. Opens as a heatmap over the strip. Try: Co-location (radius 300 m / 30 min), switch back to markers, filter to view.',
         sourceId: 'dataset',
-        query: { projection: { datasetId: 'border_roamers', latCol: 'lat', lonCol: 'lon', entityCol: 'imei', kindCol: 'side', timeCol: 'seen_at' } },
+        query: {
+            projection: {
+                datasetId: 'border_roamers',
+                latCol: 'lat',
+                lonCol: 'lon',
+                entityCol: 'imei',
+                kindCol: 'side',
+                timeCol: 'seen_at',
+            },
+        },
         display: 'heatmap',
         camera: { center: [88.894, 23.045], zoom: 11 },
     });
@@ -260,7 +387,13 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         name: 'tariff_usage_table',
         datasetId: 'cdr_sample',
         vizType: 'table',
-        controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }, { field: 'cost_usd', agg: 'sum' }] },
+        controls: {
+            x: [{ field: 'tariff' }],
+            y: [
+                { field: 'duration_s', agg: 'sum' },
+                { field: 'cost_usd', agg: 'sum' },
+            ],
+        },
         description: 'Per-tariff usage and cost as a sortable table.',
     });
     putComponent(store, space, 'dashboard', 'investigation_overview', {
@@ -308,10 +441,13 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
     putComponent(store, space, 'grammar', 'cdr_csv', { delimiter: ',', has_header: true });
     putComponent(store, space, 'grammar', 'pipe_delimited', { delimiter: '|', has_header: false });
     putComponent(store, space, 'transform', 'drop_test_rows', {
-        type: 'transform.filter', where: "msisdn NOT LIKE '0000%'",
+        type: 'transform.filter',
+        where: "msisdn NOT LIKE '0000%'",
     });
     putComponent(store, space, 'sink', 'cdr_parquet', {
-        type: 'sink.persistent', format: 'parquet', partitions: ['event_date'],
+        type: 'sink.persistent',
+        format: 'parquet',
+        partitions: ['event_date'],
     });
 
     // ── Authored pipelines: two samples so open/edit works immediately ──────────────────────────
@@ -319,9 +455,20 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         name: 'cdr_ingest',
         active: true,
         nodes: [
-            { id: 'collect', type: 'acquisition', name: 'Collect CDR drops', use: 'connection/cdr_sftp_prod', config: { include: 'glob:**/*.csv.gz' } },
+            {
+                id: 'collect',
+                type: 'acquisition',
+                name: 'Collect CDR drops',
+                use: 'connection/cdr_sftp_prod',
+                config: { include: 'glob:**/*.csv.gz' },
+            },
             { id: 'parse', type: 'parser', name: 'Parse CSV', config: { delimiter: ',', header: true } },
-            { id: 'filter', type: 'transform.filter', name: 'Drop test rows', config: { predicate: "msisdn NOT LIKE '0000%'" } },
+            {
+                id: 'filter',
+                type: 'transform.filter',
+                name: 'Drop test rows',
+                config: { predicate: "msisdn NOT LIKE '0000%'" },
+            },
             { id: 'write', type: 'sink.persistent', name: 'CDR parquet', config: { format: 'PARQUET' } },
         ],
         edges: [
@@ -376,7 +523,10 @@ export function seedDefaultSpace(store: MockStore, space: string): void {
         },
     };
     store.put(space, PIPELINE_CONFIGS_COLL, 'cdr_ingest', {
-        id: 'cdr_ingest', path: 'cdr_ingest_pipeline.toon', config: cdrIngestConfig, registered: true,
+        id: 'cdr_ingest',
+        path: 'cdr_ingest_pipeline.toon',
+        config: cdrIngestConfig,
+        registered: true,
     } satisfies StoredPipelineConfig);
 
     // ── Pipeline case-study pack CS1–CS5 (docs/superpower/pipeline-case-studies.md):

@@ -11,10 +11,14 @@ describe('PivotService', () => {
         const spy = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
         service.pivotTo('map', { id: 'case-1', type: 'CASE' });
-        expect(spy).toHaveBeenCalledWith(['/studio/geo-map'], { queryParams: { pivotId: 'case-1', pivotType: 'CASE' } });
+        expect(spy).toHaveBeenCalledWith(['/studio/geo-map'], {
+            queryParams: { pivotId: 'case-1', pivotType: 'CASE' },
+        });
 
         service.pivotTo('graph', { id: 'inc-1', type: 'INCIDENT' });
-        expect(spy).toHaveBeenCalledWith(['/studio/link-analysis'], { queryParams: { pivotId: 'inc-1', pivotType: 'INCIDENT' } });
+        expect(spy).toHaveBeenCalledWith(['/studio/link-analysis'], {
+            queryParams: { pivotId: 'inc-1', pivotType: 'INCIDENT' },
+        });
     });
 
     it('reads a valid incoming pivot off the route query params', () => {

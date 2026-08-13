@@ -6,9 +6,8 @@
 
     <div class="flex max-w-3xl flex-col gap-4">
         <p class="text-secondary m-0">
-            How each collected file's raw bytes become rows. Pick the file type, set its options,
-            then test against your captured sample — the preview runs the same DuckDB reads the
-            engine uses.
+            How each collected file's raw bytes become rows. Pick the file type, set its options, then test against your
+            captured sample — the preview runs the same DuckDB reads the engine uses.
         </p>
 
         <inspecto-grammar-editor
@@ -19,7 +18,8 @@
             [previewFn]="previewFn"
             (pluginChange)="plugin.set($event)"
             (previewed)="onPreviewed($event)"
-            (submitted)="save()">
+            (submitted)="save()"
+        >
             <!-- Segments need one schema .toon written per segment BEFORE the block referencing them —
                  a host write path, which is why this stays projected rather than absorbed. -->
             <div grammarExtras>
@@ -33,7 +33,8 @@
                     <app-onboarding-segments-editor
                         [tree]="pluginTree()"
                         [editable]="lens.canAuthorWorkbench()"
-                        [initial]="initialSegments()" />
+                        [initial]="initialSegments()"
+                    />
                 }
             </div>
         </inspecto-grammar-editor>
@@ -46,14 +47,17 @@
                 color="primary"
                 type="button"
                 [disabled]="saving() || (!!plugin() && !pluginIngestable()) || !lens.canAuthorWorkbench()"
-                (click)="save()">
-                @if (saving()) { <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" /> }
+                (click)="save()"
+            >
+                @if (saving()) {
+                    <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
+                }
                 Save parsing
             </button>
             @if (plugin() && !pluginIngestable()) {
                 <span class="text-secondary text-xs">
-                    This parser previews only — loading its records to Tables needs the flatten
-                    configuration, so there is nothing to save yet.
+                    This parser previews only — loading its records to Tables needs the flatten configuration, so there
+                    is nothing to save yet.
                 </span>
             }
         </div>

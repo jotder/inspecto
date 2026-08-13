@@ -14,9 +14,7 @@ export class DatasetsService {
     private components = inject(ComponentsService);
 
     list(): Observable<Dataset[]> {
-        return this.components
-            .list('dataset')
-            .pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
+        return this.components.list('dataset').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
     }
 
     get(id: string): Observable<Dataset> {

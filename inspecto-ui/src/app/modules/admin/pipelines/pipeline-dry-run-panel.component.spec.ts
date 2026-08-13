@@ -11,7 +11,9 @@ describe('PipelineDryRunPanelComponent', () => {
 
     beforeEach(() => {
         api = {
-            dryRunAuthored: vi.fn().mockReturnValue(of({ seedNode: 'src', nodes: [], sinks: [] } as PipelineDryRunResult)),
+            dryRunAuthored: vi
+                .fn()
+                .mockReturnValue(of({ seedNode: 'src', nodes: [], sinks: [] } as PipelineDryRunResult)),
         };
         TestBed.configureTestingModule({
             imports: [PipelineDryRunPanelComponent],

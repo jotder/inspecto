@@ -163,7 +163,10 @@ export interface VizPlugin {
     meta: VizMeta;
     controls: ControlSpec[];
     /** Build the structured query from the field mapping (caller supplies dataset id/source). */
-    buildQuery(values: ControlValues, ctx: { datasetId: string; sourceName: string; filters?: ConditionGroup | null }): QuerySpec;
+    buildQuery(
+        values: ControlValues,
+        ctx: { datasetId: string; sourceName: string; filters?: ConditionGroup | null },
+    ): QuerySpec;
     /** Shape result rows into render props for this plugin. */
     transformProps(rows: Record<string, unknown>[], values: ControlValues): VizProps;
     render: VizRender;

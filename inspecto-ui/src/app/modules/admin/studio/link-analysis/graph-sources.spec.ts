@@ -26,19 +26,37 @@ const metaEdges: MetadataEdge[] = [
 describe('LineageGraphSource', () => {
     it('returns exactly toG6Data() of the API graph and forwards the query', async () => {
         let seen: unknown;
-        const catalog = { graph: (q: unknown) => { seen = q; return of({ nodes: metaNodes, edges: metaEdges }); } };
+        const catalog = {
+            graph: (q: unknown) => {
+                seen = q;
+                return of({ nodes: metaNodes, edges: metaEdges });
+            },
+        };
         const src = new LineageGraphSource(catalog as never);
-        const out = await src.query({ from: 'src1', depth: 2, direction: 'out', kinds: ['STREAM'], edgeKinds: ['FEEDS'], overlay: true });
+        const out = await src.query({
+            from: 'src1',
+            depth: 2,
+            direction: 'out',
+            kinds: ['STREAM'],
+            edgeKinds: ['FEEDS'],
+            overlay: true,
+        });
         expect(out).toEqual(toG6Data(metaNodes, metaEdges));
-        expect(seen).toEqual({ from: 'src1', depth: 2, direction: 'out', kinds: ['STREAM'], edgeKinds: ['FEEDS'], overlay: true });
+        expect(seen).toEqual({
+            from: 'src1',
+            depth: 2,
+            direction: 'out',
+            kinds: ['STREAM'],
+            edgeKinds: ['FEEDS'],
+            overlay: true,
+        });
     });
 
     it('multi-root (Phase D): queries each root and merges into one graph', async () => {
         const otherNode: MetadataNode = { id: 'src2', label: 'API', kind: 'STREAM' } as MetadataNode;
         const catalog = {
-            graph: (q: { from?: string }) => of(
-                q.from === 'src2' ? { nodes: [otherNode], edges: [] } : { nodes: metaNodes, edges: metaEdges },
-            ),
+            graph: (q: { from?: string }) =>
+                of(q.from === 'src2' ? { nodes: [otherNode], edges: [] } : { nodes: metaNodes, edges: metaEdges }),
         };
         const src = new LineageGraphSource(catalog as never);
         const out = await src.query({ roots: ['src1', 'src2'] });
@@ -47,7 +65,12 @@ describe('LineageGraphSource', () => {
 
     it('expand (Phase E): fetches a one-hop neighborhood from the clicked node', async () => {
         let seen: unknown;
-        const catalog = { graph: (q: unknown) => { seen = q; return of({ nodes: metaNodes, edges: metaEdges }); } };
+        const catalog = {
+            graph: (q: unknown) => {
+                seen = q;
+                return of({ nodes: metaNodes, edges: metaEdges });
+            },
+        };
         const src = new LineageGraphSource(catalog as never);
         const out = await src.expand('tbl1', 'cdr', { direction: 'out', kinds: ['TABLE'] });
         expect(out).toEqual(toG6Data(metaNodes, metaEdges));
@@ -57,7 +80,12 @@ describe('LineageGraphSource', () => {
 
 describe('ComponentRegistryGraphSource', () => {
     const comps: Component[] = [
-        { kind: 'dashboard', id: 'd1', name: 'Ops', parts: [{ partId: 'w', ref: { kind: 'widget', id: 'w1' } }] } as Component,
+        {
+            kind: 'dashboard',
+            id: 'd1',
+            name: 'Ops',
+            parts: [{ partId: 'w', ref: { kind: 'widget', id: 'w1' } }],
+        } as Component,
         { kind: 'widget', id: 'w1', name: 'Trend' } as Component,
     ];
 
@@ -71,9 +99,10 @@ describe('ComponentRegistryGraphSource', () => {
 
     it('a failing kind degrades to the remaining kinds (no throw)', async () => {
         const provider = {
-            list: (kind: string) => (kind === 'widget'
-                ? Promise.reject(new Error('boom'))
-                : Promise.resolve(comps.filter((c) => c.kind === kind))),
+            list: (kind: string) =>
+                kind === 'widget'
+                    ? Promise.reject(new Error('boom'))
+                    : Promise.resolve(comps.filter((c) => c.kind === kind)),
         };
         const src = new ComponentRegistryGraphSource(provider as never);
         const expected = deriveComponentGraph({ components: comps.filter((c) => c.kind !== 'widget') });
@@ -120,7 +149,10 @@ describe('PipelineGraphSource', () => {
     });
 
     it('multi-root (Phase D): queries each pipeline and merges into one graph', async () => {
-        const graph2: PipelineGraph = { nodes: [{ id: 'in2', label: 'Read2', category: 'SOURCE' }], edges: [] } as never;
+        const graph2: PipelineGraph = {
+            nodes: [{ id: 'in2', label: 'Read2', category: 'SOURCE' }],
+            edges: [],
+        } as never;
         const pipelines = { graph: (id: string) => of(id === 'p2' ? graph2 : graph) };
         const src = new PipelineGraphSource(pipelines as never);
         const out = await src.query({ roots: ['p1', 'p2'] });

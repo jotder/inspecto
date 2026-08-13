@@ -18,7 +18,14 @@ export interface SpaceTemplateGalleryData {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -70,7 +77,9 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                                 <span class="text-secondary text-sm">{{ t.tagline }}</span>
                                 <div class="flex flex-wrap gap-1">
                                     @for (c of t.contents; track c) {
-                                        <span class="text-secondary rounded-full border px-2 py-0.5 text-xs">{{ c }}</span>
+                                        <span class="text-secondary rounded-full border px-2 py-0.5 text-xs">{{
+                                            c
+                                        }}</span>
                                     }
                                 </div>
                             </button>
@@ -134,7 +143,14 @@ export class SpaceTemplateGalleryDialog {
     readonly saving = signal(false);
 
     form: FormGroup = this.fb.group({
-        id: ['', [Validators.required, Validators.pattern(/^[a-z0-9][a-z0-9-]{0,62}$/), uniqueNameValidator(this.data.existingIds)]],
+        id: [
+            '',
+            [
+                Validators.required,
+                Validators.pattern(/^[a-z0-9][a-z0-9-]{0,62}$/),
+                uniqueNameValidator(this.data.existingIds),
+            ],
+        ],
         display_name: [''],
         description: [''],
     });

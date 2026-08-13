@@ -144,10 +144,7 @@ export class ExchangeService {
 
     /** Owner acts on a grant. 404 unknown, 409 wrong state. */
     actOnGrant(id: string, action: 'approve' | 'deny' | 'revoke'): Observable<ExchangeGrant> {
-        return this.http.post<ExchangeGrant>(
-            apiUrl(`/exchange/grants/${encodeURIComponent(id)}/${action}`),
-            {},
-        );
+        return this.http.post<ExchangeGrant>(apiUrl(`/exchange/grants/${encodeURIComponent(id)}/${action}`), {});
     }
 
     /** Consumer pins its grant to a snapshot version (null/'' clears — back to tracking current). */
@@ -159,10 +156,9 @@ export class ExchangeService {
 
     /** Owner sets/clears a grant's expiry (epoch millis; null clears). */
     expiry(id: string, expiresAt: number | null): Observable<ExchangeGrant> {
-        return this.http.post<ExchangeGrant>(
-            apiUrl(`/exchange/grants/${encodeURIComponent(id)}/expiry`),
-            { expiresAt },
-        );
+        return this.http.post<ExchangeGrant>(apiUrl(`/exchange/grants/${encodeURIComponent(id)}/expiry`), {
+            expiresAt,
+        });
     }
 
     /** One offered dataset's metadata (+ the caller's grant when `consumer` is given). */

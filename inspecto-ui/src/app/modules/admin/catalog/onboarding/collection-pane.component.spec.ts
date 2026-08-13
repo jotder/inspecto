@@ -10,7 +10,15 @@ import { OnboardingCollectionPaneComponent } from './collection-pane.component';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
-const WRITE_OK = { type: 'pipeline', written: true, path: 'x.toon', name: 'x', bytes: 1, overwritten: true, findings: [] };
+const WRITE_OK = {
+    type: 'pipeline',
+    written: true,
+    path: 'x.toon',
+    name: 'x',
+    bytes: 1,
+    overwritten: true,
+    findings: [],
+};
 
 function create(
     config: Record<string, unknown>,
@@ -24,7 +32,10 @@ function create(
             provideNoopAnimations(),
             OnboardingStateService,
             { provide: ConfigService, useValue: { patch } },
-            { provide: ConnectionsService, useValue: { list: () => of(profiles), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) } },
+            {
+                provide: ConnectionsService,
+                useValue: { list: () => of(profiles), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) },
+            },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
         ],
@@ -60,7 +71,7 @@ describe('OnboardingCollectionPaneComponent', () => {
         c.collector.schemaForm.form.get('include')?.setValue('*.csv, *.txt');
         c.save();
         expect(patch).toHaveBeenCalledTimes(1);
-        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
+        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)['collector'] as Record<string, unknown>;
         expect(collector['connector']).toBe('local');
         expect(collector['include']).toEqual(['*.csv', '*.txt']);
         // The cleared key travels as an explicit null delete marker (nullifyDeletes — JSON would
@@ -77,7 +88,7 @@ describe('OnboardingCollectionPaneComponent', () => {
         c.collector.schemaForm.form.get('connection')?.setValue('blob_prod');
         expect(c.collector.derivedConnector()).toBe('azure');
         c.save();
-        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
+        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)['collector'] as Record<string, unknown>;
         expect(collector['connector']).toBe('azure');
         expect(collector['connection']).toBe('blob_prod');
     });
@@ -93,9 +104,9 @@ describe('OnboardingCollectionPaneComponent', () => {
         c.collector.setMode('local');
         fixture.detectChanges();
         c.save();
-        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
+        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)['collector'] as Record<string, unknown>;
         expect(collector['connector']).toBe('local');
-        expect(collector['connection']).toBeNull();   // explicit delete marker for the server merge
+        expect(collector['connection']).toBeNull(); // explicit delete marker for the server merge
     });
 
     it('blocks a Connection-mode save with no Connection picked', () => {
@@ -124,7 +135,7 @@ describe('OnboardingCollectionPaneComponent', () => {
         const c = fixture.componentInstance;
         expect(c.collector.mode()).toBe('connection');
         c.save();
-        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)["collector"] as Record<string, unknown>;
+        const collector = (patch.mock.calls[0][2] as Record<string, unknown>)['collector'] as Record<string, unknown>;
         expect(collector['connector']).toBe('sftp');
         expect(c.collector.error()).toBeNull();
     });

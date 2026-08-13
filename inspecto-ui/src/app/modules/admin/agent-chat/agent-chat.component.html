@@ -1,7 +1,9 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <div class="bg-card flex flex-col border-b p-6 sm:px-10 sm:py-8 dark:bg-transparent">
         <h1 class="text-3xl font-extrabold leading-none tracking-tight">Agent Chat</h1>
-        <div class="text-secondary mt-1.5">Ask the embedded intelligence agent — answers stream in, with inline components.</div>
+        <div class="text-secondary mt-1.5">
+            Ask the embedded intelligence agent — answers stream in, with inline components.
+        </div>
     </div>
 
     <div class="flex flex-auto flex-col gap-4 p-6 sm:p-10">
@@ -33,12 +35,22 @@
                             <div class="text-secondary text-xs font-semibold uppercase tracking-wider">Agent</div>
                             @if (m.text) {
                                 <!-- errors carry their message as text; the tone is reinforcement, not the only cue -->
-                                <div [class]="m.error ? 'whitespace-pre-wrap text-red-600 dark:text-red-400' : 'whitespace-pre-wrap'">
+                                <div
+                                    [class]="
+                                        m.error
+                                            ? 'whitespace-pre-wrap text-red-600 dark:text-red-400'
+                                            : 'whitespace-pre-wrap'
+                                    "
+                                >
                                     {{ m.text }}
                                 </div>
                             } @else if (m.streaming) {
                                 <div class="text-secondary flex items-center gap-2">
-                                    <mat-progress-spinner diameter="16" mode="indeterminate" aria-label="Waiting for the answer" />
+                                    <mat-progress-spinner
+                                        diameter="16"
+                                        mode="indeterminate"
+                                        aria-label="Waiting for the answer"
+                                    />
                                     <span>Answering…</span>
                                 </div>
                             }
@@ -48,12 +60,18 @@
                                 </div>
                             }
                             @if (m.navigationTarget; as target) {
-                                <button mat-stroked-button class="mt-3" (click)="goTo(target)">Open {{ target }}</button>
+                                <button mat-stroked-button class="mt-3" (click)="goTo(target)">
+                                    Open {{ target }}
+                                </button>
                             }
                             @if (m.citations?.length) {
                                 <div class="text-secondary mt-2 text-xs">
                                     Sources:
                                     @for (c of m.citations; track $index) {
+                                        <!-- prettier-ignore: whitespace-significant — Angular collapses the
+                                             newline prettier would insert here into an extra space, so
+                                             "source (locator)" would render as "source  (locator)" (double). -->
+                                        <!-- prettier-ignore -->
                                         <span class="ml-1">{{ c.source }}@if (c.locator) {<span> ({{ c.locator }})</span>}</span>
                                     }
                                 </div>

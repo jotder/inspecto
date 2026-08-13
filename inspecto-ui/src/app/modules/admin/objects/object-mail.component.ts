@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, OnInit, signal, ViewEncapsulation } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    inject,
+    OnInit,
+    signal,
+    ViewEncapsulation,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -13,12 +22,18 @@ import { ColDef, ICellRendererParams, ValueGetterParams } from 'ag-grid-communit
 import { forkJoin, Observable, of } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, FindingsSpecDef, ObjectsService, OperationalObject, optimisticMutate, Tag, TagRule, UpdateObject, WorkflowDef } from 'app/inspecto/api';
 import {
-    STATUS_BADGE_BASE,
-    statusBadgeClasses,
-    statusBadgeHtml,
-} from 'app/inspecto/components/status-badge.component';
+    apiErrorMessage,
+    FindingsSpecDef,
+    ObjectsService,
+    OperationalObject,
+    optimisticMutate,
+    Tag,
+    TagRule,
+    UpdateObject,
+    WorkflowDef,
+} from 'app/inspecto/api';
+import { STATUS_BADGE_BASE, statusBadgeClasses, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -192,17 +207,23 @@ export class ObjectMailComponent implements OnInit {
     readonly stateLabel = stateLabel;
 
     // Incident toolbar enablement (fixed mail-metaphor verbs; cases use the dynamic caseActions()).
-    readonly canAccept = computed(() => this.isIncident && this.selected().some((o) => displayStatus(o) === 'IDENTIFIED'));
-    readonly canResolve = computed(() =>
-        this.isIncident && this.selected().some((o) => ['IDENTIFIED', 'DIAGNOSING'].includes(displayStatus(o))),
+    readonly canAccept = computed(
+        () => this.isIncident && this.selected().some((o) => displayStatus(o) === 'IDENTIFIED'),
     );
-    readonly canArchive = computed(() => this.isIncident && this.selected().some((o) => displayStatus(o) !== 'ARCHIVED'));
-    readonly canReopen = computed(() =>
-        this.isIncident && this.selected().some((o) => ['RESOLVED', 'ARCHIVED'].includes(displayStatus(o))),
+    readonly canResolve = computed(
+        () => this.isIncident && this.selected().some((o) => ['IDENTIFIED', 'DIAGNOSING'].includes(displayStatus(o))),
+    );
+    readonly canArchive = computed(
+        () => this.isIncident && this.selected().some((o) => displayStatus(o) !== 'ARCHIVED'),
+    );
+    readonly canReopen = computed(
+        () => this.isIncident && this.selected().some((o) => ['RESOLVED', 'ARCHIVED'].includes(displayStatus(o))),
     );
     readonly canEscalate = computed(() => this.isIncident && this.selected().length > 0);
     readonly escalateLabel = computed(() =>
-        this.isIncident && this.selected().length > 0 && this.selected().every(isEscalated) ? 'De-escalate' : 'Escalate',
+        this.isIncident && this.selected().length > 0 && this.selected().every(isEscalated)
+            ? 'De-escalate'
+            : 'Escalate',
     );
 
     // ── grid ──────────────────────────────────────────────────────────────────────
@@ -223,7 +244,8 @@ export class ObjectMailComponent implements OnInit {
             field: 'priority',
             headerName: 'Priority',
             width: 116,
-            cellRenderer: (p: ICellRendererParams<OperationalObject>) => (p.value ? statusBadgeHtml(p.value as string) : '—'),
+            cellRenderer: (p: ICellRendererParams<OperationalObject>) =>
+                p.value ? statusBadgeHtml(p.value as string) : '—',
         },
         {
             field: 'category',
@@ -238,7 +260,11 @@ export class ObjectMailComponent implements OnInit {
             width: 170,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? objectTags(p.data).join(', ') : ''),
             cellRenderer: (p: ICellRendererParams<OperationalObject>) =>
-                p.data ? objectTags(p.data).map((t) => statusBadgeHtml(esc(t))).join(' ') : '',
+                p.data
+                    ? objectTags(p.data)
+                          .map((t) => statusBadgeHtml(esc(t)))
+                          .join(' ')
+                    : '',
         },
         {
             field: 'title',
@@ -339,16 +365,14 @@ export class ObjectMailComponent implements OnInit {
      *  Selection and the open detail are untouched; a full reload resets back to page 0. */
     loadMore(): void {
         this.loading.set(true);
-        this.api
-            .list({ type: this.type, limit: ObjectMailComponent.PAGE, offset: this.objects().length })
-            .subscribe({
-                next: (page) => {
-                    this.objects.update((o) => [...o, ...page]);
-                    this.hasMore.set(page.length >= ObjectMailComponent.PAGE);
-                    this.loading.set(false);
-                },
-                error: () => this.loading.set(false),
-            });
+        this.api.list({ type: this.type, limit: ObjectMailComponent.PAGE, offset: this.objects().length }).subscribe({
+            next: (page) => {
+                this.objects.update((o) => [...o, ...page]);
+                this.hasMore.set(page.length >= ObjectMailComponent.PAGE);
+                this.loading.set(false);
+            },
+            error: () => this.loading.set(false),
+        });
     }
 
     // ── nav interactions ──────────────────────────────────────────────────────────
@@ -395,7 +419,13 @@ export class ObjectMailComponent implements OnInit {
 
     openCreate(): void {
         // Assignee suggestions = whoever already holds work in this mailbox (free text stays valid).
-        const assignees = [...new Set(this.objects().map((o) => o.assignee).filter((a): a is string => !!a))];
+        const assignees = [
+            ...new Set(
+                this.objects()
+                    .map((o) => o.assignee)
+                    .filter((a): a is string => !!a),
+            ),
+        ];
         this.dialog
             .open(ObjectCreateDialog, {
                 data: { type: this.type, label: this.createLabel, assignees },
@@ -413,15 +443,22 @@ export class ObjectMailComponent implements OnInit {
         if (!o) return;
         const one = [o];
         if (!this.isIncident && id !== 'resolve') {
-            void this.runCaseAction(id, one);   // case panel verbs are workflow actions (C6)
+            void this.runCaseAction(id, one); // case panel verbs are workflow actions (C6)
             return;
         }
         switch (id) {
-            case 'accept': return this.accept(one);
-            case 'resolve': void this.resolve(one); return;
-            case 'archive': void this.archive(one); return;
-            case 'reopen': return this.reopen(one);
-            case 'escalate': return this.escalate(one);
+            case 'accept':
+                return this.accept(one);
+            case 'resolve':
+                void this.resolve(one);
+                return;
+            case 'archive':
+                void this.archive(one);
+                return;
+            case 'reopen':
+                return this.reopen(one);
+            case 'escalate':
+                return this.escalate(one);
         }
     }
 
@@ -573,7 +610,9 @@ export class ObjectMailComponent implements OnInit {
      */
     async resolve(targets?: OperationalObject[]): Promise<void> {
         const caseLegal = new Set(
-            this.workflowDef().transitions.filter((t) => t.action === 'resolve').map((t) => t.from),
+            this.workflowDef()
+                .transitions.filter((t) => t.action === 'resolve')
+                .map((t) => t.from),
         );
         const list = (targets ?? this.selected()).filter((o) =>
             this.isIncident ? ['IDENTIFIED', 'DIAGNOSING'].includes(displayStatus(o)) : caseLegal.has(displayStatus(o)),
@@ -636,7 +675,8 @@ export class ObjectMailComponent implements OnInit {
     async archive(targets?: OperationalObject[]): Promise<void> {
         const list = (targets ?? this.selected()).filter((o) => displayStatus(o) !== 'ARCHIVED');
         if (!list.length) return;
-        if (!(await this.confirm.confirm(`Archive ${list.length} incident${list.length === 1 ? '' : 's'}?`, 'Archive'))) return;
+        if (!(await this.confirm.confirm(`Archive ${list.length} incident${list.length === 1 ? '' : 's'}?`, 'Archive')))
+            return;
         this.bulk(
             list,
             (o) => this.api.transition(o.id, 'archive', this.me),
@@ -700,9 +740,7 @@ export class ObjectMailComponent implements OnInit {
      *  reconciles the rest — closedAt, audit stamps). No legal transition ⇒ the row is left as-is. */
     private expectTransition(action: string): (o: OperationalObject) => OperationalObject {
         return (o) => {
-            const t = this.workflowDef().transitions.find(
-                (x) => x.action === action && x.from === displayStatus(o),
-            );
+            const t = this.workflowDef().transitions.find((x) => x.action === action && x.from === displayStatus(o));
             return t ? { ...o, status: t.to } : o;
         };
     }

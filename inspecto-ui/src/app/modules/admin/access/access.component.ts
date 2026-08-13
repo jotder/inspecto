@@ -1,12 +1,4 @@
-import {
-    ChangeDetectionStrategy,
-    Component,
-    computed,
-    effect,
-    inject,
-    signal,
-    viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -24,14 +16,7 @@ import {
     indexCatalog,
     resolveGrant,
 } from 'app/inspecto/access/access-catalog';
-import {
-    AccessCatalog,
-    AccessGrant,
-    AccessNode,
-    AccessService,
-    apiErrorMessage,
-    LensService,
-} from 'app/inspecto/api';
+import { AccessCatalog, AccessGrant, AccessNode, AccessService, apiErrorMessage, LensService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { TreeTableComponent } from 'app/inspecto/tree-table/tree-table.component';
 import { TreeNode } from 'app/inspecto/tree-table/tree-types';
@@ -106,7 +91,8 @@ export class AccessComponent {
 
     /** The matrix rows: the (search-filtered) catalog with per-lens display values (CSV-exportable). */
     readonly nodes = computed<TreeNode[]>(() =>
-        this.toTree(this.filterCatalog(this.catalogNodes, this.search().trim().toLowerCase())));
+        this.toTree(this.filterCatalog(this.catalogNodes, this.search().trim().toLowerCase())),
+    );
 
     /** One column per lens; the cells read/write the working grants through the callbacks. */
     readonly columns: ColDef[] = this.subjects.map((s) => ({
@@ -168,12 +154,14 @@ export class AccessComponent {
         for (const s of this.subjects) {
             const changed = JSON.stringify(this.grants()[s.id] ?? {}) !== JSON.stringify(this.baseline()[s.id] ?? {});
             if (changed) {
-                puts.push(this.api.saveProfile({
-                    subjectType: 'lens',
-                    subjectId: s.id,
-                    label: s.label,
-                    grants: this.grants()[s.id] ?? {},
-                }));
+                puts.push(
+                    this.api.saveProfile({
+                        subjectType: 'lens',
+                        subjectId: s.id,
+                        label: s.label,
+                        grants: this.grants()[s.id] ?? {},
+                    }),
+                );
             }
         }
         forkJoin(puts).subscribe({
@@ -182,7 +170,7 @@ export class AccessComponent {
                 this.baseline.set(cloneDeep(this.grants()));
                 this.saving.set(false);
                 this.toastr.success('Access configuration saved — switch lens via "View as" to preview it');
-                this.accessState.reload();   // apply live: sidebar filter + capability re-derivation
+                this.accessState.reload(); // apply live: sidebar filter + capability re-derivation
             },
             error: (err) => {
                 this.saving.set(false);

@@ -31,7 +31,10 @@ import { GraphSourcesService } from './graph-sources';
                     [fill]="true"
                 />
             } @else if (loaded()) {
-                <inspecto-empty-state icon="heroicons_outline:share" message="No saved Link-Analysis view bound to this widget." />
+                <inspecto-empty-state
+                    icon="heroicons_outline:share"
+                    message="No saved Link-Analysis view bound to this widget."
+                />
             } @else {
                 <div class="text-secondary flex h-full items-center justify-center text-sm">Loading…</div>
             }
@@ -75,7 +78,9 @@ export class LinkViewWidgetComponent {
                     source
                         .query(view.query)
                         .then((d) => this.data.set(d))
-                        .catch((e: unknown) => this.error.set(e instanceof Error ? e.message : 'The view’s query failed.'));
+                        .catch((e: unknown) =>
+                            this.error.set(e instanceof Error ? e.message : 'The view’s query failed.'),
+                        );
                 },
                 error: () => {
                     this.loaded.set(true);

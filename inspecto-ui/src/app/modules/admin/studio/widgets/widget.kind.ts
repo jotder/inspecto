@@ -1,4 +1,15 @@
-import { ComponentKind, ConfigFinding, Part, Ref, Wiring, getKind, hasEditorRoute, registerEditorRoute, registerKind, widgetRefs } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    ConfigFinding,
+    Part,
+    Ref,
+    Wiring,
+    getKind,
+    hasEditorRoute,
+    registerEditorRoute,
+    registerKind,
+    widgetRefs,
+} from 'app/inspecto/component-model';
 import { getViz, getVizComponentLoader, registerVizComponent } from 'app/inspecto/viz';
 // Side-effect: ensure the built-in VizPlugins are registered (the widget kind's sub-types).
 import { registerBuiltinViz } from 'app/inspecto/viz/plugins';

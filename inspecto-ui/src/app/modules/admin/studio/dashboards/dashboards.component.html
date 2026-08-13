@@ -5,7 +5,9 @@
             <div class="text-secondary mt-1">Compositions of widgets with a shared cross-filter.</div>
         </div>
         <div class="flex items-center gap-3">
-            @if (loading()) { <mat-spinner diameter="24"></mat-spinner> }
+            @if (loading()) {
+                <mat-spinner diameter="24"></mat-spinner>
+            }
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
@@ -17,7 +19,10 @@
     </div>
 
     <div class="relative mt-4 max-w-md">
-        <mat-icon class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+        <mat-icon
+            class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2"
+            svgIcon="heroicons_outline:magnifying-glass"
+        ></mat-icon>
         <input
             type="text"
             class="bg-card w-full rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
@@ -47,7 +52,12 @@
                     <button mat-icon-button [routerLink]="[d.id]" matTooltip="Open" aria-label="Open">
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                     </button>
-                    <button mat-icon-button (click)="openTags(d)" [attr.aria-label]="'Tags for ' + d.id" matTooltip="Tags">
+                    <button
+                        mat-icon-button
+                        (click)="openTags(d)"
+                        [attr.aria-label]="'Tags for ' + d.id"
+                        matTooltip="Tags"
+                    >
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
                     </button>
                     <button mat-icon-button (click)="remove(d)" matTooltip="Delete" aria-label="Delete">

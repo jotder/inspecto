@@ -12,11 +12,14 @@ import { ReconBoardComponent } from './recon-board.component';
 import { ReconExecService } from './recon-exec.service';
 
 const RECON: Reconciliation = {
-    id: 'med_vs_bill', name: 'Mediation vs Billing',
-    leftDataset: 'mediation_daily', rightDataset: 'billing_daily',
+    id: 'med_vs_bill',
+    name: 'Mediation vs Billing',
+    leftDataset: 'mediation_daily',
+    rightDataset: 'billing_daily',
     keyColumns: ['region', 'product'],
     compareColumns: [{ column: 'amount', toleranceType: 'percent', tolerance: 0.5 }],
-    breaks: [], lastRunAt: null,
+    breaks: [],
+    lastRunAt: null,
 };
 
 const LEFT = [
@@ -38,7 +41,10 @@ async function create() {
         providers: [
             provideNoopAnimations(),
             { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: RECON.id }) } } },
-            { provide: Router, useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY } },
+            {
+                provide: Router,
+                useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
+            },
             { provide: ReconciliationsService, useValue: { get: () => of(RECON), save } },
             {
                 provide: ReconExecService,
@@ -53,8 +59,8 @@ async function create() {
         ],
     });
     const fixture = TestBed.createComponent(ReconBoardComponent);
-    fixture.detectChanges();           // ngOnInit — load + auto-run
-    await fixture.whenStable();        // the async exec.run
+    fixture.detectChanges(); // ngOnInit — load + auto-run
+    await fixture.whenStable(); // the async exec.run
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, navigate, save };
 }
@@ -72,8 +78,14 @@ describe('ReconBoardComponent', () => {
 
         // the tree folds region → product, worst-severity first (MEA is structural: only in A)
         expect(c.treeNodes().map((n) => n.label)).toEqual(['MEA', 'EU']);
-        expect(c.treeColumns().map((col) => col.field)).toEqual(
-            ['a_amount', 'b_amount', 'pct_b_amount', 'a___records', 'b___records', 'pct_b___records']);
+        expect(c.treeColumns().map((col) => col.field)).toEqual([
+            'a_amount',
+            'b_amount',
+            'pct_b_amount',
+            'a___records',
+            'b___records',
+            'pct_b___records',
+        ]);
     });
 
     it('a run refreshes the persisted break lifecycle (C9 merge semantics)', async () => {
@@ -88,9 +100,17 @@ describe('ReconBoardComponent', () => {
 
     it('the details action navigates to the Breaks page with the encoded path', async () => {
         const { c, navigate } = await create();
-        c.rowActions[0].onClick!({ __id: 'x', __depth: 0, __hasChildren: false, __expanded: false, __label: 'EU', __path: 'region:EU' });
-        expect(navigate).toHaveBeenCalledWith(['/reconciliation', RECON.id, 'breaks'],
-            { queryParams: { path: 'region:EU' } });
+        c.rowActions[0].onClick!({
+            __id: 'x',
+            __depth: 0,
+            __hasChildren: false,
+            __expanded: false,
+            __label: 'EU',
+            __path: 'region:EU',
+        });
+        expect(navigate).toHaveBeenCalledWith(['/reconciliation', RECON.id, 'breaks'], {
+            queryParams: { path: 'region:EU' },
+        });
     });
 
     it('renders with no a11y violations', async () => {

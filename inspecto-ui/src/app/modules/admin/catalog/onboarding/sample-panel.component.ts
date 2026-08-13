@@ -81,8 +81,8 @@ const RAW_PREVIEW_LINES = 40;
                     </button>
                 } @else {
                     <span class="text-secondary text-sm">
-                        Capture one representative sample — it follows you through the stages, so every
-                        test shows <em>your</em> data.
+                        Capture one representative sample — it follows you through the stages, so every test shows
+                        <em>your</em> data.
                     </span>
                     <span class="flex-1"></span>
                     <button mat-flat-button color="primary" type="button" (click)="fileInput.click()">
@@ -97,7 +97,8 @@ const RAW_PREVIEW_LINES = 40;
                 <pre
                     class="bg-default m-0 max-h-96 overflow-auto rounded-b-lg border-t p-3 text-xs leading-relaxed"
                     aria-label="Raw sample preview"
-                >{{ rawPreview() }}</pre>
+                    >{{ rawPreview() }}</pre
+                >
             }
 
             @if (pasting()) {
@@ -134,7 +135,13 @@ export class OnboardingSamplePanelComponent {
     readonly expanded = signal(true);
     pasteText = '';
 
-    readonly lineCount = computed(() => this.state.sample()?.text.split('\n').filter((l) => l.length).length ?? 0);
+    readonly lineCount = computed(
+        () =>
+            this.state
+                .sample()
+                ?.text.split('\n')
+                .filter((l) => l.length).length ?? 0,
+    );
     readonly rawPreview = computed(() => {
         const text = this.state.sample()?.text ?? '';
         const lines = text.split('\n');

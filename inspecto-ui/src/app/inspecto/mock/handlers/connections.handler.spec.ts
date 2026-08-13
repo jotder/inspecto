@@ -44,7 +44,10 @@ describe('connectionsHandler', () => {
         const store = seededStore();
         const updated = handler(
             req('PUT', '/api/connections/pg_warehouse', {
-                id: 'pg_warehouse', connector: 'db', host: 'pg2.example.com', password: '***',
+                id: 'pg_warehouse',
+                connector: 'db',
+                host: 'pg2.example.com',
+                password: '***',
             }),
             store,
         );

@@ -50,22 +50,30 @@ export class TagsService {
     }
 
     /** The tags on one thing, alphabetical. */
-    assignments(targetKind: string, targetId: string): Observable<{ targetKind: string; targetId: string; tags: string[] }> {
+    assignments(
+        targetKind: string,
+        targetId: string,
+    ): Observable<{ targetKind: string; targetId: string; tags: string[] }> {
         return this.http.get<{ targetKind: string; targetId: string; tags: string[] }>(
-            apiUrl(`/tags/assignments/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}`));
+            apiUrl(`/tags/assignments/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}`),
+        );
     }
 
     /** Apply a registered tag to a target. Idempotent — safe to fire optimistically and to retry. */
     assign(targetKind: string, targetId: string, tag: string, actor?: string): Observable<TagAssignment> {
         return this.http.post<TagAssignment>(
             apiUrl(`/tags/assignments/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}`),
-            { tag, actor });
+            { tag, actor },
+        );
     }
 
     /** Remove one label from one target. Idempotent — already-absent is success, not an error. */
     unassign(targetKind: string, targetId: string, tag: string): Observable<{ tag: string; removed: boolean }> {
         return this.http.delete<{ tag: string; removed: boolean }>(
-            apiUrl(`/tags/assignments/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}/${encodeURIComponent(tag)}`));
+            apiUrl(
+                `/tags/assignments/${encodeURIComponent(targetKind)}/${encodeURIComponent(targetId)}/${encodeURIComponent(tag)}`,
+            ),
+        );
     }
 
     /**
@@ -76,7 +84,9 @@ export class TagsService {
      */
     rename(from: string, to: string): Observable<TagVocabularyChange & { renamed: string; to: string }> {
         return this.http.post<TagVocabularyChange & { renamed: string; to: string }>(
-            apiUrl(`/tags/${encodeURIComponent(from)}/rename`), { to });
+            apiUrl(`/tags/${encodeURIComponent(from)}/rename`),
+            { to },
+        );
     }
 
     /**
@@ -85,7 +95,6 @@ export class TagsService {
      * Requires `canAuthorWorkbench`.
      */
     remove(name: string): Observable<TagVocabularyChange & { deleted: string }> {
-        return this.http.delete<TagVocabularyChange & { deleted: string }>(
-            apiUrl(`/tags/${encodeURIComponent(name)}`));
+        return this.http.delete<TagVocabularyChange & { deleted: string }>(apiUrl(`/tags/${encodeURIComponent(name)}`));
     }
 }

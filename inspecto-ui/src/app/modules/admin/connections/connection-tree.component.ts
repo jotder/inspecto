@@ -20,59 +20,63 @@ import { fmtBytes } from 'app/inspecto/format';
         <ul class="m-0 list-none p-0">
             @for (n of nodes; track n.path) {
                 @if (visible(n)) {
-                <li>
-                    <div
-                        class="flex items-center gap-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
-                        [class.bg-gray-100]="selectedPath === n.path"
-                        [class.dark:bg-gray-800]="selectedPath === n.path"
-                    >
-                        @if (loadingPaths.has(n.path)) {
-                            <mat-spinner diameter="16" class="mx-2 shrink-0"></mat-spinner>
-                        } @else if (n.hasChildren) {
-                            <button
-                                mat-icon-button
-                                class="icon-size-5"
-                                (click)="expand.emit(n)"
-                                [attr.aria-expanded]="expanded.has(n.path)"
-                                [attr.aria-label]="(expanded.has(n.path) ? 'Collapse ' : 'Expand ') + n.name"
-                            >
-                                <mat-icon
-                                    class="icon-size-4"
-                                    [svgIcon]="expanded.has(n.path) ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
-                                ></mat-icon>
-                            </button>
-                        } @else {
-                            <span class="inline-block w-8 shrink-0"></span>
-                        }
-                        <button
-                            type="button"
-                            class="tree-row flex min-w-0 flex-auto items-center gap-2 px-1 py-1 text-left text-sm"
-                            [class.font-semibold]="selectedPath === n.path"
-                            [attr.aria-current]="selectedPath === n.path ? 'true' : null"
-                            (click)="select.emit(n)"
-                            (keydown)="onKey(n, $event)"
+                    <li>
+                        <div
+                            class="flex items-center gap-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                            [class.bg-gray-100]="selectedPath === n.path"
+                            [class.dark:bg-gray-800]="selectedPath === n.path"
                         >
-                            <mat-icon class="icon-size-4 shrink-0" [svgIcon]="icon(n)"></mat-icon>
-                            <span class="truncate">{{ n.name }}</span>
-                            @if (n.sizeBytes != null) {
-                                <span class="text-secondary ml-auto pl-2 text-xs">{{ size(n.sizeBytes) }}</span>
+                            @if (loadingPaths.has(n.path)) {
+                                <mat-spinner diameter="16" class="mx-2 shrink-0"></mat-spinner>
+                            } @else if (n.hasChildren) {
+                                <button
+                                    mat-icon-button
+                                    class="icon-size-5"
+                                    (click)="expand.emit(n)"
+                                    [attr.aria-expanded]="expanded.has(n.path)"
+                                    [attr.aria-label]="(expanded.has(n.path) ? 'Collapse ' : 'Expand ') + n.name"
+                                >
+                                    <mat-icon
+                                        class="icon-size-4"
+                                        [svgIcon]="
+                                            expanded.has(n.path)
+                                                ? 'heroicons_outline:chevron-down'
+                                                : 'heroicons_outline:chevron-right'
+                                        "
+                                    ></mat-icon>
+                                </button>
+                            } @else {
+                                <span class="inline-block w-8 shrink-0"></span>
                             }
-                        </button>
-                    </div>
-                    @if (expanded.has(n.path)) {
-                        <app-connection-tree
-                            class="block pl-5"
-                            [nodes]="childrenByPath[n.path] ?? []"
-                            [childrenByPath]="childrenByPath"
-                            [expanded]="expanded"
-                            [loadingPaths]="loadingPaths"
-                            [selectedPath]="selectedPath"
-                            [filter]="filter"
-                            (expand)="expand.emit($event)"
-                            (select)="select.emit($event)"
-                        />
-                    }
-                </li>
+                            <button
+                                type="button"
+                                class="tree-row flex min-w-0 flex-auto items-center gap-2 px-1 py-1 text-left text-sm"
+                                [class.font-semibold]="selectedPath === n.path"
+                                [attr.aria-current]="selectedPath === n.path ? 'true' : null"
+                                (click)="select.emit(n)"
+                                (keydown)="onKey(n, $event)"
+                            >
+                                <mat-icon class="icon-size-4 shrink-0" [svgIcon]="icon(n)"></mat-icon>
+                                <span class="truncate">{{ n.name }}</span>
+                                @if (n.sizeBytes != null) {
+                                    <span class="text-secondary ml-auto pl-2 text-xs">{{ size(n.sizeBytes) }}</span>
+                                }
+                            </button>
+                        </div>
+                        @if (expanded.has(n.path)) {
+                            <app-connection-tree
+                                class="block pl-5"
+                                [nodes]="childrenByPath[n.path] ?? []"
+                                [childrenByPath]="childrenByPath"
+                                [expanded]="expanded"
+                                [loadingPaths]="loadingPaths"
+                                [selectedPath]="selectedPath"
+                                [filter]="filter"
+                                (expand)="expand.emit($event)"
+                                (select)="select.emit($event)"
+                            />
+                        }
+                    </li>
                 }
             }
         </ul>

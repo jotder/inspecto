@@ -1,5 +1,14 @@
 import type { DecisionRule } from 'app/inspecto/api/decision-rules.service';
-import { ComponentKind, ConfigFinding, Ref, decisionRuleRefs, getKind, hasEditorRoute, registerEditorRoute, registerKind } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    ConfigFinding,
+    Ref,
+    decisionRuleRefs,
+    getKind,
+    hasEditorRoute,
+    registerEditorRoute,
+    registerKind,
+} from 'app/inspecto/component-model';
 
 /**
  * The `decision-rule` {@link ComponentKind} — R5 of the living-operational-system roadmap: the
@@ -18,8 +27,14 @@ export const DECISION_RULE_KIND: ComponentKind<DecisionRule> = {
         validate: validateDecisionRuleConfig,
         create: () =>
             ({
-                name: '', description: '', targetType: 'pipeline', target: '',
-                when: { kind: 'group', op: 'AND', items: [] }, consequences: [], priority: 100, enabled: true,
+                name: '',
+                description: '',
+                targetType: 'pipeline',
+                target: '',
+                when: { kind: 'group', op: 'AND', items: [] },
+                consequences: [],
+                priority: 100,
+                enabled: true,
             }) as DecisionRule,
     },
     deriveRefs: (config: DecisionRule): Ref[] => decisionRuleRefs(config as unknown as Record<string, unknown>),
@@ -33,7 +48,8 @@ export function validateDecisionRuleConfig(config: unknown): ConfigFinding[] {
     const findings: ConfigFinding[] = [];
     if (!c.name) findings.push({ severity: 'error', path: 'name', message: 'A decision rule needs a name.' });
     if (!c.target) findings.push({ severity: 'error', path: 'target', message: 'Pick a target pipeline or job.' });
-    if (!c.consequences?.length) findings.push({ severity: 'error', path: 'consequences', message: 'Add at least one consequence.' });
+    if (!c.consequences?.length)
+        findings.push({ severity: 'error', path: 'consequences', message: 'Add at least one consequence.' });
     return findings;
 }
 

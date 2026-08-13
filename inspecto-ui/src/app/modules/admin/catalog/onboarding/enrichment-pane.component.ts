@@ -1,10 +1,28 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    OnDestroy,
+    OnInit,
+    computed,
+    effect,
+    inject,
+    signal,
+    viewChild,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { CatalogService, ConfigService, DbBrowserService, EnrichmentPreview, LensService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
+import {
+    CatalogService,
+    ConfigService,
+    DbBrowserService,
+    EnrichmentPreview,
+    LensService,
+    SpacesService,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -82,9 +100,11 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         this.catalogApi.references().subscribe({
             next: (nodes) => {
                 const self = this.state.normalizedName();
-                this.referenceOptions.set(nodes
-                    .filter((n) => typeof n.attrs?.['pipeline'] === 'string' && n.attrs['pipeline'] !== self)
-                    .map((n) => ({ id: String(n.attrs!['pipeline']), label: n.label })));
+                this.referenceOptions.set(
+                    nodes
+                        .filter((n) => typeof n.attrs?.['pipeline'] === 'string' && n.attrs['pipeline'] !== self)
+                        .map((n) => ({ id: String(n.attrs!['pipeline']), label: n.label })),
+                );
             },
             error: () => this.referenceOptions.set([]),
         });
@@ -152,7 +172,8 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         if (!draft) return;
         this.previewing.set(true);
         this.previewError.set(null);
-        this.db.table({ name: this.state.normalizedName(), limit: OnboardingEnrichmentPaneComponent.SAMPLE_LIMIT })
+        this.db
+            .table({ name: this.state.normalizedName(), limit: OnboardingEnrichmentPaneComponent.SAMPLE_LIMIT })
             .subscribe({
                 next: (res) => this.runPreview(draft, res.rows),
                 error: () => this.runPreview(draft, []),
@@ -164,7 +185,8 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
             this.previewing.set(false);
             this.previewResult.set(null);
             this.toastr.warning(
-                `No data in "${this.state.normalizedName()}" yet to preview against — run the stream first.`);
+                `No data in "${this.state.normalizedName()}" yet to preview against — run the stream first.`,
+            );
             return;
         }
         this.configApi.previewEnrichment(draft, sampleRows).subscribe({
@@ -198,8 +220,12 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
                     error: (e) => {
                         this.saving.set(false);
                         this.finishSave(draft);
-                        this.toastr.warning(apiErrorMessage(e,
-                            'Saved, but registering failed — it will load on the next service restart.'));
+                        this.toastr.warning(
+                            apiErrorMessage(
+                                e,
+                                'Saved, but registering failed — it will load on the next service restart.',
+                            ),
+                        );
                     },
                 });
             },

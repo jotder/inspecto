@@ -38,7 +38,10 @@ const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** A parsed column name → a valid SQL identifier (`Identifiers.validate`'s own pattern), so an
  *  auto-derived field name is register-able without hand-editing. */
 function sanitizeIdentifier(raw: string, index: number): string {
-    let s = raw.trim().toUpperCase().replace(/[^A-Z0-9_]+/g, '_');
+    let s = raw
+        .trim()
+        .toUpperCase()
+        .replace(/[^A-Z0-9_]+/g, '_');
     s = s.replace(/^_+/, '').replace(/_+$/, '');
     if (/^[0-9]/.test(s)) s = `_${s}`;
     return s || `FIELD_${index}`;
@@ -97,8 +100,7 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
     protected readonly types = SCHEMA_TYPES;
 
     private readonly pipelineName = String((this.state.config() ?? {})['name'] ?? '');
-    protected readonly existingSchemaFile =
-        String(this.state.block('processing')?.['schema_file'] ?? '').trim();
+    protected readonly existingSchemaFile = String(this.state.block('processing')?.['schema_file'] ?? '').trim();
 
     private base(): string {
         return this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
@@ -176,9 +178,7 @@ export class OnboardingSchemaMappingPaneComponent implements OnInit, OnDestroy {
             const bn = Number(bv);
             // Numeric when both sides are numbers — delimited selectors are positions, and
             // "10" must not sort before "2".
-            const c = av !== '' && bv !== '' && !Number.isNaN(an) && !Number.isNaN(bn)
-                ? an - bn
-                : av.localeCompare(bv);
+            const c = av !== '' && bv !== '' && !Number.isNaN(an) && !Number.isNaN(bn) ? an - bn : av.localeCompare(bv);
             return (c !== 0 ? c : a.index - b.index) * dir;
         });
     });

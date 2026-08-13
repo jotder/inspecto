@@ -2,8 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import {
-    DatasetGeoSource, GEO_POINT_CAP, ProjectedGeo, RouteProjectionGeoSource,
-    isGeoProjectionError, projectPoints, projectRoutes,
+    DatasetGeoSource,
+    GEO_POINT_CAP,
+    ProjectedGeo,
+    RouteProjectionGeoSource,
+    isGeoProjectionError,
+    projectPoints,
+    projectRoutes,
 } from './geo-projection';
 
 const ROWS = [
@@ -25,7 +30,12 @@ describe('projectPoints', () => {
 
     it('folds valid rows into points and counts the skipped invalid ones', () => {
         const out = projectPoints(ROWS, {
-            datasetId: 'x', latCol: 'lat', lonCol: 'lon', entityCol: 'site', kindCol: 'type', timeCol: 'seen',
+            datasetId: 'x',
+            latCol: 'lat',
+            lonCol: 'lon',
+            entityCol: 'site',
+            kindCol: 'type',
+            timeCol: 'seen',
         });
         if (isGeoProjectionError(out)) throw new Error(out.error);
         expect(out.points.map((p) => p.label)).toEqual(['T1', 'T2', 'D1']);
@@ -46,14 +56,48 @@ describe('projectPoints', () => {
 
     it('folds O/D rows into endpoint points + weighted routes, skipping broken legs', () => {
         const legs = [
-            { fa: 23.81, fo: 90.41, ta: 25.2, to: 55.27, from: 'Dhaka', to_c: 'Dubai', ch: 'hundi', at: '2026-06-02T09:30:00Z' },
-            { fa: 23.81, fo: 90.41, ta: 25.2, to: 55.27, from: 'Dhaka', to_c: 'Dubai', ch: 'hundi', at: '2026-06-02T11:30:00Z' },
-            { fa: 25.2, fo: 55.27, ta: 51.5, to: -0.13, from: 'Dubai', to_c: 'London', ch: 'wire', at: '2026-06-02T12:30:00Z' },
+            {
+                fa: 23.81,
+                fo: 90.41,
+                ta: 25.2,
+                to: 55.27,
+                from: 'Dhaka',
+                to_c: 'Dubai',
+                ch: 'hundi',
+                at: '2026-06-02T09:30:00Z',
+            },
+            {
+                fa: 23.81,
+                fo: 90.41,
+                ta: 25.2,
+                to: 55.27,
+                from: 'Dhaka',
+                to_c: 'Dubai',
+                ch: 'hundi',
+                at: '2026-06-02T11:30:00Z',
+            },
+            {
+                fa: 25.2,
+                fo: 55.27,
+                ta: 51.5,
+                to: -0.13,
+                from: 'Dubai',
+                to_c: 'London',
+                ch: 'wire',
+                at: '2026-06-02T12:30:00Z',
+            },
             { fa: 23.81, fo: 90.41, ta: null, to: null, from: 'Dhaka', to_c: 'Nowhere', ch: 'wire', at: '' },
         ];
         const out = projectRoutes(legs as unknown as Record<string, unknown>[], {
-            datasetId: 'x', fromLatCol: 'fa', fromLonCol: 'fo', toLatCol: 'ta', toLonCol: 'to',
-            fromCol: 'from', toCol: 'to_c', kindCol: 'ch', timeCol: 'at',
+            datasetId: 'x',
+            fromLatCol: 'fa',
+            fromLonCol: 'fo',
+            toLatCol: 'ta',
+            toLonCol: 'to',
+            fromCol: 'from',
+            toCol: 'to_c',
+            kindCol: 'ch',
+            timeCol: 'at',
         });
         if (isGeoProjectionError(out)) throw new Error(out.error);
         expect(out.points.map((p) => p.label).sort()).toEqual(['Dhaka', 'Dubai', 'London']);
@@ -65,12 +109,22 @@ describe('projectPoints', () => {
     });
 
     it('rejects a route mapping without both coordinate pairs', () => {
-        const out = projectRoutes([], { datasetId: 'x', fromLatCol: 'a', fromLonCol: 'b', toLatCol: '', toLonCol: 'd' });
+        const out = projectRoutes([], {
+            datasetId: 'x',
+            fromLatCol: 'a',
+            fromLonCol: 'b',
+            toLatCol: '',
+            toLonCol: 'd',
+        });
         expect(isGeoProjectionError(out) && out.error).toMatch(/origin and destination/);
     });
 
     it('truncates at the point cap and says so', () => {
-        const many = Array.from({ length: GEO_POINT_CAP + 10 }, (_, i) => ({ lat: 10 + (i % 50) * 0.01, lon: 20, site: `s${i}` }));
+        const many = Array.from({ length: GEO_POINT_CAP + 10 }, (_, i) => ({
+            lat: 10 + (i % 50) * 0.01,
+            lon: 20,
+            site: `s${i}`,
+        }));
         const out = projectPoints(many, { datasetId: 'x', latCol: 'lat', lonCol: 'lon' });
         if (isGeoProjectionError(out)) throw new Error(out.error);
         expect(out.points).toHaveLength(GEO_POINT_CAP);
@@ -83,16 +137,27 @@ describe('projectPoints', () => {
 // `geo-projection.ts` is the only place `GeoService` is called.
 describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fallback)', () => {
     const ds: Dataset = {
-        id: 'geo-ds', name: 'Geo', kind: 'physical', sourceName: 'simbox_sweep',
-        query: null, physicalRef: null, columns: [], measures: [], calculated: [],
+        id: 'geo-ds',
+        name: 'Geo',
+        kind: 'physical',
+        sourceName: 'simbox_sweep',
+        query: null,
+        physicalRef: null,
+        columns: [],
+        measures: [],
+        calculated: [],
     };
 
     it('DatasetGeoSource calls POST /geo/projection first and folds the server result', async () => {
         const geo = {
             project: (req: unknown) => {
                 expect(req).toEqual({
-                    dataset: 'geo-ds', latCol: 'lat', lonCol: 'lon',
-                    entityCol: 'msisdn', kindCol: 'role', timeCol: undefined,
+                    dataset: 'geo-ds',
+                    latCol: 'lat',
+                    lonCol: 'lon',
+                    entityCol: 'msisdn',
+                    kindCol: 'role',
+                    timeCol: undefined,
                 });
                 return of({
                     points: [{ id: 'pt:0', lat: 1, lon: 2, kind: 'tower', label: 'T1' }],
@@ -102,12 +167,18 @@ describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fal
                 });
             },
         } as never;
-        const datasets = { get: () => { throw new Error('must not fetch rows on the backend path'); } } as never;
+        const datasets = {
+            get: () => {
+                throw new Error('must not fetch rows on the backend path');
+            },
+        } as never;
         const src = new DatasetGeoSource(datasets, geo);
         const out = (await src.query({
             projection: { datasetId: 'geo-ds', latCol: 'lat', lonCol: 'lon', entityCol: 'msisdn', kindCol: 'role' },
         })) as ProjectedGeo;
-        expect(out.points).toEqual([{ id: 'pt:0', lat: 1, lon: 2, kind: 'tower', label: 'T1', time: undefined, attrs: undefined }]);
+        expect(out.points).toEqual([
+            { id: 'pt:0', lat: 1, lon: 2, kind: 'tower', label: 'T1', time: undefined, attrs: undefined },
+        ]);
         expect(out.skipped).toBe(3);
     });
 
@@ -124,8 +195,14 @@ describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fal
         const geo = {
             routes: (req: unknown) => {
                 expect(req).toEqual({
-                    dataset: 'geo-ds', fromLatCol: 'fa', fromLonCol: 'fo', toLatCol: 'ta', toLonCol: 'to',
-                    fromCol: undefined, toCol: undefined, kindCol: undefined,
+                    dataset: 'geo-ds',
+                    fromLatCol: 'fa',
+                    fromLonCol: 'fo',
+                    toLatCol: 'ta',
+                    toLonCol: 'to',
+                    fromCol: undefined,
+                    toCol: undefined,
+                    kindCol: undefined,
                 });
                 return of({
                     points: [{ id: 'ep:A', lat: 1, lon: 2, kind: 'place', label: 'A' }],
@@ -135,19 +212,27 @@ describe('DatasetGeoSource / RouteProjectionGeoSource (backend-first, client fal
                 });
             },
         } as never;
-        const datasets = { get: () => { throw new Error('must not fetch rows on the backend path'); } } as never;
+        const datasets = {
+            get: () => {
+                throw new Error('must not fetch rows on the backend path');
+            },
+        } as never;
         const src = new RouteProjectionGeoSource(datasets, geo);
         const out = (await src.query({
             routes: { datasetId: 'geo-ds', fromLatCol: 'fa', fromLonCol: 'fo', toLatCol: 'ta', toLonCol: 'to' },
         })) as ProjectedGeo;
-        expect(out.routes).toEqual([{ id: 'ep:A->ep:B:route', from: 'ep:A', to: 'ep:B', kind: 'route', label: 'route', weight: 4 }]);
+        expect(out.routes).toEqual([
+            { id: 'ep:A->ep:B:route', from: 'ep:A', to: 'ep:B', kind: 'route', label: 'route', weight: 4 },
+        ]);
     });
 
     it('RouteProjectionGeoSource falls back to the client fold when the backend is unavailable', async () => {
         const geo = { routes: () => throwError(() => new Error('offline')) } as never;
         const src = new RouteProjectionGeoSource({ get: () => of(ds) } as never, geo);
-        await expect(src.query({
-            routes: { datasetId: 'geo-ds', fromLatCol: 'a', fromLonCol: 'b', toLatCol: 'c', toLonCol: 'd' },
-        })).rejects.toThrow(); // simbox_sweep has no o/d columns named a/b/c/d — surfaces as a mapping error
+        await expect(
+            src.query({
+                routes: { datasetId: 'geo-ds', fromLatCol: 'a', fromLonCol: 'b', toLatCol: 'c', toLonCol: 'd' },
+            }),
+        ).rejects.toThrow(); // simbox_sweep has no o/d columns named a/b/c/d — surfaces as a mapping error
     });
 });

@@ -35,7 +35,13 @@ function matches(route: Route, segments: string[]): boolean {
     if (!parts.every((p, i) => p.startsWith(':') || p === segments[i])) return false;
     const rest = segments.slice(parts.length);
     if (rest.length === 0) {
-        return !!(route.component || route.loadComponent || route.loadChildren || route.children || route.redirectTo !== undefined);
+        return !!(
+            route.component ||
+            route.loadComponent ||
+            route.loadChildren ||
+            route.children ||
+            route.redirectTo !== undefined
+        );
     }
     if (route.loadChildren) return true; // lazy subtree — remainder resolves at navigation time
     return route.children ? matchesAny(route.children, rest) : false;

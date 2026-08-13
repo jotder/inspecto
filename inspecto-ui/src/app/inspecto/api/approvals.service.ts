@@ -51,9 +51,9 @@ export class ApprovalsService {
      * Returns the updated view; 404 when the id is unknown or already decided.
      */
     decide(id: string, decision: ApprovalDecision, decidedBy?: string): Observable<AgentApproval> {
-        return this.http.post<AgentApproval>(
-            apiUrl(`/agent/approvals/${encodeURIComponent(id)}/decision`),
-            { decision, decidedBy },
-        );
+        return this.http.post<AgentApproval>(apiUrl(`/agent/approvals/${encodeURIComponent(id)}/decision`), {
+            decision,
+            decidedBy,
+        });
     }
 }

@@ -21,7 +21,10 @@ function create(list: ConnectionProfile[] = [CONN]) {
             { provide: ConnectionsService, useValue: { list: () => of(list), test: () => of({ reachable: true }) } },
             { provide: MatDialog, useValue: {} },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
         ],
     });
     const fixture = TestBed.createComponent(ConnectionsComponent);
@@ -49,7 +52,9 @@ describe('ConnectionsComponent', () => {
     it('shows New/Edit/Delete in the default (Builder) lens', () => {
         const fixture = create();
         const el = fixture.nativeElement as HTMLElement;
-        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('New connection'))).toBe(true);
+        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('New connection'))).toBe(
+            true,
+        );
         expect(el.querySelector('[aria-label="Edit"]')).not.toBeNull();
         expect(el.querySelector('[aria-label="Delete"]')).not.toBeNull();
     });
@@ -59,7 +64,9 @@ describe('ConnectionsComponent', () => {
         TestBed.inject(LensService).selectLens('business');
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('New connection'))).toBe(false);
+        expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('New connection'))).toBe(
+            false,
+        );
         expect(el.querySelector('[aria-label="Edit"]')).toBeNull();
         expect(el.querySelector('[aria-label="Delete"]')).toBeNull();
     });

@@ -8,10 +8,7 @@ import { GammaNavigationItem } from '@gamma/components/navigation';
  * `subtitle` breadcrumb of its ancestor groups for context. An empty query returns `[]` — callers
  * render the full (unflattened) tree in that case.
  */
-export function flattenNavForSearch(
-    items: readonly GammaNavigationItem[],
-    query: string,
-): GammaNavigationItem[] {
+export function flattenNavForSearch(items: readonly GammaNavigationItem[], query: string): GammaNavigationItem[] {
     const q = query.trim().toLowerCase();
     if (!q) {
         return [];
@@ -19,11 +16,7 @@ export function flattenNavForSearch(
 
     const results: GammaNavigationItem[] = [];
 
-    const walk = (
-        nodes: readonly GammaNavigationItem[],
-        ancestorMatch: boolean,
-        trail: readonly string[],
-    ): void => {
+    const walk = (nodes: readonly GammaNavigationItem[], ancestorMatch: boolean, trail: readonly string[]): void => {
         for (const node of nodes) {
             const titleMatch = (node.title ?? '').toLowerCase().includes(q);
             const matched = ancestorMatch || titleMatch;

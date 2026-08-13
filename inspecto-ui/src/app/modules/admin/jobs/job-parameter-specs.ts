@@ -1,5 +1,11 @@
 import { JobExpressionDecl, JobParameterDecl, typeableForm } from 'app/inspecto/api';
-import { AttributeOption, AttributeSpec, AttributeTier, AttributeToken, AttributeType } from 'app/inspecto/component-model';
+import {
+    AttributeOption,
+    AttributeSpec,
+    AttributeTier,
+    AttributeToken,
+    AttributeType,
+} from 'app/inspecto/component-model';
 
 /**
  * Maps a Job Type's declared {@link JobParameterDecl}s (from `GET /jobs/types/{id}`, R3) onto
@@ -21,7 +27,10 @@ import { AttributeOption, AttributeSpec, AttributeTier, AttributeToken, Attribut
  */
 const TYPE_PRESETS: Record<string, { pattern: string; placeholder: string }> = {
     DATE: { pattern: '\\d{4}-\\d{2}-\\d{2}', placeholder: '2026-08-06' },
-    INSTANT: { pattern: '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z?', placeholder: '2026-08-06T00:00:00Z' },
+    INSTANT: {
+        pattern: '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z?',
+        placeholder: '2026-08-06T00:00:00Z',
+    },
     // Deliberately permissive, matching the engine's own: only delivery truly validates an address,
     // and a strict regex rejects valid ones (§7.2-A).
     EMAIL: { pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+', placeholder: 'ops@example.com' },
@@ -84,7 +93,10 @@ function humanise(name: string): string {
 function defaultFor(decl: JobParameterDecl): unknown {
     if (!decl.default) return undefined;
     if (!decl.multi) return decl.default;
-    const items = decl.default.split(',').map((s) => s.trim()).filter(Boolean);
+    const items = decl.default
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     return items.length ? items : undefined;
 }
 
@@ -196,7 +208,10 @@ export function paramTokens(
  */
 export function paramValueToForm(spec: AttributeSpec, stored: unknown): unknown {
     if (spec.type !== 'list' || Array.isArray(stored)) return stored;
-    const items = String(stored ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    const items = String(stored ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     return items.length ? items : null;
 }
 

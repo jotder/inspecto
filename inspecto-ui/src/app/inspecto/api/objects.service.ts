@@ -275,8 +275,10 @@ export class ObjectsService {
 
     /** Apply a workflow action (e.g. assign / start / resolve / close / investigate / escalate). */
     transition(id: string, action: string, actor?: string): Observable<OperationalObject> {
-        return this.http.post<OperationalObject>(
-            apiUrl(`/objects/${encodeURIComponent(id)}/transition`), { action, actor });
+        return this.http.post<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/transition`), {
+            action,
+            actor,
+        });
     }
 
     links(id: string): Observable<ObjectLink[]> {
@@ -284,8 +286,11 @@ export class ObjectsService {
     }
 
     link(id: string, to: string, relationship: string, actor?: string): Observable<ObjectLink> {
-        return this.http.post<ObjectLink>(
-            apiUrl(`/objects/${encodeURIComponent(id)}/links`), { to, relationship, actor });
+        return this.http.post<ObjectLink>(apiUrl(`/objects/${encodeURIComponent(id)}/links`), {
+            to,
+            relationship,
+            actor,
+        });
     }
 
     /** The effective lifecycle for an object type — drives workflow-derived folders/actions (C6). */
@@ -336,8 +341,10 @@ export class ObjectsService {
     }
 
     /** Split the listed member incidents out of case `id` into a new case (GLOSSARY §9 — Split). */
-    splitCase(id: string, body: { title: string; members: string[]; assignee?: string; actor?: string }):
-        Observable<SplitResult> {
+    splitCase(
+        id: string,
+        body: { title: string; members: string[]; assignee?: string; actor?: string },
+    ): Observable<SplitResult> {
         return this.http.post<SplitResult>(apiUrl(`/objects/${encodeURIComponent(id)}/split`), body);
     }
 
@@ -352,22 +359,26 @@ export class ObjectsService {
     }
 
     addComment(id: string, body: string, author?: string): Observable<ObjectNote> {
-        return this.http.post<ObjectNote>(
-            apiUrl(`/objects/${encodeURIComponent(id)}/comments`), { body, author });
+        return this.http.post<ObjectNote>(apiUrl(`/objects/${encodeURIComponent(id)}/comments`), { body, author });
     }
 
     attachments(id: string): Observable<ObjectNote[]> {
         return this.http.get<ObjectNote[]>(apiUrl(`/objects/${encodeURIComponent(id)}/attachments`));
     }
 
-    addAttachment(id: string, a: { name: string; uri: string; contentType?: string; author?: string; caption?: string }):
-        Observable<ObjectNote> {
+    addAttachment(
+        id: string,
+        a: { name: string; uri: string; contentType?: string; author?: string; caption?: string },
+    ): Observable<ObjectNote> {
         return this.http.post<ObjectNote>(apiUrl(`/objects/${encodeURIComponent(id)}/attachments`), a);
     }
 
     /** Seed an RCA skeleton — by template name, or an inline {sections[]} / {name,sections[]}. */
-    applyRca(id: string, template: string | { name?: string; sections: string[] }, actor?: string):
-        Observable<ObjectNote[]> {
+    applyRca(
+        id: string,
+        template: string | { name?: string; sections: string[] },
+        actor?: string,
+    ): Observable<ObjectNote[]> {
         return this.http.post<ObjectNote[]>(apiUrl(`/objects/${encodeURIComponent(id)}/rca`), { template, actor });
     }
 
@@ -400,6 +411,8 @@ export class ObjectsService {
     /** Bulk-apply a saved Tag Rule to every existing match — returns how many were tagged. */
     applyTagRule(name: string): Observable<{ matched: number; updated: number }> {
         return this.http.post<{ matched: number; updated: number }>(
-            apiUrl(`/tags/rules/${encodeURIComponent(name)}/apply`), {});
+            apiUrl(`/tags/rules/${encodeURIComponent(name)}/apply`),
+            {},
+        );
     }
 }

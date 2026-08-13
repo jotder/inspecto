@@ -75,8 +75,13 @@ export class ConnectionsService {
      * Test an <em>unsaved</em> profile straight from a form (no persistence). {@code target} selects which
      * endpoint to probe — the connection itself or its SSH tunnel hop.
      */
-    testProfile(profile: ConnectionProfile, target: 'connection' | 'tunnel' | 'proxy' = 'connection'): Observable<ConnectionTestResult> {
-        return this.http.post<ConnectionTestResult>(apiUrl('/connections/test'), profile, { params: toParams({ target }) });
+    testProfile(
+        profile: ConnectionProfile,
+        target: 'connection' | 'tunnel' | 'proxy' = 'connection',
+    ): Observable<ConnectionTestResult> {
+        return this.http.post<ConnectionTestResult>(apiUrl('/connections/test'), profile, {
+            params: toParams({ target }),
+        });
     }
 
     /**

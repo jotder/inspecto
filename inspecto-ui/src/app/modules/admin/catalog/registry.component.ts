@@ -8,7 +8,13 @@ import { firstValueFrom } from 'rxjs';
 import type { ColDef } from 'ag-grid-community';
 import { DecisionRulesService, JobsService, PipelinesService } from 'app/inspecto/api';
 import { RequirementsService } from 'app/inspecto/requirement';
-import { Component as ModelComponent, Part, deriveComponentGraph, refsForComponent, resolveEditorLink } from 'app/inspecto/component-model';
+import {
+    Component as ModelComponent,
+    Part,
+    deriveComponentGraph,
+    refsForComponent,
+    resolveEditorLink,
+} from 'app/inspecto/component-model';
 // Side-effect: register the Studio / jobs / decision-rule ComponentKinds + their editor routes so
 // `resolveEditorLink` covers every kind this pane loads (all registrations are guarded).
 import 'app/modules/admin/studio/datasets/dataset.kind';
@@ -27,7 +33,18 @@ import { registerPlatformKinds } from './platform-kinds';
 /** The component-registry kinds the reuse-graph loads (the backend `ComponentType`s). Pipelines are loaded
  *  separately (authored flows via {@link PipelinesService}) since they live in their own store, not `/components`.
  *  The saved investigation views joined with R1 (widget→view→dataset edges now derive). */
-export const REGISTRY_KINDS = ['dataset', 'query', 'widget', 'dashboard', 'grammar', 'transform', 'sink', 'rule-template', 'geo-map-view', 'link-analysis-view'];
+export const REGISTRY_KINDS = [
+    'dataset',
+    'query',
+    'widget',
+    'dashboard',
+    'grammar',
+    'transform',
+    'sink',
+    'rule-template',
+    'geo-map-view',
+    'link-analysis-view',
+];
 
 /** The kinds a pipeline node may bind (mirrors `PIPELINE_KIND.allowedPartKinds`); a node's `use=<kind>/<id>`
  *  ref is turned into a part only for these, so source→connection refs don't clutter the graph. */
@@ -115,7 +132,9 @@ export class RegistryComponent implements OnInit {
         const comps: ModelComponent[] = [];
         for (const r of compResults) {
             if (r.status === 'fulfilled') {
-                comps.push(...r.value.map((c) => ({ ...c, parts: refParts(c.kind, c.config as Record<string, unknown>) })));
+                comps.push(
+                    ...r.value.map((c) => ({ ...c, parts: refParts(c.kind, c.config as Record<string, unknown>) })),
+                );
             }
         }
         comps.push(...pipelines, ...jobs, ...decisionRules, ...requirements);
@@ -144,7 +163,13 @@ export class RegistryComponent implements OnInit {
             const rules = await firstValueFrom(this.decisionRules.list());
             return rules.map((r) => {
                 const config = r as unknown as Record<string, unknown>;
-                return { kind: 'decision-rule', id: r.name, name: r.name, config, parts: refParts('decision-rule', config) };
+                return {
+                    kind: 'decision-rule',
+                    id: r.name,
+                    name: r.name,
+                    config,
+                    parts: refParts('decision-rule', config),
+                };
             });
         } catch {
             return [];
@@ -173,7 +198,13 @@ export class RegistryComponent implements OnInit {
                     try {
                         const flow = await firstValueFrom(this.flows.pipelineGraphRaw(f.name));
                         const config = flow as unknown as Record<string, unknown>; // carried opaquely; parts already derived
-                        return { kind: 'pipeline', id: f.name, name: flow.name || f.name, config, parts: refParts('pipeline', config, PIPELINE_REF_KINDS) };
+                        return {
+                            kind: 'pipeline',
+                            id: f.name,
+                            name: flow.name || f.name,
+                            config,
+                            parts: refParts('pipeline', config, PIPELINE_REF_KINDS),
+                        };
                     } catch {
                         return null;
                     }
@@ -209,4 +240,3 @@ function splitRef(nodeId: string): { kind: string; id: string } {
     const i = nodeId.indexOf('/');
     return i < 0 ? { kind: nodeId, id: nodeId } : { kind: nodeId.slice(0, i), id: nodeId.slice(i + 1) };
 }
-

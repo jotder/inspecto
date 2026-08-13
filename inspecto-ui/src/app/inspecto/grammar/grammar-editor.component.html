@@ -3,8 +3,8 @@
 @if (unservedPlugin()) {
     <inspecto-alert variant="warning" title="Parser plugin not available here">
         This Grammar parses through <span class="font-mono text-xs">{{ unservedPlugin() }}</span
-        >, which no parser on this server provides. The options below are the built-in fallback — saving
-        would replace the plugin settings.
+        >, which no parser on this server provides. The options below are the built-in fallback — saving would replace
+        the plugin settings.
     </inspecto-alert>
 }
 
@@ -15,21 +15,20 @@
         [value]="activeType()"
         (change)="setType($event.value)"
         aria-label="File format"
-        class="flex-wrap">
+        class="flex-wrap"
+    >
         @for (f of frontends; track f.id) {
             <mat-button-toggle [value]="f.id" [matTooltip]="f.hint">{{ f.label }}</mat-button-toggle>
         }
         @for (p of pluginTypes(); track p.id) {
-            <mat-button-toggle [value]="p.id" [matTooltip]="typeHint(p.label)">{{ typeName(p.label) }}</mat-button-toggle>
+            <mat-button-toggle [value]="p.id" [matTooltip]="typeHint(p.label)">{{
+                typeName(p.label)
+            }}</mat-button-toggle>
         }
     </mat-button-toggle-group>
 
     @if (suggestion(); as sg) {
-        <button
-            type="button"
-            class="mt-2"
-            (click)="applySuggestion()"
-            matTooltip="Apply the suggested file format">
+        <button type="button" class="mt-2" (click)="applySuggestion()" matTooltip="Apply the suggested file format">
             <inspecto-chip variant="soft" tone="primary">
                 Looks like {{ sg.reason }} — use {{ frontendLabel(sg.frontend) }}?
             </inspecto-chip>
@@ -50,7 +49,8 @@
                 type="file"
                 class="hidden"
                 aria-label="Choose a sample file"
-                (change)="onSampleFile($any($event.target).files)" />
+                (change)="onSampleFile($any($event.target).files)"
+            />
         </div>
         <mat-form-field class="w-full" subscriptSizing="dynamic">
             <textarea
@@ -60,7 +60,8 @@
                 placeholder="Paste a few lines of your data…"
                 aria-label="Sample content"
                 [value]="sampleText()"
-                (input)="onSampleText($any($event.target).value)"></textarea>
+                (input)="onSampleText($any($event.target).value)"
+            ></textarea>
         </mat-form-field>
     </div>
 }
@@ -81,7 +82,9 @@
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
                         <mat-label>Name</mat-label>
                         <input matInput formControlName="name" />
-                        @if (g.get('name')?.hasError('required')) { <mat-error>Required</mat-error> }
+                        @if (g.get('name')?.hasError('required')) {
+                            <mat-error>Required</mat-error>
+                        }
                     </mat-form-field>
                     <mat-form-field class="w-24" subscriptSizing="dynamic">
                         <mat-label>Start</mat-label>
@@ -96,7 +99,8 @@
                         type="button"
                         class="mt-1"
                         [attr.aria-label]="'Remove field ' + ($index + 1)"
-                        (click)="removeField($index)">
+                        (click)="removeField($index)"
+                    >
                         <mat-icon class="icon-size-4">remove_circle_outline</mat-icon>
                     </button>
                 </div>
@@ -112,7 +116,9 @@
 <!-- ── test ────────────────────────────────────────────────────────────────── -->
 <div class="mt-4 flex items-center gap-2">
     <button mat-stroked-button type="button" [disabled]="testing() || !sampleText()" (click)="test()">
-        @if (testing()) { <mat-spinner diameter="16" class="mr-2" /> }
+        @if (testing()) {
+            <mat-spinner diameter="16" class="mr-2" />
+        }
         Test parse
     </button>
     @if (!sampleText()) {
@@ -135,13 +141,20 @@
             @if (p.kind === 'table') {
                 <inspecto-chip variant="soft">{{ p.columns.length }} columns</inspecto-chip>
                 <inspecto-chip variant="soft">{{ p.rowCount }} rows</inspecto-chip>
-                @if (p.rejectedRows > 0) { <inspecto-chip variant="outline">{{ p.rejectedRows }} rejected</inspecto-chip> }
+                @if (p.rejectedRows > 0) {
+                    <inspecto-chip variant="outline">{{ p.rejectedRows }} rejected</inspecto-chip>
+                }
             } @else {
                 <inspecto-chip variant="soft">{{ p.recordCount }} records</inspecto-chip>
             }
 
             @if (sampleTree()) {
-                <mat-button-toggle-group [value]="resultView()" (change)="resultView.set($event.value)" aria-label="Result view" class="ml-auto">
+                <mat-button-toggle-group
+                    [value]="resultView()"
+                    (change)="resultView.set($event.value)"
+                    aria-label="Result view"
+                    class="ml-auto"
+                >
                     <mat-button-toggle value="table">Table</mat-button-toggle>
                     <mat-button-toggle value="tree">Tree</mat-button-toggle>
                 </mat-button-toggle-group>
@@ -158,7 +171,8 @@
                 sourceName="parsed"
                 exportName="parsed-sample"
                 [autoHeight]="true"
-                [rows]="rows()" />
+                [rows]="rows()"
+            />
         }
     </div>
 }

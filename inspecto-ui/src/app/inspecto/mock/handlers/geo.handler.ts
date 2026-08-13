@@ -14,14 +14,17 @@ const ROUTES = /\/geo\/routes$/;
  * and `/geo/routes` when mocks are off.
  */
 export function geoHandler(flags: MockFlags): MockHandler {
-  return (req: MockRequest) => {
-    if (!flags.mockStudio) return undefined;
-    if (req.method === 'POST' && match(req.url, PROJECTION)) {
-      return error(501, 'Geo projection runs on the real backend; offline mode folds sample rows client-side.');
-    }
-    if (req.method === 'POST' && match(req.url, ROUTES)) {
-      return error(501, 'Geo route aggregation runs on the real backend; offline mode folds sample rows client-side.');
-    }
-    return undefined;
-  };
+    return (req: MockRequest) => {
+        if (!flags.mockStudio) return undefined;
+        if (req.method === 'POST' && match(req.url, PROJECTION)) {
+            return error(501, 'Geo projection runs on the real backend; offline mode folds sample rows client-side.');
+        }
+        if (req.method === 'POST' && match(req.url, ROUTES)) {
+            return error(
+                501,
+                'Geo route aggregation runs on the real backend; offline mode folds sample rows client-side.',
+            );
+        }
+        return undefined;
+    };
 }

@@ -39,7 +39,14 @@ describe('opsHandler', () => {
 
     it('round-trips alert-rule authoring (create 409-on-duplicate, update name-immutable, delete 404-when-absent)', () => {
         const store = seededStore();
-        const rule = { name: 'slow_batch_2', metric: 'duration_ms', comparator: 'gt', threshold: 60_000, window: '1h', severity: 'WARNING' };
+        const rule = {
+            name: 'slow_batch_2',
+            metric: 'duration_ms',
+            comparator: 'gt',
+            threshold: 60_000,
+            window: '1h',
+            severity: 'WARNING',
+        };
 
         expect(handler(req('POST', '/api/alerts/rules', rule), store)?.status).toBe(200);
         expect(handler(req('POST', '/api/alerts/rules', rule), store)?.status).toBe(409); // duplicate name
@@ -98,9 +105,7 @@ describe('opsHandler', () => {
         const q = all[0].message.slice(0, 8).toLowerCase();
         const searched = handler(req('GET', '/api/events/search', null, { q }), store)?.body as EventRow[];
         expect(searched.length).toBeGreaterThan(0);
-        expect(
-            searched.every((e) => (e.message + ' ' + e.source).toLowerCase().includes(q)),
-        ).toBe(true);
+        expect(searched.every((e) => (e.message + ' ' + e.source).toLowerCase().includes(q))).toBe(true);
     });
 
     it('serves the audit trail by exact type (the Audit-log pane contract)', () => {
@@ -194,14 +199,26 @@ describe('opsHandler', () => {
         const store = seededStore();
         // no links / empty links → 422; an unknown target → 422
         expect(handler(req('POST', '/api/objects', { type: 'incident', title: 'orphan' }), store)?.status).toBe(422);
-        expect(handler(req('POST', '/api/objects', { type: 'incident', title: 'orphan', links: [] }), store)?.status).toBe(422);
-        expect(handler(req('POST', '/api/objects', { type: 'incident', title: 'orphan', links: [{ to: 'ghost' }] }), store)?.status).toBe(422);
+        expect(
+            handler(req('POST', '/api/objects', { type: 'incident', title: 'orphan', links: [] }), store)?.status,
+        ).toBe(422);
+        expect(
+            handler(req('POST', '/api/objects', { type: 'incident', title: 'orphan', links: [{ to: 'ghost' }] }), store)
+                ?.status,
+        ).toBe(422);
         // a valid target → created, and the link row is queryable
-        const created = handler(req('POST', '/api/objects',
-            { type: 'incident', title: 'linked', links: [{ to: 'incident-101', relationship: 'CAUSED_BY' }] }), store)
-            ?.body as OperationalObject;
+        const created = handler(
+            req('POST', '/api/objects', {
+                type: 'incident',
+                title: 'linked',
+                links: [{ to: 'incident-101', relationship: 'CAUSED_BY' }],
+            }),
+            store,
+        )?.body as OperationalObject;
         const links = handler(req('GET', `/api/objects/${created.id}/links`), store)?.body as ObjectLink[];
-        expect(links.some((l) => l.from === created.id && l.to === 'incident-101' && l.relationship === 'CAUSED_BY')).toBe(true);
+        expect(
+            links.some((l) => l.from === created.id && l.to === 'incident-101' && l.relationship === 'CAUSED_BY'),
+        ).toBe(true);
     });
 
     it('manages the tag registry (list sorted, create validates + 409s duplicates)', () => {
@@ -222,21 +239,29 @@ describe('opsHandler', () => {
         expect(handler(req('POST', '/api/tags/rules', { name: 'r0', tag: 't0', filter: {} }), store)?.status).toBe(422);
         // Every seeded incident title contains "rejected" → the rule matches all 5.
         const saved = handler(
-            req('POST', '/api/tags/rules', { name: 'feed-issues', tag: 'feed-issue', filter: { type: 'INCIDENT', q: 'rejected' } }),
+            req('POST', '/api/tags/rules', {
+                name: 'feed-issues',
+                tag: 'feed-issue',
+                filter: { type: 'INCIDENT', q: 'rejected' },
+            }),
             store,
         );
         expect(saved?.status).toBe(200);
         const tags = handler(req('GET', '/api/tags'), store)?.body as Array<{ name: string }>;
         expect(tags.map((t) => t.name)).toContain('feed-issue'); // saving the rule registered its tag
-        const applied = handler(req('POST', '/api/tags/rules/feed-issues/apply', {}), store)
-            ?.body as { matched: number; updated: number };
+        const applied = handler(req('POST', '/api/tags/rules/feed-issues/apply', {}), store)?.body as {
+            matched: number;
+            updated: number;
+        };
         expect(applied).toEqual({ matched: 5, updated: 5 });
         const incidents = handler(req('GET', '/api/objects', null, { type: 'incident' }), store)
             ?.body as OperationalObject[];
         expect(incidents.every((o) => (o.attributes?.['tags'] ?? '').includes('feed-issue'))).toBe(true);
         // Re-apply is idempotent.
-        const again = handler(req('POST', '/api/tags/rules/feed-issues/apply', {}), store)
-            ?.body as { matched: number; updated: number };
+        const again = handler(req('POST', '/api/tags/rules/feed-issues/apply', {}), store)?.body as {
+            matched: number;
+            updated: number;
+        };
         expect(again).toEqual({ matched: 5, updated: 0 });
         expect(handler(req('DELETE', '/api/tags/rules/feed-issues'), store)?.status).toBe(200);
         expect(handler(req('POST', '/api/tags/rules/feed-issues/apply', {}), store)?.status).toBe(404);
@@ -250,30 +275,47 @@ describe('opsHandler', () => {
         expect(before.every((a) => a.targetKind === 'object')).toBe(true);
 
         // Applying an unregistered tag is a 404, never an implicit create.
-        expect(handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'nope' }), store)?.status)
-            .toBe(404);
+        expect(
+            handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'nope' }), store)?.status,
+        ).toBe(404);
         expect(handler(req('POST', '/api/tags/assignments/nonsense/x', { tag: 'urgent' }), store)?.status).toBe(400);
 
-        expect(handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store)?.status)
-            .toBe(200);
+        expect(
+            handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store)
+                ?.status,
+        ).toBe(200);
         // Idempotent — re-applying adds no second edge.
         handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store);
 
-        const after = handler(req('GET', '/api/tags/urgent/targets'), store)?.body as Array<{ targetKind: string; targetId: string }>;
+        const after = handler(req('GET', '/api/tags/urgent/targets'), store)?.body as Array<{
+            targetKind: string;
+            targetId: string;
+        }>;
         expect(after.length).toBe(before.length + 1);
         expect(after.filter((a) => a.targetKind === 'link-analysis-view')).toEqual([
             expect.objectContaining({ targetId: 'fraud-ring' }),
         ]);
 
-        const on = handler(req('GET', '/api/tags/assignments/link-analysis-view/fraud-ring'), store)
-            ?.body as { tags: string[] };
+        const on = handler(req('GET', '/api/tags/assignments/link-analysis-view/fraud-ring'), store)?.body as {
+            tags: string[];
+        };
         expect(on.tags).toEqual(['urgent']);
 
         // Removal is idempotent: the first reports removed, the second is a no-op success.
-        expect((handler(req('DELETE', '/api/tags/assignments/link-analysis-view/fraud-ring/urgent'), store)
-            ?.body as { removed: boolean }).removed).toBe(true);
-        expect((handler(req('DELETE', '/api/tags/assignments/link-analysis-view/fraud-ring/urgent'), store)
-            ?.body as { removed: boolean }).removed).toBe(false);
+        expect(
+            (
+                handler(req('DELETE', '/api/tags/assignments/link-analysis-view/fraud-ring/urgent'), store)?.body as {
+                    removed: boolean;
+                }
+            ).removed,
+        ).toBe(true);
+        expect(
+            (
+                handler(req('DELETE', '/api/tags/assignments/link-analysis-view/fraud-ring/urgent'), store)?.body as {
+                    removed: boolean;
+                }
+            ).removed,
+        ).toBe(false);
     });
 
     it('renames a tag across the registry, edges, CSV projections and Tag Rules at once (D7)', () => {
@@ -281,8 +323,11 @@ describe('opsHandler', () => {
         handler(req('POST', '/api/tags/assignments/link-analysis-view/fraud-ring', { tag: 'urgent' }), store);
         const before = handler(req('GET', '/api/tags/urgent/targets'), store)?.body as unknown[];
 
-        const out = handler(req('POST', '/api/tags/urgent/rename', { to: 'p1' }), store)
-            ?.body as { assignments: number; objects: number; rules: number };
+        const out = handler(req('POST', '/api/tags/urgent/rename', { to: 'p1' }), store)?.body as {
+            assignments: number;
+            objects: number;
+            rules: number;
+        };
         expect(out.assignments).toBe(before.length);
         expect(out.rules).toBeGreaterThan(0); // the seeded "critical-is-urgent" rule followed the rename
 
@@ -305,8 +350,10 @@ describe('opsHandler', () => {
         handler(req('POST', '/api/tags/assignments/link-analysis-view/v1', { tag: 'urgent' }), store);
 
         handler(req('POST', '/api/tags/urgent/rename', { to: 'p1' }), store);
-        const targets = handler(req('GET', '/api/tags/p1/targets'), store)
-            ?.body as Array<{ targetKind: string; targetId: string }>;
+        const targets = handler(req('GET', '/api/tags/p1/targets'), store)?.body as Array<{
+            targetKind: string;
+            targetId: string;
+        }>;
         // The two edges on v1 collapsed into one rather than conflicting.
         expect(targets.filter((t) => t.targetId === 'v1').length).toBe(1);
     });
@@ -320,8 +367,11 @@ describe('opsHandler', () => {
         handler(req('POST', '/api/tags/assignments/link-analysis-view/v1', { tag: 'scratch' }), store);
         expect(handler(req('DELETE', '/api/tags/scratch'), store)?.status).toBe(200);
         expect((handler(req('GET', '/api/tags/scratch/targets'), store)?.body as unknown[]).length).toBe(0);
-        expect((handler(req('GET', '/api/tags'), store)?.body as Array<{ name: string }>)
-            .some((t) => t.name === 'scratch')).toBe(false);
+        expect(
+            (handler(req('GET', '/api/tags'), store)?.body as Array<{ name: string }>).some(
+                (t) => t.name === 'scratch',
+            ),
+        ).toBe(false);
         expect(handler(req('DELETE', '/api/tags/scratch'), store)?.status).toBe(404);
     });
 
@@ -329,13 +379,23 @@ describe('opsHandler', () => {
         const store = seededStore();
         // The seeded rule "critical-is-urgent" tags CRITICAL incidents with "urgent".
         const created = handler(
-            req('POST', '/api/objects', { type: 'incident', title: 'Broken feed', priority: 'CRITICAL', links: [{ to: 'incident-101' }] }),
+            req('POST', '/api/objects', {
+                type: 'incident',
+                title: 'Broken feed',
+                priority: 'CRITICAL',
+                links: [{ to: 'incident-101' }],
+            }),
             store,
         )?.body as OperationalObject;
         expect((created.attributes?.['tags'] ?? '').split(',')).toContain('urgent');
         // A non-matching object stays untagged.
         const minor = handler(
-            req('POST', '/api/objects', { type: 'incident', title: 'Small glitch', priority: 'LOW', links: [{ to: 'incident-101' }] }),
+            req('POST', '/api/objects', {
+                type: 'incident',
+                title: 'Small glitch',
+                priority: 'LOW',
+                links: [{ to: 'incident-101' }],
+            }),
             store,
         )?.body as OperationalObject;
         expect(minor.attributes?.['tags']).toBeUndefined();
@@ -344,8 +404,11 @@ describe('opsHandler', () => {
     it('merges cases (members re-point, tags union, source closes) and splits them back out', () => {
         const store = seededStore();
         // seeded membership: case-102 CONTAINS incident-101 + incident-104; case-108 CONTAINS incident-107
-        const merged = handler(req('POST', '/api/objects/case-102/merge', { sources: ['case-108'] }), store)
-            ?.body as { survivor: OperationalObject; merged: string[]; membersMoved: number };
+        const merged = handler(req('POST', '/api/objects/case-102/merge', { sources: ['case-108'] }), store)?.body as {
+            survivor: OperationalObject;
+            merged: string[];
+            membersMoved: number;
+        };
         expect(merged.membersMoved).toBe(1);
         expect(merged.merged).toEqual(['case-108']);
 
@@ -353,8 +416,9 @@ describe('opsHandler', () => {
         expect(absorbed.status).toBe('CLOSED');
         expect(absorbed.attributes?.['mergedInto']).toBe('case-102');
         // the survivor now contains all three members
-        const graph = handler(req('GET', '/api/objects/case-102/graph', null, { depth: '1' }), store)
-            ?.body as { edges: Array<{ from: string; to: string; relationship: string }> };
+        const graph = handler(req('GET', '/api/objects/case-102/graph', null, { depth: '1' }), store)?.body as {
+            edges: Array<{ from: string; to: string; relationship: string }>;
+        };
         const members = graph.edges.filter((e) => e.from === 'case-102' && e.relationship === 'CONTAINS');
         expect(members.map((e) => e.to).sort()).toEqual(['incident-101', 'incident-104', 'incident-107']);
 
@@ -362,62 +426,109 @@ describe('opsHandler', () => {
         expect(handler(req('POST', '/api/objects/case-102/merge', { sources: ['case-108'] }), store)?.status).toBe(422);
         expect(handler(req('POST', '/api/objects/case-102/merge', { sources: ['case-102'] }), store)?.status).toBe(422);
         expect(handler(req('POST', '/api/objects/case-102/merge', { sources: [] }), store)?.status).toBe(400);
-        expect(handler(req('POST', '/api/objects/case-102/merge', { sources: ['incident-101'] }), store)?.status).toBe(422);
+        expect(handler(req('POST', '/api/objects/case-102/merge', { sources: ['incident-101'] }), store)?.status).toBe(
+            422,
+        );
 
         // split two members back out into a new case
-        const split = handler(req('POST', '/api/objects/case-102/split',
-            { title: 'part B', members: ['incident-101', 'incident-107'], assignee: 'dana' }), store)
-            ?.body as { case: OperationalObject; membersMoved: number };
+        const split = handler(
+            req('POST', '/api/objects/case-102/split', {
+                title: 'part B',
+                members: ['incident-101', 'incident-107'],
+                assignee: 'dana',
+            }),
+            store,
+        )?.body as { case: OperationalObject; membersMoved: number };
         expect(split.membersMoved).toBe(2);
         expect(split.case.objectType).toBe('CASE');
         expect(split.case.assignee).toBe('dana');
-        const after = handler(req('GET', '/api/objects/case-102/graph', null, { depth: '1' }), store)
-            ?.body as { edges: Array<{ from: string; to: string; relationship: string }> };
-        expect(after.edges.filter((e) => e.from === 'case-102' && e.relationship === 'CONTAINS')
-            .map((e) => e.to)).toEqual(['incident-104']);
+        const after = handler(req('GET', '/api/objects/case-102/graph', null, { depth: '1' }), store)?.body as {
+            edges: Array<{ from: string; to: string; relationship: string }>;
+        };
+        expect(
+            after.edges.filter((e) => e.from === 'case-102' && e.relationship === 'CONTAINS').map((e) => e.to),
+        ).toEqual(['incident-104']);
         // foreign member now → 422; missing title → 400
-        expect(handler(req('POST', '/api/objects/case-102/split',
-            { title: 'x', members: ['incident-101'] }), store)?.status).toBe(422);
-        expect(handler(req('POST', '/api/objects/case-102/split',
-            { members: ['incident-104'] }), store)?.status).toBe(400);
+        expect(
+            handler(req('POST', '/api/objects/case-102/split', { title: 'x', members: ['incident-101'] }), store)
+                ?.status,
+        ).toBe(422);
+        expect(handler(req('POST', '/api/objects/case-102/split', { members: ['incident-104'] }), store)?.status).toBe(
+            400,
+        );
     });
 
     it('evaluates a case rule — groups matching incidents once the threshold is met (C5)', () => {
         const store = seededStore();
         // Seeded rule "critical-cluster": >=2 CRITICAL incidents → one case. Seed data has CRITICAL incidents.
-        const first = handler(req('POST', '/api/cases/rules/critical-cluster/evaluate', {}), store)
-            ?.body as { matched: number; grouped: number; caseId: string | null; opened: boolean };
+        const first = handler(req('POST', '/api/cases/rules/critical-cluster/evaluate', {}), store)?.body as {
+            matched: number;
+            grouped: number;
+            caseId: string | null;
+            opened: boolean;
+        };
         if (first.grouped > 0) {
             expect(first.opened).toBe(true);
             expect(first.caseId).toBeTruthy();
             // re-evaluate: already grouped → idempotent no-op
-            const again = handler(req('POST', '/api/cases/rules/critical-cluster/evaluate', {}), store)
-                ?.body as { grouped: number };
+            const again = handler(req('POST', '/api/cases/rules/critical-cluster/evaluate', {}), store)?.body as {
+                grouped: number;
+            };
             expect(again.grouped).toBe(0);
         }
         // create two fresh CRITICAL incidents, then a bespoke rule groups them
-        handler(req('POST', '/api/objects', { type: 'incident', title: 'x1', priority: 'CRITICAL', links: [{ to: 'incident-101' }] }), store);
-        handler(req('POST', '/api/objects', { type: 'incident', title: 'x2', priority: 'CRITICAL', links: [{ to: 'incident-101' }] }), store);
-        handler(req('POST', '/api/cases/rules', {
-            name: 'r2', title: 'Cluster 2', threshold: 2, windowMinutes: 1440,
-            filter: { type: 'INCIDENT', priority: 'CRITICAL' },
-        }), store);
-        const r2 = handler(req('POST', '/api/cases/rules/r2/evaluate', {}), store)
-            ?.body as { grouped: number; caseId: string };
+        handler(
+            req('POST', '/api/objects', {
+                type: 'incident',
+                title: 'x1',
+                priority: 'CRITICAL',
+                links: [{ to: 'incident-101' }],
+            }),
+            store,
+        );
+        handler(
+            req('POST', '/api/objects', {
+                type: 'incident',
+                title: 'x2',
+                priority: 'CRITICAL',
+                links: [{ to: 'incident-101' }],
+            }),
+            store,
+        );
+        handler(
+            req('POST', '/api/cases/rules', {
+                name: 'r2',
+                title: 'Cluster 2',
+                threshold: 2,
+                windowMinutes: 1440,
+                filter: { type: 'INCIDENT', priority: 'CRITICAL' },
+            }),
+            store,
+        );
+        const r2 = handler(req('POST', '/api/cases/rules/r2/evaluate', {}), store)?.body as {
+            grouped: number;
+            caseId: string;
+        };
         expect(r2.grouped).toBeGreaterThanOrEqual(2);
         const links = handler(req('GET', `/api/objects/${r2.caseId}/links`), store)?.body as ObjectLink[];
-        expect(links.filter((l) => l.from === r2.caseId && l.relationship === 'CONTAINS').length)
-            .toBeGreaterThanOrEqual(2);
+        expect(
+            links.filter((l) => l.from === r2.caseId && l.relationship === 'CONTAINS').length,
+        ).toBeGreaterThanOrEqual(2);
 
         // gates: no criterion → 422; unknown rule evaluate → 404
-        expect(handler(req('POST', '/api/cases/rules', { name: 'bad', title: 't', filter: {} }), store)?.status).toBe(422);
+        expect(handler(req('POST', '/api/cases/rules', { name: 'bad', title: 't', filter: {} }), store)?.status).toBe(
+            422,
+        );
         expect(handler(req('POST', '/api/cases/rules/ghost/evaluate', {}), store)?.status).toBe(404);
     });
 
     it('rolls up case analytics (C4)', () => {
         const store = seededStore();
         const a = handler(req('GET', '/api/objects/analytics', null, { type: 'CASE' }), store)?.body as {
-            type: string; total: number; backlog: number; byCategory: Record<string, number>;
+            type: string;
+            total: number;
+            backlog: number;
+            byCategory: Record<string, number>;
             impact: { impactAmount: number; recordsAffected: number };
         };
         expect(a.type).toBe('CASE');
@@ -429,13 +540,16 @@ describe('opsHandler', () => {
     it('serves the effective lifecycle per type (C6 workflow-driven folders)', () => {
         const store = seededStore();
         const caseWf = handler(req('GET', '/api/workflows/CASE'), store)?.body as {
-            initial: string; states: string[]; terminal: string[];
+            initial: string;
+            states: string[];
+            terminal: string[];
         };
         expect(caseWf.initial).toBe('OPEN');
         expect(caseWf.states).toEqual(['OPEN', 'INVESTIGATING', 'ESCALATED', 'RESOLVED', 'CLOSED']);
         expect(caseWf.terminal).toEqual(['CLOSED']);
-        expect((handler(req('GET', '/api/workflows/incident'), store)?.body as { initial: string }).initial)
-            .toBe('IDENTIFIED');
+        expect((handler(req('GET', '/api/workflows/incident'), store)?.body as { initial: string }).initial).toBe(
+            'IDENTIFIED',
+        );
         expect(handler(req('GET', '/api/workflows/bogus'), store)?.status).toBe(400);
     });
 
@@ -446,24 +560,38 @@ describe('opsHandler', () => {
             sections: { key: string; tier: string; required: boolean; options?: { value: string; label: string }[] }[];
         };
         expect(spec.objectType).toBe('case');
-        expect(spec.sections.map((s) => s.key))
-            .toEqual(['disposition', 'impactAmount', 'recordsAffected', 'summary']);
+        expect(spec.sections.map((s) => s.key)).toEqual(['disposition', 'impactAmount', 'recordsAffected', 'summary']);
         // Always visible, never mandatory — the no-disposition prompt on resolve is a soft warning.
         expect(spec.sections.every((s) => s.tier === 'required' && s.required === false)).toBe(true);
-        expect(spec.sections[0].options?.map((o) => o.label))
-            .toEqual(['Confirmed', 'False positive', 'Recovered', 'Written off', 'Inconclusive']);
+        expect(spec.sections[0].options?.map((o) => o.label)).toEqual([
+            'Confirmed',
+            'False positive',
+            'Recovered',
+            'Written off',
+            'Inconclusive',
+        ]);
         expect(handler(req('GET', '/api/findings/bogus'), store)?.status).toBe(400);
     });
 
     it('deletes a single link and 404s when it is already gone', () => {
         const store = seededStore();
-        expect(handler(req('DELETE', '/api/objects/case-102/links', null,
-            { to: 'incident-101', relationship: 'CONTAINS' }), store)?.status).toBe(200);
-        expect(handler(req('DELETE', '/api/objects/case-102/links', null,
-            { to: 'incident-101', relationship: 'CONTAINS' }), store)?.status).toBe(404);
+        expect(
+            handler(
+                req('DELETE', '/api/objects/case-102/links', null, { to: 'incident-101', relationship: 'CONTAINS' }),
+                store,
+            )?.status,
+        ).toBe(200);
+        expect(
+            handler(
+                req('DELETE', '/api/objects/case-102/links', null, { to: 'incident-101', relationship: 'CONTAINS' }),
+                store,
+            )?.status,
+        ).toBe(404);
         expect(handler(req('DELETE', '/api/objects/case-102/links', null, {}), store)?.status).toBe(400);
-        expect(handler(req('DELETE', '/api/objects/nope/links', null,
-            { to: 'x', relationship: 'CONTAINS' }), store)?.status).toBe(404);
+        expect(
+            handler(req('DELETE', '/api/objects/nope/links', null, { to: 'x', relationship: 'CONTAINS' }), store)
+                ?.status,
+        ).toBe(404);
     });
 
     it('patches priority and merges attributes without touching the rest', () => {
@@ -507,14 +635,19 @@ describe('opsHandler', () => {
         const comments = handler(req('GET', `/api/objects/${a.id}/comments`), store)?.body as Array<{ body: string }>;
         expect(comments.map((c) => c.body)).toEqual(['looking into it']);
 
-        handler(req('POST', `/api/objects/${a.id}/attachments`, { name: 'evidence.log', uri: 's3://x/evidence.log' }), store);
+        handler(
+            req('POST', `/api/objects/${a.id}/attachments`, { name: 'evidence.log', uri: 's3://x/evidence.log' }),
+            store,
+        );
         const atts = handler(req('GET', `/api/objects/${a.id}/attachments`), store)?.body as Array<{
             attributes?: Record<string, string>;
         }>;
         expect(atts[0].attributes?.['uri']).toBe('s3://x/evidence.log');
 
-        const rca = handler(req('POST', `/api/objects/${a.id}/rca`, { template: { sections: ['Summary', 'Root cause'] } }), store)
-            ?.body as unknown[];
+        const rca = handler(
+            req('POST', `/api/objects/${a.id}/rca`, { template: { sections: ['Summary', 'Root cause'] } }),
+            store,
+        )?.body as unknown[];
         expect(rca.length).toBe(2);
         const after = handler(req('GET', `/api/objects/${a.id}/comments`), store)?.body as Array<{ body: string }>;
         expect(after.length).toBe(3); // 1 comment + 2 RCA sections
@@ -523,12 +656,26 @@ describe('opsHandler', () => {
     it('fans fired alerts and opened incidents out to enabled channels (C4)', () => {
         const store = seededStore();
         store.put('default', NOTIFICATION_CHANNELS_COLL, 'ops_email', {
-            id: 'ops_email', kind: 'EMAIL', target: 'ops@x.com', enabled: true, createdAt: 1,
+            id: 'ops_email',
+            kind: 'EMAIL',
+            target: 'ops@x.com',
+            enabled: true,
+            createdAt: 1,
         });
 
         handler(req('POST', '/api/alerts/evaluate'), store);
-        handler(req('POST', '/api/objects', { type: 'INCIDENT', title: 'Late feed', links: [{ to: 'incident-101' }] }), store);
-        handler(req('POST', '/api/objects', { type: 'CASE', title: 'No fan-out for cases', links: [{ to: 'incident-101' }] }), store);
+        handler(
+            req('POST', '/api/objects', { type: 'INCIDENT', title: 'Late feed', links: [{ to: 'incident-101' }] }),
+            store,
+        );
+        handler(
+            req('POST', '/api/objects', {
+                type: 'CASE',
+                title: 'No fan-out for cases',
+                links: [{ to: 'incident-101' }],
+            }),
+            store,
+        );
 
         // The evaluate() sweep can fire more than one rule (real ledger math, not a single canned
         // breach) — assert both trigger KINDS fan out, not an exact count.

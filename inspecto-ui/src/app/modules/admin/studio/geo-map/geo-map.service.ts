@@ -28,17 +28,33 @@ export interface GeoMapView {
 export class GeoMapService {
     private store = new SavedViewStore<GeoMapView>(inject(ComponentsService), 'geo-map-view', {
         toContent: (v) => ({
-            name: v.name, description: v.description, sourceId: v.sourceId, query: v.query,
-            display: v.display, camera: v.camera, notes: v.notes,
+            name: v.name,
+            description: v.description,
+            sourceId: v.sourceId,
+            query: v.query,
+            display: v.display,
+            camera: v.camera,
+            notes: v.notes,
         }),
         fromContent: (id, content) => {
             const c = content as {
-                name?: string; description?: string; sourceId?: GeoSourceId; query?: GeoQuery;
-                display?: GeoDisplayMode; camera?: GeoCamera; notes?: GeoNote[];
+                name?: string;
+                description?: string;
+                sourceId?: GeoSourceId;
+                query?: GeoQuery;
+                display?: GeoDisplayMode;
+                camera?: GeoCamera;
+                notes?: GeoNote[];
             };
             return {
-                id, name: c.name ?? id, description: c.description, sourceId: c.sourceId ?? 'dataset',
-                query: c.query ?? {}, display: c.display, camera: c.camera, notes: c.notes,
+                id,
+                name: c.name ?? id,
+                description: c.description,
+                sourceId: c.sourceId ?? 'dataset',
+                query: c.query ?? {},
+                display: c.display,
+                camera: c.camera,
+                notes: c.notes,
             };
         },
     });

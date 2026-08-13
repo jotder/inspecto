@@ -1,29 +1,20 @@
-import {
-  Component,
-  inject,
-  OnInit,
-  ViewEncapsulation,
-  ChangeDetectionStrategy,
-} from "@angular/core";
-import { MatButtonModule } from "@angular/material/button";
-import { MatDialog } from "@angular/material/dialog";
-import { MatIconModule } from "@angular/material/icon";
-import { MatTooltipModule } from "@angular/material/tooltip";
-import { Router } from "@angular/router";
-import { ColDef, ICellRendererParams } from "ag-grid-community";
-import { ReportsService, RunStatus, StatusReport } from "app/inspecto/api";
-import { statusBadgeHtml } from "app/inspecto/components/status-badge.component";
-import { DataTableComponent } from "app/inspecto/data-table";
-import { fmtDateTime, InspectoRowAction } from "app/inspecto/grid";
-import {
-  AiStatusData,
-  AiStatusDialog,
-} from "app/inspecto/ai-assist/ai-status.dialog";
+import { Component, inject, OnInit, ViewEncapsulation, ChangeDetectionStrategy } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { Router } from '@angular/router';
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
+import { ReportsService, RunStatus, StatusReport } from 'app/inspecto/api';
+import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
+import { DataTableComponent } from 'app/inspecto/data-table';
+import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
+import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 
 /** A summary card above the grid. */
 interface MetricCard {
-  label: string;
-  value: string;
+    label: string;
+    value: string;
 }
 
 /**
@@ -33,106 +24,99 @@ interface MetricCard {
  * detail for the full provenance/lineage/quarantine breakdown — this page doesn't duplicate it.
  */
 @Component({
-  selector: "app-processing-status",
-  standalone: true,
-  imports: [
-    MatButtonModule,
-    MatIconModule,
-    MatTooltipModule,
-    DataTableComponent,
-  ],
-  templateUrl: "./processing-status.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
-  encapsulation: ViewEncapsulation.None,
+    selector: 'app-processing-status',
+    standalone: true,
+    imports: [MatButtonModule, MatIconModule, MatTooltipModule, DataTableComponent],
+    templateUrl: './processing-status.component.html',
+    changeDetection: ChangeDetectionStrategy.Eager,
+    encapsulation: ViewEncapsulation.None,
 })
 export class ProcessingStatusComponent implements OnInit {
-  private api = inject(ReportsService);
-  private router = inject(Router);
-  private dialog = inject(MatDialog);
+    private api = inject(ReportsService);
+    private router = inject(Router);
+    private dialog = inject(MatDialog);
 
-  loading = false;
-  report: StatusReport | null = null;
-  cards: MetricCard[] = [];
+    loading = false;
+    report: StatusReport | null = null;
+    cards: MetricCard[] = [];
 
-  readonly columnDefs: ColDef<RunStatus>[] = [
-    { field: "pipeline", headerName: "Pipeline", flex: 1 },
-    {
-      field: "paused",
-      headerName: "State",
-      width: 110,
-      cellRenderer: (p: ICellRendererParams<RunStatus>) =>
-        statusBadgeHtml(p.value ? "PAUSED" : "RUNNING"),
-    },
-    { field: "committedBatches", headerName: "Committed batches", width: 170 },
-    { field: "quarantineFiles", headerName: "Quarantine files", width: 160 },
-    {
-      field: "lastBatchStatus",
-      headerName: "Last batch",
-      width: 130,
-      cellRenderer: (p: ICellRendererParams<RunStatus>) =>
-        p.value ? statusBadgeHtml(p.value) : "—",
-    },
-    {
-      field: "lastBatchId",
-      headerName: "Last batch id",
-      flex: 1,
-      valueFormatter: (p) => p.value ?? "—",
-    },
-    {
-      field: "lastBatchTime",
-      headerName: "Last batch time",
-      width: 180,
-      valueFormatter: (p) => fmtDateTime(p.value),
-    },
-  ];
+    readonly columnDefs: ColDef<RunStatus>[] = [
+        { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
+        {
+            field: 'paused',
+            headerName: 'State',
+            width: 110,
+            cellRenderer: (p: ICellRendererParams<RunStatus>) => statusBadgeHtml(p.value ? 'PAUSED' : 'RUNNING'),
+        },
+        { field: 'committedBatches', headerName: 'Committed batches', width: 170 },
+        { field: 'quarantineFiles', headerName: 'Quarantine files', width: 160 },
+        {
+            field: 'lastBatchStatus',
+            headerName: 'Last batch',
+            width: 130,
+            cellRenderer: (p: ICellRendererParams<RunStatus>) => (p.value ? statusBadgeHtml(p.value) : '—'),
+        },
+        {
+            field: 'lastBatchId',
+            headerName: 'Last batch id',
+            flex: 1,
+            valueFormatter: (p) => p.value ?? '—',
+        },
+        {
+            field: 'lastBatchTime',
+            headerName: 'Last batch time',
+            width: 180,
+            valueFormatter: (p) => fmtDateTime(p.value),
+        },
+    ];
 
-  readonly rowActions: InspectoRowAction<RunStatus>[] = [
-    {
-      // "Why is this red" (AGT-6a A4-status) — this row IS the pipeline's state, so it is the
-      // natural place to ask. No correlationId here, so the dialog takes the windowed path,
-      // focused on this pipeline. Ungated: reading state is not an authoring act.
-      icon: "heroicons_outline:information-circle",
-      hint: "What happened",
-      onClick: (r) =>
-        this.dialog.open(AiStatusDialog, {
-          data: {
-            label: r.pipeline,
-            pipelineId: r.pipeline,
-          } satisfies AiStatusData,
-        }),
-    },
-    {
-      icon: "heroicons_outline:rectangle-group",
-      hint: "Open provenance & lineage for this pipeline",
-      onClick: (r) => this.router.navigate(["/runs", r.pipeline]),
-    },
-  ];
+    readonly rowActions: InspectoRowAction<RunStatus>[] = [
+        {
+            // "Why is this red" (AGT-6a A4-status) — this row IS the pipeline's state, so it is the
+            // natural place to ask. No correlationId here, so the dialog takes the windowed path,
+            // focused on this pipeline. Ungated: reading state is not an authoring act.
+            icon: 'heroicons_outline:information-circle',
+            hint: 'What happened',
+            onClick: (r) =>
+                this.dialog.open(AiStatusDialog, {
+                    data: {
+                        label: r.pipeline,
+                        pipelineId: r.pipeline,
+                    } satisfies AiStatusData,
+                }),
+        },
+        {
+            icon: 'heroicons_outline:rectangle-group',
+            hint: 'Open provenance & lineage for this pipeline',
+            onClick: (r) => this.router.navigate(['/runs', r.pipeline]),
+        },
+    ];
 
-  ngOnInit(): void {
-    this.load();
-  }
+    ngOnInit(): void {
+        this.load();
+    }
 
-  load(): void {
-    this.loading = true;
-    this.api.status().subscribe({
-      next: (r) => {
-        this.report = r;
-        this.cards = [
-          { label: "Pipelines", value: String(r.pipelineCount) },
-          { label: "Paused", value: String(r.pausedCount) },
-          {
-            label: "Committed batches",
-            value: r.totalCommittedBatches.toLocaleString(),
-          },
-          { label: "Quarantine files", value: String(r.totalQuarantineFiles) },
-        ];
-        this.loading = false;
-      },
-      error: () => {
-        this.report = null;
-        this.cards = [];
-        this.loading = false;
-      },
-    });
-  }
+    load(): void {
+        this.loading = true;
+        this.api.status().subscribe({
+            next: (r) => {
+                this.report = r;
+                this.cards = [
+                    { label: 'Pipelines', value: String(r.pipelineCount) },
+                    { label: 'Paused', value: String(r.pausedCount) },
+                    {
+                        label: 'Committed batches',
+                        value: r.totalCommittedBatches.toLocaleString(),
+                    },
+                    { label: 'Quarantine files', value: String(r.totalQuarantineFiles) },
+                ];
+                this.loading = false;
+            },
+            error: () => {
+                this.report = null;
+                this.cards = [];
+                this.loading = false;
+            },
+        });
+    }
 }

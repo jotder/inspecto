@@ -55,7 +55,15 @@ describe('structural derivations', () => {
     });
 
     it('dashboard: tiles its widgets with stable tile anchors', () => {
-        expect(dashboardRefs({ tiles: [{ widgetId: 'a', span: 1 }, { widgetId: '', span: 1 }, { widgetId: 'b', span: 2 }] })).toEqual([
+        expect(
+            dashboardRefs({
+                tiles: [
+                    { widgetId: 'a', span: 1 },
+                    { widgetId: '', span: 1 },
+                    { widgetId: 'b', span: 2 },
+                ],
+            }),
+        ).toEqual([
             { kind: 'widget', id: 'a', rel: 'tiles', via: 'tile0' },
             { kind: 'widget', id: 'b', rel: 'tiles', via: 'tile2' },
         ]);
@@ -101,7 +109,16 @@ describe('structural derivations', () => {
             { kind: 'dashboard', id: 'audit_overview', rel: 'delivered-by', via: 'deliveredNote1' },
         ]);
         // Prose never becomes an edge — even prose containing a slash token.
-        for (const prose of [undefined, '', 'shipped in Q3', 'reused pipelines/orders rework', 'a/b then c', 'kind/', '/id', 'kind/a/b']) {
+        for (const prose of [
+            undefined,
+            '',
+            'shipped in Q3',
+            'reused pipelines/orders rework',
+            'a/b then c',
+            'kind/',
+            '/id',
+            'kind/a/b',
+        ]) {
             expect(requirementRefs({ deliveredNote: prose })).toEqual([]);
         }
     });

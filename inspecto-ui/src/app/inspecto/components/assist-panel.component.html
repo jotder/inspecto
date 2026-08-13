@@ -27,8 +27,7 @@
         <div class="flex flex-col gap-2">
             <p class="font-medium">{{ result.answer }}</p>
             <p class="text-secondary text-sm">
-                status <b>{{ result.status }}</b> ·
-                confidence {{ (result.confidence * 100).toFixed(0) }}% ·
+                status <b>{{ result.status }}</b> · confidence {{ (result.confidence * 100).toFixed(0) }}% ·
                 {{ result.validated ? 'validated' : 'unvalidated' }}
                 @if (!result.applyVia) {
                     <span>· draft only</span>
@@ -101,7 +100,9 @@
             <!-- raw fallback -->
             <details>
                 <summary class="text-secondary cursor-pointer text-sm">Raw data</summary>
-                <pre class="overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{ pretty(result.data) }}</pre>
+                <pre class="overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{
+                    pretty(result.data)
+                }}</pre>
             </details>
         </div>
     }

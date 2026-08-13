@@ -6,7 +6,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ExchangeService, LensService, parseSharedRef, SessionService, SpacesService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    ExchangeService,
+    LensService,
+    parseSharedRef,
+    SessionService,
+    SpacesService,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { OfferShareDialog, OfferShareResult } from 'app/inspecto/components/offer-share.dialog';
@@ -71,7 +78,9 @@ export class DatasetsComponent implements OnInit {
     });
 
     /** The filtered datasets as transfer references — what the export/import menu offers. */
-    readonly transferItems = computed(() => this.visibleDatasets().map((d) => ({ kind: 'dataset' as const, id: d.id })));
+    readonly transferItems = computed(() =>
+        this.visibleDatasets().map((d) => ({ kind: 'dataset' as const, id: d.id })),
+    );
 
     ngOnInit(): void {
         this.load();
@@ -158,10 +167,7 @@ export class DatasetsComponent implements OnInit {
     }
 
     async remove(d: Dataset): Promise<void> {
-        if (
-            !(await this.confirm.confirmDestructive(`Delete dataset "${d.id}"?`, { title: 'Delete dataset' }))
-        )
-            return;
+        if (!(await this.confirm.confirmDestructive(`Delete dataset "${d.id}"?`, { title: 'Delete dataset' }))) return;
         this.api.remove(d.id).subscribe({
             next: () => {
                 this.toastr.success(`Dataset "${d.id}" deleted`);

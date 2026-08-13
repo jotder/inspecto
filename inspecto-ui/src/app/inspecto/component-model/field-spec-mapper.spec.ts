@@ -8,8 +8,11 @@ describe('fieldSpecsToAttributes', () => {
             { path: 'delimited.has_header', label: 'Header', type: 'BOOL', defaultValue: true },
             { path: 'fixedwidth.min_record_length', label: 'Min length', type: 'INT' },
             {
-                path: 'fixedwidth.trim', label: 'Trim', type: 'ENUM',
-                enumValues: ['BOTH', 'NONE'], defaultValue: 'BOTH',
+                path: 'fixedwidth.trim',
+                label: 'Trim',
+                type: 'ENUM',
+                enumValues: ['BOTH', 'NONE'],
+                defaultValue: 'BOTH',
             },
             { path: 'text_regex.pattern', label: 'Pattern', type: 'STRING', required: true },
         ]);

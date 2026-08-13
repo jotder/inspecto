@@ -1,8 +1,4 @@
-import type {
-    ExchangeFreshness,
-    ExchangeGrant,
-    ExchangeOffer,
-} from '../../api/exchange.service';
+import type { ExchangeFreshness, ExchangeGrant, ExchangeOffer } from '../../api/exchange.service';
 import type { Space } from '../../api/spaces.service';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
@@ -112,11 +108,7 @@ function putOffer(store: MockStore, b: OfferBody): ReturnType<typeof json> {
     if (bad) return bad;
     const { kind, owner, item } = b as Required<Pick<OfferBody, 'kind' | 'owner' | 'item'>>;
 
-    const component = store.get<{ content?: Record<string, unknown> }>(
-        owner,
-        componentCollection(kind),
-        item,
-    );
+    const component = store.get<{ content?: Record<string, unknown> }>(owner, componentCollection(kind), item);
     if (!component) return error(404, `no ${kind} '${item}' in space '${owner}'`);
 
     // A derived kind shares render-only; every Dataset it reads must already be offered by the same
@@ -166,11 +158,7 @@ function refresh(store: MockStore, b: OfferBody): ReturnType<typeof json> {
 }
 
 function withFreshness(store: MockStore, offer: ExchangeOffer): ExchangeOffer {
-    const meta = store.get<ExchangeFreshness>(
-        SERVER_SPACE,
-        EXCHANGE_SNAPSHOTS_COLL,
-        `${offer.owner}~${offer.item}`,
-    );
+    const meta = store.get<ExchangeFreshness>(SERVER_SPACE, EXCHANGE_SNAPSHOTS_COLL, `${offer.owner}~${offer.item}`);
     return meta ? { ...offer, freshness: meta } : offer;
 }
 
@@ -195,7 +183,10 @@ function requestGrant(store: MockStore, b: RequestBody): ReturnType<typeof json>
     // A saved view holds no rows, so snapshot delivery is meaningless: reject an explicit non-live mode
     // rather than silently coercing it (D9). An omitted mode defaults to live for a view.
     if (kind === VIEW && b.mode && b.mode !== 'live') {
-        return error(422, `a ${VIEW} grant is live-mode only (mode '${b.mode}' rejected: a saved view has no rows of its own to snapshot)`);
+        return error(
+            422,
+            `a ${VIEW} grant is live-mode only (mode '${b.mode}' rejected: a saved view has no rows of its own to snapshot)`,
+        );
     }
 
     const grant = newGrant(id, kind, item, owner, consumer, b);
@@ -207,15 +198,24 @@ function requestGrant(store: MockStore, b: RequestBody): ReturnType<typeof json>
             const dgid = `${consumer}~${owner}~dataset~${ds}`;
             const pair = store.get<ExchangeGrant>(SERVER_SPACE, EXCHANGE_GRANTS_COLL, dgid);
             if (pair?.status !== 'active' && pair?.status !== 'requested') {
-                store.put(SERVER_SPACE, EXCHANGE_GRANTS_COLL, dgid,
-                    { ...newGrant(dgid, 'dataset', ds, owner, consumer, b), mode: grant.mode });
+                store.put(SERVER_SPACE, EXCHANGE_GRANTS_COLL, dgid, {
+                    ...newGrant(dgid, 'dataset', ds, owner, consumer, b),
+                    mode: grant.mode,
+                });
             }
         }
     }
     return json(grant);
 }
 
-function newGrant(id: string, kind: string, item: string, owner: string, consumer: string, b: RequestBody): ExchangeGrant {
+function newGrant(
+    id: string,
+    kind: string,
+    item: string,
+    owner: string,
+    consumer: string,
+    b: RequestBody,
+): ExchangeGrant {
     return {
         id,
         kind: kind as ExchangeGrant['kind'],
@@ -252,8 +252,10 @@ function actOnGrant(store: MockStore, id: string, action: string): ReturnType<ty
         // so revoking any one of a view's datasets closes the view.
         for (const w of store.list<ExchangeGrant>(SERVER_SPACE, EXCHANGE_GRANTS_COLL)) {
             if (
-                isDerived(w.kind) && w.status === 'active' &&
-                w.owner === g.owner && w.consumer === g.consumer &&
+                isDerived(w.kind) &&
+                w.status === 'active' &&
+                w.owner === g.owner &&
+                w.consumer === g.consumer &&
                 boundDatasets(store, w.owner, w.kind, w.item).includes(g.item)
             ) {
                 transition(store, w.id, 'active', 'revoked', false);
@@ -284,11 +286,7 @@ function transition(
     return { grant: store.put(SERVER_SPACE, EXCHANGE_GRANTS_COLL, id, next) };
 }
 
-function mutateGrant(
-    store: MockStore,
-    id: string,
-    fn: (g: ExchangeGrant) => ExchangeGrant,
-): ReturnType<typeof json> {
+function mutateGrant(store: MockStore, id: string, fn: (g: ExchangeGrant) => ExchangeGrant): ReturnType<typeof json> {
     const g = store.get<ExchangeGrant>(SERVER_SPACE, EXCHANGE_GRANTS_COLL, id);
     if (!g) return error(404, `no such grant '${id}'`);
     return json(store.put(SERVER_SPACE, EXCHANGE_GRANTS_COLL, id, fn(g)));
@@ -371,8 +369,9 @@ function sharedMapping(owner: string, mapping: unknown): unknown {
 function canRender(store: MockStore, consumer: string, owner: string, kind: string, item: string): boolean {
     if (!effectivelyActive(store, `${consumer}~${owner}~${kind}~${item}`)) return false;
     const datasets = boundDatasets(store, owner, kind, item);
-    return datasets.length > 0
-        && datasets.every((ds) => effectivelyActive(store, `${consumer}~${owner}~dataset~${ds}`));
+    return (
+        datasets.length > 0 && datasets.every((ds) => effectivelyActive(store, `${consumer}~${owner}~dataset~${ds}`))
+    );
 }
 
 /** Active and not past expiry — the single fail-closed gate (mirrors `Exchange.effectivelyActive`). */
@@ -428,9 +427,11 @@ function noBindingMessage(kind: string, item: string, content: Record<string, un
     if (kind !== VIEW) return `${kind} '${item}' has no dataset binding to share`;
     const source = content['sourceId'];
     if (source !== 'entity-projection') {
-        return `only an entity-projection saved view can be shared (its mappings name Datasets); view `
-            + `'${item}' reads the '${source ?? 'unset'}' source, whose roots are Pipelines/catalog assets `
-            + `the Exchange cannot grant`;
+        return (
+            `only an entity-projection saved view can be shared (its mappings name Datasets); view ` +
+            `'${item}' reads the '${source ?? 'unset'}' source, whose roots are Pipelines/catalog assets ` +
+            `the Exchange cannot grant`
+        );
     }
     return `saved view '${item}' has no dataset mappings (query.projection/query.projections) to share`;
 }
@@ -445,7 +446,8 @@ function validate(store: MockStore, b: OfferBody): ReturnType<typeof error> | nu
     }
     if (!b.owner) return error(400, `'owner' must be a valid space id`);
     if (!spaceExists(store, b.owner)) return error(404, `no such space '${b.owner}'`);
-    if (!b.item || b.item.includes('..') || !ITEM_ID.test(b.item)) return error(400, `'item' must be a valid component id`);
+    if (!b.item || b.item.includes('..') || !ITEM_ID.test(b.item))
+        return error(400, `'item' must be a valid component id`);
     return null;
 }
 
@@ -497,44 +499,78 @@ function ensureSeed(store: MockStore): void {
 
     const offers: ExchangeOffer[] = [
         {
-            kind: 'dataset', item: 'fx_rates_daily', owner: 'analytics-hub',
+            kind: 'dataset',
+            item: 'fx_rates_daily',
+            owner: 'analytics-hub',
             description: 'Daily FX reference rates, one row per currency pair per day.',
-            resultSet: {}, offeredBy: 'analyst', offeredAt: now - 30 * 86_400_000, datasets: [],
+            resultSet: {},
+            offeredBy: 'analyst',
+            offeredAt: now - 30 * 86_400_000,
+            datasets: [],
         },
         {
-            kind: 'dataset', item: 'customer_segments', owner: 'analytics-hub',
+            kind: 'dataset',
+            item: 'customer_segments',
+            owner: 'analytics-hub',
             description: 'Curated customer segmentation (refreshed weekly).',
-            resultSet: {}, offeredBy: 'analyst', offeredAt: now - 14 * 86_400_000, datasets: [],
+            resultSet: {},
+            offeredBy: 'analyst',
+            offeredAt: now - 14 * 86_400_000,
+            datasets: [],
         },
         {
-            kind: 'dataset', item: 'billing_summary', owner: 'default',
+            kind: 'dataset',
+            item: 'billing_summary',
+            owner: 'default',
             description: 'Monthly billing rollup by account.',
-            resultSet: {}, offeredBy: 'appUser', offeredAt: now - 7 * 86_400_000, datasets: [],
+            resultSet: {},
+            offeredBy: 'appUser',
+            offeredAt: now - 7 * 86_400_000,
+            datasets: [],
         },
     ];
     for (const o of offers) store.put(SERVER_SPACE, EXCHANGE_OFFERS_COLL, `${o.owner}~${o.kind}~${o.item}`, o);
 
     store.put<ExchangeFreshness>(SERVER_SPACE, EXCHANGE_SNAPSHOTS_COLL, 'analytics-hub~fx_rates_daily', {
-        version: 'v3', rows: 48210, refreshedAt: new Date(now - 86_400_000).toISOString(), columns: [],
+        version: 'v3',
+        rows: 48210,
+        refreshedAt: new Date(now - 86_400_000).toISOString(),
+        columns: [],
     });
 
     const grants: ExchangeGrant[] = [
         {
             id: 'default~analytics-hub~dataset~fx_rates_daily',
-            kind: 'dataset', item: 'fx_rates_daily', owner: 'analytics-hub', consumer: 'default',
-            mode: 'snapshot', status: 'active',
-            requestedBy: 'appUser', requestedAt: now - 20 * 86_400_000,
+            kind: 'dataset',
+            item: 'fx_rates_daily',
+            owner: 'analytics-hub',
+            consumer: 'default',
+            mode: 'snapshot',
+            status: 'active',
+            requestedBy: 'appUser',
+            requestedAt: now - 20 * 86_400_000,
             purpose: 'Currency normalization in billing pipelines.',
             // Pinned to v2 while the owner has published v3 → a "Behind" drift chip in the with-me grid.
-            approvedBy: 'analyst', approvedAt: now - 19 * 86_400_000, pin: 'v2', expiresAt: null,
+            approvedBy: 'analyst',
+            approvedAt: now - 19 * 86_400_000,
+            pin: 'v2',
+            expiresAt: null,
         },
         {
             id: 'analytics-hub~default~dataset~billing_summary',
-            kind: 'dataset', item: 'billing_summary', owner: 'default', consumer: 'analytics-hub',
-            mode: 'snapshot', status: 'requested',
-            requestedBy: 'analyst', requestedAt: now - 2 * 86_400_000,
+            kind: 'dataset',
+            item: 'billing_summary',
+            owner: 'default',
+            consumer: 'analytics-hub',
+            mode: 'snapshot',
+            status: 'requested',
+            requestedBy: 'analyst',
+            requestedAt: now - 2 * 86_400_000,
             purpose: 'Cross-checking revenue attribution.',
-            approvedBy: null, approvedAt: 0, pin: null, expiresAt: null,
+            approvedBy: null,
+            approvedAt: 0,
+            pin: null,
+            expiresAt: null,
         },
     ];
     for (const g of grants) store.put(SERVER_SPACE, EXCHANGE_GRANTS_COLL, g.id, g);

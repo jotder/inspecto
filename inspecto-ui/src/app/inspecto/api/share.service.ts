@@ -5,36 +5,36 @@ import { apiUrl } from './api-base';
 
 /** One shared component as the public endpoint returns it: id + raw content (typed by the feature side). */
 export interface SharedComponent {
-  id: string;
-  content: Record<string, unknown>;
+    id: string;
+    content: Record<string, unknown>;
 }
 
 /** `GET /public/dashboards/{token}` — the shared dashboard, its widgets, and the link's expiry. */
 export interface SharedDashboard {
-  dashboard: SharedComponent;
-  widgets: SharedComponent[];
-  expiresAt: string;
+    dashboard: SharedComponent;
+    widgets: SharedComponent[];
+    expiresAt: string;
 }
 
 /** One measure of a public BI query (the backend's validated agg/field pair — never SQL text). */
 export interface PublicMeasure {
-  agg: string;
-  field?: string;
+    agg: string;
+    field?: string;
 }
 
 /** The `POST /public/dashboards/{token}/query` body — the /bi/query spec, fenced to the share's datasets. */
 export interface PublicQueryBody {
-  dataset: string;
-  measures?: PublicMeasure[];
-  groupBy?: string[];
-  orderBy?: { field: string; dir: 'asc' | 'desc' }[];
-  limit?: number;
+    dataset: string;
+    measures?: PublicMeasure[];
+    groupBy?: string[];
+    orderBy?: { field: string; dir: 'asc' | 'desc' }[];
+    limit?: number;
 }
 
 export interface PublicQueryResult {
-  rows: Record<string, unknown>[];
-  rowCount: number;
-  truncated: boolean;
+    rows: Record<string, unknown>[];
+    rowCount: number;
+    truncated: boolean;
 }
 
 /**
@@ -45,16 +45,18 @@ export interface PublicQueryResult {
  */
 @Injectable({ providedIn: 'root' })
 export class ShareService {
-  private http = inject(HttpClient);
+    private http = inject(HttpClient);
 
-  /** Resolve a share token to its dashboard + widget definitions (read-only). */
-  resolve(token: string): Observable<SharedDashboard> {
-    return this.http.get<SharedDashboard>(apiUrl('/public/dashboards/' + encodeURIComponent(token)));
-  }
+    /** Resolve a share token to its dashboard + widget definitions (read-only). */
+    resolve(token: string): Observable<SharedDashboard> {
+        return this.http.get<SharedDashboard>(apiUrl('/public/dashboards/' + encodeURIComponent(token)));
+    }
 
-  /** Run one widget's aggregation, fenced server-side to the datasets the shared dashboard references. */
-  query(token: string, body: PublicQueryBody): Observable<PublicQueryResult> {
-    return this.http.post<PublicQueryResult>(
-      apiUrl('/public/dashboards/' + encodeURIComponent(token) + '/query'), body);
-  }
+    /** Run one widget's aggregation, fenced server-side to the datasets the shared dashboard references. */
+    query(token: string, body: PublicQueryBody): Observable<PublicQueryResult> {
+        return this.http.post<PublicQueryResult>(
+            apiUrl('/public/dashboards/' + encodeURIComponent(token) + '/query'),
+            body,
+        );
+    }
 }

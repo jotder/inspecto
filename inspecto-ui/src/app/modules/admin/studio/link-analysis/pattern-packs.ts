@@ -46,11 +46,14 @@ export function patternPackFromContent(content: Record<string, unknown>): Patter
         const direction = (s as Record<string, unknown>)?.['direction'];
         return DIRECTIONS.has(direction as NonNullable<PatternStep['direction']>)
             ? { direction: direction as PatternStep['direction'] }
-            : {};   // blank / unknown ⇒ wildcard, the start node's shape
+            : {}; // blank / unknown ⇒ wildcard, the start node's shape
     });
     const tool = content['tool'] as NonNullable<PatternPack['tool']>;
     return {
-        id, label, category, steps,
+        id,
+        label,
+        category,
+        steps,
         description: typeof content['description'] === 'string' ? content['description'] : '',
         ...(TOOLS.has(tool) ? { tool } : {}),
     };
@@ -61,21 +64,24 @@ export const PATTERN_PACKS: PatternPack[] = [
         id: 'layering-chain',
         label: 'Layering chain',
         category: 'money',
-        description: 'Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering.',
+        description:
+            'Funds relayed through a chain of intermediaries (A → B → C → D) to obscure origin — classic placement/layering.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }, { direction: 'out' }],
     },
     {
         id: 'pass-through',
         label: 'Pass-through intermediary',
         category: 'money',
-        description: 'A single intermediary that receives then forwards (A → M → B). Inspect the middle node — it is the mule/shell to scrutinize.',
+        description:
+            'A single intermediary that receives then forwards (A → M → B). Inspect the middle node — it is the mule/shell to scrutinize.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
     },
     {
         id: 'inbound-collector',
         label: 'Inbound collector',
         category: 'money',
-        description: 'Many parties converging INTO one account (they → M → target). Start from the collector and follow incoming links.',
+        description:
+            'Many parties converging INTO one account (they → M → target). Start from the collector and follow incoming links.',
         steps: [{}, { direction: 'in' }, { direction: 'in' }],
     },
     {
@@ -89,7 +95,8 @@ export const PATTERN_PACKS: PatternPack[] = [
         id: 'circular-flow',
         label: 'Circular flow',
         category: 'money',
-        description: 'Value or calls returning to their origin (A → … → A). Use the Cycles tool — a closed loop is not a simple path motif.',
+        description:
+            'Value or calls returning to their origin (A → … → A). Use the Cycles tool — a closed loop is not a simple path motif.',
         steps: [{}, { direction: 'out' }, { direction: 'out' }],
         tool: 'cycles',
     },
@@ -97,7 +104,8 @@ export const PATTERN_PACKS: PatternPack[] = [
         id: 'shared-associates',
         label: 'Shared associates',
         category: 'identity',
-        description: 'Distinct identities that share the same devices/accounts. Use Similarity from a seed node, or Cohesive groups for the whole ring.',
+        description:
+            'Distinct identities that share the same devices/accounts. Use Similarity from a seed node, or Cohesive groups for the whole ring.',
         steps: [{}, { direction: 'both' }],
         tool: 'similarity',
     },

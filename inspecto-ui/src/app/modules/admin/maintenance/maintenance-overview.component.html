@@ -3,8 +3,8 @@
         <div>
             <h1 class="text-2xl font-semibold">System Maintenance — Overview</h1>
             <p class="text-secondary mt-1">
-                Platform health, the maintenance job fleet, and storage — observation only; author jobs in
-                Workbench → Jobs.
+                Platform health, the maintenance job fleet, and storage — observation only; author jobs in Workbench →
+                Jobs.
             </p>
         </div>
         <button mat-stroked-button aria-label="Refresh maintenance overview" (click)="refresh()">
@@ -20,7 +20,8 @@
             <inspecto-empty-state
                 icon="heroicons_outline:heart"
                 title="Health details unavailable"
-                [message]="healthError()!" />
+                [message]="healthError()!"
+            />
         } @else if (!health()) {
             <inspecto-skeleton [lines]="3" />
         } @else {
@@ -54,7 +55,8 @@
             [loading]="loading()"
             [autoHeight]="true"
             noRowsTitle="No maintenance jobs"
-            noRowsHint="Author maintenance jobs (cleanup, backup, audits) in Workbench → Jobs." />
+            noRowsHint="Author maintenance jobs (cleanup, backup, audits) in Workbench → Jobs."
+        />
     </section>
 
     <!-- Recent failed maintenance runs -->
@@ -70,7 +72,8 @@
                 [columns]="failedRunColumns"
                 [autoHeight]="true"
                 noRowsTitle="No failed maintenance runs"
-                noRowsHint="Failures and rejections of maintenance jobs land here (and fire alertable signals)." />
+                noRowsHint="Failures and rejections of maintenance jobs land here (and fire alertable signals)."
+            />
         }
     </section>
 
@@ -79,8 +82,8 @@
         <h2 id="mnt-storage" class="text-lg font-medium mb-3">Storage</h2>
         @if (storageAxes().length === 0) {
             <p class="text-secondary text-sm">
-                No storage report yet — add a <span class="font-mono">storage_report</span> maintenance job to
-                populate this section.
+                No storage report yet — add a <span class="font-mono">storage_report</span> maintenance job to populate
+                this section.
             </p>
         } @else {
             <ul class="flex flex-col gap-1">

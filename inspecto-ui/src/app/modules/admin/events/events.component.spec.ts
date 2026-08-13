@@ -108,7 +108,9 @@ describe('EventsComponent', () => {
         c.applyView('errors');
         expect(c.fLevel).toBe('ERROR');
         expect(c.fPipeline).toBe('cdr_ingest');
-        expect(api.search).toHaveBeenLastCalledWith(expect.objectContaining({ level: 'ERROR', pipeline: 'cdr_ingest' }));
+        expect(api.search).toHaveBeenLastCalledWith(
+            expect.objectContaining({ level: 'ERROR', pipeline: 'cdr_ingest' }),
+        );
     });
 
     it('clearing the correlation chip re-runs the query without it', async () => {

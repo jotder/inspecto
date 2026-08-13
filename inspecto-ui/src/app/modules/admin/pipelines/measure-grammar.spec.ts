@@ -45,12 +45,15 @@ describe('measure grammar', () => {
         });
 
         it('rejects a measure with no call brackets', () => {
-            expect(measureError('sum amount')).toBe('"sum amount" must be count or agg(column) — for example sum(amount)');
+            expect(measureError('sum amount')).toBe(
+                '"sum amount" must be count or agg(column) — for example sum(amount)',
+            );
             expect(measureError('total')).toBe('"total" must be count or agg(column) — for example sum(amount)');
         });
 
         it('rejects a field that is not a single SQL-safe identifier', () => {
-            const expected = (m: string) => `"${m}" needs a single column name in the brackets, starting with a letter or _`;
+            const expected = (m: string) =>
+                `"${m}" needs a single column name in the brackets, starting with a letter or _`;
             expect(measureError('sum(a, b)')).toBe(expected('sum(a, b)'));
             expect(measureError('sum(amount * 2)')).toBe(expected('sum(amount * 2)'));
             expect(measureError('sum(1amount)')).toBe(expected('sum(1amount)'));
@@ -138,7 +141,9 @@ describe('measure grammar', () => {
 
         it('reports the first offending entry as a verbatim message', () => {
             const result = validator(new FormControl(['region', 'region name', '1bad']));
-            expect(result).toEqual({ message: '"region name" must be a single column name, starting with a letter or _' });
+            expect(result).toEqual({
+                message: '"region name" must be a single column name, starting with a letter or _',
+            });
         });
 
         it('ignores a null/absent value — required owns emptiness', () => {

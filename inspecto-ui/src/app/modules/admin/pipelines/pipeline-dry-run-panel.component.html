@@ -7,9 +7,7 @@
         <mat-label>Sample rows (JSON array)</mat-label>
         <textarea matInput rows="3" [formControl]="sampleText"></textarea>
     </mat-form-field>
-    <button class="mt-2" mat-flat-button color="primary" [disabled]="!pipelineId()" (click)="run()">
-        Run dry-run
-    </button>
+    <button class="mt-2" mat-flat-button color="primary" [disabled]="!pipelineId()" (click)="run()">Run dry-run</button>
     @if (error()) {
         <p class="mt-2 text-sm" role="alert" style="color: var(--gamma-warn)">{{ error() }}</p>
     }

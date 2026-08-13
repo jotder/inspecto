@@ -1,7 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
-    GeoData, GeoPoint, GeoProjection, GeoQuery, GeoRoute, GeoSource, RouteProjection, validCoordinate,
+    GeoData,
+    GeoPoint,
+    GeoProjection,
+    GeoQuery,
+    GeoRoute,
+    GeoSource,
+    RouteProjection,
+    validCoordinate,
 } from 'app/inspecto/geo';
 import { GeoProjectionResult, GeoService } from 'app/inspecto/api';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
@@ -119,8 +126,10 @@ export function projectRoutes(rows: Record<string, unknown>[], p: RouteProjectio
     };
 
     for (const row of rows) {
-        const aLat = coord(row[p.fromLatCol]), aLon = coord(row[p.fromLonCol]);
-        const bLat = coord(row[p.toLatCol]), bLon = coord(row[p.toLonCol]);
+        const aLat = coord(row[p.fromLatCol]),
+            aLon = coord(row[p.fromLonCol]);
+        const bLat = coord(row[p.toLatCol]),
+            bLon = coord(row[p.toLonCol]);
         if (!validCoordinate(aLat, aLon) || !validCoordinate(bLat, bLon)) {
             skipped++;
             continue;
@@ -146,9 +155,22 @@ export function projectRoutes(rows: Record<string, unknown>[], p: RouteProjectio
 function foldServerResult(res: GeoProjectionResult): ProjectedGeo {
     return {
         points: res.points.map((p) => ({
-            id: p.id, lat: p.lat, lon: p.lon, kind: p.kind, label: p.label, time: p.time, attrs: p.attrs,
+            id: p.id,
+            lat: p.lat,
+            lon: p.lon,
+            kind: p.kind,
+            label: p.label,
+            time: p.time,
+            attrs: p.attrs,
         })),
-        routes: res.routes.map((r) => ({ id: r.id, from: r.from, to: r.to, kind: r.kind, label: r.kind, weight: r.weight })),
+        routes: res.routes.map((r) => ({
+            id: r.id,
+            from: r.from,
+            to: r.to,
+            kind: r.kind,
+            label: r.kind,
+            weight: r.weight,
+        })),
         truncated: res.truncated,
         skipped: res.skipped,
     };
@@ -158,21 +180,26 @@ function foldServerResult(res: GeoProjectionResult): ProjectedGeo {
 export class DatasetGeoSource implements GeoSource {
     readonly id = 'dataset' as const;
     readonly label = 'Locations (from a Dataset)';
-    constructor(private datasets: DatasetsService, private geo: GeoService) {}
+    constructor(
+        private datasets: DatasetsService,
+        private geo: GeoService,
+    ) {}
 
     async query(q: GeoQuery): Promise<ProjectedGeo> {
         const p = q.projection;
         if (!p?.datasetId) throw new Error('The dataset source needs a Dataset mapping.');
         if (!p.latCol || !p.lonCol) throw new Error('The mapping needs a latitude and a longitude column.');
         try {
-            const res = await firstValueFrom(this.geo.project({
-                dataset: p.datasetId,
-                latCol: p.latCol,
-                lonCol: p.lonCol,
-                entityCol: p.entityCol || undefined,
-                kindCol: p.kindCol || undefined,
-                timeCol: p.timeCol || undefined,
-            }));
+            const res = await firstValueFrom(
+                this.geo.project({
+                    dataset: p.datasetId,
+                    latCol: p.latCol,
+                    lonCol: p.lonCol,
+                    entityCol: p.entityCol || undefined,
+                    kindCol: p.kindCol || undefined,
+                    timeCol: p.timeCol || undefined,
+                }),
+            );
             return foldServerResult(res);
         } catch {
             // Offline / mock (501) or an older backend: the original client-side sample fold.
@@ -188,7 +215,10 @@ export class DatasetGeoSource implements GeoSource {
 export class RouteProjectionGeoSource implements GeoSource {
     readonly id = 'od-routes' as const;
     readonly label = 'Routes (origin → destination)';
-    constructor(private datasets: DatasetsService, private geo: GeoService) {}
+    constructor(
+        private datasets: DatasetsService,
+        private geo: GeoService,
+    ) {}
 
     async query(q: GeoQuery): Promise<ProjectedGeo> {
         const p = q.routes;
@@ -197,16 +227,18 @@ export class RouteProjectionGeoSource implements GeoSource {
             throw new Error('The mapping needs origin and destination latitude/longitude columns.');
         }
         try {
-            const res = await firstValueFrom(this.geo.routes({
-                dataset: p.datasetId,
-                fromLatCol: p.fromLatCol,
-                fromLonCol: p.fromLonCol,
-                toLatCol: p.toLatCol,
-                toLonCol: p.toLonCol,
-                fromCol: p.fromCol || undefined,
-                toCol: p.toCol || undefined,
-                kindCol: p.kindCol || undefined,
-            }));
+            const res = await firstValueFrom(
+                this.geo.routes({
+                    dataset: p.datasetId,
+                    fromLatCol: p.fromLatCol,
+                    fromLonCol: p.fromLonCol,
+                    toLatCol: p.toLatCol,
+                    toLonCol: p.toLonCol,
+                    fromCol: p.fromCol || undefined,
+                    toCol: p.toCol || undefined,
+                    kindCol: p.kindCol || undefined,
+                }),
+            );
             return foldServerResult(res);
         } catch {
             // Offline / mock (501) or an older backend: the original client-side sample fold.

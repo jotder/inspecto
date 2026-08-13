@@ -1,5 +1,15 @@
 import { AuthoredPipeline } from 'app/inspecto/api';
-import { ComponentKind, Part, Ref, Wiring, getKind, hasEditorRoute, pipelineRefs, registerEditorRoute, registerKind } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    Part,
+    Ref,
+    Wiring,
+    getKind,
+    hasEditorRoute,
+    pipelineRefs,
+    registerEditorRoute,
+    registerKind,
+} from 'app/inspecto/component-model';
 
 /**
  * P2 of the component-model adoption plan: register the platform's **existing** kinds on the unified registry
@@ -25,7 +35,10 @@ export const SINK_KIND = atomicKind('sink', 'Writer');
 export const RULE_TEMPLATE_KIND = atomicKind('rule-template', 'Rule Template');
 // A Requirement joins the reuse-graph via its `delivered-by` ref (`requirementRefs`, C1 follow-up).
 // Its "editor" is the Requirements pane (dialog-based detail, no /:id route).
-export const REQUIREMENT_KIND: ComponentKind = { ...atomicKind('requirement', 'Requirement'), authoring: { editorKey: 'requirement' } };
+export const REQUIREMENT_KIND: ComponentKind = {
+    ...atomicKind('requirement', 'Requirement'),
+    authoring: { editorKey: 'requirement' },
+};
 
 const ATOMIC_KINDS: ComponentKind[] = [GRAMMAR_KIND, TRANSFORM_KIND, SINK_KIND, RULE_TEMPLATE_KIND, REQUIREMENT_KIND];
 

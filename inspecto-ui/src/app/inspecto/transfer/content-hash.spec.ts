@@ -6,8 +6,9 @@ describe('sha256Hex', () => {
         expect(sha256Hex('')).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
         expect(sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
         // crosses the 55/56-byte padding boundary (a second block)
-        expect(sha256Hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq'))
-            .toBe('248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
+        expect(sha256Hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq')).toBe(
+            '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
+        );
     });
 
     it('handles multi-byte UTF-8', () => {
@@ -44,7 +45,9 @@ describe('content-hash — UI↔backend conformance vectors', () => {
     });
 
     it('array order + booleans (parity: ContentHashTest.preservesArrayOrderAndBooleans)', () => {
-        expect(hashContent({ n: true, list: [3, 1, 2] })).toBe('052056fc446d4e0ac3678ab97574cf3cbfbaba11e668015db4c3f848b0ec2a0b');
+        expect(hashContent({ n: true, list: [3, 1, 2] })).toBe(
+            '052056fc446d4e0ac3678ab97574cf3cbfbaba11e668015db4c3f848b0ec2a0b',
+        );
     });
 
     describe('floating-point', () => {
@@ -53,12 +56,16 @@ describe('content-hash — UI↔backend conformance vectors', () => {
         // match ContentHashTest.matchesUiHashForNonIntegerFloats verbatim.
         it('agrees with the backend on realistic geo coordinates', () => {
             expect(canonicalJson({ lon: 88.89, lat: 23.04 })).toBe('{"lat":23.04,"lon":88.89}');
-            expect(hashContent({ lon: 88.89, lat: 23.04 })).toBe('54317338419e694fa0b603d0eb3bf179f0762f60c80f3d748d796e446b38ae93');
+            expect(hashContent({ lon: 88.89, lat: 23.04 })).toBe(
+                '54317338419e694fa0b603d0eb3bf179f0762f60c80f3d748d796e446b38ae93',
+            );
         });
 
         it('agrees on a bare double and a mix of fractional values', () => {
             expect(hashContent(3.14)).toBe('2efff1261c25d94dd6698ea1047f5c0a7107ca98b0a6c2427ee6614143500215');
-            expect(hashContent({ a: 0.1, b: 0.5, c: -2.5 })).toBe('0fb5c6cba126819f44b399eba37313188f6eb5bcb8831c2ec7f919e8b5b2f2ed');
+            expect(hashContent({ a: 0.1, b: 0.5, c: -2.5 })).toBe(
+                '0fb5c6cba126819f44b399eba37313188f6eb5bcb8831c2ec7f919e8b5b2f2ed',
+            );
         });
 
         it('KNOWN DIVERGENCE: an integer-valued double serializes without a decimal here (1.0 → "1")', () => {

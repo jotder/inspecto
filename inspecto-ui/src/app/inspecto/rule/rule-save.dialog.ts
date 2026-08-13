@@ -45,7 +45,8 @@ export interface RuleSaveData {
         <h2 mat-dialog-title>Save as rule</h2>
         <mat-dialog-content class="space-y-2">
             <p class="text-secondary text-xs">
-                Saves this query as a reusable rule template over <span class="font-mono">{{ data.sourceName }}</span>.
+                Saves this query as a reusable rule template over <span class="font-mono">{{ data.sourceName }}</span
+                >.
             </p>
             <form [formGroup]="form" (ngSubmit)="save()">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -66,7 +67,9 @@ export interface RuleSaveData {
                                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                                     <mat-label>
                                         <span class="font-mono">:{{ p.name }}</span>
-                                        <span class="text-secondary ml-1 text-xs">— {{ p.field }} {{ p.operator }}</span>
+                                        <span class="text-secondary ml-1 text-xs"
+                                            >— {{ p.field }} {{ p.operator }}</span
+                                        >
                                     </mat-label>
                                     <input matInput [formControlName]="p.name" />
                                 </mat-form-field>
@@ -77,13 +80,18 @@ export interface RuleSaveData {
             </form>
 
             <div class="mb-1 text-xs font-semibold uppercase tracking-wider opacity-60">SQL</div>
-            <pre class="max-h-40 overflow-auto rounded border p-2 font-mono text-xs"
-                 style="background: var(--gamma-bg-default); border-color: var(--gamma-border)">{{ data.paramSql || data.sql }}</pre>
+            <pre
+                class="max-h-40 overflow-auto rounded border p-2 font-mono text-xs"
+                style="background: var(--gamma-bg-default); border-color: var(--gamma-border)"
+                >{{ data.paramSql || data.sql }}</pre
+            >
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button type="button" mat-button mat-dialog-close>Cancel</button>
             <button type="button" mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
-                @if (saving()) { <mat-spinner diameter="16" class="mr-2"></mat-spinner> }
+                @if (saving()) {
+                    <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                }
                 <span>Save rule</span>
             </button>
         </mat-dialog-actions>

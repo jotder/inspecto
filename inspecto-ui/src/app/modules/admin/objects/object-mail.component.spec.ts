@@ -81,7 +81,12 @@ describe('ObjectMailComponent', () => {
         expect(counts.get('mine')).toBe(1); // i2 assigned to 'operator'
         expect(counts.get('escalated')).toBe(1); // i2 flag
         // Default folder is the Inbox (Identified).
-        expect(c.rows().map((o) => o.id).sort()).toEqual(['i1', 'i4']);
+        expect(
+            c
+                .rows()
+                .map((o) => o.id)
+                .sort(),
+        ).toEqual(['i1', 'i4']);
     });
 
     it('merges registry tags (zero-count) with tags derived from the rows, and filters by tag', async () => {
@@ -121,7 +126,9 @@ describe('ObjectMailComponent', () => {
 
     it('accept assigns me + transitions when the category is already set', async () => {
         const { c, api } = await create();
-        const categorized = incident('i9', 'IDENTIFIED', { attributes: { category: 'Security / Access / Expired credentials' } });
+        const categorized = incident('i9', 'IDENTIFIED', {
+            attributes: { category: 'Security / Access / Expired credentials' },
+        });
         c.accept([categorized]);
         expect(api.update).toHaveBeenCalledWith('i9', { assignee: 'operator' });
         expect(api.transition).toHaveBeenCalledWith('i9', 'accept', 'operator');

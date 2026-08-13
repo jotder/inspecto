@@ -9,7 +9,10 @@ import { PivotService } from './pivot.service';
 const DATA: ElementDetailData = {
     title: 'CELL-101',
     subtitle: 'entity',
-    rows: [{ label: 'Label', value: 'CELL-101' }, { label: 'Degree', value: '3' }],
+    rows: [
+        { label: 'Label', value: 'CELL-101' },
+        { label: 'Degree', value: '3' },
+    ],
     branch: 'collapse',
 };
 
@@ -35,9 +38,13 @@ describe('ElementDetailDialog', () => {
         const { fixture, ref } = create();
         const el = fixture.nativeElement as HTMLElement;
         expect(el.textContent).toContain('CELL-101');
-        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Collapse branch'))?.click();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Collapse branch'))
+            ?.click();
         expect(ref.close).toHaveBeenCalledWith('collapse');
-        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Focus'))?.click();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Focus'))
+            ?.click();
         expect(ref.close).toHaveBeenCalledWith('focus');
     });
 

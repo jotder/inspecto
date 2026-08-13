@@ -11,7 +11,15 @@ import { OnboardingPublishPaneComponent } from './publish-pane.component';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
-const WRITE_OK = { type: 'pipeline', written: true, path: 'x.toon', name: 'x', bytes: 1, overwritten: false, findings: [] };
+const WRITE_OK = {
+    type: 'pipeline',
+    written: true,
+    path: 'x.toon',
+    name: 'x',
+    bytes: 1,
+    overwritten: false,
+    findings: [],
+};
 const PENDING: InboxStatus = { pipeline: 'x', inbox: 'spaces/demo/data/inbox/orders_feed', pending: 2, running: false };
 
 const READY_CONFIG = {
@@ -24,7 +32,13 @@ const READY_CONFIG = {
 
 function create(
     config: Record<string, unknown>,
-    opts: { api?: Partial<ConfigService>; confirm?: boolean; runsApi?: Partial<RunsService>; datasets?: ComponentDef[]; components?: Partial<ComponentsService> } = {},
+    opts: {
+        api?: Partial<ConfigService>;
+        confirm?: boolean;
+        runsApi?: Partial<RunsService>;
+        datasets?: ComponentDef[];
+        components?: Partial<ComponentsService>;
+    } = {},
 ) {
     // Stage saves go through POST /config/patch — the mock's third arg is the block patch itself.
     const patch = vi.fn((_type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK));
@@ -32,7 +46,8 @@ function create(
     const components = {
         list: vi.fn(() => of(opts.datasets ?? [])),
         create: vi.fn((_t: string, c: Record<string, unknown>) =>
-            of({ type: 'dataset', name: String(c['id']), ref: `dataset/${c['id']}`, content: c } as ComponentDef)),
+            of({ type: 'dataset', name: String(c['id']), ref: `dataset/${c['id']}`, content: c } as ComponentDef),
+        ),
         ...opts.components,
     };
     TestBed.configureTestingModule({
@@ -44,7 +59,10 @@ function create(
             { provide: ConfigService, useValue: { patch, ...opts.api } },
             { provide: RunsService, useValue: { pending: vi.fn(() => of(PENDING)), ...opts.runsApi } },
             { provide: ComponentsService, useValue: components },
-            { provide: InspectoConfirmService, useValue: { confirm: confirmFn, confirmDestructive: vi.fn(() => Promise.resolve(true)) } },
+            {
+                provide: InspectoConfirmService,
+                useValue: { confirm: confirmFn, confirmDestructive: vi.fn(() => Promise.resolve(true)) },
+            },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
@@ -102,8 +120,11 @@ describe('OnboardingPublishPaneComponent', () => {
     });
 
     /** A go-live-ready config (all required stages + saved output), optionally reference-kind. */
-    const readyConfig = (extra: Record<string, unknown> = {}) =>
-        ({ ...READY_CONFIG, output: { format: 'PARQUET' }, ...extra });
+    const readyConfig = (extra: Record<string, unknown> = {}) => ({
+        ...READY_CONFIG,
+        output: { format: 'PARQUET' },
+        ...extra,
+    });
 
     it('going live on a Stream registers the Dataset over its store (split S1)', async () => {
         const { fixture, components } = create(readyConfig());
@@ -120,7 +141,9 @@ describe('OnboardingPublishPaneComponent', () => {
 
     it('skips registration when a dataset already points at the store, whatever its id', async () => {
         const existing: ComponentDef = {
-            type: 'dataset', name: 'orders_gold', ref: 'dataset/orders_gold',
+            type: 'dataset',
+            name: 'orders_gold',
+            ref: 'dataset/orders_gold',
             content: { name: 'Orders (gold)', physicalRef: 'orders_feed' },
         };
         const { fixture, components } = create(readyConfig(), { datasets: [existing] });

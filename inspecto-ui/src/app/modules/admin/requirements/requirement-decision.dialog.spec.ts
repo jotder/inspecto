@@ -17,7 +17,10 @@ function create(requirement = buildRequirement('Daily churn KPI', 'kpi', 'Track 
             { provide: MAT_DIALOG_DATA, useValue: requirement },
             { provide: MatDialogRef, useValue: ref },
             // The "Delivered via" picker's cross-kind suggestion sources.
-            { provide: ComponentsService, useValue: { list: (kind: string) => of(kind === 'dashboard' ? [{ name: 'churn_kpi' }] : []) } },
+            {
+                provide: ComponentsService,
+                useValue: { list: (kind: string) => of(kind === 'dashboard' ? [{ name: 'churn_kpi' }] : []) },
+            },
             { provide: RunsService, useValue: { list: () => of([{ name: 'cdr_ingest' }]) } },
             { provide: JobsService, useValue: { list: () => of([]) } },
             { provide: DecisionRulesService, useValue: { list: () => of([]) } },
@@ -34,7 +37,9 @@ describe('RequirementDecisionDialog', () => {
     it('shows Accept/Reject for a submitted requirement in the default (Builder) lens', () => {
         const { fixture, ref } = create();
         const el = fixture.nativeElement as HTMLElement;
-        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Accept'))?.click();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Accept'))
+            ?.click();
         const result = ref.close.mock.calls[0][0] as RequirementDecisionResult;
         expect(result).toEqual({ action: 'decide', accept: true, note: undefined });
     });
@@ -42,7 +47,9 @@ describe('RequirementDecisionDialog', () => {
     it('shows Mark delivered for an accepted requirement', () => {
         const { fixture, ref } = create(decideRequirement(buildRequirement('x', 'kpi', 'y'), true));
         const el = fixture.nativeElement as HTMLElement;
-        Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('Mark delivered'))?.click();
+        Array.from(el.querySelectorAll('button'))
+            .find((b) => b.textContent?.includes('Mark delivered'))
+            ?.click();
         expect(ref.close).toHaveBeenCalledWith({ action: 'deliver', note: undefined });
     });
 
@@ -57,7 +64,8 @@ describe('RequirementDecisionDialog', () => {
 
         c.note.setValue('dashboard/churn_kpi');
         Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-            .find((b) => b.textContent?.includes('Mark delivered'))?.click();
+            .find((b) => b.textContent?.includes('Mark delivered'))
+            ?.click();
         expect(ref.close).toHaveBeenCalledWith({ action: 'deliver', note: 'dashboard/churn_kpi' });
     });
 

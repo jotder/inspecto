@@ -57,7 +57,8 @@ export interface TagAssignmentData {
         <h2 mat-dialog-title>Tags</h2>
         <mat-dialog-content class="w-[26rem] max-w-full">
             <div class="text-secondary mb-3 text-sm">
-                Tags on <strong>{{ data.label || data.targetId }}</strong>.
+                Tags on <strong>{{ data.label || data.targetId }}</strong
+                >.
             </div>
             @if (loading()) {
                 <div class="flex items-center gap-3 py-2 text-sm">
@@ -199,7 +200,11 @@ export class TagAssignmentDialog {
             of(null), // keeps forkJoin honest if one side is empty
         ]).subscribe({
             next: () => {
-                const result = [...this.tags().map((t) => t.name).filter((n) => this.isOn(n))].sort();
+                const result = [
+                    ...this.tags()
+                        .map((t) => t.name)
+                        .filter((n) => this.isOn(n)),
+                ].sort();
                 this.saving.set(false);
                 this.ref.close(result);
             },

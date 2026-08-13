@@ -5,20 +5,37 @@
         <span>{{ editing() ? id : 'New widget' }}</span>
     </nav>
     <div class="flex items-center justify-between">
-        <h1 class="text-3xl font-extrabold leading-tight tracking-tight">{{ editing() ? 'Edit widget' : 'Widget Builder' }}</h1>
+        <h1 class="text-3xl font-extrabold leading-tight tracking-tight">
+            {{ editing() ? 'Edit widget' : 'Widget Builder' }}
+        </h1>
         <div class="flex items-center gap-2">
-            <inspecto-transfer-menu [items]="transferItems" [allowedKinds]="['widget']" label="Import / export widget" />
+            <inspecto-transfer-menu
+                [items]="transferItems"
+                [allowedKinds]="['widget']"
+                label="Import / export widget"
+            />
             @if (editing()) {
                 <button mat-stroked-button (click)="history()">
                     <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:clock"></mat-icon>
                     <span>History</span>
                 </button>
             }
-            <button mat-icon-button (click)="openOptions()" [disabled]="viewBound() || !dataset() || !plugin()" matTooltip="Advanced options" aria-label="Advanced options">
+            <button
+                mat-icon-button
+                (click)="openOptions()"
+                [disabled]="viewBound() || !dataset() || !plugin()"
+                matTooltip="Advanced options"
+                aria-label="Advanced options"
+            >
                 <mat-icon svgIcon="heroicons_outline:cog"></mat-icon>
             </button>
             <button mat-button routerLink="/studio/widgets">Cancel</button>
-            <button mat-flat-button color="primary" (click)="save()" [disabled]="!plugin() || (viewBound() ? !viewId() : !dataset())">
+            <button
+                mat-flat-button
+                color="primary"
+                (click)="save()"
+                [disabled]="!plugin() || (viewBound() ? !viewId() : !dataset())"
+            >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
                 <span class="ml-2">Save widget</span>
             </button>
@@ -45,7 +62,9 @@
 
             <!-- Investigation views: bind a saved studio view (geo-map / link-analysis) instead of a dataset. -->
             <div>
-                <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Investigation views</div>
+                <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">
+                    Investigation views
+                </div>
                 <div class="flex flex-wrap gap-1">
                     @for (p of viewPlugins; track p.meta.type) {
                         <button
@@ -116,7 +135,12 @@
                     <div class="mb-2 flex items-center gap-2">
                         <h2 class="text-lg font-semibold">{{ p.meta.label }}</h2>
                     </div>
-                    <inspecto-viz-render [plugin]="p" [props]="props()" [title]="p.meta.label" [viewId]="viewId() || undefined" />
+                    <inspecto-viz-render
+                        [plugin]="p"
+                        [props]="props()"
+                        [title]="p.meta.label"
+                        [viewId]="viewId() || undefined"
+                    />
                 }
             } @else if (!dataset()) {
                 <div class="text-secondary flex h-64 items-center justify-center text-sm">
@@ -125,10 +149,19 @@
             } @else if (plugin(); as p) {
                 <div class="mb-2 flex items-center gap-2">
                     <h2 class="text-lg font-semibold">{{ options().title || p.meta.label }}</h2>
-                    @if (running()) { <span class="text-secondary text-xs">updating…</span> }
+                    @if (running()) {
+                        <span class="text-secondary text-xs">updating…</span>
+                    }
                 </div>
-                @if (options().subtitle) { <div class="text-secondary -mt-1 mb-2 text-sm">{{ options().subtitle }}</div> }
-                <inspecto-viz-render [plugin]="p" [props]="props()" [title]="sourceName()" [renderOptions]="options()" />
+                @if (options().subtitle) {
+                    <div class="text-secondary -mt-1 mb-2 text-sm">{{ options().subtitle }}</div>
+                }
+                <inspecto-viz-render
+                    [plugin]="p"
+                    [props]="props()"
+                    [title]="sourceName()"
+                    [renderOptions]="options()"
+                />
             }
         </div>
     </div>

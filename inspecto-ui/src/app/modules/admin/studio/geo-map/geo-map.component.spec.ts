@@ -16,7 +16,15 @@ import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 import { GeoMapService, GeoMapView } from './geo-map.service';
 
-const DS: Dataset = { id: 'towers-ds', name: 'Towers', kind: 'physical', sourceName: 'towers', columns: [], measures: [], calculated: [] };
+const DS: Dataset = {
+    id: 'towers-ds',
+    name: 'Towers',
+    kind: 'physical',
+    sourceName: 'towers',
+    columns: [],
+    measures: [],
+    calculated: [],
+};
 
 const GEO: ProjectedGeo = {
     points: [
@@ -39,7 +47,9 @@ const ROUTES_GEO: ProjectedGeo = {
     skipped: 0,
 };
 
-function create(opts: { fail?: boolean; views?: GeoMapView[]; geo?: ProjectedGeo; queryParams?: Record<string, string> } = {}) {
+function create(
+    opts: { fail?: boolean; views?: GeoMapView[]; geo?: ProjectedGeo; queryParams?: Record<string, string> } = {},
+) {
     const queried: unknown[] = [];
     const fakeSource: GeoSource = {
         id: 'dataset',
@@ -68,7 +78,10 @@ function create(opts: { fail?: boolean; views?: GeoMapView[]; geo?: ProjectedGeo
             { provide: GeoMapService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GeoSettingsService, useValue: { get: () => of({ tileServerUrl: null }) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
-            { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined, info: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { success: () => undefined, error: () => undefined, info: () => undefined },
+            },
             {
                 provide: ActivatedRoute,
                 useValue: { snapshot: { queryParamMap: convertToParamMap(opts.queryParams ?? {}) } },
@@ -132,7 +145,10 @@ describe('GeoMapComponent', () => {
 
     it('resolves an incoming investigation pivot against the loaded points (ui-design-review R8)', async () => {
         const geoWithRef: ProjectedGeo = {
-            points: [...GEO.points, { id: 'pt:case', lat: 10, lon: 20, kind: 'tower', label: 'T3', attrs: { caseId: 'case-1' } }],
+            points: [
+                ...GEO.points,
+                { id: 'pt:case', lat: 10, lon: 20, kind: 'tower', label: 'T3', attrs: { caseId: 'case-1' } },
+            ],
             routes: [],
             truncated: false,
             skipped: 0,
@@ -168,7 +184,13 @@ describe('GeoMapComponent', () => {
         fixture.detectChanges();
         const c = fixture.componentInstance;
         c.sourceId.set('od-routes');
-        c.queryForm.patchValue({ datasetId: 'towers-ds', fromLatCol: 'fa', fromLonCol: 'fo', toLatCol: 'ta', toLonCol: 'to' });
+        c.queryForm.patchValue({
+            datasetId: 'towers-ds',
+            fromLatCol: 'fa',
+            fromLonCol: 'fo',
+            toLatCol: 'ta',
+            toLonCol: 'to',
+        });
         await c.run();
         expect(c.geo()?.routes).toHaveLength(1);
         expect(c.querySummary()).toContain('→');
@@ -209,7 +231,9 @@ describe('GeoMapComponent', () => {
                     { id: 'p1', lat: 1, lon: 1, kind: 'x', label: 'P', time: 0 },
                     { id: 'p2', lat: 2, lon: 2, kind: 'x', label: 'P', time: 30_000 },
                 ],
-                routes: [], truncated: false, skipped: 0,
+                routes: [],
+                truncated: false,
+                skipped: 0,
             });
             c.togglePlay();
             expect(c.playing()).toBe(true);
@@ -303,7 +327,8 @@ describe('GeoMapComponent', () => {
         const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
 
         const openSpy = vi.spyOn(dialog, 'open').mockReturnValue({ afterClosed: () => of(undefined) } as never);
-        const dataOf = (call: number): ElementDetailData => (openSpy.mock.calls[call][1] as { data: ElementDetailData }).data;
+        const dataOf = (call: number): ElementDetailData =>
+            (openSpy.mock.calls[call][1] as { data: ElementDetailData }).data;
         c.onPointClick('pt:0'); // attrs: { site: 'T1' } — no case/incident reference
         expect(dataOf(0).objectRef).toBeUndefined();
         expect(dataOf(0).pivotViews).toBeUndefined();
@@ -318,8 +343,20 @@ describe('GeoMapComponent', () => {
 
     it('captures display mode with a saved view and restores a route view', async () => {
         const routeView: GeoMapView = {
-            id: 'corridors', name: 'Corridors', sourceId: 'od-routes', display: 'heatmap',
-            query: { routes: { datasetId: 'towers-ds', fromLatCol: 'fa', fromLonCol: 'fo', toLatCol: 'ta', toLonCol: 'to', kindCol: 'ch' } },
+            id: 'corridors',
+            name: 'Corridors',
+            sourceId: 'od-routes',
+            display: 'heatmap',
+            query: {
+                routes: {
+                    datasetId: 'towers-ds',
+                    fromLatCol: 'fa',
+                    fromLonCol: 'fo',
+                    toLatCol: 'ta',
+                    toLonCol: 'to',
+                    kindCol: 'ch',
+                },
+            },
         };
         const { fixture, save } = create({ views: [routeView] });
         fixture.detectChanges();
@@ -340,7 +377,9 @@ describe('GeoMapComponent', () => {
 
     it('saves the current run as a view (unique name enforced) and loads it back', async () => {
         const existing: GeoMapView = {
-            id: 'dhaka', name: 'Dhaka', sourceId: 'dataset',
+            id: 'dhaka',
+            name: 'Dhaka',
+            sourceId: 'dataset',
             query: { projection: { datasetId: 'towers-ds', latCol: 'lat', lonCol: 'lon', kindCol: 'type' } },
         };
         const { fixture, save, queried } = create({ views: [existing] });

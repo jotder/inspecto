@@ -45,7 +45,11 @@
                             class="mt-4 block"
                             icon="heroicons_outline:document-text"
                             title="Spec unavailable"
-                            [message]="'The field spec for &quot;' + typeCtrl.value + '&quot; could not be loaded. Retry by re-selecting the config type.'"
+                            [message]="
+                                'The field spec for &quot;' +
+                                typeCtrl.value +
+                                '&quot; could not be loaded. Retry by re-selecting the config type.'
+                            "
                         ></inspecto-empty-state>
                     }
 
@@ -59,7 +63,9 @@
                                     @for (r of spec.rules; track r.description) {
                                         <li>
                                             {{ r.description }}
-                                            <span class="text-secondary">[{{ (r.affectedFields || []).join(', ') }}]</span>
+                                            <span class="text-secondary"
+                                                >[{{ (r.affectedFields || []).join(', ') }}]</span
+                                            >
                                         </li>
                                     }
                                 </ul>
@@ -80,7 +86,9 @@
 
                 <div class="w-full lg:w-100">
                     <div class="font-semibold">Assembled config (preview — copy &amp; commit the .toon manually)</div>
-                    <pre class="mt-2 overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{ assembledPreview() }}</pre>
+                    <pre class="mt-2 overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{
+                        assembledPreview()
+                    }}</pre>
                 </div>
             </div>
         }

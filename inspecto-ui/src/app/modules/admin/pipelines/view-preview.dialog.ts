@@ -24,7 +24,16 @@ export interface ViewPreviewData {
 @Component({
     selector: 'app-view-preview-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, MatTooltipModule, InspectoAlertComponent, InspectoDialogResizeDirective, DataTableComponent],
+    imports: [
+        MatDialogModule,
+        MatButtonModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        MatTooltipModule,
+        InspectoAlertComponent,
+        InspectoDialogResizeDirective,
+        DataTableComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
@@ -39,15 +48,17 @@ export interface ViewPreviewData {
             >
                 <mat-icon
                     class="icon-size-5"
-                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                    [svgIcon]="
+                        chrome.maximized()
+                            ? 'heroicons_outline:arrows-pointing-in'
+                            : 'heroicons_outline:arrows-pointing-out'
+                    "
                 ></mat-icon>
             </button>
         </h2>
         <mat-dialog-content>
             @if (loading()) {
-                <div class="flex items-center gap-2 text-sm">
-                    <mat-spinner diameter="16"></mat-spinner> Loading…
-                </div>
+                <div class="flex items-center gap-2 text-sm"><mat-spinner diameter="16"></mat-spinner> Loading…</div>
             } @else if (error()) {
                 <inspecto-alert variant="error" title="Preview unavailable">{{ error() }}</inspecto-alert>
             } @else if (result(); as r) {
@@ -62,7 +73,8 @@ export interface ViewPreviewData {
                     [columns]="columnsFor(r)"
                     [autoHeight]="true"
                     noRowsTitle="No rows"
-                    noRowsHint="This view's derived_sql returned nothing." />
+                    noRowsHint="This view's derived_sql returned nothing."
+                />
             }
         </mat-dialog-content>
         <mat-dialog-actions align="end">

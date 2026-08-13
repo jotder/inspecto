@@ -22,7 +22,13 @@ const DS: Dataset = {
     measures: [],
     calculated: [],
 };
-const WIDGET: Widget = { id: 'total_dur', name: 'Total duration', datasetId: 'cdr_sample', vizType: 'kpi', controls: { value: [{ field: 'duration_s', agg: 'sum' }] } };
+const WIDGET: Widget = {
+    id: 'total_dur',
+    name: 'Total duration',
+    datasetId: 'cdr_sample',
+    vizType: 'kpi',
+    controls: { value: [{ field: 'duration_s', agg: 'sum' }] },
+};
 
 function create() {
     TestBed.configureTestingModule({
@@ -51,7 +57,8 @@ describe('DashboardTileComponent', () => {
 
     it('passes its widget/dataset through to the shared WidgetHostComponent, which resolves the plugin', () => {
         const fixture = create();
-        const host = fixture.debugElement.query(By.directive(WidgetHostComponent)).componentInstance as WidgetHostComponent;
+        const host = fixture.debugElement.query(By.directive(WidgetHostComponent))
+            .componentInstance as WidgetHostComponent;
         expect(host.plugin()?.meta.type).toBe('kpi');
     });
 

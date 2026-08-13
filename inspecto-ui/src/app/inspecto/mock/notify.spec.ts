@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { NotificationChannel, NotificationRow } from '../api/notifications.service';
 import { MockStore } from './mock-store';
-import {
-    fanOut,
-    NOTIFICATION_CHANNELS_COLL,
-    NOTIFICATION_DELIVERIES_COLL,
-    NOTIFICATIONS_COLL,
-} from './notify';
+import { fanOut, NOTIFICATION_CHANNELS_COLL, NOTIFICATION_DELIVERIES_COLL, NOTIFICATIONS_COLL } from './notify';
 
 function channel(id: string, enabled: boolean): NotificationChannel {
     return { id, kind: 'EMAIL', target: id + '@example.com', enabled, createdAt: 1 };

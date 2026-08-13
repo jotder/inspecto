@@ -71,8 +71,14 @@ describe('node-attributes', () => {
     });
 
     it('classifies every attribute of every known type into a tier', () => {
-        for (const type of ['acquisition', 'transform.filter', 'transform.route',
-            'sink.persistent', 'sink.materialized', 'sink.view']) {
+        for (const type of [
+            'acquisition',
+            'transform.filter',
+            'transform.route',
+            'sink.persistent',
+            'sink.materialized',
+            'sink.view',
+        ]) {
             for (const s of nodeAttributesFor(type)!) {
                 expect(['required', 'optional', 'advanced']).toContain(s.tier);
             }
@@ -197,8 +203,16 @@ describe('node-attributes', () => {
 
     /** The retired fiction must not creep back via this map either. */
     it('has no schema under any of the invented type names', () => {
-        for (const fiction of ['collector.file', 'collector.database', 'collector.stream',
-            'sink.file', 'sink.database', 'transform.record', 'transform.aggregate', 'transform.alert']) {
+        for (const fiction of [
+            'collector.file',
+            'collector.database',
+            'collector.stream',
+            'sink.file',
+            'sink.database',
+            'transform.record',
+            'transform.aggregate',
+            'transform.alert',
+        ]) {
             expect(nodeAttributesFor(fiction)).toBeUndefined();
         }
     });

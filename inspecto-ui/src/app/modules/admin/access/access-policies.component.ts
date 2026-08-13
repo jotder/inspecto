@@ -8,13 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, of } from 'rxjs';
 
-import {
-    AccessService,
-    apiErrorMessage,
-    ExplainResult,
-    PoliciesDoc,
-    PolicyDef,
-} from 'app/inspecto/api';
+import { AccessService, apiErrorMessage, ExplainResult, PoliciesDoc, PolicyDef } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';

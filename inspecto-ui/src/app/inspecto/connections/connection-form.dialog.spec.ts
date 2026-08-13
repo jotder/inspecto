@@ -9,7 +9,12 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ConnectionFormDialog } from './connection-form.dialog';
 
 const TEST_OK: ConnectionTestResult = {
-    id: '(unsaved)', connector: 'sftp', endpoint: 'h:22', reachable: true, secretsResolved: true, detail: 'ok',
+    id: '(unsaved)',
+    connector: 'sftp',
+    endpoint: 'h:22',
+    reachable: true,
+    secretsResolved: true,
+    detail: 'ok',
 };
 
 function create(profile?: ConnectionProfile, existingIds?: string[]) {
@@ -122,7 +127,10 @@ describe('ConnectionFormDialog', () => {
         c.proxyEnabled.set(true);
         c.form.controls.proxy.patchValue({ type: 'HTTP', host: 'proxy.example.com', port: 8080 });
         c.testProxy();
-        expect(api.testProfile).toHaveBeenCalledWith(expect.objectContaining({ proxy: expect.objectContaining({ host: 'proxy.example.com' }) }), 'proxy');
+        expect(api.testProfile).toHaveBeenCalledWith(
+            expect.objectContaining({ proxy: expect.objectContaining({ host: 'proxy.example.com' }) }),
+            'proxy',
+        );
         expect(c.proxyResult()?.reachable).toBe(true);
     });
 
@@ -142,8 +150,12 @@ describe('ConnectionFormDialog', () => {
 
     it('edits an existing profile directly — no save step, id + description preserved', () => {
         const { c, api } = create({
-            id: 'cdr_sftp', connector: 'sftp', host: 'h', description: 'prod drops',
-            tunnel: { host: 'bastion' }, options: { auth_method: 'key' },
+            id: 'cdr_sftp',
+            connector: 'sftp',
+            host: 'h',
+            description: 'prod drops',
+            tunnel: { host: 'bastion' },
+            options: { auth_method: 'key' },
         });
         expect(c.connType()).toBe('sftp');
         expect(c.isEdit).toBe(true);

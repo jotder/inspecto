@@ -42,16 +42,76 @@ interface SettingsDrawer {
 })
 export class SettingsComponent {
     readonly drawers: readonly SettingsDrawer[] = [
-        { id: 'config',        title: 'Config',          icon: 'heroicons_outline:adjustments-horizontal', description: 'Author and validate pipeline / job configuration.', component: ConfigComponent },
-        { id: 'connections',   title: 'Connections',     icon: 'heroicons_outline:server-stack',           description: 'Reusable remote-system connection profiles.',        component: ConnectionsComponent },
-        { id: 'notifications', title: 'Notifications',   icon: 'heroicons_outline:bell',                   description: 'Delivery channels and notification preferences.',   component: NotificationCenterComponent },
-        { id: 'spaces',        title: 'Spaces',          icon: 'heroicons_outline:square-3-stack-3d',      description: 'Create and manage isolated project spaces.',        component: SpacesComponent },
-        { id: 'access',        title: 'Access',          icon: 'heroicons_outline:key',                    description: 'Choose what each lens shows — menus and functionalities.', component: AccessComponent },
-        { id: 'models',        title: 'Model Settings',  icon: 'heroicons_outline:cpu-chip',               description: 'Choose the AI provider and per-tier models.',        component: ModelSettingsComponent },
-        { id: 'icons',         title: 'Processor Icons', icon: 'heroicons_outline:paint-brush',            description: 'Assign icons to processor / component kinds.',       component: IconSettingsComponent },
-        { id: 'map',           title: 'Map Settings',    icon: 'heroicons_outline:map',                    description: 'Basemap and geo-analysis defaults.',                 component: MapSettingsComponent },
-        { id: 'transfer',      title: 'Import & Export', icon: 'heroicons_outline:arrow-up-tray',          description: 'Move configuration bundles in and out.',             component: TransferComponent },
-        { id: 'design',        title: 'Design System',   icon: 'heroicons_outline:swatch',                 description: 'The in-app component gallery and design tokens.',     component: DesignSystemComponent },
+        {
+            id: 'config',
+            title: 'Config',
+            icon: 'heroicons_outline:adjustments-horizontal',
+            description: 'Author and validate pipeline / job configuration.',
+            component: ConfigComponent,
+        },
+        {
+            id: 'connections',
+            title: 'Connections',
+            icon: 'heroicons_outline:server-stack',
+            description: 'Reusable remote-system connection profiles.',
+            component: ConnectionsComponent,
+        },
+        {
+            id: 'notifications',
+            title: 'Notifications',
+            icon: 'heroicons_outline:bell',
+            description: 'Delivery channels and notification preferences.',
+            component: NotificationCenterComponent,
+        },
+        {
+            id: 'spaces',
+            title: 'Spaces',
+            icon: 'heroicons_outline:square-3-stack-3d',
+            description: 'Create and manage isolated project spaces.',
+            component: SpacesComponent,
+        },
+        {
+            id: 'access',
+            title: 'Access',
+            icon: 'heroicons_outline:key',
+            description: 'Choose what each lens shows — menus and functionalities.',
+            component: AccessComponent,
+        },
+        {
+            id: 'models',
+            title: 'Model Settings',
+            icon: 'heroicons_outline:cpu-chip',
+            description: 'Choose the AI provider and per-tier models.',
+            component: ModelSettingsComponent,
+        },
+        {
+            id: 'icons',
+            title: 'Processor Icons',
+            icon: 'heroicons_outline:paint-brush',
+            description: 'Assign icons to processor / component kinds.',
+            component: IconSettingsComponent,
+        },
+        {
+            id: 'map',
+            title: 'Map Settings',
+            icon: 'heroicons_outline:map',
+            description: 'Basemap and geo-analysis defaults.',
+            component: MapSettingsComponent,
+        },
+        {
+            id: 'transfer',
+            title: 'Import & Export',
+            icon: 'heroicons_outline:arrow-up-tray',
+            description: 'Move configuration bundles in and out.',
+            component: TransferComponent,
+        },
+        {
+            id: 'design',
+            title: 'Design System',
+            icon: 'heroicons_outline:swatch',
+            description: 'The in-app component gallery and design tokens.',
+            component: DesignSystemComponent,
+        },
     ];
 
     private route = inject(ActivatedRoute);

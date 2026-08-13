@@ -54,7 +54,14 @@ export interface AlertRuleFormResult {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -80,7 +87,13 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
-            {{ isEdit ? 'Edit alert rule — ' + data.rule?.name : step() === 'save' ? 'Save alert rule' : 'New alert rule' }}
+            {{
+                isEdit
+                    ? 'Edit alert rule — ' + data.rule?.name
+                    : step() === 'save'
+                      ? 'Save alert rule'
+                      : 'New alert rule'
+            }}
         </h2>
 
         <mat-dialog-content class="!pt-2">
@@ -92,7 +105,13 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
             <!-- Config step content stays mounted (not @if'd) so the schema-form ViewChild survives the
                  step transition — only visually hidden via [hidden], never destroyed. -->
             <div [hidden]="step() === 'save'">
-                <inspecto-schema-form #sf [specs]="attributes" [initial]="initialValue" [optionLoaders]="optionLoaders" (submitted)="save()"></inspecto-schema-form>
+                <inspecto-schema-form
+                    #sf
+                    [specs]="attributes"
+                    [initial]="initialValue"
+                    [optionLoaders]="optionLoaders"
+                    (submitted)="save()"
+                ></inspecto-schema-form>
 
                 <div class="mt-4 font-semibold">Only count batches matching (optional)</div>
                 <inspecto-query-condition-group class="mt-2 block" [group]="when" [columns]="columns" [root]="true" />

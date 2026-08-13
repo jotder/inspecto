@@ -8,9 +8,7 @@ import { ColumnMeta, ColumnType, Condition, ConditionGroup, Operator, QueryModel
 export function compileSql(model: QueryModel, source: QuerySource): string {
     const cols = source.columns ?? [];
     const proj =
-        model.projection === '*' || model.projection.length === 0
-            ? '*'
-            : model.projection.map(quoteIdent).join(', ');
+        model.projection === '*' || model.projection.length === 0 ? '*' : model.projection.map(quoteIdent).join(', ');
     const from = quoteIdent(source.name);
     const where = compileGroup(model.where, cols);
     return where ? `SELECT ${proj}\nFROM ${from}\nWHERE ${where}` : `SELECT ${proj}\nFROM ${from}`;
@@ -54,7 +52,10 @@ function compileCondition(c: Condition, cols: ColumnMeta[]): string {
             if (!c.value) return '';
             return `${id} LIKE ${lit('%' + c.value, 'string')}`;
         case 'in': {
-            const items = (c.value ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+            const items = (c.value ?? '')
+                .split(',')
+                .map((x) => x.trim())
+                .filter(Boolean);
             return items.length ? `${id} IN (${items.map((x) => lit(x, t)).join(', ')})` : '';
         }
         case 'between':
@@ -130,7 +131,10 @@ export function compileSqlWithParams(model: QueryModel, source: QuerySource): Pa
             case 'endsWith':
                 return c.value ? `${id} LIKE '%' || :${add(c.field, c.operator, c.value)}` : '';
             case 'in': {
-                const items = (c.value ?? '').split(',').map((x) => x.trim()).filter(Boolean);
+                const items = (c.value ?? '')
+                    .split(',')
+                    .map((x) => x.trim())
+                    .filter(Boolean);
                 if (!items.length) return '';
                 const t = columnType(cols, c.field);
                 return `${id} IN (${items.map((x) => lit(x, t)).join(', ')})`;
@@ -142,7 +146,9 @@ export function compileSqlWithParams(model: QueryModel, source: QuerySource): Pa
                 return `${id} BETWEEN :${lo} AND :${hi}`;
             }
             default:
-                return c.value == null || c.value === '' ? '' : `${id} ${c.operator} :${add(c.field, c.operator, c.value)}`;
+                return c.value == null || c.value === ''
+                    ? ''
+                    : `${id} ${c.operator} :${add(c.field, c.operator, c.value)}`;
         }
     };
 
@@ -154,9 +160,7 @@ export function compileSqlWithParams(model: QueryModel, source: QuerySource): Pa
     };
 
     const proj =
-        model.projection === '*' || model.projection.length === 0
-            ? '*'
-            : model.projection.map(quoteIdent).join(', ');
+        model.projection === '*' || model.projection.length === 0 ? '*' : model.projection.map(quoteIdent).join(', ');
     const from = quoteIdent(source.name);
     const where = groupSql(model.where);
     const sql = where ? `SELECT ${proj}\nFROM ${from}\nWHERE ${where}` : `SELECT ${proj}\nFROM ${from}`;

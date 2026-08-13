@@ -161,17 +161,177 @@ const ACQ_METRICS: Record<string, unknown> = {
 // ── collectors ──────────────────────────────────────────────────────────────
 
 const COLLECTORS = [
-    { pipeline: 'cdr_ingest', id: 'sftp_cdr', connector: 'sftp', connection: 'prod-sftp', includes: ['*.csv'], excludes: [], recursiveDepth: 1, duplicateMode: 'checksum', duplicateOnChange: 'reprocess', guarantee: 'at-least-once', incrementalWatermark: 'last_modified', fetchParallel: 4, fetchRateLimit: 0, postAction: 'archive', dbWatermarkCurrent: null },
-    { pipeline: 'subscriber_load', id: 's3_subscribers', connector: 's3', connection: 'aws-prod', includes: ['subscribers/*.parquet'], excludes: [], recursiveDepth: 2, duplicateMode: 'name', duplicateOnChange: 'skip', guarantee: 'exactly-once', incrementalWatermark: 'last_modified', fetchParallel: 8, fetchRateLimit: 0, postAction: 'none', dbWatermarkCurrent: null },
-    { pipeline: 'voucher_etl', id: 'local_vouchers', connector: 'local', connection: null, includes: ['vouchers/**/*.json'], excludes: ['*.tmp'], recursiveDepth: 3, duplicateMode: 'checksum', duplicateOnChange: 'reprocess', guarantee: 'at-least-once', incrementalWatermark: null, fetchParallel: 1, fetchRateLimit: 0, postAction: 'delete', dbWatermarkCurrent: null },
-    { pipeline: 'billing_daily', id: 'db_billing', connector: 'jdbc', connection: 'billing-db', includes: ['billing_events'], excludes: [], recursiveDepth: 0, duplicateMode: 'watermark', duplicateOnChange: 'skip', guarantee: 'exactly-once', incrementalWatermark: 'event_id', fetchParallel: 1, fetchRateLimit: 100, postAction: 'none', dbWatermarkCurrent: '2026-06-28' },
-    { pipeline: 'fraud_events', id: 'kafka_fraud', connector: 'kafka', connection: 'kafka-cluster', includes: ['fraud.*'], excludes: [], recursiveDepth: 0, duplicateMode: 'offset', duplicateOnChange: 'skip', guarantee: 'exactly-once', incrementalWatermark: 'offset', fetchParallel: 3, fetchRateLimit: 0, postAction: 'commit', dbWatermarkCurrent: 'offset:12847' },
+    {
+        pipeline: 'cdr_ingest',
+        id: 'sftp_cdr',
+        connector: 'sftp',
+        connection: 'prod-sftp',
+        includes: ['*.csv'],
+        excludes: [],
+        recursiveDepth: 1,
+        duplicateMode: 'checksum',
+        duplicateOnChange: 'reprocess',
+        guarantee: 'at-least-once',
+        incrementalWatermark: 'last_modified',
+        fetchParallel: 4,
+        fetchRateLimit: 0,
+        postAction: 'archive',
+        dbWatermarkCurrent: null,
+    },
+    {
+        pipeline: 'subscriber_load',
+        id: 's3_subscribers',
+        connector: 's3',
+        connection: 'aws-prod',
+        includes: ['subscribers/*.parquet'],
+        excludes: [],
+        recursiveDepth: 2,
+        duplicateMode: 'name',
+        duplicateOnChange: 'skip',
+        guarantee: 'exactly-once',
+        incrementalWatermark: 'last_modified',
+        fetchParallel: 8,
+        fetchRateLimit: 0,
+        postAction: 'none',
+        dbWatermarkCurrent: null,
+    },
+    {
+        pipeline: 'voucher_etl',
+        id: 'local_vouchers',
+        connector: 'local',
+        connection: null,
+        includes: ['vouchers/**/*.json'],
+        excludes: ['*.tmp'],
+        recursiveDepth: 3,
+        duplicateMode: 'checksum',
+        duplicateOnChange: 'reprocess',
+        guarantee: 'at-least-once',
+        incrementalWatermark: null,
+        fetchParallel: 1,
+        fetchRateLimit: 0,
+        postAction: 'delete',
+        dbWatermarkCurrent: null,
+    },
+    {
+        pipeline: 'billing_daily',
+        id: 'db_billing',
+        connector: 'jdbc',
+        connection: 'billing-db',
+        includes: ['billing_events'],
+        excludes: [],
+        recursiveDepth: 0,
+        duplicateMode: 'watermark',
+        duplicateOnChange: 'skip',
+        guarantee: 'exactly-once',
+        incrementalWatermark: 'event_id',
+        fetchParallel: 1,
+        fetchRateLimit: 100,
+        postAction: 'none',
+        dbWatermarkCurrent: '2026-06-28',
+    },
+    {
+        pipeline: 'fraud_events',
+        id: 'kafka_fraud',
+        connector: 'kafka',
+        connection: 'kafka-cluster',
+        includes: ['fraud.*'],
+        excludes: [],
+        recursiveDepth: 0,
+        duplicateMode: 'offset',
+        duplicateOnChange: 'skip',
+        guarantee: 'exactly-once',
+        incrementalWatermark: 'offset',
+        fetchParallel: 3,
+        fetchRateLimit: 0,
+        postAction: 'commit',
+        dbWatermarkCurrent: 'offset:12847',
+    },
     // Case-study pack CS1–CS5 (docs/superpower/pipeline-case-studies.md) — one data source per pipeline.
-    { pipeline: 'mediation_backbone', id: 'sftp_cdr_asn1', connector: 'sftp', connection: 'cdr_sftp_prod', includes: ['**/*.asn1'], excludes: ['*.tmp'], recursiveDepth: 3, duplicateMode: 'checksum', duplicateOnChange: 'reprocess', guarantee: 'at-least-once', incrementalWatermark: 'last_modified', fetchParallel: 6, fetchRateLimit: 0, postAction: 'archive', dbWatermarkCurrent: null },
-    { pipeline: 'fraud_velocity_stream', id: 'kafka_sim_swaps', connector: 'kafka', connection: 'kafka-cluster', includes: ['sim.swaps'], excludes: [], recursiveDepth: 0, duplicateMode: 'offset', duplicateOnChange: 'skip', guarantee: 'exactly-once', incrementalWatermark: 'offset', fetchParallel: 2, fetchRateLimit: 0, postAction: 'commit', dbWatermarkCurrent: 'offset:99120' },
-    { pipeline: 'audit_recon_feeds', id: 's3_switch_dumps', connector: 's3', connection: 's3_archive', includes: ['switch/**/*.asn1'], excludes: [], recursiveDepth: 4, duplicateMode: 'name', duplicateOnChange: 'skip', guarantee: 'exactly-once', incrementalWatermark: 'last_modified', fetchParallel: 8, fetchRateLimit: 0, postAction: 'none', dbWatermarkCurrent: null },
-    { pipeline: 'format_gauntlet', id: 'local_dropzone', connector: 'local', connection: null, includes: ['drops/**/*'], excludes: ['*.partial'], recursiveDepth: 5, duplicateMode: 'checksum', duplicateOnChange: 'reprocess', guarantee: 'at-least-once', incrementalWatermark: null, fetchParallel: 1, fetchRateLimit: 0, postAction: 'delete', dbWatermarkCurrent: null },
-    { pipeline: 'deadletter_torture', id: 'ftp_legacy_gold', connector: 'ftp', connection: 'legacy_ftp_down', includes: ['*.csv'], excludes: [], recursiveDepth: 1, duplicateMode: 'name', duplicateOnChange: 'skip', guarantee: 'at-least-once', incrementalWatermark: 'last_modified', fetchParallel: 1, fetchRateLimit: 50, postAction: 'archive', dbWatermarkCurrent: null },
+    {
+        pipeline: 'mediation_backbone',
+        id: 'sftp_cdr_asn1',
+        connector: 'sftp',
+        connection: 'cdr_sftp_prod',
+        includes: ['**/*.asn1'],
+        excludes: ['*.tmp'],
+        recursiveDepth: 3,
+        duplicateMode: 'checksum',
+        duplicateOnChange: 'reprocess',
+        guarantee: 'at-least-once',
+        incrementalWatermark: 'last_modified',
+        fetchParallel: 6,
+        fetchRateLimit: 0,
+        postAction: 'archive',
+        dbWatermarkCurrent: null,
+    },
+    {
+        pipeline: 'fraud_velocity_stream',
+        id: 'kafka_sim_swaps',
+        connector: 'kafka',
+        connection: 'kafka-cluster',
+        includes: ['sim.swaps'],
+        excludes: [],
+        recursiveDepth: 0,
+        duplicateMode: 'offset',
+        duplicateOnChange: 'skip',
+        guarantee: 'exactly-once',
+        incrementalWatermark: 'offset',
+        fetchParallel: 2,
+        fetchRateLimit: 0,
+        postAction: 'commit',
+        dbWatermarkCurrent: 'offset:99120',
+    },
+    {
+        pipeline: 'audit_recon_feeds',
+        id: 's3_switch_dumps',
+        connector: 's3',
+        connection: 's3_archive',
+        includes: ['switch/**/*.asn1'],
+        excludes: [],
+        recursiveDepth: 4,
+        duplicateMode: 'name',
+        duplicateOnChange: 'skip',
+        guarantee: 'exactly-once',
+        incrementalWatermark: 'last_modified',
+        fetchParallel: 8,
+        fetchRateLimit: 0,
+        postAction: 'none',
+        dbWatermarkCurrent: null,
+    },
+    {
+        pipeline: 'format_gauntlet',
+        id: 'local_dropzone',
+        connector: 'local',
+        connection: null,
+        includes: ['drops/**/*'],
+        excludes: ['*.partial'],
+        recursiveDepth: 5,
+        duplicateMode: 'checksum',
+        duplicateOnChange: 'reprocess',
+        guarantee: 'at-least-once',
+        incrementalWatermark: null,
+        fetchParallel: 1,
+        fetchRateLimit: 0,
+        postAction: 'delete',
+        dbWatermarkCurrent: null,
+    },
+    {
+        pipeline: 'deadletter_torture',
+        id: 'ftp_legacy_gold',
+        connector: 'ftp',
+        connection: 'legacy_ftp_down',
+        includes: ['*.csv'],
+        excludes: [],
+        recursiveDepth: 1,
+        duplicateMode: 'name',
+        duplicateOnChange: 'skip',
+        guarantee: 'at-least-once',
+        incrementalWatermark: 'last_modified',
+        fetchParallel: 1,
+        fetchRateLimit: 50,
+        postAction: 'archive',
+        dbWatermarkCurrent: null,
+    },
 ];
 
 // ── pipelines list + detail ─────────────────────────────────────────────────
@@ -257,30 +417,85 @@ PIPELINES.forEach((name, i) => {
         inbox: `inboxes/${name}`,
         pending: i === 0 ? 3 : 0,
         running: i === 0,
-        current: i === 0
-            ? { batchId: `${name}-b1025`, file: `${name}_20260629.csv`, index: 2, total: 3, startedAt: new Date(NOW - 5000).toISOString() }
-            : null,
+        current:
+            i === 0
+                ? {
+                      batchId: `${name}-b1025`,
+                      file: `${name}_20260629.csv`,
+                      index: 2,
+                      total: 3,
+                      startedAt: new Date(NOW - 5000).toISOString(),
+                  }
+                : null,
     };
 });
 
 // ── notifications (seed pack — applied per space via seeds/default-space.seed) ──
 
 const NOTIFICATION_PREFS = [
-    { category: 'PIPELINE', label: 'Pipeline', critical: false, available: true, channels: { inApp: true, email: false } },
+    {
+        category: 'PIPELINE',
+        label: 'Pipeline',
+        critical: false,
+        available: true,
+        channels: { inApp: true, email: false },
+    },
     { category: 'JOB', label: 'Job', critical: false, available: true, channels: { inApp: true, email: false } },
     { category: 'OPS', label: 'Operations', critical: false, available: true, channels: { inApp: true, email: false } },
-    { category: 'COLLABORATION', label: 'Collaboration', critical: false, available: false, channels: { inApp: false, email: false } },
-    { category: 'SECURITY', label: 'Security', critical: true, available: true, channels: { inApp: true, email: true } },
+    {
+        category: 'COLLABORATION',
+        label: 'Collaboration',
+        critical: false,
+        available: false,
+        channels: { inApp: false, email: false },
+    },
+    {
+        category: 'SECURITY',
+        label: 'Security',
+        critical: true,
+        available: true,
+        channels: { inApp: true, email: true },
+    },
 ];
 
 // ── catalog ─────────────────────────────────────────────────────────────────
 
 const CATALOG_TABLES = [
-    { id: 'cdr_output', kind: 'TABLE', label: 'cdr_output', description: { text: 'CDR records after parsing and enrichment', source: 'schema' }, overlay: { lastSeen: new Date(NOW - 3_600_000).toISOString(), rowCount: 847_000, freshness: 'FRESH' } },
-    { id: 'subscriber_master', kind: 'TABLE', label: 'subscriber_master', description: { text: 'Subscriber master dimension table', source: 'schema' }, overlay: { lastSeen: new Date(NOW - 7_200_000).toISOString(), rowCount: 125_000, freshness: 'FRESH' } },
-    { id: 'voucher_transactions', kind: 'TABLE', label: 'voucher_transactions', description: { text: 'Voucher recharge transactions', source: 'schema' }, overlay: { lastSeen: new Date(NOW - 14_400_000).toISOString(), rowCount: 340_000, freshness: 'FRESH' } },
-    { id: 'billing_events', kind: 'TABLE', label: 'billing_events', description: { text: 'Daily billing event feed', source: 'schema' }, overlay: { lastSeen: new Date(NOW - 86_400_000).toISOString(), rowCount: 1_200_000, freshness: 'STALE' } },
-    { id: 'fraud_scores', kind: 'TABLE', label: 'fraud_scores', description: { text: 'Real-time fraud scoring output', source: 'schema' }, overlay: { lastSeen: new Date(NOW - 600_000).toISOString(), rowCount: 95_000, freshness: 'FRESH' } },
+    {
+        id: 'cdr_output',
+        kind: 'TABLE',
+        label: 'cdr_output',
+        description: { text: 'CDR records after parsing and enrichment', source: 'schema' },
+        overlay: { lastSeen: new Date(NOW - 3_600_000).toISOString(), rowCount: 847_000, freshness: 'FRESH' },
+    },
+    {
+        id: 'subscriber_master',
+        kind: 'TABLE',
+        label: 'subscriber_master',
+        description: { text: 'Subscriber master dimension table', source: 'schema' },
+        overlay: { lastSeen: new Date(NOW - 7_200_000).toISOString(), rowCount: 125_000, freshness: 'FRESH' },
+    },
+    {
+        id: 'voucher_transactions',
+        kind: 'TABLE',
+        label: 'voucher_transactions',
+        description: { text: 'Voucher recharge transactions', source: 'schema' },
+        overlay: { lastSeen: new Date(NOW - 14_400_000).toISOString(), rowCount: 340_000, freshness: 'FRESH' },
+    },
+    {
+        id: 'billing_events',
+        kind: 'TABLE',
+        label: 'billing_events',
+        description: { text: 'Daily billing event feed', source: 'schema' },
+        overlay: { lastSeen: new Date(NOW - 86_400_000).toISOString(), rowCount: 1_200_000, freshness: 'STALE' },
+    },
+    {
+        id: 'fraud_scores',
+        kind: 'TABLE',
+        label: 'fraud_scores',
+        description: { text: 'Real-time fraud scoring output', source: 'schema' },
+        overlay: { lastSeen: new Date(NOW - 600_000).toISOString(), rowCount: 95_000, freshness: 'FRESH' },
+    },
 ];
 
 // A Stream is the Catalog's data-origin lens over a Collector (+ its Connection) — same identity, catalog view.
@@ -303,10 +518,34 @@ const CATALOG_STREAMS = COLLECTORS.map((s) => ({
 // References are the Catalog's dimension-origin lens (REFERENCE_DATASET nodes) — lookup/master tables
 // joined into pipelines, browsed by name alongside Streams.
 const CATALOG_REFERENCES = [
-    { id: 'country_codes', connector: 'local', connection: null, pipeline: 'subscriber_load', text: 'ISO country + dialing-code reference' },
-    { id: 'currency_rates', connector: 'jdbc', connection: 'billing-db', pipeline: 'billing_daily', text: 'Daily FX rate reference' },
-    { id: 'imsi_ranges', connector: 's3', connection: 'aws-prod', pipeline: 'cdr_ingest', text: 'IMSI operator-range dimension' },
-    { id: 'fraud_watchlist', connector: 'local', connection: null, pipeline: 'fraud_events', text: 'Known-fraud subscriber watchlist' },
+    {
+        id: 'country_codes',
+        connector: 'local',
+        connection: null,
+        pipeline: 'subscriber_load',
+        text: 'ISO country + dialing-code reference',
+    },
+    {
+        id: 'currency_rates',
+        connector: 'jdbc',
+        connection: 'billing-db',
+        pipeline: 'billing_daily',
+        text: 'Daily FX rate reference',
+    },
+    {
+        id: 'imsi_ranges',
+        connector: 's3',
+        connection: 'aws-prod',
+        pipeline: 'cdr_ingest',
+        text: 'IMSI operator-range dimension',
+    },
+    {
+        id: 'fraud_watchlist',
+        connector: 'local',
+        connection: null,
+        pipeline: 'fraud_events',
+        text: 'Known-fraud subscriber watchlist',
+    },
 ].map((r) => ({
     id: r.id,
     kind: 'REFERENCE_DATASET',
@@ -315,17 +554,47 @@ const CATALOG_REFERENCES = [
     attrs: { connector: r.connector, connection: r.connection, pipeline: r.pipeline },
 }));
 
-const CATALOG_EDGES = CATALOG_STREAMS
-    .filter((s) => PIPELINE_OUTPUT_TABLE[s.attrs.pipeline])
-    .map((s) => ({ from: s.id, to: PIPELINE_OUTPUT_TABLE[s.attrs.pipeline], kind: 'EMITS' }));
+const CATALOG_EDGES = CATALOG_STREAMS.filter((s) => PIPELINE_OUTPUT_TABLE[s.attrs.pipeline]).map((s) => ({
+    from: s.id,
+    to: PIPELINE_OUTPUT_TABLE[s.attrs.pipeline],
+    kind: 'EMITS',
+}));
 
 const CATALOG_KPIS = {
     domain: 'telecom',
     kpis: [
-        { id: 'arpu', name: 'ARPU', definition: 'Average Revenue Per User = total_revenue / active_subscribers', grain: 'monthly', joinKeys: ['subscriber_id'], inputs: ['billing_events', 'subscriber_master'] },
-        { id: 'churn_rate', name: 'Churn Rate', definition: 'Subscribers lost / total subscribers in period', grain: 'monthly', joinKeys: ['subscriber_id'], inputs: ['subscriber_master'] },
-        { id: 'fraud_rate', name: 'Fraud Detection Rate', definition: 'Flagged transactions / total transactions', grain: 'daily', joinKeys: ['transaction_id'], inputs: ['fraud_scores', 'cdr_output'] },
-        { id: 'recharge_volume', name: 'Recharge Volume', definition: 'Sum of voucher recharge amounts', grain: 'daily', joinKeys: ['subscriber_id'], inputs: ['voucher_transactions'] },
+        {
+            id: 'arpu',
+            name: 'ARPU',
+            definition: 'Average Revenue Per User = total_revenue / active_subscribers',
+            grain: 'monthly',
+            joinKeys: ['subscriber_id'],
+            inputs: ['billing_events', 'subscriber_master'],
+        },
+        {
+            id: 'churn_rate',
+            name: 'Churn Rate',
+            definition: 'Subscribers lost / total subscribers in period',
+            grain: 'monthly',
+            joinKeys: ['subscriber_id'],
+            inputs: ['subscriber_master'],
+        },
+        {
+            id: 'fraud_rate',
+            name: 'Fraud Detection Rate',
+            definition: 'Flagged transactions / total transactions',
+            grain: 'daily',
+            joinKeys: ['transaction_id'],
+            inputs: ['fraud_scores', 'cdr_output'],
+        },
+        {
+            id: 'recharge_volume',
+            name: 'Recharge Volume',
+            definition: 'Sum of voucher recharge amounts',
+            grain: 'daily',
+            joinKeys: ['subscriber_id'],
+            inputs: ['voucher_transactions'],
+        },
     ],
 };
 
@@ -342,7 +611,10 @@ const DIAGNOSES = Array.from({ length: 10 }, (_, i) => ({
         'Empty file received — upstream export may have failed silently.',
         'Timestamp column "event_ts" contains future dates (>24h ahead), likely timezone misconfiguration.',
     ][i % 5],
-    suggestedAlertRuleToon: i % 3 === 2 ? 'alert.schema_mismatch { metric: "rejected_files", comparator: "gt", threshold: 0, window: "1h" }' : null,
+    suggestedAlertRuleToon:
+        i % 3 === 2
+            ? 'alert.schema_mismatch { metric: "rejected_files", comparator: "gt", threshold: 0, window: "1h" }'
+            : null,
     heuristicOnly: i % 4 === 0,
     epochMillis: NOW - i * 7_200_000,
     citations: [{ source: 'batch-audit', ref: `${PIPELINES[i % PIPELINES.length]}-b${990 + i}` }],
@@ -356,20 +628,95 @@ const CONFIG_SPECS: Record<string, unknown> = {
     pipeline: {
         type: 'pipeline',
         fields: [
-            { path: 'pipeline', label: 'Pipeline', type: 'STRING', required: true, description: 'Pipeline name (unique identifier)' },
-            { path: 'collector.connector', label: 'Connector', type: 'ENUM', required: true, description: 'Collector connector type', enumValues: ['sftp', 's3', 'local', 'jdbc', 'kafka'] },
-            { path: 'collector.connection', label: 'Connection', type: 'STRING', required: false, description: 'Connection profile reference' },
-            { path: 'collector.includes', label: 'Includes', type: 'LIST', required: true, description: 'File include globs' },
-            { path: 'collector.excludes', label: 'Excludes', type: 'LIST', required: false, description: 'File exclude globs' },
-            { path: 'parser.format', label: 'Format', type: 'ENUM', required: true, description: 'Input format', enumValues: ['csv', 'json', 'parquet', 'avro', 'xml', 'fixed', 'asn1', 'edi', 'custom'] },
-            { path: 'parser.delimiter', label: 'Delimiter', type: 'STRING', required: false, description: 'Field delimiter (CSV)' },
-            { path: 'parser.header', label: 'Header row', type: 'BOOL', required: false, description: 'First row is header', defaultValue: true },
-            { path: 'output.format', label: 'Output format', type: 'ENUM', required: true, description: 'Output format', enumValues: ['parquet', 'csv', 'json'] },
-            { path: 'output.partitionBy', label: 'Partition by', type: 'LIST', required: false, description: 'Partition columns' },
-            { path: 'batch.maxFiles', label: 'Max files', type: 'INT', required: false, description: 'Max files per batch', defaultValue: 100 },
+            {
+                path: 'pipeline',
+                label: 'Pipeline',
+                type: 'STRING',
+                required: true,
+                description: 'Pipeline name (unique identifier)',
+            },
+            {
+                path: 'collector.connector',
+                label: 'Connector',
+                type: 'ENUM',
+                required: true,
+                description: 'Collector connector type',
+                enumValues: ['sftp', 's3', 'local', 'jdbc', 'kafka'],
+            },
+            {
+                path: 'collector.connection',
+                label: 'Connection',
+                type: 'STRING',
+                required: false,
+                description: 'Connection profile reference',
+            },
+            {
+                path: 'collector.includes',
+                label: 'Includes',
+                type: 'LIST',
+                required: true,
+                description: 'File include globs',
+            },
+            {
+                path: 'collector.excludes',
+                label: 'Excludes',
+                type: 'LIST',
+                required: false,
+                description: 'File exclude globs',
+            },
+            {
+                path: 'parser.format',
+                label: 'Format',
+                type: 'ENUM',
+                required: true,
+                description: 'Input format',
+                enumValues: ['csv', 'json', 'parquet', 'avro', 'xml', 'fixed', 'asn1', 'edi', 'custom'],
+            },
+            {
+                path: 'parser.delimiter',
+                label: 'Delimiter',
+                type: 'STRING',
+                required: false,
+                description: 'Field delimiter (CSV)',
+            },
+            {
+                path: 'parser.header',
+                label: 'Header row',
+                type: 'BOOL',
+                required: false,
+                description: 'First row is header',
+                defaultValue: true,
+            },
+            {
+                path: 'output.format',
+                label: 'Output format',
+                type: 'ENUM',
+                required: true,
+                description: 'Output format',
+                enumValues: ['parquet', 'csv', 'json'],
+            },
+            {
+                path: 'output.partitionBy',
+                label: 'Partition by',
+                type: 'LIST',
+                required: false,
+                description: 'Partition columns',
+            },
+            {
+                path: 'batch.maxFiles',
+                label: 'Max files',
+                type: 'INT',
+                required: false,
+                description: 'Max files per batch',
+                defaultValue: 100,
+            },
         ],
         rules: [
-            { description: 'JDBC connector requires a connection profile', affectedFields: ['collector.connector', 'collector.connection'], condition: 'collector.connector == "jdbc" => collector.connection != null' },
+            {
+                description: 'JDBC connector requires a connection profile',
+                affectedFields: ['collector.connector', 'collector.connection'],
+                condition: 'collector.connector == "jdbc" => collector.connection != null',
+            },
         ],
     },
 };
@@ -462,7 +809,9 @@ export function demoHandler(flags: MockFlags): MockHandler {
         }
         if (method === 'GET' && (m = match(url, PIPELINE_PENDING))) {
             const name = m[1];
-            return json(INBOX_STATUSES[name] ?? { pipeline: name, inbox: `inboxes/${name}`, pending: 0, running: false });
+            return json(
+                INBOX_STATUSES[name] ?? { pipeline: name, inbox: `inboxes/${name}`, pending: 0, running: false },
+            );
         }
         if (method === 'GET' && (m = match(url, PIPELINE_REPORT))) {
             const name = m[1];
@@ -521,8 +870,12 @@ export function demoHandler(flags: MockFlags): MockHandler {
             if (!b.id || !b.kind || !b.target) return error(422, 'id, kind and target are required');
             if (store.get(space, NOTIFICATION_CHANNELS_COLL, b.id)) return error(409, `channel ${b.id} already exists`);
             const ch: NotificationChannel = {
-                id: b.id, kind: b.kind, target: b.target, description: b.description,
-                enabled: b.enabled !== false, createdAt: Date.now(),
+                id: b.id,
+                kind: b.kind,
+                target: b.target,
+                description: b.description,
+                enabled: b.enabled !== false,
+                createdAt: Date.now(),
             };
             return json(store.put(space, NOTIFICATION_CHANNELS_COLL, ch.id, ch));
         }
@@ -547,9 +900,14 @@ export function demoHandler(flags: MockFlags): MockHandler {
             if (!b.id || !b.eventType || !b.category) return error(422, 'id, eventType and category are required');
             if (store.get(space, NOTIFICATION_RULES_COLL, b.id)) return error(409, `rule ${b.id} already exists`);
             const rule: NotificationRule = {
-                id: b.id, eventType: b.eventType, minLevel: b.minLevel ?? null, category: b.category,
-                titleTemplate: b.titleTemplate, bodyTemplate: b.bodyTemplate,
-                dedupeKeyTemplate: b.dedupeKeyTemplate, enabled: b.enabled !== false,
+                id: b.id,
+                eventType: b.eventType,
+                minLevel: b.minLevel ?? null,
+                category: b.category,
+                titleTemplate: b.titleTemplate,
+                bodyTemplate: b.bodyTemplate,
+                dedupeKeyTemplate: b.dedupeKeyTemplate,
+                enabled: b.enabled !== false,
             };
             return json(store.put(space, NOTIFICATION_RULES_COLL, rule.id, rule));
         }
@@ -558,9 +916,14 @@ export function demoHandler(flags: MockFlags): MockHandler {
             const b = (req.body ?? {}) as Partial<NotificationRule>;
             if (!b.eventType || !b.category) return error(422, 'eventType and category are required');
             const next: NotificationRule = {
-                id: m[1], eventType: b.eventType, minLevel: b.minLevel ?? null, category: b.category,
-                titleTemplate: b.titleTemplate, bodyTemplate: b.bodyTemplate,
-                dedupeKeyTemplate: b.dedupeKeyTemplate, enabled: b.enabled !== false,
+                id: m[1],
+                eventType: b.eventType,
+                minLevel: b.minLevel ?? null,
+                category: b.category,
+                titleTemplate: b.titleTemplate,
+                bodyTemplate: b.bodyTemplate,
+                dedupeKeyTemplate: b.dedupeKeyTemplate,
+                enabled: b.enabled !== false,
             };
             return json(store.put(space, NOTIFICATION_RULES_COLL, next.id, next));
         }
@@ -577,8 +940,10 @@ export function demoHandler(flags: MockFlags): MockHandler {
 
         // ── catalog ── (streams/references also carry the store-backed onboarding drafts)
         if (method === 'GET' && CATALOG_KPIS_RE.test(url)) return json(CATALOG_KPIS);
-        if (method === 'GET' && CATALOG_STREAMS_RE.test(url)) return json([...CATALOG_STREAMS, ...draftStreamRows(store, space)]);
-        if (method === 'GET' && CATALOG_REFERENCES_RE.test(url)) return json([...CATALOG_REFERENCES, ...draftReferenceRows(store, space)]);
+        if (method === 'GET' && CATALOG_STREAMS_RE.test(url))
+            return json([...CATALOG_STREAMS, ...draftStreamRows(store, space)]);
+        if (method === 'GET' && CATALOG_REFERENCES_RE.test(url))
+            return json([...CATALOG_REFERENCES, ...draftReferenceRows(store, space)]);
         if (method === 'GET' && CATALOG_TABLES_RE.test(url)) return json(CATALOG_TABLES);
         if (method === 'GET' && (m = match(url, CATALOG_NODE))) {
             const id = m[1];
@@ -597,8 +962,10 @@ export function demoHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && DIAGNOSES_RE.test(url)) return json(DIAGNOSES);
 
         // ── config ──
-        if (method === 'GET' && (m = match(url, CONFIG_SPEC))) return json(CONFIG_SPECS[m[1]] ?? CONFIG_SPECS['pipeline']);
-        if (method === 'POST' && VALIDATE.test(url)) return json(validateBody(req.body as Record<string, unknown> | undefined));
+        if (method === 'GET' && (m = match(url, CONFIG_SPEC)))
+            return json(CONFIG_SPECS[m[1]] ?? CONFIG_SPECS['pipeline']);
+        if (method === 'POST' && VALIDATE.test(url))
+            return json(validateBody(req.body as Record<string, unknown> | undefined));
 
         return undefined;
     };
@@ -617,7 +984,9 @@ function validateBody(body: Record<string, unknown> | undefined): {
 } {
     const type = body?.['type'] as string | undefined;
     const config = (body?.['config'] ?? {}) as Record<string, unknown>;
-    const spec = type ? (CONFIG_SPECS[type] as { fields?: { path: string; required?: boolean }[] } | undefined) : undefined;
+    const spec = type
+        ? (CONFIG_SPECS[type] as { fields?: { path: string; required?: boolean }[] } | undefined)
+        : undefined;
     const findings: { severity: string; fieldPath: string; message: string }[] = [];
     for (const f of spec?.fields ?? []) {
         if (!f.required) continue;

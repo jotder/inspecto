@@ -152,11 +152,13 @@ export class MenuTreeNodeComponent {
         const takenTitles = this.siblings()
             .filter((s) => s.id !== this.node().id)
             .map((s) => s.title);
-        this.open({ heading: 'Rename', title: this.node().title, icon: this.node().icon, takenTitles }).subscribe((r) => {
-            if (!r) return;
-            this.menu.mutate((s) => s.rename(this.node().id, r.title).setIcon(this.node().id, r.icon));
-            this.changed.emit();
-        });
+        this.open({ heading: 'Rename', title: this.node().title, icon: this.node().icon, takenTitles }).subscribe(
+            (r) => {
+                if (!r) return;
+                this.menu.mutate((s) => s.rename(this.node().id, r.title).setIcon(this.node().id, r.icon));
+                this.changed.emit();
+            },
+        );
     }
 
     toggleFavorite(): void {

@@ -12,7 +12,17 @@ import { JobsComponent, fmtDuration } from './jobs.component';
 
 const METRICS: JobMetrics = { total: 4, success: 3, failed: 1, successRate: 0.75, p50Ms: 20, p95Ms: 40, meanMs: 25 };
 const RUNS: JobRunRow[] = [
-    { runId: 'r1', job: 'rollup', type: 'ENRICH', trigger: 'schedule', startTime: '2026-06-17 10:00:00', endTime: '2026-06-17 10:00:01', status: 'SUCCESS', durationMs: 20, message: 'ok' },
+    {
+        runId: 'r1',
+        job: 'rollup',
+        type: 'ENRICH',
+        trigger: 'schedule',
+        startTime: '2026-06-17 10:00:00',
+        endTime: '2026-06-17 10:00:01',
+        status: 'SUCCESS',
+        durationMs: 20,
+        message: 'ok',
+    },
 ];
 const FAILS: JobFailureDay[] = [{ day: '2026-06-17', total: 4, failed: 1 }];
 
@@ -29,7 +39,8 @@ function create(
         recentRuns: () => (reporting === 'ok' ? of(RUNS) : report404()),
         failures: () => (reporting === 'ok' ? of(FAILS) : report404()),
         // Consumed by the embedded job-detail side panel.
-        get: () => of({ name: 'rollup', type: 'enrich', cron: '0 0 6 * * *', onPipeline: null, enabled: true, params: {} }),
+        get: () =>
+            of({ name: 'rollup', type: 'enrich', cron: '0 0 6 * * *', onPipeline: null, enabled: true, params: {} }),
         runs: () => of([]),
         runLogs: () => of({ logs: [], events: [] }),
     } as unknown as JobsService;
@@ -41,7 +52,11 @@ function create(
             // The `/jobs(/:name)` param drives the detail side panel (R5).
             {
                 provide: ActivatedRoute,
-                useValue: { paramMap, queryParamMap: of(convertToParamMap({})), snapshot: { paramMap: convertToParamMap({}) } },
+                useValue: {
+                    paramMap,
+                    queryParamMap: of(convertToParamMap({})),
+                    snapshot: { paramMap: convertToParamMap({}) },
+                },
             },
             { provide: JobsService, useValue: stub },
             { provide: ToastrService, useValue: {} },
@@ -50,7 +65,7 @@ function create(
         ],
     });
     const fixture = TestBed.createComponent(JobsComponent);
-    fixture.detectChanges();   // runs ngOnInit (schedules load)
+    fixture.detectChanges(); // runs ngOnInit (schedules load)
     return fixture;
 }
 
@@ -75,7 +90,7 @@ describe('JobsComponent', () => {
         expect(c.metrics?.total).toBe(4);
         expect(c.successPct).toBe(75);
         expect(c.runs.length).toBe(1);
-        expect(c.chartData?.datasets.length).toBe(2);   // Total + Failed series
+        expect(c.chartData?.datasets.length).toBe(2); // Total + Failed series
     });
 
     it('flags the reporting backend as disabled on a 404', () => {
@@ -97,7 +112,9 @@ describe('JobsComponent', () => {
         const fixture = create('ok');
         const c = fixture.componentInstance;
         TestBed.inject(LensService).selectLens('business');
-        const hints = c.scheduleActions.map((a) => (typeof a.hint === 'function' ? a.hint({ enabled: true } as JobView) : a.hint));
+        const hints = c.scheduleActions.map((a) =>
+            typeof a.hint === 'function' ? a.hint({ enabled: true } as JobView) : a.hint,
+        );
         expect(hints).toEqual(['Run now', 'Disable']);
     });
 
@@ -109,12 +126,12 @@ describe('JobsComponent', () => {
         expect(c.detailName()).toBeNull();
         expect(el.querySelector('app-job-detail')).toBeNull();
 
-        params.next(convertToParamMap({ name: 'rollup' }));   // deep link /jobs/rollup
+        params.next(convertToParamMap({ name: 'rollup' })); // deep link /jobs/rollup
         fixture.detectChanges();
         expect(c.detailName()).toBe('rollup');
         expect(el.querySelector('app-job-detail')).toBeTruthy();
 
-        params.next(convertToParamMap({}));                   // back to /jobs
+        params.next(convertToParamMap({})); // back to /jobs
         fixture.detectChanges();
         expect(c.detailName()).toBeNull();
         expect(el.querySelector('app-job-detail')).toBeNull();

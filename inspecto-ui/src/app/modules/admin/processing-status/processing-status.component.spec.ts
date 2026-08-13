@@ -11,8 +11,24 @@ import { ReportsService, RunStatus, StatusReport } from 'app/inspecto/api';
 import { ProcessingStatusComponent } from './processing-status.component';
 
 const PIPELINES: RunStatus[] = [
-    { pipeline: 'cdr_ingest', paused: false, committedBatches: 120, quarantineFiles: 2, lastBatchId: 'batch-1000', lastBatchStatus: 'COMMITTED', lastBatchTime: '2026-06-30T00:00:00.000Z' },
-    { pipeline: 'billing_daily', paused: true, committedBatches: 231, quarantineFiles: 0, lastBatchId: 'batch-1003', lastBatchStatus: 'FAILED', lastBatchTime: '2026-06-29T00:00:00.000Z' },
+    {
+        pipeline: 'cdr_ingest',
+        paused: false,
+        committedBatches: 120,
+        quarantineFiles: 2,
+        lastBatchId: 'batch-1000',
+        lastBatchStatus: 'COMMITTED',
+        lastBatchTime: '2026-06-30T00:00:00.000Z',
+    },
+    {
+        pipeline: 'billing_daily',
+        paused: true,
+        committedBatches: 231,
+        quarantineFiles: 0,
+        lastBatchId: 'batch-1003',
+        lastBatchStatus: 'FAILED',
+        lastBatchTime: '2026-06-29T00:00:00.000Z',
+    },
 ];
 
 const REPORT: StatusReport = {

@@ -51,10 +51,31 @@ describe('compileSql', () => {
     });
 
     it('renders contains / in / between / null', () => {
-        expect(compileSql(model(group('AND', [{ kind: 'condition', field: 'msisdn', operator: 'contains', value: '880' }])), SOURCE)).toContain("\"msisdn\" LIKE '%880%'");
-        expect(compileSql(model(group('AND', [{ kind: 'condition', field: 'cell_id', operator: 'in', value: 'A, B' }])), SOURCE)).toContain("\"cell_id\" IN ('A', 'B')");
-        expect(compileSql(model(group('AND', [{ kind: 'condition', field: 'duration_s', operator: 'between', value: '1', value2: '9' }])), SOURCE)).toContain('"duration_s" BETWEEN 1 AND 9');
-        expect(compileSql(model(group('AND', [{ kind: 'condition', field: 'msisdn', operator: 'isNull' }])), SOURCE)).toContain('"msisdn" IS NULL');
+        expect(
+            compileSql(
+                model(group('AND', [{ kind: 'condition', field: 'msisdn', operator: 'contains', value: '880' }])),
+                SOURCE,
+            ),
+        ).toContain('"msisdn" LIKE \'%880%\'');
+        expect(
+            compileSql(
+                model(group('AND', [{ kind: 'condition', field: 'cell_id', operator: 'in', value: 'A, B' }])),
+                SOURCE,
+            ),
+        ).toContain("\"cell_id\" IN ('A', 'B')");
+        expect(
+            compileSql(
+                model(
+                    group('AND', [
+                        { kind: 'condition', field: 'duration_s', operator: 'between', value: '1', value2: '9' },
+                    ]),
+                ),
+                SOURCE,
+            ),
+        ).toContain('"duration_s" BETWEEN 1 AND 9');
+        expect(
+            compileSql(model(group('AND', [{ kind: 'condition', field: 'msisdn', operator: 'isNull' }])), SOURCE),
+        ).toContain('"msisdn" IS NULL');
     });
 
     it('skips incomplete conditions so the SQL stays valid', () => {

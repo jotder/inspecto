@@ -16,7 +16,13 @@ function create(inputs: Partial<PipelineInspectorComponent> = {}) {
     return { fixture, c: fixture.componentInstance };
 }
 
-const NODE: AuthoredNode = { id: 'parse', type: 'parser.dsv', name: 'Parse CSV', use: 'grammar/cdr_csv', config: { delimiter: ',' } };
+const NODE: AuthoredNode = {
+    id: 'parse',
+    type: 'parser.dsv',
+    name: 'Parse CSV',
+    use: 'grammar/cdr_csv',
+    config: { delimiter: ',' },
+};
 
 describe('PipelineInspectorComponent', () => {
     it('shows the idle hint when nothing is selected', () => {
@@ -42,12 +48,17 @@ describe('PipelineInspectorComponent', () => {
 
         fixture.componentRef.setInput('lastRun', { rowCount: 1234, runTs: '2026-07-18T10:00:00Z' });
         fixture.detectChanges();
-        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Last run: 1,234 row(s) · 2026-07-18T10:00:00Z');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+            'Last run: 1,234 row(s) · 2026-07-18T10:00:00Z',
+        );
     });
 
     it('emits configure/runToHere/connect/deleteSelected from the node actions', () => {
         const { fixture, c } = create({
-            node: NODE, status: 'configured', category: 'PARSE', canRunToHere: true,
+            node: NODE,
+            status: 'configured',
+            category: 'PARSE',
+            canRunToHere: true,
         });
         const configure = vi.fn();
         const runToHere = vi.fn();
@@ -70,8 +81,10 @@ describe('PipelineInspectorComponent', () => {
 
     it('hides Run to here unless the scratch-run backend is available (it is mock-only)', () => {
         const { fixture } = create({ node: NODE, status: 'configured', category: 'PARSE' });
-        const runBtn = () => Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-            .find((b) => b.textContent?.includes('Run to here'));
+        const runBtn = () =>
+            Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Run to here'),
+            );
         expect(runBtn(), 'no button that would 404 against the real ControlApi').toBeUndefined();
 
         fixture.componentRef.setInput('canRunToHere', true);
@@ -125,7 +138,11 @@ describe('PipelineInspectorComponent', () => {
     it('readOnly hides Configure/Connect/Delete but keeps Run to here', () => {
         // One TestBed/fixture, mutated between assertions — TestBed can only be configured once per test.
         const { fixture, c } = create({
-            node: NODE, status: 'configured', category: 'PARSE', readOnly: true, canRunToHere: true,
+            node: NODE,
+            status: 'configured',
+            category: 'PARSE',
+            readOnly: true,
+            canRunToHere: true,
         });
         const el = fixture.nativeElement as HTMLElement;
         const buttons = Array.from(el.querySelectorAll('button'));
@@ -137,7 +154,10 @@ describe('PipelineInspectorComponent', () => {
 
     it('readOnly hides Delete connection in the edge view', () => {
         const { fixture } = create({
-            selectedEdgeId: 'a->b:data:1', selectedEdgeRel: 'data', candidateRels: ['data', 'kept'], readOnly: true,
+            selectedEdgeId: 'a->b:data:1',
+            selectedEdgeRel: 'data',
+            candidateRels: ['data', 'kept'],
+            readOnly: true,
         });
         expect(fixture.nativeElement.querySelector('[aria-label="Delete connection"]')).toBeNull();
     });

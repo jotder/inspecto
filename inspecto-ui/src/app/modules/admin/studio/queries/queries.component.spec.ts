@@ -14,10 +14,23 @@ import { QueriesService } from './queries.service';
 import { QueriesComponent } from './queries.component';
 
 const DS: Dataset = {
-    id: 'cdr_sample', name: 'cdr_sample', kind: 'virtual', sourceName: 'cdr',
-    columns: [{ name: 'cost_usd', type: 'number', role: 'measure' }], measures: [], calculated: [],
+    id: 'cdr_sample',
+    name: 'cdr_sample',
+    kind: 'virtual',
+    sourceName: 'cdr',
+    columns: [{ name: 'cost_usd', type: 'number', role: 'measure' }],
+    measures: [],
+    calculated: [],
 };
-const Q: Query = { id: 'recent', name: 'recent', type: 'sql', datasetId: 'cdr_sample', sourceName: 'cdr', text: 'SELECT * FROM cdr', parameters: [] };
+const Q: Query = {
+    id: 'recent',
+    name: 'recent',
+    type: 'sql',
+    datasetId: 'cdr_sample',
+    sourceName: 'cdr',
+    text: 'SELECT * FROM cdr',
+    parameters: [],
+};
 
 function create(queries: Query[] = [Q], dialogResult: unknown = true) {
     const save = vi.fn((q: Query) => of(q));
@@ -31,7 +44,10 @@ function create(queries: Query[] = [Q], dialogResult: unknown = true) {
             provideRouter([]),
             { provide: QueriesService, useValue: { list, get: () => of(Q), save, remove } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
         ],
     });
@@ -102,21 +118,21 @@ describe('QueriesComponent (R3)', () => {
         const { fixture, list, dialogOpen } = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        c.editQuery(Q);                       // the restored query is open in the edit form
-        c.history(Q);                         // dialog closes with `true` (restored)
+        c.editQuery(Q); // the restored query is open in the edit form
+        c.history(Q); // dialog closes with `true` (restored)
         expect(dialogOpen).toHaveBeenCalled();
-        expect(c.editing()).toBe(false);      // stale form closed — saving it would overwrite the restore
+        expect(c.editing()).toBe(false); // stale form closed — saving it would overwrite the restore
         expect(list).toHaveBeenCalledTimes(2); // init + post-restore reload
     });
 
     it('a dismissed history dialog changes nothing', () => {
         // `null`, not `undefined` — an explicit undefined would trigger create()'s `= true` default.
-        const { fixture, list } = create([Q], null);   // dialog dismissed (no restore)
+        const { fixture, list } = create([Q], null); // dialog dismissed (no restore)
         fixture.detectChanges();
         const c = fixture.componentInstance;
         c.editQuery(Q);
         c.history(Q);
-        expect(c.editing()).toBe(true);        // editor untouched
+        expect(c.editing()).toBe(true); // editor untouched
         expect(list).toHaveBeenCalledTimes(1); // no reload
     });
 
@@ -140,7 +156,10 @@ describe('QueriesComponent (R3)', () => {
         const c = fixture.componentInstance;
         c.newQuery();
         c.form.patchValue({ datasetId: 'cdr_sample', type: 'structured' });
-        c.onStructuredChange({ model: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null }, sql: 'SELECT * FROM cdr' });
+        c.onStructuredChange({
+            model: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null },
+            sql: 'SELECT * FROM cdr',
+        });
         await c.run();
         expect(c.preview()?.resolvedSql).toBe('SELECT * FROM cdr');
         expect(c.preview()?.error).toBeUndefined();
@@ -150,21 +169,43 @@ describe('QueriesComponent (R3)', () => {
         const { fixture, save } = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        const model = { projection: ['cost_usd'], where: { kind: 'group' as const, op: 'AND' as const, items: [] }, sqlOverride: null };
+        const model = {
+            projection: ['cost_usd'],
+            where: { kind: 'group' as const, op: 'AND' as const, items: [] },
+            sqlOverride: null,
+        };
         c.newQuery();
         c.form.patchValue({ name: 'structured_q', datasetId: 'cdr_sample', type: 'structured' });
         c.onStructuredChange({ model, sql: 'SELECT cost_usd FROM cdr' });
         c.save();
         expect(save).toHaveBeenCalled();
-        expect(save.mock.calls[0][0]).toMatchObject({ id: 'structured_q', type: 'structured', model, text: null, parameters: [] });
+        expect(save.mock.calls[0][0]).toMatchObject({
+            id: 'structured_q',
+            type: 'structured',
+            model,
+            text: null,
+            parameters: [],
+        });
     });
 
     it('editing an existing structured query round-trips its model into the panel', () => {
         const { fixture } = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
-        const model = { projection: '*' as const, where: { kind: 'group' as const, op: 'AND' as const, items: [] }, sqlOverride: null };
-        c.editQuery({ ...Q, id: 'structured_q', name: 'structured_q', type: 'structured', text: null, model, parameters: [] });
+        const model = {
+            projection: '*' as const,
+            where: { kind: 'group' as const, op: 'AND' as const, items: [] },
+            sqlOverride: null,
+        };
+        c.editQuery({
+            ...Q,
+            id: 'structured_q',
+            name: 'structured_q',
+            type: 'structured',
+            text: null,
+            model,
+            parameters: [],
+        });
         expect(c.form.controls.type.value).toBe('structured');
         expect(c.structuredModel()).toEqual(model);
     });

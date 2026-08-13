@@ -112,7 +112,12 @@
                     </div>
                 </form>
                 <div class="flex justify-end">
-                    <button mat-flat-button color="primary" [disabled]="saving || !findingsDirty" (click)="saveFindings()">
+                    <button
+                        mat-flat-button
+                        color="primary"
+                        [disabled]="saving || !findingsDirty"
+                        (click)="saveFindings()"
+                    >
                         Save findings
                     </button>
                 </div>
@@ -139,7 +144,11 @@
                         </mat-form-field>
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Business Impact</mat-label>
-                            <input matInput formControlName="businessImpact" placeholder="e.g. Y% of transactions failed" />
+                            <input
+                                matInput
+                                formControlName="businessImpact"
+                                placeholder="e.g. Y% of transactions failed"
+                            />
                         </mat-form-field>
                     </div>
                 </section>
@@ -180,7 +189,9 @@
                             </button>
                         </div>
                     } @empty {
-                        <p class="text-secondary text-sm">No entries yet — add the first alert, escalation, fix and recovery.</p>
+                        <p class="text-secondary text-sm">
+                            No entries yet — add the first alert, escalation, fix and recovery.
+                        </p>
                     }
                 </section>
 
@@ -222,14 +233,18 @@
                             </button>
                         </div>
                     } @empty {
-                        <p class="text-secondary text-sm">No cause analysis yet — walk the whys from symptom to root.</p>
+                        <p class="text-secondary text-sm">
+                            No cause analysis yet — walk the whys from symptom to root.
+                        </p>
                     }
                 </section>
 
                 <!-- Corrective actions -->
                 <section formArrayName="actions">
                     <div class="mb-2 flex items-center justify-between">
-                        <h3 class="text-sm font-bold uppercase tracking-wider opacity-60">Corrective Actions &amp; Preventative Tasks</h3>
+                        <h3 class="text-sm font-bold uppercase tracking-wider opacity-60">
+                            Corrective Actions &amp; Preventative Tasks
+                        </h3>
                         <button
                             mat-icon-button
                             type="button"
@@ -267,7 +282,9 @@
                             </button>
                         </div>
                     } @empty {
-                        <p class="text-secondary text-sm">No tasks yet — capture the fixes that prevent a recurrence.</p>
+                        <p class="text-secondary text-sm">
+                            No tasks yet — capture the fixes that prevent a recurrence.
+                        </p>
                     }
                 </section>
 

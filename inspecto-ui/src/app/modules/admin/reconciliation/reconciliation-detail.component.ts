@@ -15,7 +15,12 @@ import { FlatTreeRow, TreeNode, TreeTableComponent, varianceCell } from 'app/ins
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import {
-    breakId, breaksFromSets, decodePath, Reconciliation, ReconciliationsService, ReconBreak,
+    breakId,
+    breaksFromSets,
+    decodePath,
+    Reconciliation,
+    ReconciliationsService,
+    ReconBreak,
     resolveBreak,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
@@ -31,8 +36,17 @@ import { ReconExecService } from './recon-exec.service';
 @Component({
     selector: 'app-reconciliation-detail',
     standalone: true,
-    imports: [RouterLink, MatButtonModule, MatButtonToggleModule, MatIconModule, MatProgressSpinnerModule,
-        MatTooltipModule, DataTableComponent, TreeTableComponent, InspectoEmptyStateComponent],
+    imports: [
+        RouterLink,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatIconModule,
+        MatProgressSpinnerModule,
+        MatTooltipModule,
+        DataTableComponent,
+        TreeTableComponent,
+        InspectoEmptyStateComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './reconciliation-detail.component.html',
 })
@@ -58,7 +72,8 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly threeWay = computed(() => !!this.recon()?.thirdDataset);
     /** Human label of the compared side's dataset (for the section headers). */
     readonly sideDataset = computed(() =>
-        this.side() === 'c' ? this.recon()?.thirdDataset ?? 'C' : this.recon()?.rightDataset ?? 'B');
+        this.side() === 'c' ? (this.recon()?.thirdDataset ?? 'C') : (this.recon()?.rightDataset ?? 'B'),
+    );
 
     readonly viewMode = signal<'tables' | 'grouped'>('tables');
 
@@ -88,7 +103,9 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly missingColumns: ColDef<ReconBreak>[] = [
         { field: 'key', headerName: 'Key', flex: 1 },
         {
-            field: 'status', headerName: 'Status', width: 130,
+            field: 'status',
+            headerName: 'Status',
+            width: 130,
             cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
         },
     ];
@@ -98,11 +115,18 @@ export class ReconciliationDetailComponent implements OnInit {
         return [
             { field: 'key', headerName: 'Key', flex: 1 },
             { field: 'column', headerName: 'Column', width: 140 },
-            { field: 'leftValue', headerName: r?.leftDataset || 'A', width: 140, valueFormatter: (p) => fmtVal(p.value) },
+            {
+                field: 'leftValue',
+                headerName: r?.leftDataset || 'A',
+                width: 140,
+                valueFormatter: (p) => fmtVal(p.value),
+            },
             { field: 'rightValue', headerName: this.sideDataset(), width: 140, valueFormatter: (p) => fmtVal(p.value) },
             { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
             {
-                field: 'status', headerName: 'Status', width: 130,
+                field: 'status',
+                headerName: 'Status',
+                width: 130,
                 cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
             },
         ];
@@ -159,11 +183,23 @@ export class ReconciliationDetailComponent implements OnInit {
         const r = this.recon();
         return [
             { field: 'column', headerName: 'Column', width: 150, valueFormatter: (p) => p.value ?? '—' },
-            { field: 'leftValue', headerName: r?.leftDataset || 'Left', flex: 1, valueFormatter: (p) => fmtVal(p.value) },
-            { field: 'rightValue', headerName: r?.rightDataset || 'Right', flex: 1, valueFormatter: (p) => fmtVal(p.value) },
+            {
+                field: 'leftValue',
+                headerName: r?.leftDataset || 'Left',
+                flex: 1,
+                valueFormatter: (p) => fmtVal(p.value),
+            },
+            {
+                field: 'rightValue',
+                headerName: r?.rightDataset || 'Right',
+                flex: 1,
+                valueFormatter: (p) => fmtVal(p.value),
+            },
             { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
             {
-                field: 'status', headerName: 'Status', width: 120,
+                field: 'status',
+                headerName: 'Status',
+                width: 120,
                 cellRenderer: (p: ICellRendererParams) => (p.value ? statusBadgeHtml(String(p.value)) : ''),
             },
         ];
@@ -171,7 +207,10 @@ export class ReconciliationDetailComponent implements OnInit {
 
     readonly treeActions: InspectoRowAction<FlatTreeRow>[] = [
         {
-            icon: (row) => (this.breakOf(row)?.status === 'resolved' ? 'heroicons_outline:arrow-uturn-left' : 'heroicons_outline:check'),
+            icon: (row) =>
+                this.breakOf(row)?.status === 'resolved'
+                    ? 'heroicons_outline:arrow-uturn-left'
+                    : 'heroicons_outline:check',
             hint: (row) => (this.breakOf(row)?.status === 'resolved' ? 'Re-open' : 'Resolve'),
             visible: (row) => !!this.breakOf(row),
             onClick: (row) => {
@@ -227,7 +266,14 @@ export class ReconciliationDetailComponent implements OnInit {
         const r = this.recon();
         if (!r) return;
         const resolving = b.status !== 'resolved';
-        if (resolving && !(await this.confirm.confirm(`Mark this ${breakLabel(b.type)} for key "${b.key}" resolved?`, 'Resolve break'))) return;
+        if (
+            resolving &&
+            !(await this.confirm.confirm(
+                `Mark this ${breakLabel(b.type)} for key "${b.key}" resolved?`,
+                'Resolve break',
+            ))
+        )
+            return;
         const known = this.persistedById().has(breakId(b));
         const breaks = known
             ? resolveBreak(r.breaks, b, resolving)
@@ -241,7 +287,13 @@ export class ReconciliationDetailComponent implements OnInit {
 }
 
 function breakLabel(type: string): string {
-    return type === 'missing_left' ? 'missing left' : type === 'missing_right' ? 'missing right' : type === 'value_break' ? 'value break' : type;
+    return type === 'missing_left'
+        ? 'missing left'
+        : type === 'missing_right'
+          ? 'missing right'
+          : type === 'value_break'
+            ? 'value break'
+            : type;
 }
 function fmtVal(v: unknown): string {
     if (v == null) return '—';

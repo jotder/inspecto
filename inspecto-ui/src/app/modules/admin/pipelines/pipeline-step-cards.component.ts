@@ -83,7 +83,10 @@ import {
                                         [matTooltip]="'Configure ' + row.node.id"
                                         [attr.aria-label]="'Configure ' + row.node.id"
                                     >
-                                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                                        <mat-icon
+                                            class="icon-size-4"
+                                            svgIcon="heroicons_outline:pencil-square"
+                                        ></mat-icon>
                                     </button>
                                     @if (row.depth === 0) {
                                         <button
@@ -92,7 +95,10 @@ import {
                                             [matTooltip]="'Move ' + row.node.id + ' up'"
                                             [attr.aria-label]="'Move ' + row.node.id + ' up'"
                                         >
-                                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-up"></mat-icon>
+                                            <mat-icon
+                                                class="icon-size-4"
+                                                svgIcon="heroicons_outline:chevron-up"
+                                            ></mat-icon>
                                         </button>
                                         <button
                                             mat-icon-button
@@ -100,7 +106,10 @@ import {
                                             [matTooltip]="'Move ' + row.node.id + ' down'"
                                             [attr.aria-label]="'Move ' + row.node.id + ' down'"
                                         >
-                                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-down"></mat-icon>
+                                            <mat-icon
+                                                class="icon-size-4"
+                                                svgIcon="heroicons_outline:chevron-down"
+                                            ></mat-icon>
                                         </button>
                                         <button
                                             mat-icon-button
@@ -121,7 +130,9 @@ import {
                             @if (entries.length) {
                                 <div class="flex flex-wrap gap-1">
                                     @for (e of entries; track e.k) {
-                                        <inspecto-chip variant="outline" tone="neutral">{{ e.k }}: {{ e.v }}</inspecto-chip>
+                                        <inspecto-chip variant="outline" tone="neutral"
+                                            >{{ e.k }}: {{ e.v }}</inspecto-chip
+                                        >
                                     }
                                 </div>
                             }
@@ -132,10 +143,17 @@ import {
                                 <button
                                     mat-stroked-button
                                     class="min-h-8"
-                                    (click)="modeChange.emit({ routeId: row.node.id, mode: routeMode(row.node) === 'clone' ? 'case' : 'clone' })"
-                                    [matTooltip]="routeMode(row.node) === 'clone'
-                                        ? 'clone: every matching branch fires — switch to case (first match wins)'
-                                        : 'case: first matching branch wins — switch to clone (every match fires)'"
+                                    (click)="
+                                        modeChange.emit({
+                                            routeId: row.node.id,
+                                            mode: routeMode(row.node) === 'clone' ? 'case' : 'clone',
+                                        })
+                                    "
+                                    [matTooltip]="
+                                        routeMode(row.node) === 'clone'
+                                            ? 'clone: every matching branch fires — switch to case (first match wins)'
+                                            : 'case: first matching branch wins — switch to clone (every match fires)'
+                                    "
                                     [attr.aria-label]="'Route mode: ' + routeMode(row.node) + ' — click to switch'"
                                 >
                                     mode: {{ routeMode(row.node) }}
@@ -186,13 +204,21 @@ import {
                                 placeholder="when …"
                                 [value]="row.where ?? ''"
                                 [attr.aria-label]="'Branch ' + row.key + ' predicate'"
-                                (change)="branchWhere.emit({ routeId: row.routeId, key: row.key, where: $any($event.target).value })"
+                                (change)="
+                                    branchWhere.emit({
+                                        routeId: row.routeId,
+                                        key: row.key,
+                                        where: $any($event.target).value,
+                                    })
+                                "
                             />
                             <button
                                 mat-icon-button
                                 (click)="setDefault.emit({ routeId: row.routeId, key: row.isDefault ? null : row.key })"
                                 [matTooltip]="row.isDefault ? 'Clear default' : 'Make this the default branch'"
-                                [attr.aria-label]="(row.isDefault ? 'Clear default branch ' : 'Make default branch ') + row.key"
+                                [attr.aria-label]="
+                                    (row.isDefault ? 'Clear default branch ' : 'Make default branch ') + row.key
+                                "
                             >
                                 <mat-icon
                                     class="icon-size-4"

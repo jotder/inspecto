@@ -27,7 +27,14 @@ export interface ApplyTemplateResult {
 @Component({
     selector: 'app-apply-template-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+    imports: [
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Apply “{{ data.template.title }}”</h2>

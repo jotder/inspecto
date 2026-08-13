@@ -43,7 +43,16 @@ export interface ComponentRef {
  * Requirement points at the component that satisfied it (C1 follow-up; derives only from an exact
  * `<kind>/<id>` delivered-note).
  */
-export type RefRel = 'binds' | 'tiles' | 'renders' | 'projects' | 'triggers' | 'loads' | 'emits' | 'invokes' | 'delivered-by';
+export type RefRel =
+    | 'binds'
+    | 'tiles'
+    | 'renders'
+    | 'projects'
+    | 'triggers'
+    | 'loads'
+    | 'emits'
+    | 'invokes'
+    | 'delivered-by';
 
 /**
  * One outgoing lineage edge derivable from a component's config — THE unit of the metadata

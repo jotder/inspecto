@@ -8,8 +8,13 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { EnrichmentComponent } from './enrichment.component';
 
 const JOB = {
-    name: 'geo_enrich', onPipeline: 'cdr_ingest', eventTriggered: true, scheduleTriggered: false,
-    runCount: 12, lastRunStatus: 'SUCCESS', lastRunTime: '2026-06-17 10:00:00',
+    name: 'geo_enrich',
+    onPipeline: 'cdr_ingest',
+    eventTriggered: true,
+    scheduleTriggered: false,
+    runCount: 12,
+    lastRunStatus: 'SUCCESS',
+    lastRunTime: '2026-06-17 10:00:00',
 } as unknown as EnrichmentJobView;
 const RUNS = [{ runId: 'r1', rows: 100 }] as unknown as AuditRow[];
 
@@ -29,7 +34,7 @@ function create(list: Observable<EnrichmentJobView[]> = of([JOB])) {
         ],
     });
     const fixture = TestBed.createComponent(EnrichmentComponent);
-    fixture.detectChanges();   // runs ngOnInit (jobs load)
+    fixture.detectChanges(); // runs ngOnInit (jobs load)
     return fixture;
 }
 

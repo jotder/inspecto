@@ -46,7 +46,9 @@ export function connectionsHandler(flags: MockFlags): MockHandler {
             return json(mockSample(req.params['path'] ?? '', limit));
         }
         if (method === 'POST' && PROFILE_TEST.test(url)) {
-            return json(mockProfileTest(req.body as Partial<ConnectionProfile> | null, req.params['target'] ?? 'connection'));
+            return json(
+                mockProfileTest(req.body as Partial<ConnectionProfile> | null, req.params['target'] ?? 'connection'),
+            );
         }
         if (method === 'POST' && (m = match(url, TEST))) return json(mockTest(m[1]));
         if (method === 'POST' && LIST.test(url)) {
@@ -77,8 +79,12 @@ export function connectionsHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && (m = match(url, DETAIL))) {
             const id = m[1];
             return json(
-                store.get<ConnectionProfile>(space, CONNECTIONS_COLL, id) ??
-                    { id, connector: connectorOf(id), host: 'host.example.com', port: 22 },
+                store.get<ConnectionProfile>(space, CONNECTIONS_COLL, id) ?? {
+                    id,
+                    connector: connectorOf(id),
+                    host: 'host.example.com',
+                    port: 22,
+                },
             );
         }
         if (method === 'GET' && LIST.test(url)) return json(store.list<ConnectionProfile>(space, CONNECTIONS_COLL));
@@ -110,13 +116,36 @@ function mockProfileTest(p: Partial<ConnectionProfile> | null, target: string): 
     const host = hop ? hop.host : prof.host;
     const port = hop ? hop.port : prof.port;
     if (!hop && connector === 'local') {
-        return { id, connector, endpoint: 'local', reachable: true, latencyMs: 0, secretsResolved: true, detail: 'local source — no remote endpoint to test' };
+        return {
+            id,
+            connector,
+            endpoint: 'local',
+            reachable: true,
+            latencyMs: 0,
+            secretsResolved: true,
+            detail: 'local source — no remote endpoint to test',
+        };
     }
     if (!host) {
-        return { id, connector, endpoint: label ? `${label}: (none)` : '(no host)', reachable: false, secretsResolved: true, detail: `no ${label ? label + ' ' : ''}host configured` };
+        return {
+            id,
+            connector,
+            endpoint: label ? `${label}: (none)` : '(no host)',
+            reachable: false,
+            secretsResolved: true,
+            detail: `no ${label ? label + ' ' : ''}host configured`,
+        };
     }
     const reachable = !String(host).toLowerCase().includes('down');
-    return { id, connector, endpoint: `${host}:${port ?? '?'}`, reachable, latencyMs: reachable ? 14 : undefined, secretsResolved: true, detail: reachable ? 'TCP connect ok' : 'connect timed out' };
+    return {
+        id,
+        connector,
+        endpoint: `${host}:${port ?? '?'}`,
+        reachable,
+        latencyMs: reachable ? 14 : undefined,
+        secretsResolved: true,
+        detail: reachable ? 'TCP connect ok' : 'connect timed out',
+    };
 }
 
 function mockTest(id: string): ConnectionTestResult {
@@ -146,10 +175,31 @@ function mockProbe(id: string): ConnectionProbeResult {
     const reachable = !l.includes('down');
     const readOnly = l.includes('-ro') || l.includes('readonly') || /s3|gcs|https?/.test(l);
     const checks: CheckOutcome[] = [
-        { check: 'reachability', ok: reachable, detail: reachable ? 'TCP connect ok' : 'connect timed out', latencyMs: reachable ? 12 : undefined },
-        { check: 'authenticate', ok: reachable, skipped: !reachable, detail: reachable ? 'auth handshake ok' : 'not attempted (unreachable)', latencyMs: reachable ? 38 : undefined },
-        { check: 'read', ok: reachable, skipped: !reachable, detail: reachable ? 'base path readable' : 'not attempted' },
-        { check: 'write', ok: reachable && !readOnly, skipped: !reachable || readOnly, detail: readOnly ? 'connector is read-only' : reachable ? 'scratch write + delete ok' : 'not attempted' },
+        {
+            check: 'reachability',
+            ok: reachable,
+            detail: reachable ? 'TCP connect ok' : 'connect timed out',
+            latencyMs: reachable ? 12 : undefined,
+        },
+        {
+            check: 'authenticate',
+            ok: reachable,
+            skipped: !reachable,
+            detail: reachable ? 'auth handshake ok' : 'not attempted (unreachable)',
+            latencyMs: reachable ? 38 : undefined,
+        },
+        {
+            check: 'read',
+            ok: reachable,
+            skipped: !reachable,
+            detail: reachable ? 'base path readable' : 'not attempted',
+        },
+        {
+            check: 'write',
+            ok: reachable && !readOnly,
+            skipped: !reachable || readOnly,
+            detail: readOnly ? 'connector is read-only' : reachable ? 'scratch write + delete ok' : 'not attempted',
+        },
         { check: 'list', ok: reachable, skipped: !reachable, detail: reachable ? 'listed 7 entries' : 'not attempted' },
     ];
     return {
@@ -165,7 +215,12 @@ function mockProbe(id: string): ConnectionProbeResult {
 function mockExplore(id: string, path: string): ResourceNode[] {
     const isDb = /db|pg|postgres|sql|mysql|oracle/i.test(id);
     const segs = path.split('/').filter(Boolean);
-    const child = (name: string, kind: ResourceKind, hasChildren: boolean, extra: Partial<ResourceNode> = {}): ResourceNode => ({
+    const child = (
+        name: string,
+        kind: ResourceKind,
+        hasChildren: boolean,
+        extra: Partial<ResourceNode> = {},
+    ): ResourceNode => ({
         name,
         path: path ? `${path}/${name}` : name,
         kind,

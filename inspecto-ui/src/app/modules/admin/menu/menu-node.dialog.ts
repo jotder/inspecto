@@ -31,8 +31,9 @@ export const MENU_ICON_CHOICES: { value: string; label: string }[] = [
 const CURATED_VALUES = new Set(MENU_ICON_CHOICES.map((c) => c.value));
 const ALL_ICON_OPTIONS: { value: string; label: string }[] = [
     ...MENU_ICON_CHOICES,
-    ...HEROICONS_OUTLINE_IDS.map((id) => ({ value: heroiconOutline(id), label: id }))
-        .filter((o) => !CURATED_VALUES.has(o.value)),
+    ...HEROICONS_OUTLINE_IDS.map((id) => ({ value: heroiconOutline(id), label: id })).filter(
+        (o) => !CURATED_VALUES.has(o.value),
+    ),
 ];
 
 export interface MenuNodeDialogData {
@@ -125,10 +126,7 @@ export class MenuNodeDialog {
     }
 
     readonly form = this.fb.group({
-        title: [
-            this.data.title ?? '',
-            [Validators.required, uniqueNameValidator(() => this.data.takenTitles)],
-        ],
+        title: [this.data.title ?? '', [Validators.required, uniqueNameValidator(() => this.data.takenTitles)]],
         icon: [this.data.icon ?? '', [MenuNodeDialog.iconValidator]],
     });
 
@@ -145,11 +143,15 @@ export class MenuNodeDialog {
 
     /** Options narrowed by the typed text (matches the bare id / label / full value), capped for the panel. */
     readonly filteredIcons = computed(() => {
-        const q = String(this.iconValue() ?? '').trim().toLowerCase();
+        const q = String(this.iconValue() ?? '')
+            .trim()
+            .toLowerCase();
         // When the value is exactly a selected icon, show the full list (so the panel isn't a 1-row dead end).
         const term = MenuNodeDialog.VALID_ICONS.has(q) ? '' : q;
         const matches = term
-            ? ALL_ICON_OPTIONS.filter((o) => o.label.toLowerCase().includes(term) || o.value.toLowerCase().includes(term))
+            ? ALL_ICON_OPTIONS.filter(
+                  (o) => o.label.toLowerCase().includes(term) || o.value.toLowerCase().includes(term),
+              )
             : ALL_ICON_OPTIONS;
         return matches.slice(0, 60);
     });

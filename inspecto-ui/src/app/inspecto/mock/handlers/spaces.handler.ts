@@ -58,7 +58,8 @@ export function spacesHandler(flags: MockFlags): MockHandler {
 function createSpace(store: MockStore, body: unknown) {
     const b = (body ?? {}) as { id?: string; display_name?: string; description?: string; template?: string };
     const id = String(b.id ?? '');
-    if (!SPACE_ID.test(id)) return error(400, 'Invalid space id: use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
+    if (!SPACE_ID.test(id))
+        return error(400, 'Invalid space id: use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
     if (store.has(SERVER_SPACE, SPACES_COLL, id)) return error(409, `A space "${id}" already exists.`);
     const template = b.template ? findTemplate(b.template) : undefined;
     if (b.template && !template) return error(400, `Unknown space template "${b.template}".`);

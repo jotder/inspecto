@@ -138,7 +138,7 @@ export function segmentDraftFrom(key: string, config: Record<string, unknown> | 
     for (const f of fields) {
         const name = String(f['name'] ?? '').trim();
         const selector = String(f['selector'] ?? '').trim();
-        if (!name || !selector) continue;   // a half-written row is not an editable column
+        if (!name || !selector) continue; // a half-written row is not an editable column
         const declared = String(f['type'] ?? '').toUpperCase();
         columns.push({
             name,

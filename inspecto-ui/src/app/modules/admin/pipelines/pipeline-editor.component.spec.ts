@@ -45,7 +45,11 @@ describe('PipelineEditorComponent', () => {
         document: ReturnType<typeof vi.fn>;
         documentFingerprint: ReturnType<typeof vi.fn>;
     };
-    let config: { write: ReturnType<typeof vi.fn>; registerPipeline: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
+    let config: {
+        write: ReturnType<typeof vi.fn>;
+        registerPipeline: ReturnType<typeof vi.fn>;
+        remove: ReturnType<typeof vi.fn>;
+    };
     let dialog: { open: ReturnType<typeof vi.fn> };
     let toast: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
 
@@ -56,23 +60,54 @@ describe('PipelineEditorComponent', () => {
             list: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(
                 of([
-                    { type: 'transform.filter', category: 'TRANSFORM', label: 'Filter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false, lowerable: true },
+                    {
+                        type: 'transform.filter',
+                        category: 'TRANSFORM',
+                        label: 'Filter',
+                        description: '',
+                        accepts: ['data'],
+                        emits: ['data'],
+                        emitsNamedRoutes: false,
+                        lowerable: true,
+                    },
                     // Unlowerable — must be kept OUT of the palette but IN the type maps (unsupported()).
-                    { type: 'adapter', category: 'TRANSFORM', label: 'Adapter', description: '', accepts: ['data'], emits: ['data'], emitsNamedRoutes: false, lowerable: false },
+                    {
+                        type: 'adapter',
+                        category: 'TRANSFORM',
+                        label: 'Adapter',
+                        description: '',
+                        accepts: ['data'],
+                        emits: ['data'],
+                        emitsNamedRoutes: false,
+                        lowerable: false,
+                    },
                 ]),
             ),
             // S4 dual-read: an "old server" by default — the editor must fall back to RECIPE_VERBS.
             stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
-            savePipelineGraph: vi.fn().mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
+            savePipelineGraph: vi
+                .fn()
+                .mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),
-            saveAsTemplate: vi.fn().mockReturnValue(
-                of({ written: true, path: 'demo_copy_pipeline.toon', id: 'demo_copy', source: 'demo', template: true, notes: [] }),
-            ),
-            label: vi.fn().mockReturnValue(
-                of({ written: true, path: 'demo_pipeline.toon', id: 'demo', name: 'Demo (EU)', stampedId: true }),
-            ),
+            saveAsTemplate: vi
+                .fn()
+                .mockReturnValue(
+                    of({
+                        written: true,
+                        path: 'demo_copy_pipeline.toon',
+                        id: 'demo_copy',
+                        source: 'demo',
+                        template: true,
+                        notes: [],
+                    }),
+                ),
+            label: vi
+                .fn()
+                .mockReturnValue(
+                    of({ written: true, path: 'demo_pipeline.toon', id: 'demo', name: 'Demo (EU)', stampedId: true }),
+                ),
             document: vi.fn().mockReturnValue(of({ body: new Blob(['# Pipeline: demo']) })),
             documentFingerprint: vi.fn().mockReturnValue('0123456789abcdef0123'),
         };
@@ -218,9 +253,7 @@ describe('PipelineEditorComponent', () => {
             expect(api.document).toHaveBeenCalledWith('demo');
             expect(click).toHaveBeenCalled();
             expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:doc');
-            expect(toast.success).toHaveBeenCalledWith(
-                "Exported 'demo.md' — config fingerprint 0123456789ab",
-            );
+            expect(toast.success).toHaveBeenCalledWith("Exported 'demo.md' — config fingerprint 0123456789ab");
             expect(c.exportingDocument()).toBe(false);
         });
 
@@ -263,10 +296,12 @@ describe('PipelineEditorComponent', () => {
 
     describe('open set / tabs', () => {
         it('opens nothing on arrival — listing is cheap, lifting a graph is not', () => {
-            api.list.mockReturnValue(of([
-                { name: 'a', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
-                { name: 'b', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
-            ]));
+            api.list.mockReturnValue(
+                of([
+                    { name: 'a', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+                    { name: 'b', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+                ]),
+            );
             const c = make();
             expect(c.flows()).toHaveLength(2);
             expect(c.openIds()).toEqual([]);
@@ -282,10 +317,13 @@ describe('PipelineEditorComponent', () => {
             expect(api.pipelineGraphRaw).toHaveBeenCalledWith('demo');
         });
 
-        it('switching tabs keeps each tab\'s unsaved edits — the data-loss trap', () => {
+        it("switching tabs keeps each tab's unsaved edits — the data-loss trap", () => {
             const c = make();
             c.select('demo');
-            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, { id: 'extra', type: 'transform.filter', config: {} }] }));
+            c.model.update((m) => ({
+                ...m!,
+                nodes: [...m!.nodes, { id: 'extra', type: 'transform.filter', config: {} }],
+            }));
             c.dirty.set(true);
             TestBed.tick(); // flush the per-tab dirty effect
 
@@ -329,9 +367,9 @@ describe('PipelineEditorComponent', () => {
             const c = make();
             c.select('demo');
             c.select('gone');
-            api.list.mockReturnValue(of([
-                { name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
-            ]));
+            api.list.mockReturnValue(
+                of([{ name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]),
+            );
             c.load();
             expect(c.openIds()).toEqual(['demo']);
         });
@@ -406,14 +444,30 @@ describe('PipelineEditorComponent', () => {
         const c = make();
         c.selectedId.set('demo');
         c.model.set(structuredClone(FLOW));
-        api.savePipelineGraph.mockReturnValue(throwError(() => ({
-            status: 422,
-            error: { error: { details: { refusals: [
-                { code: 'UNSUPPORTED_NODE', nodeId: 'a', message: "no home for a 'transform.split' node" },
-                { code: 'UNSUPPORTED_NODE', nodeId: 'b', message: "no home for a 'transform.merge' node" },
-                { code: 'NO_PARSER', message: 'the pipeline has no parser' },
-            ] } } },
-        })));
+        api.savePipelineGraph.mockReturnValue(
+            throwError(() => ({
+                status: 422,
+                error: {
+                    error: {
+                        details: {
+                            refusals: [
+                                {
+                                    code: 'UNSUPPORTED_NODE',
+                                    nodeId: 'a',
+                                    message: "no home for a 'transform.split' node",
+                                },
+                                {
+                                    code: 'UNSUPPORTED_NODE',
+                                    nodeId: 'b',
+                                    message: "no home for a 'transform.merge' node",
+                                },
+                                { code: 'NO_PARSER', message: 'the pipeline has no parser' },
+                            ],
+                        },
+                    },
+                },
+            })),
+        );
 
         c.save();
 
@@ -440,9 +494,13 @@ describe('PipelineEditorComponent', () => {
         // Before the catalog lands there is nothing to judge against — stay quiet rather than cry wolf.
         expect(c.unsupportedNodes()).toHaveLength(0);
 
-        c['typeLowerable'].set(new Map([
-            ['acquisition', true], ['transform.split', false], ['transform.merge', false],
-        ]));
+        c['typeLowerable'].set(
+            new Map([
+                ['acquisition', true],
+                ['transform.split', false],
+                ['transform.merge', false],
+            ]),
+        );
         expect(c.unsupportedNodes().map((n) => n.id)).toEqual(['sp', 'mg']);
         expect(c.unsupportedTypeList()).toBe('transform.split, transform.merge');
     });
@@ -668,7 +726,14 @@ describe('PipelineEditorComponent', () => {
 });
 
 describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
-    let api: { list: ReturnType<typeof vi.fn>; nodeTypes: ReturnType<typeof vi.fn>; stepTypes: ReturnType<typeof vi.fn>; pipelineGraphRaw: ReturnType<typeof vi.fn>; provenanceBatches: ReturnType<typeof vi.fn>; provenance: ReturnType<typeof vi.fn> };
+    let api: {
+        list: ReturnType<typeof vi.fn>;
+        nodeTypes: ReturnType<typeof vi.fn>;
+        stepTypes: ReturnType<typeof vi.fn>;
+        pipelineGraphRaw: ReturnType<typeof vi.fn>;
+        provenanceBatches: ReturnType<typeof vi.fn>;
+        provenance: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         localStorage.removeItem('inspecto.currentLens');
@@ -712,12 +777,21 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
     });
 
     it('forces Canvas and flags it when the open graph is not recipe-expressible (fan-in)', () => {
-        api.pipelineGraphRaw.mockReturnValue(of({
-            name: 'demo',
-            active: false,
-            nodes: [{ id: 'a', type: 'acquisition' }, { id: 'b', type: 'acquisition' }, { id: 'c', type: 'sink.persistent' }],
-            edges: [{ from: 'a', rel: 'data', to: 'c' }, { from: 'b', rel: 'data', to: 'c' }],
-        }));
+        api.pipelineGraphRaw.mockReturnValue(
+            of({
+                name: 'demo',
+                active: false,
+                nodes: [
+                    { id: 'a', type: 'acquisition' },
+                    { id: 'b', type: 'acquisition' },
+                    { id: 'c', type: 'sink.persistent' },
+                ],
+                edges: [
+                    { from: 'a', rel: 'data', to: 'c' },
+                    { from: 'b', rel: 'data', to: 'c' },
+                ],
+            }),
+        );
         const c = make();
         c.select('demo');
         expect(c.stepChain()).toBeNull();

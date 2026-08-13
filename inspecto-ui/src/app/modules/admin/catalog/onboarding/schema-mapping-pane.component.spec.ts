@@ -11,7 +11,15 @@ import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 const CONVENTION_PATH = 'spaces/demo/config/orders_feed_schema.toon';
-const WRITE_OK = (type: string) => ({ type, written: true, path: 'x.toon', name: 'x', bytes: 1, overwritten: false, findings: [] });
+const WRITE_OK = (type: string) => ({
+    type,
+    written: true,
+    path: 'x.toon',
+    name: 'x',
+    bytes: 1,
+    overwritten: false,
+    findings: [],
+});
 const SCHEMA_PREVIEW: SchemaPreview = { columns: ['ORDER_ID'], okCount: 2, rejectedCount: 0, rejectedRows: [] };
 
 function delimitedPreview(): ParsingPreview {
@@ -19,7 +27,10 @@ function delimitedPreview(): ParsingPreview {
         frontend: 'delimited',
         columns: ['ORDER_ID', 'QUANTITY'],
         rowCount: 2,
-        rows: [{ ORDER_ID: '1001', QUANTITY: '3' }, { ORDER_ID: '1002', QUANTITY: '5' }],
+        rows: [
+            { ORDER_ID: '1001', QUANTITY: '3' },
+            { ORDER_ID: '1002', QUANTITY: '5' },
+        ],
         rejectedRows: 0,
     };
 }
@@ -32,7 +43,11 @@ function widePreview(n: number): ParsingPreview {
     return { frontend: 'json', columns, rowCount: 1, rows: [row], rejectedRows: 0 };
 }
 
-async function create(config: Record<string, unknown>, api: Partial<ConfigService> = {}, parsePreview: ParsingPreview | null = delimitedPreview()) {
+async function create(
+    config: Record<string, unknown>,
+    api: Partial<ConfigService> = {},
+    parsePreview: ParsingPreview | null = delimitedPreview(),
+) {
     TestBed.configureTestingModule({
         imports: [OnboardingSchemaMappingPaneComponent],
         providers: [
@@ -42,8 +57,8 @@ async function create(config: Record<string, unknown>, api: Partial<ConfigServic
             {
                 provide: ConfigService,
                 useValue: {
-                    write: vi.fn((type: string) => of(WRITE_OK(type))),       // companion schema file
-                    patch: vi.fn((type: string) => of(WRITE_OK(type))),       // pipeline stage save
+                    write: vi.fn((type: string) => of(WRITE_OK(type))), // companion schema file
+                    patch: vi.fn((type: string) => of(WRITE_OK(type))), // pipeline stage save
                     read: vi.fn(() => throwError(() => ({ status: 404 }))),
                     previewSchema: vi.fn(() => of(SCHEMA_PREVIEW)),
                     ...api,
@@ -84,7 +99,13 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
     });
 
     it('stays VARCHAR with no note when nothing is confidently typed', async () => {
-        const preview: ParsingPreview = { frontend: 'json', columns: ['label'], rowCount: 1, rows: [{ label: 'ab' }], rejectedRows: 0 };
+        const preview: ParsingPreview = {
+            frontend: 'json',
+            columns: ['label'],
+            rowCount: 1,
+            rows: [{ label: 'ab' }],
+            rejectedRows: 0,
+        };
         const { fixture } = await create({ name: 'orders_feed' }, {}, preview);
         const c = fixture.componentInstance;
         expect(c.fieldRows.at(0).get('type')?.value).toBe('VARCHAR');
@@ -92,7 +113,13 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
     });
 
     it('derives the verbatim key as the selector for a json/text_regex sample', async () => {
-        const preview: ParsingPreview = { frontend: 'json', columns: ['orderId'], rowCount: 1, rows: [{ orderId: '1' }], rejectedRows: 0 };
+        const preview: ParsingPreview = {
+            frontend: 'json',
+            columns: ['orderId'],
+            rowCount: 1,
+            rows: [{ orderId: '1' }],
+            rejectedRows: 0,
+        };
         const { fixture } = await create({ name: 'orders_feed' }, {}, preview);
         const c = fixture.componentInstance;
         expect(c.fieldRows.at(0).get('selector')?.value).toBe('orderId');
@@ -100,17 +127,34 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
     });
 
     it('shows a foreign-managed banner instead of the editor for a schema_file outside its convention', async () => {
-        const { fixture } = await create({ name: 'orders_feed', processing: { schema_file: 'spaces/demo/config/hand_authored.toon' } });
+        const { fixture } = await create({
+            name: 'orders_feed',
+            processing: { schema_file: 'spaces/demo/config/hand_authored.toon' },
+        });
         expect(fixture.componentInstance.foreignManaged()).toBe(true);
         expect(fixture.nativeElement.textContent).toContain('Schema managed elsewhere');
     });
 
     it('resumes by reading back a previously saved schema, pristine', async () => {
-        const read = vi.fn(() => of({
-            type: 'schema', name: 'orders_feed_schema', path: 'orders_feed_schema.toon',
-            config: { partitionKey: 'ORDER_DATE', raw: { name: 'orders_feed_schema', format: 'CSV', fields: [{ name: 'ORDER_ID', selector: '0', type: 'VARCHAR' }] } },
-        }));
-        const { fixture } = await create({ name: 'orders_feed', processing: { schema_file: CONVENTION_PATH } }, { read });
+        const read = vi.fn(() =>
+            of({
+                type: 'schema',
+                name: 'orders_feed_schema',
+                path: 'orders_feed_schema.toon',
+                config: {
+                    partitionKey: 'ORDER_DATE',
+                    raw: {
+                        name: 'orders_feed_schema',
+                        format: 'CSV',
+                        fields: [{ name: 'ORDER_ID', selector: '0', type: 'VARCHAR' }],
+                    },
+                },
+            }),
+        );
+        const { fixture } = await create(
+            { name: 'orders_feed', processing: { schema_file: CONVENTION_PATH } },
+            { read },
+        );
         const c = fixture.componentInstance;
         expect(c.fieldRows.length).toBe(1);
         expect(c.fieldRows.at(0).get('name')?.value).toBe('ORDER_ID');
@@ -119,7 +163,9 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
     });
 
     it('validate types casts only the included rows against the parsed rows', async () => {
-        const previewSchema = vi.fn((_config: Record<string, unknown>, _rows: Record<string, unknown>[]) => of(SCHEMA_PREVIEW));
+        const previewSchema = vi.fn((_config: Record<string, unknown>, _rows: Record<string, unknown>[]) =>
+            of(SCHEMA_PREVIEW),
+        );
         const { fixture, state } = await create({ name: 'orders_feed' }, { previewSchema });
         const c = fixture.componentInstance;
         c.fieldRows.at(1).get('include')?.setValue(false); // drop QUANTITY
@@ -198,8 +244,11 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
 
     it('sorts by name and flips direction on a second click', async () => {
         const preview: ParsingPreview = {
-            frontend: 'json', columns: ['banana', 'apple'], rowCount: 1,
-            rows: [{ banana: 'x', apple: 'y' }], rejectedRows: 0,
+            frontend: 'json',
+            columns: ['banana', 'apple'],
+            rowCount: 1,
+            rows: [{ banana: 'x', apple: 'y' }],
+            rejectedRows: 0,
         };
         const { fixture } = await create({ name: 'orders_feed' }, {}, preview);
         const c = fixture.componentInstance;

@@ -27,15 +27,19 @@ import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-re
             >
                 <mat-icon
                     class="icon-size-5"
-                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                    [svgIcon]="
+                        chrome.maximized()
+                            ? 'heroicons_outline:arrows-pointing-in'
+                            : 'heroicons_outline:arrows-pointing-out'
+                    "
                 ></mat-icon>
             </button>
         </h2>
         <mat-dialog-content>
             <p class="text-secondary text-sm">
-                Drag the grip in the bottom-right corner (or focus it and use the arrow keys), or toggle
-                the maximize button in the title. Once sized, the content flexes into the chosen size
-                instead of scrolling inside a bigger dialog.
+                Drag the grip in the bottom-right corner (or focus it and use the arrow keys), or toggle the maximize
+                button in the title. Once sized, the content flexes into the chosen size instead of scrolling inside a
+                bigger dialog.
             </p>
         </mat-dialog-content>
         <mat-dialog-actions align="end">

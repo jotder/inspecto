@@ -1,4 +1,14 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, EventEmitter, Input, Output, ViewChild, computed, signal } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    Component,
+    EventEmitter,
+    Input,
+    Output,
+    ViewChild,
+    computed,
+    signal,
+} from '@angular/core';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { QueryChange, QueryModel, QuerySource } from './query-types';
 

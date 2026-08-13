@@ -6,8 +6,9 @@
             <div class="text-secondary mt-1.5">Service health, throughput and error-rate overview</div>
         </div>
         <div class="flex items-center gap-4">
-            <mat-slide-toggle [(ngModel)]="autoRefresh"
-                              matTooltip="Auto-refresh (pauses when the tab is hidden)">Auto</mat-slide-toggle>
+            <mat-slide-toggle [(ngModel)]="autoRefresh" matTooltip="Auto-refresh (pauses when the tab is hidden)"
+                >Auto</mat-slide-toggle
+            >
             <button mat-icon-button matTooltip="Refresh now" aria-label="Refresh now" (click)="refresh()">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
@@ -53,8 +54,7 @@
                     <div class="text-secondary text-sm">Pipelines</div>
                     <div class="mt-1 text-2xl font-bold">{{ status?.pipelineCount ?? '—' }}</div>
                 </div>
-                <div class="bg-card rounded-2xl p-4 shadow"
-                     [class.text-amber-600]="(status?.pausedCount || 0) > 0">
+                <div class="bg-card rounded-2xl p-4 shadow" [class.text-amber-600]="(status?.pausedCount || 0) > 0">
                     <div class="text-secondary text-sm">Paused</div>
                     <div class="mt-1 text-2xl font-bold">{{ status?.pausedCount ?? '—' }}</div>
                 </div>
@@ -62,14 +62,18 @@
                     <div class="text-secondary text-sm">Committed batches</div>
                     <div class="mt-1 text-2xl font-bold">{{ status?.totalCommittedBatches ?? '—' }}</div>
                 </div>
-                <div class="bg-card rounded-2xl p-4 shadow"
-                     [class.text-amber-600]="(status?.totalQuarantineFiles || 0) > 0">
+                <div
+                    class="bg-card rounded-2xl p-4 shadow"
+                    [class.text-amber-600]="(status?.totalQuarantineFiles || 0) > 0"
+                >
                     <div class="text-secondary text-sm">Quarantine files</div>
                     <div class="mt-1 text-2xl font-bold">{{ status?.totalQuarantineFiles ?? '—' }}</div>
                 </div>
-                <div class="bg-card rounded-2xl p-4 shadow"
-                     [class.text-amber-600]="(report?.errorRate || 0) > 0 && (report?.errorRate || 0) < 0.1"
-                     [class.text-red-600]="(report?.errorRate || 0) >= 0.1">
+                <div
+                    class="bg-card rounded-2xl p-4 shadow"
+                    [class.text-amber-600]="(report?.errorRate || 0) > 0 && (report?.errorRate || 0) < 0.1"
+                    [class.text-red-600]="(report?.errorRate || 0) >= 0.1"
+                >
                     <div class="text-secondary text-sm">Error rate</div>
                     <div class="mt-1 text-2xl font-bold">{{ errorRatePct }}</div>
                 </div>
@@ -81,7 +85,9 @@
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-4 flex items-center justify-between">
                     <div class="font-semibold">Data acquisition</div>
-                    <a class="text-primary dark:text-primary-400 text-sm hover:underline" [routerLink]="['/collectors']">Collectors</a>
+                    <a class="text-primary dark:text-primary-400 text-sm hover:underline" [routerLink]="['/collectors']"
+                        >Collectors</a
+                    >
                 </div>
                 <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     @for (c of acqCards; track c.label) {
@@ -113,7 +119,9 @@
             <div class="bg-card rounded-2xl p-6 shadow">
                 <div class="mb-3 flex items-center justify-between">
                     <div class="font-semibold">Recent activity</div>
-                    <a class="text-primary dark:text-primary-400 text-sm hover:underline" [routerLink]="['/events']">View all</a>
+                    <a class="text-primary dark:text-primary-400 text-sm hover:underline" [routerLink]="['/events']"
+                        >View all</a
+                    >
                 </div>
                 <div class="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
                     @for (e of recentEvents; track e.eventId) {
@@ -150,7 +158,9 @@
                     {{ showMetrics ? 'Hide' : 'Show' }} Prometheus metrics (raw)
                 </button>
                 @if (showMetrics) {
-                    <pre class="mt-4 max-h-96 overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{ metricsText }}</pre>
+                    <pre class="mt-4 max-h-96 overflow-auto rounded bg-gray-100 p-3 text-xs dark:bg-gray-800">{{
+                        metricsText
+                    }}</pre>
                 }
             </div>
         }

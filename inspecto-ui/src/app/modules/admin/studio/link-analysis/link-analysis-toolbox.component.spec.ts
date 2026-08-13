@@ -11,7 +11,10 @@ import { LinkAnalysisToolboxComponent } from './link-analysis-toolbox.component'
 
 /** A tiny two-cluster graph: a–b–c plus d–e (mirrors the studio spec fixture). */
 const GRAPH: G6GraphData = {
-    nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, data: { label: id.toUpperCase(), kind: id < 'd' ? 'entity' : 'other' } })),
+    nodes: ['a', 'b', 'c', 'd', 'e'].map((id) => ({
+        id,
+        data: { label: id.toUpperCase(), kind: id < 'd' ? 'entity' : 'other' },
+    })),
     edges: [
         { id: 'a->b', source: 'a', target: 'b', data: { kind: 'link' } },
         { id: 'b->c', source: 'b', target: 'c', data: { kind: 'link' } },
@@ -33,7 +36,10 @@ function make(graph: G6GraphData | null = GRAPH, packs: ComponentDef[] = []) {
     const fixture = TestBed.createComponent(LinkAnalysisToolboxComponent);
     const c = fixture.componentInstance;
     fixture.componentRef.setInput('graph', graph);
-    fixture.componentRef.setInput('nodeOptions', (graph?.nodes ?? []).map((n) => ({ id: n.id, label: n.data.label })));
+    fixture.componentRef.setInput(
+        'nodeOptions',
+        (graph?.nodes ?? []).map((n) => ({ id: n.id, label: n.data.label })),
+    );
     fixture.componentRef.setInput('nodeKinds', ['entity', 'other']);
     fixture.componentRef.setInput('edgeKinds', ['link']);
     fixture.componentRef.setInput('labelOf', (id: string) => graph?.nodes.find((n) => n.id === id)?.data.label ?? id);
@@ -261,22 +267,29 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.loadedPack()).toBeNull();
     });
 
-    it('pattern packs: a Space\'s authored packs replace the built-ins, a malformed one is skipped', () => {
-        const def = (name: string, content: Record<string, unknown>): ComponentDef =>
-            ({ type: 'pattern-pack', name, ref: `pattern-pack/${name}`, content: { name, ...content } });
+    it("pattern packs: a Space's authored packs replace the built-ins, a malformed one is skipped", () => {
+        const def = (name: string, content: Record<string, unknown>): ComponentDef => ({
+            type: 'pattern-pack',
+            name,
+            ref: `pattern-pack/${name}`,
+            content: { name, ...content },
+        });
         const { c } = make(GRAPH, [
             // the persisted shape: uniform {direction} steps, the start node's being the EMPTY STRING
             def('smurfing-fan', {
-                label: 'Smurfing fan-out', category: 'money', description: 'One account fans out to many.',
-                steps: [{ direction: '' }, { direction: 'out' }, { direction: 'out' }], tool: 'cohesion',
+                label: 'Smurfing fan-out',
+                category: 'money',
+                description: 'One account fans out to many.',
+                steps: [{ direction: '' }, { direction: 'out' }, { direction: 'out' }],
+                tool: 'cohesion',
             }),
             def('broken-pack', { label: 'No category, no steps' }),
         ]);
 
-        expect(c.patternPacks().map((p) => p.id)).toEqual(['smurfing-fan']);   // built-ins replaced, junk dropped
+        expect(c.patternPacks().map((p) => p.id)).toEqual(['smurfing-fan']); // built-ins replaced, junk dropped
         c.loadPatternPack('smurfing-fan');
         expect(c.patternSteps()).toHaveLength(3);
-        expect(c.patternSteps()[0].direction).toBeUndefined();                 // blank start ⇒ wildcard
+        expect(c.patternSteps()[0].direction).toBeUndefined(); // blank start ⇒ wildcard
         expect(c.patternSteps()[1].direction).toBe('out');
         expect(c.loadedPack()?.tool).toBe('cohesion');
     });

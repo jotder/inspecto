@@ -20,7 +20,10 @@ const SOURCE: QuerySource = {
 async function create() {
     TestBed.configureTestingModule({
         imports: [QueryPanelComponent],
-        providers: [provideNoopAnimations(), { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+        ],
     });
     await TestBed.compileComponents(); // the embedded data-table has a @defer block (the SQL editor)
     const f = TestBed.createComponent(QueryPanelComponent);
@@ -49,7 +52,7 @@ describe('QueryPanelComponent', () => {
         expect(t.filterOpen()).toBe(true);
     });
 
-    it('re-emits the embedded table\'s queryModelChange as queryChange', async () => {
+    it("re-emits the embedded table's queryModelChange as queryChange", async () => {
         const f = await create();
         const emitted: { model: QueryModel; sql: string }[] = [];
         f.componentInstance.queryChange.subscribe((e) => emitted.push(e));
@@ -71,7 +74,10 @@ describe('QueryPanelComponent', () => {
         };
         TestBed.configureTestingModule({
             imports: [QueryPanelComponent],
-            providers: [provideNoopAnimations(), { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } }],
+            providers: [
+                provideNoopAnimations(),
+                { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+            ],
         });
         await TestBed.compileComponents();
         const f = TestBed.createComponent(QueryPanelComponent);

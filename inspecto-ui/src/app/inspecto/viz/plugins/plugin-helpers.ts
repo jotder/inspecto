@@ -79,7 +79,13 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
 export function buildValueQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
     const cv = values.value?.[0] ?? values.y?.[0];
     const measures = cv ? [channelMeasure(cv)] : [];
-    return { datasetId: ctx.datasetId, sourceName: ctx.sourceName, groupBy: [], measures, filters: ctx.filters ?? null };
+    return {
+        datasetId: ctx.datasetId,
+        sourceName: ctx.sourceName,
+        groupBy: [],
+        measures,
+        filters: ctx.filters ?? null,
+    };
 }
 
 export function transformValue(rows: Record<string, unknown>[], values: ControlValues): VizProps {

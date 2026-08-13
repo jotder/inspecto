@@ -39,14 +39,22 @@ function adjacency(g: G6GraphData): Adjacency {
 
 function neighborsOf(adj: Adjacency, id: string, direction: GraphDirection): [string, string][] {
     switch (direction) {
-        case 'out': return adj.out.get(id) ?? [];
-        case 'in':  return adj.in.get(id) ?? [];
-        default:    return [...(adj.out.get(id) ?? []), ...(adj.in.get(id) ?? [])];
+        case 'out':
+            return adj.out.get(id) ?? [];
+        case 'in':
+            return adj.in.get(id) ?? [];
+        default:
+            return [...(adj.out.get(id) ?? []), ...(adj.in.get(id) ?? [])];
     }
 }
 
 /** BFS shortest path between two nodes, or `null` when disconnected. Includes both endpoints. */
-export function shortestPath(g: G6GraphData, fromId: string, toId: string, direction: GraphDirection = 'both'): GraphSelection | null {
+export function shortestPath(
+    g: G6GraphData,
+    fromId: string,
+    toId: string,
+    direction: GraphDirection = 'both',
+): GraphSelection | null {
     if (fromId === toId) return { nodeIds: [fromId], edgeIds: [] };
     const adj = adjacency(g);
     if (!adj.out.has(fromId) || !adj.out.has(toId)) return null;
@@ -82,7 +90,9 @@ export function shortestPath(g: G6GraphData, fromId: string, toId: string, direc
  * Kept for V1 surfacing but implemented here since the MVP path tab exposes a "more paths" affordance.
  */
 export function allPaths(
-    g: G6GraphData, fromId: string, toId: string,
+    g: G6GraphData,
+    fromId: string,
+    toId: string,
     opts: { limit?: number; maxHops?: number; direction?: GraphDirection } = {},
 ): GraphSelection[] {
     const { limit = 10, maxHops = 8, direction = 'both' } = opts;
@@ -114,7 +124,12 @@ export function allPaths(
 }
 
 /** The N-hop neighborhood subgraph around a node (root included; edges within the kept set). */
-export function neighborhood(g: G6GraphData, nodeId: string, hops = 1, direction: GraphDirection = 'both'): G6GraphData {
+export function neighborhood(
+    g: G6GraphData,
+    nodeId: string,
+    hops = 1,
+    direction: GraphDirection = 'both',
+): G6GraphData {
     const adj = adjacency(g);
     const keep = new Set([nodeId]);
     let frontier = [nodeId];
@@ -274,7 +289,9 @@ export function detectCommunities(g: G6GraphData, maxIterations = 20): Map<strin
     for (const id of ids) {
         const own = label.get(id)!;
         if (size.get(own) !== 1) continue;
-        const nbs = neighborsOf(adj, id, 'both').map(([nb]) => nb).sort();
+        const nbs = neighborsOf(adj, id, 'both')
+            .map(([nb]) => nb)
+            .sort();
         if (!nbs.length) continue;
         const target = label.get(nbs[0])!;
         label.set(id, target);
@@ -321,7 +338,11 @@ export function louvainCommunities(g: G6GraphData): Map<string, string> {
         const a = index.get(e.source);
         const b = index.get(e.target);
         if (a == null || b == null) continue;
-        if (a === b) { self[a] += 1; m2 += 2; continue; }
+        if (a === b) {
+            self[a] += 1;
+            m2 += 2;
+            continue;
+        }
         adj[a].set(b, (adj[a].get(b) ?? 0) + 1);
         adj[b].set(a, (adj[b].get(a) ?? 0) + 1);
         m2 += 2;
@@ -356,10 +377,17 @@ export function louvainCommunities(g: G6GraphData): Map<string, string> {
                 for (const c of [...kiIn.keys()].sort((x, y) => x - y)) {
                     if (c === ci) continue;
                     const gain = kiIn.get(c)! - (deg[i] * commTot[c]) / m2;
-                    if (gain > bestGain + 1e-12) { bestGain = gain; bestC = c; }
+                    if (gain > bestGain + 1e-12) {
+                        bestGain = gain;
+                        bestC = c;
+                    }
                 }
                 commTot[bestC] += deg[i];
-                if (bestC !== ci) { comm[i] = bestC; improved = true; moved = true; }
+                if (bestC !== ci) {
+                    comm[i] = bestC;
+                    improved = true;
+                    moved = true;
+                }
             }
         }
         // Relabel this level's communities to contiguous ids and fold into the original membership.
@@ -377,8 +405,9 @@ export function louvainCommunities(g: G6GraphData): Map<string, string> {
             const ci = remap.get(comm[i])!;
             for (const [j, w] of adj[i]) {
                 const cj = remap.get(comm[j])!;
-                if (ci === cj) { if (i < j) nSelf[ci] += w; }
-                else nAdj[ci].set(cj, (nAdj[ci].get(cj) ?? 0) + w);
+                if (ci === cj) {
+                    if (i < j) nSelf[ci] += w;
+                } else nAdj[ci].set(cj, (nAdj[ci].get(cj) ?? 0) + w);
             }
         }
         adj = nAdj;
@@ -634,7 +663,10 @@ export function edgeWeight(e: G6Edge): number {
  * ({@link shortestPath} already answers the fewest-hops question). Includes both endpoints.
  */
 export function weightedShortestPath(
-    g: G6GraphData, fromId: string, toId: string, direction: GraphDirection = 'both',
+    g: G6GraphData,
+    fromId: string,
+    toId: string,
+    direction: GraphDirection = 'both',
 ): GraphSelection | null {
     if (fromId === toId) return { nodeIds: [fromId], edgeIds: [] };
     const adj = adjacency(g);
@@ -647,7 +679,10 @@ export function weightedShortestPath(
         let cur: string | null = null;
         let best = Infinity;
         for (const [id, d] of dist) {
-            if (!visited.has(id) && d < best) { best = d; cur = id; }
+            if (!visited.has(id) && d < best) {
+                best = d;
+                cur = id;
+            }
         }
         if (cur === null || cur === toId) break;
         visited.add(cur);
@@ -876,7 +911,9 @@ export function closenessCentrality(g: G6GraphData): NodeScore[] {
 }
 
 function powerIterate(
-    g: G6GraphData, step: (x: Map<string, number>, next: Map<string, number>) => void, iterations: number,
+    g: G6GraphData,
+    step: (x: Map<string, number>, next: Map<string, number>) => void,
+    iterations: number,
 ): Map<string, number> {
     const ids = g.nodes.map((n) => n.id);
     let x = new Map(ids.map((id) => [id, 1]));
@@ -897,13 +934,17 @@ function powerIterate(
 export function eigenvectorCentrality(g: G6GraphData, iterations = 100): NodeScore[] {
     requireUnderCap(g, 'Eigenvector centrality');
     const adj = adjacency(g);
-    const x = powerIterate(g, (cur, next) => {
-        for (const id of next.keys()) {
-            let s = 0;
-            for (const [nb] of neighborsOf(adj, id, 'both')) s += cur.get(nb) ?? 0;
-            next.set(id, s);
-        }
-    }, iterations);
+    const x = powerIterate(
+        g,
+        (cur, next) => {
+            for (const id of next.keys()) {
+                let s = 0;
+                for (const [nb] of neighborsOf(adj, id, 'both')) s += cur.get(nb) ?? 0;
+                next.set(id, s);
+            }
+        },
+        iterations,
+    );
     return scored(g, x);
 }
 
@@ -912,7 +953,8 @@ export function eigenvectorCentrality(g: G6GraphData, iterations = 100): NodeSco
  * below 1/λmax to converge (0.1 is safe for sparse investigation graphs). Throws above the cap.
  */
 export function katzCentrality(
-    g: G6GraphData, opts: { alpha?: number; beta?: number; iterations?: number } = {},
+    g: G6GraphData,
+    opts: { alpha?: number; beta?: number; iterations?: number } = {},
 ): NodeScore[] {
     requireUnderCap(g, 'Katz centrality');
     const { alpha = 0.1, beta = 1, iterations = 100 } = opts;
@@ -985,7 +1027,10 @@ export function kCore(g: G6GraphData): NodeScore[] {
         let min: string | null = null;
         let minDeg = Infinity;
         for (const id of remaining) {
-            if (deg.get(id)! < minDeg) { minDeg = deg.get(id)!; min = id; }
+            if (deg.get(id)! < minDeg) {
+                minDeg = deg.get(id)!;
+                min = id;
+            }
         }
         k = Math.max(k, minDeg);
         core.set(min!, k);
@@ -1034,16 +1079,15 @@ export function cliques(g: G6GraphData, opts: { minSize?: number } = {}): string
         for (const u of [...p, ...x]) {
             let d = 0;
             for (const w of nb.get(u) ?? []) if (p.has(w)) d++;
-            if (d > bestDeg) { bestDeg = d; pivot = u; }
+            if (d > bestDeg) {
+                bestDeg = d;
+                pivot = u;
+            }
         }
         const candidates = [...p].filter((v) => !(pivot && nb.get(pivot)?.has(v)));
         for (const v of candidates) {
             const vn = nb.get(v) ?? new Set<string>();
-            bk(
-                new Set([...r, v]),
-                new Set([...p].filter((w) => vn.has(w))),
-                new Set([...x].filter((w) => vn.has(w))),
-            );
+            bk(new Set([...r, v]), new Set([...p].filter((w) => vn.has(w))), new Set([...x].filter((w) => vn.has(w))));
             p.delete(v);
             x.add(v);
         }
@@ -1140,7 +1184,11 @@ export function maximumSpanningForest(g: G6GraphData): GraphSelection {
     const find = (x: string): string => {
         let r = x;
         while (parent.get(r) !== r) r = parent.get(r)!;
-        while (parent.get(x) !== r) { const nx = parent.get(x)!; parent.set(x, r); x = nx; }
+        while (parent.get(x) !== r) {
+            const nx = parent.get(x)!;
+            parent.set(x, r);
+            x = nx;
+        }
         return r;
     };
     const sorted = g.edges
@@ -1201,7 +1249,8 @@ export interface PredictedLink {
  * {@link ANALYSIS_NODE_CAP}.
  */
 export function linkPrediction(
-    g: G6GraphData, opts: { method?: 'common-neighbors' | 'adamic-adar'; limit?: number } = {},
+    g: G6GraphData,
+    opts: { method?: 'common-neighbors' | 'adamic-adar'; limit?: number } = {},
 ): PredictedLink[] {
     requireUnderCap(g, 'Link prediction');
     const { method = 'adamic-adar', limit = 20 } = opts;
@@ -1223,7 +1272,13 @@ export function linkPrediction(
                 score += method === 'adamic-adar' ? (deg > 1 ? 1 / Math.log(deg) : 0) : 1;
             }
             if (score > 0) {
-                out.push({ source: a, target: b, sourceLabel: label.get(a) ?? a, targetLabel: label.get(b) ?? b, score });
+                out.push({
+                    source: a,
+                    target: b,
+                    sourceLabel: label.get(a) ?? a,
+                    targetLabel: label.get(b) ?? b,
+                    score,
+                });
             }
         }
     }

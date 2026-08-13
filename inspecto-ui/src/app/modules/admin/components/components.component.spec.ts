@@ -7,8 +7,18 @@ import { ComponentDef, ComponentsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ComponentsComponent } from './components.component';
 
-const GRAMMAR: ComponentDef = { type: 'grammar', name: 'pipe', ref: 'grammar/pipe', content: { delimiter: '|', has_header: true } };
-const TRANSFORM: ComponentDef = { type: 'transform', name: 'filt', ref: 'transform/filt', content: { type: 'transform.filter' } };
+const GRAMMAR: ComponentDef = {
+    type: 'grammar',
+    name: 'pipe',
+    ref: 'grammar/pipe',
+    content: { delimiter: '|', has_header: true },
+};
+const TRANSFORM: ComponentDef = {
+    type: 'transform',
+    name: 'filt',
+    ref: 'transform/filt',
+    content: { type: 'transform.filter' },
+};
 
 /** Build the component over a stub service whose per-kind list() returns the given map. */
 function create(lists: Partial<Record<string, Observable<ComponentDef[]>>>) {
@@ -36,7 +46,9 @@ describe('ComponentsComponent', () => {
         const c = create({}).componentInstance;
         expect(c.summary(GRAMMAR)).toContain('header');
         expect(c.summary(TRANSFORM)).toContain('transform.filter');
-        expect(c.summary({ type: 'sink', name: 'o', ref: 'sink/o', content: { type: 'sink.view', store: 's' } })).toContain('sink.view');
+        expect(
+            c.summary({ type: 'sink', name: 'o', ref: 'sink/o', content: { type: 'sink.view', store: 's' } }),
+        ).toContain('sink.view');
     });
 
     it('renders an accessible empty state when there are no components', async () => {

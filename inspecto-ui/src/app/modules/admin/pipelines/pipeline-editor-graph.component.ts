@@ -81,8 +81,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
             .subscribe((config) => {
                 const dark =
                     config?.scheme === 'dark' ||
-                    (config?.scheme === 'auto' &&
-                        window.matchMedia('(prefers-color-scheme: dark)').matches);
+                    (config?.scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                 if (dark !== this.dark) {
                     this.dark = dark;
                     if (this.ready) this.rebuild();
@@ -284,7 +283,12 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
                             .some((x) => x.source === source && x.target === target);
                         if (alreadyLinked) return false;
                         this.edgeCreated.emit({ source, target });
-                        return { id: `${source}->${target}:data:${Date.now()}`, source, target, data: { kind: 'data' } };
+                        return {
+                            id: `${source}->${target}:data:${Date.now()}`,
+                            source,
+                            target,
+                            data: { kind: 'data' },
+                        };
                     },
                 },
             ],

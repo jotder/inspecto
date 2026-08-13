@@ -19,78 +19,202 @@ const PARSER_PREVIEW = /\/parsers\/([^/]+)\/preview$/;
 /** Server cap on `sample_text` (ParserRoutes.MAX_SAMPLE_CHARS). */
 const MAX_SAMPLE_CHARS = 1_000_000;
 
-const str = (path: string, label: string, description: string): ServedFieldSpec =>
-    ({ path, label, description, type: 'STRING' });
-const int = (path: string, label: string, description: string): ServedFieldSpec =>
-    ({ path, label, description, type: 'INT' });
+const str = (path: string, label: string, description: string): ServedFieldSpec => ({
+    path,
+    label,
+    description,
+    type: 'STRING',
+});
+const int = (path: string, label: string, description: string): ServedFieldSpec => ({
+    path,
+    label,
+    description,
+    type: 'INT',
+});
 
 /** The catalog `Parsers.catalog()` serves — built-ins first, then discovered plugins. */
 const CATALOG: ParserDef[] = [
     {
-        id: 'delimited', label: 'Delimited — CSV / TSV / pipe, one record per line',
-        hierarchical: false, ingestable: true,
+        id: 'delimited',
+        label: 'Delimited — CSV / TSV / pipe, one record per line',
+        hierarchical: false,
+        ingestable: true,
         grammarSchema: [
-            { path: 'delimited.delimiter', label: 'Delimiter', type: 'STRING', defaultValue: ',', description: 'Column separator character.' },
-            { path: 'delimited.has_header', label: 'First line is a header', type: 'BOOL', defaultValue: true, description: 'Whether line one carries the column names.' },
-            int('delimited.skip_header_lines', 'Skip leading lines', 'Banner/preamble lines before the data (and header).'),
+            {
+                path: 'delimited.delimiter',
+                label: 'Delimiter',
+                type: 'STRING',
+                defaultValue: ',',
+                description: 'Column separator character.',
+            },
+            {
+                path: 'delimited.has_header',
+                label: 'First line is a header',
+                type: 'BOOL',
+                defaultValue: true,
+                description: 'Whether line one carries the column names.',
+            },
+            int(
+                'delimited.skip_header_lines',
+                'Skip leading lines',
+                'Banner/preamble lines before the data (and header).',
+            ),
             str('delimited.null_strings', 'Null strings', 'Values read as NULL; comma-separate multiple.'),
             str('encoding', 'Encoding', 'Character encoding (default UTF-8).'),
             str('compression', 'Input compression', 'e.g. gzip.'),
         ],
     },
     {
-        id: 'fixedwidth', label: 'Fixed width — positional slices carved from each line',
-        hierarchical: false, ingestable: true,
+        id: 'fixedwidth',
+        label: 'Fixed width — positional slices carved from each line',
+        hierarchical: false,
+        ingestable: true,
         grammarSchema: [
-            { path: 'fixedwidth.fields', label: 'Fields', type: 'LIST', required: true, description: 'Positional slices: one {name, start, length} per field.' },
-            { path: 'delimited.has_header', label: 'First line is a header', type: 'BOOL', defaultValue: true, description: 'Header/banner line to skip before the records.' },
-            int('fixedwidth.min_record_length', 'Minimum record length', 'Shorter lines (footers, blanks) are dropped. Absent = the widest field end.'),
-            { path: 'fixedwidth.trim', label: 'Trim fields', type: 'ENUM', enumValues: ['BOTH', 'LEFT', 'RIGHT', 'NONE'], defaultValue: 'BOTH', description: 'Whitespace trim per slice.' },
+            {
+                path: 'fixedwidth.fields',
+                label: 'Fields',
+                type: 'LIST',
+                required: true,
+                description: 'Positional slices: one {name, start, length} per field.',
+            },
+            {
+                path: 'delimited.has_header',
+                label: 'First line is a header',
+                type: 'BOOL',
+                defaultValue: true,
+                description: 'Header/banner line to skip before the records.',
+            },
+            int(
+                'fixedwidth.min_record_length',
+                'Minimum record length',
+                'Shorter lines (footers, blanks) are dropped. Absent = the widest field end.',
+            ),
+            {
+                path: 'fixedwidth.trim',
+                label: 'Trim fields',
+                type: 'ENUM',
+                enumValues: ['BOTH', 'LEFT', 'RIGHT', 'NONE'],
+                defaultValue: 'BOTH',
+                description: 'Whitespace trim per slice.',
+            },
             str('encoding', 'Encoding', 'Character encoding (default UTF-8).'),
             str('compression', 'Input compression', 'e.g. gzip.'),
         ],
     },
     {
-        id: 'json', label: 'JSON — NDJSON (one object per line) or a JSON array document',
-        hierarchical: false, ingestable: true,
+        id: 'json',
+        label: 'JSON — NDJSON (one object per line) or a JSON array document',
+        hierarchical: false,
+        ingestable: true,
         grammarSchema: [
-            { path: 'json.format', label: 'Document shape', type: 'ENUM', enumValues: ['newline', 'array', 'auto'], defaultValue: 'newline', description: 'NDJSON, one JSON array of records, or auto-detect.' },
+            {
+                path: 'json.format',
+                label: 'Document shape',
+                type: 'ENUM',
+                enumValues: ['newline', 'array', 'auto'],
+                defaultValue: 'newline',
+                description: 'NDJSON, one JSON array of records, or auto-detect.',
+            },
             int('delimited.skip_header_lines', 'Skip leading lines', 'Non-JSON preamble lines before the records.'),
             str('compression', 'Input compression', 'e.g. gzip.'),
         ],
     },
     {
-        id: 'text_regex', label: 'Text / regex — named capture groups over matching lines',
-        hierarchical: false, ingestable: true,
+        id: 'text_regex',
+        label: 'Text / regex — named capture groups over matching lines',
+        hierarchical: false,
+        ingestable: true,
         grammarSchema: [
-            { path: 'text_regex.pattern', label: 'Pattern', type: 'STRING', required: true, description: 'At least one named capture group — group names become the columns; non-matching lines are dropped.' },
+            {
+                path: 'text_regex.pattern',
+                label: 'Pattern',
+                type: 'STRING',
+                required: true,
+                description:
+                    'At least one named capture group — group names become the columns; non-matching lines are dropped.',
+            },
             int('delimited.skip_header_lines', 'Skip leading lines', 'Preamble lines before the records.'),
             str('encoding', 'Encoding', 'Character encoding (default UTF-8).'),
         ],
     },
     {
-        id: 'xml', label: 'XML — XML file format',
-        hierarchical: true, ingestable: false, // preview-only until the flatten configuration
+        id: 'xml',
+        label: 'XML — XML file format',
+        hierarchical: true,
+        ingestable: false, // preview-only until the flatten configuration
         grammarSchema: [
-            str('xml.record_element', 'Record element', 'Element that starts one record — a local name (order) or a slash path (orders/order). Blank = every direct child of the root.'),
-            { path: 'xml.namespace_aware', label: 'Namespace aware', type: 'BOOL', defaultValue: false, description: 'Resolve namespaces (element labels then use local names).' },
+            str(
+                'xml.record_element',
+                'Record element',
+                'Element that starts one record — a local name (order) or a slash path (orders/order). Blank = every direct child of the root.',
+            ),
+            {
+                path: 'xml.namespace_aware',
+                label: 'Namespace aware',
+                type: 'BOOL',
+                defaultValue: false,
+                description: 'Resolve namespaces (element labels then use local names).',
+            },
             str('xml.encoding', 'Encoding', "Overrides the document prolog's encoding (default: auto-detect)."),
-            { path: 'xml.max_records', label: 'Preview records', type: 'INT', defaultValue: 50, description: 'Records materialized into the preview tree (max 1000).' },
+            {
+                path: 'xml.max_records',
+                label: 'Preview records',
+                type: 'INT',
+                defaultValue: 50,
+                description: 'Records materialized into the preview tree (max 1000).',
+            },
         ],
     },
     {
-        id: 'asn1', label: 'ASN.1 — BER/DER encoded records',
+        id: 'asn1',
+        label: 'ASN.1 — BER/DER encoded records',
         // Hierarchical like xml, but ingestable: Asn1RecordIngester flattens records onto segment
         // schemas through the existing parsing.plugin machinery.
-        hierarchical: true, ingestable: true,
+        hierarchical: true,
+        ingestable: true,
         ingesterClass: 'com.gamma.ingester.Asn1RecordIngester',
         grammarSchema: [
-            str('asn1.grammar', 'ASN.1 grammar', 'The ASN.1 module text (X.680 syntax) defining the record type. Leave EMPTY to dump the file’s raw TLV structure instead — BER is self-describing, so an unknown file can be inspected before its module is available. A grammar is still required to ingest.'),
-            str('asn1.root_type', 'Root type', 'Name of the type in the grammar each record binds against, e.g. Record. Required when a grammar is supplied; ignored in structural mode.'),
-            { path: 'asn1.strictness', label: 'Strictness', type: 'ENUM', defaultValue: 'BER', enumValues: ['BER', 'DER', 'CER'], description: 'Encoding rules enforced while decoding: BER (permissive), DER, or CER.' },
-            { path: 'asn1.file_header_length', label: 'File header bytes', type: 'INT', defaultValue: 0, description: 'Bytes to skip at the start of the file before the first record (e.g. 50 for Huawei-framed files). 0 = none.' },
-            { path: 'asn1.record_header_length', label: 'Record header bytes', type: 'INT', defaultValue: 0, description: 'Bytes preceding each record’s TLV, skipped (e.g. 4 for Huawei-framed files). 0 = bare back-to-back TLVs. Records stay delimited by their own BER length.' },
-            { path: 'asn1.max_records', label: 'Preview records', type: 'INT', defaultValue: 50, description: 'Records materialized into the preview tree (max 1000).' },
+            str(
+                'asn1.grammar',
+                'ASN.1 grammar',
+                'The ASN.1 module text (X.680 syntax) defining the record type. Leave EMPTY to dump the file’s raw TLV structure instead — BER is self-describing, so an unknown file can be inspected before its module is available. A grammar is still required to ingest.',
+            ),
+            str(
+                'asn1.root_type',
+                'Root type',
+                'Name of the type in the grammar each record binds against, e.g. Record. Required when a grammar is supplied; ignored in structural mode.',
+            ),
+            {
+                path: 'asn1.strictness',
+                label: 'Strictness',
+                type: 'ENUM',
+                defaultValue: 'BER',
+                enumValues: ['BER', 'DER', 'CER'],
+                description: 'Encoding rules enforced while decoding: BER (permissive), DER, or CER.',
+            },
+            {
+                path: 'asn1.file_header_length',
+                label: 'File header bytes',
+                type: 'INT',
+                defaultValue: 0,
+                description:
+                    'Bytes to skip at the start of the file before the first record (e.g. 50 for Huawei-framed files). 0 = none.',
+            },
+            {
+                path: 'asn1.record_header_length',
+                label: 'Record header bytes',
+                type: 'INT',
+                defaultValue: 0,
+                description:
+                    'Bytes preceding each record’s TLV, skipped (e.g. 4 for Huawei-framed files). 0 = bare back-to-back TLVs. Records stay delimited by their own BER length.',
+            },
+            {
+                path: 'asn1.max_records',
+                label: 'Preview records',
+                type: 'INT',
+                defaultValue: 50,
+                description: 'Records materialized into the preview tree (max 1000).',
+            },
         ],
     },
 ];
@@ -122,16 +246,23 @@ function preview(id: string, req: MockRequest) {
 
 function parse(id: string, grammar: Record<string, unknown>, sample: string): ParserPreview {
     switch (id) {
-        case 'delimited': return delimited(grammar, sample);
-        case 'fixedwidth': return fixedwidth(grammar, sample);
-        case 'json': return ndjson(sample);
-        case 'text_regex': return textRegex(grammar, sample);
-        case 'xml': return xmlTree(grammar, sample);
+        case 'delimited':
+            return delimited(grammar, sample);
+        case 'fixedwidth':
+            return fixedwidth(grammar, sample);
+        case 'json':
+            return ndjson(sample);
+        case 'text_regex':
+            return textRegex(grammar, sample);
+        case 'xml':
+            return xmlTree(grammar, sample);
         // ASN.1 is in the catalog (the segments editor gates on its ingesterClass), but its input
         // is BINARY BER — a mock decoder would be a second ASN.1 implementation and a lie either
         // way. Refuse honestly: STRICTER than the server, never more lenient.
-        case 'asn1': throw new Error('ASN.1 preview needs the real decoder — not available in mock mode');
-        default: throw new Error(`unknown parser: ${id}`);
+        case 'asn1':
+            throw new Error('ASN.1 preview needs the real decoder — not available in mock mode');
+        default:
+            throw new Error(`unknown parser: ${id}`);
     }
 }
 
@@ -164,10 +295,13 @@ function fixedwidth(grammar: Record<string, unknown>, sample: string): ParserPre
     const fields = (g['fields'] ?? []) as { name: string; start: number; length: number }[];
     if (!fields.length) throw new Error('fixed width needs at least one field');
     const skip = sub(grammar, 'delimited')['has_header'] !== false ? 1 : 0;
-    const rows = lines(sample).slice(skip).map((l) =>
-        Object.fromEntries(fields.map((f) => [f.name, l.substring(f.start, f.start + f.length).trim()])),
+    const rows = lines(sample)
+        .slice(skip)
+        .map((l) => Object.fromEntries(fields.map((f) => [f.name, l.substring(f.start, f.start + f.length).trim()])));
+    return table(
+        fields.map((f) => f.name),
+        rows,
     );
-    return table(fields.map((f) => f.name), rows);
 }
 
 /** Mirrors the server's NDJSON path: json_valid filter (invalid lines REJECTED, never null-padded),
@@ -187,11 +321,16 @@ function ndjson(sample: string): ParserPreview {
     }
     if (records.length === 0) throw new Error('sample does not parse with this grammar: no valid JSON records');
     const rows = records.map((r) =>
-        Object.fromEntries(keys.map((k) => {
-            const v = r[k];
-            // json_extract_string semantics: nested values land stringified, scalars as text.
-            return [k, v === undefined || v === null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v)];
-        })),
+        Object.fromEntries(
+            keys.map((k) => {
+                const v = r[k];
+                // json_extract_string semantics: nested values land stringified, scalars as text.
+                return [
+                    k,
+                    v === undefined || v === null ? null : typeof v === 'object' ? JSON.stringify(v) : String(v),
+                ];
+            }),
+        ),
     );
     return table(keys, rows, rejected);
 }
@@ -237,9 +376,11 @@ function xmlTree(grammar: Record<string, unknown>, sample: string): ParserPrevie
     };
     walk(doc.documentElement, []);
     if (matches.length === 0) {
-        throw new Error(recordPath
-            ? `no elements match record_element '${recordPath}'`
-            : 'no record elements found under the document root');
+        throw new Error(
+            recordPath
+                ? `no elements match record_element '${recordPath}'`
+                : 'no record elements found under the document root',
+        );
     }
     const nodes = matches.slice(0, maxRecords).map(elementNode);
     return { kind: 'tree', recordCount: matches.length, nodes };
@@ -247,7 +388,8 @@ function xmlTree(grammar: Record<string, unknown>, sample: string): ParserPrevie
 
 function elementNode(el: Element): ParserTreeNode {
     const children: ParserTreeNode[] = [];
-    for (const a of Array.from(el.attributes)) children.push({ label: `@${a.localName}`, type: 'attr', value: a.value });
+    for (const a of Array.from(el.attributes))
+        children.push({ label: `@${a.localName}`, type: 'attr', value: a.value });
     for (const c of Array.from(el.children)) children.push(elementNode(c));
     const text = Array.from(el.childNodes)
         .filter((n) => n.nodeType === Node.TEXT_NODE || n.nodeType === Node.CDATA_SECTION_NODE)

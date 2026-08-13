@@ -96,7 +96,10 @@ export class PipelinesComponent {
 
     /** Pipeline names offered in the multiselect, filtered by its search box. */
     readonly combinedPipelineOptions = computed<string[]>(() =>
-        this.filterNames(this.combinedSearch(), (this.combined()?.flows ?? []).map((f) => f.name)),
+        this.filterNames(
+            this.combinedSearch(),
+            (this.combined()?.flows ?? []).map((f) => f.name),
+        ),
     );
 
     /** Every pipeline in the topology as transfer references — what the export/import menu offers. */

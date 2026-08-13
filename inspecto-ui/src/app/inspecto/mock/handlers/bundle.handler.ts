@@ -33,9 +33,21 @@ import { PIPELINES_COLL } from './pipelines.handler';
 
 /** Mirrors `BundleRoutes.APPLY_ORDER`; a kind absent here applies last (same as the backend's default). */
 const APPLY_ORDER = [
-    'connection', 'grammar', 'transform', 'sink', 'dataset', 'query', 'widget',
-    'dashboard', 'reconciliation', 'link-analysis-view', 'geo-map-view', 'decision-rule',
-    'authored-pipeline', 'job', 'saved-view',
+    'connection',
+    'grammar',
+    'transform',
+    'sink',
+    'dataset',
+    'query',
+    'widget',
+    'dashboard',
+    'reconciliation',
+    'link-analysis-view',
+    'geo-map-view',
+    'decision-rule',
+    'authored-pipeline',
+    'job',
+    'saved-view',
 ];
 
 /** Kinds with their own store, outside the component registry (mirrors `OWN_STORE_KINDS`). */
@@ -113,9 +125,7 @@ function toBundleView(content: Record<string, unknown>): Record<string, unknown>
             if (typeof v === 'string' && v.startsWith('${')) out[k] = v;
             continue;
         }
-        out[k] = v && typeof v === 'object' && !Array.isArray(v)
-            ? toBundleView(v as Record<string, unknown>)
-            : v;
+        out[k] = v && typeof v === 'object' && !Array.isArray(v) ? toBundleView(v as Record<string, unknown>) : v;
     }
     return out;
 }
@@ -201,11 +211,16 @@ export function bundleHandler(flags: MockFlags): MockHandler {
         }
 
         const results: { kind: string; id: string; status: string; message?: string }[] = [];
-        let imported = 0, overwritten = 0, skipped = 0, unchanged = 0, failed = 0;
+        let imported = 0,
+            overwritten = 0,
+            skipped = 0,
+            unchanged = 0,
+            failed = 0;
 
         for (const item of items) {
             const { kind, id } = item;
-            const push = (status: string, message?: string) => results.push({ kind, id, status, ...(message ? { message } : {}) });
+            const push = (status: string, message?: string) =>
+                results.push({ kind, id, status, ...(message ? { message } : {}) });
 
             if (RETIRED.has(kind)) {
                 push('skipped', 'unsupported kind (promote via the UI or whole-space export)');
@@ -234,9 +249,12 @@ export function bundleHandler(flags: MockFlags): MockHandler {
             }
             const action = actions[`${kind}/${id}`];
             if (action === 'skip' || (current && action !== 'overwrite')) {
-                push('skipped', current
-                    ? `already exists (pass actions {"${kind}/${id}":"overwrite"} to replace)`
-                    : 'explicit skip action');
+                push(
+                    'skipped',
+                    current
+                        ? `already exists (pass actions {"${kind}/${id}":"overwrite"} to replace)`
+                        : 'explicit skip action',
+                );
                 skipped++;
                 continue;
             }
@@ -245,7 +263,8 @@ export function bundleHandler(flags: MockFlags): MockHandler {
             const idField = kind === 'connection' ? 'id' : 'name';
             store.put(space, coll, id, { ...item.content, [idField]: id });
             push(current ? 'overwritten' : 'imported');
-            if (current) overwritten++; else imported++;
+            if (current) overwritten++;
+            else imported++;
         }
 
         return json({ imported, overwritten, skipped, unchanged, failed, results });

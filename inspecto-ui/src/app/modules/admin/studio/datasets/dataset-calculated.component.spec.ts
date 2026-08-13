@@ -80,7 +80,7 @@ describe('DatasetCalculatedComponent', () => {
         // Regression: mat-error only displays when Material's errorState is true (a real Validator on
         // the control), which this plain-ngModel field never sets — so the error must be a plain
         // element, not <mat-error>, or it silently never renders despite the guard function being correct.
-        const fixture = create([{ name: 'leak', expr: "(select 1)" }]);
+        const fixture = create([{ name: 'leak', expr: '(select 1)' }]);
         fixture.detectChanges();
         expect(fixture.nativeElement.textContent).toContain("'select' is not allowed in a calculated column.");
         expect(fixture.nativeElement.querySelector('mat-error')).toBeNull();

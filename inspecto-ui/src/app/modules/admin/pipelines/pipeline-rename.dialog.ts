@@ -45,8 +45,8 @@ export interface PipelineRenameResultData {
         <h2 mat-dialog-title inspectoDialogResize>Rename pipeline</h2>
         <mat-dialog-content>
             <inspecto-alert variant="info" title="The identity stays '{{ data.id }}'">
-                Only the label changes. Run history, the dedup ledger and the data catalog keep using
-                '{{ data.id }}', so nothing is re-processed and no history is lost.
+                Only the label changes. Run history, the dedup ledger and the data catalog keep using '{{ data.id }}',
+                so nothing is re-processed and no history is lost.
             </inspecto-alert>
             <form [formGroup]="form" (ngSubmit)="save()" class="mt-4 flex flex-col gap-3">
                 <mat-form-field class="w-full" subscriptSizing="dynamic">

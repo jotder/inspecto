@@ -5,16 +5,30 @@ import { Observable, of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { AcquisitionMetrics, AcquisitionMetricsService, RunsService, CollectorView, CollectorsService } from 'app/inspecto/api';
+import {
+    AcquisitionMetrics,
+    AcquisitionMetricsService,
+    RunsService,
+    CollectorView,
+    CollectorsService,
+} from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { CollectorsComponent } from './collectors.component';
 
 const COLLECTOR = {
-    pipeline: 'cdr_ingest', id: 'sftp_in', connector: 'sftp', connection: 'sftp_edge',
-    duplicateMode: 'CONTENT_HASH', incrementalWatermark: 'mtime', dbWatermarkCurrent: null,
-    fetchParallel: 4, guarantee: 'AT_LEAST_ONCE', includes: [], excludes: [],
+    pipeline: 'cdr_ingest',
+    id: 'sftp_in',
+    connector: 'sftp',
+    connection: 'sftp_edge',
+    duplicateMode: 'CONTENT_HASH',
+    incrementalWatermark: 'mtime',
+    dbWatermarkCurrent: null,
+    fetchParallel: 4,
+    guarantee: 'AT_LEAST_ONCE',
+    includes: [],
+    excludes: [],
 } as unknown as CollectorView;
 
 const metric = (v: number) => ({ series: [{ value: v }] });
@@ -49,7 +63,7 @@ function create(
         ],
     });
     const fixture = TestBed.createComponent(CollectorsComponent);
-    fixture.detectChanges();   // runs ngOnInit (list + metrics load)
+    fixture.detectChanges(); // runs ngOnInit (list + metrics load)
     return fixture;
 }
 

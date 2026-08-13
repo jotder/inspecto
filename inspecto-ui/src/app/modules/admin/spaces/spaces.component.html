@@ -4,9 +4,9 @@
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Spaces</h1>
             <div class="text-secondary mt-1">
-                Each space is an isolated project — its own pipelines, connections, schemas, events and data
-                under <code>spaces/&lt;id&gt;/</code>. Create empty spaces or onboard them from an exported
-                bundle, export a whole space or one data source, and switch the active space from the header.
+                Each space is an isolated project — its own pipelines, connections, schemas, events and data under
+                <code>spaces/&lt;id&gt;/</code>. Create empty spaces or onboard them from an exported bundle, export a
+                whole space or one data source, and switch the active space from the header.
             </div>
         </div>
         <div class="flex flex-wrap items-center gap-3">
@@ -17,7 +17,12 @@
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
             @if (spaces.multiSpace()) {
-                <button mat-icon-button (click)="createFromBundle()" matTooltip="Create from bundle" aria-label="Create from bundle">
+                <button
+                    mat-icon-button
+                    (click)="createFromBundle()"
+                    matTooltip="Create from bundle"
+                    aria-label="Create from bundle"
+                >
                     <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
                 </button>
                 <button mat-stroked-button (click)="newFromTemplate()">
@@ -75,29 +80,63 @@
                         </div>
                         <div class="flex items-center gap-1">
                             @if (!isCurrent(s)) {
-                                <button mat-icon-button (click)="activate(s)" matTooltip="Activate (make current)" aria-label="Activate space">
+                                <button
+                                    mat-icon-button
+                                    (click)="activate(s)"
+                                    matTooltip="Activate (make current)"
+                                    aria-label="Activate space"
+                                >
                                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:check-circle"></mat-icon>
                                 </button>
                             }
                             @if (!isDefault(s)) {
-                                <button mat-icon-button (click)="editSpace(s)" matTooltip="Edit space & branding" aria-label="Edit space">
+                                <button
+                                    mat-icon-button
+                                    (click)="editSpace(s)"
+                                    matTooltip="Edit space & branding"
+                                    aria-label="Edit space"
+                                >
                                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                                 </button>
                             }
-                            <button mat-icon-button (click)="toggleDataSources(s)"
-                                    [matTooltip]="expanded[s.id] ? 'Hide data sources' : 'Show data sources'"
-                                    [attr.aria-label]="expanded[s.id] ? 'Hide data sources' : 'Show data sources'"
-                                    [attr.aria-expanded]="expanded[s.id] ? 'true' : 'false'">
-                                <mat-icon class="icon-size-5"
-                                          [svgIcon]="expanded[s.id] ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"></mat-icon>
+                            <button
+                                mat-icon-button
+                                (click)="toggleDataSources(s)"
+                                [matTooltip]="expanded[s.id] ? 'Hide data sources' : 'Show data sources'"
+                                [attr.aria-label]="expanded[s.id] ? 'Hide data sources' : 'Show data sources'"
+                                [attr.aria-expanded]="expanded[s.id] ? 'true' : 'false'"
+                            >
+                                <mat-icon
+                                    class="icon-size-5"
+                                    [svgIcon]="
+                                        expanded[s.id]
+                                            ? 'heroicons_outline:chevron-up'
+                                            : 'heroicons_outline:chevron-down'
+                                    "
+                                ></mat-icon>
                             </button>
-                            <button mat-icon-button (click)="exportSpace(s)" matTooltip="Export space (.zip)" aria-label="Export space">
+                            <button
+                                mat-icon-button
+                                (click)="exportSpace(s)"
+                                matTooltip="Export space (.zip)"
+                                aria-label="Export space"
+                            >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
                             </button>
-                            <button mat-icon-button (click)="importInto(s)" matTooltip="Import bundle" aria-label="Import bundle">
+                            <button
+                                mat-icon-button
+                                (click)="importInto(s)"
+                                matTooltip="Import bundle"
+                                aria-label="Import bundle"
+                            >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
                             </button>
-                            <button mat-icon-button [matMenuTriggerFor]="rowMenu" matTooltip="Remove" aria-label="Remove space">
+                            <button
+                                mat-icon-button
+                                [matMenuTriggerFor]="rowMenu"
+                                matTooltip="Remove"
+                                aria-label="Remove space"
+                            >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                             </button>
                             <mat-menu #rowMenu="matMenu">
@@ -118,7 +157,9 @@
                         <div class="mt-4 border-t pt-3">
                             <div class="text-secondary mb-2 text-sm font-medium">Data sources</div>
                             @if (dsLoading[s.id]) {
-                                <div class="flex items-center gap-2 text-sm"><mat-spinner diameter="16"></mat-spinner> Loading…</div>
+                                <div class="flex items-center gap-2 text-sm">
+                                    <mat-spinner diameter="16"></mat-spinner> Loading…
+                                </div>
                             } @else if ((dataSources[s.id]?.length ?? 0) === 0) {
                                 <inspecto-empty-state
                                     icon="heroicons_outline:circle-stack"
@@ -128,11 +169,20 @@
                             } @else {
                                 <div class="flex flex-col gap-1">
                                     @for (ds of dataSources[s.id]; track ds) {
-                                        <div class="flex items-center justify-between rounded bg-gray-100 px-2 py-1 text-sm dark:bg-gray-700">
+                                        <div
+                                            class="flex items-center justify-between rounded bg-gray-100 px-2 py-1 text-sm dark:bg-gray-700"
+                                        >
                                             <span class="truncate font-mono">{{ ds }}</span>
-                                            <button mat-icon-button (click)="exportDataSource(s.id, ds)"
-                                                    matTooltip="Export data source (.zip)" [attr.aria-label]="'Export ' + ds">
-                                                <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                                            <button
+                                                mat-icon-button
+                                                (click)="exportDataSource(s.id, ds)"
+                                                matTooltip="Export data source (.zip)"
+                                                [attr.aria-label]="'Export ' + ds"
+                                            >
+                                                <mat-icon
+                                                    class="icon-size-5"
+                                                    svgIcon="heroicons_outline:arrow-down-tray"
+                                                ></mat-icon>
                                             </button>
                                         </div>
                                     }

@@ -1,4 +1,15 @@
-import { ComponentKind, ConfigFinding, Part, Ref, Wiring, dashboardRefs, getKind, hasEditorRoute, registerEditorRoute, registerKind } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    ConfigFinding,
+    Part,
+    Ref,
+    Wiring,
+    dashboardRefs,
+    getKind,
+    hasEditorRoute,
+    registerEditorRoute,
+    registerKind,
+} from 'app/inspecto/component-model';
 import { DashboardConfig } from './dashboard-types';
 
 /**

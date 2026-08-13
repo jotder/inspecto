@@ -11,13 +11,26 @@
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">{{ r.name }}</h1>
                 <div class="text-secondary mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    <span>A <span class="font-mono">{{ r.leftDataset }}</span></span>
-                    <mat-icon svgIcon="heroicons_outline:arrows-right-left" class="icon-size-4" aria-hidden="true"></mat-icon>
-                    <span>B <span class="font-mono">{{ r.rightDataset }}</span></span>
+                    <span
+                        >A <span class="font-mono">{{ r.leftDataset }}</span></span
+                    >
+                    <mat-icon
+                        svgIcon="heroicons_outline:arrows-right-left"
+                        class="icon-size-4"
+                        aria-hidden="true"
+                    ></mat-icon>
+                    <span
+                        >B <span class="font-mono">{{ r.rightDataset }}</span></span
+                    >
                     <span aria-hidden="true">·</span>
-                    <span>tree <span class="font-mono">{{ r.keyColumns.join(' › ') }}</span></span>
+                    <span
+                        >tree <span class="font-mono">{{ r.keyColumns.join(' › ') }}</span></span
+                    >
                     <span aria-hidden="true">·</span>
-                    <span>bands ok &lt; {{ bands().warnPct }}% · warn {{ bands().warnPct }}–{{ bands().breachPct }}% · breach &gt; {{ bands().breachPct }}%</span>
+                    <span
+                        >bands ok &lt; {{ bands().warnPct }}% · warn {{ bands().warnPct }}–{{ bands().breachPct }}% ·
+                        breach &gt; {{ bands().breachPct }}%</span
+                    >
                 </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
@@ -26,7 +39,9 @@
                     <span class="ml-1">Edit</span>
                 </button>
                 <button mat-flat-button color="primary" (click)="run()" [disabled]="running() || loading()">
-                    @if (running()) { <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" /> }
+                    @if (running()) {
+                        <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
+                    }
                     <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                     <span class="ml-1">Run</span>
                 </button>
@@ -42,7 +57,9 @@
                 <span>only in B: {{ res.summary.byType.missing_left }}</span>
                 <span>value breaks: {{ res.summary.byType.value_break }}</span>
                 @if (res.statistics.truncated) {
-                    <span class="text-amber-600 dark:text-amber-400">! truncated — add a filter or drop a dimension</span>
+                    <span class="text-amber-600 dark:text-amber-400"
+                        >! truncated — add a filter or drop a dimension</span
+                    >
                 }
                 <button mat-button (click)="viewBreaks()">
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
@@ -51,7 +68,10 @@
             </div>
 
             <!-- TOTAL strip: exact side totals + banded Δ% per measure -->
-            <div class="bg-card mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl p-4 shadow" aria-label="Reconciliation totals">
+            <div
+                class="bg-card mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl p-4 shadow"
+                aria-label="Reconciliation totals"
+            >
                 <span class="text-secondary text-xs font-semibold uppercase tracking-wider">Total</span>
                 @for (t of totalLines(); track t.label) {
                     <span class="text-sm">

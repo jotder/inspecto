@@ -22,8 +22,7 @@ export default [
             }
             return null;
         },
-        loadComponent: () =>
-            import('./onboarding/onboarding-shell.component').then((m) => m.OnboardingShellComponent),
+        loadComponent: () => import('./onboarding/onboarding-shell.component').then((m) => m.OnboardingShellComponent),
         canDeactivate: [(cmp: OnboardingShellComponent) => cmp.canLeave()],
     },
 ] as Routes;

@@ -28,14 +28,18 @@ export function toSvg(g: G6GraphData, positions: Map<string, { x: number; y: num
     const pad = NODE_RADIUS * 3;
     const width = Math.max(1, maxX - minX + pad * 2);
     const height = Math.max(1, maxY - minY + pad * 2);
-    const ox = pad - minX, oy = pad - minY;
+    const ox = pad - minX,
+        oy = pad - minY;
 
     const lines = g.edges
         .map((e) => {
-            const s = positions.get(e.source), t = positions.get(e.target);
+            const s = positions.get(e.source),
+                t = positions.get(e.target);
             if (!s || !t) return '';
-            return `<line x1="${s.x + ox}" y1="${s.y + oy}" x2="${t.x + ox}" y2="${t.y + oy}" `
-                + `stroke="${SVG_EXPORT_COLORS.edge}" stroke-width="1.5"/>`;
+            return (
+                `<line x1="${s.x + ox}" y1="${s.y + oy}" x2="${t.x + ox}" y2="${t.y + oy}" ` +
+                `stroke="${SVG_EXPORT_COLORS.edge}" stroke-width="1.5"/>`
+            );
         })
         .filter(Boolean)
         .join('\n');
@@ -44,21 +48,26 @@ export function toSvg(g: G6GraphData, positions: Map<string, { x: number; y: num
         .map((n) => {
             const p = positions.get(n.id);
             if (!p) return '';
-            const x = p.x + ox, y = p.y + oy;
-            return `<g>`
-                + `<circle cx="${x}" cy="${y}" r="${NODE_RADIUS}" fill="${SVG_EXPORT_COLORS.node}"/>`
-                + `<text x="${x}" y="${y + NODE_RADIUS + 14}" text-anchor="middle" font-size="11" `
-                + `fill="${SVG_EXPORT_COLORS.text}" font-family="sans-serif">${escapeXml(n.data.label)}</text>`
-                + `</g>`;
+            const x = p.x + ox,
+                y = p.y + oy;
+            return (
+                `<g>` +
+                `<circle cx="${x}" cy="${y}" r="${NODE_RADIUS}" fill="${SVG_EXPORT_COLORS.node}"/>` +
+                `<text x="${x}" y="${y + NODE_RADIUS + 14}" text-anchor="middle" font-size="11" ` +
+                `fill="${SVG_EXPORT_COLORS.text}" font-family="sans-serif">${escapeXml(n.data.label)}</text>` +
+                `</g>`
+            );
         })
         .filter(Boolean)
         .join('\n');
 
-    return `<?xml version="1.0" encoding="UTF-8"?>\n`
-        + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">\n`
-        + `<rect x="0" y="0" width="${width}" height="${height}" fill="${SVG_EXPORT_COLORS.background}"/>\n`
-        + `${lines}\n${circles}\n`
-        + `</svg>\n`;
+    return (
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">\n` +
+        `<rect x="0" y="0" width="${width}" height="${height}" fill="${SVG_EXPORT_COLORS.background}"/>\n` +
+        `${lines}\n${circles}\n` +
+        `</svg>\n`
+    );
 }
 
 /**
@@ -69,23 +78,31 @@ export function toSvg(g: G6GraphData, positions: Map<string, { x: number; y: num
  */
 export function toGraphml(g: G6GraphData): string {
     const nodeRows = g.nodes
-        .map((n) => `<node id="${escapeXml(n.id)}">`
-            + `<data key="label">${escapeXml(n.data.label)}</data>`
-            + `<data key="kind">${escapeXml(String(n.data.kind))}</data>`
-            + `</node>`)
+        .map(
+            (n) =>
+                `<node id="${escapeXml(n.id)}">` +
+                `<data key="label">${escapeXml(n.data.label)}</data>` +
+                `<data key="kind">${escapeXml(String(n.data.kind))}</data>` +
+                `</node>`,
+        )
         .join('\n');
     const edgeRows = g.edges
-        .map((e) => `<edge id="${escapeXml(e.id)}" source="${escapeXml(e.source)}" target="${escapeXml(e.target)}">`
-            + `<data key="ekind">${escapeXml(e.data.kind)}</data>`
-            + `</edge>`)
+        .map(
+            (e) =>
+                `<edge id="${escapeXml(e.id)}" source="${escapeXml(e.source)}" target="${escapeXml(e.target)}">` +
+                `<data key="ekind">${escapeXml(e.data.kind)}</data>` +
+                `</edge>`,
+        )
         .join('\n');
 
-    return `<?xml version="1.0" encoding="UTF-8"?>\n`
-        + `<graphml xmlns="http://graphml.graphdrawing.org/xmlns">\n`
-        + `<key id="label" for="node" attr.name="label" attr.type="string"/>\n`
-        + `<key id="kind" for="node" attr.name="kind" attr.type="string"/>\n`
-        + `<key id="ekind" for="edge" attr.name="kind" attr.type="string"/>\n`
-        + `<graph id="G" edgedefault="directed">\n`
-        + `${nodeRows}\n${edgeRows}\n`
-        + `</graph>\n</graphml>\n`;
+    return (
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<graphml xmlns="http://graphml.graphdrawing.org/xmlns">\n` +
+        `<key id="label" for="node" attr.name="label" attr.type="string"/>\n` +
+        `<key id="kind" for="node" attr.name="kind" attr.type="string"/>\n` +
+        `<key id="ekind" for="edge" attr.name="kind" attr.type="string"/>\n` +
+        `<graph id="G" edgedefault="directed">\n` +
+        `${nodeRows}\n${edgeRows}\n` +
+        `</graph>\n</graphml>\n`
+    );
 }

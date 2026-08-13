@@ -83,7 +83,10 @@ describe('TreeTableComponent', () => {
         c.toggle('north'); // user collapses
         expect(c.flatRows().map((r) => r.__id)).toEqual(['north', 'south']);
         // Host rebuilds the forest (e.g. a matrix cell edit or a Resolve refresh) → no reseed.
-        f.componentRef.setInput('nodes', FOREST.map((n) => ({ ...n })));
+        f.componentRef.setInput(
+            'nodes',
+            FOREST.map((n) => ({ ...n })),
+        );
         f.detectChanges();
         expect(c.flatRows().map((r) => r.__id)).toEqual(['north', 'south']);
     });

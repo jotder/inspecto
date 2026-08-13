@@ -23,8 +23,7 @@ function dedupeById(items: GammaNavigationItem[]): GammaNavigationItem[] {
 
 @Injectable({ providedIn: 'root' })
 export class NavigationService {
-    private _navigation: ReplaySubject<Navigation> =
-        new ReplaySubject<Navigation>(1);
+    private _navigation: ReplaySubject<Navigation> = new ReplaySubject<Navigation>(1);
 
     // -----------------------------------------------------------------------------------------------------
     // @ Accessors
@@ -52,7 +51,7 @@ export class NavigationService {
         return of(this._build()).pipe(
             tap((navigation) => {
                 this._navigation.next(navigation);
-            })
+            }),
         );
     }
 
@@ -76,8 +75,7 @@ export class NavigationService {
         // groups, prepended above the custom-menus divider. Read fresh so a re-fetch after an edit
         // refreshes the sidebar.
         const space =
-            (typeof localStorage !== 'undefined' && localStorage.getItem('inspecto.currentSpace')) ||
-            'default';
+            (typeof localStorage !== 'undefined' && localStorage.getItem('inspecto.currentSpace')) || 'default';
         const tree = loadMenuTrees()[space];
         const custom = tree ? menuTreeToNav(tree.nodes) : [];
         // The personal Favorites group (client-local overlay) sits above the custom groups.

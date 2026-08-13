@@ -1,6 +1,8 @@
 <div class="flex min-w-0 flex-auto flex-col">
     <!-- Header -->
-    <div class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent">
+    <div
+        class="bg-card flex flex-col border-b p-6 sm:flex-row sm:items-center sm:justify-between sm:px-10 sm:py-8 dark:bg-transparent"
+    >
         <div>
             <h1 class="text-3xl font-extrabold leading-none tracking-tight">Enrichment</h1>
             <div class="text-secondary mt-1.5">Stage-2 jobs: runs, lineage and rollup reports</div>
@@ -79,22 +81,33 @@
                 }
 
                 @if (activeTab === 'report' && report && !detailLoading) {
-                    <table class="mt-6 w-fit text-sm [&_td]:px-3 [&_td]:py-1.5 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left">
+                    <table
+                        class="mt-6 w-fit text-sm [&_td]:px-3 [&_td]:py-1.5 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left"
+                    >
                         <tbody>
                             <tr class="border-b">
-                                <th scope="row">Total runs</th><td>{{ report.totalRuns }}</td>
-                                <th scope="row">Success</th><td>{{ report.success }}</td>
-                                <th scope="row">Failed</th><td>{{ report.failed }}</td>
+                                <th scope="row">Total runs</th>
+                                <td>{{ report.totalRuns }}</td>
+                                <th scope="row">Success</th>
+                                <td>{{ report.success }}</td>
+                                <th scope="row">Failed</th>
+                                <td>{{ report.failed }}</td>
                             </tr>
                             <tr class="border-b">
-                                <th scope="row">Error rate</th><td>{{ report.errorRate | fmtPercent }}</td>
-                                <th scope="row">Output rows</th><td>{{ report.totalOutputRows }}</td>
-                                <th scope="row">Output files</th><td>{{ report.totalOutputFiles ?? '—' }}</td>
+                                <th scope="row">Error rate</th>
+                                <td>{{ report.errorRate | fmtPercent }}</td>
+                                <th scope="row">Output rows</th>
+                                <td>{{ report.totalOutputRows }}</td>
+                                <th scope="row">Output files</th>
+                                <td>{{ report.totalOutputFiles ?? '—' }}</td>
                             </tr>
                             <tr>
-                                <th scope="row">p50 (ms)</th><td>{{ report.p50DurationMs }}</td>
-                                <th scope="row">p95 (ms)</th><td>{{ report.p95DurationMs }}</td>
-                                <th scope="row">p99 (ms)</th><td>{{ report.p99DurationMs }}</td>
+                                <th scope="row">p50 (ms)</th>
+                                <td>{{ report.p50DurationMs }}</td>
+                                <th scope="row">p95 (ms)</th>
+                                <td>{{ report.p95DurationMs }}</td>
+                                <th scope="row">p99 (ms)</th>
+                                <td>{{ report.p99DurationMs }}</td>
                             </tr>
                         </tbody>
                     </table>

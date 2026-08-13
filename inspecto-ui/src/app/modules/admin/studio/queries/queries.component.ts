@@ -136,7 +136,11 @@ export class QueriesComponent implements OnInit {
     /** The panel's data source — the selected dataset's sample rows + column metadata. */
     readonly panelSource = computed(() => {
         const ds = this.selectedDataset();
-        return { name: ds?.sourceName ?? 'data', rows: SAMPLE_SOURCES[ds?.sourceName ?? ''] ?? [], columns: ds?.columns };
+        return {
+            name: ds?.sourceName ?? 'data',
+            rows: SAMPLE_SOURCES[ds?.sourceName ?? ''] ?? [],
+            columns: ds?.columns,
+        };
     });
 
     /** Live mirror of the SQL text (drives parameter detection) + the user-declared param defaults/types.
@@ -146,9 +150,19 @@ export class QueriesComponent implements OnInit {
     readonly paramTypes = signal<Record<string, ParameterDef['type']>>({});
 
     /** The distinct built-in `$`-tokens present (resolved from context — shown read-only). */
-    readonly builtinTokens = computed(() => findParameters(this.text()).filter((t) => BUILTIN_PARAMS.includes(tokenName(t) as (typeof BUILTIN_PARAMS)[number])));
+    readonly builtinTokens = computed(() =>
+        findParameters(this.text()).filter((t) =>
+            BUILTIN_PARAMS.includes(tokenName(t) as (typeof BUILTIN_PARAMS)[number]),
+        ),
+    );
     /** The distinct user-declared `$`-token names present (each gets an editable default). */
-    readonly userParamNames = computed(() => [...new Set(findParameters(this.text()).map(tokenName).filter((n) => !BUILTIN_PARAMS.includes(n as (typeof BUILTIN_PARAMS)[number])))]);
+    readonly userParamNames = computed(() => [
+        ...new Set(
+            findParameters(this.text())
+                .map(tokenName)
+                .filter((n) => !BUILTIN_PARAMS.includes(n as (typeof BUILTIN_PARAMS)[number])),
+        ),
+    ]);
 
     ngOnInit(): void {
         this.form.controls.text.valueChanges
@@ -175,7 +189,11 @@ export class QueriesComponent implements OnInit {
     newQuery(): void {
         this.form.reset({ name: '', description: '', datasetId: '', text: '', type: 'sql' });
         this.form.controls.name.enable();
-        this.form.controls.name.setValidators([Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/), uniqueNameValidator(() => this.queries().map((q) => q.id))]);
+        this.form.controls.name.setValidators([
+            Validators.required,
+            Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/),
+            uniqueNameValidator(() => this.queries().map((q) => q.id)),
+        ]);
         this.form.controls.name.updateValueAndValidity({ emitEvent: false });
         this.paramDefaults.set({});
         this.paramTypes.set({});
@@ -188,7 +206,13 @@ export class QueriesComponent implements OnInit {
     }
 
     editQuery(q: Query): void {
-        this.form.reset({ name: q.name, description: q.description ?? '', datasetId: q.datasetId ?? '', text: q.text ?? '', type: q.type });
+        this.form.reset({
+            name: q.name,
+            description: q.description ?? '',
+            datasetId: q.datasetId ?? '',
+            text: q.text ?? '',
+            type: q.type,
+        });
         this.form.controls.name.setValidators([Validators.required]);
         this.form.controls.name.disable(); // id is immutable on edit
         this.paramDefaults.set(Object.fromEntries(q.parameters.map((p) => [p.name, p.default ?? ''])));
@@ -218,7 +242,8 @@ export class QueriesComponent implements OnInit {
     /** Show version history for a saved query; reload the list after a restore (MET-5). If that query is
      *  open in the edit form, close it — a stale form left open would silently overwrite the restore on save. */
     history(q: Query): void {
-        this.dialog.open(ComponentHistoryDialog, { data: { type: 'query', id: q.id, label: q.name } })
+        this.dialog
+            .open(ComponentHistoryDialog, { data: { type: 'query', id: q.id, label: q.name } })
             .afterClosed()
             .subscribe((restored) => {
                 if (!restored) return;
@@ -235,7 +260,11 @@ export class QueriesComponent implements OnInit {
     private paramDefs(): ParameterDef[] {
         const defaults = this.paramDefaults();
         const types = this.paramTypes();
-        return this.userParamNames().map((name) => ({ name, type: types[name] ?? 'string', default: defaults[name] ?? '' }));
+        return this.userParamNames().map((name) => ({
+            name,
+            type: types[name] ?? 'string',
+            default: defaults[name] ?? '',
+        }));
     }
 
     private selectedDataset(): Dataset | undefined {
@@ -249,9 +278,15 @@ export class QueriesComponent implements OnInit {
 
         if (this.form.controls.type.value === 'structured') {
             const source = this.panelSource();
-            const rows = evaluateRows(this.structuredModel(), { name: source.name, rows: source.rows, columns: source.columns });
+            const rows = evaluateRows(this.structuredModel(), {
+                name: source.name,
+                rows: source.rows,
+                columns: source.columns,
+            });
             const resultSet = describeResultSet(rows, hints);
-            const recommended = recommend(resultSet).slice(0, 3).map((p) => p.meta.label);
+            const recommended = recommend(resultSet)
+                .slice(0, 3)
+                .map((p) => p.meta.label);
             this.preview.set({ resolvedSql: this.structuredSql(), resultSet, rows: rows.slice(0, 20), recommended });
             this.running.set(false);
             return;
@@ -266,7 +301,9 @@ export class QueriesComponent implements OnInit {
             return;
         }
         const resultSet = describeResultSet(res.rows, hints);
-        const recommended = recommend(resultSet).slice(0, 3).map((p) => p.meta.label);
+        const recommended = recommend(resultSet)
+            .slice(0, 3)
+            .map((p) => p.meta.label);
         this.preview.set({ resolvedSql, resultSet, rows: res.rows.slice(0, 20), recommended });
         this.running.set(false);
     }
@@ -326,7 +363,11 @@ export class QueriesComponent implements OnInit {
         // The name control is disabled on edit; `.value` still exposes it, and validity is only enforced
         // on create (the shared duplicate/pattern rules are create-only).
         const name = String(this.form.controls.name.value ?? '').trim();
-        if (!name || !this.form.controls.datasetId.value || (this.form.controls.name.enabled && this.form.controls.name.invalid)) {
+        if (
+            !name ||
+            !this.form.controls.datasetId.value ||
+            (this.form.controls.name.enabled && this.form.controls.name.invalid)
+        ) {
             this.form.markAllAsTouched();
             return;
         }
@@ -351,7 +392,11 @@ export class QueriesComponent implements OnInit {
             error: (e) => {
                 this.saving.set(false);
                 if (e?.status === 503) this.writesDisabled.set(true);
-                this.toastr.error(e?.status === 503 ? 'Writes are disabled (no write root configured).' : apiErrorMessage(e, `Could not save "${q.name}"`));
+                this.toastr.error(
+                    e?.status === 503
+                        ? 'Writes are disabled (no write root configured).'
+                        : apiErrorMessage(e, `Could not save "${q.name}"`),
+                );
             },
         });
     }

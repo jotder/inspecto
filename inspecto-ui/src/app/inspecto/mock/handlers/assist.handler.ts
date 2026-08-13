@@ -22,7 +22,14 @@ export function assistHandler(flags: MockFlags): MockHandler {
         // Consequences a rule holds, so the human reviews them in the Decision Rule form and saves.
         const consequences: Consequence[] = [
             { action: 'quarantine', destination: 'suspected fraud' },
-            { action: 'emit-signal', params: { type: 'FRAUD_REVIEW', severity: 'warn', message: 'AI-proposed: high-cost short-call pattern' } },
+            {
+                action: 'emit-signal',
+                params: {
+                    type: 'FRAUD_REVIEW',
+                    severity: 'warn',
+                    message: 'AI-proposed: high-cost short-call pattern',
+                },
+            },
             { action: 'create-alert', params: { rule: 'ai_high_cost', metric: 'cost_usd', severity: 'warn' } },
         ];
         const result: AssistResult = {
@@ -31,7 +38,8 @@ export function assistHandler(flags: MockFlags): MockHandler {
             answer: 'Proposed a decision rule: quarantine suspected high-cost fraud, emit a review signal, and raise an alert. Review and save to activate.',
             citations: [],
             links: [],
-            rationale: 'High cost_usd with short duration_s is a common SIM-box / IRSF signature; quarantining + alerting lets an analyst confirm before the records propagate.',
+            rationale:
+                'High cost_usd with short duration_s is a common SIM-box / IRSF signature; quarantining + alerting lets an analyst confirm before the records propagate.',
             confidence: 0.72,
             validated: false,
             applyVia: 'decision-rule',

@@ -40,7 +40,12 @@ function transformScatter(rows: Record<string, unknown>[], values: ControlValues
 }
 
 export const SCATTER_PLUGIN: VizPlugin = {
-    meta: { type: 'scatter', label: 'Scatter', icon: 'heroicons_outline:cursor-arrow-ripple', fit: { minMeasure: 2, minDim: 1 } },
+    meta: {
+        type: 'scatter',
+        label: 'Scatter',
+        icon: 'heroicons_outline:cursor-arrow-ripple',
+        fit: { minMeasure: 2, minDim: 1 },
+    },
     controls: CONTROLS,
     buildQuery: buildScatterQuery,
     transformProps: transformScatter,

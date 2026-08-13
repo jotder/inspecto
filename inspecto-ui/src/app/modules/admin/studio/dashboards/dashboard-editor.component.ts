@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, ElementRef, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
-import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormBuilder,
+    FormsModule,
+    ReactiveFormsModule,
+    ValidatorFn,
+    Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -12,7 +19,14 @@ import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
 import { getViz } from 'app/inspecto/viz';
-import { Condition, ColumnMeta, ConditionGroup, QueryConditionGroupComponent, emptyGroup, evaluateRows } from 'app/inspecto/query';
+import {
+    Condition,
+    ColumnMeta,
+    ConditionGroup,
+    QueryConditionGroupComponent,
+    emptyGroup,
+    evaluateRows,
+} from 'app/inspecto/query';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -39,7 +53,14 @@ import './dashboard.kind'; // register the dashboard kind
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -101,7 +122,8 @@ export class DashboardEditorComponent implements OnInit {
     history(): void {
         if (!this.id) return;
         const id = this.id;
-        this.dialog.open(ComponentHistoryDialog, { data: { type: 'dashboard', id, label: id } })
+        this.dialog
+            .open(ComponentHistoryDialog, { data: { type: 'dashboard', id, label: id } })
             .afterClosed()
             .subscribe((restored) => {
                 if (restored) this.dashboardsApi.get(id).subscribe({ next: (d) => this.seed(d) });
@@ -187,7 +209,12 @@ export class DashboardEditorComponent implements OnInit {
     }
 
     ngOnInit(): void {
-        this.widgetsApi.list().subscribe({ next: (w) => this.widgets.set(w), error: () => this.toastr.warning('Could not load widgets.') });
+        this.widgetsApi
+            .list()
+            .subscribe({
+                next: (w) => this.widgets.set(w),
+                error: () => this.toastr.warning('Could not load widgets.'),
+            });
         this.datasetsApi.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
         if (this.id) {
             this.editing.set(true);
@@ -277,7 +304,8 @@ export class DashboardEditorComponent implements OnInit {
                                 `Created ${created.length} widget${created.length === 1 ? '' : 's'} and laid out the dashboard — review it, then Save.`,
                             );
                         },
-                        error: () => this.toastr.warning('Widgets were created but could not be reloaded; refresh the page.'),
+                        error: () =>
+                            this.toastr.warning('Widgets were created but could not be reloaded; refresh the page.'),
                     });
                 },
                 error: (e) => {
@@ -331,7 +359,8 @@ export class DashboardEditorComponent implements OnInit {
     /** Download every rendered tile canvas as a PNG — the offline "export dashboard" (chart tiles only;
      *  table/KPI tiles have no canvas and export via their own surfaces). */
     exportPngs(): void {
-        const canvases: NodeListOf<HTMLCanvasElement> = this.elementRef.nativeElement.querySelectorAll('app-dashboard-tile canvas');
+        const canvases: NodeListOf<HTMLCanvasElement> =
+            this.elementRef.nativeElement.querySelectorAll('app-dashboard-tile canvas');
         if (!canvases.length) {
             this.toastr.info('No chart tiles to export.');
             return;
@@ -367,7 +396,9 @@ export class DashboardEditorComponent implements OnInit {
             error: (e) => {
                 this.saving.set(false);
                 if (e?.status === 503) this.writesDisabled.set(true);
-                this.toastr.error(e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, `Could not save "${name}"`));
+                this.toastr.error(
+                    e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, `Could not save "${name}"`),
+                );
             },
         });
     }

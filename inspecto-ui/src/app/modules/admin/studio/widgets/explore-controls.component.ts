@@ -2,7 +2,15 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
-import { Aggregation, ChannelValue, ControlSpec, ControlValues, TimeGrain, VizField, VizPlugin } from 'app/inspecto/viz';
+import {
+    Aggregation,
+    ChannelValue,
+    ControlSpec,
+    ControlValues,
+    TimeGrain,
+    VizField,
+    VizPlugin,
+} from 'app/inspecto/viz';
 
 const AGGS: Aggregation[] = ['sum', 'avg', 'min', 'max', 'count', 'countDistinct'];
 const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
@@ -57,7 +65,9 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
                                 (ngModelChange)="onGrain(control.channel, $event)"
                                 [aria-label]="control.label + ' time grain'"
                             >
-                                @for (g of grains; track g) { <mat-option [value]="g">{{ g }}</mat-option> }
+                                @for (g of grains; track g) {
+                                    <mat-option [value]="g">{{ g }}</mat-option>
+                                }
                             </mat-select>
                         </mat-form-field>
                     }
@@ -70,7 +80,9 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
                                 (ngModelChange)="onAgg(control.channel, $event)"
                                 [aria-label]="control.label + ' aggregation'"
                             >
-                                @for (a of aggs; track a) { <mat-option [value]="a">{{ a }}</mat-option> }
+                                @for (a of aggs; track a) {
+                                    <mat-option [value]="a">{{ a }}</mat-option>
+                                }
                             </mat-select>
                         </mat-form-field>
                     }
@@ -122,7 +134,10 @@ export class ExploreControlsComponent {
         this.patch(control.channel, cv);
     }
     onFields(control: ControlSpec, fields: string[]): void {
-        this.patch(control.channel, fields.map((field) => this.toChannelValue(control, field)));
+        this.patch(
+            control.channel,
+            fields.map((field) => this.toChannelValue(control, field)),
+        );
     }
 
     /** A named-measure field carries its expression (no aggregation applies); a column gets the default agg. */

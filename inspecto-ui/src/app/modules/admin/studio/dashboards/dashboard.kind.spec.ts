@@ -11,13 +11,29 @@ describe('dashboard ComponentKind', () => {
     });
 
     it('derives layout tiles from the dashboard config', () => {
-        const cfg = { tiles: [{ widgetId: 'a', span: 2 as const }, { widgetId: 'b', span: 1 as const }] };
+        const cfg = {
+            tiles: [
+                { widgetId: 'a', span: 2 as const },
+                { widgetId: 'b', span: 1 as const },
+            ],
+        };
         const wiring = DASHBOARD_KIND.deriveWiring!([], cfg);
-        expect(wiring).toEqual({ strategy: 'layout', tiles: [{ partId: 'tile0', w: 2 }, { partId: 'tile1', w: 1 }] });
+        expect(wiring).toEqual({
+            strategy: 'layout',
+            tiles: [
+                { partId: 'tile0', w: 2 },
+                { partId: 'tile1', w: 1 },
+            ],
+        });
     });
 
     it('exposes one widget part per tile (composition for the reuse graph)', () => {
-        const parts = dashboardParts({ tiles: [{ widgetId: 'a', span: 1 }, { widgetId: 'b', span: 1 }] });
+        const parts = dashboardParts({
+            tiles: [
+                { widgetId: 'a', span: 1 },
+                { widgetId: 'b', span: 1 },
+            ],
+        });
         expect(parts).toEqual([
             { partId: 'tile0', ref: { kind: 'widget', id: 'a' } },
             { partId: 'tile1', ref: { kind: 'widget', id: 'b' } },

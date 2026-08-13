@@ -1,41 +1,24 @@
 import {
-  AfterViewInit,
-  Component,
-  DestroyRef,
-  ElementRef,
-  EventEmitter,
-  Input,
-  OnChanges,
-  OnDestroy,
-  Output,
-  ViewChild,
-  inject,
-  ChangeDetectionStrategy,
-} from "@angular/core";
-import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
-import { GammaConfigService } from "@gamma/services/config";
-import {
-  EdgeData,
-  EdgeEvent,
-  ElementDatum,
-  Graph,
-  GraphData,
-  LayoutOptions,
-  NodeData,
-  NodeEvent,
-} from "@antv/g6";
-import {
-  G6GraphData,
-  nodeColor,
-  nodeKindLabel,
-  nodeShape,
-} from "./catalog-graph";
-import { toSvg } from "app/inspecto/graph";
-import { NodeKind } from "app/inspecto/api";
-import {
-  ICON_COLOR_SWATCHES,
-  canvasTheme,
-} from "app/inspecto/theme/chart-tokens";
+    AfterViewInit,
+    Component,
+    DestroyRef,
+    ElementRef,
+    EventEmitter,
+    Input,
+    OnChanges,
+    OnDestroy,
+    Output,
+    ViewChild,
+    inject,
+    ChangeDetectionStrategy,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { GammaConfigService } from '@gamma/services/config';
+import { EdgeData, EdgeEvent, ElementDatum, Graph, GraphData, LayoutOptions, NodeData, NodeEvent } from '@antv/g6';
+import { G6GraphData, nodeColor, nodeKindLabel, nodeShape } from './catalog-graph';
+import { toSvg } from 'app/inspecto/graph';
+import { NodeKind } from 'app/inspecto/api';
+import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
 
 /**
  * An analysis-result overlay (Link Analysis Studio): listed nodes/edges render full-strength (or
@@ -43,13 +26,13 @@ import {
  * each distinct key gets a swatch colour. `null` = no emphasis (all full-strength).
  */
 export interface GraphEmphasis {
-  nodeIds: string[];
-  edgeIds?: string[];
-  groups?: Map<string, string>;
+    nodeIds: string[];
+    edgeIds?: string[];
+    groups?: Map<string, string>;
 }
 
 /** Line pattern for a relationship kind (Link Analysis "Display" menu). */
-export type EdgePattern = "solid" | "dashed" | "dotted";
+export type EdgePattern = 'solid' | 'dashed' | 'dotted';
 
 /**
  * Optional presentation overrides (Link Analysis Studio "Display" menu — persisted with a saved
@@ -58,153 +41,144 @@ export type EdgePattern = "solid" | "dashed" | "dotted";
  * defaults.
  */
 export interface GraphDisplayOptions {
-  nodeLabels: boolean;
-  edgeLabels: boolean;
-  /** node kind → stroke colour (a chart-token swatch). */
-  nodeColors: Record<string, string>;
-  /** edge (relationship) kind → stroke colour. */
-  edgeColors: Record<string, string>;
-  /** node kind → G6 shape name (the per-kind "icon"). */
-  nodeShapes: Record<string, string>;
-  /** edge (relationship) kind → line pattern. */
-  edgePatterns: Record<string, EdgePattern>;
-  /** edge (relationship) kind → line width in px. */
-  edgeSizes: Record<string, number>;
+    nodeLabels: boolean;
+    edgeLabels: boolean;
+    /** node kind → stroke colour (a chart-token swatch). */
+    nodeColors: Record<string, string>;
+    /** edge (relationship) kind → stroke colour. */
+    edgeColors: Record<string, string>;
+    /** node kind → G6 shape name (the per-kind "icon"). */
+    nodeShapes: Record<string, string>;
+    /** edge (relationship) kind → line pattern. */
+    edgePatterns: Record<string, EdgePattern>;
+    /** edge (relationship) kind → line width in px. */
+    edgeSizes: Record<string, number>;
 }
 
 /** The node shapes the Display menu offers per kind (value = G6 node type; glyph = the picker face). */
 export const GRAPH_NODE_SHAPES: readonly {
-  value: string;
-  glyph: string;
-  label: string;
+    value: string;
+    glyph: string;
+    label: string;
 }[] = [
-  { value: "circle", glyph: "●", label: "Circle" },
-  { value: "rect", glyph: "■", label: "Square" },
-  { value: "diamond", glyph: "◆", label: "Diamond" },
-  { value: "triangle", glyph: "▲", label: "Triangle" },
-  { value: "star", glyph: "★", label: "Star" },
-  { value: "hexagon", glyph: "⬢", label: "Hexagon" },
+    { value: 'circle', glyph: '●', label: 'Circle' },
+    { value: 'rect', glyph: '■', label: 'Square' },
+    { value: 'diamond', glyph: '◆', label: 'Diamond' },
+    { value: 'triangle', glyph: '▲', label: 'Triangle' },
+    { value: 'star', glyph: '★', label: 'Star' },
+    { value: 'hexagon', glyph: '⬢', label: 'Hexagon' },
 ];
 
 /** The line patterns the Display menu offers per relationship kind. */
 export const GRAPH_EDGE_PATTERNS: readonly {
-  value: EdgePattern;
-  glyph: string;
-  label: string;
+    value: EdgePattern;
+    glyph: string;
+    label: string;
 }[] = [
-  { value: "solid", glyph: "—", label: "Solid" },
-  { value: "dashed", glyph: "╌", label: "Dashed" },
-  { value: "dotted", glyph: "⋯", label: "Dotted" },
+    { value: 'solid', glyph: '—', label: 'Solid' },
+    { value: 'dashed', glyph: '╌', label: 'Dashed' },
+    { value: 'dotted', glyph: '⋯', label: 'Dotted' },
 ];
 
 /** The line widths the Display menu offers per relationship kind. */
 export const GRAPH_EDGE_SIZES: readonly { value: number; label: string }[] = [
-  { value: 1.5, label: "S" },
-  { value: 3, label: "M" },
-  { value: 5, label: "L" },
+    { value: 1.5, label: 'S' },
+    { value: 3, label: 'M' },
+    { value: 5, label: 'L' },
 ];
 
 /** The G6 `lineDash` array for a pattern; solid (or unset) = a solid stroke (`undefined`). */
-export function edgeDash(
-  pattern: EdgePattern | undefined,
-): number[] | undefined {
-  return pattern === "dashed"
-    ? [6, 4]
-    : pattern === "dotted"
-      ? [1, 3]
-      : undefined;
+export function edgeDash(pattern: EdgePattern | undefined): number[] | undefined {
+    return pattern === 'dashed' ? [6, 4] : pattern === 'dotted' ? [1, 3] : undefined;
 }
 
 /** A selectable graph layout — the requested names mapped onto G6 v5 built-in layout types. */
 export type GraphLayoutId =
-  | "dagre"
-  | "grid"
-  | "force"
-  | "force-cluster"
-  | "radial"
-  | "concentric"
-  | "circular"
-  | "mds"
-  | "mindmap"
-  | "org"
-  | "radial-tree";
+    | 'dagre'
+    | 'grid'
+    | 'force'
+    | 'force-cluster'
+    | 'radial'
+    | 'concentric'
+    | 'circular'
+    | 'mds'
+    | 'mindmap'
+    | 'org'
+    | 'radial-tree';
 
 /** The layouts the Link Analysis "Layout" toolbox offers; `tree` ones need a tree/forest graph. */
 export const GRAPH_LAYOUTS: readonly {
-  id: GraphLayoutId;
-  label: string;
-  tree: boolean;
+    id: GraphLayoutId;
+    label: string;
+    tree: boolean;
 }[] = [
-  { id: "dagre", label: "Flow (layered)", tree: false },
-  { id: "grid", label: "Grid", tree: false },
-  { id: "force", label: "Force", tree: false },
-  { id: "force-cluster", label: "Clustering force", tree: false },
-  { id: "radial", label: "Radial", tree: false },
-  { id: "concentric", label: "Degree ordered", tree: false },
-  { id: "circular", label: "Circular", tree: false },
-  { id: "mds", label: "Information density", tree: false },
-  { id: "mindmap", label: "Mind map", tree: true },
-  { id: "org", label: "Organization chart", tree: true },
-  { id: "radial-tree", label: "Radial tree", tree: true },
+    { id: 'dagre', label: 'Flow (layered)', tree: false },
+    { id: 'grid', label: 'Grid', tree: false },
+    { id: 'force', label: 'Force', tree: false },
+    { id: 'force-cluster', label: 'Clustering force', tree: false },
+    { id: 'radial', label: 'Radial', tree: false },
+    { id: 'concentric', label: 'Degree ordered', tree: false },
+    { id: 'circular', label: 'Circular', tree: false },
+    { id: 'mds', label: 'Information density', tree: false },
+    { id: 'mindmap', label: 'Mind map', tree: true },
+    { id: 'org', label: 'Organization chart', tree: true },
+    { id: 'radial-tree', label: 'Radial tree', tree: true },
 ];
 
 /** The G6 layout options for an id; `null`/`dagre` = the default LR layered layout (unchanged). */
-export function layoutConfig(
-  id: GraphLayoutId | null,
-): Record<string, unknown> {
-  switch (id) {
-    case "grid":
-      return { type: "grid" };
-    case "force":
-      return { type: "d3-force", collide: { radius: 28 } };
-    case "force-cluster":
-      return { type: "force-atlas2", kr: 20, preventOverlap: true };
-    case "radial":
-      return { type: "radial", unitRadius: 120, preventOverlap: true };
-    case "concentric":
-      return {
-        type: "concentric",
-        sortBy: "degree",
-        preventOverlap: true,
-        nodeSize: 40,
-      };
-    case "circular":
-      return { type: "circular" };
-    case "mds":
-      return { type: "mds" };
-    case "mindmap":
-      return {
-        type: "mindmap",
-        direction: "H",
-        getHeight: () => 32,
-        getWidth: () => 32,
-        getVGap: () => 12,
-        getHGap: () => 60,
-      };
-    case "org":
-      return {
-        type: "compact-box",
-        direction: "TB",
-        getHeight: () => 32,
-        getWidth: () => 60,
-        getVGap: () => 30,
-        getHGap: () => 20,
-      };
-    case "radial-tree":
-      return { type: "dendrogram", radial: true, nodeSep: 40, rankSep: 120 };
-    case "dagre":
-    default:
-      return { type: "antv-dagre", rankdir: "LR", nodesep: 18, ranksep: 60 };
-  }
+export function layoutConfig(id: GraphLayoutId | null): Record<string, unknown> {
+    switch (id) {
+        case 'grid':
+            return { type: 'grid' };
+        case 'force':
+            return { type: 'd3-force', collide: { radius: 28 } };
+        case 'force-cluster':
+            return { type: 'force-atlas2', kr: 20, preventOverlap: true };
+        case 'radial':
+            return { type: 'radial', unitRadius: 120, preventOverlap: true };
+        case 'concentric':
+            return {
+                type: 'concentric',
+                sortBy: 'degree',
+                preventOverlap: true,
+                nodeSize: 40,
+            };
+        case 'circular':
+            return { type: 'circular' };
+        case 'mds':
+            return { type: 'mds' };
+        case 'mindmap':
+            return {
+                type: 'mindmap',
+                direction: 'H',
+                getHeight: () => 32,
+                getWidth: () => 32,
+                getVGap: () => 12,
+                getHGap: () => 60,
+            };
+        case 'org':
+            return {
+                type: 'compact-box',
+                direction: 'TB',
+                getHeight: () => 32,
+                getWidth: () => 60,
+                getVGap: () => 30,
+                getHGap: () => 20,
+            };
+        case 'radial-tree':
+            return { type: 'dendrogram', radial: true, nodeSep: 40, rankSep: 120 };
+        case 'dagre':
+        default:
+            return { type: 'antv-dagre', rankdir: 'LR', nodesep: 18, ranksep: 60 };
+    }
 }
 
 /** The relationship kind an edge styles by — the folded-count suffix (`calls · 2`) stripped. */
 export function baseEdgeKind(kind: unknown): string {
-  return String(kind ?? "").split(" · ")[0];
+    return String(kind ?? '').split(' · ')[0];
 }
 
-const esc = (s: unknown): string =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+const esc = (s: unknown): string => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
  * Read-only AntV G6 host for the catalog metadata graph: layered (dagre) layout,
@@ -212,242 +186,210 @@ const esc = (s: unknown): string =>
  * Recreated when the data or the gamma colour scheme changes.
  */
 @Component({
-  selector: "inspecto-graph-view",
-  standalone: true,
-  template: '<div #host class="h-full w-full"></div>',
-  // Default: viewport-dynamic height for scrolling pages. `fill` mode instead grows into the
-  // remaining space of a flex-column studio (Link Analysis); autoFit:'view' scales the graph.
-  changeDetection: ChangeDetectionStrategy.Eager,
-  host: {
-    "[class]": `fill ? 'block w-full min-h-0 flex-auto' : 'block w-full min-h-96 h-[62vh]'`,
-  },
+    selector: 'inspecto-graph-view',
+    standalone: true,
+    template: '<div #host class="h-full w-full"></div>',
+    // Default: viewport-dynamic height for scrolling pages. `fill` mode instead grows into the
+    // remaining space of a flex-column studio (Link Analysis); autoFit:'view' scales the graph.
+    changeDetection: ChangeDetectionStrategy.Eager,
+    host: {
+        '[class]': `fill ? 'block w-full min-h-0 flex-auto' : 'block w-full min-h-96 h-[62vh]'`,
+    },
 })
 export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
-  @Input({ required: true }) data: G6GraphData | null = null;
-  @Input() emphasis: GraphEmphasis | null = null;
-  /** Fill the remaining space of a flex-column parent instead of the fixed 62vh page band. */
-  @Input() fill = false;
-  /** Presentation overrides (labels on/off, per-kind colours); `null` = defaults. */
-  @Input() display: GraphDisplayOptions | null = null;
-  /** Enable hover tooltips with short node/edge details (Link Analysis). */
-  @Input() tooltips = false;
-  /** Graph layout; `null` = the default LR layered layout (the 4 existing hosts). */
-  @Input() layout: GraphLayoutId | null = null;
-  @Output() nodeClick = new EventEmitter<string>();
-  @Output() edgeClick = new EventEmitter<string>();
+    @Input({ required: true }) data: G6GraphData | null = null;
+    @Input() emphasis: GraphEmphasis | null = null;
+    /** Fill the remaining space of a flex-column parent instead of the fixed 62vh page band. */
+    @Input() fill = false;
+    /** Presentation overrides (labels on/off, per-kind colours); `null` = defaults. */
+    @Input() display: GraphDisplayOptions | null = null;
+    /** Enable hover tooltips with short node/edge details (Link Analysis). */
+    @Input() tooltips = false;
+    /** Graph layout; `null` = the default LR layered layout (the 4 existing hosts). */
+    @Input() layout: GraphLayoutId | null = null;
+    @Output() nodeClick = new EventEmitter<string>();
+    @Output() edgeClick = new EventEmitter<string>();
 
-  @ViewChild("host") private hostEl!: ElementRef<HTMLDivElement>;
-  private graph: Graph | null = null;
-  private dark = false;
-  private ready = false;
-  private resizeObserver: ResizeObserver | null = null;
-  private destroyRef = inject(DestroyRef);
+    @ViewChild('host') private hostEl!: ElementRef<HTMLDivElement>;
+    private graph: Graph | null = null;
+    private dark = false;
+    private ready = false;
+    private resizeObserver: ResizeObserver | null = null;
+    private destroyRef = inject(DestroyRef);
 
-  constructor() {
-    inject(GammaConfigService)
-      .config$.pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((config) => {
-        this.dark =
-          config?.scheme === "dark" ||
-          (config?.scheme === "auto" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches);
+    constructor() {
+        inject(GammaConfigService)
+            .config$.pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((config) => {
+                this.dark =
+                    config?.scheme === 'dark' ||
+                    (config?.scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (this.ready) this.rebuild();
+            });
+    }
+
+    ngAfterViewInit(): void {
+        this.ready = true;
+        this.rebuild();
+        // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
+        if (typeof ResizeObserver !== 'undefined') {
+            this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
+            this.resizeObserver.observe(this.hostEl.nativeElement);
+        }
+    }
+
+    ngOnChanges(): void {
         if (this.ready) this.rebuild();
-      });
-  }
-
-  ngAfterViewInit(): void {
-    this.ready = true;
-    this.rebuild();
-    // Track container size (collapsible side panes resize the canvas live). Absent in jsdom.
-    if (typeof ResizeObserver !== "undefined") {
-      this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
-      this.resizeObserver.observe(this.hostEl.nativeElement);
     }
-  }
 
-  ngOnChanges(): void {
-    if (this.ready) this.rebuild();
-  }
-
-  ngOnDestroy(): void {
-    this.resizeObserver?.disconnect();
-    this.graph?.destroy();
-  }
-
-  /** The rendered canvas as a PNG data-URI (Link Analysis export), or `null` before the first render. */
-  exportPng(): Promise<string> | null {
-    return this.graph ? this.graph.toDataURL({ type: "image/png" }) : null;
-  }
-
-  /**
-   * The rendered graph as a standalone SVG string (Phase F export) — a hand-rolled serializer
-   * ({@link toSvg}), not a G6 renderer-mode switch, so it stays decoupled from the canvas renderer.
-   * `null` before the first render (mirrors {@link exportPng}).
-   */
-  exportSvg(): string | null {
-    if (!this.graph || !this.data) return null;
-    const positions = new Map<string, { x: number; y: number }>();
-    for (const n of this.data.nodes) {
-      try {
-        const p = this.graph.getElementPosition(n.id);
-        if (p) positions.set(n.id, { x: p[0], y: p[1] });
-      } catch {
-        // Not (yet) rendered — skipped, same as a position-less node in toSvg.
-      }
+    ngOnDestroy(): void {
+        this.resizeObserver?.disconnect();
+        this.graph?.destroy();
     }
-    return toSvg(this.data, positions);
-  }
 
-  /** Re-fit the whole graph into the viewport (the toolbar's fit-to-screen). */
-  fitView(): void {
-    void this.graph?.fitView();
-  }
-
-  /** Short hover details: node → label/kind/degree, edge → kind + endpoint labels. */
-  private tooltipHtml(items: ElementDatum[]): string {
-    const d = items[0];
-    if (!d) return "";
-    const data = (d.data ?? {}) as { label?: string; kind?: string };
-    if ("source" in d && "target" in d) {
-      const label = (id: unknown): string =>
-        (this.data?.nodes.find((n) => n.id === id)?.data.label ??
-          String(id)) as string;
-      return `<b>${esc(data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}`;
+    /** The rendered canvas as a PNG data-URI (Link Analysis export), or `null` before the first render. */
+    exportPng(): Promise<string> | null {
+        return this.graph ? this.graph.toDataURL({ type: 'image/png' }) : null;
     }
-    const degree =
-      this.data?.edges.filter((e) => e.source === d.id || e.target === d.id)
-        .length ?? 0;
-    return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ""))} · ${degree} link${degree === 1 ? "" : "s"}`;
-  }
 
-  private rebuild(): void {
-    this.graph?.destroy();
-    this.graph = null;
-    if (!this.data?.nodes.length) return;
-    const { fg, surface: nodeFill, edge } = canvasTheme(this.dark);
-    const kindOf = (d: NodeData): NodeKind =>
-      (d.data as { kind: NodeKind }).kind;
-    const iconOf = (d: NodeData): string | undefined =>
-      (d.data as { iconSrc?: string }).iconSrc;
-    // Emphasis overlay: swatch per distinct group key; non-listed elements dim.
-    const em = this.emphasis;
-    const emNodes = em ? new Set(em.nodeIds) : null;
-    const emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
-    const groupSwatch = new Map<string, string>();
-    for (const g of em?.groups?.values() ?? []) {
-      if (!groupSwatch.has(g))
-        groupSwatch.set(
-          g,
-          ICON_COLOR_SWATCHES[groupSwatch.size % ICON_COLOR_SWATCHES.length],
-        );
+    /**
+     * The rendered graph as a standalone SVG string (Phase F export) — a hand-rolled serializer
+     * ({@link toSvg}), not a G6 renderer-mode switch, so it stays decoupled from the canvas renderer.
+     * `null` before the first render (mirrors {@link exportPng}).
+     */
+    exportSvg(): string | null {
+        if (!this.graph || !this.data) return null;
+        const positions = new Map<string, { x: number; y: number }>();
+        for (const n of this.data.nodes) {
+            try {
+                const p = this.graph.getElementPosition(n.id);
+                if (p) positions.set(n.id, { x: p[0], y: p[1] });
+            } catch {
+                // Not (yet) rendered — skipped, same as a position-less node in toSvg.
+            }
+        }
+        return toSvg(this.data, positions);
     }
-    const nodeDim = (id: string): boolean =>
-      !!emNodes && !emNodes.has(id) && !em?.groups?.has(id);
-    const display = this.display;
-    const colorOf = (d: NodeData): string => {
-      const group = em?.groups?.get(d.id as string);
-      if (group) return groupSwatch.get(group)!; // analysis overlay wins over styling
-      return (
-        display?.nodeColors[kindOf(d)] ??
-        (d.data as { color?: string }).color ??
-        nodeColor(kindOf(d))
-      );
-    };
-    const edgeColorOf = (d: EdgeData): string =>
-      display?.edgeColors[baseEdgeKind((d.data as { kind?: string }).kind)] ??
-      edge;
-    const graph = new Graph({
-      container: this.hostEl.nativeElement,
-      data: this.data as unknown as GraphData,
-      autoFit: "view",
-      // See the pipeline editor canvas: G6's default [0.01, 10] lets a flick of the wheel land on
-      // specks or on one node filling the viewport. Floored much lower than the editor's because
-      // this host is shared with Link Analysis and the catalog metadata graph, where a
-      // several-hundred-node `autoFit: 'view'` legitimately needs to zoom well out.
-      zoomRange: [0.05, 4],
-      node: {
-        // Icon tile (rounded rect + glyph) when the data carries a resolved icon (flow/pipeline views);
-        // otherwise the per-kind shape (the catalog metadata graph).
-        type: (d) =>
-          iconOf(d)
-            ? "rect"
-            : (display?.nodeShapes[kindOf(d)] ?? nodeShape(kindOf(d))),
-        style: {
-          size: (d) => (iconOf(d) ? [46, 34] : 32),
-          radius: 8,
-          fill: nodeFill,
-          stroke: (d) => colorOf(d),
-          lineWidth: 2,
-          iconSrc: (d) => iconOf(d),
-          iconWidth: 22,
-          iconHeight: 22,
-          labelText:
-            display?.nodeLabels === false
-              ? undefined
-              : (d): string => (d.data as { label: string }).label,
-          labelFill: fg,
-          labelFontSize: 11,
-          labelPlacement: "bottom",
-          cursor: "pointer",
-          opacity: (d) => (nodeDim(d.id as string) ? 0.25 : 1),
-          labelOpacity: (d) => (nodeDim(d.id as string) ? 0.35 : 1),
-        },
-      },
-      edge: {
-        type: "line",
-        style: {
-          stroke: (d) => edgeColorOf(d),
-          opacity: (d) =>
-            emEdges ? (emEdges.has(d.id as string) ? 1 : 0.2) : 1,
-          endArrow: true,
-          lineDash: (d) =>
-            edgeDash(
-              display?.edgePatterns[
-                baseEdgeKind((d.data as { kind?: string }).kind)
-              ],
-            ),
-          // Per-kind size override wins; else the optional data-plane weight (T22 provenance
-          // overlay) scales the line width log-style; else the default (catalog/combined views).
-          lineWidth: (d) => {
-            const override =
-              display?.edgeSizes[
-                baseEdgeKind((d.data as { kind?: string }).kind)
-              ];
-            if (override) return override;
-            const w = (d.data as { weight?: number }).weight;
-            return w && w > 0 ? Math.min(12, 1.5 + Math.log2(w + 1)) : 1.5;
-          },
-          labelText:
-            display?.edgeLabels === false
-              ? undefined
-              : (d): string => (d.data as { kind: string }).kind,
-          labelFill: fg,
-          labelFontSize: 9,
-          labelBackground: false,
-        },
-      },
-      layout: layoutConfig(this.layout) as LayoutOptions,
-      behaviors: ["drag-canvas", "zoom-canvas", "drag-element"],
-      plugins: this.tooltips
-        ? [
-            {
-              type: "tooltip",
-              trigger: "hover",
-              getContent: async (_e: unknown, items: ElementDatum[]) =>
-                this.tooltipHtml(items),
+
+    /** Re-fit the whole graph into the viewport (the toolbar's fit-to-screen). */
+    fitView(): void {
+        void this.graph?.fitView();
+    }
+
+    /** Short hover details: node → label/kind/degree, edge → kind + endpoint labels. */
+    private tooltipHtml(items: ElementDatum[]): string {
+        const d = items[0];
+        if (!d) return '';
+        const data = (d.data ?? {}) as { label?: string; kind?: string };
+        if ('source' in d && 'target' in d) {
+            const label = (id: unknown): string =>
+                (this.data?.nodes.find((n) => n.id === id)?.data.label ?? String(id)) as string;
+            return `<b>${esc(data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}`;
+        }
+        const degree = this.data?.edges.filter((e) => e.source === d.id || e.target === d.id).length ?? 0;
+        return `<b>${esc(data.label)}</b><br/>${esc(nodeKindLabel(data.kind ?? ''))} · ${degree} link${degree === 1 ? '' : 's'}`;
+    }
+
+    private rebuild(): void {
+        this.graph?.destroy();
+        this.graph = null;
+        if (!this.data?.nodes.length) return;
+        const { fg, surface: nodeFill, edge } = canvasTheme(this.dark);
+        const kindOf = (d: NodeData): NodeKind => (d.data as { kind: NodeKind }).kind;
+        const iconOf = (d: NodeData): string | undefined => (d.data as { iconSrc?: string }).iconSrc;
+        // Emphasis overlay: swatch per distinct group key; non-listed elements dim.
+        const em = this.emphasis;
+        const emNodes = em ? new Set(em.nodeIds) : null;
+        const emEdges = em?.edgeIds ? new Set(em.edgeIds) : null;
+        const groupSwatch = new Map<string, string>();
+        for (const g of em?.groups?.values() ?? []) {
+            if (!groupSwatch.has(g))
+                groupSwatch.set(g, ICON_COLOR_SWATCHES[groupSwatch.size % ICON_COLOR_SWATCHES.length]);
+        }
+        const nodeDim = (id: string): boolean => !!emNodes && !emNodes.has(id) && !em?.groups?.has(id);
+        const display = this.display;
+        const colorOf = (d: NodeData): string => {
+            const group = em?.groups?.get(d.id as string);
+            if (group) return groupSwatch.get(group)!; // analysis overlay wins over styling
+            return display?.nodeColors[kindOf(d)] ?? (d.data as { color?: string }).color ?? nodeColor(kindOf(d));
+        };
+        const edgeColorOf = (d: EdgeData): string =>
+            display?.edgeColors[baseEdgeKind((d.data as { kind?: string }).kind)] ?? edge;
+        const graph = new Graph({
+            container: this.hostEl.nativeElement,
+            data: this.data as unknown as GraphData,
+            autoFit: 'view',
+            // See the pipeline editor canvas: G6's default [0.01, 10] lets a flick of the wheel land on
+            // specks or on one node filling the viewport. Floored much lower than the editor's because
+            // this host is shared with Link Analysis and the catalog metadata graph, where a
+            // several-hundred-node `autoFit: 'view'` legitimately needs to zoom well out.
+            zoomRange: [0.05, 4],
+            node: {
+                // Icon tile (rounded rect + glyph) when the data carries a resolved icon (flow/pipeline views);
+                // otherwise the per-kind shape (the catalog metadata graph).
+                type: (d) => (iconOf(d) ? 'rect' : (display?.nodeShapes[kindOf(d)] ?? nodeShape(kindOf(d)))),
+                style: {
+                    size: (d) => (iconOf(d) ? [46, 34] : 32),
+                    radius: 8,
+                    fill: nodeFill,
+                    stroke: (d) => colorOf(d),
+                    lineWidth: 2,
+                    iconSrc: (d) => iconOf(d),
+                    iconWidth: 22,
+                    iconHeight: 22,
+                    labelText:
+                        display?.nodeLabels === false ? undefined : (d): string => (d.data as { label: string }).label,
+                    labelFill: fg,
+                    labelFontSize: 11,
+                    labelPlacement: 'bottom',
+                    cursor: 'pointer',
+                    opacity: (d) => (nodeDim(d.id as string) ? 0.25 : 1),
+                    labelOpacity: (d) => (nodeDim(d.id as string) ? 0.35 : 1),
+                },
             },
-          ]
-        : [],
-    });
-    graph.on(NodeEvent.CLICK, (e) => {
-      const id = (e as unknown as { target?: { id?: string } }).target?.id;
-      if (id) this.nodeClick.emit(id);
-    });
-    graph.on(EdgeEvent.CLICK, (e) => {
-      const id = (e as unknown as { target?: { id?: string } }).target?.id;
-      if (id) this.edgeClick.emit(id);
-    });
-    graph.render();
-    this.graph = graph;
-  }
+            edge: {
+                type: 'line',
+                style: {
+                    stroke: (d) => edgeColorOf(d),
+                    opacity: (d) => (emEdges ? (emEdges.has(d.id as string) ? 1 : 0.2) : 1),
+                    endArrow: true,
+                    lineDash: (d) => edgeDash(display?.edgePatterns[baseEdgeKind((d.data as { kind?: string }).kind)]),
+                    // Per-kind size override wins; else the optional data-plane weight (T22 provenance
+                    // overlay) scales the line width log-style; else the default (catalog/combined views).
+                    lineWidth: (d) => {
+                        const override = display?.edgeSizes[baseEdgeKind((d.data as { kind?: string }).kind)];
+                        if (override) return override;
+                        const w = (d.data as { weight?: number }).weight;
+                        return w && w > 0 ? Math.min(12, 1.5 + Math.log2(w + 1)) : 1.5;
+                    },
+                    labelText:
+                        display?.edgeLabels === false ? undefined : (d): string => (d.data as { kind: string }).kind,
+                    labelFill: fg,
+                    labelFontSize: 9,
+                    labelBackground: false,
+                },
+            },
+            layout: layoutConfig(this.layout) as LayoutOptions,
+            behaviors: ['drag-canvas', 'zoom-canvas', 'drag-element'],
+            plugins: this.tooltips
+                ? [
+                      {
+                          type: 'tooltip',
+                          trigger: 'hover',
+                          getContent: async (_e: unknown, items: ElementDatum[]) => this.tooltipHtml(items),
+                      },
+                  ]
+                : [],
+        });
+        graph.on(NodeEvent.CLICK, (e) => {
+            const id = (e as unknown as { target?: { id?: string } }).target?.id;
+            if (id) this.nodeClick.emit(id);
+        });
+        graph.on(EdgeEvent.CLICK, (e) => {
+            const id = (e as unknown as { target?: { id?: string } }).target?.id;
+            if (id) this.edgeClick.emit(id);
+        });
+        graph.render();
+        this.graph = graph;
+    }
 }

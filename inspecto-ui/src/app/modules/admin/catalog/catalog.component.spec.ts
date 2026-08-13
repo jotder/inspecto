@@ -5,7 +5,15 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { CatalogService, ExchangeService, MetadataGraph, MetadataNode, PipelinesService, SessionService, SpacesService } from 'app/inspecto/api';
+import {
+    CatalogService,
+    ExchangeService,
+    MetadataGraph,
+    MetadataNode,
+    PipelinesService,
+    SessionService,
+    SpacesService,
+} from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -14,7 +22,9 @@ import { CatalogComponent } from './catalog.component';
 
 const TABLE: MetadataNode = { id: 'tbl/cdr', kind: 'TABLE', label: 'cdr' };
 const STREAM: MetadataNode = {
-    id: 'stream:orders', kind: 'STREAM', label: 'orders',
+    id: 'stream:orders',
+    kind: 'STREAM',
+    label: 'orders',
     attrs: { connector: 'local', pipeline: 'orders', active: false },
 };
 const GRAPH: MetadataGraph = { nodes: [TABLE], edges: [] };
@@ -53,7 +63,10 @@ function create(
             { provide: PipelinesService, useValue: { list: () => of([]), pipelineGraphRaw: () => of(undefined) } },
             // The Exchange tabs gate on bootstrap.features.exchange (SharingComponent is embedded).
             // authMode 'none' keeps LensService on the honor system (R2 grant checks bypassed).
-            { provide: SessionService, useValue: { exchangeEnabled: () => true, authMode: () => 'none', capabilities: () => capabilities } },
+            {
+                provide: SessionService,
+                useValue: { exchangeEnabled: () => true, authMode: () => 'none', capabilities: () => capabilities },
+            },
             { provide: ExchangeService, useValue: { grants: () => of([]), offers: () => of([]) } },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
             { provide: ToastrService, useValue: {} },
@@ -76,8 +89,9 @@ describe('CatalogComponent', () => {
     it('opens the create dialog from ?onboard=stream, AFTER the rows are in', () => {
         // The nav item Catalog ▸ Onboard Stream is this link. The dialog must see the loaded names so a
         // duplicate is rejected inline rather than only by the server's 409.
-        const c = create({ streams: () => of([STREAM]) }, { onboard: 'stream' }, ['canAuthorWorkbench'])
-            .componentInstance;
+        const c = create({ streams: () => of([STREAM]) }, { onboard: 'stream' }, [
+            'canAuthorWorkbench',
+        ]).componentInstance;
         expect(c.activeTab).toBe('streams');
         expect(DIALOG.open).toHaveBeenCalledTimes(1);
         expect(DIALOG.open.mock.calls[0][1]).toMatchObject({ data: { kind: 'stream', existingNames: ['orders'] } });

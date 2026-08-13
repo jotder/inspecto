@@ -11,7 +11,10 @@ import { InspectoChartComponent } from './chart.component';
 function create() {
     TestBed.configureTestingModule({
         imports: [InspectoChartComponent],
-        providers: [provideNoopAnimations(), { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+        ],
     });
     const fixture = TestBed.createComponent(InspectoChartComponent);
     fixture.componentRef.setInput('type', 'bar');

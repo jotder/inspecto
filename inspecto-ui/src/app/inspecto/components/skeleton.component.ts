@@ -27,7 +27,7 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
             <span
                 class="inspecto-skeleton-block"
                 [style.height]="height"
-                [style.width]="lines === 1 ? width : ($last ? lastLineWidth : '100%')"
+                [style.width]="lines === 1 ? width : $last ? lastLineWidth : '100%'"
             ></span>
         }
     `,

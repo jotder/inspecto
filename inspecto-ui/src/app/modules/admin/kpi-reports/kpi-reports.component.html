@@ -26,13 +26,21 @@
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             @for (d of dashboards(); track d.id) {
                 <div class="bg-card flex flex-col gap-2 rounded-2xl p-5 shadow">
-                    <a class="flex flex-col gap-1 transition-opacity hover:opacity-80" [routerLink]="['/studio/dashboards', d.id]">
+                    <a
+                        class="flex flex-col gap-1 transition-opacity hover:opacity-80"
+                        [routerLink]="['/studio/dashboards', d.id]"
+                    >
                         <div class="flex items-center gap-2">
-                            <mat-icon class="text-primary icon-size-5" svgIcon="heroicons_outline:squares-2x2"></mat-icon>
+                            <mat-icon
+                                class="text-primary icon-size-5"
+                                svgIcon="heroicons_outline:squares-2x2"
+                            ></mat-icon>
                             <span class="truncate font-semibold">{{ d.name }}</span>
                         </div>
                         <span class="text-secondary text-sm">
-                            {{ d.tiles.length }} tile(s){{ d.exposedFields?.length ? ' · ' + d.exposedFields!.length + ' quick filter(s)' : '' }}
+                            {{ d.tiles.length }} tile(s){{
+                                d.exposedFields?.length ? ' · ' + d.exposedFields!.length + ' quick filter(s)' : ''
+                            }}
                         </span>
                     </a>
 
@@ -45,22 +53,50 @@
                                     <span class="text-secondary ml-1 uppercase">{{ paramsOf(job).format }}</span>
                                     <span [innerHTML]="statusBadgeHtml(job.enabled ? 'enabled' : 'disabled')"></span>
                                     @if (job.lastRunTime) {
-                                        <span class="text-secondary ml-1 text-xs">last {{ fmtDateTime(job.lastRunTime) }}</span>
+                                        <span class="text-secondary ml-1 text-xs"
+                                            >last {{ fmtDateTime(job.lastRunTime) }}</span
+                                        >
                                     }
                                 </div>
                                 <div class="flex items-center gap-1">
-                                    <button mat-icon-button (click)="runNow(job)" matTooltip="Run now" [attr.aria-label]="'Run ' + job.name + ' now'">
+                                    <button
+                                        mat-icon-button
+                                        (click)="runNow(job)"
+                                        matTooltip="Run now"
+                                        [attr.aria-label]="'Run ' + job.name + ' now'"
+                                    >
                                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:play"></mat-icon>
                                     </button>
-                                    <button mat-icon-button (click)="downloadLatest(job)" [disabled]="!job.lastRunTime"
-                                            matTooltip="Download latest export" [attr.aria-label]="'Download latest export for ' + job.name">
-                                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                                    <button
+                                        mat-icon-button
+                                        (click)="downloadLatest(job)"
+                                        [disabled]="!job.lastRunTime"
+                                        matTooltip="Download latest export"
+                                        [attr.aria-label]="'Download latest export for ' + job.name"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-5"
+                                            svgIcon="heroicons_outline:arrow-down-tray"
+                                        ></mat-icon>
                                     </button>
                                     @if (lens.canAuthorWorkbench()) {
-                                        <button mat-icon-button (click)="editSchedule(job, d)" matTooltip="Edit schedule" [attr.aria-label]="'Edit schedule ' + job.name">
-                                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                                        <button
+                                            mat-icon-button
+                                            (click)="editSchedule(job, d)"
+                                            matTooltip="Edit schedule"
+                                            [attr.aria-label]="'Edit schedule ' + job.name"
+                                        >
+                                            <mat-icon
+                                                class="icon-size-5"
+                                                svgIcon="heroicons_outline:pencil-square"
+                                            ></mat-icon>
                                         </button>
-                                        <button mat-icon-button (click)="removeSchedule(job)" matTooltip="Delete schedule" [attr.aria-label]="'Delete schedule ' + job.name">
+                                        <button
+                                            mat-icon-button
+                                            (click)="removeSchedule(job)"
+                                            matTooltip="Delete schedule"
+                                            [attr.aria-label]="'Delete schedule ' + job.name"
+                                        >
                                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                                         </button>
                                     }

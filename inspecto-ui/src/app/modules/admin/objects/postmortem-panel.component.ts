@@ -200,8 +200,8 @@ export class PostmortemPanelComponent {
             // The gate only applies while `disposition` is actually a configured section (D6) — a
             // deployment that removed it has no disposition to record, so there is nothing to warn about.
             if (id === 'resolve' && this.findingsSpecs().some((s) => s.key === 'disposition')) {
-                const disposition = this.findingsValues()['disposition']
-                    || parseFindings(this.object())?.['disposition'];
+                const disposition =
+                    this.findingsValues()['disposition'] || parseFindings(this.object())?.['disposition'];
                 if (!disposition) warnings.push('no disposition recorded (Findings)');
             }
             if (warnings.length) {
@@ -314,7 +314,7 @@ export class PostmortemPanelComponent {
     /** C3 + C6: persist the case's Findings + team + target date as an attributes patch. */
     saveFindings(): void {
         const schema = this.findingsSchema();
-        if (schema && !schema.validate()) return;   // house rule: markAllAsTouched, surface inline errors
+        if (schema && !schema.validate()) return; // house rule: markAllAsTouched, surface inline errors
         const findings = this.findingsValues();
         const v = this.teamForm.getRawValue();
         const team = (v.team ?? '')
@@ -323,28 +323,30 @@ export class PostmortemPanelComponent {
             .filter(Boolean)
             .join(',');
         this.saving = true;
-        this.api.update(this.object().id, {
-            attributes: {
-                findings: JSON.stringify(findings),
-                // Flat, queryable copies so case analytics (C4) can sum impact without parsing the blob.
-                // A deployment that removes these sections (D6) simply stops feeding the roll-up.
-                impactAmount: findings['impactAmount'] ?? '',
-                recordsAffected: findings['recordsAffected'] ?? '',
-                assignees: team,
-                targetDate: (v.targetDate ?? '').trim(),
-            },
-        }).subscribe({
-            next: () => {
-                this.saving = false;
-                this.teamForm.markAsPristine();
-                schema?.form.markAsPristine();   // the values are already in place — just clear dirtiness
-                this.toastr.success('Findings saved');
-                this.changed.emit();
-            },
-            error: (e) => {
-                this.saving = false;
-                this.toastr.error(apiErrorMessage(e, 'Save failed'));
-            },
-        });
+        this.api
+            .update(this.object().id, {
+                attributes: {
+                    findings: JSON.stringify(findings),
+                    // Flat, queryable copies so case analytics (C4) can sum impact without parsing the blob.
+                    // A deployment that removes these sections (D6) simply stops feeding the roll-up.
+                    impactAmount: findings['impactAmount'] ?? '',
+                    recordsAffected: findings['recordsAffected'] ?? '',
+                    assignees: team,
+                    targetDate: (v.targetDate ?? '').trim(),
+                },
+            })
+            .subscribe({
+                next: () => {
+                    this.saving = false;
+                    this.teamForm.markAsPristine();
+                    schema?.form.markAsPristine(); // the values are already in place — just clear dirtiness
+                    this.toastr.success('Findings saved');
+                    this.changed.emit();
+                },
+                error: (e) => {
+                    this.saving = false;
+                    this.toastr.error(apiErrorMessage(e, 'Save failed'));
+                },
+            });
     }
 }

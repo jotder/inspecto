@@ -8,7 +8,11 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
-    breakId, Reconciliation, ReconciliationsService, ReconBreak, reconBreakSets,
+    breakId,
+    Reconciliation,
+    ReconciliationsService,
+    ReconBreak,
+    reconBreakSets,
 } from 'app/inspecto/reconciliation';
 import { ReconciliationDetailComponent } from './reconciliation-detail.component';
 import { ReconExecService } from './recon-exec.service';
@@ -28,18 +32,22 @@ const RIGHT = [
 ];
 
 const recon = (breaks: ReconBreak[] = []): Reconciliation => ({
-    id: 'med_vs_bill', name: 'Mediation vs Billing',
-    leftDataset: 'mediation_daily', rightDataset: 'billing_daily',
+    id: 'med_vs_bill',
+    name: 'Mediation vs Billing',
+    leftDataset: 'mediation_daily',
+    rightDataset: 'billing_daily',
     keyColumns: ['region', 'product'],
     compareColumns: [{ column: 'amount', toleranceType: 'percent', tolerance: 0.5 }],
-    breaks, lastRunAt: null,
+    breaks,
+    lastRunAt: null,
 });
 
 async function create(opts: { path?: string; breaks?: ReconBreak[] } = {}) {
     let current = recon(opts.breaks ?? []);
     const save = vi.fn((r: Reconciliation) => ((current = r), of(r)));
     const breaks = vi.fn(async (r: Reconciliation, path?: Record<string, string> | null) =>
-        reconBreakSets(r, LEFT, RIGHT, path));
+        reconBreakSets(r, LEFT, RIGHT, path),
+    );
     TestBed.configureTestingModule({
         imports: [ReconciliationDetailComponent],
         providers: [
@@ -53,7 +61,10 @@ async function create(opts: { path?: string; breaks?: ReconBreak[] } = {}) {
                     },
                 },
             },
-            { provide: Router, useValue: { navigate: vi.fn(), createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY } },
+            {
+                provide: Router,
+                useValue: { navigate: vi.fn(), createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
+            },
             { provide: ReconciliationsService, useValue: { get: () => of(current), save } },
             { provide: ReconExecService, useValue: { breaks } },
             { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
@@ -62,7 +73,7 @@ async function create(opts: { path?: string; breaks?: ReconBreak[] } = {}) {
         ],
     });
     const fixture = TestBed.createComponent(ReconciliationDetailComponent);
-    fixture.detectChanges();       // ngOnInit — load + compute
+    fixture.detectChanges(); // ngOnInit — load + compute
     await fixture.whenStable();
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, save, breaks };
@@ -74,7 +85,12 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         expect(c.missingA().map((b) => b.key)).toEqual(['MEA · voice']);
         expect(c.missingB().map((b) => b.key)).toEqual(['APAC · sms']);
         expect(c.valueBreaks()).toHaveLength(1);
-        expect(c.valueBreaks()[0]).toMatchObject({ key: 'EU · data', column: 'amount', leftValue: 118, rightValue: 114 });
+        expect(c.valueBreaks()[0]).toMatchObject({
+            key: 'EU · data',
+            column: 'amount',
+            leftValue: 118,
+            rightValue: 114,
+        });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Only in A');
         expect(text).toContain('Matched, different');
@@ -92,17 +108,21 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         const vb = c.valueBreaks()[0];
         expect(vb.status).toBe('open');
 
-        await c.toggleResolve(vb);                       // first touch appends the live break as resolved
+        await c.toggleResolve(vb); // first touch appends the live break as resolved
         expect(save).toHaveBeenCalledTimes(1);
         expect(c.valueBreaks()[0].status).toBe('resolved');
 
-        await c.toggleResolve(c.valueBreaks()[0]);       // re-open via resolveBreak on the persisted entry
+        await c.toggleResolve(c.valueBreaks()[0]); // re-open via resolveBreak on the persisted entry
         expect(c.valueBreaks()[0].status).toBe('open');
     });
 
     it('shows a pre-persisted resolution without any interaction', async () => {
         const resolved: ReconBreak = {
-            key: 'EU · data', type: 'value_break', column: 'amount', status: 'resolved', note: 'known billing lag',
+            key: 'EU · data',
+            type: 'value_break',
+            column: 'amount',
+            status: 'resolved',
+            note: 'known billing lag',
         };
         const { c } = await create({ breaks: [resolved] });
         expect(breakId(c.valueBreaks()[0])).toBe(breakId(resolved));

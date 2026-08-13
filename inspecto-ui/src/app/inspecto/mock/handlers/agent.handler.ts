@@ -44,19 +44,30 @@ function readSchemaFields(prompt: string): Record<string, unknown>[] {
     if (!clause) return [];
     return clause[1]
         .split(/,|\band\b/i)
-        .map((part) => part.trim().replace(/^(an?|the)\s+/i, '').replace(/[.?!]+$/, '').trim())
+        .map((part) =>
+            part
+                .trim()
+                .replace(/^(an?|the)\s+/i, '')
+                .replace(/[.?!]+$/, '')
+                .trim(),
+        )
         .filter((name) => /^[a-z][a-z0-9 _-]*$/i.test(name) && name.length > 0)
         .map((name) => {
             const key = name.toLowerCase().replace(/[\s-]+/g, '_');
             // ⚠ These must be the schema form's OWN type vocabulary (`string|integer|bigint|double|
             // boolean|date|timestamp`). Emitting a plausible-but-foreign type like `number` applies
             // silently and leaves the row's type dropdown BLANK — it looks like the draft worked.
-            const type = /_at$|timestamp/.test(key) ? 'timestamp'
-                : /date|time/.test(key) ? 'date'
-                    : /amount|total|price|rate|ratio/.test(key) ? 'double'
-                        : /count|qty|quantity|_id$|^id$|num/.test(key) ? 'integer'
-                            : /^is_|^has_|flag/.test(key) ? 'boolean'
-                                : 'string';
+            const type = /_at$|timestamp/.test(key)
+                ? 'timestamp'
+                : /date|time/.test(key)
+                  ? 'date'
+                  : /amount|total|price|rate|ratio/.test(key)
+                    ? 'double'
+                    : /count|qty|quantity|_id$|^id$|num/.test(key)
+                      ? 'integer'
+                      : /^is_|^has_|flag/.test(key)
+                        ? 'boolean'
+                        : 'string';
             return { name: key, type };
         });
 }
@@ -83,7 +94,7 @@ function readPipeline(prompt: string): Record<string, unknown> | null {
         });
     if (/\bwrite|store|sink|save|persist\b/i.test(prompt))
         stages.push({ id: 'sink', type: 'sink.persistent', config: { store: 'drafted' } });
-    if (stages.length < 2) return null;   // one lone node is not a topology
+    if (stages.length < 2) return null; // one lone node is not a topology
     return {
         name: 'drafted_flow',
         nodes: stages,
@@ -127,7 +138,7 @@ function asGroup(condition: Condition): ConditionGroup {
 function renderPredicate(node: unknown): string {
     if (!isGroupNode(node)) return '';
     const g = node as Record<string, unknown>;
-    const raw = g['items'] ?? g['conditions'];   // ConditionSql accepts either key
+    const raw = g['items'] ?? g['conditions']; // ConditionSql accepts either key
     const items = Array.isArray(raw) ? raw : [];
     const joiner = String(g['op'] ?? 'AND').toUpperCase() === 'OR' ? ' OR ' : ' AND ';
     const parts = items
@@ -159,18 +170,32 @@ function renderLeaf(node: unknown): string {
     const value2 = operand('value2');
     if (operator === 'isNull') return `${field} IS NULL`;
     if (operator === 'isNotNull') return `${field} IS NOT NULL`;
-    if (operator === 'between') return value && value2 ? `(${field} >= ${lit(value)} AND ${field} <= ${lit(value2)})` : '';
+    if (operator === 'between')
+        return value && value2 ? `(${field} >= ${lit(value)} AND ${field} <= ${lit(value2)})` : '';
     if (!value) return '';
     switch (operator) {
-        case 'contains': return `${field} LIKE '%${value}%'`;
-        case 'startsWith': return `${field} LIKE '${value}%'`;
-        case 'endsWith': return `${field} LIKE '%${value}'`;
-        case 'in': return `${field} IN (${value.split(',').map((v) => lit(v.trim())).join(', ')})`;
-        case '=': case '!=': case '<': case '<=': case '>': case '>=':
+        case 'contains':
+            return `${field} LIKE '%${value}%'`;
+        case 'startsWith':
+            return `${field} LIKE '${value}%'`;
+        case 'endsWith':
+            return `${field} LIKE '%${value}'`;
+        case 'in':
+            return `${field} IN (${value
+                .split(',')
+                .map((v) => lit(v.trim()))
+                .join(', ')})`;
+        case '=':
+        case '!=':
+        case '<':
+        case '<=':
+        case '>':
+        case '>=':
             return `${field} ${operator === '!=' ? '<>' : operator} ${lit(value)}`;
         // An operator the renderer does not know narrows to nothing, exactly as ConditionSql does —
         // never "ignore the clause", which would widen the result set instead.
-        default: return 'FALSE';
+        default:
+            return 'FALSE';
     }
 }
 
@@ -230,41 +255,47 @@ const MUTATING = new Set([
  * answers 422 and falls through to `docs_search`, which offline has nothing real to cite.
  */
 const GLOSSARY: Record<string, string> = {
-    'alert': 'A fired instance of an Alert Rule (severity: info / warning / critical).',
+    alert: 'A fired instance of an Alert Rule (severity: info / warning / critical).',
     'alert rule': 'Watches an observability Metric against a threshold and fires an Alert when crossed.',
-    'batch': 'A set of one or more files ingested and processed together as one unit of work.',
-    'case': 'A group of related Incidents managed as one larger investigation with a shared resolution.',
-    'catalog': 'The library/index of all Schemas (and Datasets) in a Space, with version history and usage.',
-    'collector': 'A configured collection task bound to one Connection: what to collect (paths/queries), how often, and where it lands.',
-    'connection': 'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud storage).',
-    'dataset': 'The umbrella for any queryable relation the BI layer can bind to: Table | Derived Table | Reference Dataset | View | Matrix.',
+    batch: 'A set of one or more files ingested and processed together as one unit of work.',
+    case: 'A group of related Incidents managed as one larger investigation with a shared resolution.',
+    catalog: 'The library/index of all Schemas (and Datasets) in a Space, with version history and usage.',
+    collector:
+        'A configured collection task bound to one Connection: what to collect (paths/queries), how often, and where it lands.',
+    connection: 'Named endpoint + credentials for reaching a remote system (SFTP/FTP/FTPS, a database, cloud storage).',
+    dataset:
+        'The umbrella for any queryable relation the BI layer can bind to: Table | Derived Table | Reference Dataset | View | Matrix.',
     'decision rule': 'A business-logic / routing rule that transforms or routes records.',
     'derived table': 'A materialized Table produced by a Transform or cube/rollup.',
-    'diagnosis': 'An AI-assisted root-cause analysis of a failing Run or Collector that produces an Incident with a suggested fix.',
-    'disposition': 'The decided outcome a Case resolves with (built-in ladder: confirmed · …).',
-    'executable': 'The abstraction for anything the Scheduler can start and that produces a Run. It is either a Pipeline or a Job.',
-    'expectation': 'A data-quality rule that validates records against a Schema (non-null, range, regex, …).',
-    'findings': "A Case's resolution artifact (the loose, business counterpart of the Incident postmortem).",
-    'incident': 'A tracked operational problem. Raised automatically by an Alert or a Diagnosis, or by hand.',
-    'job': 'An atomic, Quartz-style Executable that can do anything. A Job may also be embedded as a Step.',
-    'measure': 'A BI aggregation (SUM, AVG, COUNT, …) over a Dataset.',
-    'notification': 'Delivery of a Signal to a channel (email, webhook); a consumer of the ledger.',
-    'pipeline': 'A named, authored DAG of Steps that turns raw source files into clean, partitioned Tables.',
-    'reference': 'A named external dimension data origin, the slow-changing counterpart to a Stream.',
-    'run': 'One execution of an Executable.',
-    'scheduler': 'The Operations engine that owns Triggers and starts Executables (Pipelines or Jobs).',
-    'step': 'One node in a Pipeline. A Step is a Parser, Transform, Enrichment, or Sink — or an embedded Job.',
-    'stream': 'A named external event / fact data origin as seen in the Catalog.',
-    'table': 'A Hive-style root directory of Parquet files, partitioned by date / partition key.',
-    'tag': 'A user-created label attached to an Incident or Case for cross-cutting grouping.',
+    diagnosis:
+        'An AI-assisted root-cause analysis of a failing Run or Collector that produces an Incident with a suggested fix.',
+    disposition: 'The decided outcome a Case resolves with (built-in ladder: confirmed · …).',
+    executable:
+        'The abstraction for anything the Scheduler can start and that produces a Run. It is either a Pipeline or a Job.',
+    expectation: 'A data-quality rule that validates records against a Schema (non-null, range, regex, …).',
+    findings: "A Case's resolution artifact (the loose, business counterpart of the Incident postmortem).",
+    incident: 'A tracked operational problem. Raised automatically by an Alert or a Diagnosis, or by hand.',
+    job: 'An atomic, Quartz-style Executable that can do anything. A Job may also be embedded as a Step.',
+    measure: 'A BI aggregation (SUM, AVG, COUNT, …) over a Dataset.',
+    notification: 'Delivery of a Signal to a channel (email, webhook); a consumer of the ledger.',
+    pipeline: 'A named, authored DAG of Steps that turns raw source files into clean, partitioned Tables.',
+    reference: 'A named external dimension data origin, the slow-changing counterpart to a Stream.',
+    run: 'One execution of an Executable.',
+    scheduler: 'The Operations engine that owns Triggers and starts Executables (Pipelines or Jobs).',
+    step: 'One node in a Pipeline. A Step is a Parser, Transform, Enrichment, or Sink — or an embedded Job.',
+    stream: 'A named external event / fact data origin as seen in the Catalog.',
+    table: 'A Hive-style root directory of Parquet files, partitioned by date / partition key.',
+    tag: 'A user-created label attached to an Incident or Case for cross-cutting grouping.',
     'tag rule': 'A saved search that applies a Tag (the Gmail-filter metaphor): it auto-tags newly arriving items.',
-    'trigger': 'The start condition of a run: cron | event | manual | on-pipeline. Owned by the Scheduler.',
-    'entity': 'A business node in a business graph (a caller, an account). Never used for artifacts (Component/Part) or assets (Asset/Lineage).',
-    'link': 'A business edge between Entities (a call, a transaction) carrying typed attributes (call-type, duration). Never used for artifacts (Component/Part) or assets (Asset/Lineage).',
-    'entity projection': "The mapping (not a store) that folds a Dataset's rows into an Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.",
-    'link-analysis view': 'A saved investigation in the Link Analysis Studio (Component kind `link-analysis-view`); when its source is `entity-projection` it is a Widget (a Graph Visualization Type bound to a Dataset).',
-    'view': 'A virtual (logical) query over a Table, Derived Table, or View. No storage of its own.',
-    'widget': "A Visualization Type + Config + a binding to a Dataset's resultset metadata — the configured, renderable instance.",
+    trigger: 'The start condition of a run: cron | event | manual | on-pipeline. Owned by the Scheduler.',
+    entity: 'A business node in a business graph (a caller, an account). Never used for artifacts (Component/Part) or assets (Asset/Lineage).',
+    link: 'A business edge between Entities (a call, a transaction) carrying typed attributes (call-type, duration). Never used for artifacts (Component/Part) or assets (Asset/Lineage).',
+    'entity projection':
+        "The mapping (not a store) that folds a Dataset's rows into an Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.",
+    'link-analysis view':
+        'A saved investigation in the Link Analysis Studio (Component kind `link-analysis-view`); when its source is `entity-projection` it is a Widget (a Graph Visualization Type bound to a Dataset).',
+    view: 'A virtual (logical) query over a Table, Derived Table, or View. No storage of its own.',
+    widget: "A Visualization Type + Config + a binding to a Dataset's resultset metadata — the configured, renderable instance.",
 };
 
 function argsOf(req: MockRequest): Record<string, unknown> {
@@ -293,7 +324,11 @@ function signalsOf(store: MockStore, space: string): Signal[] {
  * pipeline record carries no paused flag, and claiming one would be the invention this whole tool
  * exists to avoid.
  */
-function pipelineStatus(store: MockStore, space: string, name: string): { name: string; paused: boolean; committedBatches: number } {
+function pipelineStatus(
+    store: MockStore,
+    space: string,
+    name: string,
+): { name: string; paused: boolean; committedBatches: number } {
     const committedBatches = signalsOf(store, space).filter(
         (s) => s.type === 'BATCH_COMMITTED' && s.source?.id === name,
     ).length;
@@ -314,45 +349,61 @@ export function agentHandler(flags: MockFlags): MockHandler {
         const d = match(req.url, DERIVE);
         if (d) {
             const tool = d[1];
-            if (MUTATING.has(tool))          // refused before any "model" runs, like the real route
+            if (MUTATING.has(tool))
+                // refused before any "model" runs, like the real route
                 return error(403, `tool '${tool}' is mutating and is not invocable directly`);
-            const prompt = typeof (req.body as { prompt?: unknown } | null)?.prompt === 'string'
-                ? String((req.body as { prompt: string }).prompt).trim() : '';
+            const prompt =
+                typeof (req.body as { prompt?: unknown } | null)?.prompt === 'string'
+                    ? String((req.body as { prompt: string }).prompt).trim()
+                    : '';
             if (!prompt) return error(400, 'prompt is required');
             if (tool !== 'query_author' && tool !== 'component_draft' && tool !== 'pipeline_author')
-                return error(404, `unknown tool: '${tool}'`);   // A5.1 + A5.2 + A5.3
+                return error(404, `unknown tool: '${tool}'`); // A5.1 + A5.2 + A5.3
 
             // Schema-keyed, pane-wins: the same merge order the backend does.
             let derivedArgs: Record<string, unknown>;
             if (tool === 'pipeline_author') {
                 const graph = readPipeline(prompt);
                 if (!graph)
-                    return error(422, `the model did not produce arguments for '${tool}'`
-                        + ' — rephrase the request, or fill the form directly');
+                    return error(
+                        422,
+                        `the model did not produce arguments for '${tool}'` +
+                            ' — rephrase the request, or fill the form directly',
+                    );
                 derivedArgs = { flow: graph, ...argsOf(req) };
             } else if (tool === 'component_draft') {
                 const fields = readSchemaFields(prompt);
                 if (!fields.length)
-                    return error(422, `the model did not produce arguments for '${tool}'`
-                        + ' — rephrase the request, or fill the form directly');
+                    return error(
+                        422,
+                        `the model did not produce arguments for '${tool}'` +
+                            ' — rephrase the request, or fill the form directly',
+                    );
                 derivedArgs = { config: { fields }, ...argsOf(req) };
             } else {
                 const when = readCondition(prompt);
                 if (!when)
-                    return error(422, `the model did not produce arguments for '${tool}'`
-                        + ' — rephrase the request, or fill the form directly');
+                    return error(
+                        422,
+                        `the model did not produce arguments for '${tool}'` +
+                            ' — rephrase the request, or fill the form directly',
+                    );
                 derivedArgs = { when: asGroup(when), ...argsOf(req) };
             }
             const inner = agentHandler(flags)(
-                { ...req, url: req.url.replace(/\/derive$/, ''), body: { args: derivedArgs } }, store);
+                { ...req, url: req.url.replace(/\/derive$/, ''), body: { args: derivedArgs } },
+                store,
+            );
             if (!inner || (inner.status ?? 200) >= 400) return inner;
             // A5.2: the real backend may spend up to 3 repair turns. Offline there is no model to run a
             // second turn with, so 1 is the honest number — never fake a loop that did not run. ⚠ It is
             // 1 even when the draft comes back WITH findings: that is a loop which did not converge, and
             // reporting 3 would claim repair attempts that never happened.
-            return json(tool === 'query_author'
-                ? { value: inner.body, derivedArgs }
-                : { value: inner.body, derivedArgs, turns: 1 });
+            return json(
+                tool === 'query_author'
+                    ? { value: inner.body, derivedArgs }
+                    : { value: inner.body, derivedArgs, turns: 1 },
+            );
         }
 
         const m = match(req.url, TOOLS);
@@ -376,7 +427,15 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 return json({
                     table,
                     column,
-                    profile: { rows, nulls: 0, nullFraction: 0, distinct: 8134, numeric: true, min: '0.0', max: '412.75' },
+                    profile: {
+                        rows,
+                        nulls: 0,
+                        nullFraction: 0,
+                        distinct: 8134,
+                        numeric: true,
+                        min: '0.0',
+                        max: '412.75',
+                    },
                     suggestions: [
                         {
                             name: `${table}_${column}_not_null`,
@@ -438,7 +497,10 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 // measures}`) and a tile is `{widgetId, span}` (NOT an x/y/w/h grid rect). The earlier
                 // mock invented both, so an adopting pane would have saved empty widgets and untileable
                 // dashboards while looking correct offline — the same leniency trap as `pipeline_author`.
-                const base = title.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+                const base = title
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '_')
+                    .replace(/^_|_$/g, '');
                 const norm = measures.map((raw) => {
                     const measure = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
                     const agg = text(measure, 'agg') || 'count';
@@ -543,13 +605,30 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 const hint = text(args, 'hint').toLowerCase();
                 const narrowed = hint ? columns.filter((c) => c.toLowerCase().includes(hint)) : columns;
                 const candidates = narrowed.length >= 2 ? narrowed : columns;
-                const findings = narrowed.length >= 2
-                    ? []
-                    : [{ severity: 'WARNING' as const, fieldPath: 'hint', message: `hint '${hint}' matched fewer than two columns — it was ignored` }];
+                const findings =
+                    narrowed.length >= 2
+                        ? []
+                        : [
+                              {
+                                  severity: 'WARNING' as const,
+                                  fieldPath: 'hint',
+                                  message: `hint '${hint}' matched fewer than two columns — it was ignored`,
+                              },
+                          ];
                 // Same shapes the real tool scores, kept short: it is the RESULT SHAPE that matters here.
-                const pairs = [['caller', 'callee'], ['source', 'target'], ['src', 'dst'], ['from', 'to']];
-                const carries = (c: string, token: string) => c.toLowerCase().split(/[^a-z0-9]+/).includes(token)
-                    || c.toLowerCase().startsWith(token) || c.toLowerCase().endsWith(token);
+                const pairs = [
+                    ['caller', 'callee'],
+                    ['source', 'target'],
+                    ['src', 'dst'],
+                    ['from', 'to'],
+                ];
+                const carries = (c: string, token: string) =>
+                    c
+                        .toLowerCase()
+                        .split(/[^a-z0-9]+/)
+                        .includes(token) ||
+                    c.toLowerCase().startsWith(token) ||
+                    c.toLowerCase().endsWith(token);
                 let source: string | undefined;
                 let target: string | undefined;
                 for (const [a, b] of pairs) {
@@ -565,11 +644,17 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 }
                 if (!source || !target) {
                     return json({
-                        kind: 'link-analysis-view', id: datasetId, clean: false,
-                        findings: [...findings, {
-                            severity: 'ERROR' as const, fieldPath: 'projections.0.sourceCol',
-                            message: `no source/target column pair could be derived from [${candidates.join(', ')}] — pick the two endpoint columns by hand`,
-                        }],
+                        kind: 'link-analysis-view',
+                        id: datasetId,
+                        clean: false,
+                        findings: [
+                            ...findings,
+                            {
+                                severity: 'ERROR' as const,
+                                fieldPath: 'projections.0.sourceCol',
+                                message: `no source/target column pair could be derived from [${candidates.join(', ')}] — pick the two endpoint columns by hand`,
+                            },
+                        ],
                         draft: { query: { projections: [{ datasetId, sourceCol: '', targetCol: '' }] } },
                     });
                 }
@@ -585,11 +670,15 @@ export function agentHandler(flags: MockFlags): MockHandler {
                     draft: {
                         query: {
                             // entityType is left UNSET on a single mapping — it changes node ids.
-                            projections: [{
-                                datasetId, sourceCol: source, targetCol: target,
-                                ...(linkKindCol ? { linkKindCol } : {}),
-                                ...(attrCols.length ? { attrCols } : {}),
-                            }],
+                            projections: [
+                                {
+                                    datasetId,
+                                    sourceCol: source,
+                                    targetCol: target,
+                                    ...(linkKindCol ? { linkKindCol } : {}),
+                                    ...(attrCols.length ? { attrCols } : {}),
+                                },
+                            ],
                         },
                     },
                 });
@@ -605,8 +694,11 @@ export function agentHandler(flags: MockFlags): MockHandler {
                 // string and echo it back as `type`, so a wrong kind looked like a clean draft offline.
                 const spec = DRAFT_SPECS[kind.trim().toLowerCase()];
                 if (!spec) {
-                    return error(422, `no structural spec for kind '${kind}' (validatable kinds: `
-                        + `${Object.keys(DRAFT_SPECS).join(', ')})`);
+                    return error(
+                        422,
+                        `no structural spec for kind '${kind}' (validatable kinds: ` +
+                            `${Object.keys(DRAFT_SPECS).join(', ')})`,
+                    );
                 }
                 const draft = config as Record<string, unknown>;
                 // A findings-carrying draft is a SUCCESS — the repair loop is the point of the surface.
@@ -627,9 +719,10 @@ export function agentHandler(flags: MockFlags): MockHandler {
                         findings.push({
                             severity: 'ERROR' as const,
                             fieldPath: path,
-                            message: path === 'tiles'
-                                ? 'A dashboard needs at least one tile.'
-                                : 'A schema component needs at least one field.',
+                            message:
+                                path === 'tiles'
+                                    ? 'A dashboard needs at least one tile.'
+                                    : 'A schema component needs at least one field.',
                         });
                     }
                 }

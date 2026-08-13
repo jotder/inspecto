@@ -31,8 +31,19 @@ export const LINE_PLUGIN = xyPlugin('line', 'line', 'Line', 'heroicons_outline:p
     minMeasure: 1,
     temporal: true,
 });
-export const BAR_PLUGIN = xyPlugin('bar', 'bar', 'Bar', 'heroicons_outline:chart-bar', { minMeasure: 1, minDim: 1, maxCardinality: 30 });
-export const AREA_PLUGIN = xyPlugin('area', 'line', 'Area', 'heroicons_outline:chart-bar', { minMeasure: 1, temporal: true }, true);
+export const BAR_PLUGIN = xyPlugin('bar', 'bar', 'Bar', 'heroicons_outline:chart-bar', {
+    minMeasure: 1,
+    minDim: 1,
+    maxCardinality: 30,
+});
+export const AREA_PLUGIN = xyPlugin(
+    'area',
+    'line',
+    'Area',
+    'heroicons_outline:chart-bar',
+    { minMeasure: 1, temporal: true },
+    true,
+);
 
 export const PIE_PLUGIN: VizPlugin = {
     meta: {

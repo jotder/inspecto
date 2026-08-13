@@ -92,7 +92,10 @@ describe('spacesHandler', () => {
     it('updates a space name/description, 404s the unknown, refuses the default', () => {
         const store = new MockStore();
         handler(req('POST', '/api/spaces', { id: 'acme', display_name: 'Acme' }), store);
-        const res = handler(req('PUT', '/api/spaces/acme', { display_name: 'Acme Corp', description: 'renamed' }), store);
+        const res = handler(
+            req('PUT', '/api/spaces/acme', { display_name: 'Acme Corp', description: 'renamed' }),
+            store,
+        );
         expect((res?.body as Space).displayName).toBe('Acme Corp');
         expect((res?.body as Space).description).toBe('renamed');
         expect((res?.body as Space).id).toBe('acme'); // id immutable

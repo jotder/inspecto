@@ -175,7 +175,8 @@ export class ExploreComponent implements OnInit {
     /** The saved views of a kind, as id/name picker choices (names only — no feature service needed). */
     private loadSavedViews(viewKind: string): void {
         this.componentsApi.list(viewKind as ComponentType).subscribe({
-            next: (defs) => this.savedViews.set(defs.map((d) => ({ id: d.name, name: String(d.content['name'] ?? d.name) }))),
+            next: (defs) =>
+                this.savedViews.set(defs.map((d) => ({ id: d.name, name: String(d.content['name'] ?? d.name) }))),
             error: () => this.toastr.warning('Could not load saved views.'),
         });
     }
@@ -189,7 +190,8 @@ export class ExploreComponent implements OnInit {
     history(): void {
         if (!this.id) return;
         const id = this.id;
-        this.dialog.open(ComponentHistoryDialog, { data: { type: 'widget', id, label: id } })
+        this.dialog
+            .open(ComponentHistoryDialog, { data: { type: 'widget', id, label: id } })
             .afterClosed()
             .subscribe((restored) => {
                 if (restored) this.widgetsApi.get(id).subscribe({ next: (w) => this.seedFromWidget(w) });
@@ -239,7 +241,8 @@ export class ExploreComponent implements OnInit {
         const rows = x ? bucketRows(this.rows(), x.field, x.grain) : this.rows();
         // Through DatasetResultService (M2): offline AlaSQL in mock mode, POST /bi/query when Studio is
         // live — the builder previews against the same data path the saved widget will render with.
-        this.datasetResult.run(spec, rows, this.colMetas())
+        this.datasetResult
+            .run(spec, rows, this.colMetas())
             .then((res) => {
                 this.props.set(plugin.transformProps(res.ok ? res.rows : [], this.controls()));
             })
@@ -269,16 +272,22 @@ export class ExploreComponent implements OnInit {
             .subscribe((result?: WidgetSaveResult) => {
                 if (!result) return;
                 const { name, description } = result;
-                const widget = buildWidget(name, viewBound ? '' : ds!.id, this.vizType(), viewBound ? {} : this.controls(), {
-                    options: this.options(),
-                    // Carried forward from the loaded widget, never authored here: tags are assignment
-                    // edges (D7 (c)) and the server re-derives this array on write. Tag via the library
-                    // card's Tags button.
-                    tags: this.tags(),
-                    description,
-                    viewId: viewBound ? this.viewId() : undefined,
-                    queryId: viewBound ? undefined : this.boundQueryId(),
-                });
+                const widget = buildWidget(
+                    name,
+                    viewBound ? '' : ds!.id,
+                    this.vizType(),
+                    viewBound ? {} : this.controls(),
+                    {
+                        options: this.options(),
+                        // Carried forward from the loaded widget, never authored here: tags are assignment
+                        // edges (D7 (c)) and the server re-derives this array on write. Tag via the library
+                        // card's Tags button.
+                        tags: this.tags(),
+                        description,
+                        viewId: viewBound ? this.viewId() : undefined,
+                        queryId: viewBound ? undefined : this.boundQueryId(),
+                    },
+                );
                 this.widgetsApi.save(widget, { update: this.editing() }).subscribe({
                     next: () => {
                         this.toastr.success(`Widget "${name}" saved`);

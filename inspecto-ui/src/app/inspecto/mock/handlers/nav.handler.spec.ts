@@ -36,7 +36,10 @@ describe('navHandler', () => {
         const handle = navHandler(flags);
         handle(req('PUT', '/api/v1/spaces/beta/nav/menus', { version: 1, nodes: [NODE] }), store);
         expect(handle(req('GET', '/nav/menus'), store)?.body).toMatchObject({ space: 's1', nodes: [] });
-        expect(handle(req('GET', '/api/v1/spaces/beta/nav/menus'), store)?.body).toMatchObject({ space: 'beta', nodes: [NODE] });
+        expect(handle(req('GET', '/api/v1/spaces/beta/nav/menus'), store)?.body).toMatchObject({
+            space: 'beta',
+            nodes: [NODE],
+        });
     });
 
     it('stays out of the way when the demo mock is off (falls through to the real backend)', () => {

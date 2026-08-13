@@ -103,7 +103,7 @@ export interface RecipeStepType {
 
 /** A node in the combined topology: a pipeline node (with its owning `flow`) or a synthetic `STORE` join node. */
 export interface CombinedNode extends PipelineNode {
-    flow?: string;   // the owning flow (absent on synthetic store nodes)
+    flow?: string; // the owning flow (absent on synthetic store nodes)
 }
 
 /** An edge in the combined topology; `kind:'store'` is a producer→store or store→consumer join edge. */
@@ -113,7 +113,7 @@ export interface CombinedEdge {
     rel: string;
     kind: 'data' | 'control' | 'route' | 'store';
     routeKey?: string;
-    restsOnDisk?: boolean;   // on store edges: whether the joined store rests on disk
+    restsOnDisk?: boolean; // on store edges: whether the joined store rests on disk
     flow?: string;
 }
 
@@ -346,7 +346,9 @@ export class PipelinesService {
      */
     savePipelineGraph(name: string, pipeline: AuthoredPipeline): Observable<PipelineGraphWriteResult> {
         return this.http.put<PipelineGraphWriteResult>(
-            apiUrl(`/pipelines/${encodeURIComponent(name)}/graph`), pipeline);
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/graph`),
+            pipeline,
+        );
     }
 
     /**
@@ -358,7 +360,8 @@ export class PipelinesService {
     saveAsTemplate(name: string, id: string, displayName?: string): Observable<PipelineTemplateResult> {
         return this.http.post<PipelineTemplateResult>(
             apiUrl(`/pipelines/${encodeURIComponent(name)}/save-as-template`),
-            displayName ? { id, name: displayName } : { id });
+            displayName ? { id, name: displayName } : { id },
+        );
     }
 
     /**
@@ -367,8 +370,9 @@ export class PipelinesService {
      * this is a relabel, not a migration, and {@link PipelineSummary.name} is unchanged afterwards.
      */
     label(name: string, displayName: string): Observable<PipelineLabelResult> {
-        return this.http.post<PipelineLabelResult>(
-            apiUrl(`/pipelines/${encodeURIComponent(name)}/label`), { name: displayName });
+        return this.http.post<PipelineLabelResult>(apiUrl(`/pipelines/${encodeURIComponent(name)}/label`), {
+            name: displayName,
+        });
     }
 
     // ── authored-pipeline CRUD + dry-run (editor; all writes 503 without -Dassist.write.root) ──
@@ -404,13 +408,16 @@ export class PipelinesService {
     ): Observable<PipelineDryRunResult> {
         return this.http.post<PipelineDryRunResult>(
             apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/dry-run`),
-            candidate ? { sampleRows, pipeline: candidate } : { sampleRows });
+            candidate ? { sampleRows, pipeline: candidate } : { sampleRows },
+        );
     }
 
     /** Test a single processor node over a bounded sample (no production write) — the per-processor test. */
     testNode(type: string, id: string): Observable<ComponentTestResult> {
         return this.http.post<ComponentTestResult>(
-            apiUrl(`/components/${encodeURIComponent(type)}/${encodeURIComponent(id)}/test`), {});
+            apiUrl(`/components/${encodeURIComponent(type)}/${encodeURIComponent(id)}/test`),
+            {},
+        );
     }
 
     /**
@@ -421,7 +428,8 @@ export class PipelinesService {
         return this.http.post<PipelineRunResult>(
             apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/run`),
             { files },
-            { params: { to: nodeId } });
+            { params: { to: nodeId } },
+        );
     }
 
     // ── data-plane provenance (T22; 404 unless -Dprovenance.backend=duckdb) ──

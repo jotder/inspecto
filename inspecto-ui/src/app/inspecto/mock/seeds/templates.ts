@@ -39,7 +39,14 @@ export const SPACE_TEMPLATES: SpaceTemplate[] = [
         description:
             'Switch CDRs vs. billing rated events: ingest both sides, reconcile keyed on call id with a rating tolerance, and surface leakage on an RA dashboard with alerting on the daily delta.',
         icon: 'heroicons_outline:banknotes',
-        contents: ['3 connections', '2 pipelines', '3 datasets + sample CDRs', '1 reconciliation (with breaks)', '3 widgets · 1 dashboard', 'RA jobs, alerts & incidents'],
+        contents: [
+            '3 connections',
+            '2 pipelines',
+            '3 datasets + sample CDRs',
+            '1 reconciliation (with breaks)',
+            '3 widgets · 1 dashboard',
+            'RA jobs, alerts & incidents',
+        ],
         seed: seedTelecomRa,
     },
     {
@@ -49,7 +56,14 @@ export const SPACE_TEMPLATES: SpaceTemplate[] = [
         description:
             'A scoring pipeline over mediation xDRs with velocity + destination rules (SIM-box, IRSF); high-risk events feed a drillable dataset, a fraud dashboard, and open investigation Cases.',
         icon: 'heroicons_outline:shield-exclamation',
-        contents: ['2 connections', '1 scoring pipeline', '2 datasets (incl. a real risk filter)', '3 widgets · 1 dashboard', 'Velocity/IRSF alert rules', 'Investigation cases'],
+        contents: [
+            '2 connections',
+            '1 scoring pipeline',
+            '2 datasets (incl. a real risk filter)',
+            '3 widgets · 1 dashboard',
+            'Velocity/IRSF alert rules',
+            'Investigation cases',
+        ],
         seed: seedFraudMgmt,
     },
     {
@@ -59,7 +73,14 @@ export const SPACE_TEMPLATES: SpaceTemplate[] = [
         description:
             'GL postings vs. bank payments: load both sides from the ERP and the bank export, reconcile on transaction id with a $0.01 tolerance, and track unmatched items as audit findings.',
         icon: 'heroicons_outline:scale',
-        contents: ['2 connections', '2 pipelines', '2 datasets + sample postings', '1 reconciliation (with breaks)', '3 widgets · 1 dashboard', 'Audit findings as incidents'],
+        contents: [
+            '2 connections',
+            '2 pipelines',
+            '2 datasets + sample postings',
+            '1 reconciliation (with breaks)',
+            '3 widgets · 1 dashboard',
+            'Audit findings as incidents',
+        ],
         seed: seedFinancialAudit,
     },
     {
@@ -69,7 +90,13 @@ export const SPACE_TEMPLATES: SpaceTemplate[] = [
         description:
             'Entity/link tables built nightly from xDRs with community detection; ring candidates (shared devices, payment paths) surface as Cases. The interactive graph Visualization Type arrives with C5.',
         icon: 'heroicons_outline:share',
-        contents: ['1 connection', '1 graph-build pipeline', '2 datasets (entities + links)', '3 widgets · 1 dashboard', 'A seeded ring-candidate case'],
+        contents: [
+            '1 connection',
+            '1 graph-build pipeline',
+            '2 datasets (entities + links)',
+            '3 widgets · 1 dashboard',
+            'A seeded ring-candidate case',
+        ],
         seed: seedLinkAnalysis,
     },
 ];

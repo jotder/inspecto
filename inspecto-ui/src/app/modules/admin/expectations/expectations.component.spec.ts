@@ -31,7 +31,9 @@ const ROW: Expectation = {
     updatedAt: 1,
 };
 
-async function create(opts: { rows?: Expectation[]; canAuthor?: boolean; api?: Partial<Record<keyof ExpectationsService, unknown>> } = {}) {
+async function create(
+    opts: { rows?: Expectation[]; canAuthor?: boolean; api?: Partial<Record<keyof ExpectationsService, unknown>> } = {},
+) {
     const toastr = { error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
         list: vi.fn(() => of(opts.rows ?? [ROW])),

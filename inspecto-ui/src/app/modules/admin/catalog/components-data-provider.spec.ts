@@ -15,11 +15,18 @@ function setup(defs: ComponentDef[]) {
 describe('ComponentsDataProvider', () => {
     it("lists a kind's existing components mapped onto the model Component shape", async () => {
         const { provider, list } = setup([
-            { type: 'grammar', name: 'cdr_dsv', ref: 'grammar/cdr_dsv', content: { name: 'CDR DSV', parser_type: 'dsv' } },
+            {
+                type: 'grammar',
+                name: 'cdr_dsv',
+                ref: 'grammar/cdr_dsv',
+                content: { name: 'CDR DSV', parser_type: 'dsv' },
+            },
         ]);
         const comps = await provider.list('grammar');
         expect(list).toHaveBeenCalledWith('grammar');
-        expect(comps).toEqual([{ kind: 'grammar', id: 'cdr_dsv', name: 'CDR DSV', config: { name: 'CDR DSV', parser_type: 'dsv' } }]);
+        expect(comps).toEqual([
+            { kind: 'grammar', id: 'cdr_dsv', name: 'CDR DSV', config: { name: 'CDR DSV', parser_type: 'dsv' } },
+        ]);
     });
 
     it('falls back to the id when content carries no name', async () => {

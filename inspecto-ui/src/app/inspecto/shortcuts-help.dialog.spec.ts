@@ -19,7 +19,9 @@ describe('ShortcutsHelpDialog', () => {
         const fixture = await create();
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('command palette');
-        const keys = Array.from(fixture.nativeElement.querySelectorAll('kbd')).map((k) => (k as HTMLElement).textContent);
+        const keys = Array.from(fixture.nativeElement.querySelectorAll('kbd')).map(
+            (k) => (k as HTMLElement).textContent,
+        );
         expect(keys).toContain('Ctrl');
         expect(keys).toContain('K');
         expect(keys).toContain('?');

@@ -31,7 +31,9 @@ const GRAMMARS: ComponentDef[] = [
 ];
 
 const PRODUCED_REF: MetadataNode = {
-    id: 'ref:region_dim', kind: 'REFERENCE_DATASET', label: 'REGION_DIM',
+    id: 'ref:region_dim',
+    kind: 'REFERENCE_DATASET',
+    label: 'REGION_DIM',
     attrs: { pipeline: 'region_dim', active: true },
 } as MetadataNode;
 
@@ -59,8 +61,19 @@ async function create(data: Partial<NodeConfigData> = {}, api: Partial<ConfigSer
                 useValue: {
                     read: vi.fn(() => throwError(() => ({ status: 404 }))),
                     write: vi.fn((type: string, cfg: Record<string, unknown>) =>
-                        of({ type, written: true, path: `${String(cfg['name'])}.toon`, name: String(cfg['name']), bytes: 1, overwritten: false, findings: [] })),
-                    registerEnrichment: vi.fn(() => of({ registered: true, name: 'x_enrich', path: 'x_enrich.toon', findings: [] })),
+                        of({
+                            type,
+                            written: true,
+                            path: `${String(cfg['name'])}.toon`,
+                            name: String(cfg['name']),
+                            bytes: 1,
+                            overwritten: false,
+                            findings: [],
+                        }),
+                    ),
+                    registerEnrichment: vi.fn(() =>
+                        of({ registered: true, name: 'x_enrich', path: 'x_enrich.toon', findings: [] }),
+                    ),
                     ...api,
                 },
             },
@@ -70,7 +83,11 @@ async function create(data: Partial<NodeConfigData> = {}, api: Partial<ConfigSer
             {
                 provide: ConnectionsService,
                 useValue: {
-                    list: () => of([{ id: 'prod_sftp', connector: 'sftp' }, { id: 'lake_blob', connector: 'azure' }]),
+                    list: () =>
+                        of([
+                            { id: 'prod_sftp', connector: 'sftp' },
+                            { id: 'lake_blob', connector: 'azure' },
+                        ]),
                     test: vi.fn(() => of({ reachable: true, detail: 'ok' })),
                 },
             },
@@ -141,8 +158,14 @@ describe('NodeConfigDialog', () => {
 
     it('renders the schema-form for a known type and splits config into schema + free-form', async () => {
         const fixture = await create({
-            node: { id: 'w', type: 'sink.persistent', config: { format: 'CSV', compression: 'gzip', custom_flag: 'x' } },
-            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
+            node: {
+                id: 'w',
+                type: 'sink.persistent',
+                config: { format: 'CSV', compression: 'gzip', custom_flag: 'x' },
+            },
+            typeLabel: 'sink.persistent',
+            categoryLabel: 'Sink',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(c.specs().map((s) => s.key)).toContain('format');
@@ -157,7 +180,9 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'w', type: 'sink.file', config: { format: 'CSV', extra: '1' } },
-            typeLabel: 'sink.file', categoryLabel: 'Sink', bindKind: null,
+            typeLabel: 'sink.file',
+            categoryLabel: 'Sink',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
@@ -178,14 +203,17 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: {
-                id: 'acq', type: 'acquisition',
+                id: 'acq',
+                type: 'acquisition',
                 config: {
                     post_action: { on_success: 'MOVE', tags: ['done'] },
                     stability: { window: '30s', size_checks: 3 },
                     include: ['glob:**/*.csv'],
                 },
             },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
@@ -212,26 +240,35 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: {
-                id: 'acq', type: 'acquisition',
+                id: 'acq',
+                type: 'acquisition',
                 config: { duplicate: { mode: 'checksum', algorithm: 'SHA256' } },
             },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(c.schemaInitial['duplicate__mode']).toBe('checksum');
         (c as unknown as { ref: { close: (r: { node: AuthoredNode }) => void } }).ref = { close: (r) => (closed = r) };
         fixture.detectChanges();
         c.save();
-        expect((closed?.node.config as Record<string, unknown>)['duplicate'])
-            .toEqual({ mode: 'checksum', algorithm: 'SHA256' });
+        expect((closed?.node.config as Record<string, unknown>)['duplicate']).toEqual({
+            mode: 'checksum',
+            algorithm: 'SHA256',
+        });
     });
 
     /** The nested block must reach the schema form, not the free-form escape hatch (D4, load half). */
     it('seeds the schema form from a nested block instead of stringifying it into free-form', async () => {
-        const c = (await create({
-            node: { id: 'acq', type: 'acquisition', config: { stability: { window: '30s' }, mystery: { a: 1 } } },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
-        })).componentInstance;
+        const c = (
+            await create({
+                node: { id: 'acq', type: 'acquisition', config: { stability: { window: '30s' }, mystery: { a: 1 } } },
+                typeLabel: 'acquisition',
+                categoryLabel: 'Collector',
+                bindKind: null,
+            })
+        ).componentInstance;
         expect(c.schemaInitial['stability__window']).toBe('30s');
         // Only the genuinely unknown root is free-form — and it stays literal there.
         expect(c.configRows.value).toEqual([{ key: 'mystery', value: '{"a":1}' }]);
@@ -243,23 +280,37 @@ describe('NodeConfigDialog', () => {
         const served: AttributeSpec[] = [
             { key: 'served_only', label: 'Served only', type: 'string', tier: 'required' },
         ];
-        const c = (await create({
-            node: { id: 'w', type: 'sink.persistent' },
-            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
-            attributes: served,
-        })).componentInstance;
+        const c = (
+            await create({
+                node: { id: 'w', type: 'sink.persistent' },
+                typeLabel: 'sink.persistent',
+                categoryLabel: 'Sink',
+                bindKind: null,
+                attributes: served,
+            })
+        ).componentInstance;
         expect(c.specs()).toBe(served);
         expect(c.specs().map((s) => s.key)).not.toContain('format'); // the local table's key
     });
 
     /** Before the catalog resolves (and in the offline build) the client table must still drive the form. */
     it('falls back to the local table when the server said nothing', async () => {
-        const c = (await create({
-            node: { id: 'w', type: 'sink.persistent' },
-            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
-        })).componentInstance;
-        expect(c.specs().map((s) => s.key)).toEqual(
-            ['database', 'format', 'compression', 'batch__max_files', 'batch__max_bytes', 'batch__order']);
+        const c = (
+            await create({
+                node: { id: 'w', type: 'sink.persistent' },
+                typeLabel: 'sink.persistent',
+                categoryLabel: 'Sink',
+                bindKind: null,
+            })
+        ).componentInstance;
+        expect(c.specs().map((s) => s.key)).toEqual([
+            'database',
+            'format',
+            'compression',
+            'batch__max_files',
+            'batch__max_bytes',
+            'batch__order',
+        ]);
     });
 
     /**
@@ -267,11 +318,15 @@ describe('NodeConfigDialog', () => {
      * the client table, or a type the server deliberately unspecced would keep drawing a stale form.
      */
     it('honours a served empty list instead of falling back', async () => {
-        const c = (await create({
-            node: { id: 'w', type: 'sink.persistent' },
-            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
-            attributes: [],
-        })).componentInstance;
+        const c = (
+            await create({
+                node: { id: 'w', type: 'sink.persistent' },
+                typeLabel: 'sink.persistent',
+                categoryLabel: 'Sink',
+                bindKind: null,
+                attributes: [],
+            })
+        ).componentInstance;
         expect(c.specs()).toEqual([]);
         expect(c.freeFormOpen()).toBe(true); // free-form becomes the only surface
     });
@@ -288,7 +343,9 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', config: { include: ['*.csv'] } },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         pickConnectionMode(fixture);
@@ -307,7 +364,9 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', config: { include: ['*.csv'] } },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(collector(fixture).mode()).toBe('local');
@@ -325,7 +384,9 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         pickConnectionMode(fixture);
@@ -338,10 +399,14 @@ describe('NodeConfigDialog', () => {
 
     /** Round-trip: the binding has to come BACK out of `use`, or reopening the dialog shows it blank. */
     it('seeds the Connection attribute from an existing use: binding', async () => {
-        const c = (await create({
-            node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
-        })).componentInstance;
+        const c = (
+            await create({
+                node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
+                typeLabel: 'acquisition',
+                categoryLabel: 'Collector',
+                bindKind: null,
+            })
+        ).componentInstance;
         expect(c.schemaInitial['connection']).toBe('lake_blob');
     });
 
@@ -357,7 +422,9 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(collector(fixture).mode()).toBe('connection');
@@ -374,7 +441,9 @@ describe('NodeConfigDialog', () => {
         let closed: { node: AuthoredNode } | undefined;
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition', use: 'connection/lake_blob' },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         form(fixture).form.patchValue({ connection: '' });
@@ -393,7 +462,9 @@ describe('NodeConfigDialog', () => {
     it('renders the shared collector surface for an acquisition node', async () => {
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
         expect(fixture.debugElement.query(By.directive(CollectorConfigComponent))).not.toBeNull();
     });
@@ -401,7 +472,9 @@ describe('NodeConfigDialog', () => {
     it('keeps the generic schema form for every other node type', async () => {
         const fixture = await create({
             node: { id: 'w', type: 'sink.persistent' },
-            typeLabel: 'sink.persistent', categoryLabel: 'Sink', bindKind: null,
+            typeLabel: 'sink.persistent',
+            categoryLabel: 'Sink',
+            bindKind: null,
         });
         expect(fixture.debugElement.query(By.directive(CollectorConfigComponent))).toBeNull();
         expect(form(fixture).form.contains('format')).toBe(true);
@@ -411,10 +484,13 @@ describe('NodeConfigDialog', () => {
     it('hides the free-text use box on an acquisition node', async () => {
         const fixture = await create({
             node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition', categoryLabel: 'Collector', bindKind: null,
+            typeLabel: 'acquisition',
+            categoryLabel: 'Collector',
+            bindKind: null,
         });
-        const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label'))
-            .map((l) => (l as HTMLElement).textContent?.trim());
+        const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label')).map((l) =>
+            (l as HTMLElement).textContent?.trim(),
+        );
         expect(labels).not.toContain('Use (component ref)');
     });
 
@@ -423,7 +499,9 @@ describe('NodeConfigDialog', () => {
     it('renders the shared enrichment editor + wiring form for an enrichment node', async () => {
         const fixture = await create({
             node: { id: 'enrich1', type: 'enrichment' },
-            typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null,
+            typeLabel: 'enrichment',
+            categoryLabel: 'Transform',
+            bindKind: null,
         });
         const c = fixture.componentInstance;
         expect(c.isEnrichment).toBe(true);
@@ -435,10 +513,26 @@ describe('NodeConfigDialog', () => {
     it('save writes the companion, registers it, and closes bound by reference — config stays unmirrored', async () => {
         let closed: { node: AuthoredNode } | undefined;
         const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
-            of({ type, written: true, path: `${String(cfg['name'])}.toon`, name: String(cfg['name']), bytes: 1, overwritten: false, findings: [] }));
-        const registerEnrichment = vi.fn(() => of({ registered: true, name: 'enrich1_enrich', path: 'enrich1.toon', findings: [] }));
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
+        const registerEnrichment = vi.fn(() =>
+            of({ registered: true, name: 'enrich1_enrich', path: 'enrich1.toon', findings: [] }),
+        );
         const fixture = await create(
-            { node: { id: 'enrich1', type: 'enrichment' }, typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null },
+            {
+                node: { id: 'enrich1', type: 'enrichment' },
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
+            },
             { write, registerEnrichment },
         );
         const c = fixture.componentInstance;
@@ -464,22 +558,37 @@ describe('NodeConfigDialog', () => {
 
     it('hydrates a bound companion and preserves unmodeled keys (partitions) through a save', async () => {
         let closed: { node: AuthoredNode } | undefined;
-        const read = vi.fn(() => of({
-            type: 'enrichment', name: 'orders_enrich', path: 'orders_enrich.toon',
-            config: {
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
                 name: 'orders_enrich',
-                input: { database: 'in/db', format: 'PARQUET', partitions: ['year', 'month'] },
-                output: { database: 'out/db', partitions: ['year'] },
-                transform: 'SELECT 1 FROM input',
-                triggers: { on_pipeline: 'orders' },
-            },
-        }));
+                path: 'orders_enrich.toon',
+                config: {
+                    name: 'orders_enrich',
+                    input: { database: 'in/db', format: 'PARQUET', partitions: ['year', 'month'] },
+                    output: { database: 'out/db', partitions: ['year'] },
+                    transform: 'SELECT 1 FROM input',
+                    triggers: { on_pipeline: 'orders' },
+                },
+            }),
+        );
         const write = vi.fn((type: string, cfg: Record<string, unknown>) =>
-            of({ type, written: true, path: `${String(cfg['name'])}.toon`, name: String(cfg['name']), bytes: 1, overwritten: false, findings: [] }));
+            of({
+                type,
+                written: true,
+                path: `${String(cfg['name'])}.toon`,
+                name: String(cfg['name']),
+                bytes: 1,
+                overwritten: false,
+                findings: [],
+            }),
+        );
         const fixture = await create(
             {
                 node: { id: 'enrich1', type: 'enrichment', use: 'enrichment/orders_enrich' },
-                typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null,
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
             },
             { read, write },
         );
@@ -500,15 +609,26 @@ describe('NodeConfigDialog', () => {
     });
 
     it('refuses to overwrite a hand-authored transform_file config', async () => {
-        const read = vi.fn(() => of({
-            type: 'enrichment', name: 'x_enrich', path: 'x_enrich.toon',
-            config: { name: 'x_enrich', input: { database: 'a' }, output: { database: 'b' }, transform_file: 't.sql' },
-        }));
+        const read = vi.fn(() =>
+            of({
+                type: 'enrichment',
+                name: 'x_enrich',
+                path: 'x_enrich.toon',
+                config: {
+                    name: 'x_enrich',
+                    input: { database: 'a' },
+                    output: { database: 'b' },
+                    transform_file: 't.sql',
+                },
+            }),
+        );
         const write = vi.fn();
         const fixture = await create(
             {
                 node: { id: 'e', type: 'enrichment', use: 'enrichment/x_enrich' },
-                typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null,
+                typeLabel: 'enrichment',
+                categoryLabel: 'Transform',
+                bindKind: null,
             },
             { read, write },
         );
@@ -525,14 +645,20 @@ describe('NodeConfigDialog', () => {
 
     it('has no a11y violations (schema-backed type)', async () => {
         const fixture = await create({
-            node: { id: 'w', type: 'sink.file' }, typeLabel: 'sink.file', categoryLabel: 'Sink', bindKind: null,
+            node: { id: 'w', type: 'sink.file' },
+            typeLabel: 'sink.file',
+            categoryLabel: 'Sink',
+            bindKind: null,
         });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('has no a11y violations (enrichment node)', async () => {
         const fixture = await create({
-            node: { id: 'e', type: 'enrichment' }, typeLabel: 'enrichment', categoryLabel: 'Transform', bindKind: null,
+            node: { id: 'e', type: 'enrichment' },
+            typeLabel: 'enrichment',
+            categoryLabel: 'Transform',
+            bindKind: null,
         });
         await expectNoA11yViolations(fixture.nativeElement);
     });

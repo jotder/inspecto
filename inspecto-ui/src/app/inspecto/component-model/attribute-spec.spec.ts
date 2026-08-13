@@ -11,8 +11,24 @@ import {
 
 const SPECS: AttributeSpec[] = [
     { key: 'name', label: 'Name', type: 'identifier', tier: 'required' },
-    { key: 'type', label: 'Type', type: 'select', tier: 'required', options: [{ value: 'enrich', label: 'Enrich' }, { value: 'report', label: 'Report' }] },
-    { key: 'cron', label: 'Cron', type: 'string', tier: 'optional', pattern: '[0-9*/ ,-]+', dependsOn: { key: 'type', equals: 'report' } },
+    {
+        key: 'type',
+        label: 'Type',
+        type: 'select',
+        tier: 'required',
+        options: [
+            { value: 'enrich', label: 'Enrich' },
+            { value: 'report', label: 'Report' },
+        ],
+    },
+    {
+        key: 'cron',
+        label: 'Cron',
+        type: 'string',
+        tier: 'optional',
+        pattern: '[0-9*/ ,-]+',
+        dependsOn: { key: 'type', equals: 'report' },
+    },
     { key: 'threads', label: 'Threads', type: 'number', tier: 'advanced', default: 4, min: 1, max: 64 },
     { key: 'enabled', label: 'Enabled', type: 'boolean', tier: 'optional', default: true },
 ];
@@ -60,10 +76,22 @@ describe('attribute-spec', () => {
     it('hides a notEquals dependsOn attribute exactly when the controller matches', () => {
         const specs: AttributeSpec[] = [
             {
-                key: 'kind', label: 'Kind', type: 'select', tier: 'required',
-                options: [{ value: 'non_null', label: 'Non-null' }, { value: 'condition', label: 'Condition' }],
+                key: 'kind',
+                label: 'Kind',
+                type: 'select',
+                tier: 'required',
+                options: [
+                    { value: 'non_null', label: 'Non-null' },
+                    { value: 'condition', label: 'Condition' },
+                ],
             },
-            { key: 'column', label: 'Column', type: 'string', tier: 'required', dependsOn: { key: 'kind', notEquals: 'condition' } },
+            {
+                key: 'column',
+                label: 'Column',
+                type: 'string',
+                tier: 'required',
+                dependsOn: { key: 'kind', notEquals: 'condition' },
+            },
         ];
         expect(visibleSpecs(specs, { kind: 'condition' }).map((s) => s.key)).not.toContain('column');
         expect(visibleSpecs(specs, { kind: 'non_null' }).map((s) => s.key)).toContain('column');
@@ -114,7 +142,9 @@ describe('attribute-spec', () => {
 
     it('accepts a fully valid config and wraps as a kind validator', () => {
         const validate = attributeValidator(SPECS);
-        expect(validate({ name: 'daily_kpi', type: 'report', cron: '0 2 * * *', threads: 8, enabled: false })).toEqual([]);
+        expect(validate({ name: 'daily_kpi', type: 'report', cron: '0 2 * * *', threads: 8, enabled: false })).toEqual(
+            [],
+        );
         expect(validate(null).map((f) => f.path)).toEqual(['name', 'type']);
     });
 });

@@ -20,12 +20,7 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
 @Component({
     selector: 'app-menu-artifact',
     standalone: true,
-    imports: [
-        InspectoEmptyStateComponent,
-        WidgetHostComponent,
-        GeoViewWidgetComponent,
-        LinkViewWidgetComponent,
-    ],
+    imports: [InspectoEmptyStateComponent, WidgetHostComponent, GeoViewWidgetComponent, LinkViewWidgetComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @if (binding(); as b) {

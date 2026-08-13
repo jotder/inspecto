@@ -1,0 +1,24 @@
+# Build output and dependencies
+dist/
+node_modules/
+.angular/
+coverage/
+out-tsc/
+
+# ── Vendored gamma/Fuse template ───────────────────────────────────────────────
+# Kept as close to upstream as possible so a vendor update stays mergeable; the
+# angular-ui skill (§3) bans restyling it. Note the v22 codemod DID touch 13 files
+# here, so they carry Angular's 2-space output rather than either style — that is
+# deliberate, not drift: reformatting them would widen the gap from upstream.
+src/@gamma/
+src/app/modules/auth/
+
+# ── Byte-compared cross-language contracts — DO NOT FORMAT ────────────────────
+# These are written by Jackson (SerializationFeature.INDENT_OUTPUT) and compared
+# as STRINGS by NodeAttributesContractTest / StepTypesContractTest /
+# MeasureGrammarContractTest in inspecto-engine. Any reformat fails the JAVA
+# build, which the UI gate would never catch.
+src/app/inspecto/mock/*.contract.json
+
+# Demo/fixture payloads — large, generated, and reformatting them is pure churn.
+src/assets/

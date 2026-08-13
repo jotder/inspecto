@@ -10,23 +10,34 @@ import { ReconViewWidgetComponent } from './recon-view-widget.component';
 import { ReconExecService } from './recon-exec.service';
 
 const RECON: Reconciliation = {
-    id: 'med_vs_bill', name: 'Mediation vs Billing',
-    leftDataset: 'mediation_daily', rightDataset: 'billing_daily',
+    id: 'med_vs_bill',
+    name: 'Mediation vs Billing',
+    leftDataset: 'mediation_daily',
+    rightDataset: 'billing_daily',
     keyColumns: ['region'],
     compareColumns: [{ column: 'amount', toleranceType: 'percent', tolerance: 0.5 }],
-    breaks: [], lastRunAt: null,
+    breaks: [],
+    lastRunAt: null,
 };
 
-const RESULT = aggregateRecon(RECON,
-    [{ region: 'EU', amount: 100 }, { region: 'MEA', amount: 10 }],
-    [{ region: 'EU', amount: 100 }]);
+const RESULT = aggregateRecon(
+    RECON,
+    [
+        { region: 'EU', amount: 100 },
+        { region: 'MEA', amount: 10 },
+    ],
+    [{ region: 'EU', amount: 100 }],
+);
 
 async function create(opts: { viewId?: string; fail?: boolean } = {}) {
     TestBed.configureTestingModule({
         imports: [ReconViewWidgetComponent],
         providers: [
             provideNoopAnimations(),
-            { provide: Router, useValue: { navigate: vi.fn(), createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY } },
+            {
+                provide: Router,
+                useValue: { navigate: vi.fn(), createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
+            },
             { provide: ActivatedRoute, useValue: { snapshot: {} } },
             {
                 provide: ReconciliationsService,

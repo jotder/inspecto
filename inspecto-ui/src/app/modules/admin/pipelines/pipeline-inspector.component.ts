@@ -65,7 +65,9 @@ import {
                 <div class="mt-2">
                     <span class="text-xs font-semibold uppercase opacity-70">Config</span>
                     @for (c of configEntries(); track c.k) {
-                        <div class="truncate text-sm"><span class="opacity-70">{{ c.k }}:</span> {{ c.v }}</div>
+                        <div class="truncate text-sm">
+                            <span class="opacity-70">{{ c.k }}:</span> {{ c.v }}
+                        </div>
                     }
                 </div>
             }
@@ -99,7 +101,11 @@ import {
             <h3 class="mb-2 text-sm font-semibold">Connection</h3>
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Relationship</mat-label>
-                <mat-select [value]="selectedEdgeRel" [disabled]="readOnly" (selectionChange)="edgeRelChange.emit($event.value)">
+                <mat-select
+                    [value]="selectedEdgeRel"
+                    [disabled]="readOnly"
+                    (selectionChange)="edgeRelChange.emit($event.value)"
+                >
                     @for (r of candidateRels; track r) {
                         <mat-option [value]="r">{{ r }}</mat-option>
                     }
@@ -107,7 +113,13 @@ import {
             </mat-form-field>
             <p class="mt-1 text-xs opacity-60">The source's output this connection carries.</p>
             @if (!readOnly) {
-                <button class="mt-3" mat-stroked-button type="button" (click)="deleteSelected.emit()" aria-label="Delete connection">
+                <button
+                    class="mt-3"
+                    mat-stroked-button
+                    type="button"
+                    (click)="deleteSelected.emit()"
+                    aria-label="Delete connection"
+                >
                     <mat-icon svgIcon="heroicons_outline:trash"></mat-icon> Delete connection
                 </button>
             }

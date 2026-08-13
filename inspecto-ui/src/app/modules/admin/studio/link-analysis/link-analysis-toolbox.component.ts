@@ -48,11 +48,30 @@ import { GraphEmphasis } from 'app/modules/admin/catalog/graph-view.component';
 import { PATTERN_PACKS, PatternPack, patternPackFromContent } from './pattern-packs';
 
 type AnalysisTab =
-    | 'path' | 'explain' | 'centrality' | 'communities' | 'pattern' | 'all-paths' | 'components'
-    | 'cycles' | 'cut-points' | 'cohesion' | 'similarity' | 'flow' | 'scoring';
+    | 'path'
+    | 'explain'
+    | 'centrality'
+    | 'communities'
+    | 'pattern'
+    | 'all-paths'
+    | 'components'
+    | 'cycles'
+    | 'cut-points'
+    | 'cohesion'
+    | 'similarity'
+    | 'flow'
+    | 'scoring';
 
 /** The metrics the Centrality group can rank by — each returns a {@link NodeScore} list. */
-type CentralityMetric = 'degree' | 'betweenness' | 'closeness' | 'eigenvector' | 'katz' | 'pagerank' | 'hub' | 'authority';
+type CentralityMetric =
+    | 'degree'
+    | 'betweenness'
+    | 'closeness'
+    | 'eigenvector'
+    | 'katz'
+    | 'pagerank'
+    | 'hub'
+    | 'authority';
 
 /**
  * **Link Analysis — graph-algorithms toolbox** (the bottom panel's Analysis tab, extracted from the
@@ -66,8 +85,14 @@ type CentralityMetric = 'degree' | 'betweenness' | 'closeness' | 'eigenvector' |
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        DecimalPipe, MatButtonModule, MatButtonToggleModule, MatFormFieldModule, MatIconModule,
-        MatInputModule, MatSelectModule, InspectoAlertComponent,
+        DecimalPipe,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatSelectModule,
+        InspectoAlertComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -80,13 +105,18 @@ export class LinkAnalysisToolboxComponent {
         // This Space's authored pattern packs, if it has any. Degrades silently: an error (no write root,
         // intelligence-free edition, offline) leaves the shipped built-ins in place, which is the whole point
         // of seeding the signal with them — there is no error surface to show for a catalog that has a default.
-        this.componentsApi.list('pattern-pack').pipe(takeUntilDestroyed(inject(DestroyRef))).subscribe({
-            next: (defs) => {
-                const authored = defs.map((d) => patternPackFromContent(d.content)).filter((p): p is PatternPack => !!p);
-                if (authored.length) this.patternPacks.set(authored);
-            },
-            error: () => undefined,
-        });
+        this.componentsApi
+            .list('pattern-pack')
+            .pipe(takeUntilDestroyed(inject(DestroyRef)))
+            .subscribe({
+                next: (defs) => {
+                    const authored = defs
+                        .map((d) => patternPackFromContent(d.content))
+                        .filter((p): p is PatternPack => !!p);
+                    if (authored.length) this.patternPacks.set(authored);
+                },
+                error: () => undefined,
+            });
     }
 
     /** The graph the tools operate on — the host's displayed (filtered + collapsed) graph. */
@@ -224,17 +254,27 @@ export class LinkAnalysisToolboxComponent {
                 return this.cycles().length ? `${this.cycles().length} found` : '';
             case 'cut-points':
                 return this.cutNodes().length || this.cutEdges().length
-                    ? `${this.cutNodes().length} nodes · ${this.cutEdges().length} bridges` : '';
+                    ? `${this.cutNodes().length} nodes · ${this.cutEdges().length} bridges`
+                    : '';
             case 'cohesion':
                 return this.cohesionMetric() === 'cliques'
-                    ? (this.cliquesResult().length ? `${this.cliquesResult().length} cliques` : '')
-                    : (this.cohesionRanking().length ? `top ${this.cohesionRanking().length}` : '');
+                    ? this.cliquesResult().length
+                        ? `${this.cliquesResult().length} cliques`
+                        : ''
+                    : this.cohesionRanking().length
+                      ? `top ${this.cohesionRanking().length}`
+                      : '';
             case 'similarity':
                 return this.similarityResult().length || this.predictions().length
-                    ? `${this.similarityResult().length} similar · ${this.predictions().length} predicted` : '';
+                    ? `${this.similarityResult().length} similar · ${this.predictions().length} predicted`
+                    : '';
             case 'flow': {
                 const f = this.flowResult();
-                return f ? `flow ${f.value}` : (this.spanningForest() ? `${this.spanningForest()!.edgeIds.length} edges` : '');
+                return f
+                    ? `flow ${f.value}`
+                    : this.spanningForest()
+                      ? `${this.spanningForest()!.edgeIds.length} edges`
+                      : '';
             }
             case 'scoring':
                 return this.suspicion().length ? `top ${this.suspicion().length}` : '';
@@ -247,9 +287,10 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.pathFrom() || !this.pathTo()) return;
         this.analysisError.set('');
-        const p = this.pathMetric() === 'weighted'
-            ? weightedShortestPath(g, this.pathFrom(), this.pathTo())
-            : shortestPath(g, this.pathFrom(), this.pathTo());
+        const p =
+            this.pathMetric() === 'weighted'
+                ? weightedShortestPath(g, this.pathFrom(), this.pathTo())
+                : shortestPath(g, this.pathFrom(), this.pathTo());
         if (!p) {
             this.pathResult.set(null);
             this.emphasisChange.emit(null);
@@ -284,14 +325,22 @@ export class LinkAnalysisToolboxComponent {
 
     private centralityScores(g: G6GraphData): NodeScore[] {
         switch (this.centralityMetric()) {
-            case 'betweenness': return betweennessCentrality(g);
-            case 'closeness': return closenessCentrality(g);
-            case 'eigenvector': return eigenvectorCentrality(g);
-            case 'katz': return katzCentrality(g);
-            case 'pagerank': return pageRank(g);
-            case 'hub': return hits(g).hubs;
-            case 'authority': return hits(g).authorities;
-            default: return degreeCentrality(g);
+            case 'betweenness':
+                return betweennessCentrality(g);
+            case 'closeness':
+                return closenessCentrality(g);
+            case 'eigenvector':
+                return eigenvectorCentrality(g);
+            case 'katz':
+                return katzCentrality(g);
+            case 'pagerank':
+                return pageRank(g);
+            case 'hub':
+                return hits(g).hubs;
+            case 'authority':
+                return hits(g).authorities;
+            default:
+                return degreeCentrality(g);
         }
     }
 
@@ -494,7 +543,11 @@ export class LinkAnalysisToolboxComponent {
         const g = this.graph();
         if (!g || !this.similarityFor()) return;
         this.analysisError.set('');
-        this.similarityResult.set(jaccardSimilarity(g, this.similarityFor()).filter((s) => s.score > 0).slice(0, 20));
+        this.similarityResult.set(
+            jaccardSimilarity(g, this.similarityFor())
+                .filter((s) => s.score > 0)
+                .slice(0, 20),
+        );
         this.emphasisChange.emit({ nodeIds: [this.similarityFor()], edgeIds: [] });
     }
 

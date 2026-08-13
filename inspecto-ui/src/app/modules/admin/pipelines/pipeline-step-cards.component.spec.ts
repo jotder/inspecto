@@ -17,7 +17,12 @@ function create(inputs: Partial<PipelineStepCardsComponent>) {
     return { fixture, c: fixture.componentInstance };
 }
 
-const COLLECT: AuthoredNode = { id: 'collect-1', type: 'acquisition', name: 'Collect orders', config: { files: '*.csv' } };
+const COLLECT: AuthoredNode = {
+    id: 'collect-1',
+    type: 'acquisition',
+    name: 'Collect orders',
+    config: { files: '*.csv' },
+};
 const PARSE: AuthoredNode = { id: 'parse-1', type: 'parser', config: { grammar: 'grammar/pipe' } };
 
 describe('PipelineStepCardsComponent', () => {
@@ -26,7 +31,10 @@ describe('PipelineStepCardsComponent', () => {
             { kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 },
             { kind: 'node', rowId: PARSE.id, node: PARSE, depth: 0 },
         ];
-        const typeCat = new Map([['acquisition', 'SOURCE'], ['parser', 'PARSE']]);
+        const typeCat = new Map([
+            ['acquisition', 'SOURCE'],
+            ['parser', 'PARSE'],
+        ]);
         const { fixture } = create({ rows, typeCat });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Collect orders');
@@ -40,7 +48,12 @@ describe('PipelineStepCardsComponent', () => {
         // The node id encodes the type it was created with (`transform_join_1`), so using it as a
         // heading describes the type forever — it would start lying the day a Step can be retyped.
         const rows: StepRow[] = [
-            { kind: 'node', rowId: 'transform_join_1', node: { id: 'transform_join_1', type: 'transform.join' }, depth: 0 },
+            {
+                kind: 'node',
+                rowId: 'transform_join_1',
+                node: { id: 'transform_join_1', type: 'transform.join' },
+                depth: 0,
+            },
         ];
         const typeCat = new Map([['transform.join', 'TRANSFORM']]);
         const typeLabel = new Map([['transform.join', 'Join']]);
@@ -53,7 +66,12 @@ describe('PipelineStepCardsComponent', () => {
 
     it('keeps the kind caption beside a named Step', () => {
         const rows: StepRow[] = [
-            { kind: 'node', rowId: 'j', node: { id: 'j', type: 'transform.join', name: 'Enrich with customers' }, depth: 0 },
+            {
+                kind: 'node',
+                rowId: 'j',
+                node: { id: 'j', type: 'transform.join', name: 'Enrich with customers' },
+                depth: 0,
+            },
         ];
         const typeCat = new Map([['transform.join', 'TRANSFORM']]);
         const typeLabel = new Map([['transform.join', 'Join']]);
@@ -71,8 +89,14 @@ describe('PipelineStepCardsComponent', () => {
             { kind: 'node', rowId: 'j', node: { id: 'j', type: 'transform.join' }, depth: 0 },
             { kind: 'node', rowId: 'f', node: { id: 'f', type: 'transform.filter' }, depth: 0 },
         ];
-        const typeCat = new Map([['transform.join', 'TRANSFORM'], ['transform.filter', 'TRANSFORM']]);
-        const typeLabel = new Map([['transform.join', 'Join'], ['transform.filter', 'Filter']]);
+        const typeCat = new Map([
+            ['transform.join', 'TRANSFORM'],
+            ['transform.filter', 'TRANSFORM'],
+        ]);
+        const typeLabel = new Map([
+            ['transform.join', 'Join'],
+            ['transform.filter', 'Filter'],
+        ]);
 
         const { fixture } = create({ rows, typeCat, typeLabel });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
@@ -86,25 +110,39 @@ describe('PipelineStepCardsComponent', () => {
             { kind: 'node', rowId: 'j', node: { id: 'j', type: 'transform.join' }, depth: 0 },
             { kind: 'node', rowId: 'x', node: { id: 'x', type: 'transform.bespoke' }, depth: 0 },
         ];
-        const typeCat = new Map([['transform.join', 'TRANSFORM'], ['transform.bespoke', 'TRANSFORM']]);
-        const typeLabel = new Map([['transform.join', 'Join']]);   // the plugin type has no served label
+        const typeCat = new Map([
+            ['transform.join', 'TRANSFORM'],
+            ['transform.bespoke', 'TRANSFORM'],
+        ]);
+        const typeLabel = new Map([['transform.join', 'Join']]); // the plugin type has no served label
 
         const { fixture } = create({ rows, typeCat, typeLabel });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Join');
         expect(text).toContain('Transformer');
-        expect(text).not.toContain('transform.bespoke');   // never print the raw type at the user
+        expect(text).not.toContain('transform.bespoke'); // never print the raw type at the user
     });
 
     it('renders a branch-header row indented and shows its predicate + default flag', () => {
         const rows: StepRow[] = [
             { kind: 'node', rowId: 'route-1', node: { id: 'route-1', type: 'transform.route' }, depth: 0 },
-            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', where: "region = 'EU'", isDefault: false, depth: 0 },
+            {
+                kind: 'branch',
+                rowId: 'branch:emea:0',
+                routeId: 'route-1',
+                key: 'emea',
+                where: "region = 'EU'",
+                isDefault: false,
+                depth: 0,
+            },
             { kind: 'node', rowId: 'sink-emea', node: { id: 'sink-emea', type: 'sink.persistent' }, depth: 1 },
             { kind: 'branch', rowId: 'branch:other:0', routeId: 'route-1', key: 'other', isDefault: true, depth: 0 },
             { kind: 'node', rowId: 'sink-other', node: { id: 'sink-other', type: 'sink.persistent' }, depth: 1 },
         ];
-        const typeCat = new Map([['transform.route', 'TRANSFORM'], ['sink.persistent', 'SINK']]);
+        const typeCat = new Map([
+            ['transform.route', 'TRANSFORM'],
+            ['sink.persistent', 'SINK'],
+        ]);
         const { fixture } = create({ rows, typeCat });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('branch: emea');
@@ -136,7 +174,10 @@ describe('PipelineStepCardsComponent', () => {
             { kind: 'node', rowId: COLLECT.id, node: COLLECT, depth: 0 },
             { kind: 'node', rowId: 'deep', node: { id: 'deep', type: 'sink.persistent' }, depth: 1 },
         ];
-        const typeCat = new Map([['acquisition', 'SOURCE'], ['sink.persistent', 'SINK']]);
+        const typeCat = new Map([
+            ['acquisition', 'SOURCE'],
+            ['sink.persistent', 'SINK'],
+        ]);
         const { fixture, c } = create({ rows, typeCat, editable: true });
         const opened: unknown[] = [];
         const removed: string[] = [];
@@ -172,15 +213,27 @@ describe('PipelineStepCardsComponent', () => {
 
     it('S3: a route card offers mode toggle + add-branch; branch rows emit where/default/remove', async () => {
         const ROUTE: AuthoredNode = {
-            id: 'route-1', type: 'transform.route',
+            id: 'route-1',
+            type: 'transform.route',
             config: { mode: 'case', branches: [{ key: 'emea', where: "region = 'EU'" }], default: 'emea' },
         };
         const rows: StepRow[] = [
             { kind: 'node', rowId: ROUTE.id, node: ROUTE, depth: 0 },
-            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', where: "region = 'EU'", isDefault: true, depth: 0 },
+            {
+                kind: 'branch',
+                rowId: 'branch:emea:0',
+                routeId: 'route-1',
+                key: 'emea',
+                where: "region = 'EU'",
+                isDefault: true,
+                depth: 0,
+            },
             { kind: 'node', rowId: 'sink-emea', node: { id: 'sink-emea', type: 'sink.persistent' }, depth: 1 },
         ];
-        const typeCat = new Map([['transform.route', 'TRANSFORM'], ['sink.persistent', 'SINK']]);
+        const typeCat = new Map([
+            ['transform.route', 'TRANSFORM'],
+            ['sink.persistent', 'SINK'],
+        ]);
         const { fixture, c } = create({ rows, typeCat, editable: true });
         const added: unknown[] = [];
         const removed: unknown[] = [];
@@ -226,7 +279,15 @@ describe('PipelineStepCardsComponent', () => {
 
     it('S3: branch rows show the predicate as text only when not editable', () => {
         const rows: StepRow[] = [
-            { kind: 'branch', rowId: 'branch:emea:0', routeId: 'route-1', key: 'emea', where: "region = 'EU'", isDefault: false, depth: 0 },
+            {
+                kind: 'branch',
+                rowId: 'branch:emea:0',
+                routeId: 'route-1',
+                key: 'emea',
+                where: "region = 'EU'",
+                isDefault: false,
+                depth: 0,
+            },
         ];
         const { fixture } = create({ rows, typeCat: new Map(), editable: false });
         const el = fixture.nativeElement as HTMLElement;
@@ -252,15 +313,15 @@ describe('PipelineStepCardsComponent', () => {
         const inserted: { type: string; afterId: string | null }[] = [];
         c.insertStep.subscribe((e) => inserted.push(e));
 
-        const trigger = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-            .find((b) => b.getAttribute('aria-label') === 'Add a Step at the start')!;
+        const trigger = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find(
+            (b) => b.getAttribute('aria-label') === 'Add a Step at the start',
+        )!;
         trigger.click();
         fixture.detectChanges();
 
         // the menu renders in an overlay, not inside the component's own element
         const items = Array.from(document.querySelectorAll('.mat-mdc-menu-panel button.mat-mdc-menu-item'));
-        expect(items.map((i) => i.textContent?.trim()))
-            .toEqual(['Transform (filter)', 'Transform (join)', 'Sink']);
+        expect(items.map((i) => i.textContent?.trim())).toEqual(['Transform (filter)', 'Transform (join)', 'Sink']);
 
         (items[1] as HTMLButtonElement).click();
         expect(inserted).toEqual([{ type: 'transform.join', afterId: null }]);

@@ -29,7 +29,12 @@ export interface Requirement {
 /** Build a freshly submitted {@link Requirement} — the id is a slug + short suffix, not user-authored
  *  (nothing else references a requirement by id, so there's nothing to ask the user to name). */
 export function buildRequirement(title: string, kind: RequirementKind, description: string): Requirement {
-    const slug = title.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'requirement';
+    const slug =
+        title
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'requirement';
     const suffix = Math.random().toString(36).slice(2, 6);
     return {
         id: `${slug}_${suffix}`,
@@ -43,10 +48,20 @@ export function buildRequirement(title: string, kind: RequirementKind, descripti
 
 /** Builder's accept/reject decision. */
 export function decideRequirement(r: Requirement, accept: boolean, note?: string): Requirement {
-    return { ...r, status: accept ? 'accepted' : 'rejected', decisionNote: note?.trim() || undefined, decidedAt: new Date().toISOString() };
+    return {
+        ...r,
+        status: accept ? 'accepted' : 'rejected',
+        decisionNote: note?.trim() || undefined,
+        decidedAt: new Date().toISOString(),
+    };
 }
 
 /** Mark an accepted requirement delivered. */
 export function deliverRequirement(r: Requirement, note?: string): Requirement {
-    return { ...r, status: 'delivered', deliveredNote: note?.trim() || undefined, deliveredAt: new Date().toISOString() };
+    return {
+        ...r,
+        status: 'delivered',
+        deliveredNote: note?.trim() || undefined,
+        deliveredAt: new Date().toISOString(),
+    };
 }

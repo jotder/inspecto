@@ -41,8 +41,17 @@ const INCIDENT: OperationalObject = {
 const CASE_FINDINGS_SPEC: FindingsSpecDef = {
     objectType: 'case',
     sections: [
-        { key: 'disposition', label: 'Disposition', type: 'select', tier: 'required', required: false,
-          options: [{ value: 'RECOVERED', label: 'Recovered' }, { value: 'CONFIRMED', label: 'Confirmed' }] },
+        {
+            key: 'disposition',
+            label: 'Disposition',
+            type: 'select',
+            tier: 'required',
+            required: false,
+            options: [
+                { value: 'RECOVERED', label: 'Recovered' },
+                { value: 'CONFIRMED', label: 'Confirmed' },
+            ],
+        },
         { key: 'impactAmount', label: 'Impact amount', type: 'string', tier: 'required', required: false },
         { key: 'recordsAffected', label: 'Records affected', type: 'string', tier: 'required', required: false },
         { key: 'summary', label: 'Summary', type: 'multiline', tier: 'required', required: false },
@@ -116,8 +125,12 @@ describe('PostmortemPanelComponent', () => {
 
         // The Findings half is schema-driven now (D6) — drive its controls, not a fixed FormGroup.
         const schema = c.findingsSchema()!;
-        expect(Object.keys(schema.form.controls).sort())
-            .toEqual(['disposition', 'impactAmount', 'recordsAffected', 'summary']);
+        expect(Object.keys(schema.form.controls).sort()).toEqual([
+            'disposition',
+            'impactAmount',
+            'recordsAffected',
+            'summary',
+        ]);
         schema.form.patchValue({ disposition: 'RECOVERED', impactAmount: '99' });
         c.teamForm.patchValue({ team: 'alice, carol ' });
         c.teamForm.markAsDirty();
@@ -134,12 +147,24 @@ describe('PostmortemPanelComponent', () => {
     });
 
     it('renders the deployment-authored section set instead of the built-in one (D6)', () => {
-        const CASE: OperationalObject = { ...INCIDENT, id: 'c3', objectType: 'CASE', status: 'INVESTIGATING', attributes: {} };
+        const CASE: OperationalObject = {
+            ...INCIDENT,
+            id: 'c3',
+            objectType: 'CASE',
+            status: 'INVESTIGATING',
+            attributes: {},
+        };
         const { c, api } = create(CASE, {
             objectType: 'case',
             sections: [
-                { key: 'outcome', label: 'Outcome', type: 'select', tier: 'required', required: false,
-                  options: [{ value: 'WIN', label: 'Win' }] },
+                {
+                    key: 'outcome',
+                    label: 'Outcome',
+                    type: 'select',
+                    tier: 'required',
+                    required: false,
+                    options: [{ value: 'WIN', label: 'Win' }],
+                },
                 // An unrenderable type is skipped rather than drawn as a broken control.
                 { key: 'bogus', label: 'Bogus', type: 'rocket', tier: 'required' },
             ],
@@ -156,26 +181,45 @@ describe('PostmortemPanelComponent', () => {
     });
 
     it('drops the soft no-disposition gate when the section is not configured (D6)', async () => {
-        const CASE: OperationalObject = { ...INCIDENT, id: 'c4', objectType: 'CASE', status: 'INVESTIGATING', attributes: {} };
+        const CASE: OperationalObject = {
+            ...INCIDENT,
+            id: 'c4',
+            objectType: 'CASE',
+            status: 'INVESTIGATING',
+            attributes: {},
+        };
         const { c, confirm } = create(CASE, {
             objectType: 'case',
             sections: [{ key: 'outcome', label: 'Outcome', type: 'string', tier: 'required', required: false }],
         });
         await c.onAct('resolve');
-        expect(confirm.confirm).not.toHaveBeenCalled();   // nothing to warn about
+        expect(confirm.confirm).not.toHaveBeenCalled(); // nothing to warn about
     });
 
     it('still warns on resolve when disposition IS configured but empty (C3)', async () => {
-        const CASE: OperationalObject = { ...INCIDENT, id: 'c5', objectType: 'CASE', status: 'INVESTIGATING', attributes: {} };
+        const CASE: OperationalObject = {
+            ...INCIDENT,
+            id: 'c5',
+            objectType: 'CASE',
+            status: 'INVESTIGATING',
+            attributes: {},
+        };
         const { c, confirm } = create(CASE, CASE_FINDINGS_SPEC);
         await c.onAct('resolve');
         expect(confirm.confirm).toHaveBeenCalledTimes(1);
-        expect(String((confirm.confirm as ReturnType<typeof vi.fn>).mock.calls[0][0]))
-            .toContain('no disposition recorded');
+        expect(String((confirm.confirm as ReturnType<typeof vi.fn>).mock.calls[0][0])).toContain(
+            'no disposition recorded',
+        );
     });
 
     it('case quick actions derive from the effective workflow (C6)', () => {
-        const CASE: OperationalObject = { ...INCIDENT, id: 'c2', objectType: 'CASE', status: 'INVESTIGATING', attributes: {} };
+        const CASE: OperationalObject = {
+            ...INCIDENT,
+            id: 'c2',
+            objectType: 'CASE',
+            status: 'INVESTIGATING',
+            attributes: {},
+        };
         const { c } = create(CASE);
         expect(c.quickActions.map((a) => a.id).sort()).toEqual(['escalate', 'resolve']); // built-in fallback
     });

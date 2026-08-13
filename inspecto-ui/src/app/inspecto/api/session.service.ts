@@ -197,19 +197,22 @@ export class SessionService {
      * where there is no provider to redirect to), so Personal and the dev mock are unaffected.
      */
     logout(): void {
-        this.http.post(apiUrl('/auth/logout'), {}).pipe(catchError(() => of(null))).subscribe(() => {
-            this.onAuthLost();
-            const endSession = this.oidc?.endSessionUrl;
-            if (!endSession || this.oidc?.mock) {
-                this.router.navigate(['/sign-in']);
-                return;
-            }
-            const params = new URLSearchParams({
-                client_id: this.oidc?.clientId ?? '',
-                post_logout_redirect_uri: `${window.location.origin}/sign-in`,
+        this.http
+            .post(apiUrl('/auth/logout'), {})
+            .pipe(catchError(() => of(null)))
+            .subscribe(() => {
+                this.onAuthLost();
+                const endSession = this.oidc?.endSessionUrl;
+                if (!endSession || this.oidc?.mock) {
+                    this.router.navigate(['/sign-in']);
+                    return;
+                }
+                const params = new URLSearchParams({
+                    client_id: this.oidc?.clientId ?? '',
+                    post_logout_redirect_uri: `${window.location.origin}/sign-in`,
+                });
+                this.redirect(`${endSession}?${params.toString()}`);
             });
-            this.redirect(`${endSession}?${params.toString()}`);
-        });
     }
 
     /** Interceptor hook: a refresh failed / the session is gone — drop local state and bounce to sign-in. */

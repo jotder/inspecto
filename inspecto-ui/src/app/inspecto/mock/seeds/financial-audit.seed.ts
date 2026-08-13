@@ -23,21 +23,51 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
 
     // ── Workbench ───────────────────────────────────────────────────────────────────────────────
     const connections: ConnectionProfile[] = [
-        { id: 'erp_db', connector: 'db', host: 'erp.corp.example', port: 1521, database: 'GL', username: 'audit_ro', password: '${ENV:ERP_DB_PW}', description: 'ERP general-ledger replica (read-only)' },
-        { id: 'bank_sftp', connector: 'sftp', host: 'sftp.bank.example', port: 22, basePath: '/statements', username: 'corp', password: '${ENV:BANK_SFTP_PW}', description: 'Bank statement/payment export' },
+        {
+            id: 'erp_db',
+            connector: 'db',
+            host: 'erp.corp.example',
+            port: 1521,
+            database: 'GL',
+            username: 'audit_ro',
+            password: '${ENV:ERP_DB_PW}',
+            description: 'ERP general-ledger replica (read-only)',
+        },
+        {
+            id: 'bank_sftp',
+            connector: 'sftp',
+            host: 'sftp.bank.example',
+            port: 22,
+            basePath: '/statements',
+            username: 'corp',
+            password: '${ENV:BANK_SFTP_PW}',
+            description: 'Bank statement/payment export',
+        },
     ];
     for (const c of connections) store.put(space, CONNECTIONS_COLL, c.id, c);
 
     putComponent(store, space, 'grammar', 'bank_mt940_csv', { delimiter: ';', has_header: true });
-    putComponent(store, space, 'transform', 'drop_reversals', { type: 'transform.filter', where: "entry_type != 'reversal'" });
-    putComponent(store, space, 'sink', 'audit_store', { type: 'sink.persistent', format: 'parquet', partitions: ['posting_date'] });
+    putComponent(store, space, 'transform', 'drop_reversals', {
+        type: 'transform.filter',
+        where: "entry_type != 'reversal'",
+    });
+    putComponent(store, space, 'sink', 'audit_store', {
+        type: 'sink.persistent',
+        format: 'parquet',
+        partitions: ['posting_date'],
+    });
 
     store.put(space, PIPELINES_COLL, 'gl_load', {
         name: 'gl_load',
         active: true,
         nodes: [
             { id: 'extract', type: 'acquisition', name: 'Extract GL postings', use: 'connection/erp_db' },
-            { id: 'clean', type: 'transform.filter', name: 'Drop reversals', config: { predicate: "entry_type != 'reversal'" } },
+            {
+                id: 'clean',
+                type: 'transform.filter',
+                name: 'Drop reversals',
+                config: { predicate: "entry_type != 'reversal'" },
+            },
             { id: 'store', type: 'sink.persistent', name: 'Audit parquet', config: { format: 'PARQUET' } },
         ],
         edges: [
@@ -49,7 +79,13 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
         name: 'payments_load',
         active: true,
         nodes: [
-            { id: 'collect', type: 'acquisition', name: 'Collect bank exports', use: 'connection/bank_sftp', config: { include: 'glob:**/*.csv' } },
+            {
+                id: 'collect',
+                type: 'acquisition',
+                name: 'Collect bank exports',
+                use: 'connection/bank_sftp',
+                config: { include: 'glob:**/*.csv' },
+            },
             { id: 'parse', type: 'parser', name: 'Parse statement CSV', config: { delimiter: ';', header: true } },
             { id: 'store', type: 'sink.materialized', name: 'Payments side' },
         ],
@@ -61,7 +97,9 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
 
     // ── Studio ──────────────────────────────────────────────────────────────────────────────────
     putComponent(store, space, 'dataset', 'gl_entries', {
-        name: 'gl_entries', kind: 'virtual', sourceName: 'gl_entries',
+        name: 'gl_entries',
+        kind: 'virtual',
+        sourceName: 'gl_entries',
         query: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null },
         physicalRef: null,
         columns: [
@@ -76,7 +114,9 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
         viz: null,
     });
     putComponent(store, space, 'dataset', 'payments', {
-        name: 'payments', kind: 'virtual', sourceName: 'payments',
+        name: 'payments',
+        kind: 'virtual',
+        sourceName: 'payments',
         query: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: null },
         physicalRef: null,
         columns: [
@@ -86,7 +126,8 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
             { name: 'method', type: 'string', role: 'dimension' },
             { name: 'value_date', type: 'date', role: 'temporal' },
         ],
-        measures: [], viz: null,
+        measures: [],
+        viz: null,
     });
     putComponent(store, space, 'reconciliation', 'gl_vs_payments', {
         name: 'gl_vs_payments',
@@ -99,19 +140,28 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
     });
 
     putComponent(store, space, 'widget', 'total_posted', {
-        name: 'total_posted', datasetId: 'gl_entries', vizType: 'kpi',
+        name: 'total_posted',
+        datasetId: 'gl_entries',
+        vizType: 'kpi',
         controls: { value: [{ field: 'amount_usd', agg: 'sum' }] },
-        description: 'Total GL postings in the audit window', tags: ['audit'],
+        description: 'Total GL postings in the audit window',
+        tags: ['audit'],
     });
     putComponent(store, space, 'widget', 'postings_by_account', {
-        name: 'postings_by_account', datasetId: 'gl_entries', vizType: 'bar',
+        name: 'postings_by_account',
+        datasetId: 'gl_entries',
+        vizType: 'bar',
         controls: { x: [{ field: 'account' }], y: [{ field: 'amount_usd', agg: 'sum' }] },
-        description: 'Posted amounts per GL account', tags: ['audit'],
+        description: 'Posted amounts per GL account',
+        tags: ['audit'],
     });
     putComponent(store, space, 'widget', 'postings_over_time', {
-        name: 'postings_over_time', datasetId: 'gl_entries', vizType: 'line',
+        name: 'postings_over_time',
+        datasetId: 'gl_entries',
+        vizType: 'line',
         controls: { x: [{ field: 'posting_date', grain: 'day' }], y: [{ field: 'amount_usd', agg: 'sum' }] },
-        description: 'Daily posting volume', tags: ['audit'],
+        description: 'Daily posting volume',
+        tags: ['audit'],
     });
     putComponent(store, space, 'dashboard', 'audit_overview', {
         name: 'audit_overview',
@@ -129,7 +179,8 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
         id: 'gl_to_payments_recon',
         title: 'GL-to-payments reconciliation',
         kind: 'reconciliation',
-        description: 'Every GL revenue posting must match a bank payment within $0.01; unmatched items become audit findings.',
+        description:
+            'Every GL revenue posting must match a bank payment within $0.01; unmatched items become audit findings.',
         status: 'delivered',
         submittedAt: iso(-60 * 24 * 30),
         decisionNote: 'Accepted — quarterly audit control AC-114.',
@@ -140,17 +191,48 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
 
     // ── Ops ─────────────────────────────────────────────────────────────────────────────────────
     store.put<JobDetail>(space, JOBS_COLL, 'gl_load_nightly', {
-        name: 'gl_load_nightly', type: 'ingest', cron: '0 0 1 * * *', onPipeline: null, enabled: true,
-        lastStatus: 'SUCCESS', lastRunTime: iso(-60 * 11), nextFire: iso(60 * 13), catchUp: true,
+        name: 'gl_load_nightly',
+        type: 'ingest',
+        cron: '0 0 1 * * *',
+        onPipeline: null,
+        enabled: true,
+        lastStatus: 'SUCCESS',
+        lastRunTime: iso(-60 * 11),
+        nextFire: iso(60 * 13),
+        catchUp: true,
         params: { pipeline: 'gl_load' },
     });
-    recordRun(store, space, 'gl_load_nightly', 'CRON', 'SUCCESS', now - 11 * 3_600_000, 54_000, 'Loaded 5 postings (sample window).');
+    recordRun(
+        store,
+        space,
+        'gl_load_nightly',
+        'CRON',
+        'SUCCESS',
+        now - 11 * 3_600_000,
+        54_000,
+        'Loaded 5 postings (sample window).',
+    );
     store.put<JobDetail>(space, JOBS_COLL, 'audit_recon_weekly', {
-        name: 'audit_recon_weekly', type: 'report', cron: '0 0 7 * * 1', onPipeline: null, enabled: true,
-        lastStatus: 'SUCCESS', lastRunTime: iso(-60 * 24 * 2), nextFire: iso(60 * 24 * 5),
+        name: 'audit_recon_weekly',
+        type: 'report',
+        cron: '0 0 7 * * 1',
+        onPipeline: null,
+        enabled: true,
+        lastStatus: 'SUCCESS',
+        lastRunTime: iso(-60 * 24 * 2),
+        nextFire: iso(60 * 24 * 5),
         params: { reconciliation: 'gl_vs_payments' },
     });
-    recordRun(store, space, 'audit_recon_weekly', 'CRON', 'SUCCESS', now - 48 * 3_600_000, 8_600, '3 open breaks (1 amount, 1 unpaid posting, 1 unposted payment).');
+    recordRun(
+        store,
+        space,
+        'audit_recon_weekly',
+        'CRON',
+        'SUCCESS',
+        now - 48 * 3_600_000,
+        8_600,
+        '3 open breaks (1 amount, 1 unpaid posting, 1 unposted payment).',
+    );
 
     const auditEvents: Array<[string, string, string, string]> = [
         ['BATCH_COMMITTED', 'INFO', 'gl_load', 'Committed GL postings for 2026-06-24.'],
@@ -160,10 +242,23 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
     ];
     auditEvents.forEach(([type, level, pipeline, message], i) => {
         const ts = now - i * 2_700_000;
-        store.put(space, SIGNALS_COLL, `evt-aud-${i}`, eventToSignal({
-            eventId: `evt-aud-${i}`, ts, timestamp: new Date(ts).toISOString(), level, type,
-            source: 'engine', pipeline, correlationId: null, message, attributes: {},
-        }));
+        store.put(
+            space,
+            SIGNALS_COLL,
+            `evt-aud-${i}`,
+            eventToSignal({
+                eventId: `evt-aud-${i}`,
+                ts,
+                timestamp: new Date(ts).toISOString(),
+                level,
+                type,
+                source: 'engine',
+                pipeline,
+                correlationId: null,
+                message,
+                attributes: {},
+            }),
+        );
     });
 
     const findings: Array<[string, string, string, string, string]> = [
@@ -173,10 +268,19 @@ export function seedFinancialAudit(store: MockStore, space: string): void {
     findings.forEach(([objectType, title, status, severity, priority], i) => {
         const ts = now - (i + 1) * 7_200_000;
         store.put<OperationalObject>(space, OPS_OBJECTS_COLL, `${objectType.toLowerCase()}-aud-${i}`, {
-            id: `${objectType.toLowerCase()}-aud-${i}`, objectType, title,
-            description: 'Seeded by the Financial Auditing space template.', status, severity, priority,
-            owner: 'audit', assignee: i % 2 ? 'meera' : 'tom', correlationId: null,
-            attributes: { pipeline: i ? 'gl_load' : 'payments_load' }, createdAt: ts, updatedAt: ts + 600_000,
+            id: `${objectType.toLowerCase()}-aud-${i}`,
+            objectType,
+            title,
+            description: 'Seeded by the Financial Auditing space template.',
+            status,
+            severity,
+            priority,
+            owner: 'audit',
+            assignee: i % 2 ? 'meera' : 'tom',
+            correlationId: null,
+            attributes: { pipeline: i ? 'gl_load' : 'payments_load' },
+            createdAt: ts,
+            updatedAt: ts + 600_000,
             closedAt: 0,
         });
     });

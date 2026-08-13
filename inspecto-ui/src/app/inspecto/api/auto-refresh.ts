@@ -3,9 +3,7 @@ import { map, switchMap } from 'rxjs/operators';
 
 /** Emits the current page-visibility, now and on every visibilitychange. */
 function whenVisible(): Observable<boolean> {
-  return merge(of(null), fromEvent(document, 'visibilitychange')).pipe(
-    map(() => !document.hidden),
-  );
+    return merge(of(null), fromEvent(document, 'visibilitychange')).pipe(map(() => !document.hidden));
 }
 
 /**
@@ -15,9 +13,7 @@ function whenVisible(): Observable<boolean> {
  * through `takeUntilDestroyed` in the component to clean up.
  */
 export function visibleInterval(intervalMs: number): Observable<number> {
-  return whenVisible().pipe(
-    switchMap((visible) => (visible ? timer(intervalMs, intervalMs) : EMPTY)),
-  );
+    return whenVisible().pipe(switchMap((visible) => (visible ? timer(intervalMs, intervalMs) : EMPTY)));
 }
 
 /** Default operator-console refresh cadence (ms). */

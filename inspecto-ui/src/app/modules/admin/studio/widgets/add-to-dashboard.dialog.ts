@@ -22,7 +22,14 @@ export interface AddToDashboardResult {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /** Sentinel target = "create a new dashboard" (the default — the name field appears). A string, not
@@ -38,7 +45,14 @@ const NEW_DASHBOARD = '__new__';
 @Component({
     selector: 'app-add-to-dashboard-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatSelectModule],
+    imports: [
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatSelectModule,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Add “{{ data.widgetId }}” to a dashboard</h2>
@@ -49,7 +63,10 @@ const NEW_DASHBOARD = '__new__';
                     <mat-select formControlName="target" cdkFocusInitial>
                         <mat-option [value]="NEW">New dashboard…</mat-option>
                         @for (d of data.dashboards; track d.id) {
-                            <mat-option [value]="d.id">{{ d.name }} <span class="text-secondary">({{ d.tiles.length }} tiles)</span></mat-option>
+                            <mat-option [value]="d.id"
+                                >{{ d.name }}
+                                <span class="text-secondary">({{ d.tiles.length }} tiles)</span></mat-option
+                            >
                         }
                     </mat-select>
                 </mat-form-field>

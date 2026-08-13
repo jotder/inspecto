@@ -38,7 +38,7 @@ function create() {
         ],
     });
     const fixture = TestBed.createComponent(BatchDetailDialog);
-    fixture.detectChanges();   // runs ngOnInit (loads batches/files/lineage)
+    fixture.detectChanges(); // runs ngOnInit (loads batches/files/lineage)
     return { fixture, stub };
 }
 

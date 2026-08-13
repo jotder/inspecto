@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { ParserTreeNode } from 'app/inspecto/api';
-import { columnNameFor, deriveSegments, IDENTIFIER_RE, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } from './segment-drafts';
+import {
+    columnNameFor,
+    deriveSegments,
+    IDENTIFIER_RE,
+    schemaDraftFor,
+    schemaNameFromPath,
+    segmentDraftFrom,
+} from './segment-drafts';
 import type { SegmentDraft } from './segment-drafts';
 
 const leaf = (label: string, value = 'v'): ParserTreeNode => ({ label, value });

@@ -26,12 +26,7 @@ import { Subject, takeUntil } from 'rxjs';
     encapsulation: ViewEncapsulation.None,
     changeDetection: ChangeDetectionStrategy.OnPush,
     exportAs: 'user',
-    imports: [
-        MatButtonModule,
-        MatMenuModule,
-        MatIconModule,
-        MatDividerModule,
-    ],
+    imports: [MatButtonModule, MatMenuModule, MatIconModule, MatDividerModule],
 })
 export class UserComponent implements OnInit, OnDestroy {
     /* eslint-disable @typescript-eslint/naming-convention */
@@ -44,7 +39,7 @@ export class UserComponent implements OnInit, OnDestroy {
 
     @Input() showAvatar: boolean = true;
     user: User;
-user_name: string;
+    user_name: string;
     private _unsubscribeAll: Subject<any> = new Subject<any>();
 
     /**
@@ -53,7 +48,7 @@ user_name: string;
     constructor(
         private _changeDetectorRef: ChangeDetectorRef,
         private _router: Router,
-        private _userService: UserService
+        private _userService: UserService,
     ) {}
 
     // -----------------------------------------------------------------------------------------------------
@@ -68,14 +63,12 @@ user_name: string;
         // is loaded (Standard/OIDC edition); Personal leaves it blank.
         this.user_name = '';
 
-        this._userService.user$
-            .pipe(takeUntil(this._unsubscribeAll))
-            .subscribe((user: User) => {
-                this.user = user;
+        this._userService.user$.pipe(takeUntil(this._unsubscribeAll)).subscribe((user: User) => {
+            this.user = user;
 
-                // Mark for check
-                this._changeDetectorRef.markForCheck();
-            });
+            // Mark for check
+            this._changeDetectorRef.markForCheck();
+        });
     }
 
     /**
@@ -127,13 +120,12 @@ user_name: string;
     }
 
     onMyProfileClick(): any {
-        let url = environment.gatewayUrl + "/apps/profile"
-        window.open(url, "_blank");
+        let url = environment.gatewayUrl + '/apps/profile';
+        window.open(url, '_blank');
     }
 
     onMyNotificationClick(): any {
         let url = environment.gatewayUrl + '/apps/manageNotification/userNotifications';
-        window.open(url, "_blank");
+        window.open(url, '_blank');
     }
-
 }

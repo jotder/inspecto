@@ -211,23 +211,17 @@ export class SpacesService {
 
     /** Dry-run a bundle import into a space — what would be written, conflicts, findings. No writes. */
     importPreview(spaceId: string, zip: Blob): Observable<ImportPreview> {
-        return this.http.post<ImportPreview>(
-            apiUrl(`/spaces/${encodeURIComponent(spaceId)}/import/preview`),
-            zip,
-            { headers: { 'Content-Type': 'application/zip' } },
-        );
+        return this.http.post<ImportPreview>(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/import/preview`), zip, {
+            headers: { 'Content-Type': 'application/zip' },
+        });
     }
 
     /** Import a bundle into an existing space. 409 {error, conflicts} unless `overwrite`. */
     importBundle(spaceId: string, zip: Blob, overwrite: boolean): Observable<BundleImportResult> {
-        return this.http.post<BundleImportResult>(
-            apiUrl(`/spaces/${encodeURIComponent(spaceId)}/import`),
-            zip,
-            {
-                params: toParams({ on_conflict: overwrite ? 'overwrite' : '' }),
-                headers: { 'Content-Type': 'application/zip' },
-            },
-        );
+        return this.http.post<BundleImportResult>(apiUrl(`/spaces/${encodeURIComponent(spaceId)}/import`), zip, {
+            params: toParams({ on_conflict: overwrite ? 'overwrite' : '' }),
+            headers: { 'Content-Type': 'application/zip' },
+        });
     }
 
     // ── internals ─────────────────────────────────────────────────────────────────

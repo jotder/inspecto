@@ -28,9 +28,16 @@ const GRANT_VALUES = new Set(['allow', 'deny']);
 
 /** The route-gate capability vocabulary (backend `Roles.KNOWN_CAPABILITIES`, R4 manifest-derived). */
 const KNOWN_CAPABILITIES = new Set([
-    'canAuthorWorkbench', 'canOperateRuns', 'canTriageRequirements', 'canOnboardConnections',
-    'canConfigureAccess', 'canAuthorAlertRules', 'canOfferDatasets', 'canRequestShares',
-    'canApproveShares', 'canCurateMenus',
+    'canAuthorWorkbench',
+    'canOperateRuns',
+    'canTriageRequirements',
+    'canOnboardConnections',
+    'canConfigureAccess',
+    'canAuthorAlertRules',
+    'canOfferDatasets',
+    'canRequestShares',
+    'canApproveShares',
+    'canCurateMenus',
 ]);
 
 /**
@@ -46,8 +53,28 @@ const SEED_ROLES: { name: string; capabilities: string[] }[] = [
     { name: 'developer', capabilities: BUILDER },
     { name: 'operations', capabilities: OPS },
     { name: 'support', capabilities: OPS },
-    { name: 'admin', capabilities: ['canOnboardConnections', 'canConfigureAccess', 'canApproveShares', 'canOfferDatasets', 'canTriageRequirements', 'canCurateMenus'] },
-    { name: 'power', capabilities: ['canAuthorWorkbench', 'canAuthorAlertRules', 'canOperateRuns', 'canRequestShares', 'canTriageRequirements', 'canCurateMenus'] },
+    {
+        name: 'admin',
+        capabilities: [
+            'canOnboardConnections',
+            'canConfigureAccess',
+            'canApproveShares',
+            'canOfferDatasets',
+            'canTriageRequirements',
+            'canCurateMenus',
+        ],
+    },
+    {
+        name: 'power',
+        capabilities: [
+            'canAuthorWorkbench',
+            'canAuthorAlertRules',
+            'canOperateRuns',
+            'canRequestShares',
+            'canTriageRequirements',
+            'canCurateMenus',
+        ],
+    },
     { name: 'super', capabilities: [...KNOWN_CAPABILITIES] },
     { name: 'business', capabilities: ['canTriageRequirements'] },
 ];
@@ -80,7 +107,9 @@ export function accessHandler(flags: MockFlags): MockHandler {
             const seen = new Set<string>();
             const authored: RoleRow[] = [];
             for (const raw of b.roles as Partial<RoleRow>[]) {
-                const name = String(raw?.name ?? '').trim().toLowerCase();
+                const name = String(raw?.name ?? '')
+                    .trim()
+                    .toLowerCase();
                 if (!name) return error(422, 'every role must be an object {name, capabilities, dataScopes?}');
                 if (seen.has(name)) return error(422, `duplicate role '${name}'`);
                 seen.add(name);
@@ -106,18 +135,16 @@ export function accessHandler(flags: MockFlags): MockHandler {
             return json({ enabled: false, reason: 'no access policy engine on this edition' });
         }
         if (method === 'GET' && CATALOG.test(url)) {
-            return json(store.get(space, ACCESS_CATALOG_COLL, 'catalog')
-                ?? { name: 'catalog', version: 0, nodes: [] });
+            return json(store.get(space, ACCESS_CATALOG_COLL, 'catalog') ?? { name: 'catalog', version: 0, nodes: [] });
         }
         if (method === 'PUT' && CATALOG.test(url)) {
             const b = req.body as { version?: number; nodes?: unknown } | null;
-            if (!Array.isArray(b?.nodes)) return error(422, 'access catalog requires a \'nodes\' list');
+            if (!Array.isArray(b?.nodes)) return error(422, "access catalog requires a 'nodes' list");
             const doc = { name: 'catalog', version: b.version ?? 1, nodes: b.nodes };
             return json(store.put(space, ACCESS_CATALOG_COLL, 'catalog', doc));
         }
         if (method === 'GET' && PROFILES.test(url)) {
-            return json(store.list<ProfileDoc>(space, ACCESS_PROFILE_COLL)
-                .sort((a, b) => a.id.localeCompare(b.id)));
+            return json(store.list<ProfileDoc>(space, ACCESS_PROFILE_COLL).sort((a, b) => a.id.localeCompare(b.id)));
         }
 
         const m = match(url, PROFILE);

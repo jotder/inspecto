@@ -12,32 +12,70 @@ import { SharingComponent } from './sharing.component';
 
 const OFFERS: ExchangeOffer[] = [
     {
-        kind: 'dataset', item: 'fx_rates_daily', owner: 'analytics-hub', description: 'FX rates',
-        resultSet: {}, offeredBy: 'analyst', offeredAt: 1, datasets: [],
+        kind: 'dataset',
+        item: 'fx_rates_daily',
+        owner: 'analytics-hub',
+        description: 'FX rates',
+        resultSet: {},
+        offeredBy: 'analyst',
+        offeredAt: 1,
+        datasets: [],
         freshness: { version: 'v3', rows: 42, refreshedAt: '2026-07-08T00:00:00Z', columns: [] },
     },
     {
-        kind: 'dataset', item: 'customer_segments', owner: 'analytics-hub', description: 'Segments',
-        resultSet: {}, offeredBy: 'analyst', offeredAt: 2, datasets: [],
+        kind: 'dataset',
+        item: 'customer_segments',
+        owner: 'analytics-hub',
+        description: 'Segments',
+        resultSet: {},
+        offeredBy: 'analyst',
+        offeredAt: 2,
+        datasets: [],
     },
     {
-        kind: 'dataset', item: 'billing_summary', owner: 'default', description: 'Billing',
-        resultSet: {}, offeredBy: 'appUser', offeredAt: 3, datasets: [],
+        kind: 'dataset',
+        item: 'billing_summary',
+        owner: 'default',
+        description: 'Billing',
+        resultSet: {},
+        offeredBy: 'appUser',
+        offeredAt: 3,
+        datasets: [],
     },
 ];
 
 const GRANTS: ExchangeGrant[] = [
     {
         id: 'default~analytics-hub~dataset~fx_rates_daily',
-        kind: 'dataset', item: 'fx_rates_daily', owner: 'analytics-hub', consumer: 'default',
-        mode: 'snapshot', status: 'active', requestedBy: 'appUser', requestedAt: 1, purpose: '',
-        approvedBy: 'analyst', approvedAt: 2, pin: null, expiresAt: null,
+        kind: 'dataset',
+        item: 'fx_rates_daily',
+        owner: 'analytics-hub',
+        consumer: 'default',
+        mode: 'snapshot',
+        status: 'active',
+        requestedBy: 'appUser',
+        requestedAt: 1,
+        purpose: '',
+        approvedBy: 'analyst',
+        approvedAt: 2,
+        pin: null,
+        expiresAt: null,
     },
     {
         id: 'analytics-hub~default~dataset~billing_summary',
-        kind: 'dataset', item: 'billing_summary', owner: 'default', consumer: 'analytics-hub',
-        mode: 'snapshot', status: 'requested', requestedBy: 'analyst', requestedAt: 3, purpose: 'x',
-        approvedBy: null, approvedAt: 0, pin: null, expiresAt: null,
+        kind: 'dataset',
+        item: 'billing_summary',
+        owner: 'default',
+        consumer: 'analytics-hub',
+        mode: 'snapshot',
+        status: 'requested',
+        requestedBy: 'analyst',
+        requestedAt: 3,
+        purpose: 'x',
+        approvedBy: null,
+        approvedAt: 0,
+        pin: null,
+        expiresAt: null,
     },
 ];
 
@@ -128,8 +166,9 @@ describe('SharingComponent', () => {
         expect(c.grantActions[0].visible!(requested)).toBe(false); // approve
         expect(c.grantActions[1].visible!(requested)).toBe(false); // deny
         expect(c.grantActions[2].visible!(active)).toBe(false); // revoke
-        const expiry = c.grantActions.find((a) => typeof a.hint === 'function'
-            && (a.hint as (g: ExchangeGrant) => string)(active).includes('expiry'))!;
+        const expiry = c.grantActions.find(
+            (a) => typeof a.hint === 'function' && (a.hint as (g: ExchangeGrant) => string)(active).includes('expiry'),
+        )!;
         expect(expiry.visible!(active)).toBe(false);
     });
 

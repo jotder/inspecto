@@ -47,7 +47,14 @@ interface PipelineStatus {
 interface SignalTimelineResult {
     correlationId: string;
     count: number;
-    timeline: { signalId: string; at: string; type: string; severity?: string; message?: string; causedBy?: string | null }[];
+    timeline: {
+        signalId: string;
+        at: string;
+        type: string;
+        severity?: string;
+        message?: string;
+        causedBy?: string | null;
+    }[];
 }
 
 interface BuiltTimelineResult {
@@ -99,8 +106,8 @@ const ENTRY_LIMIT = 40;
                 </div>
             } @else if (unavailable()) {
                 <inspecto-alert variant="info" title="AI assistance unavailable">
-                    The intelligence module is not installed on this backend, so live state and the activity
-                    timeline cannot be read. Everything else on this screen works as usual.
+                    The intelligence module is not installed on this backend, so live state and the activity timeline
+                    cannot be read. Everything else on this screen works as usual.
                 </inspecto-alert>
             } @else {
                 @if (status(); as s) {
@@ -142,9 +149,7 @@ const ENTRY_LIMIT = 40;
                         }
                     } @else {
                         <!-- Honest silence: nothing recorded is a real answer, not an empty state to fill. -->
-                        <p class="text-secondary text-sm">
-                            Nothing was recorded for {{ data.label }} in this window.
-                        </p>
+                        <p class="text-secondary text-sm">Nothing was recorded for {{ data.label }} in this window.</p>
                     }
                 </section>
             }

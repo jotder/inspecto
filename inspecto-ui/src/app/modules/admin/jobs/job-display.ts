@@ -32,7 +32,11 @@ export function whatScheduled(job: { type: string; params?: Record<string, unkno
 }
 
 /** "Schedule" — the cron expression, an event or signal trigger, or manual-only. */
-export function scheduleSummary(job: { cron?: string | null; onPipeline?: string | null; onSignal?: string | null }): string {
+export function scheduleSummary(job: {
+    cron?: string | null;
+    onPipeline?: string | null;
+    onSignal?: string | null;
+}): string {
     if (job.cron) return job.cron;
     if (job.onPipeline) return `on ${job.onPipeline}`;
     return job.onSignal ? `on signal ${job.onSignal}` : 'manual';

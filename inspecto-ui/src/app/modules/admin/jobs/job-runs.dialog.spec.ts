@@ -36,7 +36,7 @@ function create() {
         ],
     });
     const fixture = TestBed.createComponent(JobRunsDialog);
-    fixture.detectChanges();   // runs ngOnInit (loads run history)
+    fixture.detectChanges(); // runs ngOnInit (loads run history)
     return { fixture, runs };
 }
 

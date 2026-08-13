@@ -125,7 +125,9 @@ describe('AiAssistComponent', () => {
         expect(text).toContain('column is required');
         expect(text).toContain('Needs attention');
         // Worst-first, so an ERROR is never hidden below a WARNING.
-        expect(fixture.componentInstance.findingsOf(fixture.componentInstance.activeDraft()!)[0].severity).toBe('ERROR');
+        expect(fixture.componentInstance.findingsOf(fixture.componentInstance.activeDraft()!)[0].severity).toBe(
+            'ERROR',
+        );
     });
 
     it('diffs the draft against the pane current config, folding unchanged fields away', () => {
@@ -143,7 +145,12 @@ describe('AiAssistComponent', () => {
         // ...but the operator can audit the whole config.
         fixture.componentInstance.toggleUnchanged();
         fixture.detectChanges();
-        expect(fixture.componentInstance.diff().map((r) => r.path).sort()).toEqual(['name', 'severity']);
+        expect(
+            fixture.componentInstance
+                .diff()
+                .map((r) => r.path)
+                .sort(),
+        ).toEqual(['name', 'severity']);
     });
 
     it('degrades to a disabled, explained affordance on 503 instead of failing the pane', () => {
@@ -163,7 +170,9 @@ describe('AiAssistComponent', () => {
 
     it('surfaces the backend message on a rejected request without latching', () => {
         runTool.mockReturnValue(
-            throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message: 'column is required' } } })),
+            throwError(
+                () => new HttpErrorResponse({ status: 422, error: { error: { message: 'column is required' } } }),
+            ),
         );
         const fixture = create();
         clickRun(fixture);

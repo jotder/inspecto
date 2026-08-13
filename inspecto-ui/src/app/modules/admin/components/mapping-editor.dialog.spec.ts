@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import {
-    AuthoredPipeline, ComponentDef, ComponentsService, Finding, PipelineDryRunResult, PipelinesService,
+    AuthoredPipeline,
+    ComponentDef,
+    ComponentsService,
+    Finding,
+    PipelineDryRunResult,
+    PipelinesService,
 } from 'app/inspecto/api';
 import { CsvImport } from 'app/inspecto/components/editable-grid.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -31,14 +36,20 @@ const DEF: ComponentDef = {
  * engine here — the same honest limit the offline mock handler documents). Keeping it rule-driven is the
  * point: a canned row set would make the before/after preview identical no matter what changed.
  */
-function projectDryRun(candidate: AuthoredPipeline | undefined,
-                       sample: Record<string, unknown>[]): PipelineDryRunResult {
+function projectDryRun(
+    candidate: AuthoredPipeline | undefined,
+    sample: Record<string, unknown>[],
+): PipelineDryRunResult {
     const map = candidate?.nodes.find((n) => n.id === 'map');
     const rules = (map?.config?.['rules'] ?? []) as Record<string, string>[];
-    const rows = sample.map((row) => Object.fromEntries(rules.map((r) => [
-        r.targetColumn,
-        (r.transformType ?? '').toUpperCase() === 'EXPR' ? null : row[r.sourceExpression] ?? null,
-    ])));
+    const rows = sample.map((row) =>
+        Object.fromEntries(
+            rules.map((r) => [
+                r.targetColumn,
+                (r.transformType ?? '').toUpperCase() === 'EXPR' ? null : (row[r.sourceExpression] ?? null),
+            ]),
+        ),
+    );
     return {
         seedNode: 'seed',
         nodes: [{ node: 'map', type: 'transform.map', relations: [{ rel: 'data', rowCount: rows.length, rows }] }],
@@ -56,7 +67,8 @@ async function create(def?: ComponentDef, findings: Finding[] = []) {
     };
     const pipelines = {
         dryRunAuthored: vi.fn((_id: string, sample: Record<string, unknown>[], candidate?: AuthoredPipeline) =>
-            of(projectDryRun(candidate, sample))),
+            of(projectDryRun(candidate, sample)),
+        ),
     };
     const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
     TestBed.configureTestingModule({
@@ -105,11 +117,15 @@ describe('MappingEditorDialog', () => {
         ]);
 
         c.save();
-        expect(api.update).toHaveBeenCalledWith('mapping', 'cdr_map', expect.objectContaining({
-            // content keys beyond rules survive the save (verbatim-sections rule)
-            description: 'kept verbatim',
-            rules: DEF.content['rules'],
-        }));
+        expect(api.update).toHaveBeenCalledWith(
+            'mapping',
+            'cdr_map',
+            expect.objectContaining({
+                // content keys beyond rules survive the save (verbatim-sections rule)
+                description: 'kept verbatim',
+                rules: DEF.content['rules'],
+            }),
+        );
         expect(ref.close).toHaveBeenCalledWith({ saved: expect.objectContaining({ name: 'cdr_map' }) });
         await expectNoA11yViolations(fixture.nativeElement);
     });
@@ -128,10 +144,13 @@ describe('MappingEditorDialog', () => {
             { targetColumn: '', sourceExpression: '  ', transformType: '' }, // all-blank — dropped
         ]);
         c.save();
-        expect(api.create).toHaveBeenCalledWith('mapping', expect.objectContaining({
-            id: 'new_map',
-            rules: [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }],
-        }));
+        expect(api.create).toHaveBeenCalledWith(
+            'mapping',
+            expect.objectContaining({
+                id: 'new_map',
+                rules: [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }],
+            }),
+        );
     });
 
     describe('import loop (S6b)', () => {
@@ -151,7 +170,9 @@ describe('MappingEditorDialog', () => {
         });
 
         it('a whole-set finding is listed but marks no cell', async () => {
-            const { c } = await create(DEF, [{ severity: 'ERROR', fieldPath: '', message: 'A mapping needs at least one rule.' }]);
+            const { c } = await create(DEF, [
+                { severity: 'ERROR', fieldPath: '', message: 'A mapping needs at least one rule.' },
+            ]);
             c.save();
             expect(c.findings().length).toBe(1);
             expect(c.cellFindings().size).toBe(0);
@@ -169,7 +190,7 @@ describe('MappingEditorDialog', () => {
             const { c, api } = await create(DEF);
             c.onRows([
                 { targetColumn: 'AMOUNT', sourceExpression: 'amount_cents', transformType: 'DIRECT' }, // changed
-                { targetColumn: 'MSISDN', sourceExpression: 'msisdn', transformType: 'DIRECT' },       // added
+                { targetColumn: 'MSISDN', sourceExpression: 'msisdn', transformType: 'DIRECT' }, // added
             ]);
             c.onImported(importOf(c.rows()));
             expect(c.diff()).toEqual([
@@ -236,8 +257,9 @@ describe('MappingEditorDialog', () => {
             const [, sample, candidate] = pipelines.dryRunAuthored.mock.calls[1];
             expect(sample).toEqual([{ amt: '150', ts: '2026-06-24' }]);
             // the draft rules travel INLINE on the map step — that is what makes an unsaved draft previewable
-            expect(candidate?.nodes.find((n) => n.id === 'map')?.config?.['rules'])
-                .toEqual([{ targetColumn: 'AMOUNT', sourceExpression: 'amount_cents', transformType: 'DIRECT' }]);
+            expect(candidate?.nodes.find((n) => n.id === 'map')?.config?.['rules']).toEqual([
+                { targetColumn: 'AMOUNT', sourceExpression: 'amount_cents', transformType: 'DIRECT' },
+            ]);
             expect(candidate?.name).toBe('cdr_map');
         });
 
@@ -256,13 +278,15 @@ describe('MappingEditorDialog', () => {
             await made.c.onSample(fileEvent('sample.csv', 'amt\n150\n'));
             expect(made.c.previewBefore()).toBeNull();
             expect(made.c.previewError()).toBeTruthy();
-            expect(made.c.diff().length).toBeGreaterThan(0);   // the rule-level diff still stands
+            expect(made.c.diff().length).toBeGreaterThan(0); // the rule-level diff still stands
         });
 
         it('renders both tables and stays accessible', async () => {
             const { fixture } = await withSample('amt,amount_cents\n150,15000\n');
             fixture.detectChanges();
-            const headings = Array.from(fixture.nativeElement.querySelectorAll('h4')).map((h) => (h as HTMLElement).textContent);
+            const headings = Array.from(fixture.nativeElement.querySelectorAll('h4')).map(
+                (h) => (h as HTMLElement).textContent,
+            );
             expect(headings.some((t) => t?.includes('Before'))).toBe(true);
             expect(headings.some((t) => t?.includes('After'))).toBe(true);
             await expectNoA11yViolations(fixture.nativeElement);
@@ -294,16 +318,20 @@ describe('previewGraph', () => {
 
 describe('diffRules', () => {
     it('is keyed by target column and ignores rows without one', () => {
-        expect(diffRules(
-            [{ targetColumn: '', sourceExpression: 'x', transformType: '' }],
-            [{ targetColumn: '', sourceExpression: 'y', transformType: '' }],
-        )).toEqual([]);
+        expect(
+            diffRules(
+                [{ targetColumn: '', sourceExpression: 'x', transformType: '' }],
+                [{ targetColumn: '', sourceExpression: 'y', transformType: '' }],
+            ),
+        ).toEqual([]);
     });
 
     it('treats a blank transform type as DIRECT, so it is not a change', () => {
-        expect(diffRules(
-            [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }],
-            [{ targetColumn: 'A', sourceExpression: 'a', transformType: '' }],
-        )).toEqual([]);
+        expect(
+            diffRules(
+                [{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }],
+                [{ targetColumn: 'A', sourceExpression: 'a', transformType: '' }],
+            ),
+        ).toEqual([]);
     });
 });

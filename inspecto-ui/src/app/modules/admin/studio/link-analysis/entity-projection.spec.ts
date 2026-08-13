@@ -17,12 +17,17 @@ const rows = [
     { source: 'sub-02', target: 'dev-01', link_type: 'shared_device', weight: 4 },
     { source: 'sub-01', target: 'sub-02', link_type: 'calls', weight: 17 },
     { source: 'sub-01', target: 'sub-02', link_type: 'calls', weight: 3 }, // duplicate link → folded count
-    { source: '', target: 'dev-01', link_type: 'calls' },                   // blank endpoint → skipped
+    { source: '', target: 'dev-01', link_type: 'calls' }, // blank endpoint → skipped
 ];
 
 describe('projectEntities', () => {
     it('folds rows into entities and typed, deduplicated links', () => {
-        const g = projectEntities(rows, { datasetId: 'd', sourceCol: 'source', targetCol: 'target', linkKindCol: 'link_type' });
+        const g = projectEntities(rows, {
+            datasetId: 'd',
+            sourceCol: 'source',
+            targetCol: 'target',
+            linkKindCol: 'link_type',
+        });
         if (isProjectionError(g)) throw new Error(g.error);
         expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:dev-01', 'entity:sub-01', 'entity:sub-02']);
         expect(g.nodes[0].data.kind).toBe('entity');
@@ -33,7 +38,11 @@ describe('projectEntities', () => {
     });
 
     it('defaults the link kind when no kind column is mapped', () => {
-        const g = projectEntities(rows.slice(0, 1), { datasetId: 'd', sourceCol: 'source', targetCol: 'target' }) as ProjectedGraph;
+        const g = projectEntities(rows.slice(0, 1), {
+            datasetId: 'd',
+            sourceCol: 'source',
+            targetCol: 'target',
+        }) as ProjectedGraph;
         expect(g.edges[0].data.kind).toBe('link');
     });
 
@@ -56,7 +65,12 @@ describe('projectEntities', () => {
             { source: 's', target: 't', channel: 'sms' },
             { source: 's', target: 't', channel: 'call' },
         ];
-        const g = projectEntities(mixed, { datasetId: 'd', sourceCol: 'source', targetCol: 'target', attrCols: ['channel'] }) as ProjectedGraph;
+        const g = projectEntities(mixed, {
+            datasetId: 'd',
+            sourceCol: 'source',
+            targetCol: 'target',
+            attrCols: ['channel'],
+        }) as ProjectedGraph;
         expect(g.edges).toHaveLength(2);
         expect(g.edges.every((e) => (e.data as unknown as { count: number }).count === 1)).toBe(true);
         const smsEdge = g.edges.find((e) => e.data.attrs?.channel === 'sms');
@@ -64,10 +78,11 @@ describe('projectEntities', () => {
     });
 
     it('tags nodes from a caseId/incidentId column with an objectRef; other columns get none (R8)', () => {
-        const g = projectEntities(
-            [{ caseId: 'case-7', msisdn: '555-0101' }],
-            { datasetId: 'd', sourceCol: 'caseId', targetCol: 'msisdn' },
-        ) as ProjectedGraph;
+        const g = projectEntities([{ caseId: 'case-7', msisdn: '555-0101' }], {
+            datasetId: 'd',
+            sourceCol: 'caseId',
+            targetCol: 'msisdn',
+        }) as ProjectedGraph;
         expect(g.nodes.find((n) => n.id === 'entity:case-7')!.data.objectRef).toEqual({ id: 'case-7', type: 'CASE' });
         expect(g.nodes.find((n) => n.id === 'entity:555-0101')!.data.objectRef).toBeUndefined();
     });
@@ -86,7 +101,10 @@ describe('example graph sample sources (C5 user testing)', () => {
     it('each projects cleanly with the seeded mapping and stays under the node cap', () => {
         for (const [source, nodes, links] of CASES) {
             const g = projectEntities(SAMPLE_SOURCES[source], {
-                datasetId: source, sourceCol: 'source', targetCol: 'target', linkKindCol: 'link_type',
+                datasetId: source,
+                sourceCol: 'source',
+                targetCol: 'target',
+                linkKindCol: 'link_type',
             });
             if (isProjectionError(g)) throw new Error(`${source}: ${g.error}`);
             expect(g.nodes, source).toHaveLength(nodes);
@@ -98,8 +116,15 @@ describe('example graph sample sources (C5 user testing)', () => {
 
 describe('EntityProjectionGraphSource', () => {
     const ds: Dataset = {
-        id: 'links-ds', name: 'Links', kind: 'physical', sourceName: 'links',
-        query: null, physicalRef: null, columns: [], measures: [], calculated: [],
+        id: 'links-ds',
+        name: 'Links',
+        kind: 'physical',
+        sourceName: 'links',
+        query: null,
+        physicalRef: null,
+        columns: [],
+        measures: [],
+        calculated: [],
     };
 
     /** An InvService stub for the offline path: the backend call fails, forcing the client fold. */
@@ -126,7 +151,10 @@ describe('EntityProjectionGraphSource', () => {
         const inv = {
             project: (req: { dataset: string }) => {
                 if (req.dataset === 'phones-ds') {
-                    return of({ rows: [{ source: '555-0101', target: '555-0102', kind: null, count: 1 }], truncated: false });
+                    return of({
+                        rows: [{ source: '555-0101', target: '555-0102', kind: null, count: 1 }],
+                        truncated: false,
+                    });
                 }
                 return of({ rows: [{ source: '555-0101', target: 'acct-9', kind: null, count: 1 }], truncated: false });
             },
@@ -140,7 +168,10 @@ describe('EntityProjectionGraphSource', () => {
         });
         // The same value '555-0101' surfaces under two entity types and stays two distinct nodes.
         expect(g.nodes.map((n) => n.id).sort()).toEqual([
-            'entity:account:555-0101', 'entity:account:acct-9', 'entity:phone:555-0101', 'entity:phone:555-0102',
+            'entity:account:555-0101',
+            'entity:account:acct-9',
+            'entity:phone:555-0101',
+            'entity:phone:555-0102',
         ]);
     });
 
@@ -148,7 +179,10 @@ describe('EntityProjectionGraphSource', () => {
         const inv = {
             project: (req: unknown) => {
                 expect(req).toEqual({
-                    dataset: 'links-ds', sourceCol: 'source', targetCol: 'target', linkKindCol: undefined,
+                    dataset: 'links-ds',
+                    sourceCol: 'source',
+                    targetCol: 'target',
+                    linkKindCol: undefined,
                 });
                 return of({
                     rows: [
@@ -159,7 +193,11 @@ describe('EntityProjectionGraphSource', () => {
                 });
             },
         } as never;
-        const datasets = { get: () => { throw new Error('must not fetch rows on the backend path'); } } as never;
+        const datasets = {
+            get: () => {
+                throw new Error('must not fetch rows on the backend path');
+            },
+        } as never;
         const src = new EntityProjectionGraphSource(datasets, inv);
         const g = (await src.query({
             projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' },
@@ -173,8 +211,15 @@ describe('EntityProjectionGraphSource', () => {
 
 describe('EntityProjectionGraphSource.expand (Phase E, incremental expand)', () => {
     const ds: Dataset = {
-        id: 'links-ds', name: 'Links', kind: 'physical', sourceName: 'links',
-        query: null, physicalRef: null, columns: [], measures: [], calculated: [],
+        id: 'links-ds',
+        name: 'Links',
+        kind: 'physical',
+        sourceName: 'links',
+        query: null,
+        physicalRef: null,
+        columns: [],
+        measures: [],
+        calculated: [],
     };
 
     it('calls /inv/projection/neighbors with the node label as value and folds the result', async () => {
@@ -185,17 +230,19 @@ describe('EntityProjectionGraphSource.expand (Phase E, incremental expand)', () 
             },
         } as never;
         const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, inv);
-        const g = await src.expand('entity:bob', 'bob', {
+        const g = (await src.expand('entity:bob', 'bob', {
             projection: { datasetId: 'links-ds', sourceCol: 'source', targetCol: 'target' },
-        }) as ProjectedGraph;
+        })) as ProjectedGraph;
         expect(g.nodes.map((n) => n.id).sort()).toEqual(['entity:alice', 'entity:bob']);
     });
 
     it('refuses a multi-mapping query (no way to know which mapping owns the node)', async () => {
         const src = new EntityProjectionGraphSource({ get: () => of(ds) } as never, {} as never);
-        await expect(src.expand('entity:bob', 'bob', {
-            projections: [{ datasetId: 'links-ds', sourceCol: 'a', targetCol: 'b' }],
-        })).rejects.toThrow(/single-mapping/);
+        await expect(
+            src.expand('entity:bob', 'bob', {
+                projections: [{ datasetId: 'links-ds', sourceCol: 'a', targetCol: 'b' }],
+            }),
+        ).rejects.toThrow(/single-mapping/);
     });
 });
 
@@ -205,7 +252,7 @@ describe('projectTriples', () => {
             [
                 { source: 'a', target: 'b', kind: 'sms', count: 2 },
                 { source: 'a', target: 'c', kind: 'call', count: 1 },
-                { source: ' ', target: 'x', kind: null, count: 5 },   // blank endpoint skipped
+                { source: ' ', target: 'x', kind: null, count: 5 }, // blank endpoint skipped
             ],
             false,
         );
@@ -219,7 +266,10 @@ describe('projectTriples', () => {
 
     it('caps nodes and carries server truncation through', () => {
         const many = Array.from({ length: PROJECTION_NODE_CAP + 50 }, (_, i) => ({
-            source: `s${i}`, target: `t${i}`, kind: null, count: 1,
+            source: `s${i}`,
+            target: `t${i}`,
+            kind: null,
+            count: 1,
         }));
         const capped = projectTriples(many, false);
         expect(capped.nodes.length).toBeLessThanOrEqual(PROJECTION_NODE_CAP);
@@ -229,11 +279,11 @@ describe('projectTriples', () => {
     });
 
     it('tags nodes with an objectRef when the projection column names an operational object (R8)', () => {
-        const g = projectTriples(
-            [{ source: 'inc-1', target: 'tower-9', kind: null, count: 1 }],
-            false,
-            { datasetId: 'd', sourceCol: 'incidentId', targetCol: 'tower' },
-        );
+        const g = projectTriples([{ source: 'inc-1', target: 'tower-9', kind: null, count: 1 }], false, {
+            datasetId: 'd',
+            sourceCol: 'incidentId',
+            targetCol: 'tower',
+        });
         expect(g.nodes.find((n) => n.id === 'entity:inc-1')!.data.objectRef).toEqual({ id: 'inc-1', type: 'INCIDENT' });
         expect(g.nodes.find((n) => n.id === 'entity:tower-9')!.data.objectRef).toBeUndefined();
     });
@@ -255,7 +305,10 @@ describe('mergeProjectedGraphs', () => {
             truncated: true,
         };
         const b: ProjectedGraph = {
-            nodes: [{ id: 'entity:x', data: { label: 'stale', kind: 'entity' } }, { id: 'entity:z', data: { label: 'z', kind: 'entity' } }],
+            nodes: [
+                { id: 'entity:x', data: { label: 'stale', kind: 'entity' } },
+                { id: 'entity:z', data: { label: 'z', kind: 'entity' } },
+            ],
             edges: [{ id: 'e2', source: 'entity:x', target: 'entity:z', data: { kind: 'link' } }],
             truncated: false,
         };

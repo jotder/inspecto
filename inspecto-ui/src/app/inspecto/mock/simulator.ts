@@ -86,7 +86,9 @@ function fireAlert(store: MockStore, space: string, now: number, n: number): voi
         correlationId: null,
         severity: (['info', 'warn', 'critical'] as const)[n % 3],
         payload: {
-            rule, pipeline, metric,
+            rule,
+            pipeline,
+            metric,
             value: [0.12, 7, 45_000][n % 3] + (n % 10),
             comparator: 'gt',
             threshold: [0.1, 5, 30_000][n % 3],

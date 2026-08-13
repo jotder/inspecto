@@ -9,15 +9,24 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { Observable, catchError, forkJoin, map, of } from 'rxjs';
 import {
-    apiErrorMessage, AuthoredPipeline, ComponentDef, ComponentsService, Finding,
-    PipelineDryRunResult, PipelinesService,
+    apiErrorMessage,
+    AuthoredPipeline,
+    ComponentDef,
+    ComponentsService,
+    Finding,
+    PipelineDryRunResult,
+    PipelinesService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import {
-    CellFinding, CsvImport, EditableGridColumn, EditableGridComponent, parseCsv,
+    CellFinding,
+    CsvImport,
+    EditableGridColumn,
+    EditableGridComponent,
+    parseCsv,
 } from 'app/inspecto/components/editable-grid.component';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -56,10 +65,7 @@ function ruleText(r: Record<string, string> | undefined): string {
  * needs nothing but the two rule sets. The complementary output-ROW diff (what the change does to actual
  * data) needs a sample to run over, so it appears only once the operator uploads one.
  */
-export function diffRules(
-    before: Record<string, string>[],
-    after: Record<string, string>[],
-): RuleDiff[] {
+export function diffRules(before: Record<string, string>[], after: Record<string, string>[]): RuleDiff[] {
     const key = (r: Record<string, string>): string => (r['targetColumn'] ?? '').trim();
     const beforeBy = new Map(before.filter((r) => key(r)).map((r) => [key(r), r]));
     const afterBy = new Map(after.filter((r) => key(r)).map((r) => [key(r), r]));
@@ -71,8 +77,7 @@ export function diffRules(
             out.push({ change: 'Changed', targetColumn: target, before: ruleText(prior), after: ruleText(r) });
     }
     for (const [target, r] of beforeBy) {
-        if (!afterBy.has(target))
-            out.push({ change: 'Removed', targetColumn: target, before: ruleText(r), after: '' });
+        if (!afterBy.has(target)) out.push({ change: 'Removed', targetColumn: target, before: ruleText(r), after: '' });
     }
     return out;
 }
@@ -122,13 +127,27 @@ const COLUMNS: EditableGridColumn[] = [
     selector: 'app-mapping-editor-dialog',
     standalone: true,
     imports: [
-        ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule,
-        MatIconModule, MatInputModule, MatTooltipModule, EditableGridComponent, InspectoAlertComponent,
-        ChipComponent, DataTableComponent, InspectoDialogResizeDirective,
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatTooltipModule,
+        EditableGridComponent,
+        InspectoAlertComponent,
+        ChipComponent,
+        DataTableComponent,
+        InspectoDialogResizeDirective,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <h2 mat-dialog-title class="flex min-w-0 items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
+        <h2
+            mat-dialog-title
+            class="flex min-w-0 items-center gap-2"
+            inspectoDialogResize
+            #chrome="inspectoDialogResize"
+        >
             <mat-icon class="shrink-0" svgIcon="heroicons_outline:table-cells"></mat-icon>
             <span class="min-w-0 truncate">{{ isEdit ? 'Edit Mapping · ' + data.def!.name : 'New Mapping' }}</span>
             <span class="flex-1"></span>
@@ -141,7 +160,11 @@ const COLUMNS: EditableGridColumn[] = [
             >
                 <mat-icon
                     class="icon-size-5"
-                    [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+                    [svgIcon]="
+                        chrome.maximized()
+                            ? 'heroicons_outline:arrows-pointing-in'
+                            : 'heroicons_outline:arrows-pointing-out'
+                    "
                 ></mat-icon>
             </button>
         </h2>
@@ -157,8 +180,8 @@ const COLUMNS: EditableGridColumn[] = [
                 </mat-form-field>
             }
             <p class="text-secondary mb-2 mt-3 text-sm">
-                One row per target column. Transform type DIRECT (or blank) copies the source column;
-                EXPR treats the source expression as a DuckDB scalar expression, emitted verbatim.
+                One row per target column. Transform type DIRECT (or blank) copies the source column; EXPR treats the
+                source expression as a DuckDB scalar expression, emitted verbatim.
             </p>
             @if (importNote(); as note) {
                 <inspecto-alert class="mb-3 block" [variant]="note.variant" [title]="note.title">
@@ -170,7 +193,9 @@ const COLUMNS: EditableGridColumn[] = [
                     <h3 class="mb-1 text-sm font-medium">What this import changes</h3>
                     <div class="max-h-48 overflow-auto">
                         <table class="w-full text-sm">
-                            <caption class="sr-only">Mapping rule changes from the imported file</caption>
+                            <caption class="sr-only">
+                                Mapping rule changes from the imported file
+                            </caption>
                             <thead>
                                 <tr class="text-secondary text-left">
                                     <th scope="col" class="py-1 pr-2 font-medium">Change</th>
@@ -182,7 +207,9 @@ const COLUMNS: EditableGridColumn[] = [
                             <tbody>
                                 @for (d of diff(); track d.targetColumn) {
                                     <tr class="border-t">
-                                        <td class="py-1 pr-2"><inspecto-chip variant="soft">{{ d.change }}</inspecto-chip></td>
+                                        <td class="py-1 pr-2">
+                                            <inspecto-chip variant="soft">{{ d.change }}</inspecto-chip>
+                                        </td>
                                         <td class="py-1 pr-2 font-mono">{{ d.targetColumn }}</td>
                                         <td class="text-secondary py-1 pr-2 font-mono">{{ d.before || '—' }}</td>
                                         <td class="py-1 font-mono">{{ d.after || '—' }}</td>
@@ -206,7 +233,9 @@ const COLUMNS: EditableGridColumn[] = [
                             (change)="onSample($event)"
                         />
                         @if (sampleName(); as name) {
-                            <inspecto-chip variant="outline">{{ name }} · {{ sampleRows().length }} row(s)</inspecto-chip>
+                            <inspecto-chip variant="outline"
+                                >{{ name }} · {{ sampleRows().length }} row(s)</inspecto-chip
+                            >
                         } @else {
                             <span class="text-secondary text-sm">
                                 A few rows of the data itself — not the rules file — to see what these rules produce.
@@ -283,12 +312,11 @@ export class MappingEditorDialog {
 
     /** The rule rows as strings — verbatim from the component content, unknown keys preserved on save. */
     readonly rows = signal<Record<string, string>[]>(
-        ((this.data.def?.content?.['rules'] as Record<string, unknown>[] | undefined) ?? [])
-            .map((r) => ({
-                targetColumn: String(r['targetColumn'] ?? ''),
-                sourceExpression: String(r['sourceExpression'] ?? ''),
-                transformType: String(r['transformType'] ?? ''),
-            })),
+        ((this.data.def?.content?.['rules'] as Record<string, unknown>[] | undefined) ?? []).map((r) => ({
+            targetColumn: String(r['targetColumn'] ?? ''),
+            sourceExpression: String(r['sourceExpression'] ?? ''),
+            transformType: String(r['transformType'] ?? ''),
+        })),
     );
 
     /** Server findings for the current rows, anchored `rules[N].<key>` (empty until a validate runs). */
@@ -317,7 +345,7 @@ export class MappingEditorDialog {
         const map = new Map<string, CellFinding>();
         for (const f of this.findings()) {
             const m = /^rules\[(\d+)]\.(\w+)$/.exec(f.fieldPath);
-            if (!m) continue;   // a whole-set finding has no cell to mark; the list above still shows it
+            if (!m) continue; // a whole-set finding has no cell to mark; the list above still shows it
             map.set(`${m[1]}|${m[2]}`, {
                 severity: f.severity === 'ERROR' ? 'error' : 'warning',
                 message: f.message,
@@ -335,7 +363,7 @@ export class MappingEditorDialog {
     onRows(rows: Record<string, string>[]): void {
         this.rows.set(rows);
         this.dirty = true;
-        this.findings.set([]);   // the rows moved on; stale cell marks would point at the wrong cells
+        this.findings.set([]); // the rows moved on; stale cell marks would point at the wrong cells
     }
 
     /**
@@ -349,8 +377,9 @@ export class MappingEditorDialog {
             this.importNote.set({
                 variant: 'error',
                 title: `Nothing imported from ${imported.fileName}`,
-                message: `No column of that file matched this mapping. Expected a header with `
-                    + `${this.columns.map((c) => c.key).join(', ')}. The rules were left unchanged.`,
+                message:
+                    `No column of that file matched this mapping. Expected a header with ` +
+                    `${this.columns.map((c) => c.key).join(', ')}. The rules were left unchanged.`,
             });
             return;
         }
@@ -395,8 +424,9 @@ export class MappingEditorDialog {
             return;
         }
         const header = parsed[0].map((h) => h.trim());
-        this.sampleRows.set(parsed.slice(1).map((cells) =>
-            Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']))));
+        this.sampleRows.set(
+            parsed.slice(1).map((cells) => Object.fromEntries(header.map((h, i) => [h, cells[i] ?? '']))),
+        );
         this.sampleName.set(file.name);
         this.runPreview();
     }
@@ -433,11 +463,10 @@ export class MappingEditorDialog {
         rules: Record<string, string>[],
         sample: Record<string, unknown>[],
     ): Observable<Record<string, unknown>[]> {
-        const id = this.isEdit ? this.data.def!.name : (this.id.value.trim() || 'mapping');
-        return this.pipelines.dryRunAuthored(id, sample, previewGraph(id, rules)).pipe(
-            map((r: PipelineDryRunResult) =>
-                r.nodes.find((n) => n.node === MAP_NODE)?.relations[0]?.rows ?? []),
-        );
+        const id = this.isEdit ? this.data.def!.name : this.id.value.trim() || 'mapping';
+        return this.pipelines
+            .dryRunAuthored(id, sample, previewGraph(id, rules))
+            .pipe(map((r: PipelineDryRunResult) => r.nodes.find((n) => n.node === MAP_NODE)?.relations[0]?.rows ?? []));
     }
 
     private clearPreview(): void {

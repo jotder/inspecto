@@ -59,7 +59,10 @@ export interface MemberRollup {
             </p>
 
             @for (n of members(); track n.id) {
-                <div class="mb-1 flex items-center gap-2 rounded border px-2 py-1.5" style="border-color: var(--gamma-border)">
+                <div
+                    class="mb-1 flex items-center gap-2 rounded border px-2 py-1.5"
+                    style="border-color: var(--gamma-border)"
+                >
                     <inspecto-status-badge [value]="displayStatusOf(n)" />
                     <span class="min-w-0 flex-auto truncate text-sm" [matTooltip]="n.title">{{ n.title }}</span>
                     <span class="text-secondary shrink-0 text-xs">{{ n.id }}</span>
@@ -93,7 +96,8 @@ export class CaseContentsComponent {
 
     readonly members = signal<ObjectGraphNode[]>([]);
     readonly openCount = computed(
-        () => this.members().filter((n) => !['RESOLVED', 'ARCHIVED', 'CLOSED'].includes(this.displayStatusOf(n))).length,
+        () =>
+            this.members().filter((n) => !['RESOLVED', 'ARCHIVED', 'CLOSED'].includes(this.displayStatusOf(n))).length,
     );
 
     constructor() {
@@ -108,9 +112,7 @@ export class CaseContentsComponent {
         this.api.graph(caseId, 1).subscribe({
             next: (g) => {
                 const memberIds = new Set(
-                    g.edges
-                        .filter((e) => e.from === caseId && e.relationship === 'CONTAINS')
-                        .map((e) => e.to),
+                    g.edges.filter((e) => e.from === caseId && e.relationship === 'CONTAINS').map((e) => e.to),
                 );
                 this.members.set(g.nodes.filter((n) => memberIds.has(n.id)));
                 this.membersChange.emit({ total: memberIds.size, open: this.openCount() });

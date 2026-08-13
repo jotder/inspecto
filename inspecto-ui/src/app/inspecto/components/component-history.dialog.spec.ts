@@ -10,8 +10,22 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ComponentHistoryDialog } from './component-history.dialog';
 
 const VERSIONS: ComponentVersion[] = [
-    { type: 'dashboard', id: 'cdr', version: 2, savedAt: '2026-07-09T10:00:00Z', contentHash: 'hash-2', content: { name: 'cdr', tiles: [] } },
-    { type: 'dashboard', id: 'cdr', version: 1, savedAt: '2026-07-08T10:00:00Z', contentHash: 'hash-1', content: { name: 'cdr', tiles: [] } },
+    {
+        type: 'dashboard',
+        id: 'cdr',
+        version: 2,
+        savedAt: '2026-07-09T10:00:00Z',
+        contentHash: 'hash-2',
+        content: { name: 'cdr', tiles: [] },
+    },
+    {
+        type: 'dashboard',
+        id: 'cdr',
+        version: 1,
+        savedAt: '2026-07-08T10:00:00Z',
+        contentHash: 'hash-1',
+        content: { name: 'cdr', tiles: [] },
+    },
 ];
 
 function create(opts: { versions?: ComponentVersion[]; confirm?: boolean } = {}) {
@@ -43,7 +57,7 @@ describe('ComponentHistoryDialog', () => {
 
     it('confirms, restores the chosen version, and closes with true', async () => {
         const { c, close, restore } = create();
-        await c.restore(VERSIONS[1]);   // restore v1
+        await c.restore(VERSIONS[1]); // restore v1
         expect(restore).toHaveBeenCalledWith('dashboard', 'cdr', 1);
         expect(close).toHaveBeenCalledWith(true);
     });

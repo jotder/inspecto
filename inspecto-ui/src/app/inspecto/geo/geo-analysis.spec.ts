@@ -24,7 +24,12 @@ import {
 import { GeoData, GeoPoint } from './geo-types';
 
 const pt = (id: string, lat: number, lon: number, kind = 'device', time?: number): GeoPoint => ({
-    id, lat, lon, kind, label: id.toUpperCase(), time,
+    id,
+    lat,
+    lon,
+    kind,
+    label: id.toUpperCase(),
+    time,
 });
 
 const DATA: GeoData = {
@@ -114,7 +119,10 @@ describe('geo-analysis', () => {
         const midLat = arc[8][1];
         expect(midLat).toBeGreaterThan(44);
         // Degenerate zero-length arc: just the two (identical) ends.
-        expect(greatCircleArc(10, 10, 10, 10)).toEqual([[10, 10], [10, 10]]);
+        expect(greatCircleArc(10, 10, 10, 10)).toEqual([
+            [10, 10],
+            [10, 10],
+        ]);
     });
 
     it('computes the time extent across points and routes', () => {
@@ -129,7 +137,13 @@ describe('geo-analysis', () => {
     });
 
     it('point-in-polygon via ray casting', () => {
-        const box: [number, number][] = [[90, 23], [91, 23], [91, 24], [90, 24], [90, 23]];
+        const box: [number, number][] = [
+            [90, 23],
+            [91, 23],
+            [91, 24],
+            [90, 24],
+            [90, 23],
+        ];
         expect(pointInPolygon(23.5, 90.5, box)).toBe(true);
         expect(pointInPolygon(24.5, 90.5, box)).toBe(false);
         expect(pointInPolygon(23.5, 89.9, box)).toBe(false);
@@ -153,13 +167,20 @@ describe('geo-analysis', () => {
     const HOUR = 3_600_000;
     const track = (entity: string, legs: [number, number, number][]): GeoPoint[] =>
         legs.map(([lat, lon, h], i) => ({
-            id: `${entity}-${i}`, lat, lon, kind: 'device', label: entity, time: h * HOUR,
+            id: `${entity}-${i}`,
+            lat,
+            lon,
+            kind: 'device',
+            label: entity,
+            time: h * HOUR,
         }));
 
     it('detects stay-points: a dwell within radius spanning the minimum time', () => {
         const pts = track('A', [
-            [23.8100, 90.4100, 1], [23.8101, 90.4101, 3], [23.8102, 90.4100, 5], // 4h dwell
-            [23.9000, 90.5000, 6], // moves away
+            [23.81, 90.41, 1],
+            [23.8101, 90.4101, 3],
+            [23.8102, 90.41, 5], // 4h dwell
+            [23.9, 90.5, 6], // moves away
         ]);
         const stays = stayPoints(pts, 200, 2 * HOUR);
         expect(stays).toHaveLength(1);
@@ -172,8 +193,16 @@ describe('geo-analysis', () => {
 
     it('finds frequent locations per entity, busiest first', () => {
         const pts = [
-            ...track('A', [[23.81, 90.41, 1], [23.8101, 90.4101, 4], [23.8102, 90.41, 9], [22.35, 91.78, 6]]),
-            ...track('B', [[23.81, 90.41, 2], [22.35, 91.78, 3]]),
+            ...track('A', [
+                [23.81, 90.41, 1],
+                [23.8101, 90.4101, 4],
+                [23.8102, 90.41, 9],
+                [22.35, 91.78, 6],
+            ]),
+            ...track('B', [
+                [23.81, 90.41, 2],
+                [22.35, 91.78, 3],
+            ]),
         ];
         const freq = frequentLocations(pts, 300, 2);
         expect(freq).toHaveLength(1); // only A's Dhaka spot has ≥2 visits
@@ -183,8 +212,16 @@ describe('geo-analysis', () => {
 
     it('detects repeated co-location and builds the bridge graph', () => {
         const pts = [
-            ...track('A', [[23.81, 90.41, 1], [23.81, 90.41, 10], [22.35, 91.78, 20]]),
-            ...track('B', [[23.8101, 90.4101, 1.5], [23.8101, 90.4101, 10.5], [24.89, 91.87, 20]]),
+            ...track('A', [
+                [23.81, 90.41, 1],
+                [23.81, 90.41, 10],
+                [22.35, 91.78, 20],
+            ]),
+            ...track('B', [
+                [23.8101, 90.4101, 1.5],
+                [23.8101, 90.4101, 10.5],
+                [24.89, 91.87, 20],
+            ]),
             ...track('C', [[23.81, 90.41, 40]]), // right place, wrong time
         ];
         const pairs = coLocations(pts, 300, HOUR);

@@ -32,14 +32,28 @@ function seededStore(): MockStore {
  */
 describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType enum', () => {
     const ENUM_TYPES = [
-        'acquisition', 'adapter',
+        'acquisition',
+        'adapter',
         'parser',
-        'transform.map', 'transform.filter', 'transform.select', 'transform.derive', 'transform.validate',
-        'transform.dedup.marker', 'transform.dedup', 'transform.route', 'transform.join',
-        'transform.summarize', 'transform.split',
-        'transform.merge', 'enrichment',
-        'sink.persistent', 'sink.materialized', 'sink.view',
-        'alert', 'gap', 'event',
+        'transform.map',
+        'transform.filter',
+        'transform.select',
+        'transform.derive',
+        'transform.validate',
+        'transform.dedup.marker',
+        'transform.dedup',
+        'transform.route',
+        'transform.join',
+        'transform.summarize',
+        'transform.split',
+        'transform.merge',
+        'enrichment',
+        'sink.persistent',
+        'sink.materialized',
+        'sink.view',
+        'alert',
+        'gap',
+        'event',
     ];
 
     it('serves exactly the enum types, in enum order', () => {
@@ -48,9 +62,18 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
 
     it('carries none of the invented types the editor used to author', () => {
         const served = new Set(NODE_TYPES.map((t) => t.type));
-        for (const fiction of ['collector.file', 'collector.database', 'collector.stream', 'sink.file',
-            'sink.database', 'parser.dsv', 'parser.asn1', 'transform.record', 'transform.aggregate',
-            'transform.alert']) {
+        for (const fiction of [
+            'collector.file',
+            'collector.database',
+            'collector.stream',
+            'sink.file',
+            'sink.database',
+            'parser.dsv',
+            'parser.asn1',
+            'transform.record',
+            'transform.aggregate',
+            'transform.alert',
+        ]) {
             expect(served.has(fiction)).toBe(false);
         }
     });
@@ -76,17 +99,29 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
     it('marks exactly the 12 types the server can lower — a laxer mock is the whole failure mode', () => {
         // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
         // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
-        expect(NODE_TYPES.filter((t) => t.lowerable).map((t) => t.type).sort()).toEqual([
-            'acquisition', 'enrichment', 'gap', 'parser', 'sink.persistent',
-            'transform.dedup', 'transform.dedup.marker', 'transform.filter', 'transform.join',
-            'transform.map', 'transform.route', 'transform.summarize',
+        expect(
+            NODE_TYPES.filter((t) => t.lowerable)
+                .map((t) => t.type)
+                .sort(),
+        ).toEqual([
+            'acquisition',
+            'enrichment',
+            'gap',
+            'parser',
+            'sink.persistent',
+            'transform.dedup',
+            'transform.dedup.marker',
+            'transform.filter',
+            'transform.join',
+            'transform.map',
+            'transform.route',
+            'transform.summarize',
         ]);
         expect(NODE_TYPES.length).toBe(22);
     });
 
     it('only the parser and the router emit operator-named routes', () => {
-        expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type))
-            .toEqual(['parser', 'transform.route']);
+        expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type)).toEqual(['parser', 'transform.route']);
     });
 });
 
@@ -152,13 +187,17 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
 
     it('lists the registered CANONICAL pipelines (config store), not the grandfathered flows', () => {
         const store = seededStore();
-        const names = ((handler(req('GET', '/api/pipelines'), store)?.body as { name: string }[]) ?? []).map((p) => p.name);
+        const names = ((handler(req('GET', '/api/pipelines'), store)?.body as { name: string }[]) ?? []).map(
+            (p) => p.name,
+        );
         expect(names).toContain('cdr_ingest'); // the canonical config seed
     });
 
     it('lifts a config to the editable graph and lowers an edit back verbatim', () => {
         const store = seededStore();
-        const raw = handler(req('GET', '/api/pipelines/cdr_ingest/graph/raw'), store)?.body as { nodes: { type: string }[] };
+        const raw = handler(req('GET', '/api/pipelines/cdr_ingest/graph/raw'), store)?.body as {
+            nodes: { type: string }[];
+        };
         expect(raw.nodes.some((n) => n.type === 'acquisition')).toBe(true);
         expect(raw.nodes.some((n) => n.type === 'sink.persistent')).toBe(true);
         const put = handler(req('PUT', '/api/pipelines/cdr_ingest/graph', raw), store);
@@ -191,7 +230,9 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
         const put = handler(req('PUT', '/api/pipelines/cdr_ingest/graph', raw), store);
         expect((put?.body as { written: boolean }).written).toBe(true);
         const saved = store.get<{ config: { processing: { csv_settings: Record<string, unknown> } } }>(
-            'default', PIPELINE_CONFIGS_COLL, 'cdr_ingest',
+            'default',
+            PIPELINE_CONFIGS_COLL,
+            'cdr_ingest',
         )!;
         expect(saved.config.processing.csv_settings['where']).toBe("msisdn NOT LIKE '0000%'");
     });
@@ -215,8 +256,12 @@ describe('pipelinesHandler — the W5 canonical graph round-trip (lift/lower ove
 
     it('POST/PUT /pipelines/authored are retired (405) — authoring goes through the graph now', () => {
         const store = seededStore();
-        expect(handler(req('POST', '/api/pipelines/authored', { name: 'x', nodes: [], edges: [] }), store)?.status).toBe(405);
-        expect(handler(req('PUT', '/api/pipelines/authored/cdr_ingest', { nodes: [], edges: [] }), store)?.status).toBe(405);
+        expect(
+            handler(req('POST', '/api/pipelines/authored', { name: 'x', nodes: [], edges: [] }), store)?.status,
+        ).toBe(405);
+        expect(handler(req('PUT', '/api/pipelines/authored/cdr_ingest', { nodes: [], edges: [] }), store)?.status).toBe(
+            405,
+        );
     });
 });
 
@@ -237,8 +282,10 @@ describe('pipelinesHandler — save-as-template mirrors the server gates and neu
         expect(post('/api/pipelines/nope/save-as-template', { id: 'x' }, store)?.status).toBe(404);
         expect(post('/api/pipelines/cdr_ingest/save-as-template', {}, store)?.status).toBe(400);
         for (const bad of ['Orders EU', 'orders-eu', '_x', 'x!']) {
-            expect(post('/api/pipelines/cdr_ingest/save-as-template', { id: bad }, store)?.status,
-                `${bad} must be refused`).toBe(422);
+            expect(
+                post('/api/pipelines/cdr_ingest/save-as-template', { id: bad }, store)?.status,
+                `${bad} must be refused`,
+            ).toBe(422);
         }
         expect(post('/api/pipelines/cdr_ingest/save-as-template', { id: 'cdr_ingest' }, store)?.status).toBe(409);
     });
@@ -270,8 +317,12 @@ describe('pipelinesHandler — save-as-template mirrors the server gates and neu
         const store = seededStore();
         post('/api/pipelines/cdr_ingest/save-as-template', { id: 'cdr_eu', name: 'CDR (EU)' }, store);
 
-        const rows = handler(req('GET', '/api/pipelines'), store)?.body as
-            { name: string; template?: boolean; displayName?: string; active: boolean }[];
+        const rows = handler(req('GET', '/api/pipelines'), store)?.body as {
+            name: string;
+            template?: boolean;
+            displayName?: string;
+            active: boolean;
+        }[];
         const row = rows.find((r) => r.name === 'cdr_eu')!;
         expect(row.template).toBe(true);
         expect(row.displayName).toBe('CDR (EU)');
@@ -287,8 +338,11 @@ describe('pipelinesHandler — label relabels without moving the identity', () =
 
     it('stamps the derived id, keeps the record key, and reports stampedId once', () => {
         const store = seededStore();
-        const first = handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: 'CDR (EU)' }), store)?.body as
-            { id: string; name: string; stampedId: boolean };
+        const first = handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: 'CDR (EU)' }), store)?.body as {
+            id: string;
+            name: string;
+            stampedId: boolean;
+        };
         expect(first).toMatchObject({ id: 'cdr_ingest', name: 'CDR (EU)', stampedId: true });
 
         // Still addressable by identity — the whole point of stamping before relabelling.
@@ -296,8 +350,9 @@ describe('pipelinesHandler — label relabels without moving the identity', () =
         const rows = handler(req('GET', '/api/pipelines'), store)?.body as { name: string; displayName?: string }[];
         expect(rows.find((r) => r.name === 'cdr_ingest')?.displayName).toBe('CDR (EU)');
 
-        const second = handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: 'CDR (APAC)' }), store)?.body as
-            { stampedId: boolean };
+        const second = handler(req('POST', '/api/pipelines/cdr_ingest/label', { name: 'CDR (APAC)' }), store)?.body as {
+            stampedId: boolean;
+        };
         expect(second.stampedId).toBe(false); // idempotent
     });
 
@@ -333,56 +388,81 @@ describe('pipelinesHandler — dry-run honours the candidate body and the sample
 
     /** The map step's first output relation — where the projected rows land. */
     const mapRel = (body: unknown) =>
-        (body as { nodes: { node: string; relations: { rel: string; rows: unknown[] }[] }[] })
-            .nodes.find((n) => n.node === 'map')!.relations[0];
+        (body as { nodes: { node: string; relations: { rel: string; rows: unknown[] }[] }[] }).nodes.find(
+            (n) => n.node === 'map',
+        )!.relations[0];
 
     it('projects the candidate rules over the supplied sample, not canned rows', () => {
         const store = seededStore();
-        const res = handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
-            sampleRows: [{ a: '8801700000001', b: '150' }],
-            pipeline: candidate([{ targetColumn: 'MSISDN', sourceExpression: 'a', transformType: 'DIRECT' }]),
-        }), store);
+        const res = handler(
+            req('POST', '/api/pipelines/authored/scratch/dry-run', {
+                sampleRows: [{ a: '8801700000001', b: '150' }],
+                pipeline: candidate([{ targetColumn: 'MSISDN', sourceExpression: 'a', transformType: 'DIRECT' }]),
+            }),
+            store,
+        );
         expect(res?.status ?? 200).toBe(200);
         const rel = mapRel(res?.body);
         expect(rel.rows).toEqual([{ MSISDN: '8801700000001' }]);
-        expect(rel.rel).toBe('data');   // the server's PipelineRel.DATA, never 'success'
+        expect(rel.rel).toBe('data'); // the server's PipelineRel.DATA, never 'success'
     });
 
     it('a different rule set really produces different rows — what makes an old-vs-new diff meaningful', () => {
         const store = seededStore();
         const sampleRows = [{ a: '1', b: '2' }];
-        const before = mapRel(handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
-            sampleRows, pipeline: candidate([{ targetColumn: 'X', sourceExpression: 'a', transformType: 'DIRECT' }]),
-        }), store)?.body).rows;
-        const after = mapRel(handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
-            sampleRows, pipeline: candidate([{ targetColumn: 'X', sourceExpression: 'b', transformType: 'DIRECT' }]),
-        }), store)?.body).rows;
+        const before = mapRel(
+            handler(
+                req('POST', '/api/pipelines/authored/scratch/dry-run', {
+                    sampleRows,
+                    pipeline: candidate([{ targetColumn: 'X', sourceExpression: 'a', transformType: 'DIRECT' }]),
+                }),
+                store,
+            )?.body,
+        ).rows;
+        const after = mapRel(
+            handler(
+                req('POST', '/api/pipelines/authored/scratch/dry-run', {
+                    sampleRows,
+                    pipeline: candidate([{ targetColumn: 'X', sourceExpression: 'b', transformType: 'DIRECT' }]),
+                }),
+                store,
+            )?.body,
+        ).rows;
         expect(before).toEqual([{ X: '1' }]);
         expect(after).toEqual([{ X: '2' }]);
     });
 
     it('an EXPR rule yields null rather than a fabricated value (no SQL engine on this path)', () => {
         const store = seededStore();
-        const res = handler(req('POST', '/api/pipelines/authored/scratch/dry-run', {
-            sampleRows: [{ amt: '5' }],
-            pipeline: candidate([{ targetColumn: 'DOUBLED', sourceExpression: 'amt * 2', transformType: 'EXPR' }]),
-        }), store);
+        const res = handler(
+            req('POST', '/api/pipelines/authored/scratch/dry-run', {
+                sampleRows: [{ amt: '5' }],
+                pipeline: candidate([{ targetColumn: 'DOUBLED', sourceExpression: 'amt * 2', transformType: 'EXPR' }]),
+            }),
+            store,
+        );
         expect(mapRel(res?.body).rows).toEqual([{ DOUBLED: null }]);
     });
 
     it('a candidate for an id with no stored pipeline previews too — the server skips the lookup, so no 404', () => {
         const store = seededStore();
-        const res = handler(req('POST', '/api/pipelines/authored/no_such_pipeline_at_all/dry-run', {
-            sampleRows: [{ a: 'x' }],
-            pipeline: candidate([{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }]),
-        }), store);
+        const res = handler(
+            req('POST', '/api/pipelines/authored/no_such_pipeline_at_all/dry-run', {
+                sampleRows: [{ a: 'x' }],
+                pipeline: candidate([{ targetColumn: 'A', sourceExpression: 'a', transformType: 'DIRECT' }]),
+            }),
+            store,
+        );
         expect(res?.status ?? 200).toBe(200);
         expect(mapRel(res?.body).rows).toEqual([{ A: 'x' }]);
     });
 
     it('without a candidate it still falls back to the stored/lifted pipeline (W5 behaviour kept)', () => {
         const store = seededStore();
-        const res = handler(req('POST', '/api/pipelines/authored/cdr_ingest/dry-run', { sampleRows: [{ a: '1' }] }), store);
+        const res = handler(
+            req('POST', '/api/pipelines/authored/cdr_ingest/dry-run', { sampleRows: [{ a: '1' }] }),
+            store,
+        );
         expect(res?.status ?? 200).toBe(200);
         expect((res?.body as { nodes: unknown[] }).nodes.length).toBeGreaterThan(0);
     });

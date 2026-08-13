@@ -6,23 +6,30 @@ import { apiUrl, toParams } from './api-base';
 /** One browsable table within a group (a Parquet/CSV store, or — Phase 2 — an operational DB table). */
 export interface DbTable {
     name: string;
-    format?: string;          // 'PARQUET' | 'CSV' for business stores
-    dataset?: string | null;  // owning dataset id, when a dataset component references this store
+    format?: string; // 'PARQUET' | 'CSV' for business stores
+    dataset?: string | null; // owning dataset id, when a dataset component references this store
 }
 
 /** A catalog group: the business-data "stores" group, or an operational capability group. */
 export interface DbGroup {
     id: string;
     label: string;
-    kind: string;             // 'parquet' | 'operational'
-    engine?: string;          // 'duckdb' | 'postgres' (operational only)
-    live?: boolean;           // operational: whether the capability runs on a DB backend
+    kind: string; // 'parquet' | 'operational'
+    engine?: string; // 'duckdb' | 'postgres' (operational only)
+    live?: boolean; // operational: whether the capability runs on a DB backend
     tables: DbTable[];
 }
 
-export interface DbCatalog { groups: DbGroup[]; }
+export interface DbCatalog {
+    groups: DbGroup[];
+}
 
-export interface DbColumn { name: string; type: string; role?: string; cardinality?: number; }
+export interface DbColumn {
+    name: string;
+    type: string;
+    role?: string;
+    cardinality?: number;
+}
 
 export interface DbResult {
     columns: DbColumn[];
@@ -36,7 +43,7 @@ export interface DbTableQuery {
     group?: string;
     limit?: number;
     offset?: number;
-    sort?: string;            // 'field:asc' | 'field:desc'
+    sort?: string; // 'field:asc' | 'field:desc'
 }
 
 /** Ad-hoc read-only SQL scoped to one group/table (the SQL references the table by name). */

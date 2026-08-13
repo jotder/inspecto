@@ -12,9 +12,13 @@ import { TemplateGalleryComponent } from './template-gallery.component';
 
 const TEMPLATES: BiTemplate[] = [
     {
-        id: 'kpi-overview', title: 'KPI overview', description: 'A starter board.', params: ['dataset', 'prefix?'],
+        id: 'kpi-overview',
+        title: 'KPI overview',
+        description: 'A starter board.',
+        params: ['dataset', 'prefix?'],
         components: [
-            { kind: 'widget', id: 'kpi_total' }, { kind: 'widget', id: 'sum_by_dim' },
+            { kind: 'widget', id: 'kpi_total' },
+            { kind: 'widget', id: 'sum_by_dim' },
             { kind: 'dashboard', id: 'kpi_board' },
         ],
     },
@@ -35,7 +39,13 @@ describe('TemplateGalleryComponent', () => {
             providers: [
                 provideRouter([]),
                 provideNoopAnimations(),
-                { provide: BiTemplatesService, useValue: { list: over.list ?? (() => of(TEMPLATES)), apply: over.apply ?? (() => of({ template: 't', dataset: 'd', created: [] })) } },
+                {
+                    provide: BiTemplatesService,
+                    useValue: {
+                        list: over.list ?? (() => of(TEMPLATES)),
+                        apply: over.apply ?? (() => of({ template: 't', dataset: 'd', created: [] })),
+                    },
+                },
                 { provide: DatasetsService, useValue: { list: over.datasets ?? (() => of([{ id: 'sales_ds' }])) } },
                 { provide: MatDialog, useValue: dialog },
                 { provide: ToastrService, useValue: toastr },
@@ -63,7 +73,9 @@ describe('TemplateGalleryComponent', () => {
     });
 
     it('opens the apply dialog and calls apply with the chosen dataset + prefix', () => {
-        const applySpy = vi.fn(() => of({ template: 'kpi-overview', dataset: 'sales_ds', created: [{ kind: 'dashboard', id: 'q3_kpi_board' }] }));
+        const applySpy = vi.fn(() =>
+            of({ template: 'kpi-overview', dataset: 'sales_ds', created: [{ kind: 'dashboard', id: 'q3_kpi_board' }] }),
+        );
         const { fixture, toastr, dialog } = make({
             apply: applySpy as unknown as BiTemplatesService['apply'],
             dialogResult: { dataset: 'sales_ds', prefix: 'q3' },

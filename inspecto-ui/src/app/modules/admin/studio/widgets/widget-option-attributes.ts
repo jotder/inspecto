@@ -9,13 +9,25 @@ import { CHART_PALETTES } from 'app/inspecto/theme/chart-tokens';
  * on save. Mirrors `job-attributes.ts` (the schema-form pilot).
  */
 export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
-    { key: 'title', label: 'Title', type: 'string', tier: 'required', required: false, placeholder: "Defaults to the widget's name" },
+    {
+        key: 'title',
+        label: 'Title',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: "Defaults to the widget's name",
+    },
     { key: 'subtitle', label: 'Subtitle', type: 'string', tier: 'required', required: false },
     { key: 'xTitle', label: 'X axis title', type: 'string', tier: 'required', required: false },
     { key: 'yTitle', label: 'Y axis title', type: 'string', tier: 'required', required: false },
     { key: 'legendShow', label: 'Show legend', type: 'boolean', tier: 'required', required: false, default: true },
     {
-        key: 'legendPosition', label: 'Legend position', type: 'select', tier: 'required', required: false, default: 'top',
+        key: 'legendPosition',
+        label: 'Legend position',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'top',
         options: [
             { value: 'top', label: 'top' },
             { value: 'right', label: 'right' },
@@ -24,12 +36,21 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
         ],
     },
     {
-        key: 'palette', label: 'Color palette', type: 'select', tier: 'required', required: false,
+        key: 'palette',
+        label: 'Color palette',
+        type: 'select',
+        tier: 'required',
+        required: false,
         default: Object.keys(CHART_PALETTES)[0],
         options: Object.keys(CHART_PALETTES).map((p) => ({ value: p, label: p })),
     },
     {
-        key: 'sort', label: 'Sort', type: 'select', tier: 'required', required: false, default: '',
+        key: 'sort',
+        label: 'Sort',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '',
         options: [
             { value: '', label: 'Unsorted' },
             { value: 'asc', label: 'Ascending' },

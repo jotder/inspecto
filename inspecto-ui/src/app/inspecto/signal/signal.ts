@@ -34,13 +34,27 @@ export const NOTIFY_TYPES = new Set<string>(['ALERT_FIRED', 'INCIDENT_OPENED', '
 
 /** `EventRow.level` values, TRACE..ERROR (mirrors `EVENT_LEVELS` without importing it, to keep this leaf-free). */
 const EVENT_LEVEL_OF: Record<SignalSeverity, string> = {
-    trace: 'TRACE', debug: 'DEBUG', info: 'INFO', warn: 'WARN', error: 'ERROR', critical: 'ERROR',
+    trace: 'TRACE',
+    debug: 'DEBUG',
+    info: 'INFO',
+    warn: 'WARN',
+    error: 'ERROR',
+    critical: 'ERROR',
 };
 const SEVERITY_OF_LEVEL: Record<string, SignalSeverity> = {
-    TRACE: 'trace', DEBUG: 'debug', INFO: 'info', WARN: 'warn', ERROR: 'error',
+    TRACE: 'trace',
+    DEBUG: 'debug',
+    INFO: 'info',
+    WARN: 'warn',
+    ERROR: 'error',
 };
 const ALERT_SEVERITY_OF: Record<SignalSeverity, string> = {
-    trace: 'INFO', debug: 'INFO', info: 'INFO', warn: 'WARNING', error: 'CRITICAL', critical: 'CRITICAL',
+    trace: 'INFO',
+    debug: 'INFO',
+    info: 'INFO',
+    warn: 'WARNING',
+    error: 'CRITICAL',
+    critical: 'CRITICAL',
 };
 const SEVERITY_OF_ALERT: Record<string, SignalSeverity> = { INFO: 'info', WARNING: 'warn', CRITICAL: 'critical' };
 
@@ -125,23 +139,46 @@ export function alertToSignal(a: FiredAlert, signalId = `alert-${a.epochMillis}`
         correlationId: null,
         severity: alertSeverityToSignal(a.severity),
         payload: {
-            rule: a.rule, pipeline: a.pipeline, metric: a.metric, value: a.value,
-            comparator: a.comparator, threshold: a.threshold, window: a.window, message: a.message,
+            rule: a.rule,
+            pipeline: a.pipeline,
+            metric: a.metric,
+            value: a.value,
+            comparator: a.comparator,
+            threshold: a.threshold,
+            window: a.window,
+            message: a.message,
         },
     };
 }
 
 /** The `fanOut` arguments for a notify-worthy signal (else null). Keeps notification bodies stable across producers. */
-export function notifyMeta(s: Signal): { category: string; title: string; body: string; sourceId: string | null } | null {
+export function notifyMeta(
+    s: Signal,
+): { category: string; title: string; body: string; sourceId: string | null } | null {
     const p = s.payload;
     if (s.type === 'ALERT_FIRED') {
-        return { category: 'OPS', title: `Alert: ${p['rule']}`, body: `${p['metric']} on ${p['pipeline']}`, sourceId: (p['rule'] as string) ?? null };
+        return {
+            category: 'OPS',
+            title: `Alert: ${p['rule']}`,
+            body: `${p['metric']} on ${p['pipeline']}`,
+            sourceId: (p['rule'] as string) ?? null,
+        };
     }
     if (s.type === 'INCIDENT_OPENED') {
-        return { category: 'OPS', title: `Incident opened: ${p['title']}`, body: (p['description'] as string) ?? '', sourceId: s.source.id };
+        return {
+            category: 'OPS',
+            title: `Incident opened: ${p['title']}`,
+            body: (p['description'] as string) ?? '',
+            sourceId: s.source.id,
+        };
     }
     if (s.type === 'EXPECTATION_FAILED') {
-        return { category: 'OPS', title: (p['title'] as string) ?? `Expectation failed: ${p['name']}`, body: (p['description'] as string) ?? '', sourceId: (p['incidentId'] as string) ?? s.source.id };
+        return {
+            category: 'OPS',
+            title: (p['title'] as string) ?? `Expectation failed: ${p['name']}`,
+            body: (p['description'] as string) ?? '',
+            sourceId: (p['incidentId'] as string) ?? s.source.id,
+        };
     }
     return null;
 }

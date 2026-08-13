@@ -112,13 +112,20 @@ export interface EnrichmentEditorValue {
                                     </mat-form-field>
                                     <mat-form-field class="w-36" subscriptSizing="dynamic">
                                         <mat-label>As-of column</mat-label>
-                                        <input matInput formControlName="asOf"
-                                               matTooltip="SCD2 producers only — the event-time column to join as-of" />
+                                        <input
+                                            matInput
+                                            formControlName="asOf"
+                                            matTooltip="SCD2 producers only — the event-time column to join as-of"
+                                        />
                                     </mat-form-field>
                                 } @else {
                                     <mat-form-field class="min-w-52 flex-1" subscriptSizing="dynamic">
                                         <mat-label>File path</mat-label>
-                                        <input matInput formControlName="path" placeholder="spaces/demo/data/ref/region_dim.csv" />
+                                        <input
+                                            matInput
+                                            formControlName="path"
+                                            placeholder="spaces/demo/data/ref/region_dim.csv"
+                                        />
                                     </mat-form-field>
                                     <mat-form-field class="w-32" subscriptSizing="dynamic">
                                         <mat-label>Format</mat-label>
@@ -147,7 +154,14 @@ export interface EnrichmentEditorValue {
             <div class="flex flex-col gap-2">
                 <h2 class="m-0 text-lg font-semibold">Transform</h2>
                 <p class="text-secondary m-0 text-sm">
-                    Views available: @for (v of availableViews(); track v; let last = $last) {<code>{{ v }}</code>@if (!last) {, }}.
+                    Views available:
+                    @for (v of availableViews(); track v; let last = $last) {
+                        <code>{{ v }}</code>
+                        @if (!last) {
+                            ,
+                        }
+                    }
+                    .
                 </p>
                 <div class="rounded border" role="group" aria-label="Transform SQL editor">
                     <inspecto-sql-codemirror [value]="sql()" (valueChange)="onSqlChange($event)" />
@@ -173,9 +187,12 @@ export class EnrichmentEditorComponent {
     /** The DuckDB views the transform can select from: `input` + each reference alias. */
     readonly availableViews = computed(() => {
         void this.viewsTick();
-        return ['input', ...this.referenceRows.controls
-            .map((g) => String(g.getRawValue()['name'] ?? '').trim())
-            .filter((n) => IDENTIFIER_RE.test(n))];
+        return [
+            'input',
+            ...this.referenceRows.controls
+                .map((g) => String(g.getRawValue()['name'] ?? '').trim())
+                .filter((n) => IDENTIFIER_RE.test(n)),
+        ];
     });
     /** Bumped on reference-row edits so `availableViews` recomputes (forms aren't signals). */
     private readonly viewsTick = signal(0);

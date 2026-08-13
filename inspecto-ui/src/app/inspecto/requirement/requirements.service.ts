@@ -19,12 +19,19 @@ export class RequirementsService {
     }
 
     create(r: { id: string; title: string; kind: RequirementKind; description: string }): Observable<Requirement> {
-        return this.http.post<Requirement>(apiUrl('/requirements'),
-            { id: r.id, title: r.title, kind: r.kind, description: r.description });
+        return this.http.post<Requirement>(apiUrl('/requirements'), {
+            id: r.id,
+            title: r.title,
+            kind: r.kind,
+            description: r.description,
+        });
     }
 
     decide(id: string, accept: boolean, note?: string): Observable<Requirement> {
-        return this.http.post<Requirement>(apiUrl(`/requirements/${encodeURIComponent(id)}/decision`), { accept, note });
+        return this.http.post<Requirement>(apiUrl(`/requirements/${encodeURIComponent(id)}/decision`), {
+            accept,
+            note,
+        });
     }
 
     deliver(id: string, note?: string): Observable<Requirement> {

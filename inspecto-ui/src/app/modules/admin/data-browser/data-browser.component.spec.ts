@@ -9,17 +9,26 @@ import { DataBrowserComponent } from './data-browser.component';
 
 describe('DataBrowserComponent', () => {
     const svc = {
-        catalog: () => of({
-            groups: [{
-                id: 'stores', label: 'Data Stores', kind: 'parquet',
-                tables: [{ name: 'orders', format: 'PARQUET', dataset: 'orders_ds' }],
-            }],
-        }),
-        table: () => of({
-            columns: [{ name: 'id', type: 'INTEGER' }, { name: 'name', type: 'VARCHAR' }],
-            rows: [{ id: 1, name: 'alice' }],
-            statistics: { rowCount: 1, elapsedMs: 1, truncated: false },
-        }),
+        catalog: () =>
+            of({
+                groups: [
+                    {
+                        id: 'stores',
+                        label: 'Data Stores',
+                        kind: 'parquet',
+                        tables: [{ name: 'orders', format: 'PARQUET', dataset: 'orders_ds' }],
+                    },
+                ],
+            }),
+        table: () =>
+            of({
+                columns: [
+                    { name: 'id', type: 'INTEGER' },
+                    { name: 'name', type: 'VARCHAR' },
+                ],
+                rows: [{ id: 1, name: 'alice' }],
+                statistics: { rowCount: 1, elapsedMs: 1, truncated: false },
+            }),
         query: () => of({ columns: [], rows: [], statistics: { rowCount: 0, elapsedMs: 1, truncated: false } }),
     };
 
@@ -36,7 +45,7 @@ describe('DataBrowserComponent', () => {
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Data Stores');
         expect(text).toContain('orders');
-        expect(text).toContain('Select a table');   // right pane before selection
+        expect(text).toContain('Select a table'); // right pane before selection
     });
 
     it('renders with no accessibility violations', async () => {
@@ -46,17 +55,24 @@ describe('DataBrowserComponent', () => {
     });
 
     it('Load more widens the limit and re-runs the last read (table browse, or server SQL if used) — R6a', () => {
-        const table = vi.fn(() => of({
-            columns: [{ name: 'id', type: 'INTEGER' }],
-            rows: [{ id: 1 }],
-            statistics: { rowCount: 1, elapsedMs: 1, truncated: true },
-        }));
-        const query = vi.fn(() => of({ columns: [], rows: [], statistics: { rowCount: 0, elapsedMs: 1, truncated: true } }));
+        const table = vi.fn(() =>
+            of({
+                columns: [{ name: 'id', type: 'INTEGER' }],
+                rows: [{ id: 1 }],
+                statistics: { rowCount: 1, elapsedMs: 1, truncated: true },
+            }),
+        );
+        const query = vi.fn(() =>
+            of({ columns: [], rows: [], statistics: { rowCount: 0, elapsedMs: 1, truncated: true } }),
+        );
         TestBed.overrideProvider(DbBrowserService, { useValue: { ...svc, table, query } });
         const fixture = TestBed.createComponent(DataBrowserComponent);
         const c = fixture.componentInstance;
         fixture.detectChanges();
-        c.select({ id: 'stores', label: 'Data Stores', kind: 'parquet', tables: [] }, { name: 'orders', format: 'PARQUET' });
+        c.select(
+            { id: 'stores', label: 'Data Stores', kind: 'parquet', tables: [] },
+            { name: 'orders', format: 'PARQUET' },
+        );
         expect(c.limit()).toBe(200);
 
         c.loadMore();

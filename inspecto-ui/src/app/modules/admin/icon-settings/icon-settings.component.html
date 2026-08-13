@@ -3,9 +3,9 @@
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Processor Icons</h1>
             <div class="text-secondary mt-1 max-w-2xl">
-                Choose the icon and colour for each processor type and sub-type. A sub-type overrides its
-                category default; an <em>inherit</em> row falls back to the category, then the built-in icon.
-                Pipeline graphs render these.
+                Choose the icon and colour for each processor type and sub-type. A sub-type overrides its category
+                default; an <em>inherit</em> row falls back to the category, then the built-in icon. Pipeline graphs
+                render these.
             </div>
         </div>
         <div class="flex items-center gap-2">
@@ -22,13 +22,21 @@
     } @else {
         @for (g of groups(); track g.category) {
             <section class="bg-card mt-6 rounded-2xl p-5 shadow">
-                <h2 class="text-secondary mb-1 text-sm font-semibold uppercase tracking-wider">{{ categoryLabel(g.category) }}</h2>
+                <h2 class="text-secondary mb-1 text-sm font-semibold uppercase tracking-wider">
+                    {{ categoryLabel(g.category) }}
+                </h2>
                 <ng-container
-                    *ngTemplateOutlet="row; context: { key: g.category, type: undefined, label: 'Default', category: g.category }"
+                    *ngTemplateOutlet="
+                        row;
+                        context: { key: g.category, type: undefined, label: 'Default', category: g.category }
+                    "
                 ></ng-container>
                 @for (t of g.types; track t.type) {
                     <ng-container
-                        *ngTemplateOutlet="row; context: { key: t.type, type: t.type, label: t.label, category: g.category }"
+                        *ngTemplateOutlet="
+                            row;
+                            context: { key: t.type, type: t.type, label: t.label, category: g.category }
+                        "
                     ></ng-container>
                 }
             </section>
@@ -51,7 +59,11 @@
                 <mat-option [value]="''">— inherit —</mat-option>
                 @for (gName of glyphNames; track gName) {
                     <mat-option [value]="gName">
-                        <img class="mr-2 inline-block h-4 w-4 align-middle" [src]="glyphOptionSrc(gName, effColor(type, category))" alt="" />
+                        <img
+                            class="mr-2 inline-block h-4 w-4 align-middle"
+                            [src]="glyphOptionSrc(gName, effColor(type, category))"
+                            alt=""
+                        />
                         {{ gName }}
                     </mat-option>
                 }

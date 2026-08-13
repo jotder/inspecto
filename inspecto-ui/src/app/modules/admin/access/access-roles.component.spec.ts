@@ -36,15 +36,18 @@ const AUTHORED: RoleDef = {
     source: 'authored',
 };
 
-function create(opts: {
-    roles?: RoleDef[];
-    error?: string;
-    profiles?: unknown[];
-    canEdit?: boolean;
-    dialogResult?: RoleDef;
-} = {}) {
+function create(
+    opts: {
+        roles?: RoleDef[];
+        error?: string;
+        profiles?: unknown[];
+        canEdit?: boolean;
+        dialogResult?: RoleDef;
+    } = {},
+) {
     const saveRoles = vi.fn((authored: RoleDef[]) =>
-        of({ roles: authored.map((r) => ({ ...r, source: 'authored' as const })) }));
+        of({ roles: authored.map((r) => ({ ...r, source: 'authored' as const })) }),
+    );
     const api = {
         roles: vi.fn(() => of({ roles: opts.roles ?? [SEED_OPS, AUTHORED], error: opts.error })),
         profiles: vi.fn(() => of(opts.profiles ?? [])),
@@ -82,16 +85,20 @@ describe('AccessRolesComponent', () => {
         const { c } = create({
             roles: [{ name: 'super', capabilities: ['canApproveShares'], source: 'seed' }],
         });
-        expect(c.vocabulary()).toContain(ACTION.capability!);   // from the derived catalog
-        expect(c.vocabulary()).toContain('canApproveShares');   // from a role row only
+        expect(c.vocabulary()).toContain(ACTION.capability!); // from the derived catalog
+        expect(c.vocabulary()).toContain('canApproveShares'); // from a role row only
     });
 
-    it('strikes a capability the role\'s own Access Profile denies (effective view, R2 semantics)', () => {
+    it("strikes a capability the role's own Access Profile denies (effective view, R2 semantics)", () => {
         const { c } = create({
-            profiles: [{
-                subjectType: 'role', subjectId: 'fraud-analyst', label: 'fraud-analyst',
-                grants: { [ACTION.id]: 'deny' },
-            }],
+            profiles: [
+                {
+                    subjectType: 'role',
+                    subjectId: 'fraud-analyst',
+                    label: 'fraud-analyst',
+                    grants: { [ACTION.id]: 'deny' },
+                },
+            ],
         });
         const fraud = c.cards().find((card) => card.role.name === 'fraud-analyst')!;
         const denied = fraud.capabilities.find((cap) => cap.capability === ACTION.capability)!;
@@ -106,7 +113,7 @@ describe('AccessRolesComponent', () => {
         const { c, saveRoles } = create();
         await c.revert(AUTHORED);
         expect(saveRoles).toHaveBeenCalledTimes(1);
-        expect(saveRoles.mock.calls[0][0]).toEqual([]);   // fraud-analyst was the only authored row
+        expect(saveRoles.mock.calls[0][0]).toEqual([]); // fraud-analyst was the only authored row
     });
 
     it('a dialog save replaces the role inside the authored overlay and reloads from the response', () => {
@@ -119,7 +126,7 @@ describe('AccessRolesComponent', () => {
             { name: AUTHORED.name, capabilities: AUTHORED.capabilities, dataScopes: ['fraud'], source: 'authored' },
             edited,
         ]);
-        expect(c.rows().every((r) => r.source === 'authored')).toBe(true);   // reloaded from the PUT response
+        expect(c.rows().every((r) => r.source === 'authored')).toBe(true); // reloaded from the PUT response
         expect(toastr.success).toHaveBeenCalled();
     });
 
@@ -127,8 +134,8 @@ describe('AccessRolesComponent', () => {
         const { fixture, c, saveRoles } = create({ canEdit: false, dialogResult: SEED_OPS });
         const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
         expect(text).toContain('Read-only');
-        expect(fixture.nativeElement.querySelector('button')).toBeNull();   // no New role / edit / revert
-        c.edit(SEED_OPS);   // defense in depth: the mutating method itself is gated
+        expect(fixture.nativeElement.querySelector('button')).toBeNull(); // no New role / edit / revert
+        c.edit(SEED_OPS); // defense in depth: the mutating method itself is gated
         expect(saveRoles).not.toHaveBeenCalled();
     });
 

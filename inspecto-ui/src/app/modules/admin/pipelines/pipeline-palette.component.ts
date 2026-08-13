@@ -54,7 +54,10 @@ import { categoryColor, categoryLabel, NodeTypeGroup, paletteHeroIcon } from './
                                     : 'heroicons_outline:chevron-right'
                             "
                         ></mat-icon>
-                        <span class="h-2 w-2 shrink-0 rounded-full" [style.background]="categoryColor(group.category)"></span>
+                        <span
+                            class="h-2 w-2 shrink-0 rounded-full"
+                            [style.background]="categoryColor(group.category)"
+                        ></span>
                         <span class="truncate opacity-70">{{ categoryLabel(group.category) }}</span>
                         <span class="ml-auto text-xs font-normal opacity-40">{{ group.types.length }}</span>
                     </button>
@@ -72,7 +75,10 @@ import { categoryColor, categoryLabel, NodeTypeGroup, paletteHeroIcon } from './
                                 (click)="pick.emit(t.type)"
                                 (dragstart)="$event.dataTransfer?.setData('text/flow-node-type', t.type)"
                             >
-                                <mat-icon class="icon-size-4 shrink-0" [svgIcon]="paletteHeroIcon(group.category)"></mat-icon>
+                                <mat-icon
+                                    class="icon-size-4 shrink-0"
+                                    [svgIcon]="paletteHeroIcon(group.category)"
+                                ></mat-icon>
                                 <span class="truncate">{{ t.label }}</span>
                             </button>
                         }
@@ -105,9 +111,7 @@ export class PipelinePaletteComponent {
         return this.groups()
             .map((g) => ({
                 category: g.category,
-                types: g.types.filter(
-                    (t) => t.label.toLowerCase().includes(q) || t.type.toLowerCase().includes(q),
-                ),
+                types: g.types.filter((t) => t.label.toLowerCase().includes(q) || t.type.toLowerCase().includes(q)),
             }))
             .filter((g) => g.types.length > 0);
     });

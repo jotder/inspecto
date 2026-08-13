@@ -52,7 +52,12 @@ describe('GeoAnalysisToolboxComponent', () => {
         const { c } = make(TIMED);
         c.analysisTool.set('frequent');
         c.runAnalysis();
-        expect(c.freqs().map((f) => f.entity).sort()).toEqual(['A', 'B']);
+        expect(
+            c
+                .freqs()
+                .map((f) => f.entity)
+                .sort(),
+        ).toEqual(['A', 'B']);
         expect(c.analysisRan()).toBe(true);
 
         c.reset();

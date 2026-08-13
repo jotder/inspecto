@@ -17,9 +17,13 @@
             <div>
                 <h1 class="text-2xl font-semibold tracking-tight">Breaks — {{ r.name }}</h1>
                 <div class="text-secondary mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                    <span>A <span class="font-mono">{{ r.leftDataset }}</span></span>
+                    <span
+                        >A <span class="font-mono">{{ r.leftDataset }}</span></span
+                    >
                     <span aria-hidden="true">vs</span>
-                    <span>B <span class="font-mono">{{ r.rightDataset }}</span></span>
+                    <span
+                        >B <span class="font-mono">{{ r.rightDataset }}</span></span
+                    >
                     @for (p of pathEntries(); track p[0]) {
                         <span class="rounded-full border px-2 py-0.5 text-xs">{{ p[0] }} = {{ p[1] }}</span>
                     }
@@ -27,19 +31,29 @@
             </div>
             <div class="flex items-center gap-2">
                 @if (threeWay()) {
-                    <mat-button-toggle-group [value]="side()" (change)="setSide($event.value)"
-                                             hideSingleSelectionIndicator aria-label="Compared side">
+                    <mat-button-toggle-group
+                        [value]="side()"
+                        (change)="setSide($event.value)"
+                        hideSingleSelectionIndicator
+                        aria-label="Compared side"
+                    >
                         <mat-button-toggle value="b">A vs B</mat-button-toggle>
                         <mat-button-toggle value="c">A vs C</mat-button-toggle>
                     </mat-button-toggle-group>
                 }
-                <mat-button-toggle-group [value]="viewMode()" (change)="viewMode.set($event.value)"
-                                         hideSingleSelectionIndicator aria-label="Break view mode">
+                <mat-button-toggle-group
+                    [value]="viewMode()"
+                    (change)="viewMode.set($event.value)"
+                    hideSingleSelectionIndicator
+                    aria-label="Break view mode"
+                >
                     <mat-button-toggle value="tables">Tables</mat-button-toggle>
                     <mat-button-toggle value="grouped">Grouped</mat-button-toggle>
                 </mat-button-toggle-group>
                 <button mat-stroked-button (click)="compute()" [disabled]="computing()">
-                    @if (computing()) { <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" /> }
+                    @if (computing()) {
+                        <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
+                    }
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                     <span class="ml-1">Refresh</span>
                 </button>

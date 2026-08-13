@@ -2,11 +2,20 @@
     <div class="flex items-center justify-between">
         <div>
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Viz Library</h1>
-            <div class="text-secondary mt-1">Saved widgets — charts, tables, maps and link graphs — ready to view or place on a dashboard.</div>
+            <div class="text-secondary mt-1">
+                Saved widgets — charts, tables, maps and link graphs — ready to view or place on a dashboard.
+            </div>
         </div>
         <div class="flex items-center gap-3">
-            @if (loading()) { <mat-spinner diameter="24"></mat-spinner> }
-            <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['widget']" (changed)="load()" label="Import / export widgets" />
+            @if (loading()) {
+                <mat-spinner diameter="24"></mat-spinner>
+            }
+            <inspecto-transfer-menu
+                [items]="transferItems()"
+                [allowedKinds]="['widget']"
+                (changed)="load()"
+                label="Import / export widgets"
+            />
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
@@ -18,7 +27,10 @@
     </div>
 
     <div class="relative mt-4 max-w-md">
-        <mat-icon class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+        <mat-icon
+            class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2"
+            svgIcon="heroicons_outline:magnifying-glass"
+        ></mat-icon>
         <input
             type="text"
             class="bg-card w-full rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
@@ -75,12 +87,18 @@
                                 />
                             }
                             @if (w.viewId) {
-                                <span>view: <span class="font-mono">{{ w.viewId }}</span></span>
+                                <span
+                                    >view: <span class="font-mono">{{ w.viewId }}</span></span
+                                >
                             } @else {
-                                <span>dataset: <span class="font-mono">{{ w.datasetId }}</span></span>
+                                <span
+                                    >dataset: <span class="font-mono">{{ w.datasetId }}</span></span
+                                >
                             }
                         </div>
-                        @if (w.description) { <div class="text-secondary mt-1 text-sm">{{ w.description }}</div> }
+                        @if (w.description) {
+                            <div class="text-secondary mt-1 text-sm">{{ w.description }}</div>
+                        }
                         @if (w.tags?.length) {
                             <div class="mt-1 flex flex-wrap gap-1">
                                 @for (tag of w.tags; track tag) {
@@ -90,20 +108,45 @@
                         }
                     </div>
                     <div class="flex items-center gap-1">
-                        <button mat-icon-button [routerLink]="[w.id, 'view']" matTooltip="Open standalone" aria-label="Open standalone">
+                        <button
+                            mat-icon-button
+                            [routerLink]="[w.id, 'view']"
+                            matTooltip="Open standalone"
+                            aria-label="Open standalone"
+                        >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:external-link"></mat-icon>
                         </button>
-                        <button mat-icon-button [routerLink]="[w.id]" matTooltip="Edit in Widget Builder" aria-label="Edit in Widget Builder">
+                        <button
+                            mat-icon-button
+                            [routerLink]="[w.id]"
+                            matTooltip="Edit in Widget Builder"
+                            aria-label="Edit in Widget Builder"
+                        >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                         </button>
-                        <button mat-icon-button (click)="openTags(w)" [attr.aria-label]="'Tags for ' + w.id" matTooltip="Tags">
+                        <button
+                            mat-icon-button
+                            (click)="openTags(w)"
+                            [attr.aria-label]="'Tags for ' + w.id"
+                            matTooltip="Tags"
+                        >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
                         </button>
-                        <button mat-icon-button (click)="addToDashboard(w)" matTooltip="Add to dashboard" aria-label="Add to dashboard">
+                        <button
+                            mat-icon-button
+                            (click)="addToDashboard(w)"
+                            matTooltip="Add to dashboard"
+                            aria-label="Add to dashboard"
+                        >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:squares-plus"></mat-icon>
                         </button>
                         @if (canShare()) {
-                            <button mat-icon-button (click)="offer(w)" matTooltip="Offer for sharing" aria-label="Offer for sharing">
+                            <button
+                                mat-icon-button
+                                (click)="offer(w)"
+                                matTooltip="Offer for sharing"
+                                aria-label="Offer for sharing"
+                            >
                                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:share"></mat-icon>
                             </button>
                         }

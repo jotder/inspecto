@@ -6,8 +6,16 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { NodeTypeGroup } from './pipeline-graph';
 import { PipelinePaletteComponent } from './pipeline-palette.component';
 
-const type = (t: string, category: string, label: string, lowerable = true): PipelineNodeType =>
-    ({ type: t, category, label, description: `Add a ${label}`, accepts: [], emits: [], emitsNamedRoutes: false, lowerable });
+const type = (t: string, category: string, label: string, lowerable = true): PipelineNodeType => ({
+    type: t,
+    category,
+    label,
+    description: `Add a ${label}`,
+    accepts: [],
+    emits: [],
+    emitsNamedRoutes: false,
+    lowerable,
+});
 
 const GROUPS: NodeTypeGroup[] = [
     { category: 'SOURCE', types: [type('acquisition', 'SOURCE', 'File')] },
@@ -90,8 +98,9 @@ describe('PipelinePaletteComponent', () => {
     it('renders every entry addable and draggable — the host pre-filters to lowerable types', () => {
         const { fixture } = create();
         const btn = (label: string) =>
-            Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-                .find((b) => b.textContent?.includes(label))!;
+            Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
+                b.textContent?.includes(label),
+            )!;
         expect(btn('File').disabled).toBe(false);
         expect(btn('File').getAttribute('draggable')).toBe('true');
         expect(btn('File writer').getAttribute('draggable')).toBe('true');

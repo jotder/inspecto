@@ -52,9 +52,11 @@ const RUNS = /\/runs$/;
 const ENRICHMENT = /\/enrichment$/;
 
 function collFor(type: string): string {
-    return type === 'schema' ? SCHEMA_CONFIGS_COLL
-        : type === 'enrichment' ? ENRICHMENT_CONFIGS_COLL
-        : PIPELINE_CONFIGS_COLL;
+    return type === 'schema'
+        ? SCHEMA_CONFIGS_COLL
+        : type === 'enrichment'
+          ? ENRICHMENT_CONFIGS_COLL
+          : PIPELINE_CONFIGS_COLL;
 }
 
 export function onboardingHandler(flags: MockFlags): MockHandler {
@@ -70,7 +72,8 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 const name = String(body.config['name'] ?? '').trim();
                 if (!name) return error(422, "config is missing its identity field 'name'");
                 const existing = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, name);
-                if (existing && !body.overwrite) return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
+                if (existing && !body.overwrite)
+                    return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
                 // The real route writes `<name>_pipeline.toon` — the bootstrap-scan convention.
                 const path = name.endsWith('_pipeline') ? `${name}.toon` : `${name}_pipeline.toon`;
                 store.put(space, PIPELINE_CONFIGS_COLL, name, {
@@ -80,8 +83,13 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                     registered: existing?.registered ?? false,
                 } satisfies StoredPipelineConfig);
                 return json({
-                    type: 'pipeline', written: true, path, name,
-                    bytes: JSON.stringify(body.config).length, overwritten: !!existing, findings: [],
+                    type: 'pipeline',
+                    written: true,
+                    path,
+                    name,
+                    bytes: JSON.stringify(body.config).length,
+                    overwritten: !!existing,
+                    findings: [],
                 });
             }
             if (body.type === 'schema') {
@@ -100,26 +108,40 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                 if (baseline && compatibility.toLowerCase() !== 'none') {
                     const findings = schemaBackwardFindings(baseline, body.config);
                     if (findings.length) {
-                        return error(422, 'schema edit is not BACKWARD-compatible; not written',
-                            { type: 'schema', written: false, findings });
+                        return error(422, 'schema edit is not BACKWARD-compatible; not written', {
+                            type: 'schema',
+                            written: false,
+                            findings,
+                        });
                     }
                 }
                 store.put(space, SCHEMA_CONFIGS_COLL, name, {
-                    id: name, path: `${name}.toon`, config: body.config,
+                    id: name,
+                    path: `${name}.toon`,
+                    config: body.config,
                 } satisfies StoredSchemaConfig);
                 store.put(space, compColl, name, {
-                    type: 'schema', name, ref: `schema/${name}`, content: body.config,
+                    type: 'schema',
+                    name,
+                    ref: `schema/${name}`,
+                    content: body.config,
                 });
                 return json({
-                    type: 'schema', written: true, path: `${name}.toon`, name,
-                    bytes: JSON.stringify(body.config).length, overwritten: !!baseline, findings: [],
+                    type: 'schema',
+                    written: true,
+                    path: `${name}.toon`,
+                    name,
+                    bytes: JSON.stringify(body.config).length,
+                    overwritten: !!baseline,
+                    findings: [],
                 });
             }
             if (body.type === 'enrichment') {
                 const name = String(body.config['name'] ?? '').trim();
                 if (!name) return error(422, "config is missing its identity field 'name'");
                 const existing = store.get<StoredEnrichmentConfig>(space, ENRICHMENT_CONFIGS_COLL, name);
-                if (existing && !body.overwrite) return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
+                if (existing && !body.overwrite)
+                    return error(409, `file exists: ${name}.toon (pass overwrite:true to replace)`);
                 // The real route writes `<name>_enrich.toon` — the bootstrap-scan convention.
                 const path = name.endsWith('_enrich') ? `${name}.toon` : `${name}_enrich.toon`;
                 store.put(space, ENRICHMENT_CONFIGS_COLL, name, {
@@ -129,8 +151,13 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
                     registered: existing?.registered ?? false,
                 } satisfies StoredEnrichmentConfig);
                 return json({
-                    type: 'enrichment', written: true, path, name,
-                    bytes: JSON.stringify(body.config).length, overwritten: !!existing, findings: [],
+                    type: 'enrichment',
+                    written: true,
+                    path,
+                    name,
+                    bytes: JSON.stringify(body.config).length,
+                    overwritten: !!existing,
+                    findings: [],
                 });
             }
             return undefined; // other types: not mocked here
@@ -142,7 +169,13 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
         if (method === 'POST' && PATCH.test(url)) {
             const body = (req.body ?? {}) as { type?: string; name?: string; patch?: Record<string, unknown> };
             const name = String(body.name ?? '').trim();
-            if (!body.type || !name || typeof body.patch !== 'object' || body.patch === null || Array.isArray(body.patch)) {
+            if (
+                !body.type ||
+                !name ||
+                typeof body.patch !== 'object' ||
+                body.patch === null ||
+                Array.isArray(body.patch)
+            ) {
                 return error(400, "body must include 'type', 'name' and 'patch' (a partial config map)");
             }
             if (!['pipeline', 'schema', 'enrichment'].includes(body.type)) {
@@ -156,23 +189,37 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
             const before = identityOf(rec.config, body.type);
             const after = identityOf(merged, body.type);
             if (before && before !== after) {
-                return error(409, `patch changes the identity field '${idField}' (${before} → ${after}); rename via /config/write`);
+                return error(
+                    409,
+                    `patch changes the identity field '${idField}' (${before} → ${after}); rename via /config/write`,
+                );
             }
             // Same BACKWARD gate as /config/write; patch has NO compatibility override key.
             if (body.type === 'schema') {
                 const findings = schemaBackwardFindings(rec.config, merged);
                 if (findings.length) {
-                    return error(422, 'schema edit is not BACKWARD-compatible; not written',
-                        { type: 'schema', written: false, findings });
+                    return error(422, 'schema edit is not BACKWARD-compatible; not written', {
+                        type: 'schema',
+                        written: false,
+                        findings,
+                    });
                 }
                 store.put(space, componentCollection('schema'), name, {
-                    type: 'schema', name, ref: `schema/${name}`, content: merged,
+                    type: 'schema',
+                    name,
+                    ref: `schema/${name}`,
+                    content: merged,
                 });
             }
             store.put(space, coll, name, { ...rec, config: merged });
             return json({
-                type: body.type, written: true, path: rec.path, name,
-                bytes: JSON.stringify(merged).length, overwritten: true, findings: [],
+                type: body.type,
+                written: true,
+                path: rec.path,
+                name,
+                bytes: JSON.stringify(merged).length,
+                overwritten: true,
+                findings: [],
             });
         }
 
@@ -189,7 +236,10 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
         }
 
         if (method === 'POST' && PREVIEW_SCHEMA.test(url)) {
-            const body = (req.body ?? {}) as { config?: Record<string, unknown>; sampleRows?: Record<string, unknown>[] };
+            const body = (req.body ?? {}) as {
+                config?: Record<string, unknown>;
+                sampleRows?: Record<string, unknown>[];
+            };
             if (!body.config || !body.sampleRows?.length) {
                 return error(400, "body must include 'config' (a schema draft map) and non-empty 'sampleRows'");
             }
@@ -285,25 +335,37 @@ export function schemaBackwardFindings(
     for (const [name, of] of oldFields) {
         const nf = newFields.get(name);
         if (!nf) {
-            findings.push({ severity: 'ERROR', fieldPath: `raw.fields[${name}]`,
-                message: `breaking change (BACKWARD): field '${name}' removed — existing data and referencing `
-                    + `Mappings still expect it; copy the schema to a new name, or pass compatibility: "none" to override` });
+            findings.push({
+                severity: 'ERROR',
+                fieldPath: `raw.fields[${name}]`,
+                message:
+                    `breaking change (BACKWARD): field '${name}' removed — existing data and referencing ` +
+                    `Mappings still expect it; copy the schema to a new name, or pass compatibility: "none" to override`,
+            });
             continue;
         }
         const oldType = up(of['type']);
         const newType = up(nf['type']);
         if (oldType && oldType !== newType && !isWidening(oldType, newType)) {
-            findings.push({ severity: 'ERROR', fieldPath: `raw.fields[${name}].type`,
-                message: `breaking change (BACKWARD): type of '${name}' changed ${oldType} → `
-                    + `${newType || '(none)'} (not a widening) — already-written data would not read back; `
-                    + `copy to a new name, or pass compatibility: "none"` });
+            findings.push({
+                severity: 'ERROR',
+                fieldPath: `raw.fields[${name}].type`,
+                message:
+                    `breaking change (BACKWARD): type of '${name}' changed ${oldType} → ` +
+                    `${newType || '(none)'} (not a widening) — already-written data would not read back; ` +
+                    `copy to a new name, or pass compatibility: "none"`,
+            });
         }
         const oldSel = verbatim(of['selector']);
         const newSel = verbatim(nf['selector']);
         if (oldSel && oldSel !== newSel) {
-            findings.push({ severity: 'ERROR', fieldPath: `raw.fields[${name}].selector`,
-                message: `breaking change (BACKWARD): selector of '${name}' moved '${oldSel}' → '${newSel}' — `
-                    + `existing raw files would parse into different columns; copy to a new name, or pass compatibility: "none"` });
+            findings.push({
+                severity: 'ERROR',
+                fieldPath: `raw.fields[${name}].selector`,
+                message:
+                    `breaking change (BACKWARD): selector of '${name}' moved '${oldSel}' → '${newSel}' — ` +
+                    `existing raw files would parse into different columns; copy to a new name, or pass compatibility: "none"`,
+            });
         }
     }
     return findings;
@@ -337,17 +399,17 @@ function identityOf(config: Record<string, unknown>, type: string): string {
 }
 
 /** Mirrors ConfigRoutes.deepMerge: maps merge recursively, scalars/lists replace, `null` deletes. */
-function deepMergeNullDeletes(
-    base: Record<string, unknown>,
-    patch: Record<string, unknown>,
-): Record<string, unknown> {
+function deepMergeNullDeletes(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
     const out: Record<string, unknown> = { ...base };
     for (const [k, v] of Object.entries(patch)) {
         if (v === null) {
             delete out[k];
         } else if (
-            typeof v === 'object' && !Array.isArray(v) &&
-            out[k] !== null && typeof out[k] === 'object' && !Array.isArray(out[k])
+            typeof v === 'object' &&
+            !Array.isArray(v) &&
+            out[k] !== null &&
+            typeof out[k] === 'object' &&
+            !Array.isArray(out[k])
         ) {
             out[k] = deepMergeNullDeletes(out[k] as Record<string, unknown>, v as Record<string, unknown>);
         } else {
@@ -381,7 +443,9 @@ function originRow(r: StoredPipelineConfig, kind: string, id: string): Record<st
         kind,
         label: r.id,
         description: {
-            text: String(r.config['description'] ?? `${String(collector['connector'] ?? 'local')} collector feeding ${r.id}`),
+            text: String(
+                r.config['description'] ?? `${String(collector['connector'] ?? 'local')} collector feeding ${r.id}`,
+            ),
             source: 'collector',
         },
         attrs: {
@@ -423,10 +487,13 @@ function previewSchema(config: Record<string, unknown>, sampleRows: Record<strin
         const v = value === undefined || value === null ? '' : String(value);
         if (v === '') return true; // blank/null: never rejects
         switch ((type ?? '').trim().toUpperCase()) {
-            case 'DOUBLE': return Number.isFinite(Number(v));
+            case 'DOUBLE':
+                return Number.isFinite(Number(v));
             case 'DATE':
-            case 'TIMESTAMP': return !Number.isNaN(Date.parse(v));
-            default: return true; // VARCHAR / unknown: never rejects
+            case 'TIMESTAMP':
+                return !Number.isNaN(Date.parse(v));
+            default:
+                return true; // VARCHAR / unknown: never rejects
         }
     };
 
@@ -479,7 +546,9 @@ function suggestSchema(sampleRows: Record<string, unknown>[]): {
         fields,
         mapping: {
             rules: fields.map((f) => ({
-                targetColumn: f.name, sourceExpression: f.name, transformType: 'DIRECT',
+                targetColumn: f.name,
+                sourceExpression: f.name,
+                transformType: 'DIRECT',
             })),
         },
     };
@@ -491,7 +560,9 @@ function previewParsing(config: Record<string, unknown>, sampleText: string): Pr
     const frontend = String(parsing['frontend'] ?? 'delimited').toLowerCase();
     const proc = (config['processing'] ?? {}) as Record<string, unknown>;
     if (frontend === 'plugin' || proc['ingester']) {
-        throw new Error('parsing preview is not supported for the plugin frontend — run the pipeline against a real file instead');
+        throw new Error(
+            'parsing preview is not supported for the plugin frontend — run the pipeline against a real file instead',
+        );
     }
 
     // Engine default: has_header true — except json/text_regex, whose records have no header.
@@ -512,11 +583,21 @@ function previewParsing(config: Record<string, unknown>, sampleText: string): Pr
             const columns = fields.map((f, i) => String(f.name ?? `field_${i}`));
             const rows = lines
                 .filter((l) => l.length >= minLen)
-                .map((l) => Object.fromEntries(fields.map((f, i) => [
-                    columns[i],
-                    l.substring(Number(f.start ?? 0), Number(f.start ?? 0) + Number(f.length ?? 1)).trim(),
-                ])));
-            return { frontend: 'fixedwidth', columns, rowCount: rows.length, rows: rows.slice(0, 200), rejectedRows: 0 };
+                .map((l) =>
+                    Object.fromEntries(
+                        fields.map((f, i) => [
+                            columns[i],
+                            l.substring(Number(f.start ?? 0), Number(f.start ?? 0) + Number(f.length ?? 1)).trim(),
+                        ]),
+                    ),
+                );
+            return {
+                frontend: 'fixedwidth',
+                columns,
+                rowCount: rows.length,
+                rows: rows.slice(0, 200),
+                rejectedRows: 0,
+            };
         }
         case 'json': {
             const jf = String(((parsing['json'] ?? {}) as Record<string, unknown>)['format'] ?? 'newline');
@@ -532,7 +613,13 @@ function previewParsing(config: Record<string, unknown>, sampleText: string): Pr
                     }
                 }
                 const columns = [...new Set(parsed.flatMap((r) => Object.keys(r)))];
-                return { frontend: 'json', columns, rowCount: parsed.length, rows: parsed.slice(0, 200), rejectedRows: invalid };
+                return {
+                    frontend: 'json',
+                    columns,
+                    rowCount: parsed.length,
+                    rows: parsed.slice(0, 200),
+                    rejectedRows: invalid,
+                };
             }
             const doc = JSON.parse(sampleText) as unknown;
             const arr = Array.isArray(doc) ? (doc as Record<string, unknown>[]) : [doc as Record<string, unknown>];
@@ -551,7 +638,13 @@ function previewParsing(config: Record<string, unknown>, sampleText: string): Pr
                 .map((l) => re.exec(l)?.groups)
                 .filter((g): g is Record<string, string> => !!g)
                 .map((g) => Object.fromEntries(groups.map((k) => [k, g[k] ?? null])));
-            return { frontend: 'text_regex', columns: groups, rowCount: rows.length, rows: rows.slice(0, 200), rejectedRows: 0 };
+            return {
+                frontend: 'text_regex',
+                columns: groups,
+                rowCount: rows.length,
+                rows: rows.slice(0, 200),
+                rejectedRows: 0,
+            };
         }
         default: {
             const delim = String(delimited['delimiter'] ?? ',') || ',';
@@ -560,7 +653,9 @@ function previewParsing(config: Record<string, unknown>, sampleText: string): Pr
             const header = hasHeader ? body[0] : null;
             const dataLines = hasHeader ? body.slice(1) : body;
             const width = (header ?? dataLines[0] ?? '').split(delim).length;
-            const columns = header ? header.split(delim).map((h) => h.trim()) : Array.from({ length: width }, (_, i) => `column${i}`);
+            const columns = header
+                ? header.split(delim).map((h) => h.trim())
+                : Array.from({ length: width }, (_, i) => `column${i}`);
             let rejected = 0;
             const rows: Record<string, unknown>[] = [];
             for (const l of dataLines) {
@@ -572,7 +667,13 @@ function previewParsing(config: Record<string, unknown>, sampleText: string): Pr
                 }
                 rows.push(Object.fromEntries(columns.map((c, i) => [c, cells[i]])));
             }
-            return { frontend: 'delimited', columns, rowCount: rows.length, rows: rows.slice(0, 200), rejectedRows: rejected };
+            return {
+                frontend: 'delimited',
+                columns,
+                rowCount: rows.length,
+                rows: rows.slice(0, 200),
+                rejectedRows: rejected,
+            };
         }
     }
 }

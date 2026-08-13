@@ -33,8 +33,14 @@ export interface QuerySummaryItem {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatFormFieldModule, MatIconModule,
-        MatInputModule, MatSelectModule, AiAssistComponent,
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatCheckboxModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatSelectModule,
+        AiAssistComponent,
     ],
     templateUrl: './link-analysis-query-panel.component.html',
 })
@@ -92,8 +98,12 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
 
     private newMappingGroup() {
         return this.fb.nonNullable.group({
-            datasetId: [''], sourceCol: [''], targetCol: [''], linkKindCol: [''],
-            attrCols: [[] as string[]], entityType: ['', Validators.required],
+            datasetId: [''],
+            sourceCol: [''],
+            targetCol: [''],
+            linkKindCol: [''],
+            attrCols: [[] as string[]],
+            entityType: ['', Validators.required],
         });
     }
 
@@ -135,7 +145,9 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
                     return { error: 'Pick a dataset plus its source and target columns.' };
                 }
                 const primary: EntityProjection = {
-                    datasetId: f.datasetId, sourceCol: f.sourceCol, targetCol: f.targetCol,
+                    datasetId: f.datasetId,
+                    sourceCol: f.sourceCol,
+                    targetCol: f.targetCol,
                     linkKindCol: f.linkKindCol || undefined,
                     attrCols: f.attrCols.length ? f.attrCols : undefined,
                     entityType: f.entityType || undefined,
@@ -157,7 +169,10 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
                     : { from: f.pipeline, counts: f.counts };
             }
             case 'lineage': {
-                const extra = f.extraRoots.split(',').map((r) => r.trim()).filter(Boolean);
+                const extra = f.extraRoots
+                    .split(',')
+                    .map((r) => r.trim())
+                    .filter(Boolean);
                 const lineageRoots = [f.from, ...extra].filter((r): r is string => !!r);
                 return lineageRoots.length > 1
                     ? { roots: lineageRoots, depth: f.depth, direction: f.direction }
@@ -201,8 +216,11 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         for (const m of extras) {
             this.addMapping();
             this.extraMappings.at(this.extraMappings.length - 1).patchValue({
-                datasetId: m.datasetId, sourceCol: m.sourceCol, targetCol: m.targetCol,
-                linkKindCol: m.linkKindCol ?? '', attrCols: m.attrCols ?? [],
+                datasetId: m.datasetId,
+                sourceCol: m.sourceCol,
+                targetCol: m.targetCol,
+                linkKindCol: m.linkKindCol ?? '',
+                attrCols: m.attrCols ?? [],
                 entityType: m.entityType ?? '',
             });
         }

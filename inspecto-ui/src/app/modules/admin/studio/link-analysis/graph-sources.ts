@@ -25,18 +25,34 @@ export class LineageGraphSource implements GraphSource {
 
     async query(q: GraphSourceQuery): Promise<G6GraphData> {
         const roots = q.roots?.length ? q.roots : [q.from];
-        const graphs = await Promise.all(roots.map((from) => firstValueFrom(this.catalog.graph({
-            from, depth: q.depth, direction: q.direction,
-            kinds: q.kinds, edgeKinds: q.edgeKinds, overlay: q.overlay,
-        })).then((g) => toG6Data(g.nodes, g.edges))));
+        const graphs = await Promise.all(
+            roots.map((from) =>
+                firstValueFrom(
+                    this.catalog.graph({
+                        from,
+                        depth: q.depth,
+                        direction: q.direction,
+                        kinds: q.kinds,
+                        edgeKinds: q.edgeKinds,
+                        overlay: q.overlay,
+                    }),
+                ).then((g) => toG6Data(g.nodes, g.edges)),
+            ),
+        );
         return graphs.length > 1 ? mergeGraphs(graphs) : graphs[0];
     }
 
     /** Phase E: one more hop from `nodeId` — cheap, `/catalog/graph` already supports `from`+`depth`. */
     async expand(nodeId: string, _nodeLabel: string, q: GraphSourceQuery): Promise<G6GraphData> {
-        const g = await firstValueFrom(this.catalog.graph({
-            from: nodeId, depth: 1, direction: q.direction, kinds: q.kinds, edgeKinds: q.edgeKinds,
-        }));
+        const g = await firstValueFrom(
+            this.catalog.graph({
+                from: nodeId,
+                depth: 1,
+                direction: q.direction,
+                kinds: q.kinds,
+                edgeKinds: q.edgeKinds,
+            }),
+        );
         return toG6Data(g.nodes, g.edges);
     }
 }

@@ -5,53 +5,53 @@ import { apiUrl } from './api-base';
 
 /** The wire shape of a `POST /geo/projection` request (mirrors the studio's `GeoProjection` mapping). */
 export interface GeoProjectionRequest {
-  dataset: string;
-  latCol: string;
-  lonCol: string;
-  entityCol?: string;
-  kindCol?: string;
-  timeCol?: string;
-  attrCols?: string[];
-  limit?: number;
+    dataset: string;
+    latCol: string;
+    lonCol: string;
+    entityCol?: string;
+    kindCol?: string;
+    timeCol?: string;
+    attrCols?: string[];
+    limit?: number;
 }
 
 export interface GeoPointRow {
-  id: string;
-  lat: number;
-  lon: number;
-  kind: string;
-  label?: string;
-  time?: number;
-  attrs?: Record<string, unknown>;
+    id: string;
+    lat: number;
+    lon: number;
+    kind: string;
+    label?: string;
+    time?: number;
+    attrs?: Record<string, unknown>;
 }
 
 export interface GeoRouteRow {
-  id: string;
-  from: string;
-  to: string;
-  kind: string;
-  weight: number;
+    id: string;
+    from: string;
+    to: string;
+    kind: string;
+    weight: number;
 }
 
 export interface GeoProjectionResult {
-  points: GeoPointRow[];
-  routes: GeoRouteRow[];
-  truncated: boolean;
-  /** Rows dropped for a missing/invalid coordinate. */
-  skipped: number;
+    points: GeoPointRow[];
+    routes: GeoRouteRow[];
+    truncated: boolean;
+    /** Rows dropped for a missing/invalid coordinate. */
+    skipped: number;
 }
 
 /** The wire shape of a `POST /geo/routes` request (mirrors the studio's `RouteProjection` mapping). */
 export interface GeoRoutesRequest {
-  dataset: string;
-  fromLatCol: string;
-  fromLonCol: string;
-  toLatCol: string;
-  toLonCol: string;
-  fromCol?: string;
-  toCol?: string;
-  kindCol?: string;
-  limit?: number;
+    dataset: string;
+    fromLatCol: string;
+    fromLonCol: string;
+    toLatCol: string;
+    toLonCol: string;
+    fromCol?: string;
+    toCol?: string;
+    kindCol?: string;
+    limit?: number;
 }
 
 /**
@@ -62,13 +62,13 @@ export interface GeoRoutesRequest {
  */
 @Injectable({ providedIn: 'root' })
 export class GeoService {
-  private http = inject(HttpClient);
+    private http = inject(HttpClient);
 
-  project(req: GeoProjectionRequest): Observable<GeoProjectionResult> {
-    return this.http.post<GeoProjectionResult>(apiUrl('/geo/projection'), req);
-  }
+    project(req: GeoProjectionRequest): Observable<GeoProjectionResult> {
+        return this.http.post<GeoProjectionResult>(apiUrl('/geo/projection'), req);
+    }
 
-  routes(req: GeoRoutesRequest): Observable<GeoProjectionResult> {
-    return this.http.post<GeoProjectionResult>(apiUrl('/geo/routes'), req);
-  }
+    routes(req: GeoRoutesRequest): Observable<GeoProjectionResult> {
+        return this.http.post<GeoProjectionResult>(apiUrl('/geo/routes'), req);
+    }
 }

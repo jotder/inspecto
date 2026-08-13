@@ -26,10 +26,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
             role="dialog"
             [attr.aria-label]="'Define ' + kindLabel() + ' · ' + title()"
         >
-            <div
-                class="flex shrink-0 items-center gap-2 border-b px-3 py-2"
-                style="border-color: var(--gamma-border)"
-            >
+            <div class="flex shrink-0 items-center gap-2 border-b px-3 py-2" style="border-color: var(--gamma-border)">
                 <mat-icon class="icon-size-5 shrink-0" [svgIcon]="icon()"></mat-icon>
                 <div class="min-w-0">
                     <div class="truncate text-sm font-semibold">{{ title() }}</div>

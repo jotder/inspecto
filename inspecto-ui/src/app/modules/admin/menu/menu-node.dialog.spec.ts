@@ -71,6 +71,8 @@ describe('MenuNodeDialog', () => {
         const { c } = make({ heading: 'Add menu', takenTitles: [] });
         c.form.controls.icon.setValue('phone');
         expect(c.filteredIcons().length).toBeGreaterThan(0);
-        expect(c.filteredIcons().every((o) => o.value.includes('phone') || o.label.toLowerCase().includes('phone'))).toBe(true);
+        expect(
+            c.filteredIcons().every((o) => o.value.includes('phone') || o.label.toLowerCase().includes('phone')),
+        ).toBe(true);
     });
 });

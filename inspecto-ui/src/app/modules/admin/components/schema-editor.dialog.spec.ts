@@ -33,7 +33,8 @@ const REFUSAL = {
     error: {
         error: {
             details: {
-                type: 'schema', written: false,
+                type: 'schema',
+                written: false,
                 findings: [
                     { severity: 'ERROR', fieldPath: 'raw.fields[QTY].type', message: 'type narrowed' },
                     { severity: 'ERROR', fieldPath: 'raw.fields[GONE]', message: 'field removed' },
@@ -46,14 +47,28 @@ const REFUSAL = {
 function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleRows?: Record<string, unknown>[]) {
     const ref = { close: vi.fn(), disableClose: false };
     const api = {
-        write: vi.fn().mockReturnValue(of({ type: 'schema', written: true, path: 'ev.toon', name: 'ev', bytes: 1, overwritten: true, findings: [] })),
-        suggestSchema: vi.fn().mockReturnValue(of({
-            fields: [
-                { name: 'ID', selector: 'ID', type: 'BIGINT' },
-                { name: 'AMT', selector: 'AMT', type: 'DOUBLE' },
-            ],
-            mapping: { rules: [] },
-        })),
+        write: vi
+            .fn()
+            .mockReturnValue(
+                of({
+                    type: 'schema',
+                    written: true,
+                    path: 'ev.toon',
+                    name: 'ev',
+                    bytes: 1,
+                    overwritten: true,
+                    findings: [],
+                }),
+            ),
+        suggestSchema: vi.fn().mockReturnValue(
+            of({
+                fields: [
+                    { name: 'ID', selector: 'ID', type: 'BIGINT' },
+                    { name: 'AMT', selector: 'AMT', type: 'DOUBLE' },
+                ],
+                mapping: { rules: [] },
+            }),
+        ),
         ...config,
     };
     const confirm = { confirmDestructive: vi.fn().mockResolvedValue(true) };
@@ -64,7 +79,10 @@ function create(def?: ComponentDef, config: Partial<ConfigService> = {}, sampleR
             { provide: MAT_DIALOG_DATA, useValue: { def, sampleRows } },
             { provide: MatDialogRef, useValue: ref },
             { provide: ConfigService, useValue: api },
-            { provide: ToastrService, useValue: { success: () => undefined, warning: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { success: () => undefined, warning: () => undefined, error: () => undefined },
+            },
             { provide: InspectoConfirmService, useValue: confirm },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
         ],
@@ -81,17 +99,22 @@ describe('SchemaEditorDialog', () => {
         expect(c.rows()[1]).toMatchObject({ name: 'QTY', type: 'INTEGER', description: 'count' });
 
         c.save();
-        expect(api.write).toHaveBeenCalledWith('schema', expect.objectContaining({
-            // the mapping section and raw.format survive the save untouched
-            mapping: { canonicalName: 'events' },
-            raw: expect.objectContaining({
-                name: 'ev', format: 'CSV',
-                fields: [
-                    { name: 'ID', selector: '0', type: 'VARCHAR' },
-                    { name: 'QTY', selector: '1', type: 'INTEGER', description: 'count' },
-                ],
+        expect(api.write).toHaveBeenCalledWith(
+            'schema',
+            expect.objectContaining({
+                // the mapping section and raw.format survive the save untouched
+                mapping: { canonicalName: 'events' },
+                raw: expect.objectContaining({
+                    name: 'ev',
+                    format: 'CSV',
+                    fields: [
+                        { name: 'ID', selector: '0', type: 'VARCHAR' },
+                        { name: 'QTY', selector: '1', type: 'INTEGER', description: 'count' },
+                    ],
+                }),
             }),
-        }), { overwrite: true });
+            { overwrite: true },
+        );
         expect(ref.close).toHaveBeenCalledWith({ saved: expect.objectContaining({ name: 'ev', type: 'schema' }) });
         await expectNoA11yViolations(fixture.nativeElement);
     });
@@ -113,9 +136,20 @@ describe('SchemaEditorDialog', () => {
     });
 
     it('saveAnyway re-sends with compatibility "none" after a confirmed destructive prompt', async () => {
-        const write = vi.fn()
+        const write = vi
+            .fn()
             .mockReturnValueOnce(throwError(() => REFUSAL))
-            .mockReturnValue(of({ type: 'schema', written: true, path: 'ev.toon', name: 'ev', bytes: 1, overwritten: true, findings: [] }));
+            .mockReturnValue(
+                of({
+                    type: 'schema',
+                    written: true,
+                    path: 'ev.toon',
+                    name: 'ev',
+                    bytes: 1,
+                    overwritten: true,
+                    findings: [],
+                }),
+            );
         const { c, ref, confirm } = create(DEF, { write });
         c.save();
         expect(c.refused()).toBe(true);
@@ -176,11 +210,15 @@ describe('SchemaEditorDialog', () => {
             { name: '', selector: '3', type: 'VARCHAR', description: '', unit: '', classification: '' }, // blank name — dropped
         ]);
         c.save();
-        expect(api.write).toHaveBeenCalledWith('schema', expect.objectContaining({
-            raw: expect.objectContaining({
-                name: 'new_schema',
-                fields: [{ name: 'A', selector: '0', type: 'varchar' }],
+        expect(api.write).toHaveBeenCalledWith(
+            'schema',
+            expect.objectContaining({
+                raw: expect.objectContaining({
+                    name: 'new_schema',
+                    fields: [{ name: 'A', selector: '0', type: 'varchar' }],
+                }),
             }),
-        }), { overwrite: true });
+            { overwrite: true },
+        );
     });
 });

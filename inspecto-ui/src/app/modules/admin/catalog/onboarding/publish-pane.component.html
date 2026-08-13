@@ -21,9 +21,9 @@
 
         @if (state.kind() === 'reference') {
             <inspecto-alert variant="info" icon="heroicons_outline:link">
-                This pipeline publishes a <strong>Reference Dataset</strong> — once live, enrichments
-                can bind it by name (<code>ref: {{ state.normalizedName() }}</code>) instead of a file
-                path.
+                This pipeline publishes a <strong>Reference Dataset</strong> — once live, enrichments can bind it by
+                name (<code>ref: {{ state.normalizedName() }}</code
+                >) instead of a file path.
             </inspecto-alert>
         }
 
@@ -33,11 +33,11 @@
             </inspecto-alert>
         } @else if (state.lifecycle() === 'Ready') {
             <p class="text-secondary m-0">
-                Every required stage is configured. Going live flips this draft to active — it starts
-                collecting from its inbox on the next poll cycle.
+                Every required stage is configured. Going live flips this draft to active — it starts collecting from
+                its inbox on the next poll cycle.
                 @if (state.kind() === 'stream') {
-                    It also registers <strong>{{ state.normalizedName() }}</strong> as a queryable
-                    Dataset in the Catalog (skipped if one already points at this stream's store).
+                    It also registers <strong>{{ state.normalizedName() }}</strong> as a queryable Dataset in the
+                    Catalog (skipped if one already points at this stream's store).
                 }
             </p>
             <button

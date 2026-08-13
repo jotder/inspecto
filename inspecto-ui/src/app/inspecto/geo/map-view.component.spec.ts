@@ -21,7 +21,10 @@ const DATA: GeoData = {
 // the component shell; the live map is verified in the browser (/design gallery).
 describe('MapViewComponent', () => {
     it('stays unmounted without data and passes axe', async () => {
-        await TestBed.configureTestingModule({ imports: [MapViewComponent], providers: [CONFIG_PROVIDER] }).compileComponents();
+        await TestBed.configureTestingModule({
+            imports: [MapViewComponent],
+            providers: [CONFIG_PROVIDER],
+        }).compileComponents();
         const fixture = TestBed.createComponent(MapViewComponent);
         fixture.componentInstance.data = null;
         fixture.detectChanges();
@@ -30,7 +33,10 @@ describe('MapViewComponent', () => {
     });
 
     it('tolerates data + input changes where WebGL is unavailable', async () => {
-        await TestBed.configureTestingModule({ imports: [MapViewComponent], providers: [CONFIG_PROVIDER] }).compileComponents();
+        await TestBed.configureTestingModule({
+            imports: [MapViewComponent],
+            providers: [CONFIG_PROVIDER],
+        }).compileComponents();
         const fixture = TestBed.createComponent(MapViewComponent);
         fixture.componentInstance.data = DATA;
         fixture.detectChanges();

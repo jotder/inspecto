@@ -21,7 +21,13 @@ export const GEO_MAP_PLUGIN: VizPlugin = {
 };
 
 export const LINK_ANALYSIS_PLUGIN: VizPlugin = {
-    meta: { type: 'link-analysis', label: 'Link analysis', icon: 'heroicons_outline:share', fit: {}, viewKind: 'link-analysis-view' },
+    meta: {
+        type: 'link-analysis',
+        label: 'Link analysis',
+        icon: 'heroicons_outline:share',
+        fit: {},
+        viewKind: 'link-analysis-view',
+    },
     controls: [],
     buildQuery: NO_QUERY,
     transformProps: NO_PROPS,
@@ -30,7 +36,13 @@ export const LINK_ANALYSIS_PLUGIN: VizPlugin = {
 
 /** DAT-7 P3: a dashboard tile renders a saved Reconciliation's Board read-only (compact Δ% tree). */
 export const RECONCILIATION_PLUGIN: VizPlugin = {
-    meta: { type: 'reconciliation', label: 'Reconciliation', icon: 'heroicons_outline:scale', fit: {}, viewKind: 'reconciliation' },
+    meta: {
+        type: 'reconciliation',
+        label: 'Reconciliation',
+        icon: 'heroicons_outline:scale',
+        fit: {},
+        viewKind: 'reconciliation',
+    },
     controls: [],
     buildQuery: NO_QUERY,
     transformProps: NO_PROPS,

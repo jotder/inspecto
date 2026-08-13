@@ -73,8 +73,7 @@ export interface BuildStreamBundleInput {
     enrichment?: Record<string, unknown> | null;
 }
 
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-    typeof v === 'object' && v !== null && !Array.isArray(v);
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /** Secret-ish key names. A config should only ever hold `${ENV:…}` references, so a LITERAL here is
  *  an authoring mistake — mask it rather than write a credential into a file that leaves the host. */
@@ -115,12 +114,15 @@ function requirementsOf(pipeline: Record<string, unknown>): StreamRequirement[] 
     const collector = pipeline['collector'];
     const id = isRecord(collector) ? String(collector['connection'] ?? '').trim() : '';
     return id
-        ? [{
-            kind: 'connection',
-            id,
-            reason: 'The Collection stage collects through this saved Connection. Connections carry '
-                + 'credentials, so it does not travel in the export — create it on the target first.',
-        }]
+        ? [
+              {
+                  kind: 'connection',
+                  id,
+                  reason:
+                      'The Collection stage collects through this saved Connection. Connections carry ' +
+                      'credentials, so it does not travel in the export — create it on the target first.',
+              },
+          ]
         : [];
 }
 
@@ -205,10 +207,7 @@ const segmentSchemaName = (pipeline: string, segmentKey: string): string =>
  * Pure — the caller performs the writes. Every rewrite that changes behaviour is reported in
  * `notes`, because an import that silently re-pointed directories would be a trap.
  */
-export function planStreamImport(
-    bundle: StreamBundle,
-    opts: { name: string; space: string | null },
-): StreamImportPlan {
+export function planStreamImport(bundle: StreamBundle, opts: { name: string; space: string | null }): StreamImportPlan {
     const { name, space } = opts;
     const pipeline: Record<string, unknown> = { ...bundle.pipeline, name, active: false };
     const notes: string[] = [];
@@ -255,14 +254,21 @@ export function planStreamImport(
     }
 
     if (bundle.enrichment) {
-        plan.enrichment = { name: `${name}_enrich`, config: retargetEnrichment(bundle.enrichment, bundle.source.name, name, space) };
+        plan.enrichment = {
+            name: `${name}_enrich`,
+            config: retargetEnrichment(bundle.enrichment, bundle.source.name, name, space),
+        };
     }
 
     if (plan.requires.length) {
-        notes.push(`Needs ${plan.requires.length} existing item on this server (see below) — the draft saves either way.`);
+        notes.push(
+            `Needs ${plan.requires.length} existing item on this server (see below) — the draft saves either way.`,
+        );
     }
     if (bundle.masked?.length) {
-        notes.push(`${bundle.masked.length} secret-looking value(s) were masked at export and import as "***" — re-enter them.`);
+        notes.push(
+            `${bundle.masked.length} secret-looking value(s) were masked at export and import as "***" — re-enter them.`,
+        );
     }
     return plan;
 }

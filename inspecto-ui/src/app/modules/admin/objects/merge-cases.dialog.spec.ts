@@ -10,8 +10,14 @@ import { MergeCasesDialog } from './merge-cases.dialog';
 
 function caseOf(id: string, updatedAt: number): OperationalObject {
     return {
-        id, objectType: 'CASE', title: `case ${id}`, description: '', status: 'OPEN',
-        createdAt: 1, updatedAt, closedAt: 0,
+        id,
+        objectType: 'CASE',
+        title: `case ${id}`,
+        description: '',
+        status: 'OPEN',
+        createdAt: 1,
+        updatedAt,
+        closedAt: 0,
     };
 }
 

@@ -13,7 +13,9 @@ export class ReconciliationsService {
     private components = inject(ComponentsService);
 
     list(): Observable<Reconciliation[]> {
-        return this.components.list('reconciliation').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
+        return this.components
+            .list('reconciliation')
+            .pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
     }
 
     get(id: string): Observable<Reconciliation> {

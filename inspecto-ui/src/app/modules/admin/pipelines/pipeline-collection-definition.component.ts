@@ -73,10 +73,14 @@ import { nodeAttributesFor } from './node-attributes';
                 >
                     <mat-icon
                         class="icon-size-4"
-                        [svgIcon]="freeFormOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
+                        [svgIcon]="
+                            freeFormOpen() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                        "
                     ></mat-icon>
                     Additional config
-                    @if (configRows.length) { <span class="opacity-60">({{ configRows.length }})</span> }
+                    @if (configRows.length) {
+                        <span class="opacity-60">({{ configRows.length }})</span>
+                    }
                 </button>
                 @if (freeFormOpen()) {
                     <button mat-stroked-button type="button" (click)="addConfigRow()">
@@ -134,9 +138,7 @@ export class PipelineCollectionDefinitionComponent {
 
     @ViewChild(CollectorConfigComponent) private collector?: CollectorConfigComponent;
 
-    readonly specs = computed<AttributeSpec[]>(
-        () => this.attributes() ?? nodeAttributesFor(this.node().type) ?? [],
-    );
+    readonly specs = computed<AttributeSpec[]>(() => this.attributes() ?? nodeAttributesFor(this.node().type) ?? []);
     /** The node's stored `connector`, so the shared component can grandfather a hand-authored one. */
     readonly storedConnector = computed(() => String(this.node().config?.['connector'] ?? ''));
     /** Schema seed + free-form rows — the same split the dialog runs (`node-config-build.ts`). */

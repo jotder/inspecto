@@ -6,33 +6,33 @@ import { apiUrl, toParams } from './api-base';
 
 /** One fired alert from the core alert engine (GET /alerts). */
 export interface FiredAlert {
-  rule: string;
-  severity: 'INFO' | 'WARNING' | 'CRITICAL' | string;
-  pipeline: string;
-  metric: string;
-  value: number;
-  comparator: string;
-  threshold: number;
-  window: string;
-  epochMillis: number;
-  message: string;
+    rule: string;
+    severity: 'INFO' | 'WARNING' | 'CRITICAL' | string;
+    pipeline: string;
+    metric: string;
+    value: number;
+    comparator: string;
+    threshold: number;
+    window: string;
+    epochMillis: number;
+    message: string;
 }
 
 /** One armed alert rule (GET /alerts/rules). */
 export interface AlertRule {
-  name: string;
-  metric: string;
-  comparator: string;
-  threshold: number;
-  window: string;
-  severity: string;
-  onPipeline?: string;
-  /**
-   * Row-scoping condition tree (2026-07-18, the same `query-types` shape Decision Rules author):
-   * restricts the metric math to ledger rows matching it, applied after the window selects rows
-   * and before the metric aggregates them. Ledger-metric rules only (no `dataset`/`measure` rule).
-   */
-  when?: ConditionGroup | null;
+    name: string;
+    metric: string;
+    comparator: string;
+    threshold: number;
+    window: string;
+    severity: string;
+    onPipeline?: string;
+    /**
+     * Row-scoping condition tree (2026-07-18, the same `query-types` shape Decision Rules author):
+     * restricts the metric math to ledger rows matching it, applied after the window selects rows
+     * and before the metric aggregates them. Ledger-metric rules only (no `dataset`/`measure` rule).
+     */
+    when?: ConditionGroup | null;
 }
 
 /** Create/update body — the whole rule is authorable; `name` is the identity (immutable on edit). */
@@ -46,32 +46,32 @@ export type AlertRuleUpsert = AlertRule;
  */
 @Injectable({ providedIn: 'root' })
 export class AlertsService {
-  private http = inject(HttpClient);
+    private http = inject(HttpClient);
 
-  recent(limit = 50): Observable<FiredAlert[]> {
-    return this.http.get<FiredAlert[]>(apiUrl('/alerts'), { params: toParams({ limit }) });
-  }
+    recent(limit = 50): Observable<FiredAlert[]> {
+        return this.http.get<FiredAlert[]>(apiUrl('/alerts'), { params: toParams({ limit }) });
+    }
 
-  rules(): Observable<AlertRule[]> {
-    return this.http.get<AlertRule[]>(apiUrl('/alerts/rules'));
-  }
+    rules(): Observable<AlertRule[]> {
+        return this.http.get<AlertRule[]>(apiUrl('/alerts/rules'));
+    }
 
-  // Rule authoring (audit C3; mirrors /decision-rules). Mock-served today — a live server
-  // without the write endpoints answers 503, which the form surfaces as writes-disabled.
-  createRule(body: AlertRuleUpsert): Observable<AlertRule> {
-    return this.http.post<AlertRule>(apiUrl('/alerts/rules'), body);
-  }
+    // Rule authoring (audit C3; mirrors /decision-rules). Mock-served today — a live server
+    // without the write endpoints answers 503, which the form surfaces as writes-disabled.
+    createRule(body: AlertRuleUpsert): Observable<AlertRule> {
+        return this.http.post<AlertRule>(apiUrl('/alerts/rules'), body);
+    }
 
-  updateRule(name: string, body: AlertRuleUpsert): Observable<AlertRule> {
-    return this.http.put<AlertRule>(apiUrl(`/alerts/rules/${encodeURIComponent(name)}`), body);
-  }
+    updateRule(name: string, body: AlertRuleUpsert): Observable<AlertRule> {
+        return this.http.put<AlertRule>(apiUrl(`/alerts/rules/${encodeURIComponent(name)}`), body);
+    }
 
-  removeRule(name: string): Observable<void> {
-    return this.http.delete<void>(apiUrl(`/alerts/rules/${encodeURIComponent(name)}`));
-  }
+    removeRule(name: string): Observable<void> {
+        return this.http.delete<void>(apiUrl(`/alerts/rules/${encodeURIComponent(name)}`));
+    }
 
-  /** Manual evaluation sweep; returns the alerts fired by this pass. */
-  evaluate(): Observable<FiredAlert[]> {
-    return this.http.post<FiredAlert[]>(apiUrl('/alerts/evaluate'), {});
-  }
+    /** Manual evaluation sweep; returns the alerts fired by this pass. */
+    evaluate(): Observable<FiredAlert[]> {
+        return this.http.post<FiredAlert[]>(apiUrl('/alerts/evaluate'), {});
+    }
 }

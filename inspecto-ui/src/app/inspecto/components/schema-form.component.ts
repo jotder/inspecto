@@ -10,7 +10,16 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AttributeOption, AttributeSpec, AttributeToken, byTier, defaultsFor, dependsOnMatches, isRequired, listPatternViolation } from '../component-model';
+import {
+    AttributeOption,
+    AttributeSpec,
+    AttributeToken,
+    byTier,
+    defaultsFor,
+    dependsOnMatches,
+    isRequired,
+    listPatternViolation,
+} from '../component-model';
 import { ChipComponent } from './chip.component';
 import { InspectoTokenPickerComponent } from './token-picker.component';
 
@@ -19,9 +28,7 @@ import { InspectoTokenPickerComponent } from './token-picker.component';
  * value so a suggestion set can follow a sibling field (e.g. `target` follows `targetType`). Called on
  * focus — return the fresh list (sync or async); failures degrade to no suggestions.
  */
-export type AttributeOptionLoader = (
-    value: Record<string, unknown>,
-) => AttributeOption[] | Promise<AttributeOption[]>;
+export type AttributeOptionLoader = (value: Record<string, unknown>) => AttributeOption[] | Promise<AttributeOption[]>;
 
 /**
  * The shared spec-driven form renderer (Wave 0, W2): renders an {@link AttributeSpec} list as a
@@ -72,10 +79,14 @@ export type AttributeOptionLoader = (
 
             @for (g of groupsOf(tiers().required); track g.name; let gi = $index) {
                 @if (g.name) {
-                    <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">{{ g.name }}</div>
+                    <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
+                        {{ g.name }}
+                    </div>
                 }
                 @for (spec of g.specs; track spec.key; let i = $index) {
-                    <ng-container *ngTemplateOutlet="field; context: { spec, first: gi === 0 && i === 0 }"></ng-container>
+                    <ng-container
+                        *ngTemplateOutlet="field; context: { spec, first: gi === 0 && i === 0 }"
+                    ></ng-container>
                 }
             }
 
@@ -86,13 +97,20 @@ export type AttributeOptionLoader = (
                     [attr.aria-expanded]="showOptional()"
                     (click)="showOptional.set(!showOptional())"
                 >
-                    <mat-icon class="icon-size-4" [svgIcon]="showOptional() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"></mat-icon>
+                    <mat-icon
+                        class="icon-size-4"
+                        [svgIcon]="
+                            showOptional() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'
+                        "
+                    ></mat-icon>
                     Optional settings ({{ tiers().optional.length }})
                 </button>
                 @if (showOptional()) {
                     @for (g of groupsOf(tiers().optional); track g.name) {
                         @if (g.name) {
-                            <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">{{ g.name }}</div>
+                            <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="3">
+                                {{ g.name }}
+                            </div>
                         }
                         @for (spec of g.specs; track spec.key) {
                             <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
@@ -105,7 +123,9 @@ export type AttributeOptionLoader = (
                 <div class="text-secondary py-1 text-sm font-medium" role="heading" aria-level="3">Advanced</div>
                 @for (g of groupsOf(tiers().advanced); track g.name) {
                     @if (g.name) {
-                        <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="4">{{ g.name }}</div>
+                        <div class="text-secondary pb-1 pt-2 text-sm font-medium" role="heading" aria-level="4">
+                            {{ g.name }}
+                        </div>
                     }
                     @for (spec of g.specs; track spec.key) {
                         <ng-container *ngTemplateOutlet="field; context: { spec }"></ng-container>
@@ -117,7 +137,12 @@ export type AttributeOptionLoader = (
                 @if (isVisible(spec)) {
                     @switch (spec.type) {
                         @case ('boolean') {
-                            <mat-slide-toggle class="py-2" [formControlName]="spec.key" [attr.cdkFocusInitial]="first ? '' : null">{{ spec.label }}</mat-slide-toggle>
+                            <mat-slide-toggle
+                                class="py-2"
+                                [formControlName]="spec.key"
+                                [attr.cdkFocusInitial]="first ? '' : null"
+                                >{{ spec.label }}</mat-slide-toggle
+                            >
                         }
                         @case ('select') {
                             <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -127,7 +152,9 @@ export type AttributeOptionLoader = (
                                         <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                                     }
                                 </mat-select>
-                                @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                @if (spec.help) {
+                                    <mat-hint>{{ spec.help }}</mat-hint>
+                                }
                                 <mat-error>{{ spec.label }} is required</mat-error>
                             </mat-form-field>
                         }
@@ -147,17 +174,37 @@ export type AttributeOptionLoader = (
                                         <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
                                     }
                                 </mat-autocomplete>
-                                <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
-                                @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                <inspecto-token-picker
+                                    matSuffix
+                                    [fieldLabel]="spec.label"
+                                    [tokens]="tokensFor(spec)"
+                                    (picked)="applyToken(spec, $event)"
+                                />
+                                @if (spec.help) {
+                                    <mat-hint>{{ spec.help }}</mat-hint>
+                                }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
                         }
                         @case ('multiline') {
                             <mat-form-field class="w-full" subscriptSizing="dynamic">
                                 <mat-label>{{ spec.label }}</mat-label>
-                                <textarea matInput rows="4" [formControlName]="spec.key" [placeholder]="spec.placeholder ?? ''" [attr.cdkFocusInitial]="first ? '' : null"></textarea>
-                                <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
-                                @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                <textarea
+                                    matInput
+                                    rows="4"
+                                    [formControlName]="spec.key"
+                                    [placeholder]="spec.placeholder ?? ''"
+                                    [attr.cdkFocusInitial]="first ? '' : null"
+                                ></textarea>
+                                <inspecto-token-picker
+                                    matSuffix
+                                    [fieldLabel]="spec.label"
+                                    [tokens]="tokensFor(spec)"
+                                    (picked)="applyToken(spec, $event)"
+                                />
+                                @if (spec.help) {
+                                    <mat-hint>{{ spec.help }}</mat-hint>
+                                }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
                         }
@@ -187,8 +234,15 @@ export type AttributeOptionLoader = (
                                     >
                                         <mat-icon svgIcon="heroicons_outline:plus" />
                                     </button>
-                                    <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
-                                    @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                    <inspecto-token-picker
+                                        matSuffix
+                                        [fieldLabel]="spec.label"
+                                        [tokens]="tokensFor(spec)"
+                                        (picked)="applyToken(spec, $event)"
+                                    />
+                                    @if (spec.help) {
+                                        <mat-hint>{{ spec.help }}</mat-hint>
+                                    }
                                     <!-- No <mat-error> here: this field's <input> is a DRAFT, never bound
                                          to the control, so the form-field has no NgControl and could
                                          never enter an error state. See listError(). -->
@@ -224,7 +278,9 @@ export type AttributeOptionLoader = (
                                     [placeholder]="spec.placeholder ?? ''"
                                     [attr.cdkFocusInitial]="first ? '' : null"
                                 />
-                                @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                @if (spec.help) {
+                                    <mat-hint>{{ spec.help }}</mat-hint>
+                                }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
                         }
@@ -242,8 +298,15 @@ export type AttributeOptionLoader = (
                                     [placeholder]="spec.placeholder ?? ''"
                                     [attr.cdkFocusInitial]="first ? '' : null"
                                 />
-                                <inspecto-token-picker matSuffix [fieldLabel]="spec.label" [tokens]="tokensFor(spec)" (picked)="applyToken(spec, $event)" />
-                                @if (spec.help) { <mat-hint>{{ spec.help }}</mat-hint> }
+                                <inspecto-token-picker
+                                    matSuffix
+                                    [fieldLabel]="spec.label"
+                                    [tokens]="tokensFor(spec)"
+                                    (picked)="applyToken(spec, $event)"
+                                />
+                                @if (spec.help) {
+                                    <mat-hint>{{ spec.help }}</mat-hint>
+                                }
                                 <mat-error>{{ errorFor(spec) }}</mat-error>
                             </mat-form-field>
                         }
@@ -275,7 +338,9 @@ export class InspectoSchemaFormComponent {
         for (const key of Object.keys(this.form.controls)) this.form.removeControl(key, { emitEvent: false });
         const defaults = defaultsFor(this.allSpecs);
         for (const s of this.allSpecs) {
-            this.form.addControl(s.key, this.fb.control(defaults[s.key] ?? null, this.validatorsFor(s)), { emitEvent: false });
+            this.form.addControl(s.key, this.fb.control(defaults[s.key] ?? null, this.validatorsFor(s)), {
+                emitEvent: false,
+            });
         }
         this.applyExtraValidators();
         this.syncVisibility(this.form.getRawValue());
@@ -437,11 +502,11 @@ export class InspectoSchemaFormComponent {
     /** Suggestions narrowed by the field's current text (matches value or label, case-insensitive). */
     filteredOptions(spec: AttributeSpec): AttributeOption[] {
         const all = this.loadedOptions()[spec.key] ?? spec.options ?? [];
-        const q = String(this.formValue()[spec.key] ?? '').trim().toLowerCase();
+        const q = String(this.formValue()[spec.key] ?? '')
+            .trim()
+            .toLowerCase();
         if (!q) return all;
-        return all.filter(
-            (o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q),
-        );
+        return all.filter((o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q));
     }
 
     constructor() {

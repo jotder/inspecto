@@ -28,11 +28,19 @@ const envelope = (items: unknown[]) => ({
     items,
 });
 
-const item = (kind: string, id: string, content: Record<string, unknown>, extra: Record<string, unknown> = {}) =>
-    ({ kind, id, content, ...extra });
+const item = (kind: string, id: string, content: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+    kind,
+    id,
+    content,
+    ...extra,
+});
 
 interface Outcome {
-    imported: number; overwritten: number; skipped: number; unchanged: number; failed: number;
+    imported: number;
+    overwritten: number;
+    skipped: number;
+    unchanged: number;
+    failed: number;
     results: { kind: string; id: string; status: string; message?: string }[];
 }
 
@@ -49,7 +57,9 @@ describe('bundleHandler — POST /bundle/import', () => {
     });
 
     it('writes new items and stamps the id as authoritative', () => {
-        const { store, res } = run({ bundle: envelope([item('dataset', 'orders_ds', { physicalRef: 'orders', name: 'RENAMED' })]) });
+        const { store, res } = run({
+            bundle: envelope([item('dataset', 'orders_ds', { physicalRef: 'orders', name: 'RENAMED' })]),
+        });
         const out = res?.body as Outcome;
 
         expect(out.imported).toBe(1);
@@ -64,16 +74,18 @@ describe('bundleHandler — POST /bundle/import', () => {
         store.put('default', componentCollection('dataset'), 'orders_ds', { name: 'orders_ds', physicalRef: 'old' });
         const body = { bundle: envelope([item('dataset', 'orders_ds', { physicalRef: 'new' })]) };
 
-        const skipped = (handler(req(body), store)?.body as Outcome);
+        const skipped = handler(req(body), store)?.body as Outcome;
         expect(skipped.skipped).toBe(1);
         expect(skipped.results[0].message).toContain('overwrite');
-        expect(store.get<Record<string, unknown>>('default', componentCollection('dataset'), 'orders_ds')?.['physicalRef'])
-            .toBe('old');
+        expect(
+            store.get<Record<string, unknown>>('default', componentCollection('dataset'), 'orders_ds')?.['physicalRef'],
+        ).toBe('old');
 
-        const forced = (handler(req({ ...body, actions: { 'dataset/orders_ds': 'overwrite' } }), store)?.body as Outcome);
+        const forced = handler(req({ ...body, actions: { 'dataset/orders_ds': 'overwrite' } }), store)?.body as Outcome;
         expect(forced.overwritten).toBe(1);
-        expect(store.get<Record<string, unknown>>('default', componentCollection('dataset'), 'orders_ds')?.['physicalRef'])
-            .toBe('new');
+        expect(
+            store.get<Record<string, unknown>>('default', componentCollection('dataset'), 'orders_ds')?.['physicalRef'],
+        ).toBe('new');
     });
 
     it('reports an identical re-promotion as unchanged and writes nothing', () => {
@@ -81,13 +93,18 @@ describe('bundleHandler — POST /bundle/import', () => {
         const content = { name: 'orders_ds', physicalRef: 'orders' };
         store.put('default', componentCollection('dataset'), 'orders_ds', content);
 
-        const out = handler(req({
-            bundle: envelope([item('dataset', 'orders_ds', content, {
-                provenance: { contentHash: `sha256:${hashContent(content)}` },
-            })]),
-            // Even an explicit overwrite must not re-write identical content.
-            actions: { 'dataset/orders_ds': 'overwrite' },
-        }), store)?.body as Outcome;
+        const out = handler(
+            req({
+                bundle: envelope([
+                    item('dataset', 'orders_ds', content, {
+                        provenance: { contentHash: `sha256:${hashContent(content)}` },
+                    }),
+                ]),
+                // Even an explicit overwrite must not re-write identical content.
+                actions: { 'dataset/orders_ds': 'overwrite' },
+            }),
+            store,
+        )?.body as Outcome;
 
         expect(out.unchanged).toBe(1);
         expect(out.overwritten).toBe(0);
@@ -95,25 +112,40 @@ describe('bundleHandler — POST /bundle/import', () => {
     });
 
     it('fails a connection carrying a literal secret, but passes a ${…} reference', () => {
-        const literal = handler(req({
-            bundle: envelope([item('connection', 'sftp_prod', { connector: 'sftp', host: 'h', password: 'hunter2' })]),
-        }), new MockStore())?.body as Outcome;
+        const literal = handler(
+            req({
+                bundle: envelope([
+                    item('connection', 'sftp_prod', { connector: 'sftp', host: 'h', password: 'hunter2' }),
+                ]),
+            }),
+            new MockStore(),
+        )?.body as Outcome;
         expect(literal.failed).toBe(1);
         expect(literal.results[0].message).toContain('password');
 
         const { store, res } = run({
-            bundle: envelope([item('connection', 'sftp_prod', {
-                connector: 'sftp', host: 'h', password: '${ENV:SFTP_PW}', options: { api_token: '${ENV:TOK}' },
-            })]),
+            bundle: envelope([
+                item('connection', 'sftp_prod', {
+                    connector: 'sftp',
+                    host: 'h',
+                    password: '${ENV:SFTP_PW}',
+                    options: { api_token: '${ENV:TOK}' },
+                }),
+            ]),
         });
         expect((res?.body as Outcome).imported).toBe(1);
         expect(store.has('default', CONNECTIONS_COLL, 'sftp_prod')).toBe(true);
     });
 
     it('finds a literal secret nested inside options', () => {
-        const out = handler(req({
-            bundle: envelope([item('connection', 'kafka', { connector: 'kafka', options: { sasl_password: 'literal' } })]),
-        }), new MockStore())?.body as Outcome;
+        const out = handler(
+            req({
+                bundle: envelope([
+                    item('connection', 'kafka', { connector: 'kafka', options: { sasl_password: 'literal' } }),
+                ]),
+            }),
+            new MockStore(),
+        )?.body as Outcome;
         expect(out.failed).toBe(1);
         expect(out.results[0].message).toContain('options.sasl_password');
     });
@@ -121,7 +153,12 @@ describe('bundleHandler — POST /bundle/import', () => {
     it('rejects the WHOLE bundle, writing nothing, when it would introduce a dangling reference', () => {
         const { store, res } = run({
             bundle: envelope([
-                item('widget', 'w1', { name: 'w1' }, { refs: [{ kind: 'dataset', id: 'absent_ds', resolution: 'included' }] }),
+                item(
+                    'widget',
+                    'w1',
+                    { name: 'w1' },
+                    { refs: [{ kind: 'dataset', id: 'absent_ds', resolution: 'included' }] },
+                ),
                 item('dataset', 'present_ds', { name: 'present_ds' }),
             ]),
         });
@@ -133,10 +170,20 @@ describe('bundleHandler — POST /bundle/import', () => {
     it('accepts a bundle whose items satisfy each other, and ignores external refs', () => {
         const out = run({
             bundle: envelope([
-                item('widget', 'w1', { name: 'w1' }, { refs: [{ kind: 'dataset', id: 'ds1', resolution: 'included' }] }),
+                item(
+                    'widget',
+                    'w1',
+                    { name: 'w1' },
+                    { refs: [{ kind: 'dataset', id: 'ds1', resolution: 'included' }] },
+                ),
                 item('dataset', 'ds1', { name: 'ds1' }),
                 // `external` is the bundle's declared contract, surfaced by the requires panel — not a reject.
-                item('widget', 'w2', { name: 'w2' }, { refs: [{ kind: 'dataset', id: 'lives_on_target', resolution: 'external' }] }),
+                item(
+                    'widget',
+                    'w2',
+                    { name: 'w2' },
+                    { refs: [{ kind: 'dataset', id: 'lives_on_target', resolution: 'external' }] },
+                ),
             ]),
         }).res?.body as Outcome;
 
@@ -174,13 +221,25 @@ describe('bundleHandler — POST /bundle/import', () => {
 
 describe('bundleHandler — POST /bundle/export', () => {
     const handler = bundleHandler({ mockOps: true });
-    const exportReq = (body: unknown): MockRequest =>
-        ({ method: 'POST', url: '/api/bundle/export', body, params: {}, space: 'default' });
+    const exportReq = (body: unknown): MockRequest => ({
+        method: 'POST',
+        url: '/api/bundle/export',
+        body,
+        params: {},
+        space: 'default',
+    });
 
     interface Exported {
         bundle: {
-            format: string; sourceSpace: string | null;
-            items: { kind: string; id: string; content: Record<string, unknown>; refs?: unknown; provenance: { contentHash: string } }[];
+            format: string;
+            sourceSpace: string | null;
+            items: {
+                kind: string;
+                id: string;
+                content: Record<string, unknown>;
+                refs?: unknown;
+                provenance: { contentHash: string };
+            }[];
             requires?: { kind: string; id: string; originHash?: string }[];
         };
         missing: { kind: string; id: string }[];
@@ -191,10 +250,13 @@ describe('bundleHandler — POST /bundle/export', () => {
         const content = { name: 'orders_ds', physicalRef: 'orders' };
         store.put('default', componentCollection('dataset'), 'orders_ds', content);
 
-        const out = handler(exportReq({
-            items: [{ kind: 'dataset', id: 'orders_ds', refs: [] }],
-            sourceSpace: 'staging',
-        }), store)?.body as Exported;
+        const out = handler(
+            exportReq({
+                items: [{ kind: 'dataset', id: 'orders_ds', refs: [] }],
+                sourceSpace: 'staging',
+            }),
+            store,
+        )?.body as Exported;
 
         expect(out.bundle.format).toBe('inspecto-metadata-bundle');
         expect(out.bundle.items[0].content).toEqual(content);
@@ -210,7 +272,10 @@ describe('bundleHandler — POST /bundle/export', () => {
     it('omits a literal secret from an exported connection but keeps a ${…} reference', () => {
         const store = new MockStore();
         store.put('default', CONNECTIONS_COLL, 'sftp_prod', {
-            id: 'sftp_prod', connector: 'sftp', host: 'h', password: '***',
+            id: 'sftp_prod',
+            connector: 'sftp',
+            host: 'h',
+            password: '***',
             options: { api_token: '${ENV:TOK}', region: 'eu' },
         });
 
@@ -220,8 +285,10 @@ describe('bundleHandler — POST /bundle/export', () => {
         expect(content['password']).toBeUndefined();
         expect(content['options']).toEqual({ api_token: '${ENV:TOK}', region: 'eu' });
         // …and the result is something the import gate accepts, which the masked form is not.
-        const back = handler(req({ bundle: envelope([{ kind: 'connection', id: 'sftp_prod', content }]) }), new MockStore())
-            ?.body as Outcome;
+        const back = handler(
+            req({ bundle: envelope([{ kind: 'connection', id: 'sftp_prod', content }]) }),
+            new MockStore(),
+        )?.body as Outcome;
         expect(back.failed).toBe(0);
     });
 
@@ -236,10 +303,16 @@ describe('bundleHandler — POST /bundle/export', () => {
         const here = { name: 'here_ds' };
         store.put('default', componentCollection('dataset'), 'here_ds', here);
 
-        const out = handler(exportReq({
-            items: [{ kind: 'widget', id: 'w1' }],
-            requires: [{ kind: 'dataset', id: 'here_ds' }, { kind: 'dataset', id: 'elsewhere' }],
-        }), store)?.body as Exported;
+        const out = handler(
+            exportReq({
+                items: [{ kind: 'widget', id: 'w1' }],
+                requires: [
+                    { kind: 'dataset', id: 'here_ds' },
+                    { kind: 'dataset', id: 'elsewhere' },
+                ],
+            }),
+            store,
+        )?.body as Exported;
 
         expect(out.bundle.requires?.[0].originHash).toBe(`sha256:${hashContent(here)}`);
         expect(out.bundle.requires?.[1].originHash).toBeUndefined();

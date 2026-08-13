@@ -29,7 +29,14 @@ describe('evaluateRows', () => {
     });
 
     it('numeric >=', () => {
-        expect(ids(evaluateRows(m(group('AND', [{ kind: 'condition', field: 'dur', operator: '>=', value: '90' }])), SOURCE))).toEqual([2, 3]);
+        expect(
+            ids(
+                evaluateRows(
+                    m(group('AND', [{ kind: 'condition', field: 'dur', operator: '>=', value: '90' }])),
+                    SOURCE,
+                ),
+            ),
+        ).toEqual([2, 3]);
     });
 
     it('evaluates a nested (A AND (B OR C)) exactly', () => {

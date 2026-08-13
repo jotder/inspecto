@@ -1,4 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, effect, ElementRef, HostListener, inject, input, linkedSignal, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    computed,
+    DestroyRef,
+    effect,
+    ElementRef,
+    HostListener,
+    inject,
+    input,
+    linkedSignal,
+    output,
+    signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -326,9 +339,7 @@ export class DataTableComponent {
     private resultColumns(rows: Record<string, unknown>[]): ColDef[] {
         const explicit = this.columns();
         if (!explicit) return autoColumns(rows);
-        const byField = new Map(
-            explicit.filter((c) => c.field != null).map((c) => [String(c.field), c] as const),
-        );
+        const byField = new Map(explicit.filter((c) => c.field != null).map((c) => [String(c.field), c] as const));
         return Object.keys(rows[0]).map((k) => byField.get(k) ?? ({ field: k } as ColDef));
     }
 

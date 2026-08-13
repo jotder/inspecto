@@ -13,13 +13,10 @@ import { OnboardingStateService } from './onboarding-state.service';
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [InspectoEmptyStateComponent],
     template: `
-        <inspecto-empty-state
-            icon="heroicons_outline:wrench-screwdriver"
-            [message]="message()"
-        />
+        <inspecto-empty-state icon="heroicons_outline:wrench-screwdriver" [message]="message()" />
         <p class="text-secondary mx-auto mt-2 max-w-lg text-center text-sm">
-            Until then this stage's config block is authored in the pipeline TOON directly
-            (Settings ▸ Config); the readiness chip on the left already reflects it.
+            Until then this stage's config block is authored in the pipeline TOON directly (Settings ▸ Config); the
+            readiness chip on the left already reflects it.
         </p>
     `,
 })

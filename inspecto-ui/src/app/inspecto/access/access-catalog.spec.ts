@@ -14,7 +14,10 @@ import {
 const NAV: GammaNavigationItem[] = [
     { id: 'custom-menus-divider', type: 'divider' },
     {
-        id: 'workbench-group', title: 'Workbench', type: 'collapsable', icon: 'heroicons_outline:wrench',
+        id: 'workbench-group',
+        title: 'Workbench',
+        type: 'collapsable',
+        icon: 'heroicons_outline:wrench',
         children: [
             { id: 'pipelines', title: 'Pipelines', type: 'basic', link: '/pipelines' },
             { id: 'runs', title: 'Runs', type: 'basic', link: '/runs' },
@@ -38,8 +41,11 @@ describe('access-catalog derivation', () => {
         const runs = workbench.children![1];
         expect(runs.children!.map((c) => c.id)).toEqual(['runs.operate']);
         expect(runs.children![0].capability).toBe('canOperateRuns');
-        expect(nodes[1].children!.map((c) => c.id))
-            .toEqual(['access.configure', 'menus.curate', 'connections.onboard']);
+        expect(nodes[1].children!.map((c) => c.id)).toEqual([
+            'access.configure',
+            'menus.curate',
+            'connections.onboard',
+        ]);
     });
 
     it('the default catalog covers every declared action node', () => {
@@ -54,8 +60,12 @@ describe('resolveGrant', () => {
     const idx = indexCatalog(deriveAccessCatalog(NAV));
 
     it('defaults to allow with no explicit ancestor', () => {
-        expect(resolveGrant('pipelines', {}, idx))
-            .toEqual({ effective: 'allow', explicit: null, sourceId: null, sourceLabel: null });
+        expect(resolveGrant('pipelines', {}, idx)).toEqual({
+            effective: 'allow',
+            explicit: null,
+            sourceId: null,
+            sourceLabel: null,
+        });
     });
 
     it('an explicit grant on the node wins and names itself as the source', () => {
@@ -82,7 +92,7 @@ describe('resolveGrant', () => {
 describe('filterNavByAccess', () => {
     const idx = indexCatalog(deriveAccessCatalog(NAV));
 
-    it('is the identity with no grants (empty profile = today\'s sidebar)', () => {
+    it("is the identity with no grants (empty profile = today's sidebar)", () => {
         expect(filterNavByAccess(NAV, {}, idx)).toBe(NAV);
     });
 

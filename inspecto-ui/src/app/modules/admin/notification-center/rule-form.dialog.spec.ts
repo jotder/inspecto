@@ -31,7 +31,13 @@ describe('RuleFormDialog', () => {
         c.schemaForm.form.patchValue({ id: 'custom1', eventType: 'job.custom', category: 'ops' });
         c.save();
         expect(save).toHaveBeenCalledWith(
-            expect.objectContaining({ id: 'custom1', eventType: 'job.custom', category: 'ops', minLevel: null, enabled: true }),
+            expect.objectContaining({
+                id: 'custom1',
+                eventType: 'job.custom',
+                category: 'ops',
+                minLevel: null,
+                enabled: true,
+            }),
         );
         expect(ref.close).toHaveBeenCalled();
     });
@@ -47,16 +53,28 @@ describe('RuleFormDialog', () => {
     it('locks the id on edit and sends the FULL rule (the server PUT is a full replace)', () => {
         const { c, save } = create({
             rule: {
-                id: 'custom1', eventType: 'BATCH_FAILED', minLevel: 'WARN', category: 'pipeline',
-                titleTemplate: 'T', bodyTemplate: 'B', dedupeKeyTemplate: 'D', enabled: true,
+                id: 'custom1',
+                eventType: 'BATCH_FAILED',
+                minLevel: 'WARN',
+                category: 'pipeline',
+                titleTemplate: 'T',
+                bodyTemplate: 'B',
+                dedupeKeyTemplate: 'D',
+                enabled: true,
             },
         });
         expect(c.schemaForm.form.get('id')?.disabled).toBe(true);
         c.schemaForm.form.patchValue({ titleTemplate: 'New title' });
         c.save();
-        expect(save).toHaveBeenCalledWith('custom1', expect.objectContaining({
-            eventType: 'BATCH_FAILED', minLevel: 'WARN', category: 'pipeline', titleTemplate: 'New title',
-        }));
+        expect(save).toHaveBeenCalledWith(
+            'custom1',
+            expect.objectContaining({
+                eventType: 'BATCH_FAILED',
+                minLevel: 'WARN',
+                category: 'pipeline',
+                titleTemplate: 'New title',
+            }),
+        );
     });
 
     it('renders with no a11y violations', async () => {

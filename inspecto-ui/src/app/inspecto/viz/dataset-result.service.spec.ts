@@ -6,7 +6,10 @@ import { BiQueryService } from 'app/inspecto/api/bi-query.service';
 import { QuerySpec } from './viz-types';
 import { biQueryBody, DatasetResultService } from './dataset-result.service';
 
-const ROWS = [{ tariff: 'gold', duration_s: 10 }, { tariff: 'gold', duration_s: 20 }];
+const ROWS = [
+    { tariff: 'gold', duration_s: 10 },
+    { tariff: 'gold', duration_s: 20 },
+];
 const COLS = [
     { name: 'tariff', type: 'string' as const },
     { name: 'duration_s', type: 'number' as const },
@@ -17,7 +20,15 @@ function spec(overrides: Partial<QuerySpec> = {}): QuerySpec {
         datasetId: 'cdr_sample',
         sourceName: 'cdr',
         groupBy: ['tariff'],
-        measures: [{ id: 'sum_duration_s', expression: 'SUM("duration_s")', label: 'sum(duration_s)', agg: 'sum', field: 'duration_s' }],
+        measures: [
+            {
+                id: 'sum_duration_s',
+                expression: 'SUM("duration_s")',
+                label: 'sum(duration_s)',
+                agg: 'sum',
+                field: 'duration_s',
+            },
+        ],
         filters: null,
         ...overrides,
     };
@@ -114,7 +125,8 @@ describe('DatasetResultService', () => {
             // A named-measure expression has no structured {agg, field} origin — offline-only.
             const res = await svc.run(
                 spec({ measures: [{ id: 'avg_cost', expression: 'SUM(x)/COUNT(*)', label: 'avg cost' }] }),
-                ROWS, COLS,
+                ROWS,
+                COLS,
             );
             expect(res.ok).toBe(false);
             expect(res.error).toContain('offline-only');
@@ -127,23 +139,28 @@ describe('DatasetResultService', () => {
 
 describe('biQueryBody', () => {
     it('maps measures/groupBy/orderBy/limit and types filter values by column', () => {
-        const body = biQueryBody(spec({
-            filters: {
-                kind: 'group', op: 'AND', items: [
-                    { kind: 'condition', field: 'tariff', operator: '=', value: 'gold' },
-                    { kind: 'condition', field: 'duration_s', operator: '>=', value: '10' },
-                ],
-            },
-            orderBy: [{ field: 'tariff', dir: 'asc' }],
-            limit: 100,
-        }), COLS);
+        const body = biQueryBody(
+            spec({
+                filters: {
+                    kind: 'group',
+                    op: 'AND',
+                    items: [
+                        { kind: 'condition', field: 'tariff', operator: '=', value: 'gold' },
+                        { kind: 'condition', field: 'duration_s', operator: '>=', value: '10' },
+                    ],
+                },
+                orderBy: [{ field: 'tariff', dir: 'asc' }],
+                limit: 100,
+            }),
+            COLS,
+        );
         expect(body).toEqual({
             dataset: 'cdr_sample',
             measures: [{ agg: 'sum', field: 'duration_s' }],
             groupBy: ['tariff'],
             filters: [
                 { field: 'tariff', op: '=', value: 'gold' },
-                { field: 'duration_s', op: '>=', value: 10 },   // number, not '10'
+                { field: 'duration_s', op: '>=', value: 10 }, // number, not '10'
             ],
             orderBy: [{ field: 'tariff', dir: 'asc' }],
             limit: 100,
@@ -151,16 +168,21 @@ describe('biQueryBody', () => {
     });
 
     it('maps count without a field, contains→like, between→two terms, in→typed list', () => {
-        const body = biQueryBody(spec({
-            measures: [{ id: 'count', expression: 'COUNT(*)', label: 'count', agg: 'count' }],
-            filters: {
-                kind: 'group', op: 'AND', items: [
-                    { kind: 'condition', field: 'tariff', operator: 'contains', value: 'ol' },
-                    { kind: 'condition', field: 'duration_s', operator: 'between', value: '5', value2: '50' },
-                    { kind: 'condition', field: 'duration_s', operator: 'in', value: '10, 20' },
-                ],
-            },
-        }), COLS);
+        const body = biQueryBody(
+            spec({
+                measures: [{ id: 'count', expression: 'COUNT(*)', label: 'count', agg: 'count' }],
+                filters: {
+                    kind: 'group',
+                    op: 'AND',
+                    items: [
+                        { kind: 'condition', field: 'tariff', operator: 'contains', value: 'ol' },
+                        { kind: 'condition', field: 'duration_s', operator: 'between', value: '5', value2: '50' },
+                        { kind: 'condition', field: 'duration_s', operator: 'in', value: '10, 20' },
+                    ],
+                },
+            }),
+            COLS,
+        );
         expect(body?.measures).toEqual([{ agg: 'count' }]);
         expect(body?.filters).toEqual([
             { field: 'tariff', op: 'like', value: '%ol%' },
@@ -171,18 +193,23 @@ describe('biQueryBody', () => {
     });
 
     it('flattens nested AND groups; a single-item OR is that item', () => {
-        const body = biQueryBody(spec({
-            filters: {
-                kind: 'group', op: 'AND', items: [
-                    { kind: 'condition', field: 'tariff', operator: 'isNotNull' },
-                    {
-                        kind: 'group', op: 'OR', items: [
-                            { kind: 'condition', field: 'tariff', operator: '!=', value: 'silver' },
-                        ],
-                    },
-                ],
-            },
-        }), COLS);
+        const body = biQueryBody(
+            spec({
+                filters: {
+                    kind: 'group',
+                    op: 'AND',
+                    items: [
+                        { kind: 'condition', field: 'tariff', operator: 'isNotNull' },
+                        {
+                            kind: 'group',
+                            op: 'OR',
+                            items: [{ kind: 'condition', field: 'tariff', operator: '!=', value: 'silver' }],
+                        },
+                    ],
+                },
+            }),
+            COLS,
+        );
         expect(body?.filters).toEqual([
             { field: 'tariff', op: 'notNull' },
             { field: 'tariff', op: '!=', value: 'silver' },
@@ -190,14 +217,21 @@ describe('biQueryBody', () => {
     });
 
     it('is null for a real OR branch — dropping a term would change the numbers', () => {
-        expect(biQueryBody(spec({
-            filters: {
-                kind: 'group', op: 'OR', items: [
-                    { kind: 'condition', field: 'tariff', operator: '=', value: 'gold' },
-                    { kind: 'condition', field: 'tariff', operator: '=', value: 'silver' },
-                ],
-            },
-        }), COLS)).toBeNull();
+        expect(
+            biQueryBody(
+                spec({
+                    filters: {
+                        kind: 'group',
+                        op: 'OR',
+                        items: [
+                            { kind: 'condition', field: 'tariff', operator: '=', value: 'gold' },
+                            { kind: 'condition', field: 'tariff', operator: '=', value: 'silver' },
+                        ],
+                    },
+                }),
+                COLS,
+            ),
+        ).toBeNull();
     });
 
     it('is null for a named-measure expression and for an empty projection', () => {

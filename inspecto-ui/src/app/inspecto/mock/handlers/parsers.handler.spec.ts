@@ -87,7 +87,9 @@ describe('parsersHandler', () => {
         expect(asn1.status).toBe(422);
         expect(String((asn1.body as { error: string }).error)).toContain('not available in mock mode');
         expect(send('POST', '/api/parsers/delimited/preview', {})!.status).toBe(400);
-        expect(send('POST', '/api/parsers/delimited/preview', { sample_text: 'x'.repeat(1_000_001) })!.status).toBe(400);
+        expect(send('POST', '/api/parsers/delimited/preview', { sample_text: 'x'.repeat(1_000_001) })!.status).toBe(
+            400,
+        );
         const malformed = send('POST', '/api/parsers/xml/preview', { sample_text: '<a><oops' })!;
         expect(malformed.status).toBe(422);
         expect(String((malformed.body as { error: string }).error)).toContain('not well-formed');

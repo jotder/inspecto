@@ -64,7 +64,7 @@ export const environment = {
     oidc: { authorizeUrl: '', clientId: '', scopes: 'openid profile roles', endSessionUrl: '', mock: false },
     apiVersion: '/api/v1',
     basePath: '/',
-    authVersion:"/oauth",
+    authVersion: '/oauth',
     appName: 'inspecto',
     appLogo: 'assets/images/logo/inspecto-logo.svg',
     gatewayUrl: 'http://localhost:4204/',
@@ -79,8 +79,7 @@ export const environment = {
     // iam details. NOTE: no client secret here — this file ships inside the browser bundle, so any
     // value in it is public by construction. A confidential-client secret must live server-side; the
     // SPA is a public PKCE client (see the `oidc` block above).
-    iamClientId: "1070682796450139008",
-    dataFormat: "YYYYMMDD",
-    notificationSount: 'assets/sound/notification_2.mp3'
+    iamClientId: '1070682796450139008',
+    dataFormat: 'YYYYMMDD',
+    notificationSount: 'assets/sound/notification_2.mp3',
 };
-

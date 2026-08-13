@@ -3,18 +3,18 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import {
-  ConfigDeleteResult,
-  ConfigReadResult,
-  ConfigSpec,
-  ConfigType,
-  ConfigWriteResult,
-  EnrichmentPreview,
-  EnrichmentRegisterResult,
-  ParsingPreview,
-  PipelineRegisterResult,
-  SchemaPreview,
-  SchemaSuggestion,
-  ValidateResult,
+    ConfigDeleteResult,
+    ConfigReadResult,
+    ConfigSpec,
+    ConfigType,
+    ConfigWriteResult,
+    EnrichmentPreview,
+    EnrichmentRegisterResult,
+    ParsingPreview,
+    PipelineRegisterResult,
+    SchemaPreview,
+    SchemaSuggestion,
+    ValidateResult,
 } from './models';
 
 /**
@@ -25,90 +25,98 @@ import {
  */
 @Injectable({ providedIn: 'root' })
 export class ConfigService {
-  private http = inject(HttpClient);
+    private http = inject(HttpClient);
 
-  /** Field/rule spec for a config type — used to render the authoring form. */
-  spec(type: ConfigType): Observable<ConfigSpec> {
-    return this.http.get<ConfigSpec>(apiUrl(`/config/spec/${encodeURIComponent(type)}`));
-  }
-  /** Validate a saved .toon file on disk. */
-  validateFile(configPath: string): Observable<ValidateResult> {
-    return this.http.post<ValidateResult>(apiUrl('/validate'), { configPath });
-  }
-  /** Validate an unsaved draft against its type's spec; opt-in hard-fail safety gate. */
-  validateDraft(type: ConfigType, config: Record<string, unknown>, safety = false): Observable<ValidateResult> {
-    return this.http.post<ValidateResult>(apiUrl('/validate'), { type, config, safety });
-  }
-  /** Persist a validated draft under the write root; `overwrite: true` replaces (stage save).
-   *  `compatibility: 'none'` is the schema BACKWARD-gate override — the deliberate escape hatch. */
-  write(
-    type: ConfigType,
-    config: Record<string, unknown>,
-    opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none' },
-  ): Observable<ConfigWriteResult> {
-    return this.http.post<ConfigWriteResult>(apiUrl('/config/write'), { type, config, ...opts });
-  }
-  /**
-   * Block-level save: deep-merge `patch` over the file's CURRENT on-disk content, server-side
-   * (collector-config unification, 2026-08-04). Maps merge recursively, scalars/lists replace, an
-   * explicit `null` deletes its key. Same result shape as {@link write}, so findings routing is
-   * unchanged. 404s when the file doesn't exist yet — create via {@link write} first.
-   */
-  patch(
-    type: ConfigType,
-    name: string,
-    patch: Record<string, unknown>,
-    subdir?: string,
-  ): Observable<ConfigWriteResult> {
-    return this.http.post<ConfigWriteResult>(apiUrl('/config/patch'), { type, name, patch, ...(subdir ? { subdir } : {}) });
-  }
-  /** Read a config back as its decoded map — the onboarding resume path. */
-  read(type: ConfigType, name: string, subdir?: string): Observable<ConfigReadResult> {
-    return this.http.get<ConfigReadResult>(
-      apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
-      { params: toParams({ subdir }) },
-    );
-  }
-  /** Discard a config file. The server refuses an `active: true` pipeline (409) — deactivate first. */
-  remove(type: ConfigType, name: string, subdir?: string): Observable<ConfigDeleteResult> {
-    return this.http.delete<ConfigDeleteResult>(
-      apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
-      { params: toParams({ subdir }) },
-    );
-  }
-  /**
-   * Register a freshly written pipeline file with the running service (`POST /runs` — pairs with
-   * {@link write}: writing alone does not index a NEW file; later overwrites hot-reload by mtime).
-   */
-  registerPipeline(configPath: string): Observable<PipelineRegisterResult> {
-    return this.http.post<PipelineRegisterResult>(apiUrl('/runs'), { configPath });
-  }
-  /**
-   * Hot-register (or replace by name) a written enrichment file with the running service
-   * (`POST /enrichment` — the Stage-2 sibling of {@link registerPipeline}; enrichments do NOT
-   * hot-reload by mtime, so every save re-registers).
-   */
-  registerEnrichment(configPath: string): Observable<EnrichmentRegisterResult> {
-    return this.http.post<EnrichmentRegisterResult>(apiUrl('/enrichment'), { configPath });
-  }
-  /** Parse a raw sample with a draft's parsing settings — stateless, scratch-only (raw→parsed hop). */
-  previewParsing(config: Record<string, unknown>, sampleText: string): Observable<ParsingPreview> {
-    return this.http.post<ParsingPreview>(apiUrl('/config/preview/parsing'), {
-      config,
-      sample_text: sampleText,
-    });
-  }
-  /** TRY_CAST already-parsed sample rows against a draft schema's typed fields — stateless, scratch-only. */
-  previewSchema(config: Record<string, unknown>, sampleRows: Record<string, unknown>[]): Observable<SchemaPreview> {
-    return this.http.post<SchemaPreview>(apiUrl('/config/preview/schema'), { config, sampleRows });
-  }
-  /** Infer a DRAFT schema (typed fields + identity mapping) from already-parsed sample rows —
-   *  stateless, scratch-only; the result seeds a human edit and is never auto-applied. */
-  suggestSchema(sampleRows: Record<string, unknown>[]): Observable<SchemaSuggestion> {
-    return this.http.post<SchemaSuggestion>(apiUrl('/config/suggest/schema'), { sampleRows });
-  }
-  /** Run a draft enrichment's transform over an in-memory `input` sample — stateless, scratch-only. */
-  previewEnrichment(config: Record<string, unknown>, sampleRows: Record<string, unknown>[]): Observable<EnrichmentPreview> {
-    return this.http.post<EnrichmentPreview>(apiUrl('/enrichment/preview'), { config, sampleRows });
-  }
+    /** Field/rule spec for a config type — used to render the authoring form. */
+    spec(type: ConfigType): Observable<ConfigSpec> {
+        return this.http.get<ConfigSpec>(apiUrl(`/config/spec/${encodeURIComponent(type)}`));
+    }
+    /** Validate a saved .toon file on disk. */
+    validateFile(configPath: string): Observable<ValidateResult> {
+        return this.http.post<ValidateResult>(apiUrl('/validate'), { configPath });
+    }
+    /** Validate an unsaved draft against its type's spec; opt-in hard-fail safety gate. */
+    validateDraft(type: ConfigType, config: Record<string, unknown>, safety = false): Observable<ValidateResult> {
+        return this.http.post<ValidateResult>(apiUrl('/validate'), { type, config, safety });
+    }
+    /** Persist a validated draft under the write root; `overwrite: true` replaces (stage save).
+     *  `compatibility: 'none'` is the schema BACKWARD-gate override — the deliberate escape hatch. */
+    write(
+        type: ConfigType,
+        config: Record<string, unknown>,
+        opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none' },
+    ): Observable<ConfigWriteResult> {
+        return this.http.post<ConfigWriteResult>(apiUrl('/config/write'), { type, config, ...opts });
+    }
+    /**
+     * Block-level save: deep-merge `patch` over the file's CURRENT on-disk content, server-side
+     * (collector-config unification, 2026-08-04). Maps merge recursively, scalars/lists replace, an
+     * explicit `null` deletes its key. Same result shape as {@link write}, so findings routing is
+     * unchanged. 404s when the file doesn't exist yet — create via {@link write} first.
+     */
+    patch(
+        type: ConfigType,
+        name: string,
+        patch: Record<string, unknown>,
+        subdir?: string,
+    ): Observable<ConfigWriteResult> {
+        return this.http.post<ConfigWriteResult>(apiUrl('/config/patch'), {
+            type,
+            name,
+            patch,
+            ...(subdir ? { subdir } : {}),
+        });
+    }
+    /** Read a config back as its decoded map — the onboarding resume path. */
+    read(type: ConfigType, name: string, subdir?: string): Observable<ConfigReadResult> {
+        return this.http.get<ConfigReadResult>(
+            apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
+            { params: toParams({ subdir }) },
+        );
+    }
+    /** Discard a config file. The server refuses an `active: true` pipeline (409) — deactivate first. */
+    remove(type: ConfigType, name: string, subdir?: string): Observable<ConfigDeleteResult> {
+        return this.http.delete<ConfigDeleteResult>(
+            apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
+            { params: toParams({ subdir }) },
+        );
+    }
+    /**
+     * Register a freshly written pipeline file with the running service (`POST /runs` — pairs with
+     * {@link write}: writing alone does not index a NEW file; later overwrites hot-reload by mtime).
+     */
+    registerPipeline(configPath: string): Observable<PipelineRegisterResult> {
+        return this.http.post<PipelineRegisterResult>(apiUrl('/runs'), { configPath });
+    }
+    /**
+     * Hot-register (or replace by name) a written enrichment file with the running service
+     * (`POST /enrichment` — the Stage-2 sibling of {@link registerPipeline}; enrichments do NOT
+     * hot-reload by mtime, so every save re-registers).
+     */
+    registerEnrichment(configPath: string): Observable<EnrichmentRegisterResult> {
+        return this.http.post<EnrichmentRegisterResult>(apiUrl('/enrichment'), { configPath });
+    }
+    /** Parse a raw sample with a draft's parsing settings — stateless, scratch-only (raw→parsed hop). */
+    previewParsing(config: Record<string, unknown>, sampleText: string): Observable<ParsingPreview> {
+        return this.http.post<ParsingPreview>(apiUrl('/config/preview/parsing'), {
+            config,
+            sample_text: sampleText,
+        });
+    }
+    /** TRY_CAST already-parsed sample rows against a draft schema's typed fields — stateless, scratch-only. */
+    previewSchema(config: Record<string, unknown>, sampleRows: Record<string, unknown>[]): Observable<SchemaPreview> {
+        return this.http.post<SchemaPreview>(apiUrl('/config/preview/schema'), { config, sampleRows });
+    }
+    /** Infer a DRAFT schema (typed fields + identity mapping) from already-parsed sample rows —
+     *  stateless, scratch-only; the result seeds a human edit and is never auto-applied. */
+    suggestSchema(sampleRows: Record<string, unknown>[]): Observable<SchemaSuggestion> {
+        return this.http.post<SchemaSuggestion>(apiUrl('/config/suggest/schema'), { sampleRows });
+    }
+    /** Run a draft enrichment's transform over an in-memory `input` sample — stateless, scratch-only. */
+    previewEnrichment(
+        config: Record<string, unknown>,
+        sampleRows: Record<string, unknown>[],
+    ): Observable<EnrichmentPreview> {
+        return this.http.post<EnrichmentPreview>(apiUrl('/enrichment/preview'), { config, sampleRows });
+    }
 }

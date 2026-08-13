@@ -23,7 +23,12 @@ const PENDING: AgentApproval = {
     decidedBy: null,
 };
 
-const APPROVED: AgentApproval = { ...PENDING, status: 'APPROVED', decidedBy: 'operator', decidedAt: '2026-07-20T10:01:00Z' };
+const APPROVED: AgentApproval = {
+    ...PENDING,
+    status: 'APPROVED',
+    decidedBy: 'operator',
+    decidedAt: '2026-07-20T10:01:00Z',
+};
 
 async function create(
     overrides: Partial<Record<keyof ApprovalsService, unknown>> = {},

@@ -30,26 +30,28 @@ export class StreamTransferService {
      * read is omitted rather than failing the export — a partial export the operator is TOLD about
      * beats no export at all (the caller surfaces `missing`).
      */
-    buildExport(name: string, kind: 'stream' | 'reference', pipeline: Record<string, unknown>):
-        Observable<{ bundle: StreamBundle; missing: string[] }> {
+    buildExport(
+        name: string,
+        kind: 'stream' | 'reference',
+        pipeline: Record<string, unknown>,
+    ): Observable<{ bundle: StreamBundle; missing: string[] }> {
         const missing: string[] = [];
         const schemaName = this.schemaNameOf(pipeline);
         const segmentKeys = this.segmentKeysOf(pipeline);
 
-        const schema$ = schemaName
-            ? this.readConfig('schema', schemaName, missing)
-            : of(null);
-        const enrichment$ = kind === 'stream'
-            ? this.readConfig('enrichment', `${name}_enrich`, [])   // absent is normal, never reported
-            : of(null);
+        const schema$ = schemaName ? this.readConfig('schema', schemaName, missing) : of(null);
+        const enrichment$ =
+            kind === 'stream'
+                ? this.readConfig('enrichment', `${name}_enrich`, []) // absent is normal, never reported
+                : of(null);
         const segments$ = segmentKeys.length
             ? forkJoin(
-                segmentKeys.map((key) =>
-                    this.readConfig('schema', this.segmentSchemaName(name, key), missing).pipe(
-                        map((config) => ({ key, config })),
-                    ),
-                ),
-            )
+                  segmentKeys.map((key) =>
+                      this.readConfig('schema', this.segmentSchemaName(name, key), missing).pipe(
+                          map((config) => ({ key, config })),
+                      ),
+                  ),
+              )
             : of([] as { key: string; config: Record<string, unknown> | null }[]);
 
         return forkJoin({ schema: schema$, enrichment: enrichment$, segments: segments$ }).pipe(
@@ -102,9 +104,7 @@ export class StreamTransferService {
 
     /** Trigger a browser download of a stream bundle as pretty-printed JSON. */
     download(bundle: StreamBundle): void {
-        const url = URL.createObjectURL(
-            new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }),
-        );
+        const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' }));
         const link = document.createElement('a');
         link.href = url;
         link.download = streamBundleFileName(bundle.source.name, new Date(bundle.exportedAt));
@@ -129,9 +129,10 @@ export class StreamTransferService {
     /** The schema config NAME behind `processing.schema_file`'s path (`…/config/<name>.toon`). */
     private schemaNameOf(pipeline: Record<string, unknown>): string | null {
         const proc = pipeline['processing'];
-        const path = typeof proc === 'object' && proc !== null
-            ? String((proc as Record<string, unknown>)['schema_file'] ?? '').trim()
-            : '';
+        const path =
+            typeof proc === 'object' && proc !== null
+                ? String((proc as Record<string, unknown>)['schema_file'] ?? '').trim()
+                : '';
         if (!path) return null;
         const file = path.split(/[\\/]/).pop() ?? '';
         return file.replace(/\.toon$/i, '') || null;
@@ -139,12 +140,10 @@ export class StreamTransferService {
 
     private segmentKeysOf(pipeline: Record<string, unknown>): string[] {
         const parsing = pipeline['parsing'];
-        const plugin = typeof parsing === 'object' && parsing !== null
-            ? (parsing as Record<string, unknown>)['plugin']
-            : null;
-        const segments = typeof plugin === 'object' && plugin !== null
-            ? (plugin as Record<string, unknown>)['segments']
-            : null;
+        const plugin =
+            typeof parsing === 'object' && parsing !== null ? (parsing as Record<string, unknown>)['plugin'] : null;
+        const segments =
+            typeof plugin === 'object' && plugin !== null ? (plugin as Record<string, unknown>)['segments'] : null;
         return typeof segments === 'object' && segments !== null && !Array.isArray(segments)
             ? Object.keys(segments as Record<string, unknown>)
             : [];

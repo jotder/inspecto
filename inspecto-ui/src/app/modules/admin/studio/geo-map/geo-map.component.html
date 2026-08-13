@@ -28,15 +28,25 @@
         <div class="flex flex-wrap items-center gap-2">
             @if (geo()) {
                 <!-- search points (icon → popover) -->
-                <button mat-icon-button [matMenuTriggerFor]="searchMenu" [color]="search() ? 'primary' : undefined"
-                        matTooltip="Search points" aria-label="Search points">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="searchMenu"
+                    [color]="search() ? 'primary' : undefined"
+                    matTooltip="Search points"
+                    aria-label="Search points"
+                >
                     <mat-icon svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                 </button>
                 <mat-menu #searchMenu="matMenu">
                     <div class="p-3" (click)="$event.stopPropagation()">
                         <mat-form-field subscriptSizing="dynamic" class="w-64">
                             <mat-label>Search points</mat-label>
-                            <input matInput [value]="search()" (input)="onSearch($any($event.target).value)" aria-label="Search points" />
+                            <input
+                                matInput
+                                [value]="search()"
+                                (input)="onSearch($any($event.target).value)"
+                                aria-label="Search points"
+                            />
                             <mat-icon matSuffix svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
                         </mat-form-field>
                     </div>
@@ -47,36 +57,61 @@
                     <mat-icon svgIcon="heroicons_outline:map-pin"></mat-icon>
                 </button>
                 <mat-menu #placeMenu="matMenu">
-                    <div class="flex w-72 flex-col gap-1 p-3" (click)="$event.stopPropagation()" aria-label="Find place">
+                    <div
+                        class="flex w-72 flex-col gap-1 p-3"
+                        (click)="$event.stopPropagation()"
+                        aria-label="Find place"
+                    >
                         <mat-form-field subscriptSizing="dynamic">
                             <mat-label>Find place</mat-label>
-                            <input matInput [value]="placeQuery()" (input)="onFindPlace($any($event.target).value)"
-                                   placeholder="e.g. Dhaka" aria-label="Find place by name" />
+                            <input
+                                matInput
+                                [value]="placeQuery()"
+                                (input)="onFindPlace($any($event.target).value)"
+                                placeholder="e.g. Dhaka"
+                                aria-label="Find place by name"
+                            />
                             <mat-icon matSuffix svgIcon="heroicons_outline:map-pin"></mat-icon>
                         </mat-form-field>
                         @if (placeQuery() && !placeResults().length) {
                             <p class="text-secondary text-sm">No matching place.</p>
                         }
                         @for (r of placeResults(); track r.name + r.lat) {
-                            <button mat-button class="!justify-start" (click)="goToPlace(r)"
-                                    [attr.aria-label]="'Go to ' + r.name">
+                            <button
+                                mat-button
+                                class="!justify-start"
+                                (click)="goToPlace(r)"
+                                [attr.aria-label]="'Go to ' + r.name"
+                            >
                                 <span>{{ r.name }}</span>
-                                @if (r.context) { <span class="text-secondary ml-1 text-xs">{{ r.context }}</span> }
+                                @if (r.context) {
+                                    <span class="text-secondary ml-1 text-xs">{{ r.context }}</span>
+                                }
                             </button>
                         }
                     </div>
                 </mat-menu>
 
                 <!-- kind filter -->
-                <button mat-icon-button [matMenuTriggerFor]="kindMenu" [color]="kindFilter().length ? 'primary' : undefined"
-                        matTooltip="Filter point types"
-                        [attr.aria-label]="'Filter point types' + (kindFilter().length ? ' (filter active)' : '')">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="kindMenu"
+                    [color]="kindFilter().length ? 'primary' : undefined"
+                    matTooltip="Filter point types"
+                    [attr.aria-label]="'Filter point types' + (kindFilter().length ? ' (filter active)' : '')"
+                >
                     <mat-icon svgIcon="heroicons_outline:funnel"></mat-icon>
                 </button>
                 <mat-menu #kindMenu="matMenu">
-                    <div class="flex flex-col gap-1 px-4 py-2" (click)="$event.stopPropagation()" aria-label="Point types">
+                    <div
+                        class="flex flex-col gap-1 px-4 py-2"
+                        (click)="$event.stopPropagation()"
+                        aria-label="Point types"
+                    >
                         @for (k of pointKinds(); track k) {
-                            <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">{{ k }}</mat-checkbox>
+                            <mat-checkbox [checked]="kindOn(k)" (change)="toggleKind(k, $event.checked)">{{
+                                k
+                            }}</mat-checkbox>
                         }
                     </div>
                 </mat-menu>
@@ -85,62 +120,115 @@
                     <mat-icon svgIcon="heroicons_outline:viewfinder-circle"></mat-icon>
                 </button>
 
-                <button mat-icon-button (click)="toggleHeatmap()"
-                        [color]="displayMode() === 'heatmap' ? 'primary' : undefined"
-                        matTooltip="Heatmap"
-                        [attr.aria-label]="displayMode() === 'heatmap' ? 'Switch back to markers' : 'Switch to the density heatmap'">
+                <button
+                    mat-icon-button
+                    (click)="toggleHeatmap()"
+                    [color]="displayMode() === 'heatmap' ? 'primary' : undefined"
+                    matTooltip="Heatmap"
+                    [attr.aria-label]="
+                        displayMode() === 'heatmap' ? 'Switch back to markers' : 'Switch to the density heatmap'
+                    "
+                >
                     <mat-icon svgIcon="heroicons_outline:fire"></mat-icon>
                 </button>
 
-                <button mat-icon-button (click)="filterToView()"
-                        [color]="viewBox() ? 'primary' : undefined"
-                        matTooltip="Filter to view"
-                        [attr.aria-label]="'Keep only the points in the current viewport' + (viewBox() ? ' (region filter active)' : '')">
+                <button
+                    mat-icon-button
+                    (click)="filterToView()"
+                    [color]="viewBox() ? 'primary' : undefined"
+                    matTooltip="Filter to view"
+                    [attr.aria-label]="
+                        'Keep only the points in the current viewport' + (viewBox() ? ' (region filter active)' : '')
+                    "
+                >
                     <mat-icon svgIcon="heroicons_outline:scissors"></mat-icon>
                 </button>
 
-                <button mat-icon-button (click)="dataOpen.set(!dataOpen())"
-                        [color]="dataOpen() ? 'primary' : undefined"
-                        matTooltip="Data" aria-label="Toggle the data panel">
+                <button
+                    mat-icon-button
+                    (click)="dataOpen.set(!dataOpen())"
+                    [color]="dataOpen() ? 'primary' : undefined"
+                    matTooltip="Data"
+                    aria-label="Toggle the data panel"
+                >
                     <mat-icon svgIcon="heroicons_outline:table-cells"></mat-icon>
                 </button>
 
-                <button mat-icon-button (click)="analysisOpen.set(!analysisOpen())"
-                        [color]="analysisOpen() ? 'primary' : undefined"
-                        matTooltip="Geo intelligence" aria-label="Toggle the geo-intelligence toolbox">
+                <button
+                    mat-icon-button
+                    (click)="analysisOpen.set(!analysisOpen())"
+                    [color]="analysisOpen() ? 'primary' : undefined"
+                    matTooltip="Geo intelligence"
+                    aria-label="Toggle the geo-intelligence toolbox"
+                >
                     <mat-icon svgIcon="heroicons_outline:beaker"></mat-icon>
                 </button>
 
                 <!-- investigation tools (measure / radius / polygon / note) -->
-                <button mat-icon-button [matMenuTriggerFor]="toolsMenu"
-                        [color]="toolsActive() || notes().length ? 'primary' : undefined"
-                        matTooltip="Investigation tools" aria-label="Investigation tools (measure, radius search, polygon, notes)">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="toolsMenu"
+                    [color]="toolsActive() || notes().length ? 'primary' : undefined"
+                    matTooltip="Investigation tools"
+                    aria-label="Investigation tools (measure, radius search, polygon, notes)"
+                >
                     <mat-icon svgIcon="heroicons_outline:wrench-screwdriver"></mat-icon>
                 </button>
                 <mat-menu #toolsMenu="matMenu">
-                    <div class="flex w-80 flex-col gap-2 p-3" (click)="$event.stopPropagation()" aria-label="Investigation tools">
-                        <mat-button-toggle-group [value]="activeTool()" (change)="setTool($event.value)"
-                                                 hideSingleSelectionIndicator aria-label="Active tool">
-                            <mat-button-toggle value="measure" matTooltip="Click the map to measure a path">Measure</mat-button-toggle>
-                            <mat-button-toggle value="radius" matTooltip="Click the map to search around a spot">Radius</mat-button-toggle>
-                            <mat-button-toggle value="polygon" matTooltip="Click corners, then close to filter">Polygon</mat-button-toggle>
-                            <mat-button-toggle value="note" matTooltip="Type a note, then click the map to pin it">Note</mat-button-toggle>
+                    <div
+                        class="flex w-80 flex-col gap-2 p-3"
+                        (click)="$event.stopPropagation()"
+                        aria-label="Investigation tools"
+                    >
+                        <mat-button-toggle-group
+                            [value]="activeTool()"
+                            (change)="setTool($event.value)"
+                            hideSingleSelectionIndicator
+                            aria-label="Active tool"
+                        >
+                            <mat-button-toggle value="measure" matTooltip="Click the map to measure a path"
+                                >Measure</mat-button-toggle
+                            >
+                            <mat-button-toggle value="radius" matTooltip="Click the map to search around a spot"
+                                >Radius</mat-button-toggle
+                            >
+                            <mat-button-toggle value="polygon" matTooltip="Click corners, then close to filter"
+                                >Polygon</mat-button-toggle
+                            >
+                            <mat-button-toggle value="note" matTooltip="Type a note, then click the map to pin it"
+                                >Note</mat-button-toggle
+                            >
                         </mat-button-toggle-group>
                         @if (activeTool() === 'measure' && measureVertices().length > 1) {
-                            <p class="text-sm">Path: <b>{{ fmtDistance(measureTotalM()) }}</b> over {{ measureVertices().length }} points</p>
+                            <p class="text-sm">
+                                Path: <b>{{ fmtDistance(measureTotalM()) }}</b> over
+                                {{ measureVertices().length }} points
+                            </p>
                         }
                         @if (activeTool() === 'radius') {
                             <mat-form-field subscriptSizing="dynamic" class="w-36">
                                 <mat-label>Radius (m)</mat-label>
-                                <input matInput type="number" min="10" [value]="searchRadiusM()"
-                                       (input)="searchRadiusM.set(+$any($event.target).value || 1000)" aria-label="Search radius in meters" />
+                                <input
+                                    matInput
+                                    type="number"
+                                    min="10"
+                                    [value]="searchRadiusM()"
+                                    (input)="searchRadiusM.set(+$any($event.target).value || 1000)"
+                                    aria-label="Search radius in meters"
+                                />
                             </mat-form-field>
                             @if (radiusCenter()) {
-                                <p class="text-sm"><b>{{ radiusHits().length }}</b> points within {{ fmtDistance(searchRadiusM()) }}</p>
+                                <p class="text-sm">
+                                    <b>{{ radiusHits().length }}</b> points within {{ fmtDistance(searchRadiusM()) }}
+                                </p>
                             }
                         }
                         @if (activeTool() === 'polygon' && polygonVertices().length >= 3) {
-                            <button mat-stroked-button (click)="closePolygon()" aria-label="Close the polygon and filter to it">
+                            <button
+                                mat-stroked-button
+                                (click)="closePolygon()"
+                                aria-label="Close the polygon and filter to it"
+                            >
                                 <mat-icon svgIcon="heroicons_outline:check"></mat-icon>
                                 Close polygon ({{ polygonVertices().length }} corners) & filter
                             </button>
@@ -148,16 +236,27 @@
                         @if (activeTool() === 'note') {
                             <mat-form-field subscriptSizing="dynamic">
                                 <mat-label>Note text</mat-label>
-                                <input matInput [value]="noteText()" (input)="noteText.set($any($event.target).value)"
-                                       placeholder="e.g. suspected meeting point" aria-label="Note text" />
+                                <input
+                                    matInput
+                                    [value]="noteText()"
+                                    (input)="noteText.set($any($event.target).value)"
+                                    placeholder="e.g. suspected meeting point"
+                                    aria-label="Note text"
+                                />
                             </mat-form-field>
                         }
                         <div class="flex gap-2">
                             @if (toolsActive()) {
-                                <button mat-button (click)="clearTools()" aria-label="Clear tool drawings">Clear drawings</button>
+                                <button mat-button (click)="clearTools()" aria-label="Clear tool drawings">
+                                    Clear drawings
+                                </button>
                             }
                             @if (notes().length) {
-                                <button mat-button (click)="notes.set([])" [attr.aria-label]="'Remove all ' + notes().length + ' notes'">
+                                <button
+                                    mat-button
+                                    (click)="notes.set([])"
+                                    [attr.aria-label]="'Remove all ' + notes().length + ' notes'"
+                                >
                                     Clear {{ notes().length }} notes
                                 </button>
                             }
@@ -166,28 +265,55 @@
                 </mat-menu>
 
                 <!-- layer manager -->
-                <button mat-icon-button [matMenuTriggerFor]="layersMenu"
-                        [color]="customOverlay() ? 'primary' : undefined"
-                        matTooltip="Layers" aria-label="Layer manager">
+                <button
+                    mat-icon-button
+                    [matMenuTriggerFor]="layersMenu"
+                    [color]="customOverlay() ? 'primary' : undefined"
+                    matTooltip="Layers"
+                    aria-label="Layer manager"
+                >
                     <mat-icon svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                 </button>
                 <mat-menu #layersMenu="matMenu">
                     <div class="flex w-64 flex-col gap-1 p-3" (click)="$event.stopPropagation()" aria-label="Layers">
-                        <mat-checkbox [checked]="layerToggles().placeLabels !== false"
-                                      (change)="toggleLayer('placeLabels', $event.checked)">Place labels</mat-checkbox>
-                        <mat-checkbox [checked]="layerToggles().boundaries !== false"
-                                      (change)="toggleLayer('boundaries', $event.checked)">Country boundaries</mat-checkbox>
-                        <mat-checkbox [checked]="layerToggles().pointLabels !== false"
-                                      (change)="toggleLayer('pointLabels', $event.checked)">Point labels</mat-checkbox>
-                        <input #overlayFile type="file" accept=".json,.geojson,application/geo+json" class="hidden"
-                               (change)="onOverlayFile(overlayFile)" aria-label="GeoJSON overlay file" />
-                        <button mat-stroked-button class="mt-1" (click)="overlayFile.click()" aria-label="Add a GeoJSON overlay">
+                        <mat-checkbox
+                            [checked]="layerToggles().placeLabels !== false"
+                            (change)="toggleLayer('placeLabels', $event.checked)"
+                            >Place labels</mat-checkbox
+                        >
+                        <mat-checkbox
+                            [checked]="layerToggles().boundaries !== false"
+                            (change)="toggleLayer('boundaries', $event.checked)"
+                            >Country boundaries</mat-checkbox
+                        >
+                        <mat-checkbox
+                            [checked]="layerToggles().pointLabels !== false"
+                            (change)="toggleLayer('pointLabels', $event.checked)"
+                            >Point labels</mat-checkbox
+                        >
+                        <input
+                            #overlayFile
+                            type="file"
+                            accept=".json,.geojson,application/geo+json"
+                            class="hidden"
+                            (change)="onOverlayFile(overlayFile)"
+                            aria-label="GeoJSON overlay file"
+                        />
+                        <button
+                            mat-stroked-button
+                            class="mt-1"
+                            (click)="overlayFile.click()"
+                            aria-label="Add a GeoJSON overlay"
+                        >
                             <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
                             Add GeoJSON overlay
                         </button>
                         @if (customOverlay(); as o) {
-                            <button mat-button (click)="customOverlay.set(null)"
-                                    [attr.aria-label]="'Remove the overlay (' + o.features.length + ' features)'">
+                            <button
+                                mat-button
+                                (click)="customOverlay.set(null)"
+                                [attr.aria-label]="'Remove the overlay (' + o.features.length + ' features)'"
+                            >
                                 Remove overlay ({{ o.features.length }} features)
                             </button>
                         }
@@ -195,7 +321,12 @@
                 </mat-menu>
 
                 @if (search() || kindFilter().length || selectedId() || timeRange() || viewBox() || polygonFilter()) {
-                    <button mat-icon-button (click)="clearInvestigation()" matTooltip="Clear search & filters" aria-label="Clear search and filters">
+                    <button
+                        mat-icon-button
+                        (click)="clearInvestigation()"
+                        matTooltip="Clear search & filters"
+                        aria-label="Clear search and filters"
+                    >
                         <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                     </button>
                 }
@@ -212,7 +343,12 @@
             }
 
             <!-- saved views (open) — always available -->
-            <button mat-icon-button [matMenuTriggerFor]="viewsMenu" matTooltip="Saved views" aria-label="Open saved views">
+            <button
+                mat-icon-button
+                [matMenuTriggerFor]="viewsMenu"
+                matTooltip="Saved views"
+                aria-label="Open saved views"
+            >
                 <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
             </button>
             <mat-menu #viewsMenu="matMenu">
@@ -247,16 +383,32 @@
                 </ng-template>
             </mat-menu>
 
-            <inspecto-transfer-menu [items]="transferItems()" [allowedKinds]="['geo-map-view']" (changed)="reloadViews()" label="Import / export saved views" />
+            <inspecto-transfer-menu
+                [items]="transferItems()"
+                [allowedKinds]="['geo-map-view']"
+                (changed)="reloadViews()"
+                label="Import / export saved views"
+            />
 
             <!-- save view — needs a rendered map -->
-            <button mat-icon-button #saveTrigger="matMenuTrigger" [matMenuTriggerFor]="saveMenu" [disabled]="!geo()"
-                    matTooltip="Save view" aria-label="Save the current view">
+            <button
+                mat-icon-button
+                #saveTrigger="matMenuTrigger"
+                [matMenuTriggerFor]="saveMenu"
+                [disabled]="!geo()"
+                matTooltip="Save view"
+                aria-label="Save the current view"
+            >
                 <mat-icon svgIcon="heroicons_outline:bookmark"></mat-icon>
             </button>
             <mat-menu #saveMenu="matMenu">
-                <form [formGroup]="saveForm" (ngSubmit)="saveView()" class="flex w-72 flex-col p-3"
-                      (click)="$event.stopPropagation()" aria-label="Save this view">
+                <form
+                    [formGroup]="saveForm"
+                    (ngSubmit)="saveView()"
+                    class="flex w-72 flex-col p-3"
+                    (click)="$event.stopPropagation()"
+                    aria-label="Save this view"
+                >
                     <mat-form-field>
                         <mat-label>Name</mat-label>
                         <input matInput formControlName="name" />
@@ -279,8 +431,13 @@
             </mat-menu>
 
             <!-- export -->
-            <button mat-icon-button [matMenuTriggerFor]="exportMenu" [disabled]="!geo()"
-                    matTooltip="Export" aria-label="Export the map">
+            <button
+                mat-icon-button
+                [matMenuTriggerFor]="exportMenu"
+                [disabled]="!geo()"
+                matTooltip="Export"
+                aria-label="Export the map"
+            >
                 <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
             </button>
             <mat-menu #exportMenu="matMenu">
@@ -297,8 +454,12 @@
 
         <!-- ══ query builder (collapses to the toolbar summary after a run) ══ -->
         @if (queryOpen()) {
-            <form [formGroup]="queryForm" (ngSubmit)="run()"
-                  class="bg-card flex flex-wrap items-start gap-3 rounded-2xl p-4 shadow" aria-label="Geo query">
+            <form
+                [formGroup]="queryForm"
+                (ngSubmit)="run()"
+                class="bg-card flex flex-wrap items-start gap-3 rounded-2xl p-4 shadow"
+                aria-label="Geo query"
+            >
                 <mat-form-field subscriptSizing="dynamic" class="w-56">
                     <mat-label>Source</mat-label>
                     <mat-select [value]="sourceId()" (valueChange)="sourceId.set($event)" aria-label="Geo source">
@@ -424,21 +585,39 @@
         <!-- ══ timeline (only when the data carries time) ══ -->
         @if (extent(); as ext) {
             <div class="bg-card flex flex-wrap items-center gap-3 rounded-2xl px-4 py-1 shadow">
-                <button mat-icon-button (click)="togglePlay()"
-                        [color]="playing() ? 'primary' : undefined"
-                        [matTooltip]="playing() ? 'Pause playback' : 'Play events over time'"
-                        [attr.aria-label]="playing() ? 'Pause event playback' : 'Play events over time'">
+                <button
+                    mat-icon-button
+                    (click)="togglePlay()"
+                    [color]="playing() ? 'primary' : undefined"
+                    [matTooltip]="playing() ? 'Pause playback' : 'Play events over time'"
+                    [attr.aria-label]="playing() ? 'Pause event playback' : 'Play events over time'"
+                >
                     <mat-icon [svgIcon]="playing() ? 'heroicons_outline:pause' : 'heroicons_outline:play'"></mat-icon>
                 </button>
                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clock"></mat-icon>
                 <span class="text-secondary whitespace-nowrap text-xs">
                     {{ timeLabel(timeRange()?.[0] ?? ext[0]) }} — {{ timeLabel(timeRange()?.[1] ?? ext[1]) }}
                 </span>
-                <mat-slider class="min-w-40 flex-auto" [min]="ext[0]" [max]="ext[1]" [step]="60000" discrete [displayWith]="timeLabel">
-                    <input matSliderStartThumb aria-label="Time filter start"
-                           [value]="timeRange()?.[0] ?? ext[0]" (valueChange)="setTimeFrom($event)" />
-                    <input matSliderEndThumb aria-label="Time filter end"
-                           [value]="timeRange()?.[1] ?? ext[1]" (valueChange)="setTimeTo($event)" />
+                <mat-slider
+                    class="min-w-40 flex-auto"
+                    [min]="ext[0]"
+                    [max]="ext[1]"
+                    [step]="60000"
+                    discrete
+                    [displayWith]="timeLabel"
+                >
+                    <input
+                        matSliderStartThumb
+                        aria-label="Time filter start"
+                        [value]="timeRange()?.[0] ?? ext[0]"
+                        (valueChange)="setTimeFrom($event)"
+                    />
+                    <input
+                        matSliderEndThumb
+                        aria-label="Time filter end"
+                        [value]="timeRange()?.[1] ?? ext[1]"
+                        (valueChange)="setTimeTo($event)"
+                    />
                 </mat-slider>
             </div>
         }
@@ -447,10 +626,19 @@
         @if (loading()) {
             <inspecto-skeleton height="24rem" />
         } @else if (displayed(); as d) {
-            <inspecto-map-view [data]="d" [emphasis]="emphasis()" [display]="displayMode()" [camera]="loadCamera"
-                               [overlay]="overlay()" [layers]="layerToggles()" [tileServerUrl]="tileServerUrl()" [fill]="true"
-                               (pointClick)="onPointClick($event)" (routeClick)="onRouteClick($event)"
-                               (mapClick)="onMapClick($event)" />
+            <inspecto-map-view
+                [data]="d"
+                [emphasis]="emphasis()"
+                [display]="displayMode()"
+                [camera]="loadCamera"
+                [overlay]="overlay()"
+                [layers]="layerToggles()"
+                [tileServerUrl]="tileServerUrl()"
+                [fill]="true"
+                (pointClick)="onPointClick($event)"
+                (routeClick)="onRouteClick($event)"
+                (mapClick)="onMapClick($event)"
+            />
             <p class="sr-only" role="status">
                 Map showing {{ d.points.length }} points{{ search() ? ' matching the search' : '' }}.
             </p>
@@ -458,7 +646,8 @@
             <inspecto-empty-state
                 icon="heroicons_outline:globe-alt"
                 title="No map yet"
-                message="Pick a dataset, map its latitude and longitude columns, then run the query." />
+                message="Pick a dataset, map its latitude and longitude columns, then run the query."
+            />
         }
 
         <!-- ══ geo-intelligence toolbox (Phase 3) — kept mounted via [hidden] so its results survive
@@ -467,7 +656,8 @@
             <inspecto-geo-analysis-toolbox
                 [hidden]="!analysisOpen()"
                 [points]="displayed()?.points ?? []"
-                (focus)="focusResult($event)" />
+                (focus)="focusResult($event)"
+            />
         }
 
         <!-- ══ bottom data panel (the shared table; row click focuses the map) ══ -->
@@ -481,7 +671,8 @@
                     sourceName="geo_points"
                     exportName="geo-points"
                     noRowsTitle="No points match"
-                    (rowClick)="onRowClick($event)" />
+                    (rowClick)="onRowClick($event)"
+                />
             </div>
         }
     </div>

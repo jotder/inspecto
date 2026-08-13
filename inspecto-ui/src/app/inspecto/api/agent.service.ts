@@ -143,7 +143,10 @@ export class AgentService {
 
     /** One complete (non-streamed) ask. 404 unknown session, 400 missing question. */
     ask(sessionId: string, question: string, page?: Record<string, unknown>): Observable<AgentAskResult> {
-        return this.http.post<AgentAskResult>(apiUrl(`/agent/sessions/${encodeURIComponent(sessionId)}/ask`), { question, page });
+        return this.http.post<AgentAskResult>(apiUrl(`/agent/sessions/${encodeURIComponent(sessionId)}/ask`), {
+            question,
+            page,
+        });
     }
 
     /**
@@ -173,8 +176,10 @@ export class AgentService {
      * rephrase would be a lie. 422 stays "the model produced nothing usable", and is retryable.
      */
     deriveTool<T>(name: string, prompt: string, args: Record<string, unknown>): Observable<DeriveResult<T>> {
-        return this.http.post<DeriveResult<T>>(
-            apiUrl(`/agent/tools/${encodeURIComponent(name)}/derive`), { prompt, args });
+        return this.http.post<DeriveResult<T>>(apiUrl(`/agent/tools/${encodeURIComponent(name)}/derive`), {
+            prompt,
+            args,
+        });
     }
 
     /**
@@ -183,7 +188,12 @@ export class AgentService {
      * `event: complete` → `onComplete` or `event: error` → `onError`. Cancel via the AbortSignal
      * (an abort ends the stream silently — no error callback).
      */
-    async askStream(sessionId: string, question: string, handlers: AgentStreamHandlers, signal?: AbortSignal): Promise<void> {
+    async askStream(
+        sessionId: string,
+        question: string,
+        handlers: AgentStreamHandlers,
+        signal?: AbortSignal,
+    ): Promise<void> {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         // authInterceptor equivalent: bearer only in Standard-edition OIDC mode, never on Personal.
         if (this.session.authMode() === 'oidc') {
@@ -217,7 +227,8 @@ export class AgentService {
             for (;;) {
                 const { done, value } = await reader.read();
                 if (done) break;
-                for (const frame of parser.push(decoder.decode(value, { stream: true }))) this.dispatch(frame, handlers);
+                for (const frame of parser.push(decoder.decode(value, { stream: true })))
+                    this.dispatch(frame, handlers);
             }
         } catch {
             if (!signal?.aborted) handlers.onError('The agent stream was interrupted.');
@@ -233,7 +244,8 @@ export class AgentService {
             case 'artifact': {
                 const artifact = safeParse(frame.data);
                 // A malformed artifact frame is dropped — the complete frame still carries the answer.
-                if (isRecord(artifact) && typeof artifact['kind'] === 'string') handlers.onArtifact(artifact as unknown as A2uiArtifact);
+                if (isRecord(artifact) && typeof artifact['kind'] === 'string')
+                    handlers.onArtifact(artifact as unknown as A2uiArtifact);
                 break;
             }
             case 'complete': {

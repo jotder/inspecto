@@ -12,44 +12,30 @@ export class IconsService {
         const matIconRegistry = inject(MatIconRegistry);
 
         // Register icon sets
-        matIconRegistry.addSvgIconSet(
-            domSanitizer.bypassSecurityTrustResourceUrl(
-                'icons/material-twotone.svg'
-            )
-        );
+        matIconRegistry.addSvgIconSet(domSanitizer.bypassSecurityTrustResourceUrl('icons/material-twotone.svg'));
         matIconRegistry.addSvgIconSetInNamespace(
             'mat_outline',
-            domSanitizer.bypassSecurityTrustResourceUrl(
-                'icons/material-outline.svg'
-            )
+            domSanitizer.bypassSecurityTrustResourceUrl('icons/material-outline.svg'),
         );
         matIconRegistry.addSvgIconSetInNamespace(
             'mat_solid',
-            domSanitizer.bypassSecurityTrustResourceUrl(
-                'icons/material-solid.svg'
-            )
+            domSanitizer.bypassSecurityTrustResourceUrl('icons/material-solid.svg'),
         );
         matIconRegistry.addSvgIconSetInNamespace(
             'feather',
-            domSanitizer.bypassSecurityTrustResourceUrl('icons/feather.svg')
+            domSanitizer.bypassSecurityTrustResourceUrl('icons/feather.svg'),
         );
         matIconRegistry.addSvgIconSetInNamespace(
             'heroicons_outline',
-            domSanitizer.bypassSecurityTrustResourceUrl(
-                'icons/heroicons-outline.svg'
-            )
+            domSanitizer.bypassSecurityTrustResourceUrl('icons/heroicons-outline.svg'),
         );
         matIconRegistry.addSvgIconSetInNamespace(
             'heroicons_solid',
-            domSanitizer.bypassSecurityTrustResourceUrl(
-                'icons/heroicons-solid.svg'
-            )
+            domSanitizer.bypassSecurityTrustResourceUrl('icons/heroicons-solid.svg'),
         );
         matIconRegistry.addSvgIconSetInNamespace(
             'heroicons_mini',
-            domSanitizer.bypassSecurityTrustResourceUrl(
-                'icons/heroicons-mini.svg'
-            )
+            domSanitizer.bypassSecurityTrustResourceUrl('icons/heroicons-mini.svg'),
         );
     }
 }

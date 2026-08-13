@@ -164,7 +164,10 @@ describe('CS4 format_gauntlet — every parser format, every reject wired', () =
         const parsers = p.nodes.filter((n) => n.type === 'parser').map((n) => n.id);
         expect(parsers.length).toBe(5);
         for (const id of parsers) {
-            expect(p.edges.some((e) => e.from === id && e.rel === 'unmatched' && e.to === 's_rejects'), id).toBe(true);
+            expect(
+                p.edges.some((e) => e.from === id && e.rel === 'unmatched' && e.to === 's_rejects'),
+                id,
+            ).toBe(true);
         }
     });
 });
@@ -175,7 +178,8 @@ describe('CS5 deadletter_torture — every control relation on a deep chain', ()
     it('wires every control-flow relation kind', () => {
         const r = rels(p);
         // 'kept' was never a PipelineRel — transform.filter emits data/dropped.
-        for (const rel of ['data', 'failure', 'gap', 'unmatched', 'dropped', 'invalid', 'success']) expect(r).toContain(rel);
+        for (const rel of ['data', 'failure', 'gap', 'unmatched', 'dropped', 'invalid', 'success'])
+            expect(r).toContain(rel);
     });
 
     it('has a 9-stage main chain and both alert severities', () => {

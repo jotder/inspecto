@@ -14,7 +14,10 @@ const ROWS = [
 async function create(rows: Record<string, unknown>[] = ROWS) {
     TestBed.configureTestingModule({
         imports: [DashboardDrillDrawerComponent],
-        providers: [provideNoopAnimations(), { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+        ],
     });
     await TestBed.compileComponents(); // the data table @defer-loads its SQL editor
     const fixture = TestBed.createComponent(DashboardDrillDrawerComponent);

@@ -92,15 +92,13 @@ export class NotificationsService {
     /** Reload the feed + unread badge (initial load and the polling fallback). */
     refresh(): void {
         this.loading.set(true);
-        this.http
-            .get<NotificationRow[]>(apiUrl('/notifications'), { params: toParams({ limit: 50 }) })
-            .subscribe({
-                next: (rows) => {
-                    this.items.set(rows);
-                    this.loading.set(false);
-                },
-                error: () => this.loading.set(false),
-            });
+        this.http.get<NotificationRow[]>(apiUrl('/notifications'), { params: toParams({ limit: 50 }) }).subscribe({
+            next: (rows) => {
+                this.items.set(rows);
+                this.loading.set(false);
+            },
+            error: () => this.loading.set(false),
+        });
         this.http
             .get<{ count: number }>(apiUrl('/notifications/unread-count'))
             .subscribe({ next: (r) => this.unreadCount.set(r.count) });
@@ -117,9 +115,7 @@ export class NotificationsService {
     markRead(id: string): void {
         this.http.post(apiUrl(`/notifications/${encodeURIComponent(id)}/read`), {}).subscribe({
             next: () => {
-                this.items.update((rows) =>
-                    rows.map((n) => (n.id === id ? { ...n, state: 'READ' as const } : n)),
-                );
+                this.items.update((rows) => rows.map((n) => (n.id === id ? { ...n, state: 'READ' as const } : n)));
                 this.unreadCount.update((c) => Math.max(0, c - 1));
             },
         });

@@ -25,7 +25,11 @@ function create(data: ScheduleExportData) {
 
 describe('ScheduleExportDialog', () => {
     it('create mode blocks a duplicate id inline and has no a11y violations', async () => {
-        const fixture = create({ dashboardId: 'cdr_overview', dashboardName: 'CDR Overview', existingNames: ['daily_cdr_export'] });
+        const fixture = create({
+            dashboardId: 'cdr_overview',
+            dashboardName: 'CDR Overview',
+            existingNames: ['daily_cdr_export'],
+        });
         const name = fixture.componentInstance.schemaForm.form.get('name')!;
         name.setValue('daily_cdr_export');
         expect(name.hasError('duplicate')).toBe(true);
@@ -39,7 +43,11 @@ describe('ScheduleExportDialog', () => {
             dashboardId: 'cdr_overview',
             dashboardName: 'CDR Overview',
             job: {
-                name: 'daily_cdr_export', type: 'report', cron: '0 0 6 * * *', onPipeline: null, enabled: true,
+                name: 'daily_cdr_export',
+                type: 'report',
+                cron: '0 0 6 * * *',
+                onPipeline: null,
+                enabled: true,
                 params: { dashboardId: 'cdr_overview', format: 'pdf', recipients: ['ops@x.com', 'fin@x.com'] },
             },
         });

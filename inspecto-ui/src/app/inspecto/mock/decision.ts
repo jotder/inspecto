@@ -26,15 +26,26 @@ export function executeConsequences(store: MockStore, space: string, rule: Decis
 }
 
 function executeOne(
-    store: MockStore, space: string, rule: DecisionRule, c: Consequence, i: number,
-    source: Ref, correlationId: string, now: number,
+    store: MockStore,
+    space: string,
+    rule: DecisionRule,
+    c: Consequence,
+    i: number,
+    source: Ref,
+    correlationId: string,
+    now: number,
 ): ExecutedConsequence {
     const sev = (c.params?.['severity'] as SignalSeverity | undefined) ?? 'info';
     switch (c.action) {
         case 'emit-signal': {
             const type = String(c.params?.['type'] ?? 'DECISION');
             emitSignal(store, space, {
-                signalId: `dec-${now}-${i}`, type, at: now, source, correlationId, severity: sev,
+                signalId: `dec-${now}-${i}`,
+                type,
+                at: now,
+                source,
+                correlationId,
+                severity: sev,
                 payload: { message: String(c.params?.['message'] ?? `${rule.name} emitted ${type}`), rule: rule.name },
             });
             return { action: c.action, status: 'executed', detail: `emitted ${type}` };
@@ -42,11 +53,21 @@ function executeOne(
         case 'create-alert': {
             const ruleName = String(c.params?.['rule'] ?? rule.name);
             emitSignal(store, space, {
-                signalId: `dec-alert-${now}-${i}`, type: 'ALERT_FIRED', at: now, source, correlationId,
+                signalId: `dec-alert-${now}-${i}`,
+                type: 'ALERT_FIRED',
+                at: now,
+                source,
+                correlationId,
                 severity: (c.params?.['severity'] as SignalSeverity | undefined) ?? 'warn',
                 payload: {
-                    rule: ruleName, pipeline: rule.target, metric: String(c.params?.['metric'] ?? 'decision'),
-                    value: 1, comparator: 'eq', threshold: 1, window: 'n/a', message: `Alert raised by decision rule ${rule.name}`,
+                    rule: ruleName,
+                    pipeline: rule.target,
+                    metric: String(c.params?.['metric'] ?? 'decision'),
+                    value: 1,
+                    comparator: 'eq',
+                    threshold: 1,
+                    window: 'n/a',
+                    message: `Alert raised by decision rule ${rule.name}`,
                 },
             });
             return { action: c.action, status: 'executed', detail: `alert ${ruleName}` };
@@ -60,17 +81,31 @@ function executeOne(
             const alreadyOpen = store
                 .list<OperationalObject>(space, OPS_OBJECTS_COLL)
                 .some((o) => o.correlationId === correlationId && o.status !== 'CLOSED' && o.status !== 'RESOLVED');
-            if (alreadyOpen) return { action: c.action, status: 'executed', detail: `Incident already open for rule ${rule.name}` };
+            if (alreadyOpen)
+                return { action: c.action, status: 'executed', detail: `Incident already open for rule ${rule.name}` };
             const obj: OperationalObject = {
-                id: `obj-${now}-${i}`, objectType: 'INCIDENT', title,
-                description: `Raised by Decision Rule "${rule.name}"`, status: 'OPEN', severity,
-                priority: undefined, owner: undefined, assignee: undefined, correlationId,
+                id: `obj-${now}-${i}`,
+                objectType: 'INCIDENT',
+                title,
+                description: `Raised by Decision Rule "${rule.name}"`,
+                status: 'OPEN',
+                severity,
+                priority: undefined,
+                owner: undefined,
+                assignee: undefined,
+                correlationId,
                 attributes: { rule: rule.name, decisionRule: rule.name, severity },
-                createdAt: now, updatedAt: now, closedAt: 0,
+                createdAt: now,
+                updatedAt: now,
+                closedAt: 0,
             };
             store.put(space, OPS_OBJECTS_COLL, obj.id, obj);
             emitSignal(store, space, {
-                signalId: `dec-incident-${now}-${i}`, type: 'INCIDENT_OPENED', at: now, source, correlationId,
+                signalId: `dec-incident-${now}-${i}`,
+                type: 'INCIDENT_OPENED',
+                at: now,
+                source,
+                correlationId,
                 severity: severity.toUpperCase() === 'CRITICAL' ? 'critical' : 'error',
                 payload: { title, incidentId: obj.id, rule: rule.name },
             });
@@ -80,7 +115,12 @@ function executeOne(
             const job = c.target?.id;
             if (!job) return { action: c.action, status: 'skipped', detail: 'no target job' };
             emitSignal(store, space, {
-                signalId: `dec-${now}-${i}`, type: 'JOB_STARTED', at: now, source, correlationId, severity: 'info',
+                signalId: `dec-${now}-${i}`,
+                type: 'JOB_STARTED',
+                at: now,
+                source,
+                correlationId,
+                severity: 'info',
                 payload: { message: `Started job ${job} (decision "${rule.name}")`, job },
             });
             return { action: c.action, status: 'executed', detail: `started job ${job}` };
@@ -89,7 +129,12 @@ function executeOne(
             const pipe = c.target?.id;
             if (!pipe) return { action: c.action, status: 'skipped', detail: 'no target pipeline' };
             emitSignal(store, space, {
-                signalId: `dec-${now}-${i}`, type: 'PIPELINE_TRIGGERED', at: now, source, correlationId, severity: 'info',
+                signalId: `dec-${now}-${i}`,
+                type: 'PIPELINE_TRIGGERED',
+                at: now,
+                source,
+                correlationId,
+                severity: 'info',
                 payload: { message: `Triggered pipeline ${pipe} (decision "${rule.name}")`, pipeline: pipe },
             });
             return { action: c.action, status: 'executed', detail: `triggered ${pipe}` };
@@ -98,7 +143,12 @@ function executeOne(
         case 'generate-report':
         case 'invoke-api': {
             emitSignal(store, space, {
-                signalId: `dec-${now}-${i}`, type: 'DECISION_ACTION', at: now, source, correlationId, severity: 'info',
+                signalId: `dec-${now}-${i}`,
+                type: 'DECISION_ACTION',
+                at: now,
+                source,
+                correlationId,
+                severity: 'info',
                 payload: { message: describeConsequence(c), action: c.action },
             });
             return { action: c.action, status: 'executed', detail: describeConsequence(c) };
@@ -106,6 +156,10 @@ function executeOne(
         default:
             // route / tag / quarantine / drop — applied to matching records during the target
             // pipeline's runs (backend parity: DecisionRoutes.executeOne), never on demand here.
-            return { action: c.action, status: 'skipped', detail: 'applied to matching records during the target pipeline\'s runs' };
+            return {
+                action: c.action,
+                status: 'skipped',
+                detail: "applied to matching records during the target pipeline's runs",
+            };
     }
 }

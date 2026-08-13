@@ -47,7 +47,10 @@ const gammaHighlight = HighlightStyle.define([
 ]);
 
 /** Build the extension set for one editor instance. `onChange` fires with the full doc on every edit. */
-export function sqlEditorExtensions(opts: { onChange: (value: string) => void; placeholderText?: string }): Extension[] {
+export function sqlEditorExtensions(opts: {
+    onChange: (value: string) => void;
+    placeholderText?: string;
+}): Extension[] {
     return [
         lineNumbers(),
         highlightActiveLine(),

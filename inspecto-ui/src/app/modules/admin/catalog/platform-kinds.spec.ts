@@ -28,7 +28,10 @@ describe('platform kinds (P2 adapters)', () => {
         const flow: AuthoredPipeline = {
             name: 'p1',
             active: false,
-            nodes: [{ id: 'src', type: 'collector' }, { id: 'parse', type: 'dsv' }],
+            nodes: [
+                { id: 'src', type: 'collector' },
+                { id: 'parse', type: 'dsv' },
+            ],
             edges: [{ from: 'src', to: 'parse', rel: 'data' }],
         };
         const parts = [

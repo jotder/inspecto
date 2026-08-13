@@ -7,26 +7,39 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  */
 export const CHANNEL_ATTRIBUTES: AttributeSpec[] = [
     {
-        key: 'id', label: 'Channel id', type: 'string', tier: 'required',
+        key: 'id',
+        label: 'Channel id',
+        type: 'string',
+        tier: 'required',
         pattern: '[A-Za-z0-9][A-Za-z0-9._-]*',
         placeholder: 'e.g. ops_email',
         help: 'Letters, digits, dot, dash, underscore; start alphanumeric.',
     },
     {
-        key: 'kind', label: 'Kind', type: 'select', tier: 'required', default: 'EMAIL',
+        key: 'kind',
+        label: 'Kind',
+        type: 'select',
+        tier: 'required',
+        default: 'EMAIL',
         options: [
             { value: 'EMAIL', label: 'Email' },
             { value: 'WEBHOOK', label: 'Webhook' },
         ],
     },
     {
-        key: 'target', label: 'Email address', type: 'string', tier: 'required',
+        key: 'target',
+        label: 'Email address',
+        type: 'string',
+        tier: 'required',
         dependsOn: { key: 'kind', equals: 'EMAIL' },
         placeholder: 'ops@example.com',
         help: 'Where alert/incident notifications are delivered.',
     },
     {
-        key: 'targetUrl', label: 'Webhook URL', type: 'string', tier: 'required',
+        key: 'targetUrl',
+        label: 'Webhook URL',
+        type: 'string',
+        tier: 'required',
         dependsOn: { key: 'kind', equals: 'WEBHOOK' },
         placeholder: 'https://hooks.example.com/inspecto',
         help: 'POSTed a JSON payload per notification.',

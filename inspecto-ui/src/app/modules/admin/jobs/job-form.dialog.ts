@@ -1,6 +1,23 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, ViewChild } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    computed,
+    inject,
+    signal,
+    ViewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormArray,
+    FormBuilder,
+    FormGroup,
+    ReactiveFormsModule,
+    ValidatorFn,
+    Validators,
+} from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,7 +26,15 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, JobDetail, JobExpressionDecl, JobsService, JobType, JobTypeDescriptor, JobUpsert } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    JobDetail,
+    JobExpressionDecl,
+    JobsService,
+    JobType,
+    JobTypeDescriptor,
+    JobUpsert,
+} from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { AttributeOptionLoader, InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -57,7 +82,11 @@ const CRON_PRESETS: { label: string; cron: string }[] = [
 
 /** Which trigger a saved job is using. Cron wins over an event trigger, which wins over a signal one —
  *  the same precedence the reschedule action applies (a cron supersedes an event trigger). */
-export function triggerModeOf(job: { cron?: string | null; onPipeline?: string | null; onSignal?: string | null }): ScheduleMode {
+export function triggerModeOf(job: {
+    cron?: string | null;
+    onPipeline?: string | null;
+    onSignal?: string | null;
+}): ScheduleMode {
     if (job.cron) return 'cron';
     if (job.onPipeline) return 'event';
     return job.onSignal ? 'signal' : 'manual';
@@ -66,7 +95,14 @@ export function triggerModeOf(job: { cron?: string | null; onPipeline?: string |
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /**
@@ -233,15 +269,13 @@ export class JobFormDialog implements AfterViewInit {
         // catalog below does) rebuilds every control, so a subscription held on the old control instance
         // would go silent and switching type would stop reloading parameters. The FormGroup instance is
         // stable across a spec swap; the control is not.
-        this.schemaForm.form.valueChanges
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe((v) => {
-                // The group emits on every field's keystroke, not just the picker's. `selectedTypeId`
-                // already records the type whose descriptor is rendered, so it is the dedupe key.
-                const t = String((v as { type?: unknown })?.type ?? '');
-                if (t !== this.selectedTypeId()) this.loadParams(t);
-                this.syncTriggerKind();
-            });
+        this.schemaForm.form.valueChanges.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((v) => {
+            // The group emits on every field's keystroke, not just the picker's. `selectedTypeId`
+            // already records the type whose descriptor is rendered, so it is the dedupe key.
+            const t = String((v as { type?: unknown })?.type ?? '');
+            if (t !== this.selectedTypeId()) this.loadParams(t);
+            this.syncTriggerKind();
+        });
         queueMicrotask(() => {
             this.loadParams(String(this.schemaForm.form.get('type')?.value ?? ''));
             this.syncTriggerKind();
@@ -366,12 +400,20 @@ export class JobFormDialog implements AfterViewInit {
 
     /** The suggested job id: `<type>_<trigger>` when the trigger names something, else just `<type>`. */
     suggestedName(): string {
-        const v = this.schemaForm.value() as { type?: string; scheduleMode?: ScheduleMode; onPipeline?: string; onSignal?: string };
+        const v = this.schemaForm.value() as {
+            type?: string;
+            scheduleMode?: ScheduleMode;
+            onPipeline?: string;
+            onSignal?: string;
+        };
         let base = String(v.type ?? 'job');
         if (v.scheduleMode === 'event' && v.onPipeline) base = `${v.type}_${v.onPipeline}`;
         // A signal id is dotted (`dataset.write`) and a glob ends in `.*` — both get sanitised below.
         else if (v.scheduleMode === 'signal' && v.onSignal) base = `${v.type}_${v.onSignal}`;
-        return base.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[^A-Za-z0-9]+/, '').replace(/[^A-Za-z0-9]+$/, '');
+        return base
+            .replace(/[^A-Za-z0-9._-]+/g, '_')
+            .replace(/^[^A-Za-z0-9]+/, '')
+            .replace(/[^A-Za-z0-9]+$/, '');
     }
 
     /** Create flow only: leave the save step back to the config step (the id is kept). */

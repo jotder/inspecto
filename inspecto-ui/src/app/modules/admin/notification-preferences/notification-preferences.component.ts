@@ -43,7 +43,9 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
             } @else {
                 <form [formGroup]="form" (ngSubmit)="save()">
                     <table class="w-full text-left">
-                        <caption class="sr-only">Notification channel preferences by category</caption>
+                        <caption class="sr-only">
+                            Notification channel preferences by category
+                        </caption>
                         <thead>
                             <tr class="border-b">
                                 <th scope="col" class="py-2">Category</th>

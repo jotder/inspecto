@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { AuthoredNode, AuthoredPipeline, PipelineCombined, PipelineGraph, PipelineNode, PipelineNodeType } from 'app/inspecto/api';
+import {
+    AuthoredNode,
+    AuthoredPipeline,
+    PipelineCombined,
+    PipelineGraph,
+    PipelineNode,
+    PipelineNodeType,
+} from 'app/inspecto/api';
 import { NODE_KIND_COLORS } from 'app/inspecto/theme/chart-tokens';
 import {
     TestOutcome,
@@ -38,8 +45,13 @@ import {
     validatePipeline,
 } from './pipeline-graph';
 
-const node = (over: Partial<PipelineNode>): PipelineNode =>
-    ({ id: 'n', type: 'transform.map', category: 'TRANSFORM', label: 'Map', ...over });
+const node = (over: Partial<PipelineNode>): PipelineNode => ({
+    id: 'n',
+    type: 'transform.map',
+    category: 'TRANSFORM',
+    label: 'Map',
+    ...over,
+});
 
 describe('categoryVisualKind', () => {
     it('maps flow categories onto catalog node kinds for shape/colour reuse', () => {
@@ -48,7 +60,7 @@ describe('categoryVisualKind', () => {
         expect(categoryVisualKind('TRANSFORM')).toBe('ENRICHMENT');
         expect(categoryVisualKind('SINK')).toBe('TABLE');
         expect(categoryVisualKind('CONTROL')).toBe('KPI');
-        expect(categoryVisualKind('STORE')).toBe('TABLE');   // the combined-view shared-store node
+        expect(categoryVisualKind('STORE')).toBe('TABLE'); // the combined-view shared-store node
     });
 
     it('passes unknown categories through (NodeKind includes string)', () => {
@@ -66,10 +78,20 @@ describe('nodeDisplayLabel', () => {
 
 describe('toPipelineG6Data', () => {
     const graph: PipelineGraph = {
-        name: 'F', active: true, produces: ['orders'], consumes: [],
+        name: 'F',
+        active: true,
+        produces: ['orders'],
+        consumes: [],
         nodes: [
             node({ id: 'acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition' }),
-            node({ id: 'sink', type: 'sink.persistent', category: 'SINK', label: 'Sink (persistent)', name: 'orders', store: 'orders' }),
+            node({
+                id: 'sink',
+                type: 'sink.persistent',
+                category: 'SINK',
+                label: 'Sink (persistent)',
+                name: 'orders',
+                store: 'orders',
+            }),
         ],
         edges: [
             { from: 'acq', to: 'sink', rel: 'data', kind: 'data' },
@@ -80,7 +102,7 @@ describe('toPipelineG6Data', () => {
     it('maps nodes with the display label + visual kind', () => {
         const { nodes } = toPipelineG6Data(graph);
         expect(nodes[0]).toEqual({ id: 'acq', data: { label: 'Acquisition', kind: 'STREAM' } });
-        expect(nodes[1].data).toEqual({ label: 'orders', kind: 'TABLE' });   // user name + SINK→TABLE
+        expect(nodes[1].data).toEqual({ label: 'orders', kind: 'TABLE' }); // user name + SINK→TABLE
     });
 
     it('keeps parallel edges unique and carries the relationship as the edge-kind label', () => {
@@ -93,8 +115,8 @@ describe('toPipelineG6Data', () => {
     it('overlays provenance counts onto matching edges (label + weight) and leaves others plain', () => {
         const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 1234 }]);
         const { edges } = toPipelineG6Data(graph, counts);
-        expect(edges[0].data).toEqual({ kind: 'data · 1,234', weight: 1234 });   // matched
-        expect(edges[1].data).toEqual({ kind: 'route:emea' });                   // no count for this rel
+        expect(edges[0].data).toEqual({ kind: 'data · 1,234', weight: 1234 }); // matched
+        expect(edges[1].data).toEqual({ kind: 'route:emea' }); // no count for this rel
     });
 });
 
@@ -111,7 +133,10 @@ describe('authoredToG6 last-run overlay (T17)', () => {
             { from: 'acq', to: 'sink', rel: 'dropped' },
         ],
     };
-    const typeCat = new Map([['acquisition', 'SOURCE'], ['sink.persistent', 'SINK']]);
+    const typeCat = new Map([
+        ['acquisition', 'SOURCE'],
+        ['sink.persistent', 'SINK'],
+    ]);
 
     it('paints matching edges with the last-run count and leaves others plain', () => {
         const counts = provenanceCounts([{ nodeId: 'acq', rel: 'data', rowCount: 42 }]);
@@ -147,11 +172,28 @@ describe('nodeLastRunTotal', () => {
 
 describe('toCombinedG6Data', () => {
     const combined: PipelineCombined = {
-        flows: [{ name: 'orders_etl', active: true }, { name: 'orders_rollup', active: true }],
+        flows: [
+            { name: 'orders_etl', active: true },
+            { name: 'orders_rollup', active: true },
+        ],
         nodes: [
             { id: 'orders_etl/acq', type: 'acquisition', category: 'SOURCE', label: 'Acquisition', flow: 'orders_etl' },
-            { id: 'orders_etl/sink', type: 'sink.persistent', category: 'SINK', label: 'Sink', store: 'orders', flow: 'orders_etl' },
-            { id: 'orders_rollup/src', type: 'transform.map', category: 'TRANSFORM', label: 'Read', sourceStore: 'orders', flow: 'orders_rollup' },
+            {
+                id: 'orders_etl/sink',
+                type: 'sink.persistent',
+                category: 'SINK',
+                label: 'Sink',
+                store: 'orders',
+                flow: 'orders_etl',
+            },
+            {
+                id: 'orders_rollup/src',
+                type: 'transform.map',
+                category: 'TRANSFORM',
+                label: 'Read',
+                sourceStore: 'orders',
+                flow: 'orders_rollup',
+            },
             { id: 'store:orders', type: 'store', category: 'STORE', label: 'orders', store: 'orders' },
         ],
         edges: [
@@ -200,7 +242,10 @@ describe('resolveNodeIcon', () => {
 
     it('embeds iconSrc+color into toPipelineG6Data only when a map is supplied', () => {
         const g = {
-            name: 'F', active: true, produces: [], consumes: [],
+            name: 'F',
+            active: true,
+            produces: [],
+            consumes: [],
             nodes: [node({ id: 'p', type: 'parser', category: 'PARSE' })],
             edges: [],
         };
@@ -242,23 +287,33 @@ describe('computeNodeStatus', () => {
 
     it('treats a source as unconfigured until a connection is bound', () => {
         expect(computeNodeStatus({ id: 's', type: 'acquisition' }, 'SOURCE', refs, noTests)).toBe('unconfigured');
-        expect(computeNodeStatus({ id: 's', type: 'acquisition', use: 'connection/cdr' }, 'SOURCE', refs, noTests)).toBe('configured');
+        expect(
+            computeNodeStatus({ id: 's', type: 'acquisition', use: 'connection/cdr' }, 'SOURCE', refs, noTests),
+        ).toBe('configured');
     });
 });
 
 describe('validatePipeline', () => {
-    const typeCat = new Map([['acquisition', 'SOURCE'], ['parser', 'PARSE'], ['sink.persistent', 'SINK']]);
+    const typeCat = new Map([
+        ['acquisition', 'SOURCE'],
+        ['parser', 'PARSE'],
+        ['sink.persistent', 'SINK'],
+    ]);
     const refs = new Set(['grammar/cdr_csv']);
 
     it('reports an error for an unconfigured node and blocks activation', () => {
         const flow: AuthoredPipeline = {
-            name: 'f', active: false,
+            name: 'f',
+            active: false,
             nodes: [
                 { id: 'src', type: 'acquisition', use: 'connection/cdr' },
-                { id: 'parse', type: 'parser' },          // no grammar → error
+                { id: 'parse', type: 'parser' }, // no grammar → error
                 { id: 'write', type: 'sink.persistent', use: 'sink/out' },
             ],
-            edges: [{ from: 'src', rel: 'data', to: 'parse' }, { from: 'parse', rel: 'data', to: 'write' }],
+            edges: [
+                { from: 'src', rel: 'data', to: 'parse' },
+                { from: 'parse', rel: 'data', to: 'write' },
+            ],
         };
         const findings = validatePipeline(flow, typeCat, refs, new Map());
         expect(findings.some((f) => f.severity === 'error' && f.nodeId === 'parse')).toBe(true);
@@ -266,7 +321,8 @@ describe('validatePipeline', () => {
 
     it('warns when there is no source or no sink', () => {
         const flow: AuthoredPipeline = {
-            name: 'f', active: false,
+            name: 'f',
+            active: false,
             nodes: [{ id: 'parse', type: 'parser', use: 'grammar/cdr_csv' }],
             edges: [],
         };
@@ -278,10 +334,21 @@ describe('validatePipeline', () => {
 
 describe('groupByCategory', () => {
     it('orders groups by the canonical category order, unknown categories last', () => {
-        const t = (type: string, category: string): PipelineNodeType =>
-            ({ type, category, label: type, description: '', accepts: [], emits: [], emitsNamedRoutes: false, lowerable: true });
+        const t = (type: string, category: string): PipelineNodeType => ({
+            type,
+            category,
+            label: type,
+            description: '',
+            accepts: [],
+            emits: [],
+            emitsNamedRoutes: false,
+            lowerable: true,
+        });
         const groups = groupByCategory([
-            t('gap', 'CONTROL'), t('acquisition', 'SOURCE'), t('x', 'WEIRD'), t('sink.view', 'SINK'),
+            t('gap', 'CONTROL'),
+            t('acquisition', 'SOURCE'),
+            t('x', 'WEIRD'),
+            t('sink.view', 'SINK'),
         ]);
         expect(groups.map((g) => g.category)).toEqual(['SOURCE', 'SINK', 'CONTROL', 'WEIRD']);
     });
@@ -324,8 +391,12 @@ describe('uniqueNodeId', () => {
 
     it('skips ids already present on the model', () => {
         const model: AuthoredPipeline = {
-            name: 'f', active: false,
-            nodes: [{ id: 'parser_1', type: 'parser' }, { id: 'parser_2', type: 'parser' }],
+            name: 'f',
+            active: false,
+            nodes: [
+                { id: 'parser_1', type: 'parser' },
+                { id: 'parser_2', type: 'parser' },
+            ],
             edges: [],
         };
         expect(uniqueNodeId(model, 'parser')).toBe('parser_3');
@@ -334,8 +405,12 @@ describe('uniqueNodeId', () => {
 
 describe('authored-model reducers', () => {
     const base: AuthoredPipeline = {
-        name: 'f', active: false,
-        nodes: [{ id: 'a', type: 'acquisition' }, { id: 'b', type: 'transform.filter' }],
+        name: 'f',
+        active: false,
+        nodes: [
+            { id: 'a', type: 'acquisition' },
+            { id: 'b', type: 'transform.filter' },
+        ],
         edges: [{ from: 'a', rel: 'data', to: 'b' }],
     };
 
@@ -380,10 +455,14 @@ describe('authored-model reducers', () => {
 });
 
 describe('candidateRelsFor', () => {
-    it('offers the source node\'s emitted rels plus data and the edge\'s current rel', () => {
+    it("offers the source node's emitted rels plus data and the edge's current rel", () => {
         const model: AuthoredPipeline = {
-            name: 'f', active: false,
-            nodes: [{ id: 'a', type: 'transform.filter' }, { id: 'b', type: 'sink.persistent' }],
+            name: 'f',
+            active: false,
+            nodes: [
+                { id: 'a', type: 'transform.filter' },
+                { id: 'b', type: 'sink.persistent' },
+            ],
             edges: [],
         };
         const emits = new Map([['transform.filter', ['kept', 'dropped']]]);
@@ -398,8 +477,11 @@ describe('candidateRelsFor', () => {
 
 // ── Recipe view: chain detection (ELT amendment UI plan §1) ────────────────────────────────────────
 
-const an = (id: string, type = 'transform.filter', config?: Record<string, unknown>): AuthoredNode =>
-    ({ id, type, config });
+const an = (id: string, type = 'transform.filter', config?: Record<string, unknown>): AuthoredNode => ({
+    id,
+    type,
+    config,
+});
 
 const linearPipeline = (): AuthoredPipeline => ({
     name: 'p',
@@ -509,8 +591,7 @@ describe('flattenStepChain', () => {
         };
         const chain = detectStepChain(model);
         expect(chain).not.toBeNull();
-        expect(chain!.trunk.map((n) => n.id)).toEqual(['acq', 'parse', 'sink'],
-        );
+        expect(chain!.trunk.map((n) => n.id)).toEqual(['acq', 'parse', 'sink']);
     });
 
     it('flattens a linear trunk with depth 0 throughout', () => {
@@ -524,7 +605,13 @@ describe('flattenStepChain', () => {
         const chain = {
             trunk: [an('collect-1')],
             branches: [
-                { routeId: 'r', key: 'emea', where: "region='EU'", isDefault: false, chain: { trunk: [an('sink-emea')] } },
+                {
+                    routeId: 'r',
+                    key: 'emea',
+                    where: "region='EU'",
+                    isDefault: false,
+                    chain: { trunk: [an('sink-emea')] },
+                },
                 { routeId: 'r', key: 'other', isDefault: true, chain: { trunk: [an('sink-other')] } },
             ],
         };
@@ -547,20 +634,17 @@ describe('insertStepAfter', () => {
     it('splices a node into the trunk, rewiring after → node → next', () => {
         const next = insertStepAfter(linearPipeline(), an('dedup-1', 'transform.dedup'), 'parse-1')!;
         expect(next).not.toBeNull();
-        expect(detectStepChain(next)!.trunk.map((n) => n.id))
-            .toEqual(['collect-1', 'parse-1', 'dedup-1', 'sink-1']);
+        expect(detectStepChain(next)!.trunk.map((n) => n.id)).toEqual(['collect-1', 'parse-1', 'dedup-1', 'sink-1']);
     });
 
     it('inserts as the new entry when afterId is null', () => {
         const next = insertStepAfter(linearPipeline(), an('collect-0', 'acquisition'), null)!;
-        expect(detectStepChain(next)!.trunk.map((n) => n.id))
-            .toEqual(['collect-0', 'collect-1', 'parse-1', 'sink-1']);
+        expect(detectStepChain(next)!.trunk.map((n) => n.id)).toEqual(['collect-0', 'collect-1', 'parse-1', 'sink-1']);
     });
 
     it('appends after the tail (no next edge to rewire)', () => {
         const next = insertStepAfter(linearPipeline(), an('sink-2', 'sink.persistent'), 'sink-1')!;
-        expect(detectStepChain(next)!.trunk.map((n) => n.id))
-            .toEqual(['collect-1', 'parse-1', 'sink-1', 'sink-2']);
+        expect(detectStepChain(next)!.trunk.map((n) => n.id)).toEqual(['collect-1', 'parse-1', 'sink-1', 'sink-2']);
     });
 
     it('ignores guarantee side-edges when rewiring (gap watch stays on the collect node)', () => {
@@ -601,10 +685,14 @@ describe('removeStepFromChain', () => {
     });
 
     it('removes the entry and the tail without fabricating edges', () => {
-        expect(detectStepChain(removeStepFromChain(linearPipeline(), 'collect-1')!)!
-            .trunk.map((n) => n.id)).toEqual(['parse-1', 'sink-1']);
-        expect(detectStepChain(removeStepFromChain(linearPipeline(), 'sink-1')!)!
-            .trunk.map((n) => n.id)).toEqual(['collect-1', 'parse-1']);
+        expect(detectStepChain(removeStepFromChain(linearPipeline(), 'collect-1')!)!.trunk.map((n) => n.id)).toEqual([
+            'parse-1',
+            'sink-1',
+        ]);
+        expect(detectStepChain(removeStepFromChain(linearPipeline(), 'sink-1')!)!.trunk.map((n) => n.id)).toEqual([
+            'collect-1',
+            'parse-1',
+        ]);
     });
 
     it('refuses a node wired beyond the trunk (branch point / non-data edges)', () => {
@@ -652,7 +740,11 @@ describe('recipe edit round trip (over the mock lift/lower, which mirrors the se
         } as Record<string, unknown>;
 
         const lifted = liftConfig(structuredClone(cfg));
-        const edited = insertStepAfter(lifted, { id: 'flt', type: 'transform.filter', config: { where: 'AMT > 0' } }, 'parse')!;
+        const edited = insertStepAfter(
+            lifted,
+            { id: 'flt', type: 'transform.filter', config: { where: 'AMT > 0' } },
+            'parse',
+        )!;
         expect(edited).not.toBeNull();
 
         const lowered = lowerGraph(edited, structuredClone(cfg), false);
@@ -664,8 +756,9 @@ describe('recipe edit round trip (over the mock lift/lower, which mirrors the se
         expect(out['parsing']).toEqual(cfg['parsing']);
         expect((out['dirs'] as Record<string, unknown>)['quarantine']).toBe('/db/q');
         // the edit itself landed
-        expect(((out['processing'] as Record<string, unknown>)['csv_settings'] as Record<string, unknown>)['where'])
-            .toBe('AMT > 0');
+        expect(
+            ((out['processing'] as Record<string, unknown>)['csv_settings'] as Record<string, unknown>)['where'],
+        ).toBe('AMT > 0');
         // and the round trip re-lifts to a chain carrying the new Step
         const relifted = detectStepChain(liftConfig(out));
         expect(relifted!.trunk.some((n) => n.type === 'transform.filter')).toBe(true);
@@ -737,11 +830,17 @@ describe('removeRouteBranch', () => {
 describe('setRouteBranchWhere / setRouteDefault', () => {
     it('sets and clears a branch predicate on the route node config', () => {
         const set = setRouteBranchWhere(routedPipeline(), 'route-1', 'other', "region <> 'EU'")!;
-        const branches = set.nodes.find((n) => n.id === 'route-1')!.config!['branches'] as { key: string; where?: string }[];
+        const branches = set.nodes.find((n) => n.id === 'route-1')!.config!['branches'] as {
+            key: string;
+            where?: string;
+        }[];
         expect(branches.find((b) => b.key === 'other')!.where).toBe("region <> 'EU'");
 
         const cleared = setRouteBranchWhere(set, 'route-1', 'other', '  ')!;
-        const cb = cleared.nodes.find((n) => n.id === 'route-1')!.config!['branches'] as { key: string; where?: string }[];
+        const cb = cleared.nodes.find((n) => n.id === 'route-1')!.config!['branches'] as {
+            key: string;
+            where?: string;
+        }[];
         expect('where' in cb.find((b) => b.key === 'other')!).toBe(false);
         expect(setRouteBranchWhere(routedPipeline(), 'route-1', 'nope', 'x')).toBeNull();
     });
@@ -776,8 +875,11 @@ describe('insertRouteAfter', () => {
 
 describe('RECIPE_VERBS fallback vs the served step-types contract (S4 dual-read)', () => {
     it('every client verb maps to the same node type the server publishes, in the same order', async () => {
-        const contract = (await import('app/inspecto/mock/step-types.contract.json'))
-            .default as { verb: string; type: string; lowerable: boolean }[];
+        const contract = (await import('app/inspecto/mock/step-types.contract.json')).default as {
+            verb: string;
+            type: string;
+            lowerable: boolean;
+        }[];
         const { RECIPE_VERBS } = await import('./pipeline-graph');
         // the served builtins are exactly the fallback map — a drift here means one side changed alone
         expect(contract.map((c) => c.type)).toEqual(RECIPE_VERBS.map((v) => v.type));

@@ -18,7 +18,11 @@
             >
                 <mat-icon
                     class="icon-size-5"
-                    [svgIcon]="navCollapsed() ? 'heroicons_outline:chevron-double-right' : 'heroicons_outline:chevron-double-left'"
+                    [svgIcon]="
+                        navCollapsed()
+                            ? 'heroicons_outline:chevron-double-right'
+                            : 'heroicons_outline:chevron-double-left'
+                    "
                 ></mat-icon>
             </button>
         </div>
@@ -118,15 +122,27 @@
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h1 class="text-2xl font-extrabold leading-none tracking-tight">{{ title }}</h1>
-                    <div class="text-secondary mt-1 text-sm">{{ activeLabel() }} · {{ rows().length }} item{{ rows().length === 1 ? '' : 's' }}</div>
+                    <div class="text-secondary mt-1 text-sm">
+                        {{ activeLabel() }} · {{ rows().length }} item{{ rows().length === 1 ? '' : 's' }}
+                    </div>
                 </div>
                 <div class="flex items-center gap-2">
                     <inspecto-ai-explain [screen]="title" [terms]="explainTerms" />
                     @if (!isIncident) {
-                        <button mat-icon-button (click)="openAnalytics()" matTooltip="Case analytics" aria-label="Case analytics">
+                        <button
+                            mat-icon-button
+                            (click)="openAnalytics()"
+                            matTooltip="Case analytics"
+                            aria-label="Case analytics"
+                        >
                             <mat-icon svgIcon="heroicons_outline:chart-bar"></mat-icon>
                         </button>
-                        <button mat-icon-button (click)="openCaseRules()" matTooltip="Case rules (auto-group incidents)" aria-label="Case rules">
+                        <button
+                            mat-icon-button
+                            (click)="openCaseRules()"
+                            matTooltip="Case rules (auto-group incidents)"
+                            aria-label="Case rules"
+                        >
                             <mat-icon svgIcon="heroicons_outline:bolt"></mat-icon>
                         </button>
                     }
@@ -143,12 +159,22 @@
             <!-- Action toolbar (drives the checkbox selection) -->
             <div class="flex flex-wrap items-center gap-2">
                 @if (isIncident) {
-                    <button mat-stroked-button [disabled]="!canAccept()" (click)="accept()" matTooltip="Identified → Diagnosing (asks for the 3-layer category when missing)">
+                    <button
+                        mat-stroked-button
+                        [disabled]="!canAccept()"
+                        (click)="accept()"
+                        matTooltip="Identified → Diagnosing (asks for the 3-layer category when missing)"
+                    >
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:check"></mat-icon>
                         <span class="ml-1">Accept</span>
                     </button>
                 }
-                <button mat-stroked-button [disabled]="!selected().length" [matMenuTriggerFor]="prioMenu" matTooltip="Set priority">
+                <button
+                    mat-stroked-button
+                    [disabled]="!selected().length"
+                    [matMenuTriggerFor]="prioMenu"
+                    matTooltip="Set priority"
+                >
                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:flag"></mat-icon>
                     <span class="ml-1">Prioritize</span>
                     <mat-icon class="icon-size-4" svgIcon="heroicons_outline:chevron-down"></mat-icon>
@@ -158,7 +184,12 @@
                         <button mat-menu-item (click)="prioritize(p)">{{ p }}</button>
                     }
                 </mat-menu>
-                <button mat-stroked-button [disabled]="!selected().length" (click)="tagSelection()" matTooltip="Add or remove tags">
+                <button
+                    mat-stroked-button
+                    [disabled]="!selected().length"
+                    (click)="tagSelection()"
+                    matTooltip="Add or remove tags"
+                >
                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:tag"></mat-icon>
                     <span class="ml-1">Tag</span>
                 </button>
@@ -167,7 +198,12 @@
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-trending-up"></mat-icon>
                         <span class="ml-1">{{ escalateLabel() }}</span>
                     </button>
-                    <button mat-stroked-button [disabled]="!canResolve()" (click)="resolve()" matTooltip="Requires a resolution comment; warns when the resolution pattern is incomplete">
+                    <button
+                        mat-stroked-button
+                        [disabled]="!canResolve()"
+                        (click)="resolve()"
+                        matTooltip="Requires a resolution comment; warns when the resolution pattern is incomplete"
+                    >
                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:paper-airplane"></mat-icon>
                         <span class="ml-1">Resolve</span>
                     </button>
@@ -183,8 +219,11 @@
                     <!-- C6: verbs derived from the effective workflow — a TOON-overridden lifecycle
                          changes these buttons with zero UI change. -->
                     @for (a of caseActions(); track a) {
-                        <button mat-stroked-button (click)="runCaseAction(a)"
-                                [matTooltip]="a === 'resolve' ? 'Requires a resolution comment' : ''">
+                        <button
+                            mat-stroked-button
+                            (click)="runCaseAction(a)"
+                            [matTooltip]="a === 'resolve' ? 'Requires a resolution comment' : ''"
+                        >
                             <span>{{ stateLabel(a) }}</span>
                         </button>
                     }

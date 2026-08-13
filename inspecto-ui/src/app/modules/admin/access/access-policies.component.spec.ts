@@ -67,7 +67,9 @@ describe('AccessPoliciesComponent', () => {
     });
 
     it('reports a disabled engine without a trace', async () => {
-        const { fixture, c } = create({ explain: { enabled: false, reason: 'no access policy engine on this edition' } });
+        const { fixture, c } = create({
+            explain: { enabled: false, reason: 'no access policy engine on this edition' },
+        });
         c.form.setValue({ route: '/access/roles', method: 'PUT', resourceKind: '' });
         c.explain();
         fixture.detectChanges();

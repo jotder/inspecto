@@ -8,7 +8,11 @@ import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ComponentDef, ConfigService, Finding } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { CellFinding, EditableGridComponent, EditableGridColumn } from 'app/inspecto/components/editable-grid.component';
+import {
+    CellFinding,
+    EditableGridComponent,
+    EditableGridColumn,
+} from 'app/inspecto/components/editable-grid.component';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ComponentFormResult } from './component-form.dialog';
@@ -45,8 +49,14 @@ const COLUMNS: EditableGridColumn[] = [
     selector: 'app-schema-editor-dialog',
     standalone: true,
     imports: [
-        ReactiveFormsModule, MatDialogModule, MatButtonModule, MatFormFieldModule,
-        MatIconModule, MatInputModule, EditableGridComponent, InspectoAlertComponent,
+        ReactiveFormsModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        EditableGridComponent,
+        InspectoAlertComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -66,8 +76,8 @@ const COLUMNS: EditableGridColumn[] = [
                 </mat-form-field>
             }
             <p class="text-secondary mb-2 mt-3 text-sm">
-                One row per typed field. Selector is the raw column the field reads from; type is a
-                DuckDB SQL type (VARCHAR, INTEGER, BIGINT, DOUBLE, DATE, TIMESTAMP, …).
+                One row per typed field. Selector is the raw column the field reads from; type is a DuckDB SQL type
+                (VARCHAR, INTEGER, BIGINT, DOUBLE, DATE, TIMESTAMP, …).
             </p>
             <inspecto-editable-grid
                 [columns]="columns"
@@ -125,9 +135,11 @@ export class SchemaEditorDialog {
 
     /** The field rows as strings — from `raw.fields[]`, verbatim keys. */
     readonly rows = signal<Record<string, string>[]>(
-        (((this.data.def?.content?.['raw'] as Record<string, unknown> | undefined)?.['fields'] as
-            Record<string, unknown>[] | undefined) ?? [])
-            .map((f) => Object.fromEntries(COLUMNS.map((c) => [c.key, String(f[c.key] ?? '')]))),
+        (
+            ((this.data.def?.content?.['raw'] as Record<string, unknown> | undefined)?.['fields'] as
+                | Record<string, unknown>[]
+                | undefined) ?? []
+        ).map((f) => Object.fromEntries(COLUMNS.map((c) => [c.key, String(f[c.key] ?? '')]))),
     );
 
     /** Findings translated onto grid cells (`"<rowIndex>|<colKey>"`) by field NAME. */
@@ -165,8 +177,8 @@ export class SchemaEditorDialog {
         if (!sampleRows.length) return;
         if (this.rows().some((r) => r['name'].trim().length)) {
             const ok = await this.confirm.confirmDestructive(
-                'Replace the current field rows with types suggested from the sample? Nothing is saved '
-                + 'until you review and press Save.',
+                'Replace the current field rows with types suggested from the sample? Nothing is saved ' +
+                    'until you review and press Save.',
                 { title: 'Suggest from sample' },
             );
             if (!ok) return;
@@ -175,9 +187,13 @@ export class SchemaEditorDialog {
         this.config.suggestSchema(sampleRows).subscribe({
             next: (s) => {
                 this.suggesting.set(false);
-                this.onRows(s.fields.map((f) => Object.fromEntries(
-                    COLUMNS.map((c) => [c.key, String((f as unknown as Record<string, unknown>)[c.key] ?? '')]),
-                )));
+                this.onRows(
+                    s.fields.map((f) =>
+                        Object.fromEntries(
+                            COLUMNS.map((c) => [c.key, String((f as unknown as Record<string, unknown>)[c.key] ?? '')]),
+                        ),
+                    ),
+                );
                 this.toast.success(`Suggested ${s.fields.length} typed field(s) — review, then Save.`);
             },
             error: (err) => {
@@ -201,8 +217,8 @@ export class SchemaEditorDialog {
     /** The deliberate escape hatch: re-save with `compatibility: "none"` after a confirmed prompt. */
     async saveAnyway(): Promise<void> {
         const ok = await this.confirm.confirmDestructive(
-            'Skip the BACKWARD compatibility check and save anyway? Already-written data or raw files '
-            + 'may no longer read back correctly.',
+            'Skip the BACKWARD compatibility check and save anyway? Already-written data or raw files ' +
+                'may no longer read back correctly.',
             { title: 'Skip compatibility check' },
         );
         if (ok) this.doSave(true);
@@ -213,11 +229,13 @@ export class SchemaEditorDialog {
         if (!this.isEdit && this.name.invalid) return;
         const fields = this.rows()
             .filter((r) => r['name'].trim().length)
-            .map((r) => Object.fromEntries(
-                COLUMNS.map((c): [string, string] => [c.key, r[c.key]?.trim() ?? ''])
-                    // name/selector/type always travel; the optional columns only when non-blank
-                    .filter(([k, v]) => v.length || k === 'name' || k === 'selector' || k === 'type'),
-            ));
+            .map((r) =>
+                Object.fromEntries(
+                    COLUMNS.map((c): [string, string] => [c.key, r[c.key]?.trim() ?? ''])
+                        // name/selector/type always travel; the optional columns only when non-blank
+                        .filter(([k, v]) => v.length || k === 'name' || k === 'selector' || k === 'type'),
+                ),
+            );
         if (!fields.length) {
             this.toast.error('A schema needs at least one named field.');
             return;
@@ -228,33 +246,45 @@ export class SchemaEditorDialog {
         // preserve non-fields raw keys (format, …) and non-raw content sections (mapping) verbatim
         const config = { ...content, raw: { ...rawIn, name, fields } };
         this.saving.set(true);
-        this.config.write('schema', config, {
-            overwrite: true,
-            ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
-        }).subscribe({
-            next: (res) => {
-                this.dirty = false;
-                const warnings = (res.findings ?? []).length;
-                if (warnings) this.toast.warning(`Saved schema '${res.name}' with ${warnings} warning(s): ${res.findings[0].message}`);
-                else this.toast.success(`Saved schema '${res.name}'`);
-                this.ref.close({ saved: { type: 'schema', name: res.name, ref: `schema/${res.name}`, content: config } as ComponentDef });
-            },
-            error: (err) => {
-                this.saving.set(false);
-                const status = (err as { status?: number })?.status;
-                if (status === 503) {
-                    this.ref.close({ writesDisabled: true });
-                    return;
-                }
-                const findings = (err as { error?: { error?: { details?: { findings?: Finding[] } } } })
-                    ?.error?.error?.details?.findings;
-                if (status === 422 && findings?.length) {
-                    this.findings.set(findings);
-                    this.refused.set(true);
-                    return;
-                }
-                this.toast.error(apiErrorMessage(err, 'Could not save the schema'));
-            },
-        });
+        this.config
+            .write('schema', config, {
+                overwrite: true,
+                ...(overrideCompatibility ? { compatibility: 'none' as const } : {}),
+            })
+            .subscribe({
+                next: (res) => {
+                    this.dirty = false;
+                    const warnings = (res.findings ?? []).length;
+                    if (warnings)
+                        this.toast.warning(
+                            `Saved schema '${res.name}' with ${warnings} warning(s): ${res.findings[0].message}`,
+                        );
+                    else this.toast.success(`Saved schema '${res.name}'`);
+                    this.ref.close({
+                        saved: {
+                            type: 'schema',
+                            name: res.name,
+                            ref: `schema/${res.name}`,
+                            content: config,
+                        } as ComponentDef,
+                    });
+                },
+                error: (err) => {
+                    this.saving.set(false);
+                    const status = (err as { status?: number })?.status;
+                    if (status === 503) {
+                        this.ref.close({ writesDisabled: true });
+                        return;
+                    }
+                    const findings = (err as { error?: { error?: { details?: { findings?: Finding[] } } } })?.error
+                        ?.error?.details?.findings;
+                    if (status === 422 && findings?.length) {
+                        this.findings.set(findings);
+                        this.refused.set(true);
+                        return;
+                    }
+                    this.toast.error(apiErrorMessage(err, 'Could not save the schema'));
+                },
+            });
     }
 }

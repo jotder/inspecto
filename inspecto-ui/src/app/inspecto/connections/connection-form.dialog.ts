@@ -171,7 +171,11 @@ export class ConnectionFormDialog {
         const group: Record<string, unknown[]> = {};
         for (const a of attrsFor(type)) {
             const fallback = a.default ?? (a.control === 'checkbox' ? false : '');
-            const stored = profile ? (a.target === 'option' ? profile.options?.[a.key] : fields?.[a.target]) : undefined;
+            const stored = profile
+                ? a.target === 'option'
+                    ? profile.options?.[a.key]
+                    : fields?.[a.target]
+                : undefined;
             let init: unknown = stored ?? fallback;
             if (a.control === 'checkbox') init = init === true || init === 'true';
             group[a.key] = [init, a.required ? [Validators.required] : []];
@@ -190,9 +194,7 @@ export class ConnectionFormDialog {
     /** Assemble the ConnectionProfile from the form (type-mapped fields + options + tunnel + proxy). */
     private build(): ConnectionProfile {
         const def = connTypeDef(this.connType());
-        const id = this.isEdit
-            ? this.data.profile!.id
-            : String(this.saveForm.getRawValue().name ?? '').trim();
+        const id = this.isEdit ? this.data.profile!.id : String(this.saveForm.getRawValue().name ?? '').trim();
         const profile: ConnectionProfile = { id, connector: def.connector };
         const description = this.isEdit
             ? this.data.profile!.description

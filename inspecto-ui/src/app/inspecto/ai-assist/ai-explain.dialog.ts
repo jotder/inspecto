@@ -76,8 +76,8 @@ const CITATION_LIMIT = 3;
                 </div>
             } @else if (unavailable()) {
                 <inspecto-alert variant="info" title="AI assistance unavailable">
-                    The intelligence module is not installed on this backend, so definitions cannot be looked
-                    up. Everything else on this screen works as usual.
+                    The intelligence module is not installed on this backend, so definitions cannot be looked up.
+                    Everything else on this screen works as usual.
                 </inspecto-alert>
             } @else {
                 <p class="text-secondary mb-4 text-sm">

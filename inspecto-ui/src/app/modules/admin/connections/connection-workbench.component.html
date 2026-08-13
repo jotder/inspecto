@@ -11,9 +11,14 @@
             <h1 class="truncate font-mono text-3xl font-extrabold leading-tight tracking-tight">{{ id }}</h1>
             @if (connection(); as c) {
                 <div class="text-secondary mt-1 text-sm">
-                    <span class="mr-2 inline-block rounded bg-gray-200 px-2 py-0.5 font-mono text-xs uppercase dark:bg-gray-700">{{ c.connector }}</span>
+                    <span
+                        class="mr-2 inline-block rounded bg-gray-200 px-2 py-0.5 font-mono text-xs uppercase dark:bg-gray-700"
+                        >{{ c.connector }}</span
+                    >
                     {{ c.host || 'local' }}{{ c.port ? ':' + c.port : '' }}
-                    @if (c.basePath) { · <span class="font-mono">{{ c.basePath }}</span> }
+                    @if (c.basePath) {
+                        · <span class="font-mono">{{ c.basePath }}</span>
+                    }
                 </div>
             }
         </div>
@@ -27,7 +32,15 @@
                 <div class="flex flex-wrap items-baseline gap-x-3">
                     <h2 class="text-lg font-semibold">Test connection</h2>
                     @if (probeSummary(); as s) {
-                        <span class="text-secondary text-sm">{{ s.passed }} passed@if (s.skipped) { · {{ s.skipped }} skipped }@if (s.failed) { · {{ s.failed }} failed }</span>
+                        <span class="text-secondary text-sm"
+                            >{{ s.passed }} passed
+                            @if (s.skipped) {
+                                · {{ s.skipped }} skipped
+                            }
+                            @if (s.failed) {
+                                · {{ s.failed }} failed
+                            }
+                        </span>
                     }
                 </div>
                 @if (lastTested(); as t) {
@@ -35,7 +48,9 @@
                 }
             </div>
             <button mat-flat-button color="primary" (click)="runProbe()" [disabled]="probing()">
-                @if (probing()) { <mat-spinner diameter="16" class="mr-2"></mat-spinner> }
+                @if (probing()) {
+                    <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                }
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:bolt"></mat-icon>
                 <span class="ml-2">Run test</span>
             </button>
@@ -81,7 +96,10 @@
             }
 
             <div class="relative mt-3">
-                <mat-icon class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" svgIcon="heroicons_outline:magnifying-glass"></mat-icon>
+                <mat-icon
+                    class="icon-size-4 text-secondary pointer-events-none absolute left-2 top-1/2 -translate-y-1/2"
+                    svgIcon="heroicons_outline:magnifying-glass"
+                ></mat-icon>
                 <input
                     type="text"
                     class="bg-card w-full rounded border border-gray-300 py-1.5 pl-8 pr-2 text-sm dark:border-gray-600"
@@ -119,17 +137,29 @@
                 <div class="flex flex-wrap items-baseline gap-x-3">
                     <h2 class="text-lg font-semibold">Sample</h2>
                     @if (sample(); as s) {
-                        <span class="text-secondary text-sm">{{ s.rows.length }} rows × {{ s.columns.length }} cols</span>
+                        <span class="text-secondary text-sm"
+                            >{{ s.rows.length }} rows × {{ s.columns.length }} cols</span
+                        >
                     }
                 </div>
                 <div class="flex items-center gap-2">
                     @if (sample()) {
-                        <button mat-stroked-button class="min-w-0 px-3" (click)="copyCsv()" matTooltip="Copy as CSV" aria-label="Copy sample as CSV">
+                        <button
+                            mat-stroked-button
+                            class="min-w-0 px-3"
+                            (click)="copyCsv()"
+                            matTooltip="Copy as CSV"
+                            aria-label="Copy sample as CSV"
+                        >
                             <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard-document"></mat-icon>
                         </button>
                     }
                     <span class="text-secondary text-xs">rows</span>
-                    <mat-button-toggle-group [value]="sampleLimit()" (change)="setLimit($event.value)" aria-label="Sample size">
+                    <mat-button-toggle-group
+                        [value]="sampleLimit()"
+                        (change)="setLimit($event.value)"
+                        aria-label="Sample size"
+                    >
                         @for (n of limitOptions; track n) {
                             <mat-button-toggle [value]="n">{{ n }}</mat-button-toggle>
                         }

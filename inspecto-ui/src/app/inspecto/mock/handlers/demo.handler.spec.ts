@@ -25,8 +25,14 @@ describe('demoHandler', () => {
         const store = seededStore();
         expect(handler(req('GET', '/api/notifications/channels'), store)?.body).toEqual([]);
 
-        handler(req('POST', '/api/notifications/channels', { id: 'ops_email', kind: 'EMAIL', target: 'ops@x.com' }), store);
-        const dup = handler(req('POST', '/api/notifications/channels', { id: 'ops_email', kind: 'EMAIL', target: 'b@x.com' }), store);
+        handler(
+            req('POST', '/api/notifications/channels', { id: 'ops_email', kind: 'EMAIL', target: 'ops@x.com' }),
+            store,
+        );
+        const dup = handler(
+            req('POST', '/api/notifications/channels', { id: 'ops_email', kind: 'EMAIL', target: 'b@x.com' }),
+            store,
+        );
         expect(dup?.status).toBe(409);
 
         handler(req('PUT', '/api/notifications/channels/ops_email', { enabled: false }), store);
@@ -43,7 +49,9 @@ describe('demoHandler', () => {
             category: string;
             channels: { email: boolean };
         }>;
-        const edited = before.map((r) => (r.category === 'PIPELINE' ? { ...r, channels: { ...r.channels, email: true } } : r));
+        const edited = before.map((r) =>
+            r.category === 'PIPELINE' ? { ...r, channels: { ...r.channels, email: true } } : r,
+        );
         handler(req('PUT', '/api/notifications/preferences', { preferences: edited }), store);
         const after = handler(req('GET', '/api/notifications/preferences'), store)?.body as typeof before;
         expect(after.find((r) => r.category === 'PIPELINE')?.channels.email).toBe(true);
@@ -96,7 +104,9 @@ describe('demoHandler', () => {
         expect(ok.safetyChecked).toBe(true);
 
         // file mode stays always-clean
-        const file = handler(req('POST', '/api/validate', { configPath: 'configs/cdr.toon' }), store)?.body as { clean: boolean };
+        const file = handler(req('POST', '/api/validate', { configPath: 'configs/cdr.toon' }), store)?.body as {
+            clean: boolean;
+        };
         expect(file.clean).toBe(true);
     });
 

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
-    buildReconciliation, CompareColumn, mergeBreaks, matchedKeyCount, ReconBreak,
-    resolveBreak, runReconciliation, summarize, withinTolerance,
+    buildReconciliation,
+    CompareColumn,
+    mergeBreaks,
+    matchedKeyCount,
+    ReconBreak,
+    resolveBreak,
+    runReconciliation,
+    summarize,
+    withinTolerance,
 } from './reconciliation-types';
 
 const KEYS = ['id'];
@@ -14,10 +21,10 @@ const LEFT = [
     { id: 4, cost_usd: 0.1 },
 ];
 const RIGHT = [
-    { id: 1, cost_usd: 1.8 },   // clean
-    { id: 2, cost_usd: 0.31 },  // within 0.02 tolerance ⇒ clean
-    { id: 3, cost_usd: 2.1 },   // value break
-    { id: 5, cost_usd: 0.5 },   // missing on left
+    { id: 1, cost_usd: 1.8 }, // clean
+    { id: 2, cost_usd: 0.31 }, // within 0.02 tolerance ⇒ clean
+    { id: 3, cost_usd: 2.1 }, // value break
+    { id: 5, cost_usd: 0.5 }, // missing on left
 ];
 // id 4 missing on right.
 
@@ -68,7 +75,9 @@ describe('mergeBreaks (lifecycle)', () => {
     });
 
     it('preserves a manual resolution when the break still exists', () => {
-        const prev: ReconBreak[] = [{ key: '3', type: 'value_break', column: 'cost_usd', status: 'resolved', note: 'known FX gap' }];
+        const prev: ReconBreak[] = [
+            { key: '3', type: 'value_break', column: 'cost_usd', status: 'resolved', note: 'known FX gap' },
+        ];
         const fresh: ReconBreak[] = [{ key: '3', type: 'value_break', column: 'cost_usd', status: 'open' }];
         const merged = mergeBreaks(prev, fresh);
         expect(merged[0].status).toBe('resolved');

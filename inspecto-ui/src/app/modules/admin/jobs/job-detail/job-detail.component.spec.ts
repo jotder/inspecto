@@ -11,9 +11,32 @@ import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobDetailComponent } from './job-detail.component';
 
-const JOB = { name: 'cdr_ingest_daily', type: 'ingest', cron: '0 0 6 * * *', onPipeline: null, enabled: true, lastStatus: 'SUCCESS', nextFire: null, params: { source: 'cdr_sftp' } };
-const RUNS = [{ jobName: 'cdr_ingest_daily', runId: 'run-1', status: 'SUCCESS', startTime: '2026-06-28T06:00:00Z', endTime: '2026-06-28T06:02:00Z', durationMs: 120_000, triggerType: 'CRON', error: null }];
-const LOGS = { logs: [{ ts: '2026-06-28T06:00:00Z', level: 'INFO', message: 'Started.' }], events: [{ ts: '2026-06-28T06:00:00Z', type: 'JOB_STARTED', message: 'fired' }] };
+const JOB = {
+    name: 'cdr_ingest_daily',
+    type: 'ingest',
+    cron: '0 0 6 * * *',
+    onPipeline: null,
+    enabled: true,
+    lastStatus: 'SUCCESS',
+    nextFire: null,
+    params: { source: 'cdr_sftp' },
+};
+const RUNS = [
+    {
+        jobName: 'cdr_ingest_daily',
+        runId: 'run-1',
+        status: 'SUCCESS',
+        startTime: '2026-06-28T06:00:00Z',
+        endTime: '2026-06-28T06:02:00Z',
+        durationMs: 120_000,
+        triggerType: 'CRON',
+        error: null,
+    },
+];
+const LOGS = {
+    logs: [{ ts: '2026-06-28T06:00:00Z', level: 'INFO', message: 'Started.' }],
+    events: [{ ts: '2026-06-28T06:00:00Z', type: 'JOB_STARTED', message: 'fired' }],
+};
 
 /** `inputs` exercises the embedded side-panel mode (R5); without it the route snapshot drives the name. */
 function create(inputs?: { name: string; embedded: boolean }) {
@@ -25,7 +48,10 @@ function create(inputs?: { name: string; embedded: boolean }) {
             { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => 'cdr_ingest_daily' } } } },
             { provide: JobsService, useValue: { get: () => of(JOB), runs: () => of(RUNS), runLogs: () => of(LOGS) } },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
-            { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(false), confirmDestructive: () => Promise.resolve(false) } },
+            {
+                provide: InspectoConfirmService,
+                useValue: { confirm: () => Promise.resolve(false), confirmDestructive: () => Promise.resolve(false) },
+            },
             { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],

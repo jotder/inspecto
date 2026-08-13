@@ -9,8 +9,11 @@
     @if (loading()) {
         <inspecto-skeleton></inspecto-skeleton>
     } @else if (templates().length === 0) {
-        <inspecto-empty-state icon="heroicons_outline:squares-2x2" title="No templates"
-            message="The curated template gallery is empty."></inspecto-empty-state>
+        <inspecto-empty-state
+            icon="heroicons_outline:squares-2x2"
+            title="No templates"
+            message="The curated template gallery is empty."
+        ></inspecto-empty-state>
     } @else {
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             @for (t of templates(); track t.id) {
@@ -22,8 +25,13 @@
                         {{ componentSummary(t) }}
                     </p>
                     <div class="mt-4">
-                        <button type="button" mat-flat-button color="primary"
-                            [attr.aria-label]="'Apply template ' + t.title" (click)="apply(t)">
+                        <button
+                            type="button"
+                            mat-flat-button
+                            color="primary"
+                            [attr.aria-label]="'Apply template ' + t.title"
+                            (click)="apply(t)"
+                        >
                             Apply…
                         </button>
                     </div>

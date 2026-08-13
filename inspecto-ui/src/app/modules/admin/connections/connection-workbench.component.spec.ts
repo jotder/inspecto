@@ -39,8 +39,14 @@ function create() {
             provideRouter([]),
             { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ id: 'TEST_CONN' }) } } },
             { provide: ConnectionsService, useValue: { get: () => of(PROFILE) } },
-            { provide: ConnectionProbeService, useValue: { probe: () => of(PROBE_R), explore: () => of(NODES), sample: () => of(SAMPLE_R) } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ConnectionProbeService,
+                useValue: { probe: () => of(PROBE_R), explore: () => of(NODES), sample: () => of(SAMPLE_R) },
+            },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });

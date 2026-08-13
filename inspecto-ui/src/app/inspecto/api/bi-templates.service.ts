@@ -5,24 +5,24 @@ import { apiUrl } from './api-base';
 
 /** One component a template writes, as the gallery listing names it (component kind + resolved-later id). */
 export interface TemplateComponentRef {
-  kind: string;
-  id: string;
+    kind: string;
+    id: string;
 }
 
 /** A curated starter template as `GET /bi/templates` lists it (metadata only; content ships with apply). */
 export interface BiTemplate {
-  id: string;
-  title: string;
-  description: string;
-  params: string[];
-  components: TemplateComponentRef[];
+    id: string;
+    title: string;
+    description: string;
+    params: string[];
+    components: TemplateComponentRef[];
 }
 
 /** The `POST /bi/templates/{id}/apply` result — the components written into the registry. */
 export interface TemplateApplyResult {
-  template: string;
-  dataset: string;
-  created: TemplateComponentRef[];
+    template: string;
+    dataset: string;
+    created: TemplateComponentRef[];
 }
 
 /**
@@ -33,16 +33,15 @@ export interface TemplateApplyResult {
  */
 @Injectable({ providedIn: 'root' })
 export class BiTemplatesService {
-  private http = inject(HttpClient);
+    private http = inject(HttpClient);
 
-  list(): Observable<BiTemplate[]> {
-    return this.http.get<BiTemplate[]>(apiUrl('/bi/templates'));
-  }
+    list(): Observable<BiTemplate[]> {
+        return this.http.get<BiTemplate[]>(apiUrl('/bi/templates'));
+    }
 
-  apply(id: string, dataset: string, prefix?: string): Observable<TemplateApplyResult> {
-    const body: Record<string, string> = { dataset };
-    if (prefix && prefix.trim()) body['prefix'] = prefix.trim();
-    return this.http.post<TemplateApplyResult>(
-      apiUrl('/bi/templates/' + encodeURIComponent(id) + '/apply'), body);
-  }
+    apply(id: string, dataset: string, prefix?: string): Observable<TemplateApplyResult> {
+        const body: Record<string, string> = { dataset };
+        if (prefix && prefix.trim()) body['prefix'] = prefix.trim();
+        return this.http.post<TemplateApplyResult>(apiUrl('/bi/templates/' + encodeURIComponent(id) + '/apply'), body);
+    }
 }

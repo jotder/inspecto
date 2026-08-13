@@ -61,9 +61,15 @@ describe('geo case studies (CS1–CS5)', () => {
         const rows = SAMPLE_SOURCES['mule_corridors'];
         expect(rows.length).toBeGreaterThan(850);
         const out = projectRoutes(rows, {
-            datasetId: 'mule_corridors', fromLatCol: 'from_lat', fromLonCol: 'from_lon',
-            toLatCol: 'to_lat', toLonCol: 'to_lon', fromCol: 'from_city', toCol: 'to_city',
-            kindCol: 'channel', timeCol: 'moved_at',
+            datasetId: 'mule_corridors',
+            fromLatCol: 'from_lat',
+            fromLonCol: 'from_lon',
+            toLatCol: 'to_lat',
+            toLonCol: 'to_lon',
+            fromCol: 'from_city',
+            toCol: 'to_city',
+            kindCol: 'channel',
+            timeCol: 'moved_at',
         });
         if (isGeoProjectionError(out)) throw new Error(out.error);
         expect(out.routes).toHaveLength(24);
@@ -102,7 +108,13 @@ describe('geo case studies (CS1–CS5)', () => {
     });
 
     it('all five case-study sources are deterministic module constants (same reference on re-read)', () => {
-        for (const id of ['simbox_sweep', 'impossible_travel', 'mule_corridors', 'fleet_breadcrumbs', 'border_roamers']) {
+        for (const id of [
+            'simbox_sweep',
+            'impossible_travel',
+            'mule_corridors',
+            'fleet_breadcrumbs',
+            'border_roamers',
+        ]) {
             expect(SAMPLE_SOURCES[id]).toBe(SAMPLE_SOURCES[id]);
             expect(SAMPLE_SOURCES[id].length).toBeGreaterThan(0);
         }

@@ -80,7 +80,8 @@ export class DashboardsComponent implements OnInit {
     }
 
     async remove(d: Dashboard): Promise<void> {
-        if (!(await this.confirm.confirmDestructive(`Delete dashboard "${d.id}"?`, { title: 'Delete dashboard' }))) return;
+        if (!(await this.confirm.confirmDestructive(`Delete dashboard "${d.id}"?`, { title: 'Delete dashboard' })))
+            return;
         this.api.remove(d.id).subscribe({
             next: () => {
                 this.toastr.success(`Dashboard "${d.id}" deleted`);

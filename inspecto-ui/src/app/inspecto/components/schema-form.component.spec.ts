@@ -9,8 +9,14 @@ import { InspectoSchemaFormComponent } from './schema-form.component';
 const SPECS: AttributeSpec[] = [
     { key: 'name', label: 'Name', type: 'identifier', tier: 'required' },
     {
-        key: 'type', label: 'Type', type: 'select', tier: 'required',
-        options: [{ value: 'enrich', label: 'Enrich' }, { value: 'report', label: 'Report' }],
+        key: 'type',
+        label: 'Type',
+        type: 'select',
+        tier: 'required',
+        options: [
+            { value: 'enrich', label: 'Enrich' },
+            { value: 'report', label: 'Report' },
+        ],
         default: 'enrich',
     },
     { key: 'cron', label: 'Cron', type: 'string', tier: 'optional', dependsOn: { key: 'type', equals: 'report' } },
@@ -97,14 +103,27 @@ describe('InspectoSchemaFormComponent', () => {
 
     it('autocomplete loads suggestions via optionLoaders and narrows them by the typed text', async () => {
         const specs: AttributeSpec[] = [
-            { key: 'kind', label: 'Kind', type: 'select', tier: 'required', default: 'a', options: [{ value: 'a', label: 'A' }] },
+            {
+                key: 'kind',
+                label: 'Kind',
+                type: 'select',
+                tier: 'required',
+                default: 'a',
+                options: [{ value: 'a', label: 'A' }],
+            },
             { key: 'target', label: 'Target', type: 'autocomplete', tier: 'required' },
         ];
         const fixture = create(specs);
         const c = fixture.componentInstance;
         c.optionLoaders = {
             // The loader sees the sibling values (here: kind) and returns the suggestion list.
-            target: (v) => (v['kind'] === 'a' ? [{ value: 'cdr_ingest', label: 'cdr_ingest' }, { value: 'events_daily', label: 'events_daily' }] : []),
+            target: (v) =>
+                v['kind'] === 'a'
+                    ? [
+                          { value: 'cdr_ingest', label: 'cdr_ingest' },
+                          { value: 'events_daily', label: 'events_daily' },
+                      ]
+                    : [],
         };
 
         c.loadOptionsFor(specs[1]);
@@ -298,10 +317,17 @@ describe('InspectoSchemaFormComponent', () => {
 
         it('coalesces a group declared in two places into one heading', () => {
             // Repeating a name means one section, not two — and a repeated @for track key would throw.
-            const fixture = create([...GROUPED, { key: 'bcc', label: 'Bcc', type: 'string', tier: 'required', group: 'Recipients' }]);
+            const fixture = create([
+                ...GROUPED,
+                { key: 'bcc', label: 'Bcc', type: 'string', tier: 'required', group: 'Recipients' },
+            ]);
             expect(headings(fixture)).toEqual(['Recipients', 'Message']);
-            expect(fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().required)
-                .find((g) => g.name === 'Recipients')!.specs.map((s) => s.key)).toEqual(['to', 'cc', 'bcc']);
+            expect(
+                fixture.componentInstance
+                    .groupsOf(fixture.componentInstance.tiers().required)
+                    .find((g) => g.name === 'Recipients')!
+                    .specs.map((s) => s.key),
+            ).toEqual(['to', 'cc', 'bcc']);
         });
 
         it('does not group across tiers — disclosure is the outer structure', () => {
@@ -309,8 +335,12 @@ describe('InspectoSchemaFormComponent', () => {
                 { key: 'a', label: 'A', type: 'string', tier: 'required', group: 'Shared' },
                 { key: 'b', label: 'B', type: 'string', tier: 'advanced', group: 'Shared' },
             ]);
-            expect(fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().required).map((g) => g.name)).toEqual(['Shared']);
-            expect(fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().advanced).map((g) => g.name)).toEqual(['Shared']);
+            expect(
+                fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().required).map((g) => g.name),
+            ).toEqual(['Shared']);
+            expect(
+                fixture.componentInstance.groupsOf(fixture.componentInstance.tiers().advanced).map((g) => g.name),
+            ).toEqual(['Shared']);
         });
 
         it('has no a11y violations with headings present', async () => {
@@ -343,7 +373,14 @@ describe('InspectoSchemaFormComponent', () => {
 
     describe('per-item list validation', () => {
         const EMAILS: AttributeSpec[] = [
-            { key: 'to', label: 'To', type: 'list', tier: 'required', required: false, pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+' },
+            {
+                key: 'to',
+                label: 'To',
+                type: 'list',
+                tier: 'required',
+                required: false,
+                pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+',
+            },
         ];
 
         it('applies `pattern` to each entry and names the offending one', () => {
@@ -388,7 +425,14 @@ describe('InspectoSchemaFormComponent', () => {
             { key: 'plain', label: 'Plain', type: 'string', tier: 'required' },
         ];
         const EMAIL_LIST: AttributeSpec[] = [
-            { key: 'to', label: 'To', type: 'list', tier: 'required', required: false, pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+' },
+            {
+                key: 'to',
+                label: 'To',
+                type: 'list',
+                tier: 'required',
+                required: false,
+                pattern: '[^@\\s]+@[^@\\s]+\\.[^@\\s]+',
+            },
         ];
 
         const pickers = (fixture: { nativeElement: HTMLElement }): HTMLElement[] =>
@@ -419,7 +463,10 @@ describe('InspectoSchemaFormComponent', () => {
         });
 
         it('replaces the whole value rather than inserting into it', () => {
-            const fixture = create(TEXTS, { day: '2026-01-01' }, undefined, { tokens: { day: [TOKEN] }, tokenSyntax: SYNTAX });
+            const fixture = create(TEXTS, { day: '2026-01-01' }, undefined, {
+                tokens: { day: [TOKEN] },
+                tokenSyntax: SYNTAX,
+            });
             const control = fixture.componentInstance.form.get('day')!;
             fixture.componentInstance.applyToken(TEXTS[0], TOKEN);
 

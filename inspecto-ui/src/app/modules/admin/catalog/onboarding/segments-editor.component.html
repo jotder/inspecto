@@ -4,15 +4,18 @@
             <h3 class="text-lg font-medium">Segments</h3>
             <p class="text-secondary text-sm">
                 Each segment is one record type and becomes one Table. A column's
-                <strong>selector</strong> is a dotted path into the decoded record (e.g.
-                <code>party.number</code>) and must point at a leaf — a sub-record or a repeated
-                field loads as NULL. A <code>{{ eventTypeColumn }}</code> column carrying the segment
-                key is added automatically.
+                <strong>selector</strong> is a dotted path into the decoded record (e.g. <code>party.number</code>) and
+                must point at a leaf — a sub-record or a repeated field loads as NULL. A
+                <code>{{ eventTypeColumn }}</code> column carrying the segment key is added automatically.
             </p>
         </div>
         @if (editable()) {
-            <button mat-stroked-button type="button" (click)="deriveFromPreview()"
-                    matTooltip="Replace the segments below with one per record type in the preview">
+            <button
+                mat-stroked-button
+                type="button"
+                (click)="deriveFromPreview()"
+                matTooltip="Replace the segments below with one per record type in the preview"
+            >
                 <mat-icon>auto_fix_high</mat-icon>
                 Derive from preview
             </button>
@@ -25,20 +28,26 @@
 
     <div formArrayName="segments" class="flex flex-col gap-4">
         @for (segment of segments.controls; track $index; let si = $index) {
-            <div [formGroupName]="si" class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col gap-3">
+            <div
+                [formGroupName]="si"
+                class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 flex flex-col gap-3"
+            >
                 <div class="flex items-center gap-2">
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
                         <mat-label>Segment key</mat-label>
-                        <input matInput formControlName="key" [readonly]="!editable()"
-                               placeholder="moCallRecord" />
+                        <input matInput formControlName="key" [readonly]="!editable()" placeholder="moCallRecord" />
                         <mat-hint>Must match the decoded record's own name.</mat-hint>
                         @if (segment.get('key')?.hasError('required') && segment.get('key')?.touched) {
                             <mat-error>A segment key is required.</mat-error>
                         }
                     </mat-form-field>
                     @if (editable()) {
-                        <button mat-icon-button type="button" (click)="removeSegment(si)"
-                                [attr.aria-label]="'Remove segment ' + (segment.get('key')?.value || si + 1)">
+                        <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeSegment(si)"
+                            [attr.aria-label]="'Remove segment ' + (segment.get('key')?.value || si + 1)"
+                        >
                             <mat-icon>delete_outline</mat-icon>
                         </button>
                     }
@@ -49,21 +58,32 @@
                         <div [formGroupName]="ci" class="flex items-start gap-2">
                             <mat-form-field class="flex-1" subscriptSizing="dynamic">
                                 <mat-label>Selector</mat-label>
-                                <input matInput formControlName="selector" [readonly]="!editable()"
-                                       placeholder="party.number" (blur)="nameFromSelector(column)" />
+                                <input
+                                    matInput
+                                    formControlName="selector"
+                                    [readonly]="!editable()"
+                                    placeholder="party.number"
+                                    (blur)="nameFromSelector(column)"
+                                />
                                 @if (column.get('selector')?.hasError('required') && column.get('selector')?.touched) {
                                     <mat-error>A selector is required.</mat-error>
                                 }
                             </mat-form-field>
                             <mat-form-field class="flex-1" subscriptSizing="dynamic">
                                 <mat-label>Column</mat-label>
-                                <input matInput formControlName="name" [readonly]="!editable()"
-                                       placeholder="B_NUMBER" />
+                                <input
+                                    matInput
+                                    formControlName="name"
+                                    [readonly]="!editable()"
+                                    placeholder="B_NUMBER"
+                                />
                                 @if (column.get('name')?.hasError('required') && column.get('name')?.touched) {
                                     <mat-error>A column name is required.</mat-error>
                                 }
                                 @if (column.get('name')?.hasError('pattern') && column.get('name')?.touched) {
-                                    <mat-error>Letters, digits and underscore only; cannot start with a digit.</mat-error>
+                                    <mat-error
+                                        >Letters, digits and underscore only; cannot start with a digit.</mat-error
+                                    >
                                 }
                             </mat-form-field>
                             <mat-form-field class="w-40" subscriptSizing="dynamic">
@@ -75,9 +95,13 @@
                                 </mat-select>
                             </mat-form-field>
                             @if (editable()) {
-                                <button mat-icon-button type="button" class="mt-1"
-                                        (click)="removeColumn(segment, ci)"
-                                        [attr.aria-label]="'Remove column ' + (column.get('name')?.value || ci + 1)">
+                                <button
+                                    mat-icon-button
+                                    type="button"
+                                    class="mt-1"
+                                    (click)="removeColumn(segment, ci)"
+                                    [attr.aria-label]="'Remove column ' + (column.get('name')?.value || ci + 1)"
+                                >
                                     <mat-icon>close</mat-icon>
                                 </button>
                             }

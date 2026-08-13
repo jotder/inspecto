@@ -34,10 +34,14 @@
                                         [class.bg-hover]="isSelected(g.id, t.name)"
                                         [class.font-semibold]="isSelected(g.id, t.name)"
                                         [attr.aria-current]="isSelected(g.id, t.name) ? 'true' : null"
-                                        (click)="select(g, t)">
+                                        (click)="select(g, t)"
+                                    >
                                         <span class="truncate font-mono">{{ t.name }}</span>
                                         @if (t.format) {
-                                            <span class="bg-gray-200 rounded px-1.5 py-0.5 text-xs uppercase dark:bg-gray-700">{{ t.format }}</span>
+                                            <span
+                                                class="bg-gray-200 rounded px-1.5 py-0.5 text-xs uppercase dark:bg-gray-700"
+                                                >{{ t.format }}</span
+                                            >
                                         }
                                     </button>
                                 </li>
@@ -63,7 +67,8 @@
             @if (!selected()) {
                 <inspecto-empty-state
                     title="Select a table"
-                    message="Choose a table on the left to view its schema and rows." />
+                    message="Choose a table on the left to view its schema and rows."
+                />
             } @else {
                 <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <div class="min-w-0">
@@ -74,7 +79,12 @@
                     </div>
                     @if (stats(); as s) {
                         <p class="text-secondary flex items-center gap-2 text-xs" role="status">
-                            <span>{{ s.rowCount }} row(s) · {{ s.elapsedMs }} ms@if (s.truncated) { · showing first {{ limit() }} }</span>
+                            <span
+                                >{{ s.rowCount }} row(s) · {{ s.elapsedMs }} ms
+                                @if (s.truncated) {
+                                    · showing first {{ limit() }}
+                                }
+                            </span>
                             @if (s.truncated) {
                                 <button type="button" mat-button (click)="loadMore()">Load more</button>
                             }
@@ -83,7 +93,9 @@
                 </div>
 
                 @if (rowsError()) {
-                    <inspecto-alert variant="error" title="Query failed" class="mb-2 block">{{ rowsError() }}</inspecto-alert>
+                    <inspecto-alert variant="error" title="Query failed" class="mb-2 block">{{
+                        rowsError()
+                    }}</inspecto-alert>
                 }
 
                 <!-- Pro data-table: its toolbar toggles the SQL editor (client Run over the loaded page) +
@@ -100,7 +112,8 @@
                     [exportName]="selected()!.table.name"
                     (runOnServer)="onServerSql($event)"
                     noRowsTitle="No rows"
-                    noRowsHint="This table has no rows to display." />
+                    noRowsHint="This table has no rows to display."
+                />
             }
         </section>
     </div>

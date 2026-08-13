@@ -1,6 +1,22 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, DestroyRef, inject, signal, ViewChild } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    inject,
+    signal,
+    ViewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { AbstractControl, FormArray, FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import {
+    AbstractControl,
+    FormArray,
+    FormBuilder,
+    FormGroup,
+    ReactiveFormsModule,
+    ValidatorFn,
+    Validators,
+} from '@angular/forms';
 import { debounceTime, distinctUntilChanged } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
@@ -10,7 +26,13 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, DbBrowserService, DecisionRule, DecisionRulesService, DecisionRuleUpsert } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    DbBrowserService,
+    DecisionRule,
+    DecisionRulesService,
+    DecisionRuleUpsert,
+} from 'app/inspecto/api';
 import {
     type Consequence,
     type ConsequenceInputSpec,
@@ -47,7 +69,14 @@ export interface DecisionRuleFormResult {
 /** Rejects a value (case-insensitive, trimmed) already present in `taken` → `{ duplicate: true }`. */
 function uniqueNameValidator(taken: string[]): ValidatorFn {
     const set = new Set(taken.map((t) => t.trim().toLowerCase()));
-    return (c: AbstractControl) => (set.has(String(c.value ?? '').trim().toLowerCase()) ? { duplicate: true } : null);
+    return (c: AbstractControl) =>
+        set.has(
+            String(c.value ?? '')
+                .trim()
+                .toLowerCase(),
+        )
+            ? { duplicate: true }
+            : null;
 }
 
 /** The distinct fields an existing when-clause already references (typed string until probed). */
@@ -92,7 +121,13 @@ const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
-            {{ isEdit ? 'Edit decision rule "' + data.rule!.name + '"' : step() === 'save' ? 'Save decision rule' : 'New decision rule' }}
+            {{
+                isEdit
+                    ? 'Edit decision rule "' + data.rule!.name + '"'
+                    : step() === 'save'
+                      ? 'Save decision rule'
+                      : 'New decision rule'
+            }}
         </h2>
         <mat-dialog-content>
             @if (writesDisabled()) {
@@ -103,14 +138,23 @@ const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS
             <!-- Config step content stays mounted (not @if'd) so the schema-form ViewChild survives the
                  step transition — only visually hidden via [hidden], never destroyed. -->
             <div [hidden]="step() === 'save'">
-                <inspecto-schema-form [specs]="attributes" [initial]="initialValue" [optionLoaders]="optionLoaders" (submitted)="save()"></inspecto-schema-form>
+                <inspecto-schema-form
+                    [specs]="attributes"
+                    [initial]="initialValue"
+                    [optionLoaders]="optionLoaders"
+                    (submitted)="save()"
+                ></inspecto-schema-form>
 
                 <div class="mt-4 font-semibold">When records match</div>
                 <inspecto-query-condition-group class="mt-2 block" [group]="when" [columns]="columns()" [root]="true" />
                 @if (!columns().length) {
-                    <div class="text-secondary mt-1 text-sm">Field choices load from the target's records — set Target above first.</div>
+                    <div class="text-secondary mt-1 text-sm">
+                        Field choices load from the target's records — set Target above first.
+                    </div>
                 } @else if (whenEmpty()) {
-                    <div class="text-secondary mt-1 text-sm">No conditions yet — the rule would match every record.</div>
+                    <div class="text-secondary mt-1 text-sm">
+                        No conditions yet — the rule would match every record.
+                    </div>
                 }
 
                 <div class="mt-4 font-semibold">Then</div>
@@ -137,9 +181,14 @@ const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS
                                         </mat-form-field>
                                     }
                                 }
-                                <button type="button" mat-icon-button (click)="removeConsequence(i)"
-                                        [disabled]="consequencesArray.length === 1"
-                                        matTooltip="Remove consequence" aria-label="Remove consequence">
+                                <button
+                                    type="button"
+                                    mat-icon-button
+                                    (click)="removeConsequence(i)"
+                                    [disabled]="consequencesArray.length === 1"
+                                    matTooltip="Remove consequence"
+                                    aria-label="Remove consequence"
+                                >
                                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                                 </button>
                             </div>
@@ -164,7 +213,10 @@ const ACTIONS: { value: ConsequenceType; label: string }[] = [...ROUTING_ACTIONS
                             @if (c.hasError('required')) {
                                 <mat-error>An id is required.</mat-error>
                             } @else if (c.hasError('pattern')) {
-                                <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
+                                <mat-error
+                                    >Start with a letter or digit; then letters, digits,
+                                    <code>. _ -</code> only.</mat-error
+                                >
                             } @else if (c.hasError('duplicate')) {
                                 <mat-error>A decision rule with this id already exists.</mat-error>
                             }

@@ -44,7 +44,10 @@ describe('OnboardingCreateDialog', () => {
         const c = fixture.componentInstance;
         c.form.controls.name.setValue('orders_feed');
         c.create();
-        const [type, config] = (api.write as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Record<string, unknown>];
+        const [type, config] = (api.write as ReturnType<typeof vi.fn>).mock.calls[0] as [
+            string,
+            Record<string, unknown>,
+        ];
         expect(type).toBe('pipeline');
         expect(config['name']).toBe('orders_feed');
         expect(config['active']).toBe(false);
@@ -63,7 +66,9 @@ describe('OnboardingCreateDialog', () => {
         });
         // The LOCAL poll path's real dedup — collector-level `duplicate:` is engine-only.
         expect((config['processing'] as Record<string, unknown>)['duplicate_check']).toEqual({
-            enabled: true, marker_extension: '.processed', retention_days: 30,
+            enabled: true,
+            marker_extension: '.processed',
+            retention_days: 30,
         });
         expect(api.registerPipeline).toHaveBeenCalledWith('x.toon');
         expect(ref.close).toHaveBeenCalledWith({ name: 'orders_feed' });
@@ -154,9 +159,9 @@ describe('OnboardingCreateDialog', () => {
     });
 
     it('takes the kind from the FILE and locks the toggle', () => {
-        const { fixture } = create({ kind: 'stream' });   // caller asked for a Stream…
+        const { fixture } = create({ kind: 'stream' }); // caller asked for a Stream…
         const c = load(fixture);
-        expect(c.kind()).toBe('reference');               // …the file says Reference
+        expect(c.kind()).toBe('reference'); // …the file says Reference
         // Assert the behaviour (both toggles unclickable), not a Material-internal class name.
         const buttons = Array.from(
             fixture.nativeElement.querySelectorAll('mat-button-toggle button'),
@@ -173,15 +178,16 @@ describe('OnboardingCreateDialog', () => {
 
         const calls = (api.write as ReturnType<typeof vi.fn>).mock.calls as [string, Record<string, unknown>][];
         const types = calls.map((c2) => c2[0]);
-        expect(types.indexOf('pipeline')).toBe(types.length - 1);   // pipeline is written LAST
+        expect(types.indexOf('pipeline')).toBe(types.length - 1); // pipeline is written LAST
         expect(types.filter((t) => t === 'schema')).toHaveLength(2); // main + 1 segment
 
         const pipeline = calls.find((c2) => c2[0] === 'pipeline')![1];
         expect(pipeline['name']).toBe('orders_copy');
         expect(pipeline['active']).toBe(false);
         expect((pipeline['dirs'] as Record<string, string>)['poll']).toBe('spaces/demo/data/inbox/orders_copy');
-        expect((pipeline['processing'] as Record<string, unknown>)['schema_file'])
-            .toBe('spaces/demo/config/orders_copy_schema.toon');
+        expect((pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
+            'spaces/demo/config/orders_copy_schema.toon',
+        );
         expect((pipeline['processing'] as Record<string, unknown>)['threads']).toBe(2); // body preserved
         expect(ref.close).toHaveBeenCalledWith({ name: 'orders_copy' });
     });

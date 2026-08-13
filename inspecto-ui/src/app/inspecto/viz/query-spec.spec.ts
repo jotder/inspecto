@@ -32,7 +32,10 @@ describe('aggExpression / measureId / buildMeasure', () => {
         });
         // `count` takes no column — the stamp carries the agg only.
         expect(buildMeasure('count', 'x')).toEqual({
-            id: 'count', expression: 'COUNT(*)', label: 'count(x)', agg: 'count',
+            id: 'count',
+            expression: 'COUNT(*)',
+            label: 'count(x)',
+            agg: 'count',
         });
     });
 });

@@ -12,20 +12,20 @@ const DETAILS = /\/health\/details$/;
  * backend's subsystem shape (jobRunsProjection NOT_CONFIGURED, like a backend without -Djobs.backend).
  */
 export function healthHandler(flags: MockFlags): MockHandler {
-  return (req: MockRequest) => {
-    if (!flags.mockOps) return undefined;
-    if (req.method === 'GET' && match(req.url, DETAILS)) {
-      return json({
-        status: 'UP',
-        subsystems: {
-          configStore: { status: 'UP', detail: 'mock write root' },
-          dataStore: { status: 'UP', detail: 'mock data root' },
-          pipelines: { status: 'UP', detail: '2 registered' },
-          scheduler: { status: 'UP', detail: '5 job(s), 2 cron-scheduled' },
-          jobRunsProjection: { status: 'NOT_CONFIGURED', detail: '-Djobs.backend not set' },
-        },
-      });
-    }
-    return undefined;
-  };
+    return (req: MockRequest) => {
+        if (!flags.mockOps) return undefined;
+        if (req.method === 'GET' && match(req.url, DETAILS)) {
+            return json({
+                status: 'UP',
+                subsystems: {
+                    configStore: { status: 'UP', detail: 'mock write root' },
+                    dataStore: { status: 'UP', detail: 'mock data root' },
+                    pipelines: { status: 'UP', detail: '2 registered' },
+                    scheduler: { status: 'UP', detail: '5 job(s), 2 cron-scheduled' },
+                    jobRunsProjection: { status: 'NOT_CONFIGURED', detail: '-Djobs.backend not set' },
+                },
+            });
+        }
+        return undefined;
+    };
 }

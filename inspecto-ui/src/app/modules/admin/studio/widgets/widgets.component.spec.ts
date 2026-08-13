@@ -19,9 +19,31 @@ import { DashboardsService } from '../dashboards/dashboards.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 
-const W1: Widget = { id: 'dur_by_tariff', name: 'dur_by_tariff', datasetId: 'cdr_sample', vizType: 'bar', controls: {}, tags: ['ops'] };
-const W2: Widget = { id: 'other', name: 'other', datasetId: 'cdr_sample', vizType: 'line', controls: {}, tags: ['billing'] };
-const DS: Dataset = { id: 'cdr_sample', name: 'cdr_sample', kind: 'virtual', sourceName: 'cdr', columns: [], measures: [], calculated: [] };
+const W1: Widget = {
+    id: 'dur_by_tariff',
+    name: 'dur_by_tariff',
+    datasetId: 'cdr_sample',
+    vizType: 'bar',
+    controls: {},
+    tags: ['ops'],
+};
+const W2: Widget = {
+    id: 'other',
+    name: 'other',
+    datasetId: 'cdr_sample',
+    vizType: 'line',
+    controls: {},
+    tags: ['billing'],
+};
+const DS: Dataset = {
+    id: 'cdr_sample',
+    name: 'cdr_sample',
+    kind: 'virtual',
+    sourceName: 'cdr',
+    columns: [],
+    measures: [],
+    calculated: [],
+};
 const D1: Dashboard = { id: 'd1', name: 'd1', tiles: [{ widgetId: 'other', span: 1 }], filter: null };
 
 function create(
@@ -42,13 +64,26 @@ function create(
             provideRouter([]),
             { provide: WidgetsService, useValue: { list: () => of(widgets), remove } },
             { provide: DatasetsService, useValue: { list: () => of(datasets) } },
-            { provide: DashboardsService, useValue: { list: () => of([D1]), get: () => of({ ...D1, tiles: [...D1.tiles] }), save: saveDashboard } },
+            {
+                provide: DashboardsService,
+                useValue: { list: () => of([D1]), get: () => of({ ...D1, tiles: [...D1.tiles] }), save: saveDashboard },
+            },
             { provide: MatDialog, useValue: dialog },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
-            { provide: ToastrService, useValue: { warning: () => undefined, success: () => undefined, error: () => undefined } },
+            {
+                provide: ToastrService,
+                useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+            },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: () => Promise.resolve(true) } },
             // authMode 'none' keeps LensService on the honor system (R2 grant checks bypassed).
-            { provide: SessionService, useValue: { exchangeEnabled: () => opts.canShare ?? false, authMode: () => 'none', capabilities: () => [] } },
+            {
+                provide: SessionService,
+                useValue: {
+                    exchangeEnabled: () => opts.canShare ?? false,
+                    authMode: () => 'none',
+                    capabilities: () => [],
+                },
+            },
             { provide: ExchangeService, useValue: { offer } },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
         ],
@@ -145,7 +180,12 @@ describe('WidgetsComponent', () => {
         fixture.detectChanges();
         expect(fixture.componentInstance.canShare()).toBe(true);
         fixture.componentInstance.offer(W1);
-        expect(offer).toHaveBeenCalledWith({ kind: 'widget', owner: 'default', item: 'dur_by_tariff', description: 'ops chart' });
+        expect(offer).toHaveBeenCalledWith({
+            kind: 'widget',
+            owner: 'default',
+            item: 'dur_by_tariff',
+            description: 'ops chart',
+        });
     });
 
     it('renders the empty state with no a11y violations', async () => {

@@ -22,12 +22,7 @@
             <!-- Nothing is open on arrival, so Open is the primary affordance rather than a picker over
                  an already-loaded set. It is also how tabs are closed (untick), which is why it stays
                  available with tabs open. -->
-            <button
-                mat-icon-button
-                (click)="openPipelines()"
-                matTooltip="Open pipelines…"
-                aria-label="Open pipelines"
-            >
+            <button mat-icon-button (click)="openPipelines()" matTooltip="Open pipelines…" aria-label="Open pipelines">
                 <mat-icon svgIcon="heroicons_outline:folder-open"></mat-icon>
             </button>
 
@@ -285,9 +280,7 @@
                     icon="heroicons_outline:folder-open"
                     title="No pipeline open"
                     [message]="
-                        'Open one or more of the ' +
-                        flows().length +
-                        ' available pipelines to see them on the canvas.'
+                        'Open one or more of the ' + flows().length + ' available pipelines to see them on the canvas.'
                     "
                     actionLabel="Open a pipeline…"
                     (action)="openPipelines()"
@@ -363,15 +356,16 @@
                 -->
                 @if (unsupportedNodes().length; as n) {
                     <inspecto-alert class="absolute inset-x-2 top-2 z-10 block" variant="warning">
-                        This pipeline uses {{ n }} step{{ n === 1 ? '' : 's' }} the current save format has
-                        no home for (<code>{{ unsupportedTypeList() }}</code>). You can explore and edit, but
-                        <b>Save will refuse</b> until {{ n === 1 ? 'it is' : 'they are' }} removed.
+                        This pipeline uses {{ n }} step{{ n === 1 ? '' : 's' }} the current save format has no home for
+                        (<code>{{ unsupportedTypeList() }}</code
+                        >). You can explore and edit, but <b>Save will refuse</b> until
+                        {{ n === 1 ? 'it is' : 'they are' }} removed.
                     </inspecto-alert>
                 }
                 @if (forcedToCanvas()) {
                     <inspecto-alert class="block px-2 pt-2" variant="info">
-                        This pipeline's topology can't be shown as a linear recipe (it has a branch or
-                        connection the Recipe view can't represent) — showing Canvas instead.
+                        This pipeline's topology can't be shown as a linear recipe (it has a branch or connection the
+                        Recipe view can't represent) — showing Canvas instead.
                     </inspecto-alert>
                 }
                 @if (effectiveMode() === 'recipe') {
@@ -437,10 +431,7 @@
                 aria-label="Properties"
             >
                 @if (inspectorOpen()) {
-                    <div
-                        class="flex shrink-0 items-center border-b pr-1"
-                        style="border-color: var(--gamma-border)"
-                    >
+                    <div class="flex shrink-0 items-center border-b pr-1" style="border-color: var(--gamma-border)">
                         <div role="tablist" aria-label="Properties panel" class="flex items-center">
                             <button
                                 type="button"
@@ -450,7 +441,9 @@
                                 [attr.aria-selected]="rightTab() === 'properties'"
                                 [attr.tabindex]="rightTab() === 'properties' ? 0 : -1"
                                 class="border-b-2 px-2.5 py-1.5 text-xs font-semibold"
-                                [style.border-color]="rightTab() === 'properties' ? 'var(--gamma-primary)' : 'transparent'"
+                                [style.border-color]="
+                                    rightTab() === 'properties' ? 'var(--gamma-primary)' : 'transparent'
+                                "
                                 [class.opacity-60]="rightTab() !== 'properties'"
                                 (click)="rightTab.set('properties')"
                             >
@@ -683,11 +676,18 @@
             [style.top.px]="t.y + 14"
         >
             <div class="font-semibold">{{ t.name }}</div>
-            <div class="opacity-70">{{ t.type }}@if (t.category) { · {{ t.category }} }</div>
+            <div class="opacity-70">
+                {{ t.type }}
+                @if (t.category) {
+                    · {{ t.category }}
+                }
+            </div>
             @if (t.config.length) {
                 <div class="mt-1">
                     @for (c of t.config; track c.k) {
-                        <div class="truncate"><span class="opacity-70">{{ c.k }}:</span> {{ c.v }}</div>
+                        <div class="truncate">
+                            <span class="opacity-70">{{ c.k }}:</span> {{ c.v }}
+                        </div>
                     }
                 </div>
             }

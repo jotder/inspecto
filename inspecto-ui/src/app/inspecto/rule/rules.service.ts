@@ -18,7 +18,9 @@ export class RulesService {
     private components = inject(ComponentsService);
 
     list(): Observable<RuleTemplate[]> {
-        return this.components.list('rule-template').pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
+        return this.components
+            .list('rule-template')
+            .pipe(map((defs) => defs.map((d) => fromContent(d.name, d.content))));
     }
 
     save(rule: RuleTemplate): Observable<RuleTemplate> {
@@ -31,7 +33,13 @@ export class RulesService {
 }
 
 function toContent(r: RuleTemplate): Record<string, unknown> {
-    return { name: r.name, source: r.source, projection: r.projection, where: r.where, sqlOverride: r.sqlOverride ?? null };
+    return {
+        name: r.name,
+        source: r.source,
+        projection: r.projection,
+        where: r.where,
+        sqlOverride: r.sqlOverride ?? null,
+    };
 }
 
 function fromContent(name: string, content: Record<string, unknown>): RuleTemplate {

@@ -37,7 +37,12 @@
             <div class="flex flex-col gap-4 md:flex-row">
                 <mat-form-field class="flex-auto" subscriptSizing="dynamic">
                     <mat-label>Name</mat-label>
-                    <input matInput formControlName="name" autocomplete="off" placeholder="e.g. recent_high_risk_cdrs" />
+                    <input
+                        matInput
+                        formControlName="name"
+                        autocomplete="off"
+                        placeholder="e.g. recent_high_risk_cdrs"
+                    />
                     @if (errorFor('name'); as err) {
                         <mat-error>{{ err }}</mat-error>
                     }
@@ -46,7 +51,9 @@
                     <mat-label>Source dataset</mat-label>
                     <mat-select formControlName="datasetId">
                         @for (d of datasets(); track d.id) {
-                            <mat-option [value]="d.id">{{ d.id }} <span class="text-secondary">({{ d.sourceName }})</span></mat-option>
+                            <mat-option [value]="d.id"
+                                >{{ d.id }} <span class="text-secondary">({{ d.sourceName }})</span></mat-option
+                            >
                         }
                     </mat-select>
                 </mat-form-field>
@@ -80,7 +87,10 @@
                         <span class="text-secondary text-sm font-medium">Parameters</span>
                         <div class="flex flex-wrap items-center gap-2">
                             @for (t of builtinTokens(); track t) {
-                                <span class="rounded-full border border-gray-300 px-2 py-0.5 font-mono text-xs dark:border-gray-600">{{ t }}</span>
+                                <span
+                                    class="rounded-full border border-gray-300 px-2 py-0.5 font-mono text-xs dark:border-gray-600"
+                                    >{{ t }}</span
+                                >
                             }
                             @for (name of userParamNames(); track name) {
                                 <mat-form-field subscriptSizing="dynamic" class="w-48">
@@ -97,11 +107,20 @@
                     </div>
                 }
             } @else {
-                <inspecto-query-panel [initialModel]="structuredModel()" [source]="panelSource()" (queryChange)="onStructuredChange($event)" />
+                <inspecto-query-panel
+                    [initialModel]="structuredModel()"
+                    [source]="panelSource()"
+                    (queryChange)="onStructuredChange($event)"
+                />
             }
 
             <div class="flex flex-wrap items-center gap-2">
-                <button mat-stroked-button type="button" (click)="run()" [disabled]="running() || !form.controls.datasetId.value">
+                <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="run()"
+                    [disabled]="running() || !form.controls.datasetId.value"
+                >
                     @if (running()) {
                         <mat-spinner diameter="18"></mat-spinner>
                     } @else {
@@ -147,20 +166,27 @@
                         Resolved SQL: <span class="font-mono">{{ p.resolvedSql }}</span>
                     </div>
                     @if (p.error) {
-                        <inspecto-alert variant="error" icon="heroicons_outline:exclamation-triangle">{{ p.error }}</inspecto-alert>
+                        <inspecto-alert variant="error" icon="heroicons_outline:exclamation-triangle">{{
+                            p.error
+                        }}</inspecto-alert>
                     } @else if (p.resultSet) {
                         <div class="flex flex-wrap items-center gap-2 text-sm">
                             <span class="font-medium">{{ p.resultSet.rowCount }} rows</span>
                             @if (p.recommended?.length) {
                                 <span class="text-secondary">· fits:</span>
                                 @for (r of p.recommended; track r) {
-                                    <span class="rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-gray-600">{{ r }}</span>
+                                    <span
+                                        class="rounded-full border border-gray-300 px-2 py-0.5 text-xs dark:border-gray-600"
+                                        >{{ r }}</span
+                                    >
                                 }
                             }
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-left text-sm">
-                                <caption class="sr-only">Result set columns</caption>
+                                <caption class="sr-only">
+                                    Result set columns
+                                </caption>
                                 <thead>
                                     <tr class="text-secondary">
                                         <th scope="col" class="pr-4 font-medium">Column</th>
@@ -174,7 +200,9 @@
                                         <tr>
                                             <td class="pr-4 font-mono">{{ col.name }}</td>
                                             <td class="pr-4">{{ col.type }}</td>
-                                            <td class="pr-4"><inspecto-status-badge [value]="col.role" [label]="col.role" /></td>
+                                            <td class="pr-4">
+                                                <inspecto-status-badge [value]="col.role" [label]="col.role" />
+                                            </td>
                                             <td>{{ col.cardinality ?? '—' }}</td>
                                         </tr>
                                     }
@@ -209,7 +237,9 @@
                             <div class="text-secondary mt-0.5 flex flex-wrap items-center gap-2 text-sm">
                                 <inspecto-status-badge [value]="q.type" [label]="q.type" />
                                 @if (q.datasetId) {
-                                    <span>reads <span class="font-mono">{{ q.datasetId }}</span></span>
+                                    <span
+                                        >reads <span class="font-mono">{{ q.datasetId }}</span></span
+                                    >
                                 }
                                 @if (q.parameters.length) {
                                     <span>· {{ q.parameters.length }} params</span>
@@ -218,14 +248,29 @@
                         </div>
                         @if (canAuthor()) {
                             <div class="flex flex-wrap items-center gap-1">
-                                <button mat-icon-button (click)="editQuery(q)" matTooltip="Edit" aria-label="Edit query">
+                                <button
+                                    mat-icon-button
+                                    (click)="editQuery(q)"
+                                    matTooltip="Edit"
+                                    aria-label="Edit query"
+                                >
                                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
                                 </button>
-                                <button mat-icon-button (click)="history(q)" matTooltip="Version history" aria-label="Version history">
+                                <button
+                                    mat-icon-button
+                                    (click)="history(q)"
+                                    matTooltip="Version history"
+                                    aria-label="Version history"
+                                >
                                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:clock"></mat-icon>
                                 </button>
                                 @if (!writesDisabled()) {
-                                    <button mat-icon-button (click)="remove(q)" matTooltip="Delete" aria-label="Delete query">
+                                    <button
+                                        mat-icon-button
+                                        (click)="remove(q)"
+                                        matTooltip="Delete"
+                                        aria-label="Delete query"
+                                    >
                                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                                     </button>
                                 }

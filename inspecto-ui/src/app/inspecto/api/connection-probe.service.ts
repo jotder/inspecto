@@ -78,19 +78,20 @@ export class ConnectionProbeService {
 
     /** Graded test connection: connect + read/write permission + a bounded list (design §3). */
     probe(id: string, req: ProbeRequest = {}): Observable<ConnectionProbeResult> {
-        return this.http.post<ConnectionProbeResult>(
-            apiUrl(`/connections/${encodeURIComponent(id)}/probe`), req);
+        return this.http.post<ConnectionProbeResult>(apiUrl(`/connections/${encodeURIComponent(id)}/probe`), req);
     }
 
     /** Explore the resource: children of {@code path} (the root when {@code path} is omitted). Permission-aware. */
     explore(id: string, path?: string): Observable<ResourceNode[]> {
-        return this.http.get<ResourceNode[]>(
-            apiUrl(`/connections/${encodeURIComponent(id)}/explore`), { params: toParams({ path }) });
+        return this.http.get<ResourceNode[]>(apiUrl(`/connections/${encodeURIComponent(id)}/explore`), {
+            params: toParams({ path }),
+        });
     }
 
     /** Extract a bounded sample from {@code path} (first {@code limit} rows / file head) for preview only. */
     sample(id: string, path: string, limit = 50): Observable<SampleResult> {
-        return this.http.get<SampleResult>(
-            apiUrl(`/connections/${encodeURIComponent(id)}/sample`), { params: toParams({ path, limit }) });
+        return this.http.get<SampleResult>(apiUrl(`/connections/${encodeURIComponent(id)}/sample`), {
+            params: toParams({ path, limit }),
+        });
     }
 }

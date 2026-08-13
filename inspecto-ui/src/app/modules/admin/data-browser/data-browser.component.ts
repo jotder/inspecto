@@ -3,13 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { ColDef } from 'ag-grid-community';
 
-import {
-    apiErrorMessage,
-    DbBrowserService,
-    DbGroup,
-    DbResult,
-    DbTable,
-} from 'app/inspecto/api';
+import { apiErrorMessage, DbBrowserService, DbGroup, DbResult, DbTable } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -65,16 +59,19 @@ export class DataBrowserComponent {
     loadCatalog(): void {
         this.loadingCatalog.set(true);
         this.catalogError.set(null);
-        this.api.catalog().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-            next: (c) => {
-                this.groups.set(c.groups ?? []);
-                this.loadingCatalog.set(false);
-            },
-            error: (err) => {
-                this.catalogError.set(apiErrorMessage(err, 'Could not load the catalog'));
-                this.loadingCatalog.set(false);
-            },
-        });
+        this.api
+            .catalog()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (c) => {
+                    this.groups.set(c.groups ?? []);
+                    this.loadingCatalog.set(false);
+                },
+                error: (err) => {
+                    this.catalogError.set(apiErrorMessage(err, 'Could not load the catalog'));
+                    this.loadingCatalog.set(false);
+                },
+            });
     }
 
     isSelected(groupId: string, table: string): boolean {
@@ -95,7 +92,8 @@ export class DataBrowserComponent {
         if (!s) return;
         this.loadingRows.set(true);
         this.rowsError.set(null);
-        this.api.table({ group: s.group, name: s.table.name, limit: this.limit() })
+        this.api
+            .table({ group: s.group, name: s.table.name, limit: this.limit() })
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
                 next: (r) => this.applyResult(r),
@@ -110,7 +108,8 @@ export class DataBrowserComponent {
         this.lastSql = sql;
         this.loadingRows.set(true);
         this.rowsError.set(null);
-        this.api.query({ group: s.group, table: s.table.name, sql, limit: this.limit() })
+        this.api
+            .query({ group: s.group, table: s.table.name, sql, limit: this.limit() })
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({
                 next: (r) => this.applyResult(r),

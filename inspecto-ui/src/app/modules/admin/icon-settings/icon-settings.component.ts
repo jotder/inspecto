@@ -7,7 +7,12 @@ import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { PipelineNodeType, PipelinesService, IconMap, IconMapService, apiErrorMessage } from 'app/inspecto/api';
 import { GLYPH_LIBRARY, ICON_COLOR_SWATCHES, iconDataUri } from 'app/modules/admin/catalog/catalog-graph';
-import { NodeTypeGroup, categoryLabel, groupByCategory, resolveNodeIcon } from 'app/modules/admin/pipelines/pipeline-graph';
+import {
+    NodeTypeGroup,
+    categoryLabel,
+    groupByCategory,
+    resolveNodeIcon,
+} from 'app/modules/admin/pipelines/pipeline-graph';
 
 /**
  * Processor-icon settings — map each processor **type** (and per-**sub-type**) to a glyph + colour. A

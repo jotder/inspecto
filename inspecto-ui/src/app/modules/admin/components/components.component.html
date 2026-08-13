@@ -5,8 +5,8 @@
             <h1 class="text-3xl font-extrabold leading-tight tracking-tight">Components</h1>
             <div class="text-secondary mt-1">
                 Reusable building blocks — <code>grammar</code>, <code>schema</code>, <code>mapping</code>,
-                <code>transform</code>, <code>sink</code> — authored under <code>registry/</code> and composed by flows via
-                <code>use:</code>. Edit one to dry-run it over a sample (no data is written).
+                <code>transform</code>, <code>sink</code> — authored under <code>registry/</code> and composed by flows
+                via <code>use:</code>. Edit one to dry-run it over a sample (no data is written).
             </div>
         </div>
         <div class="flex items-center gap-3">
@@ -54,13 +54,31 @@
                             </div>
                             @if (!writesDisabled) {
                                 <div class="flex items-center gap-1">
-                                    <button mat-icon-button (click)="edit(type, def)" matTooltip="Edit & test" aria-label="Edit and test">
-                                        <mat-icon class="icon-size-5" svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                                    <button
+                                        mat-icon-button
+                                        (click)="edit(type, def)"
+                                        matTooltip="Edit & test"
+                                        aria-label="Edit and test"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-5"
+                                            svgIcon="heroicons_outline:pencil-square"
+                                        ></mat-icon>
                                     </button>
-                                    <button mat-icon-button (click)="history(type, def)" matTooltip="Version history" aria-label="Version history">
+                                    <button
+                                        mat-icon-button
+                                        (click)="history(type, def)"
+                                        matTooltip="Version history"
+                                        aria-label="Version history"
+                                    >
                                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:clock"></mat-icon>
                                     </button>
-                                    <button mat-icon-button (click)="remove(type, def)" matTooltip="Delete" aria-label="Delete">
+                                    <button
+                                        mat-icon-button
+                                        (click)="remove(type, def)"
+                                        matTooltip="Delete"
+                                        aria-label="Delete"
+                                    >
                                         <mat-icon class="icon-size-5" svgIcon="heroicons_outline:trash"></mat-icon>
                                     </button>
                                 </div>

@@ -21,12 +21,18 @@ export interface Refusal {
 }
 
 export const LOWERABLE = new Set([
-    'acquisition', 'parser', 'gap', 'transform.dedup.marker',
-    'transform.filter', 'transform.map', 'sink.persistent', 'enrichment',
-    'transform.route',     // route: block — authoring-only until the executor lands (mirrors backend S3)
-    'transform.dedup',     // record-grain dedup → processing.dedup (ELT P2)
+    'acquisition',
+    'parser',
+    'gap',
+    'transform.dedup.marker',
+    'transform.filter',
+    'transform.map',
+    'sink.persistent',
+    'enrichment',
+    'transform.route', // route: block — authoring-only until the executor lands (mirrors backend S3)
+    'transform.dedup', // record-grain dedup → processing.dedup (ELT P2)
     'transform.summarize', // group-by rollup → processing.summarize (ELT P3), authoring-only
-    'transform.join',      // reference join → processing.join (ELT P3 S2), authoring-only
+    'transform.join', // reference join → processing.join (ELT P3 S2), authoring-only
 ]);
 
 type Cfg = Record<string, unknown>;
@@ -50,9 +56,7 @@ function extractRowFilters(parserCfg: Cfg): Cfg {
     if (parserCfg['csv_settings'] == null) return {};
     const csv = asMap(parserCfg['csv_settings']);
     const out: Cfg = {};
-    const hasLists = PRE_PARSE_FILTER_KEYS.some(
-        (k) => Array.isArray(csv[k]) && (csv[k] as unknown[]).length > 0,
-    );
+    const hasLists = PRE_PARSE_FILTER_KEYS.some((k) => Array.isArray(csv[k]) && (csv[k] as unknown[]).length > 0);
     for (const k of PRE_PARSE_FILTER_KEYS) {
         if (csv[k] != null) {
             out[k] = csv[k];
@@ -220,7 +224,7 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     const sinksList = Array.isArray(config['sinks']) ? (config['sinks'] as unknown[]).map(asMap) : [];
     let extra = 2;
     for (const s of sinksList) {
-        if (s['database'] == null || String(s['database']) === String(dirs['database'])) continue;   // primary already lifted
+        if (s['database'] == null || String(s['database']) === String(dirs['database'])) continue; // primary already lifted
         const c: Cfg = { database: s['database'] };
         for (const k of ['format', 'compression', 'ducklake']) if (s[k] != null) c[k] = s[k];
         sinkDefs.push({ id: `sink_${extra}`, name: `out_${extra}`, cfg: c });
@@ -228,15 +232,19 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
     }
     const branchKeyFor = (db: unknown): string | null => {
         if (!routeCfg || db == null || !Array.isArray(routeCfg['branches'])) return null;
-        const hit = (routeCfg['branches'] as Cfg[]).find((b) => String(b['database']) === String(db) && b['key'] != null);
+        const hit = (routeCfg['branches'] as Cfg[]).find(
+            (b) => String(b['database']) === String(db) && b['key'] != null,
+        );
         return hit ? String(hit['key']) : null;
     };
     for (const d of sinkDefs) {
         nodes.push({ id: d.id, type: 'sink.persistent', name: d.name, description: 'Persistent store', config: d.cfg });
         const key = branchKeyFor(d.cfg['database']);
-        edges.push(key != null
-            ? { from: 'route', rel: `route:${key}`, to: d.id }
-            : { from: sinkUpstream, rel: 'data', to: d.id });
+        edges.push(
+            key != null
+                ? { from: 'route', rel: `route:${key}`, to: d.id }
+                : { from: sinkUpstream, rel: 'data', to: d.id },
+        );
     }
 
     return { name: String(config['name'] ?? ''), active: config['active'] === true, nodes, edges };
@@ -247,7 +255,11 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
  * Returns `{ config }` on success or `{ refusals }` when the topology cannot be represented.
  * `strict` (active save, or a brand-new file) additionally requires completeness.
  */
-export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean): { config: Cfg } | { refusals: Refusal[] } {
+export function lowerGraph(
+    g: AuthoredPipeline,
+    existing: Cfg,
+    strict: boolean,
+): { config: Cfg } | { refusals: Refusal[] } {
     const refusals: Refusal[] = [];
     let acq: AuthoredNode | undefined, parser: AuthoredNode | undefined, gap: AuthoredNode | undefined;
     let marker: AuthoredNode | undefined;
@@ -260,7 +272,11 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
 
     for (const n of g.nodes) {
         if (!LOWERABLE.has(n.type)) {
-            refusals.push({ code: 'UNSUPPORTED_NODE', nodeId: n.id, message: `the flat pipeline config has no home for a '${n.type}' node` });
+            refusals.push({
+                code: 'UNSUPPORTED_NODE',
+                nodeId: n.id,
+                message: `the flat pipeline config has no home for a '${n.type}' node`,
+            });
             continue;
         }
         if (n.type === 'acquisition') acq = n;
@@ -278,7 +294,8 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
             else {
                 const db = n.config?.['database'];
                 if (db != null && !destByDatabase.has(String(db))) destByDatabase.set(String(db), n);
-                if (!primarySink || (primarySink.config?.['database'] == null && n.config?.['database'] != null)) primarySink = n;
+                if (!primarySink || (primarySink.config?.['database'] == null && n.config?.['database'] != null))
+                    primarySink = n;
             }
         }
     }
@@ -299,26 +316,47 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
         if (!acq) refusals.push({ code: 'NO_ACQUISITION', message: 'an active pipeline needs an acquisition node' });
         if (!parser) refusals.push({ code: 'NO_PARSER', message: 'an active pipeline needs a parser node' });
         if (!primarySink || primarySink.config?.['database'] == null)
-            refusals.push({ code: 'NO_PERSISTENT_SINK', message: 'an active pipeline needs a persistent sink with a database dir' });
-        const schemaKeys = ['parsing', 'csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config'];
+            refusals.push({
+                code: 'NO_PERSISTENT_SINK',
+                message: 'an active pipeline needs a persistent sink with a database dir',
+            });
+        const schemaKeys = [
+            'parsing',
+            'csv_settings',
+            'schema_file',
+            'schemas',
+            'segments',
+            'ingester',
+            'ingester_config',
+        ];
         const grammarBound = !!parser?.use?.startsWith('grammar/');
         if (parser && !grammarBound && !schemaKeys.some((k) => parser!.config?.[k] != null))
-            refusals.push({ code: 'PARSER_NO_SCHEMA', nodeId: parser.id, message: 'the parser names no Grammar / parsing: block / schema_file / schemas / segments' });
+            refusals.push({
+                code: 'PARSER_NO_SCHEMA',
+                nodeId: parser.id,
+                message: 'the parser names no Grammar / parsing: block / schema_file / schemas / segments',
+            });
     }
     if (refusals.length) return { refusals };
 
     const out: Cfg = structuredClone(existing);
-    if (typeof out['name'] !== 'string' || String(out['name']).toLowerCase() !== g.name.toLowerCase()) out['name'] = g.name;
+    if (typeof out['name'] !== 'string' || String(out['name']).toLowerCase() !== g.name.toLowerCase())
+        out['name'] = g.name;
     out['active'] = g.active;
     const colKey = 'source' in out && !('collector' in out) ? 'source' : 'collector';
-    const collector = asMap(out[colKey]); out[colKey] = collector;
-    const dirs = asMap(out['dirs']); out['dirs'] = dirs;
-    const output = asMap(out['output']); out['output'] = output;
-    const processing = asMap(out['processing']); out['processing'] = processing;
+    const collector = asMap(out[colKey]);
+    out[colKey] = collector;
+    const dirs = asMap(out['dirs']);
+    out['dirs'] = dirs;
+    const output = asMap(out['output']);
+    out['output'] = output;
+    const processing = asMap(out['processing']);
+    out['processing'] = processing;
 
     if (acq) {
         for (const k of Object.keys(collector)) if (k !== 'gap_detection') delete collector[k];
-        for (const [k, v] of Object.entries(acq.config ?? {})) if (!['poll', 'trigger', 'file_pattern'].includes(k)) collector[k] = v;
+        for (const [k, v] of Object.entries(acq.config ?? {}))
+            if (!['poll', 'trigger', 'file_pattern'].includes(k)) collector[k] = v;
         delete collector['connection'];
         if (acq.use?.startsWith('connection/')) collector['connection'] = acq.use.slice('connection/'.length);
         setOrDel(dirs, 'poll', acq.config?.['poll']);
@@ -377,17 +415,20 @@ export function lowerGraph(g: AuthoredPipeline, existing: Cfg, strict: boolean):
     }
 
     if (parser) {
-        for (const k of ['csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config']) delete processing[k];
+        for (const k of ['csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config'])
+            delete processing[k];
         for (const k of ['csv_settings', 'schema_file', 'schemas', 'segments', 'ingester', 'ingester_config'])
             if (parser.config?.[k] != null) processing[k] = parser.config[k];
         if (filters.length) {
-            const csv = asMap(processing['csv_settings']); processing['csv_settings'] = csv;
+            const csv = asMap(processing['csv_settings']);
+            processing['csv_settings'] = csv;
             for (const f of filters) Object.assign(csv, f.config ?? {});
         }
         // …and the top-level parsing: block it owns. Removed only in strict mode: a partial merge
         // must not drop a block it was never given (mirrors `overlayOwned`).
         const parsingBlock = asMap(parser.config?.['parsing'] ?? out['parsing']);
-        if (parser.config?.['parsing'] == null && strict) for (const k of Object.keys(parsingBlock)) delete parsingBlock[k];
+        if (parser.config?.['parsing'] == null && strict)
+            for (const k of Object.keys(parsingBlock)) delete parsingBlock[k];
         // …and the Grammar binding it carries on use:. Without this the ref rides the graph model and
         // is silently dropped on the way to disk (mirrors PipelineEditable.lower).
         if (parser.use?.startsWith('grammar/')) parsingBlock['grammar'] = parser.use;
@@ -496,13 +537,21 @@ function stepConfig(g: AuthoredPipeline, n: AuthoredNode): Cfg {
         for (const k of keys) if (n.config?.[k] != null) c[k] = n.config[k];
     };
     switch (STEP_KIND[n.type]) {
-        case 'dedup': keep('keys', 'order_by'); return c;
-        case 'join': keep('reference', 'on'); return c;
-        case 'summarize': keep('group_by', 'measures'); return c;
-        case 'route': return routeSection(g, n);
+        case 'dedup':
+            keep('keys', 'order_by');
+            return c;
+        case 'join':
+            keep('reference', 'on');
+            return c;
+        case 'summarize':
+            keep('group_by', 'measures');
+            return c;
+        case 'route':
+            return routeSection(g, n);
         // filter: verbatim — the post-parse `where` and the pre-parse include/exclude lists together,
         // so the round-trip is lossless. Only `where` has a legacy singular spelling.
-        default: return structuredClone(n.config ?? {}) as Cfg;
+        default:
+            return structuredClone(n.config ?? {}) as Cfg;
     }
 }
 

@@ -7,13 +7,20 @@ import { AttributeSpec } from 'app/inspecto/component-model';
  */
 export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
     {
-        key: 'name', label: 'Schedule id', type: 'string', tier: 'required',
+        key: 'name',
+        label: 'Schedule id',
+        type: 'string',
+        tier: 'required',
         pattern: '[A-Za-z0-9][A-Za-z0-9._-]*',
         placeholder: 'e.g. daily_sales_export',
         help: 'Letters, digits, dot, dash, underscore; start alphanumeric.',
     },
     {
-        key: 'format', label: 'Export format', type: 'select', tier: 'required', default: 'csv',
+        key: 'format',
+        label: 'Export format',
+        type: 'select',
+        tier: 'required',
+        default: 'csv',
         options: [
             { value: 'csv', label: 'CSV (tile data)' },
             { value: 'pdf', label: 'PDF (snapshot)' },
@@ -21,21 +28,32 @@ export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
         ],
     },
     {
-        key: 'scheduleMode', label: 'Trigger', type: 'select', tier: 'required', default: 'cron',
+        key: 'scheduleMode',
+        label: 'Trigger',
+        type: 'select',
+        tier: 'required',
+        default: 'cron',
         options: [
             { value: 'cron', label: 'Cron schedule' },
             { value: 'manual', label: 'Manual only' },
         ],
     },
     {
-        key: 'cron', label: 'Cron expression', type: 'string', tier: 'required',
+        key: 'cron',
+        label: 'Cron expression',
+        type: 'string',
+        tier: 'required',
         dependsOn: { key: 'scheduleMode', equals: 'cron' },
         default: '0 0 6 * * *',
         pattern: '\\S+(\\s+\\S+){4,5}',
         help: '5 or 6 fields (sec min hour day month weekday)',
     },
     {
-        key: 'recipients', label: 'Recipients (comma-separated)', type: 'string', tier: 'optional', required: false,
+        key: 'recipients',
+        label: 'Recipients (comma-separated)',
+        type: 'string',
+        tier: 'optional',
+        required: false,
         placeholder: 'ops@example.com, finance@example.com',
         help: 'Who is notified when the export completes.',
     },

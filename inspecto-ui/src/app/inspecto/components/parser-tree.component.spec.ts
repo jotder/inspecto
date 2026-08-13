@@ -7,7 +7,9 @@ import { ParserTreeComponent } from './parser-tree.component';
 
 const NODES: ParserTreeNode[] = [
     {
-        label: 'record[0]', type: 'SEQUENCE', children: [
+        label: 'record[0]',
+        type: 'SEQUENCE',
+        children: [
             { label: 'id', type: 'INTEGER', value: '1001' },
             { label: 'msisdn', type: 'string', value: '8801700000001' },
         ],

@@ -9,19 +9,32 @@ import { AttributeSpec } from 'app/inspecto/component-model';
 // name-at-save), not declared here; see DecisionRuleFormDialog's `saveForm`.
 export const DECISION_RULE_ATTRIBUTES: AttributeSpec[] = [
     {
-        key: 'targetType', label: 'Attach to', type: 'select', tier: 'required', default: 'pipeline',
+        key: 'targetType',
+        label: 'Attach to',
+        type: 'select',
+        tier: 'required',
+        default: 'pipeline',
         options: [
             { value: 'pipeline', label: 'Pipeline' },
             { value: 'job', label: 'Job' },
         ],
     },
     {
-        key: 'target', label: 'Target', type: 'autocomplete', tier: 'required',
+        key: 'target',
+        label: 'Target',
+        type: 'autocomplete',
+        tier: 'required',
         placeholder: 'e.g. cdr_ingest',
         help: 'The pipeline or job whose records this rule routes.',
     },
     {
-        key: 'priority', label: 'Priority', type: 'number', tier: 'optional', default: 100, min: 1, max: 10_000,
+        key: 'priority',
+        label: 'Priority',
+        type: 'number',
+        tier: 'optional',
+        default: 100,
+        min: 1,
+        max: 10_000,
         help: 'Lower fires first when several rules target the same records.',
     },
     { key: 'enabled', label: 'Enabled', type: 'boolean', tier: 'optional', default: true },

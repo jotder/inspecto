@@ -37,7 +37,8 @@ export interface LinkAnalysisCommentsData {
         <h2 mat-dialog-title>Comments</h2>
         <mat-dialog-content class="w-[34rem] max-w-full">
             <div class="text-secondary mb-3 text-sm">
-                Comments on the saved view <strong>{{ data.label || data.id }}</strong>.
+                Comments on the saved view <strong>{{ data.label || data.id }}</strong
+                >.
             </div>
             <form class="mb-4 flex items-start gap-3" (ngSubmit)="addComment()">
                 <mat-form-field class="flex-auto" subscriptSizing="dynamic">
@@ -50,17 +51,18 @@ export interface LinkAnalysisCommentsData {
                 <button type="submit" mat-flat-button color="primary" class="mt-1" [disabled]="posting()">Add</button>
             </form>
             @if (loading()) {
-                <div class="flex items-center gap-3 py-2 text-sm"><mat-spinner diameter="20"></mat-spinner><span>Loading comments…</span></div>
+                <div class="flex items-center gap-3 py-2 text-sm">
+                    <mat-spinner diameter="20"></mat-spinner><span>Loading comments…</span>
+                </div>
             } @else if (!comments().length) {
-                <inspecto-empty-state
-                    icon="heroicons_outline:chat-bubble-left-right"
-                    message="No comments yet."
-                />
+                <inspecto-empty-state icon="heroicons_outline:chat-bubble-left-right" message="No comments yet." />
             } @else {
                 <div class="flex flex-col gap-3">
                     @for (c of comments(); track c.id) {
                         <div class="bg-card rounded-lg border p-4">
-                            <div class="text-secondary mb-1 text-sm">{{ c.author || 'unknown' }} · {{ savedAt(c) }}</div>
+                            <div class="text-secondary mb-1 text-sm">
+                                {{ c.author || 'unknown' }} · {{ savedAt(c) }}
+                            </div>
                             <div class="whitespace-pre-wrap">{{ c.body }}</div>
                         </div>
                     }

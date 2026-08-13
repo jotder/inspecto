@@ -14,7 +14,9 @@ function create() {
         providers: [{ provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } }],
     });
     const fixture = TestBed.createComponent(PipelineEditorGraphComponent);
-    vi.spyOn(fixture.componentInstance as unknown as { rebuild(): void }, 'rebuild').mockImplementation(() => undefined);
+    vi.spyOn(fixture.componentInstance as unknown as { rebuild(): void }, 'rebuild').mockImplementation(
+        () => undefined,
+    );
     fixture.detectChanges();
     return fixture;
 }

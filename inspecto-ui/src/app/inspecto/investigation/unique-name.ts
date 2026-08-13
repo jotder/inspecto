@@ -6,7 +6,9 @@ import { AbstractControl, ValidatorFn } from '@angular/forms';
  */
 export function uniqueNameValidator(taken: () => string[]): ValidatorFn {
     return (c: AbstractControl) => {
-        const v = String(c.value ?? '').trim().toLowerCase();
+        const v = String(c.value ?? '')
+            .trim()
+            .toLowerCase();
         return taken().some((t) => t.trim().toLowerCase() === v) ? { duplicate: true } : null;
     };
 }

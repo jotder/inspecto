@@ -4,15 +4,22 @@
 <div class="flex flex-col gap-2">
     @for (t of tools; track t.id) {
         <section class="rounded-lg border">
-            <button type="button" class="flex w-full items-center gap-2 p-3 text-left"
-                    (click)="toggleTool(t.id)" [attr.aria-expanded]="tab() === t.id" [attr.aria-controls]="'tool-' + t.id">
+            <button
+                type="button"
+                class="flex w-full items-center gap-2 p-3 text-left"
+                (click)="toggleTool(t.id)"
+                [attr.aria-expanded]="tab() === t.id"
+                [attr.aria-controls]="'tool-' + t.id"
+            >
                 <mat-icon class="icon-size-5" [svgIcon]="t.icon"></mat-icon>
                 <span class="font-medium">{{ t.label }}</span>
                 @if (toolBadge(t.id); as badge) {
                     <span class="truncate rounded-full border px-2 py-0.5 text-xs">{{ badge }}</span>
                 }
-                <mat-icon class="icon-size-4 ml-auto shrink-0"
-                          [svgIcon]="tab() === t.id ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"></mat-icon>
+                <mat-icon
+                    class="icon-size-4 ml-auto shrink-0"
+                    [svgIcon]="tab() === t.id ? 'heroicons_outline:chevron-up' : 'heroicons_outline:chevron-down'"
+                ></mat-icon>
             </button>
 
             @if (tab() === t.id) {
@@ -36,8 +43,11 @@
                                         }
                                     </mat-select>
                                 </mat-form-field>
-                                <mat-button-toggle-group [value]="pathMetric()" (change)="pathMetric.set($event.value)"
-                                                         aria-label="Path metric">
+                                <mat-button-toggle-group
+                                    [value]="pathMetric()"
+                                    (change)="pathMetric.set($event.value)"
+                                    aria-label="Path metric"
+                                >
                                     <mat-button-toggle value="hops">Fewest hops</mat-button-toggle>
                                     <mat-button-toggle value="weighted">Strongest ties</mat-button-toggle>
                                 </mat-button-toggle-group>
@@ -50,7 +60,9 @@
                                 <ol class="mt-1 list-inside list-decimal text-sm" aria-label="Path hops">
                                     @for (hop of p.hops; track hop) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusNode(hop)">{{ label(hop) }}</button>
+                                            <button class="underline-offset-2 hover:underline" (click)="focusNode(hop)">
+                                                {{ label(hop) }}
+                                            </button>
                                         </li>
                                     }
                                 </ol>
@@ -74,7 +86,11 @@
                                         }
                                     </mat-select>
                                 </mat-form-field>
-                                <button mat-stroked-button (click)="runAllPaths()" [disabled]="!pathFrom() || !pathTo()">
+                                <button
+                                    mat-stroked-button
+                                    (click)="runAllPaths()"
+                                    [disabled]="!pathFrom() || !pathTo()"
+                                >
                                     <mat-icon svgIcon="heroicons_outline:share"></mat-icon>
                                     Find all paths
                                 </button>
@@ -83,7 +99,12 @@
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="All paths">
                                     @for (p of allPathsResult(); track $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusAllPath(p)">{{ patternMatchLabel(p) }}</button>
+                                            <button
+                                                class="underline-offset-2 hover:underline"
+                                                (click)="focusAllPath(p)"
+                                            >
+                                                {{ patternMatchLabel(p) }}
+                                            </button>
                                         </li>
                                     }
                                 </ul>
@@ -101,8 +122,14 @@
                                 </mat-form-field>
                                 <mat-form-field subscriptSizing="dynamic" class="w-28">
                                     <mat-label>Hops</mat-label>
-                                    <input matInput type="number" min="1" max="5" [value]="explainHops()"
-                                           (input)="explainHops.set(+$any($event.target).value || 1)" />
+                                    <input
+                                        matInput
+                                        type="number"
+                                        min="1"
+                                        max="5"
+                                        [value]="explainHops()"
+                                        (input)="explainHops.set(+$any($event.target).value || 1)"
+                                    />
                                 </mat-form-field>
                                 <button mat-stroked-button (click)="runExplain()" [disabled]="!explainFor()">
                                     <mat-icon svgIcon="heroicons_outline:light-bulb"></mat-icon>
@@ -117,7 +144,10 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <mat-form-field subscriptSizing="dynamic" class="w-56">
                                     <mat-label>Metric</mat-label>
-                                    <mat-select [value]="centralityMetric()" (valueChange)="centralityMetric.set($event)">
+                                    <mat-select
+                                        [value]="centralityMetric()"
+                                        (valueChange)="centralityMetric.set($event)"
+                                    >
                                         <mat-option value="degree">Degree</mat-option>
                                         <mat-option value="betweenness">Betweenness</mat-option>
                                         <mat-option value="closeness">Closeness</mat-option>
@@ -135,7 +165,13 @@
                             </div>
                             @if (ranking().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
-                                    <caption class="sr-only">Node ranking by {{ centralityMetric() }} centrality</caption>
+                                    <caption class="sr-only">
+                                        Node ranking by
+                                        {{
+                                            centralityMetric()
+                                        }}
+                                        centrality
+                                    </caption>
                                     <thead>
                                         <tr class="text-left">
                                             <th scope="col" class="py-1">Node</th>
@@ -146,9 +182,16 @@
                                         @for (r of ranking(); track r.id) {
                                             <tr>
                                                 <td class="py-0.5">
-                                                    <button class="underline-offset-2 hover:underline" (click)="focusNode(r.id)">{{ r.label }}</button>
+                                                    <button
+                                                        class="underline-offset-2 hover:underline"
+                                                        (click)="focusNode(r.id)"
+                                                    >
+                                                        {{ r.label }}
+                                                    </button>
                                                 </td>
-                                                <td class="py-0.5 text-right tabular-nums">{{ r.score | number: '1.0-2' }}</td>
+                                                <td class="py-0.5 text-right tabular-nums">
+                                                    {{ r.score | number: '1.0-2' }}
+                                                </td>
                                             </tr>
                                         }
                                     </tbody>
@@ -157,8 +200,11 @@
                         }
                         @case ('communities') {
                             <div class="flex flex-wrap items-center gap-2">
-                                <mat-button-toggle-group [value]="communityMethod()" (change)="communityMethod.set($event.value)"
-                                                         aria-label="Community detection method">
+                                <mat-button-toggle-group
+                                    [value]="communityMethod()"
+                                    (change)="communityMethod.set($event.value)"
+                                    aria-label="Community detection method"
+                                >
                                     <mat-button-toggle value="label-prop">LP automatic clustering</mat-button-toggle>
                                     <mat-button-toggle value="louvain">Louvain</mat-button-toggle>
                                 </mat-button-toggle-group>
@@ -171,7 +217,10 @@
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Communities">
                                     @for (c of communities(); track c.id; let i = $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusCommunity(c.members)">
+                                            <button
+                                                class="underline-offset-2 hover:underline"
+                                                (click)="focusCommunity(c.members)"
+                                            >
                                                 Community {{ i + 1 }} — {{ c.members.length }} nodes
                                             </button>
                                         </li>
@@ -190,7 +239,10 @@
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Connected components">
                                     @for (c of components(); track $index; let i = $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusComponent(c)">
+                                            <button
+                                                class="underline-offset-2 hover:underline"
+                                                (click)="focusComponent(c)"
+                                            >
                                                 Component {{ i + 1 }} — {{ c.length }} nodes
                                             </button>
                                         </li>
@@ -204,13 +256,17 @@
                                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                                     Find cycles
                                 </button>
-                                <span class="text-sm text-secondary">Directed loops — circular flow, forwarding loops.</span>
+                                <span class="text-sm text-secondary"
+                                    >Directed loops — circular flow, forwarding loops.</span
+                                >
                             </div>
                             @if (cycles().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Cycles">
                                     @for (c of cycles(); track $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusCycle(c)">{{ cycleLabel(c) }}</button>
+                                            <button class="underline-offset-2 hover:underline" (click)="focusCycle(c)">
+                                                {{ cycleLabel(c) }}
+                                            </button>
                                         </li>
                                     }
                                 </ul>
@@ -222,18 +278,25 @@
                                     <mat-icon svgIcon="heroicons_outline:scissors"></mat-icon>
                                     Find cut points
                                 </button>
-                                <span class="text-sm text-secondary">Nodes / links whose removal splits the graph.</span>
+                                <span class="text-sm text-secondary"
+                                    >Nodes / links whose removal splits the graph.</span
+                                >
                             </div>
                             @if (cutNodes().length) {
                                 <div class="mt-1 text-sm">
                                     <span class="font-medium">Articulation nodes:</span>
                                     @for (id of cutNodes(); track id) {
-                                        <button class="ml-1 underline-offset-2 hover:underline" (click)="focusNode(id)">{{ label(id) }}</button>
+                                        <button class="ml-1 underline-offset-2 hover:underline" (click)="focusNode(id)">
+                                            {{ label(id) }}
+                                        </button>
                                     }
                                 </div>
                             }
                             @if (cutEdges().length) {
-                                <p class="text-sm"><span class="font-medium">Bridges:</span> {{ cutEdges().length }} link(s) highlighted.</p>
+                                <p class="text-sm">
+                                    <span class="font-medium">Bridges:</span> {{ cutEdges().length }} link(s)
+                                    highlighted.
+                                </p>
                             }
                         }
                         @case ('cohesion') {
@@ -253,7 +316,12 @@
                             </div>
                             @if (cohesionRanking().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
-                                    <caption class="sr-only">Nodes by {{ cohesionMetric() }}</caption>
+                                    <caption class="sr-only">
+                                        Nodes by
+                                        {{
+                                            cohesionMetric()
+                                        }}
+                                    </caption>
                                     <thead>
                                         <tr class="text-left">
                                             <th scope="col" class="py-1">Node</th>
@@ -264,9 +332,16 @@
                                         @for (r of cohesionRanking(); track r.id) {
                                             <tr>
                                                 <td class="py-0.5">
-                                                    <button class="underline-offset-2 hover:underline" (click)="focusNode(r.id)">{{ r.label }}</button>
+                                                    <button
+                                                        class="underline-offset-2 hover:underline"
+                                                        (click)="focusNode(r.id)"
+                                                    >
+                                                        {{ r.label }}
+                                                    </button>
                                                 </td>
-                                                <td class="py-0.5 text-right tabular-nums">{{ r.score | number: '1.0-2' }}</td>
+                                                <td class="py-0.5 text-right tabular-nums">
+                                                    {{ r.score | number: '1.0-2' }}
+                                                </td>
                                             </tr>
                                         }
                                     </tbody>
@@ -305,7 +380,9 @@
                             </div>
                             @if (similarityResult().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
-                                    <caption class="sr-only">Nodes by Jaccard similarity</caption>
+                                    <caption class="sr-only">
+                                        Nodes by Jaccard similarity
+                                    </caption>
                                     <thead>
                                         <tr class="text-left">
                                             <th scope="col" class="py-1">Node</th>
@@ -316,9 +393,16 @@
                                         @for (r of similarityResult(); track r.id) {
                                             <tr>
                                                 <td class="py-0.5">
-                                                    <button class="underline-offset-2 hover:underline" (click)="focusNode(r.id)">{{ r.label }}</button>
+                                                    <button
+                                                        class="underline-offset-2 hover:underline"
+                                                        (click)="focusNode(r.id)"
+                                                    >
+                                                        {{ r.label }}
+                                                    </button>
                                                 </td>
-                                                <td class="py-0.5 text-right tabular-nums">{{ r.score | number: '1.0-2' }}</td>
+                                                <td class="py-0.5 text-right tabular-nums">
+                                                    {{ r.score | number: '1.0-2' }}
+                                                </td>
                                             </tr>
                                         }
                                     </tbody>
@@ -328,8 +412,13 @@
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Predicted links">
                                     @for (p of predictions(); track $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusPrediction(p)">
-                                                {{ p.sourceLabel }} ↔ {{ p.targetLabel }} ({{ p.score | number: '1.0-2' }})
+                                            <button
+                                                class="underline-offset-2 hover:underline"
+                                                (click)="focusPrediction(p)"
+                                            >
+                                                {{ p.sourceLabel }} ↔ {{ p.targetLabel }} ({{
+                                                    p.score | number: '1.0-2'
+                                                }})
                                             </button>
                                         </li>
                                     }
@@ -364,10 +453,16 @@
                                 </button>
                             </div>
                             @if (flowResult(); as f) {
-                                <p class="mt-1 text-sm" role="status">Max flow = {{ f.value | number: '1.0-2' }}; {{ f.minCut.edgeIds.length }} min-cut link(s) highlighted.</p>
+                                <p class="mt-1 text-sm" role="status">
+                                    Max flow = {{ f.value | number: '1.0-2' }}; {{ f.minCut.edgeIds.length }} min-cut
+                                    link(s) highlighted.
+                                </p>
                             }
                             @if (spanningForest(); as msf) {
-                                <p class="mt-1 text-sm" role="status">Backbone: {{ msf.edgeIds.length }} strongest link(s) spanning {{ msf.nodeIds.length }} node(s).</p>
+                                <p class="mt-1 text-sm" role="status">
+                                    Backbone: {{ msf.edgeIds.length }} strongest link(s) spanning
+                                    {{ msf.nodeIds.length }} node(s).
+                                </p>
                             }
                         }
                         @case ('scoring') {
@@ -376,11 +471,15 @@
                                     <mat-icon svgIcon="heroicons_outline:shield-exclamation"></mat-icon>
                                     Score nodes
                                 </button>
-                                <span class="text-sm text-secondary">Composite risk from degree, betweenness, PageRank, k-core, triangles.</span>
+                                <span class="text-sm text-secondary"
+                                    >Composite risk from degree, betweenness, PageRank, k-core, triangles.</span
+                                >
                             </div>
                             @if (suspicion().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
-                                    <caption class="sr-only">Nodes by suspicion score</caption>
+                                    <caption class="sr-only">
+                                        Nodes by suspicion score
+                                    </caption>
                                     <thead>
                                         <tr class="text-left">
                                             <th scope="col" class="py-1">Node</th>
@@ -391,9 +490,16 @@
                                         @for (r of suspicion(); track r.id) {
                                             <tr>
                                                 <td class="py-0.5">
-                                                    <button class="underline-offset-2 hover:underline" (click)="focusNode(r.id)">{{ r.label }}</button>
+                                                    <button
+                                                        class="underline-offset-2 hover:underline"
+                                                        (click)="focusNode(r.id)"
+                                                    >
+                                                        {{ r.label }}
+                                                    </button>
                                                 </td>
-                                                <td class="py-0.5 text-right tabular-nums">{{ r.score | number: '1.0-0' }}</td>
+                                                <td class="py-0.5 text-right tabular-nums">
+                                                    {{ r.score | number: '1.0-0' }}
+                                                </td>
                                             </tr>
                                         }
                                     </tbody>
@@ -401,11 +507,16 @@
                             }
                         }
                         @case ('pattern') {
-                            <p class="text-sm text-secondary">Match a path motif — a start node, then one hop per step.</p>
+                            <p class="text-sm text-secondary">
+                                Match a path motif — a start node, then one hop per step.
+                            </p>
                             <div class="flex flex-wrap items-center gap-2">
                                 <mat-form-field subscriptSizing="dynamic" class="w-64">
                                     <mat-label>Pattern pack</mat-label>
-                                    <mat-select [value]="loadedPack()?.id ?? ''" (valueChange)="loadPatternPack($event)">
+                                    <mat-select
+                                        [value]="loadedPack()?.id ?? ''"
+                                        (valueChange)="loadPatternPack($event)"
+                                    >
                                         <mat-option [value]="''">Custom motif</mat-option>
                                         @for (p of patternPacks(); track p.id) {
                                             <mat-option [value]="p.id">{{ p.label }}</mat-option>
@@ -427,16 +538,30 @@
                                         @if (i === 0) {
                                             <span class="w-16 text-sm font-medium">Start</span>
                                         } @else {
-                                            <mat-button-toggle-group class="shrink-0" [value]="step.direction ?? 'out'"
-                                                                     (change)="updatePatternStep(i, { direction: $event.value })"
-                                                                     [attr.aria-label]="'Step ' + (i + 1) + ' direction'">
-                                                <mat-button-toggle value="out" aria-label="outgoing">→</mat-button-toggle>
-                                                <mat-button-toggle value="in" aria-label="incoming">←</mat-button-toggle>
-                                                <mat-button-toggle value="both" aria-label="either direction">↔</mat-button-toggle>
+                                            <mat-button-toggle-group
+                                                class="shrink-0"
+                                                [value]="step.direction ?? 'out'"
+                                                (change)="updatePatternStep(i, { direction: $event.value })"
+                                                [attr.aria-label]="'Step ' + (i + 1) + ' direction'"
+                                            >
+                                                <mat-button-toggle value="out" aria-label="outgoing"
+                                                    >→</mat-button-toggle
+                                                >
+                                                <mat-button-toggle value="in" aria-label="incoming"
+                                                    >←</mat-button-toggle
+                                                >
+                                                <mat-button-toggle value="both" aria-label="either direction"
+                                                    >↔</mat-button-toggle
+                                                >
                                             </mat-button-toggle-group>
                                             <mat-form-field subscriptSizing="dynamic" class="w-40">
                                                 <mat-label>Link kind</mat-label>
-                                                <mat-select [value]="step.edgeKind ?? ''" (valueChange)="updatePatternStep(i, { edgeKind: $event || undefined })">
+                                                <mat-select
+                                                    [value]="step.edgeKind ?? ''"
+                                                    (valueChange)="
+                                                        updatePatternStep(i, { edgeKind: $event || undefined })
+                                                    "
+                                                >
                                                     <mat-option [value]="''">Any</mat-option>
                                                     @for (k of edgeKinds(); track k) {
                                                         <mat-option [value]="k">{{ k }}</mat-option>
@@ -446,7 +571,10 @@
                                         }
                                         <mat-form-field subscriptSizing="dynamic" class="w-40">
                                             <mat-label>Node kind</mat-label>
-                                            <mat-select [value]="step.nodeKind ?? ''" (valueChange)="updatePatternStep(i, { nodeKind: $event || undefined })">
+                                            <mat-select
+                                                [value]="step.nodeKind ?? ''"
+                                                (valueChange)="updatePatternStep(i, { nodeKind: $event || undefined })"
+                                            >
                                                 <mat-option [value]="''">Any</mat-option>
                                                 @for (k of nodeKinds(); track k) {
                                                     <mat-option [value]="k">{{ k }}</mat-option>
@@ -454,7 +582,11 @@
                                             </mat-select>
                                         </mat-form-field>
                                         @if (i > 0) {
-                                            <button mat-icon-button (click)="removePatternStep(i)" [attr.aria-label]="'Remove step ' + (i + 1)">
+                                            <button
+                                                mat-icon-button
+                                                (click)="removePatternStep(i)"
+                                                [attr.aria-label]="'Remove step ' + (i + 1)"
+                                            >
                                                 <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                                             </button>
                                         }
@@ -475,7 +607,9 @@
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Pattern matches">
                                     @for (m of patternMatches(); track $index) {
                                         <li>
-                                            <button class="underline-offset-2 hover:underline" (click)="focusMatch(m)">{{ patternMatchLabel(m) }}</button>
+                                            <button class="underline-offset-2 hover:underline" (click)="focusMatch(m)">
+                                                {{ patternMatchLabel(m) }}
+                                            </button>
                                         </li>
                                     }
                                 </ul>

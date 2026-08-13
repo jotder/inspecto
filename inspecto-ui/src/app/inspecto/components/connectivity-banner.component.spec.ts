@@ -10,7 +10,10 @@ import { ConnectivityBannerComponent } from './connectivity-banner.component';
 function create() {
     TestBed.configureTestingModule({
         imports: [ConnectivityBannerComponent],
-        providers: [provideNoopAnimations(), { provide: HealthService, useValue: { health: vi.fn(() => of({ status: 'ok' })) } }],
+        providers: [
+            provideNoopAnimations(),
+            { provide: HealthService, useValue: { health: vi.fn(() => of({ status: 'ok' })) } },
+        ],
     });
     const fixture = TestBed.createComponent(ConnectivityBannerComponent);
     fixture.detectChanges();

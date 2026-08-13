@@ -18,7 +18,18 @@ import { hashContent } from './content-hash';
 
 /** Everything a bundle can carry: the Studio/registry component kinds + the three non-component stores. */
 export type BundleKind =
-    | Extract<ComponentType, 'grammar' | 'transform' | 'sink' | 'dataset' | 'query' | 'widget' | 'dashboard' | 'link-analysis-view' | 'geo-map-view'>
+    | Extract<
+          ComponentType,
+          | 'grammar'
+          | 'transform'
+          | 'sink'
+          | 'dataset'
+          | 'query'
+          | 'widget'
+          | 'dashboard'
+          | 'link-analysis-view'
+          | 'geo-map-view'
+      >
     | 'connection'
     | 'authored-pipeline'
     | 'job'
@@ -109,16 +120,23 @@ const KNOWN_KINDS = new Set<BundleKind>([...BUNDLE_KINDS.map((k) => k.kind), ...
 const key = (kind: BundleKind, id: string): string => `${kind}/${id}`;
 
 const byKindThenId = (a: BundleItem, b: BundleItem): number =>
-    (KIND_ORDER.get(a.kind)! - KIND_ORDER.get(b.kind)!) || a.id.localeCompare(b.id);
+    KIND_ORDER.get(a.kind)! - KIND_ORDER.get(b.kind)! || a.id.localeCompare(b.id);
 
 /** The item's lineage edges, marked included/external against the set of ids travelling in the bundle.
  *  Delegates to the R1 derivation (`refsForComponent`); `pipeline` → the bundle's `authored-pipeline`
  *  store name; refs to kinds a bundle can't carry are dropped. */
 function itemRefs(item: BundleItem, includedKeys: Set<string>): BundleRef[] {
     return refsForComponent(item.kind, item.content)
-        .map((r) => ({ kind: (r.kind === 'pipeline' ? 'authored-pipeline' : r.kind) as BundleKind, id: r.id, rel: r.rel }))
+        .map((r) => ({
+            kind: (r.kind === 'pipeline' ? 'authored-pipeline' : r.kind) as BundleKind,
+            id: r.id,
+            rel: r.rel,
+        }))
         .filter((r) => KNOWN_KINDS.has(r.kind))
-        .map((r) => ({ ...r, resolution: (includedKeys.has(key(r.kind, r.id)) ? 'included' : 'external') as BundleRefResolution }));
+        .map((r) => ({
+            ...r,
+            resolution: (includedKeys.has(key(r.kind, r.id)) ? 'included' : 'external') as BundleRefResolution,
+        }));
 }
 
 /** The deduped external refs across all items — recomputed for v1 files that lack a top-level `requires`. */
@@ -144,7 +162,14 @@ export function buildBundle(items: BundleItem[], sourceSpace: string | null, now
         refs: itemRefs(item, includedKeys),
         provenance: { sourceSpace, exportedAt, contentHash: hashContent(item.content) },
     }));
-    return { format: BUNDLE_FORMAT, version: BUNDLE_VERSION, exportedAt, sourceSpace, items: withMeta, requires: deriveRequires(withMeta) };
+    return {
+        format: BUNDLE_FORMAT,
+        version: BUNDLE_VERSION,
+        exportedAt,
+        sourceSpace,
+        items: withMeta,
+        requires: deriveRequires(withMeta),
+    };
 }
 
 /** Parse + validate an uploaded bundle file. Returns the bundle or human-readable errors. */
@@ -157,14 +182,17 @@ export function parseBundle(text: string): { bundle?: MetadataBundle; errors: st
     }
     const b = raw as Partial<MetadataBundle>;
     const errors: string[] = [];
-    if (b?.format !== BUNDLE_FORMAT) errors.push(`Not an Inspecto metadata bundle (format must be "${BUNDLE_FORMAT}").`);
-    if (typeof b?.version !== 'number' || b.version > BUNDLE_VERSION) errors.push(`Unsupported bundle version "${b?.version}".`);
+    if (b?.format !== BUNDLE_FORMAT)
+        errors.push(`Not an Inspecto metadata bundle (format must be "${BUNDLE_FORMAT}").`);
+    if (typeof b?.version !== 'number' || b.version > BUNDLE_VERSION)
+        errors.push(`Unsupported bundle version "${b?.version}".`);
     if (!Array.isArray(b?.items)) errors.push('Missing "items" array.');
     if (errors.length) return { errors };
     for (const [i, it] of (b.items as BundleItem[]).entries()) {
         if (!it || typeof it.id !== 'string' || !it.id) errors.push(`Item ${i}: missing id.`);
         else if (!KNOWN_KINDS.has(it.kind)) errors.push(`Item "${it.id}": unknown kind "${it.kind}".`);
-        else if (typeof it.content !== 'object' || it.content === null) errors.push(`Item "${it.id}": missing content.`);
+        else if (typeof it.content !== 'object' || it.content === null)
+            errors.push(`Item "${it.id}": missing content.`);
     }
     return errors.length ? { errors } : { bundle: b as MetadataBundle, errors: [] };
 }

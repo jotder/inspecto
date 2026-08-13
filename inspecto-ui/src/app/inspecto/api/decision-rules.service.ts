@@ -72,7 +72,9 @@ export class DecisionRulesService {
      *  supplies the rows — a rule's target is a pipeline/job, not a queryable dataset, so the sample is
      *  the row source (typically a bounded fetch from the target's store). An empty sample yields 0/0. */
     simulate(name: string, sampleRows: Record<string, unknown>[] = []): Observable<DecisionRule> {
-        return this.http.post<DecisionRule>(apiUrl(`/decision-rules/${encodeURIComponent(name)}/simulate`), { sampleRows });
+        return this.http.post<DecisionRule>(apiUrl(`/decision-rules/${encodeURIComponent(name)}/simulate`), {
+            sampleRows,
+        });
     }
 
     /** Execute the rule's consequences through the Execution/Signal networks (R5) — emit-signal / create-alert
@@ -82,6 +84,10 @@ export class DecisionRulesService {
      *  instead of the browsing human — additive only, omitted for every existing (human) caller. */
     apply(name: string, agentSessionId?: string): Observable<DecisionApplyResult> {
         const options = agentSessionId ? { headers: { 'X-Agent-Session': agentSessionId } } : undefined;
-        return this.http.post<DecisionApplyResult>(apiUrl(`/decision-rules/${encodeURIComponent(name)}/apply`), {}, options);
+        return this.http.post<DecisionApplyResult>(
+            apiUrl(`/decision-rules/${encodeURIComponent(name)}/apply`),
+            {},
+            options,
+        );
     }
 }

@@ -66,7 +66,13 @@ export function expectationsHandler(flags: MockFlags): MockHandler {
             if (!b.name) return error(422, 'name is required');
             if (get(store, space, b.name)) return error(409, `expectation "${b.name}" already exists`);
             const now = Date.now();
-            const e: MockExpectation = { ...normalize(b), name: b.name, lastResult: null, createdAt: now, updatedAt: now };
+            const e: MockExpectation = {
+                ...normalize(b),
+                name: b.name,
+                lastResult: null,
+                createdAt: now,
+                updatedAt: now,
+            };
             return json(putComponent(store, space, 'expectation', e, e.name).content);
         }
         if (method === 'PUT' && (m = match(url, ONE))) {
@@ -80,7 +86,7 @@ export function expectationsHandler(flags: MockFlags): MockHandler {
         if (method === 'DELETE' && (m = match(url, ONE))) {
             const prev = get(store, space, m[1]);
             if (!prev) return error(404, `expectation ${m[1]} not found`);
-            deleteComponent(store, space, 'expectation', m[1]);   // purges archived versions too
+            deleteComponent(store, space, 'expectation', m[1]); // purges archived versions too
             return json({ deleted: m[1] });
         }
 
@@ -100,7 +106,9 @@ function get(store: MockStore, space: string, name: string): MockExpectation | u
 }
 
 /** Clamp an upsert body to the model's own fields (drops junk, keeps kind params as sent). */
-function normalize(b: Partial<MockExpectation>): Omit<MockExpectation, 'name' | 'lastResult' | 'createdAt' | 'updatedAt'> {
+function normalize(
+    b: Partial<MockExpectation>,
+): Omit<MockExpectation, 'name' | 'lastResult' | 'createdAt' | 'updatedAt'> {
     return {
         description: b.description ?? '',
         targetType: b.targetType === 'job' ? 'job' : 'pipeline',

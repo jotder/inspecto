@@ -40,7 +40,9 @@ describe('DashboardFilterBarComponent', () => {
         const fixture = create();
         const spy = vi.fn();
         fixture.componentInstance.toggle.subscribe(spy);
-        const chip = fixture.nativeElement.querySelector('button[aria-label="Remove filter tariff = premium"]') as HTMLButtonElement;
+        const chip = fixture.nativeElement.querySelector(
+            'button[aria-label="Remove filter tariff = premium"]',
+        ) as HTMLButtonElement;
         chip.click();
         expect(spy).toHaveBeenCalledWith({ field: 'tariff', value: 'premium' });
     });

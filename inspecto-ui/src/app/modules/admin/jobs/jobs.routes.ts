@@ -9,9 +9,11 @@ import './job.kind';
 export default [
     {
         matcher: (segments: UrlSegment[]) =>
-            segments.length === 0 ? { consumed: [] }
-            : segments.length === 1 ? { consumed: segments, posParams: { name: segments[0] } }
-            : null,
+            segments.length === 0
+                ? { consumed: [] }
+                : segments.length === 1
+                  ? { consumed: segments, posParams: { name: segments[0] } }
+                  : null,
         component: JobsComponent,
     },
 ] as Routes;

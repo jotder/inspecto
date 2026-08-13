@@ -86,14 +86,25 @@ interface InvokeState {
                     @if (chartData(); as data) {
                         <inspecto-chart [type]="chartType()" [data]="data" [options]="chartOptions()" />
                     } @else {
-                        <inspecto-empty-state icon="heroicons_outline:chart-bar" message="This chart has no renderable data." />
+                        <inspecto-empty-state
+                            icon="heroicons_outline:chart-bar"
+                            message="This chart has no renderable data."
+                        />
                     }
                 }
                 @case ('data-table') {
-                    <inspecto-data-table tier="mini" [rows]="tableRows()" [columns]="tableColumns()" [autoHeight]="true" />
+                    <inspecto-data-table
+                        tier="mini"
+                        [rows]="tableRows()"
+                        [columns]="tableColumns()"
+                        [autoHeight]="true"
+                    />
                 }
                 @default {
-                    <inspecto-empty-state icon="heroicons_outline:cube-transparent" message="This component type isn't supported." />
+                    <inspecto-empty-state
+                        icon="heroicons_outline:cube-transparent"
+                        message="This component type isn't supported."
+                    />
                 }
             }
             @if (nestedParts().length) {
@@ -116,17 +127,26 @@ interface InvokeState {
                         <div class="flex flex-wrap items-center gap-2">
                             @switch (invokeState(action.target).phase) {
                                 @case ('idle') {
-                                    <button mat-stroked-button (click)="dryRun(action)">{{ action.label }} (dry-run)</button>
+                                    <button mat-stroked-button (click)="dryRun(action)">
+                                        {{ action.label }} (dry-run)
+                                    </button>
                                 }
                                 @case ('simulating') {
-                                    <mat-progress-spinner diameter="16" mode="indeterminate" aria-label="Running the dry-run" />
+                                    <mat-progress-spinner
+                                        diameter="16"
+                                        mode="indeterminate"
+                                        aria-label="Running the dry-run"
+                                    />
                                     <span class="text-secondary text-sm">Running dry-run…</span>
                                 }
                                 @case ('ready') {
                                     <span class="text-sm" role="status">
-                                        Dry-run: {{ invokeState(action.target).matched }} of {{ invokeState(action.target).total }} rows match.
+                                        Dry-run: {{ invokeState(action.target).matched }} of
+                                        {{ invokeState(action.target).total }} rows match.
                                     </span>
-                                    <button mat-flat-button color="primary" (click)="confirmApply(action)">Confirm &amp; apply</button>
+                                    <button mat-flat-button color="primary" (click)="confirmApply(action)">
+                                        Confirm &amp; apply
+                                    </button>
                                     <button mat-button (click)="decline(action)">Cancel</button>
                                 }
                                 @case ('applying') {
@@ -137,7 +157,9 @@ interface InvokeState {
                                     <span class="text-sm" role="status">{{ invokeState(action.target).message }}</span>
                                 }
                                 @case ('error') {
-                                    <span class="text-sm text-red-600 dark:text-red-400" role="alert">{{ invokeState(action.target).message }}</span>
+                                    <span class="text-sm text-red-600 dark:text-red-400" role="alert">{{
+                                        invokeState(action.target).message
+                                    }}</span>
                                     <button mat-button (click)="decline(action)">Dismiss</button>
                                 }
                             }
@@ -225,7 +247,10 @@ export class A2uiRenderComponent {
         for (const col of cols) {
             if (typeof col === 'string' && col) defs.push({ field: col });
             else if (isRecord(col) && typeof col['field'] === 'string') {
-                defs.push({ field: col['field'], headerName: typeof col['headerName'] === 'string' ? col['headerName'] : undefined });
+                defs.push({
+                    field: col['field'],
+                    headerName: typeof col['headerName'] === 'string' ? col['headerName'] : undefined,
+                });
             }
         }
         return defs.length ? defs : undefined;
@@ -259,7 +284,8 @@ export class A2uiRenderComponent {
         const resolved: InvokeAction[] = [];
         for (const a of actions as unknown[]) {
             if (!isRecord(a) || a['intent'] !== 'invoke' || typeof a['label'] !== 'string') continue;
-            if (typeof a['target'] === 'string' && a['target']) resolved.push({ label: a['label'], target: a['target'] });
+            if (typeof a['target'] === 'string' && a['target'])
+                resolved.push({ label: a['label'], target: a['target'] });
         }
         return resolved;
     });
@@ -285,12 +311,17 @@ export class A2uiRenderComponent {
         this.decisionRules.simulate(action.target, []).subscribe({
             next: (rule) => {
                 const sim = rule.lastSimulation;
-                this.patchInvokeState(action.target, { phase: 'ready', matched: sim?.matched ?? 0, total: sim?.total ?? 0 });
+                this.patchInvokeState(action.target, {
+                    phase: 'ready',
+                    matched: sim?.matched ?? 0,
+                    total: sim?.total ?? 0,
+                });
             },
-            error: (err) => this.patchInvokeState(action.target, {
-                phase: 'error',
-                message: apiErrorMessage(err, `Could not dry-run '${action.target}'.`),
-            }),
+            error: (err) =>
+                this.patchInvokeState(action.target, {
+                    phase: 'error',
+                    message: apiErrorMessage(err, `Could not dry-run '${action.target}'.`),
+                }),
         });
     }
 
@@ -308,10 +339,11 @@ export class A2uiRenderComponent {
                     message: `Applied '${action.target}' — ${ran} of ${result.executed.length} consequence(s) executed.`,
                 });
             },
-            error: (err) => this.patchInvokeState(action.target, {
-                phase: 'error',
-                message: apiErrorMessage(err, `Could not apply '${action.target}'.`),
-            }),
+            error: (err) =>
+                this.patchInvokeState(action.target, {
+                    phase: 'error',
+                    message: apiErrorMessage(err, `Could not apply '${action.target}'.`),
+                }),
         });
     }
 

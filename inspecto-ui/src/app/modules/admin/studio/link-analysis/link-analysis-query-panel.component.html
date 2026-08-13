@@ -1,5 +1,10 @@
 @if (queryOpen()) {
-    <form [formGroup]="queryForm" (ngSubmit)="run.emit()" class="flex flex-wrap items-start gap-3" aria-label="Graph query">
+    <form
+        [formGroup]="queryForm"
+        (ngSubmit)="run.emit()"
+        class="flex flex-wrap items-start gap-3"
+        aria-label="Graph query"
+    >
         <mat-form-field subscriptSizing="dynamic" class="w-56">
             <mat-label>Graph source</mat-label>
             <mat-icon matPrefix class="icon-size-5" svgIcon="heroicons_outline:circle-stack"></mat-icon>
@@ -97,7 +102,12 @@
                             <mat-label>Entity type</mat-label>
                             <input matInput formControlName="entityType" placeholder="e.g. account" />
                         </mat-form-field>
-                        <button mat-icon-button type="button" (click)="removeMapping(i)" [attr.aria-label]="'Remove mapping ' + (i + 2)">
+                        <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeMapping(i)"
+                            [attr.aria-label]="'Remove mapping ' + (i + 2)"
+                        >
                             <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
                         </button>
                     </div>
@@ -152,7 +162,9 @@
                         }
                     </mat-select>
                 </mat-form-field>
-                <mat-checkbox formControlName="counts" class="self-center">Weight edges by last run's record counts</mat-checkbox>
+                <mat-checkbox formControlName="counts" class="self-center"
+                    >Weight edges by last run's record counts</mat-checkbox
+                >
             }
             @default {
                 <p class="text-secondary self-center text-sm">Graphs every registered component and its references.</p>

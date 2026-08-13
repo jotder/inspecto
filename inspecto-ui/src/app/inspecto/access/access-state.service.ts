@@ -34,7 +34,7 @@ export class AccessStateService {
     reload(): void {
         this.api.profiles().subscribe({
             next: (profiles) => this.apply(profiles ?? []),
-            error: () => this.apply([]),   // unreachable / read-only backend → allow-all fallback
+            error: () => this.apply([]), // unreachable / read-only backend → allow-all fallback
         });
     }
 

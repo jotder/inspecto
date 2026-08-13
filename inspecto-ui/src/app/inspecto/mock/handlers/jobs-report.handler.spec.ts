@@ -23,7 +23,12 @@ function seededStore(): MockStore {
         type: 'dashboard',
         name: 'cdr_sample',
         ref: 'dashboard/cdr_sample',
-        content: { tiles: [{ widgetId: 'w1', span: 1 }, { widgetId: 'w2', span: 2 }] },
+        content: {
+            tiles: [
+                { widgetId: 'w1', span: 1 },
+                { widgetId: 'w2', span: 2 },
+            ],
+        },
     });
     return store;
 }
@@ -66,7 +71,8 @@ describe('jobsHandler — scheduled report exports (C6)', () => {
         expect(runs.length).toBe(1);
         expect(runs[0].runId).toBe(result.runId);
 
-        const artifact = handler(req('GET', `/api/jobs/daily_cdr_export/runs/${runs[0].runId}/artifact`), store)?.body as ReportArtifact;
+        const artifact = handler(req('GET', `/api/jobs/daily_cdr_export/runs/${runs[0].runId}/artifact`), store)
+            ?.body as ReportArtifact;
         expect(artifact.mime).toBe('text/csv');
         expect(artifact.content).toContain('tile_index,widget_id,span');
 
@@ -82,7 +88,8 @@ describe('jobsHandler — scheduled report exports (C6)', () => {
         handler(req('POST', '/api/jobs', { ...REPORT_JOB, name: 'weekly_pdf', format: 'pdf' }), store);
         handler(req('POST', '/api/jobs/weekly_pdf/trigger'), store);
         const runs = handler(req('GET', '/api/jobs/weekly_pdf/runs'), store)?.body as { runId: string }[];
-        const artifact = handler(req('GET', `/api/jobs/weekly_pdf/runs/${runs[0].runId}/artifact`), store)?.body as ReportArtifact;
+        const artifact = handler(req('GET', `/api/jobs/weekly_pdf/runs/${runs[0].runId}/artifact`), store)
+            ?.body as ReportArtifact;
         expect(artifact.mime).toBe('application/pdf');
         expect(artifact.filename).toBe('cdr_sample.pdf');
     });

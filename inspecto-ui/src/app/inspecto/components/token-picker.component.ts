@@ -42,8 +42,12 @@ import { AttributeToken } from '../component-model';
                 @for (t of tokens; track t.token) {
                     <button mat-menu-item type="button" (click)="picked.emit(t)">
                         <span class="font-mono">{{ t.token }}</span>
-                        @if (t.preview) { <span class="text-secondary text-xs"> → {{ t.preview }}</span> }
-                        @if (t.description) { <span class="text-secondary block text-xs">{{ t.description }}</span> }
+                        @if (t.preview) {
+                            <span class="text-secondary text-xs"> → {{ t.preview }}</span>
+                        }
+                        @if (t.description) {
+                            <span class="text-secondary block text-xs">{{ t.description }}</span>
+                        }
                     </button>
                 }
             </mat-menu>

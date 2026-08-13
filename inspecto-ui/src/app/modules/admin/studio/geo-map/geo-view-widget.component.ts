@@ -81,7 +81,9 @@ export class GeoViewWidgetComponent {
                     source
                         .query(view.query)
                         .then((d) => this.data.set(d))
-                        .catch((e: unknown) => this.error.set(e instanceof Error ? e.message : 'The view’s query failed.'));
+                        .catch((e: unknown) =>
+                            this.error.set(e instanceof Error ? e.message : 'The view’s query failed.'),
+                        );
                 },
                 error: () => {
                     this.loaded.set(true);

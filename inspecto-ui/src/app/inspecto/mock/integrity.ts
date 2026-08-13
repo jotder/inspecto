@@ -15,7 +15,15 @@ import { MockStore } from './mock-store';
  * with the referencers listed. No per-kind rules to keep in sync anymore.
  */
 const COMPONENT_KINDS = [
-    'grammar', 'transform', 'sink', 'dataset', 'query', 'widget', 'dashboard', 'geo-map-view', 'link-analysis-view',
+    'grammar',
+    'transform',
+    'sink',
+    'dataset',
+    'query',
+    'widget',
+    'dashboard',
+    'geo-map-view',
+    'link-analysis-view',
 ];
 
 /** Map a derived ref's target kind onto the store collection that holds it. */
@@ -29,20 +37,32 @@ function collectionOf(kind: string): string {
 export function registerIntegrityRules(store: MockStore): void {
     store.addRefRule({
         from: PIPELINES_COLL,
-        refs: (e) => refsForComponent('pipeline', e as Record<string, unknown>).map((r) => ({ collection: collectionOf(r.kind), id: r.id })),
+        refs: (e) =>
+            refsForComponent('pipeline', e as Record<string, unknown>).map((r) => ({
+                collection: collectionOf(r.kind),
+                id: r.id,
+            })),
     });
 
     // A job's `triggers` edge protects the pipeline it listens to (R2).
     store.addRefRule({
         from: JOBS_COLL,
-        refs: (e) => refsForComponent('job', e as Record<string, unknown>).map((r) => ({ collection: collectionOf(r.kind), id: r.id })),
+        refs: (e) =>
+            refsForComponent('job', e as Record<string, unknown>).map((r) => ({
+                collection: collectionOf(r.kind),
+                id: r.id,
+            })),
     });
 
     // A decision rule's `binds` (target) + `invokes` (platform-consequence target) edges protect the
     // pipeline/job/widget it acts on (R5): deleting an invoked job/pipeline/widget 409s.
     store.addRefRule({
         from: DECISION_RULES_COLL,
-        refs: (e) => refsForComponent('decision-rule', e as Record<string, unknown>).map((r) => ({ collection: collectionOf(r.kind), id: r.id })),
+        refs: (e) =>
+            refsForComponent('decision-rule', e as Record<string, unknown>).map((r) => ({
+                collection: collectionOf(r.kind),
+                id: r.id,
+            })),
     });
 
     for (const kind of COMPONENT_KINDS) {

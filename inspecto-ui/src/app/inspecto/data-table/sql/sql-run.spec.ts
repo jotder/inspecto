@@ -6,7 +6,9 @@ describe('toAlaSqlDialect', () => {
         expect(toAlaSqlDialect('SELECT "a" FROM "t" WHERE "n" >= 3')).toBe('SELECT `a` FROM `t` WHERE `n` >= 3');
     });
     it('leaves single-quoted string literals untouched', () => {
-        expect(toAlaSqlDialect(`SELECT * FROM "t" WHERE "type" = 'CA"LL'`)).toBe("SELECT * FROM `t` WHERE `type` = 'CA\"LL'");
+        expect(toAlaSqlDialect(`SELECT * FROM "t" WHERE "type" = 'CA"LL'`)).toBe(
+            "SELECT * FROM `t` WHERE `type` = 'CA\"LL'",
+        );
     });
 });
 

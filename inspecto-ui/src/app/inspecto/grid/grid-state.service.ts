@@ -50,10 +50,7 @@ export class GridStateService {
     patch(key: string | undefined, patch: Partial<InspectoGridState>): void {
         if (!key) return;
         try {
-            localStorage.setItem(
-                this.storageKey(key),
-                JSON.stringify({ ...(this.load(key) ?? {}), ...patch }),
-            );
+            localStorage.setItem(this.storageKey(key), JSON.stringify({ ...(this.load(key) ?? {}), ...patch }));
         } catch {
             // Quota / privacy mode — layout persistence is a convenience, never an error.
         }

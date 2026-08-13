@@ -87,7 +87,7 @@ describe('stream-bundle — export', () => {
         const b = build({ pipeline: withSecrets });
         const collector = b.pipeline['collector'] as Record<string, unknown>;
         expect(collector['password']).toBe('***');
-        expect(collector['token']).toBe('${ENV:SFTP_TOKEN}');   // a pointer, safe to travel
+        expect(collector['token']).toBe('${ENV:SFTP_TOKEN}'); // a pointer, safe to travel
         expect(b.masked).toEqual(['collector.password']);
     });
 
@@ -106,8 +106,8 @@ describe('stream-bundle — export', () => {
         const segs = { moCallRecord: { raw: { name: 'orders_feed_moCallRecord', fields: [] } } };
         const b = build({ pipeline: plugin, segments: segs });
         const built = (b.pipeline['parsing'] as Record<string, unknown>)['plugin'] as Record<string, unknown>;
-        expect(built['segments']).toBeUndefined();          // path stripped
-        expect(built['ingester_config']).toEqual({ root_type: 'Record' });   // inline config kept
+        expect(built['segments']).toBeUndefined(); // path stripped
+        expect(built['ingester_config']).toEqual({ root_type: 'Record' }); // inline config kept
         expect(b.segments).toEqual(segs);
     });
 
@@ -146,13 +146,12 @@ describe('stream-bundle — parse', () => {
 });
 
 describe('stream-bundle — import plan', () => {
-    const planFor = (name = 'orders_copy', space: string | null = 'prod') =>
-        planStreamImport(build(), { name, space });
+    const planFor = (name = 'orders_copy', space: string | null = 'prod') => planStreamImport(build(), { name, space });
 
     it('names the target, forces a draft, and re-derives every directory', () => {
         const p = planFor();
         expect(p.pipeline['name']).toBe('orders_copy');
-        expect(p.pipeline['active']).toBe(false);   // NEVER import as live
+        expect(p.pipeline['active']).toBe(false); // NEVER import as live
         const dirs = p.pipeline['dirs'] as Record<string, string>;
         expect(dirs['poll']).toBe('spaces/prod/data/inbox/orders_copy');
         expect(dirs['database']).toBe('spaces/prod/data/orders_copy/database');
@@ -165,15 +164,17 @@ describe('stream-bundle — import plan', () => {
         const p = planFor();
         expect(p.schema?.name).toBe('orders_copy_schema');
         expect((p.schema?.config['raw'] as Record<string, unknown>)['name']).toBe('orders_copy_schema');
-        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file'])
-            .toBe('spaces/prod/config/orders_copy_schema.toon');
+        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
+            'spaces/prod/config/orders_copy_schema.toon',
+        );
     });
 
     it('handles a single-space (no space id) target', () => {
         const p = planFor('orders_copy', null);
         expect((p.pipeline['dirs'] as Record<string, string>)['poll']).toBe('./data/inbox/orders_copy');
-        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file'])
-            .toBe('./config/orders_copy_schema.toon');
+        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe(
+            './config/orders_copy_schema.toon',
+        );
     });
 
     it('rewires every segment path and sanitizes the derived names', () => {
@@ -184,7 +185,7 @@ describe('stream-bundle — import plan', () => {
         const bundle = build({ pipeline: plugin, segments: { 'mo-call': { raw: { name: 'old' } } } });
         const p = planStreamImport(bundle, { name: 'cdr', space: 'prod' });
         expect(p.segments).toHaveLength(1);
-        expect(p.segments[0].name).toBe('cdr_mo_call');   // '-' is not identifier-safe
+        expect(p.segments[0].name).toBe('cdr_mo_call'); // '-' is not identifier-safe
         const built = (p.pipeline['parsing'] as Record<string, unknown>)['plugin'] as Record<string, unknown>;
         expect(built['segments']).toEqual({ 'mo-call': 'spaces/prod/config/cdr_mo_call.toon' });
     });
@@ -203,8 +204,7 @@ describe('stream-bundle — import plan', () => {
 
     it('names the enrichment companion by the target convention', () => {
         const b = build({ enrichment: { joins: [] } });
-        expect(planStreamImport(b, { name: 'orders_copy', space: 'prod' }).enrichment?.name)
-            .toBe('orders_copy_enrich');
+        expect(planStreamImport(b, { name: 'orders_copy', space: 'prod' }).enrichment?.name).toBe('orders_copy_enrich');
     });
 
     // REGRESSION (live round-trip, 2026-07-31): `ConfigService.write` derives the target file from
@@ -214,9 +214,9 @@ describe('stream-bundle — import plan', () => {
     it('writes each satellite under the TARGET identity, inside the config body', () => {
         const b = build({ enrichment: { name: 'orders_feed_enrich', joins: [] } });
         const p = planStreamImport(b, { name: 'orders_copy', space: 'prod' });
-        expect(p.enrichment?.config['name']).toBe('orders_copy_enrich');       // body, not just the label
+        expect(p.enrichment?.config['name']).toBe('orders_copy_enrich'); // body, not just the label
         expect(p.schema?.config['raw']).toMatchObject({ name: 'orders_copy_schema' });
-        expect(p.enrichment?.name).toBe(p.enrichment?.config['name']);          // label agrees with body
+        expect(p.enrichment?.name).toBe(p.enrichment?.config['name']); // label agrees with body
     });
 
     it('re-points the enrichment at the imported stream, not the source it came from', () => {
@@ -231,15 +231,19 @@ describe('stream-bundle — import plan', () => {
         });
         const e = planStreamImport(b, { name: 'orders_copy', space: 'prod' }).enrichment!.config;
         expect((e['input'] as Record<string, unknown>)['database']).toBe('spaces/prod/data/orders_copy/database');
-        expect((e['output'] as Record<string, unknown>)['database']).toBe('spaces/prod/data/enriched/orders_copy_enrich');
+        expect((e['output'] as Record<string, unknown>)['database']).toBe(
+            'spaces/prod/data/enriched/orders_copy_enrich',
+        );
         expect((e['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders_copy');
-        expect(e['transform']).toBe('SELECT * FROM input');   // the author's logic is untouched
+        expect(e['transform']).toBe('SELECT * FROM input'); // the author's logic is untouched
         expect((e['input'] as Record<string, unknown>)['format']).toBe('PARQUET');
     });
 
     it('omits satellites the source never had', () => {
         const bare = buildStreamBundle({
-            name: 'a', space: null, kind: 'stream',
+            name: 'a',
+            space: null,
+            kind: 'stream',
             pipeline: { name: 'a', processing: { threads: 1 } },
         });
         const p = planStreamImport(bare, { name: 'b', space: null });

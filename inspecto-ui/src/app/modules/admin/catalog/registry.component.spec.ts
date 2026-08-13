@@ -11,7 +11,10 @@ import { Component as ModelComponent } from 'app/inspecto/component-model';
 import { ComponentsDataProvider } from './components-data-provider';
 import { RegistryComponent } from './registry.component';
 
-function configure(byKind: Record<string, ModelComponent[]>, flows: { summaries?: PipelineSummary[]; raw?: Record<string, AuthoredPipeline> } = {}) {
+function configure(
+    byKind: Record<string, ModelComponent[]>,
+    flows: { summaries?: PipelineSummary[]; raw?: Record<string, AuthoredPipeline> } = {},
+) {
     const summaries = flows.summaries ?? [];
     const raw = flows.raw ?? {};
     TestBed.configureTestingModule({
@@ -20,7 +23,10 @@ function configure(byKind: Record<string, ModelComponent[]>, flows: { summaries?
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ComponentsDataProvider, useValue: { list: (k: string) => Promise.resolve(byKind[k] ?? []) } },
-            { provide: PipelinesService, useValue: { list: () => of(summaries), pipelineGraphRaw: (id: string) => of(raw[id]) } },
+            {
+                provide: PipelinesService,
+                useValue: { list: () => of(summaries), pipelineGraphRaw: (id: string) => of(raw[id]) },
+            },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
@@ -31,7 +37,9 @@ describe('RegistryComponent', () => {
         configure({
             dataset: [{ kind: 'dataset', id: 'cdr', name: 'cdr', config: {} }],
             widget: [{ kind: 'widget', id: 'ch1', name: 'ch1', config: { datasetId: 'cdr' } }],
-            dashboard: [{ kind: 'dashboard', id: 'db1', name: 'db1', config: { tiles: [{ widgetId: 'ch1', span: 1 }] } }],
+            dashboard: [
+                { kind: 'dashboard', id: 'db1', name: 'db1', config: { tiles: [{ widgetId: 'ch1', span: 1 }] } },
+            ],
         });
         // Drive state directly (no detectChanges) — the G6 host can't instantiate in jsdom.
         const c = TestBed.createComponent(RegistryComponent).componentInstance;
@@ -51,14 +59,22 @@ describe('RegistryComponent', () => {
                 { id: 'parse', type: 'dsv', use: 'grammar/cdr_csv' },
                 { id: 'write', type: 'parquet', use: 'sink/cdr_parquet' },
             ],
-            edges: [{ from: 'src', to: 'parse', rel: 'data' }, { from: 'parse', to: 'write', rel: 'data' }],
+            edges: [
+                { from: 'src', to: 'parse', rel: 'data' },
+                { from: 'parse', to: 'write', rel: 'data' },
+            ],
         };
         configure(
             {
                 grammar: [{ kind: 'grammar', id: 'cdr_csv', name: 'cdr_csv', config: {} }],
                 sink: [{ kind: 'sink', id: 'cdr_parquet', name: 'cdr_parquet', config: {} }],
             },
-            { summaries: [{ name: 'cdr_pipeline', active: true, nodeCount: 3, edgeCount: 2, produces: [], consumes: [] }], raw: { cdr_pipeline: flow } },
+            {
+                summaries: [
+                    { name: 'cdr_pipeline', active: true, nodeCount: 3, edgeCount: 2, produces: [], consumes: [] },
+                ],
+                raw: { cdr_pipeline: flow },
+            },
         );
         const c = TestBed.createComponent(RegistryComponent).componentInstance;
         await c.load();
@@ -80,8 +96,24 @@ describe('RegistryComponent', () => {
             useValue: {
                 list: () =>
                     of([
-                        { id: 'churn_req', title: 'Churn KPI', kind: 'kpi', description: '', status: 'delivered', submittedAt: '', deliveredNote: 'dashboard/churn_kpi' },
-                        { id: 'prose_req', title: 'Prose', kind: 'report', description: '', status: 'delivered', submittedAt: '', deliveredNote: 'shipped in Q3' },
+                        {
+                            id: 'churn_req',
+                            title: 'Churn KPI',
+                            kind: 'kpi',
+                            description: '',
+                            status: 'delivered',
+                            submittedAt: '',
+                            deliveredNote: 'dashboard/churn_kpi',
+                        },
+                        {
+                            id: 'prose_req',
+                            title: 'Prose',
+                            kind: 'report',
+                            description: '',
+                            status: 'delivered',
+                            submittedAt: '',
+                            deliveredNote: 'shipped in Q3',
+                        },
                     ]),
             },
         });
@@ -99,7 +131,10 @@ describe('RegistryComponent', () => {
         const c = TestBed.createComponent(RegistryComponent).componentInstance;
         c.ngOnInit(); // registers the platform kinds (+ editor routes); the *.kind side-effect imports cover the rest
         expect(c.editorLink({ kind: 'widget', id: 'w1', name: 'w1', config: {} })).toEqual(['/studio/widgets', 'w1']);
-        expect(c.editorLink({ kind: 'dataset', id: 'd1', name: 'd1', config: {} })).toEqual(['/catalog/datasets', 'd1']);
+        expect(c.editorLink({ kind: 'dataset', id: 'd1', name: 'd1', config: {} })).toEqual([
+            '/catalog/datasets',
+            'd1',
+        ]);
         // Dialog-based panes keep their id-less pane link.
         expect(c.editorLink({ kind: 'pipeline', id: 'p1', name: 'p1', config: {} })).toEqual(['/pipelines']);
         expect(c.editorLink({ kind: 'job', id: 'j1', name: 'j1', config: {} })).toEqual(['/jobs']);

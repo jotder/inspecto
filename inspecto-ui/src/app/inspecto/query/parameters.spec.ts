@@ -4,8 +4,10 @@ import { findParameters, resolveParameters } from './parameters';
 /** R3 §4: the runtime `$`-parameter namespace. These pins are the contract for the query run path. */
 describe('findParameters', () => {
     it('lists the distinct $tokens present, including args, in first-seen order', () => {
-        expect(findParameters("a >= $day(-7) AND b = $region AND c < $day(-7) AND u = $current_user")).toEqual([
-            '$day(-7)', '$region', '$current_user',
+        expect(findParameters('a >= $day(-7) AND b = $region AND c < $day(-7) AND u = $current_user')).toEqual([
+            '$day(-7)',
+            '$region',
+            '$current_user',
         ]);
     });
 
@@ -36,7 +38,9 @@ describe('resolveParameters', () => {
             { name: 'region', type: 'string' as const, default: 'APAC' },
             { name: 'min_cost', type: 'number' as const, default: '5' },
         ];
-        expect(resolveParameters('region = $region AND cost > $min_cost', defs, {})).toBe("region = 'APAC' AND cost > 5");
+        expect(resolveParameters('region = $region AND cost > $min_cost', defs, {})).toBe(
+            "region = 'APAC' AND cost > 5",
+        );
     });
 
     it('leaves an undeclared / default-less token visible rather than blanking it', () => {

@@ -34,7 +34,10 @@ export class TemplateGalleryComponent implements OnInit {
 
     ngOnInit(): void {
         this.api.list().subscribe({
-            next: (t) => { this.templates.set(t); this.loading.set(false); },
+            next: (t) => {
+                this.templates.set(t);
+                this.loading.set(false);
+            },
             error: (e) => {
                 this.loading.set(false);
                 this.toastr.warning(apiErrorMessage(e, 'Could not load templates — is ControlApi running?'));
@@ -57,7 +60,10 @@ export class TemplateGalleryComponent implements OnInit {
                     return;
                 }
                 this.dialog
-                    .open(ApplyTemplateDialog, { data: { template, datasetIds: datasets.map((d) => d.id) }, width: '28rem' })
+                    .open(ApplyTemplateDialog, {
+                        data: { template, datasetIds: datasets.map((d) => d.id) },
+                        width: '28rem',
+                    })
                     .afterClosed()
                     .subscribe((res: ApplyTemplateResult | undefined) => {
                         if (res) this.runApply(template, res);
@@ -74,8 +80,13 @@ export class TemplateGalleryComponent implements OnInit {
                 const board = result.created.find((c) => c.kind === 'dashboard');
                 if (board) this.router.navigate(['/studio/dashboards', board.id]);
             },
-            error: (e) => this.toastr.error(apiErrorMessage(e,
-                'Could not apply the template. Templates apply on the backend — is ControlApi running?')),
+            error: (e) =>
+                this.toastr.error(
+                    apiErrorMessage(
+                        e,
+                        'Could not apply the template. Templates apply on the backend — is ControlApi running?',
+                    ),
+                ),
         });
     }
 }

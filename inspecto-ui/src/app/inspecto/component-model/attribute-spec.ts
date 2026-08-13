@@ -24,9 +24,9 @@ export type AttributeType =
     //                  the renderer host supplies the suggestion source via its `optionLoaders` input
     | 'multiline'
     | 'list'; // string[] edited as removable chips — for config keys the engine reads as a list
-    //           (e.g. csv_settings.include_regex). An empty list counts as blank, so a `required`
-    //           list must have at least one entry. ⚠ Adding a member here also needs
-    //           `FindingsSpec.TYPES` (backend) widened, or the server 422s a spec this can draw.
+//           (e.g. csv_settings.include_regex). An empty list counts as blank, so a `required`
+//           list must have at least one entry. ⚠ Adding a member here also needs
+//           `FindingsSpec.TYPES` (backend) widened, or the server 422s a spec this can draw.
 
 export interface AttributeOption {
     value: string;
@@ -86,7 +86,10 @@ export function defaultsFor(specs: AttributeSpec[]): Record<string, unknown> {
 
 /** Whether a `dependsOn` clause matches `value` — the one place `equals`/`notEquals` is interpreted
  *  (shared by `visibleSpecs` here and `<inspecto-schema-form>`'s live show/hide + enable/disable). */
-export function dependsOnMatches(dependsOn: NonNullable<AttributeSpec['dependsOn']>, value: Record<string, unknown>): boolean {
+export function dependsOnMatches(
+    dependsOn: NonNullable<AttributeSpec['dependsOn']>,
+    value: Record<string, unknown>,
+): boolean {
     const v = value[dependsOn.key];
     return 'notEquals' in dependsOn ? v !== dependsOn.notEquals : v === dependsOn.equals;
 }
@@ -157,12 +160,20 @@ export function validateAttributes(specs: AttributeSpec[], value: Record<string,
                 break;
             case 'select':
                 if (!(s.options ?? []).some((o) => o.value === v)) {
-                    findings.push({ severity: 'error', path: s.key, message: `${s.label} must be one of the listed options` });
+                    findings.push({
+                        severity: 'error',
+                        path: s.key,
+                        message: `${s.label} must be one of the listed options`,
+                    });
                 }
                 break;
             case 'list': {
                 if (!Array.isArray(v) || v.some((e) => typeof e !== 'string')) {
-                    findings.push({ severity: 'error', path: s.key, message: `${s.label} must be a list of text values` });
+                    findings.push({
+                        severity: 'error',
+                        path: s.key,
+                        message: `${s.label} must be a list of text values`,
+                    });
                     break;
                 }
                 const violation = listPatternViolation(s, v as string[]);
@@ -190,8 +201,7 @@ export function validateAttributes(specs: AttributeSpec[], value: Record<string,
 
 /** A ready-made `config.validate` for kinds whose config is fully described by their specs. */
 export function attributeValidator(specs: AttributeSpec[]): (config: unknown) => ConfigFinding[] {
-    return (config: unknown) =>
-        validateAttributes(specs, (config ?? {}) as Record<string, unknown>);
+    return (config: unknown) => validateAttributes(specs, (config ?? {}) as Record<string, unknown>);
 }
 
 /**

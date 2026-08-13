@@ -16,7 +16,13 @@ const BUILT_TIMELINE = {
     truncated: false,
     timeline: [
         { at: '2026-07-26T10:00:00Z', kind: 'signal', summary: 'batch committed', ref: 'orders', severity: 'info' },
-        { at: '2026-07-26T11:00:00Z', kind: 'signal', summary: 'reject rate breached', ref: 'orders', severity: 'error' },
+        {
+            at: '2026-07-26T11:00:00Z',
+            kind: 'signal',
+            summary: 'reject rate breached',
+            ref: 'orders',
+            severity: 'error',
+        },
     ],
 };
 
@@ -44,9 +50,7 @@ describe('AiStatusDialog', () => {
 
     it('reads live state and the focused window for a pipeline', () => {
         runTool.mockImplementation((tool: string) =>
-            tool === 'status_get'
-                ? of({ name: 'orders', paused: false, committedBatches: 12 })
-                : of(BUILT_TIMELINE),
+            tool === 'status_get' ? of({ name: 'orders', paused: false, committedBatches: 12 }) : of(BUILT_TIMELINE),
         );
         const fixture = create({ label: 'reject-rate-high', pipelineId: 'orders' });
 
@@ -76,7 +80,14 @@ describe('AiStatusDialog', () => {
                 correlationId: 'b1',
                 count: 1,
                 timeline: [
-                    { signalId: 's1', at: '2026-07-26T10:00:00Z', type: 'BATCH_FAILED', severity: 'error', message: 'boom', causedBy: null },
+                    {
+                        signalId: 's1',
+                        at: '2026-07-26T10:00:00Z',
+                        type: 'BATCH_FAILED',
+                        severity: 'error',
+                        message: 'boom',
+                        causedBy: null,
+                    },
                 ],
             }),
         );

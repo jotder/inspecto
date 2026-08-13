@@ -10,7 +10,11 @@
             {{ editing() ? 'Edit dataset' : 'New dataset' }}
         </h1>
         <div class="flex items-center gap-2">
-            <inspecto-transfer-menu [items]="transferItems" [allowedKinds]="['dataset']" label="Import / export dataset" />
+            <inspecto-transfer-menu
+                [items]="transferItems"
+                [allowedKinds]="['dataset']"
+                label="Import / export dataset"
+            />
             @if (editing()) {
                 <button mat-stroked-button (click)="history()">
                     <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:clock"></mat-icon>
@@ -19,7 +23,9 @@
             }
             <button mat-button routerLink="/catalog/datasets">Cancel</button>
             <button mat-flat-button color="primary" (click)="save()" [disabled]="saving()">
-                @if (saving()) { <mat-spinner diameter="16" class="mr-2"></mat-spinner> }
+                @if (saving()) {
+                    <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                }
                 <span>Save dataset</span>
             </button>
         </div>
@@ -46,14 +52,18 @@
         <mat-form-field subscriptSizing="dynamic">
             <mat-label>Kind</mat-label>
             <mat-select formControlName="kind">
-                @for (k of kinds; track k) { <mat-option [value]="k">{{ k }}</mat-option> }
+                @for (k of kinds; track k) {
+                    <mat-option [value]="k">{{ k }}</mat-option>
+                }
             </mat-select>
         </mat-form-field>
 
         <mat-form-field subscriptSizing="dynamic">
             <mat-label>Source</mat-label>
             <mat-select formControlName="sourceName">
-                @for (s of sourceNames; track s) { <mat-option [value]="s">{{ s }}</mat-option> }
+                @for (s of sourceNames; track s) {
+                    <mat-option [value]="s">{{ s }}</mat-option>
+                }
             </mat-select>
         </mat-form-field>
 
@@ -69,7 +79,11 @@
     @if (isVirtual() && ready()) {
         <section class="mt-6">
             <h2 class="mb-2 text-lg font-semibold">Query</h2>
-            <inspecto-query-panel [initialModel]="model()" [source]="querySource()" (queryChange)="onQueryChange($event)" />
+            <inspecto-query-panel
+                [initialModel]="model()"
+                [source]="querySource()"
+                (queryChange)="onQueryChange($event)"
+            />
         </section>
     }
 

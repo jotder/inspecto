@@ -1,5 +1,16 @@
 import type { JobDetail } from 'app/inspecto/api/jobs.service';
-import { ComponentKind, ConfigFinding, Part, Ref, Wiring, getKind, hasEditorRoute, jobRefs, registerEditorRoute, registerKind } from 'app/inspecto/component-model';
+import {
+    ComponentKind,
+    ConfigFinding,
+    Part,
+    Ref,
+    Wiring,
+    getKind,
+    hasEditorRoute,
+    jobRefs,
+    registerEditorRoute,
+    registerKind,
+} from 'app/inspecto/component-model';
 
 /**
  * The `job` {@link ComponentKind} — R2 of the living-operational-system roadmap: the Execution
@@ -35,11 +46,19 @@ export function validateJobConfig(config: unknown): ConfigFinding[] {
     const c = (config ?? {}) as Partial<JobDetail>;
     const findings: ConfigFinding[] = [];
     if (!c.name || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(c.name)) {
-        findings.push({ severity: 'error', path: 'name', message: 'Letters, digits, dot, dash, underscore; start alphanumeric.' });
+        findings.push({
+            severity: 'error',
+            path: 'name',
+            message: 'Letters, digits, dot, dash, underscore; start alphanumeric.',
+        });
     }
     if (!c.type) findings.push({ severity: 'error', path: 'type', message: 'Pick a job type.' });
     if (c.cron && c.onPipeline) {
-        findings.push({ severity: 'error', path: 'cron', message: 'A job triggers on a cron OR a pipeline event, not both.' });
+        findings.push({
+            severity: 'error',
+            path: 'cron',
+            message: 'A job triggers on a cron OR a pipeline event, not both.',
+        });
     }
     return findings;
 }

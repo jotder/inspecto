@@ -42,7 +42,7 @@ describe('PipelineTemplateDialog', () => {
 
     it('blocks a duplicate id inline rather than letting the server 409', () => {
         const { c, ref } = make();
-        c.form.controls.id.setValue('ORDERS');   // the check is case-insensitive
+        c.form.controls.id.setValue('ORDERS'); // the check is case-insensitive
         c.save();
         expect(c.form.controls.id.hasError('duplicate')).toBe(true);
         expect(ref.close).not.toHaveBeenCalled();

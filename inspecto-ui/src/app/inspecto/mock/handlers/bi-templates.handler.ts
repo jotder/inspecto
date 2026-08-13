@@ -12,33 +12,43 @@ const APPLY = /\/bi\/templates\/[^/]+\/apply$/;
  * Gated on `mockStudio` so the backend's curated list + real apply serve when mocks are off.
  */
 export function biTemplatesHandler(flags: MockFlags): MockHandler {
-  return (req: MockRequest) => {
-    if (!flags.mockStudio) return undefined;
-    if (req.method === 'POST' && match(req.url, APPLY)) {
-      return error(501, 'Templates apply on the real backend (they write components server-side); offline mode is browse-only.');
-    }
-    if (req.method === 'GET' && match(req.url, LIST)) {
-      return json([
-        {
-          id: 'kpi-overview', title: 'KPI overview',
-          description: 'A count KPI, a sum-by-dimension bar, and a per-dimension table over one Dataset — the minimal executive board to start from.',
-          params: ['dataset', 'prefix?'],
-          components: [
-            { kind: 'widget', id: 'kpi_total' }, { kind: 'widget', id: 'sum_by_dim' },
-            { kind: 'widget', id: 'raw_table' }, { kind: 'dashboard', id: 'kpi_board' },
-          ],
-        },
-        {
-          id: 'quality-monitor', title: 'Data quality monitor',
-          description: 'Row volume by dimension plus a distinct-key count — a starting point for watching a feed’s health.',
-          params: ['dataset', 'prefix?'],
-          components: [
-            { kind: 'widget', id: 'volume' }, { kind: 'widget', id: 'distincts' },
-            { kind: 'dashboard', id: 'quality_board' },
-          ],
-        },
-      ]);
-    }
-    return undefined;
-  };
+    return (req: MockRequest) => {
+        if (!flags.mockStudio) return undefined;
+        if (req.method === 'POST' && match(req.url, APPLY)) {
+            return error(
+                501,
+                'Templates apply on the real backend (they write components server-side); offline mode is browse-only.',
+            );
+        }
+        if (req.method === 'GET' && match(req.url, LIST)) {
+            return json([
+                {
+                    id: 'kpi-overview',
+                    title: 'KPI overview',
+                    description:
+                        'A count KPI, a sum-by-dimension bar, and a per-dimension table over one Dataset — the minimal executive board to start from.',
+                    params: ['dataset', 'prefix?'],
+                    components: [
+                        { kind: 'widget', id: 'kpi_total' },
+                        { kind: 'widget', id: 'sum_by_dim' },
+                        { kind: 'widget', id: 'raw_table' },
+                        { kind: 'dashboard', id: 'kpi_board' },
+                    ],
+                },
+                {
+                    id: 'quality-monitor',
+                    title: 'Data quality monitor',
+                    description:
+                        'Row volume by dimension plus a distinct-key count — a starting point for watching a feed’s health.',
+                    params: ['dataset', 'prefix?'],
+                    components: [
+                        { kind: 'widget', id: 'volume' },
+                        { kind: 'widget', id: 'distincts' },
+                        { kind: 'dashboard', id: 'quality_board' },
+                    ],
+                },
+            ]);
+        }
+        return undefined;
+    };
 }

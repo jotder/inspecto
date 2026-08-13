@@ -88,13 +88,23 @@ export class BundleTransferService {
         return forkJoin({
             ...componentLists,
             connection: this.connections.list().pipe(catchError(() => of([]))),
-            pipelineNames: this.pipelines.list().pipe(map((list) => list.map((p) => p.name)), catchError(() => of([] as string[]))),
-            jobNames: this.jobs.list().pipe(map((list) => list.map((j) => j.name)), catchError(() => of([] as string[]))),
+            pipelineNames: this.pipelines.list().pipe(
+                map((list) => list.map((p) => p.name)),
+                catchError(() => of([] as string[])),
+            ),
+            jobNames: this.jobs.list().pipe(
+                map((list) => list.map((j) => j.name)),
+                catchError(() => of([] as string[])),
+            ),
             decisionRules: this.decisionRules.list().pipe(catchError(() => of([] as DecisionRule[]))),
         }).pipe(
             concatMap((res) => {
-                const raws = (res['pipelineNames'] as string[]).map((name) => this.pipelines.pipelineGraphRaw(name).pipe(catchError(() => of(null))));
-                const jobDetails = (res['jobNames'] as string[]).map((name) => this.jobs.get(name).pipe(catchError(() => of(null))));
+                const raws = (res['pipelineNames'] as string[]).map((name) =>
+                    this.pipelines.pipelineGraphRaw(name).pipe(catchError(() => of(null))),
+                );
+                const jobDetails = (res['jobNames'] as string[]).map((name) =>
+                    this.jobs.get(name).pipe(catchError(() => of(null))),
+                );
                 return forkJoin({
                     pipelines: raws.length ? forkJoin(raws) : of([] as (AuthoredPipeline | null)[]),
                     jobs: jobDetails.length ? forkJoin(jobDetails) : of([] as (JobDetail | null)[]),
@@ -110,9 +120,16 @@ export class BundleTransferService {
                 for (const c of res['connection'] as ConnectionProfile[]) {
                     items.push({ kind: 'connection', id: c.id, content: c as unknown as Record<string, unknown> });
                 }
-                for (const p of pipelines) if (p) items.push({ kind: 'authored-pipeline', id: p.name, content: p as unknown as Record<string, unknown> });
+                for (const p of pipelines)
+                    if (p)
+                        items.push({
+                            kind: 'authored-pipeline',
+                            id: p.name,
+                            content: p as unknown as Record<string, unknown>,
+                        });
                 for (const j of jobs) if (j) items.push({ kind: 'job', id: j.name, content: jobContent(j) });
-                for (const r of res['decisionRules'] as DecisionRule[]) items.push({ kind: 'decision-rule', id: r.name, content: decisionRuleContent(r) });
+                for (const r of res['decisionRules'] as DecisionRule[])
+                    items.push({ kind: 'decision-rule', id: r.name, content: decisionRuleContent(r) });
                 return items;
             }),
         );
@@ -178,11 +195,13 @@ export class BundleTransferService {
         };
         return this.http
             .post<{ bundle: MetadataBundle; missing?: { kind: string; id: string }[] }>(apiUrl('/bundle/export'), body)
-            .pipe(map((res) => ({
-                bundle: res.bundle,
-                missing,
-                absent: (res.missing ?? []).map((m) => `${m.kind}/${m.id}`),
-            })));
+            .pipe(
+                map((res) => ({
+                    bundle: res.bundle,
+                    missing,
+                    absent: (res.missing ?? []).map((m) => `${m.kind}/${m.id}`),
+                })),
+            );
     }
 
     /** Trigger a browser download of a bundle as pretty-printed JSON. */

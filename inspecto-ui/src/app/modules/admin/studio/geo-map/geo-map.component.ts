@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    OnDestroy,
+    OnInit,
+    ViewChild,
+    computed,
+    inject,
+    signal,
+} from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -79,7 +88,10 @@ function objectRefFromAttrs(attrs: Record<string, unknown> | undefined): Element
     if (incidentId != null && String(incidentId).trim()) return { id: String(incidentId).trim(), type: 'INCIDENT' };
     const objectId = attrs['objectId'];
     if (objectId != null && String(objectId).trim()) {
-        return { id: String(objectId).trim(), type: String(attrs['objectType'] ?? '').toUpperCase() === 'CASE' ? 'CASE' : 'INCIDENT' };
+        return {
+            id: String(objectId).trim(),
+            type: String(attrs['objectType'] ?? '').toUpperCase() === 'CASE' ? 'CASE' : 'INCIDENT',
+        };
     }
     return undefined;
 }
@@ -105,10 +117,26 @@ interface PointRow {
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
-        DecimalPipe, ReactiveFormsModule, MatButtonModule, MatButtonToggleModule, MatCheckboxModule, MatDialogModule,
-        MatFormFieldModule, MatIconModule, MatInputModule, MatMenuModule, MatSelectModule, MatSliderModule, MatTooltipModule,
-        InspectoAlertComponent, InspectoEmptyStateComponent, InspectoSkeletonComponent, MapViewComponent,
-        DataTableComponent, TransferMenuComponent, GeoAnalysisToolboxComponent,
+        DecimalPipe,
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatButtonToggleModule,
+        MatCheckboxModule,
+        MatDialogModule,
+        MatFormFieldModule,
+        MatIconModule,
+        MatInputModule,
+        MatMenuModule,
+        MatSelectModule,
+        MatSliderModule,
+        MatTooltipModule,
+        InspectoAlertComponent,
+        InspectoEmptyStateComponent,
+        InspectoSkeletonComponent,
+        MapViewComponent,
+        DataTableComponent,
+        TransferMenuComponent,
+        GeoAnalysisToolboxComponent,
     ],
     templateUrl: './geo-map.component.html',
 })
@@ -276,9 +304,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     });
 
     /** All point kinds present in the result (the filter menu's options). */
-    readonly pointKinds = computed<string[]>(() =>
-        [...new Set((this.geo()?.points ?? []).map((p) => p.kind))].sort(),
-    );
+    readonly pointKinds = computed<string[]>(() => [...new Set((this.geo()?.points ?? []).map((p) => p.kind))].sort());
 
     /** The kind/time/region-filtered subset actually on the canvas. */
     readonly displayed = computed<GeoData | null>(() => {
@@ -350,7 +376,9 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     ngOnInit(): void {
         this.datasetsService.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
         this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
-        this.geoSettings.get().subscribe({ next: (s) => this.tileServerUrl.set(s.tileServerUrl), error: () => undefined });
+        this.geoSettings
+            .get()
+            .subscribe({ next: (s) => this.tileServerUrl.set(s.tileServerUrl), error: () => undefined });
         this.queryForm.controls.datasetId.valueChanges.subscribe((id) => this.onDatasetPicked(id));
         this.pendingPivot = this.pivotService.readIncoming(this.route);
     }
@@ -462,7 +490,11 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         }
         const q = run?.projection;
         if (!q) return '';
-        const extras = [q.entityCol && `entity ${q.entityCol}`, q.kindCol && `kind ${q.kindCol}`, q.timeCol && `time ${q.timeCol}`]
+        const extras = [
+            q.entityCol && `entity ${q.entityCol}`,
+            q.kindCol && `kind ${q.kindCol}`,
+            q.timeCol && `time ${q.timeCol}`,
+        ]
             .filter(Boolean)
             .join(' · ');
         return `${dsName(q.datasetId)}: ${q.latCol}/${q.lonCol}${extras ? ' · ' + extras : ''}`;
@@ -629,7 +661,14 @@ export class GeoMapComponent implements OnInit, OnDestroy {
 
     /** Any tool artifact on the canvas (drives the clear-tools affordance). */
     readonly toolsActive = computed<boolean>(
-        () => !!(this.activeTool() || this.measureVertices().length || this.radiusCenter() || this.polygonVertices().length || this.polygonFilter()),
+        () =>
+            !!(
+                this.activeTool() ||
+                this.measureVertices().length ||
+                this.radiusCenter() ||
+                this.polygonVertices().length ||
+                this.polygonFilter()
+            ),
     );
 
     /** Custom GeoJSON overlay upload (layer manager). */
@@ -641,7 +680,8 @@ export class GeoMapComponent implements OnInit, OnDestroy {
             (text) => {
                 try {
                     const fc = JSON.parse(text) as FeatureCollection;
-                    if (fc?.type !== 'FeatureCollection' || !Array.isArray(fc.features)) throw new Error('not a FeatureCollection');
+                    if (fc?.type !== 'FeatureCollection' || !Array.isArray(fc.features))
+                        throw new Error('not a FeatureCollection');
                     this.customOverlay.set(fc);
                     this.toastr.success(`Overlay loaded (${fc.features.length} features).`);
                 } catch {
@@ -663,21 +703,28 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         const p = d?.points.find((x) => x.id === id);
         if (!d || !p) return;
         this.selectedId.set(id);
-        const rows: ElementDetailRow[] = [
-            { label: 'Coordinates', value: `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}` },
-        ];
+        const rows: ElementDetailRow[] = [{ label: 'Coordinates', value: `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}` }];
         if (p.time !== undefined) rows.push({ label: 'Time', value: new Date(p.time).toISOString() });
         for (const [k, v] of Object.entries(p.attrs ?? {})) {
             if (rows.length >= 14) break;
             rows.push({ label: k, value: String(v ?? '') });
         }
         for (const near of this.nearest(d.points, p, 3)) {
-            rows.push({ label: 'Nearby', value: `${near.point.label ?? near.point.id} · ${formatDistance(near.distanceM)}` });
+            rows.push({
+                label: 'Nearby',
+                value: `${near.point.label ?? near.point.id} · ${formatDistance(near.distanceM)}`,
+            });
         }
         const objectRef = objectRefFromAttrs(p.attrs);
         this.dialog
             .open(ElementDetailDialog, {
-                data: { title: p.label ?? p.id, subtitle: p.kind, rows, objectRef, pivotViews: objectRef ? ['graph'] : undefined },
+                data: {
+                    title: p.label ?? p.id,
+                    subtitle: p.kind,
+                    rows,
+                    objectRef,
+                    pivotViews: objectRef ? ['graph'] : undefined,
+                },
                 width: '26rem',
             })
             .afterClosed()
@@ -737,7 +784,11 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         const query = this.lastRun();
         if (!query) return;
         const view: GeoMapView = {
-            id: name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+            id: name
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-|-$/g, ''),
             name: name.trim(),
             description: description.trim() || undefined,
             sourceId: this.sourceId(),

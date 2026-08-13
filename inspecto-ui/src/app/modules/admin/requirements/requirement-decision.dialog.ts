@@ -28,7 +28,15 @@ export type RequirementDecisionResult =
 @Component({
     selector: 'app-requirement-decision-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatAutocompleteModule, MatDialogModule, MatButtonModule, MatFormFieldModule, MatInputModule, StatusBadgeComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatAutocompleteModule,
+        MatDialogModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        StatusBadgeComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>
@@ -38,10 +46,14 @@ export type RequirementDecisionResult =
             <div class="text-secondary text-xs font-semibold uppercase tracking-wider">{{ data.kind }}</div>
             <p class="whitespace-pre-wrap text-sm">{{ data.description }}</p>
             @if (data.decisionNote) {
-                <p class="text-secondary text-sm"><span class="font-medium">Decision note:</span> {{ data.decisionNote }}</p>
+                <p class="text-secondary text-sm">
+                    <span class="font-medium">Decision note:</span> {{ data.decisionNote }}
+                </p>
             }
             @if (data.deliveredNote) {
-                <p class="text-secondary text-sm"><span class="font-medium">Delivered via:</span> {{ data.deliveredNote }}</p>
+                <p class="text-secondary text-sm">
+                    <span class="font-medium">Delivered via:</span> {{ data.deliveredNote }}
+                </p>
             }
 
             @if (lens.canTriageRequirements() && data.status === 'submitted') {
@@ -57,9 +69,14 @@ export type RequirementDecisionResult =
             @if (lens.canTriageRequirements() && data.status === 'accepted') {
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Delivered via (optional)</mat-label>
-                    <input matInput [formControl]="note" [matAutocomplete]="ac"
-                           placeholder="e.g. dashboard/churn_kpi" cdkFocusInitial
-                           (focus)="loadOptions()" />
+                    <input
+                        matInput
+                        [formControl]="note"
+                        [matAutocomplete]="ac"
+                        placeholder="e.g. dashboard/churn_kpi"
+                        cdkFocusInitial
+                        (focus)="loadOptions()"
+                    />
                     <mat-autocomplete #ac="matAutocomplete">
                         @for (opt of filteredOptions(); track opt.value) {
                             <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
