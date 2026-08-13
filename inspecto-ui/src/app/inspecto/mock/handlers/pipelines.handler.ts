@@ -759,7 +759,30 @@ function dryRun(f: AuthoredPipeline | undefined, sampleRows?: Record<string, unk
         rows = projectThrough(n, rows);
         nodes.push({ node: n.id, type: n.type, relations: [{ rel: 'data', rowCount: rows.length, rows }] });
     }
-    return { seedNode, nodes, sinks };
+    return { seedNode, nodes, sinks, warnings: dryRunWarnings(seedNode, nodes, sinks) };
+}
+
+/**
+ * Mirror of the server's DRYRUN-2 rule (`PipelineDryRun.warningsFor`): a run that succeeds yet reports
+ * nothing says so, rather than answering an empty 200 that reads as success. Kept in the same shape and
+ * wording family as the server so the mock does not teach the UI a contract the real API lacks.
+ */
+function dryRunWarnings(
+    seedNode: string,
+    nodes: PipelineDryRunResult['nodes'],
+    sinks: PipelineDryRunResult['sinks'],
+): string[] {
+    if (!nodes.length && !sinks.length)
+        return [
+            `the sample reached no node past the seed '${seedNode}' — nothing downstream consumed it, ` +
+                `so this run exercised nothing`,
+        ];
+    if (sinks.length && sinks.every((s) => s.rowCount === 0))
+        return [
+            'no sink received any rows — the sample was filtered or joined away before reaching an ' +
+                'output, so this run cannot tell you the flow writes what you expect',
+        ];
+    return [];
 }
 
 /** The nodes from the seed source down to (and including) `toNode`, in declaration order — the run subgraph. */

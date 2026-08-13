@@ -22,7 +22,9 @@ import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.RecipeConverter;
 import com.gamma.pipeline.PipelineLift;
+import com.gamma.enrich.ReferenceReader;
 import com.gamma.pipeline.exec.PipelineDryRun;
+import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.service.CollectorService;
 import com.gamma.service.DbStatusStore;
 import com.gamma.service.SpaceRoot;
@@ -1402,12 +1404,50 @@ final class PipelineRoutes implements RouteModule {
             if (g == null) throw new ApiException(404, "no authored flow '" + id + "'");
         }
         try {
-            return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body));
+            return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body),
+                    dryRunReferences(api));
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, e.getMessage());
         } catch (Exception e) {
             throw new ApiException(422, "dry-run failed: " + e.getMessage());
         }
+    }
+
+    /** View-name prefix for a reference resolved during a dry-run (its own scratch database). */
+    private static final String DRYRUN_REF_VIEW_PREFIX = "dryrun_ref";
+
+    /**
+     * <b>DRYRUN-1 — the dry-run's {@link RowShaper.ReferenceResolver}.</b> Without one, every
+     * {@code transform.join} pipeline was un-dry-runnable: the walk reached the join node and
+     * {@link RowShaper.ReferenceResolver#NONE} refused, 422-ing the whole preview. Resolution goes through
+     * the shared {@link ReferenceReader} — the same one the production join executor
+     * ({@code PipelineJobRunner.references}) and the Stage-2 {@code EnrichmentEngine} use — so a versioned
+     * reference store's current/as-of view cannot mean one thing in a preview and another in a real run.
+     * The view is created on the throwaway dry-run connection and dies with it.
+     *
+     * <p>⚠ <b>Deliberately NOT path-jailed</b>, against the backlog row's own stated constraint. A
+     * {@code path:} reference names a <em>data</em> file, which routinely lives outside the config write
+     * root, so jailing it there would refuse legitimate references — and it would buy nothing, because
+     * {@code POST /enrichment/preview} already resolves the very same {@code path:} references through the
+     * very same reader with no jail and no write root at all. If arbitrary-path reads through a preview are
+     * a concern, they are a concern about <em>both</em> surfaces and need one deliberate answer; a jail on
+     * this route alone would be security theatre that breaks working configs.
+     */
+    private static RowShaper.ReferenceResolver dryRunReferences(ApiContext api) {
+        return (conn, reference) -> {
+            String sql;
+            try {
+                sql = ReferenceReader.sqlFor(ReferenceReader.parse(reference), api.service().loadedPipelines());
+            } catch (RuntimeException unresolvable) {
+                throw new ApiException(422, "dry-run cannot resolve reference '" + reference + "': "
+                        + unresolvable.getMessage());
+            }
+            String view = DRYRUN_REF_VIEW_PREFIX + "_" + reference.replaceAll("[^A-Za-z0-9._-]", "_");
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
+            }
+            return view;
+        };
     }
 
     /**

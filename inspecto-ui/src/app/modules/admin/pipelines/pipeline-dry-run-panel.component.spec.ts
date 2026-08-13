@@ -41,6 +41,35 @@ describe('PipelineDryRunPanelComponent', () => {
         expect(cmp.error()).toBeTruthy();
     });
 
+    /**
+     * DRYRUN-2: a warning must be VISIBLE. The whole complaint was that an empty result reads as success
+     * in the UI, so asserting the signal alone would not close it — this asserts the rendered text.
+     */
+    it('renders a warning from a run that reached nothing', () => {
+        api.dryRunAuthored.mockReturnValue(
+            of({
+                seedNode: 'src',
+                nodes: [],
+                sinks: [],
+                warnings: ['the sample reached no node past the seed'],
+            } as PipelineDryRunResult),
+        );
+        const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
+        fixture.componentRef.setInput('pipelineId', 'demo');
+        fixture.componentInstance.run();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain('the sample reached no node past the seed');
+    });
+
+    /** An older server omits `warnings` entirely — the panel must not render an empty alert for it. */
+    it('renders no warning when the server sends none', () => {
+        const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
+        fixture.componentRef.setInput('pipelineId', 'demo');
+        fixture.componentInstance.run();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[role="status"]')).toBeNull();
+    });
+
     it('is a11y-clean with no pipeline selected', async () => {
         const fixture = TestBed.createComponent(PipelineDryRunPanelComponent);
         fixture.detectChanges();

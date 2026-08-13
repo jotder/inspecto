@@ -38,8 +38,21 @@ public final class PipelineDryRun {
     /** A sink branch in the dry-run: the table it would consume, the row count, and a sample. */
     public record SinkDryRun(String node, String store, int rowCount, List<Map<String, Object>> rows) {}
 
-    /** The dry-run outcome: where the sample was seeded, every transform node's outputs, and each sink branch. */
-    public record Result(String seedNode, List<NodeDryRun> nodes, List<SinkDryRun> sinks) {}
+    /**
+     * The dry-run outcome: where the sample was seeded, every transform node's outputs, each sink branch,
+     * and any {@code warnings} about a run that <em>succeeded</em> yet tells the operator nothing.
+     *
+     * <p>DRYRUN-2: a sample that reaches no node at all used to answer an empty 200 — indistinguishable
+     * from success in the UI, which is the worst way to report "nothing happened". The warning is a plain
+     * string list, the shape the sink preview already returns for a missing partition column.
+     */
+    public record Result(String seedNode, List<NodeDryRun> nodes, List<SinkDryRun> sinks, List<String> warnings) {
+
+        /** Pre-warnings shape, kept for {@code @PublicApi} source/binary compatibility. */
+        public Result(String seedNode, List<NodeDryRun> nodes, List<SinkDryRun> sinks) {
+            this(seedNode, nodes, sinks, List.of());
+        }
+    }
 
     /** Rows materialised per relation in the result (the counts are exact; the rows are a bounded sample). */
     public static final int SAMPLE_ROWS = 50;
@@ -47,10 +60,20 @@ public final class PipelineDryRun {
     private static final String SEED = "dryrun_seed";
 
     /**
-     * Dry-run {@code g} over {@code sampleRows}. Throws {@link IllegalArgumentException} for an empty sample or a
-     * flow with no parser/entry node to seed at; validation errors surface from {@link PipelineExecutor#dryRun}.
+     * Dry-run {@code g} over {@code sampleRows} with no reference context, so a {@code transform.join} node
+     * refuses ({@link RowShaper.ReferenceResolver#NONE}).
      */
     public static Result run(PipelineGraph g, List<Map<String, Object>> sampleRows) throws Exception {
+        return run(g, sampleRows, RowShaper.ReferenceResolver.NONE);
+    }
+
+    /**
+     * Dry-run {@code g} over {@code sampleRows}, resolving any {@code transform.join} reference through
+     * {@code references}. Throws {@link IllegalArgumentException} for an empty sample or a flow with no
+     * parser/entry node to seed at; validation errors surface from {@link PipelineExecutor#dryRun}.
+     */
+    public static Result run(PipelineGraph g, List<Map<String, Object>> sampleRows,
+                             RowShaper.ReferenceResolver references) throws Exception {
         if (sampleRows == null || sampleRows.isEmpty())
             throw new IllegalArgumentException("at least one sample row is required");
         g = withMappingContext(g);
@@ -60,7 +83,7 @@ public final class PipelineDryRun {
         File db = DuckDbUtil.tempDbFile("dryrun_");
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             ScratchTables.seed(conn, SEED, columns, sampleRows);
-            PipelineExecutor.DryRunResult dr = PipelineExecutor.dryRun(conn, g, seedNode, SEED);
+            PipelineExecutor.DryRunResult dr = PipelineExecutor.dryRun(conn, g, seedNode, SEED, references);
             Map<String, PipelineNode> byId = g.byId();
 
             List<NodeDryRun> nodes = new ArrayList<>();
@@ -84,10 +107,33 @@ public final class PipelineDryRun {
                         ScratchTables.count(conn, s.getValue()),
                         ScratchTables.readRows(conn, s.getValue(), SAMPLE_ROWS)));
             }
-            return new Result(seedNode, nodes, sinks);
+            return new Result(seedNode, nodes, sinks, warningsFor(nodes, sinks, seedNode));
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
+    }
+
+    /**
+     * DRYRUN-2 — say so when a technically-successful dry-run tells the operator nothing. Two distinct
+     * silences, both of which answered a bare 200 before, which reads as success: the sample reached no
+     * node at all (nothing downstream of the seed consumed it), and no sink would receive a single row.
+     *
+     * <p>⚠ The second condition is deliberately about <b>sinks</b>, not "every relation is empty". A
+     * filter that drops all three sample rows produces a {@code data} of 0 and a {@code dropped} of 3 —
+     * that run is informative, and warning "every relation produced zero rows" there would be both false
+     * and noise. What the operator cannot see from row counts alone is that <em>nothing would be written</em>.
+     *
+     * <p>Warnings never fail the run — a zero-row dry-run is a legitimate answer about the sample, and the
+     * operator is the one who can tell "my filter is wrong" from "this sample has no matching rows".
+     */
+    private static List<String> warningsFor(List<NodeDryRun> nodes, List<SinkDryRun> sinks, String seedNode) {
+        if (nodes.isEmpty() && sinks.isEmpty())
+            return List.of("the sample reached no node past the seed '" + seedNode
+                    + "' — nothing downstream consumed it, so this run exercised nothing");
+        if (!sinks.isEmpty() && sinks.stream().allMatch(s -> s.rowCount() == 0))
+            return List.of("no sink received any rows — the sample was filtered or joined away before "
+                    + "reaching an output, so this run cannot tell you the flow writes what you expect");
+        return List.of();
     }
 
     /**

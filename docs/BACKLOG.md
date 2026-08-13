@@ -1117,19 +1117,29 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   lowering target, or (b) refuse explicitly with a named code. ⛔ Do **not** "fix" this by writing a
   `steps:` entry for map without settling (a)/(b): map nodes never enter the chain that triggers the
   `steps:` path, so that would change when `steps:` is emitted at all.
-- 🟠 **DRYRUN-1 — a `transform.join` pipeline cannot be dry-run at all.**
-  `POST …/pipelines/authored/{id}/dry-run` on demo's `orders_enriched_rollup` returns **422
-  `no ReferenceResolver supplied — cannot resolve reference '…/region_dim.csv' for transform.join in
-  this execution context`**. Honest and recoverable, not a crash — but it means the dry-run surface is
-  blind to every join pipeline, which is most realistic ones. The seam already exists: `b9f3b30e`
-  extracted the shared `com.gamma.enrich.ReferenceReader` for the production join executor, so this is
-  wiring a resolver into the dry-run context, not new machinery. Note the reference is a **path on
-  disk**, so the write-root/path-jail gate has to be honoured on the dry-run route too.
-- 🟡 **DRYRUN-2 — a dry-run that reaches no node returns a silent empty 200.** ucc's
-  `voucher_unknown_etl` answers `200 {"seedNode":"parse","nodes":[],"sinks":[]}` for a sample that
-  matches nothing. Indistinguishable from success in the UI. Should carry a warning (or a named
-  finding) saying the sample never reached a node — compare the sink preview, which already returns a
-  `warnings` array for a missing partition column.
+- ~~🟠 **DRYRUN-1 — a `transform.join` pipeline cannot be dry-run at all.**~~ **SHIPPED 2026-08-13** — as
+  the row predicted, pure wiring: `PipelineExecutor.dryRun` already had a resolver overload, and
+  `PipelineDryRun` was simply calling the arity that refuses. `PipelineDryRun.run` now takes an optional
+  `RowShaper.ReferenceResolver` (the two-arg entry still passes `NONE`, so nothing resolves by accident) and
+  `PipelineRoutes.dryRunFlow` supplies one over the shared `ReferenceReader`. ⚠ **This row's own stated
+  constraint — "the write-root/path-jail gate has to be honoured on the dry-run route too" — is REFUTED and
+  deliberately not implemented**: a `path:` reference names a *data* file that routinely lives outside the
+  config write root, so jailing it there refuses legitimate references, and it buys nothing because
+  `POST /enrichment/preview` already resolves the very same `path:` references through the very same reader
+  with **no jail and no write root at all**. A jail here alone is theatre that breaks working configs; if
+  preview-path reads are a concern they are a concern about *both* surfaces and need one deliberate answer.
+  As-built in `okf/backend/pipeline-graph/pipeline-graph-design.md` §18. Verified over real HTTP
+  (`ControlApiPipelineCrudTest`, a `path:` CSV reference resolving through the route) + `PipelineDryRunTest`.
+- ~~🟡 **DRYRUN-2 — a dry-run that reaches no node returns a silent empty 200.**~~ **SHIPPED 2026-08-13** —
+  `PipelineDryRun.Result` gained a `warnings` list (the sink-preview shape the row itself pointed at; a
+  compact constructor keeps the old 3-arg arity for `@PublicApi` compatibility), populated when the sample
+  reached no node past the seed, or when no sink received a row. ⚠ **The second rule is about SINKS, not
+  "every relation is empty" — a test caught the difference**: a filter dropping all three sample rows
+  produces `data`=0 **and `dropped`=3**, so a relation-based warning was both false and noise. That run is
+  informative; what the operator cannot see from counts alone is that *nothing would be written*. The
+  warning is rendered in `pipeline-dry-run-panel.component.html` and mirrored in the mock handler — the
+  complaint was "indistinguishable from success **in the UI**", so a server-only field would not close it,
+  and the panel spec asserts the rendered text rather than the signal.
 
 **Closed — do not re-propose without the stated trigger:**
 - **M2 `CollectorService` decomposition — won't-do.** Already reads as a composition-root/facade

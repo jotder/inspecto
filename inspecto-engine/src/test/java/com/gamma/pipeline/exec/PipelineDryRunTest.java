@@ -178,4 +178,90 @@ class PipelineDryRunTest {
                 List.of(PipelineEdge.data("acq", "sink")));
         assertThrows(IllegalArgumentException.class, () -> PipelineDryRun.run(g, List.of()));
     }
+
+    // ── DRYRUN-1: a join pipeline is dry-runnable when the caller supplies reference context ────
+
+    /** seed --data--> join(reference/groups) --data--> sink. */
+    private static PipelineGraph graphWithJoin() {
+        return new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        PipelineNode.of("j", "transform.join",
+                                Map.of("reference", "reference/groups", "on", "id")),
+                        new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
+                List.of(PipelineEdge.data("acq", "j"), PipelineEdge.data("j", "sink")));
+    }
+
+    @Test
+    void aJoinPipelineDryRunsWhenAReferenceResolverIsSupplied() throws Exception {
+        PipelineDryRun.Result r = PipelineDryRun.run(graphWithJoin(), SAMPLE, (conn, reference) -> {
+            assertEquals("reference/groups", reference);   // the node's cfg value reaches the resolver verbatim
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("CREATE TABLE refdim AS SELECT * FROM (VALUES ('1','Alpha')) t(id, label)");
+            }
+            return "refdim";
+        });
+
+        assertEquals(3, relCount(node(r, "j"), PipelineRel.DATA));   // LEFT JOIN keeps the unmatched rows
+        assertEquals(3, r.sinks().get(0).rowCount());
+        assertTrue(r.warnings().isEmpty(), "a join that produced rows warns about nothing: " + r.warnings());
+    }
+
+    /**
+     * Without reference context the join still refuses — the resolver is opt-in, so the two-arg entry point
+     * cannot start resolving references by accident.
+     */
+    @Test
+    void aJoinPipelineStillRefusesWithNoReferenceContext() {
+        Exception e = assertThrows(Exception.class, () -> PipelineDryRun.run(graphWithJoin(), SAMPLE));
+        assertTrue(e.getMessage() != null && e.getMessage().contains("reference/groups"),
+                "the refusal names the reference it could not reach: " + e.getMessage());
+    }
+
+    // ── DRYRUN-2: a technically-successful dry-run that tells the operator nothing says so ──────
+
+    @Test
+    void aSampleThatReachesNoNodeCarriesAWarningRatherThanASilentEmpty200() throws Exception {
+        // A lone entry node: the seed IS the whole graph, so nothing downstream consumes the sample.
+        PipelineGraph g = new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition")), List.of());
+
+        PipelineDryRun.Result r = PipelineDryRun.run(g, SAMPLE);
+
+        assertTrue(r.nodes().isEmpty());
+        assertTrue(r.sinks().isEmpty());
+        assertEquals(1, r.warnings().size(), "the empty run is reported, not left to look like success");
+        assertTrue(r.warnings().get(0).contains("reached no node"), r.warnings().get(0));
+    }
+
+    /**
+     * The sample is filtered away, so the sink would write nothing — worth saying. Note the run is NOT
+     * relation-empty: the filter's {@code dropped} branch carries all three rows, which is exactly why the
+     * warning asks about sinks rather than about every relation.
+     */
+    @Test
+    void aSampleThatReachesNoSinkRowWarnsThatNothingWouldBeWritten() throws Exception {
+        PipelineGraph g = new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "CAST(amt AS INT) > 9999")),
+                        new PipelineNode("sink", "sink.persistent", "S", null, Map.of("store", "out"), null)),
+                List.of(PipelineEdge.data("acq", "flt"), PipelineEdge.data("flt", "sink")));
+
+        PipelineDryRun.Result r = PipelineDryRun.run(g, SAMPLE);
+
+        assertEquals(0, r.sinks().get(0).rowCount());
+        assertEquals(3, relCount(node(r, "flt"), PipelineRel.DROPPED), "the dropped branch is not empty");
+        assertEquals(1, r.warnings().size());
+        assertTrue(r.warnings().get(0).contains("no sink received any rows"), r.warnings().get(0));
+    }
+
+    @Test
+    void aRunThatProducesRowsCarriesNoWarnings() throws Exception {
+        PipelineGraph g = new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        PipelineNode.of("flt", "transform.filter", Map.of("where", "CAST(amt AS INT) >= 100")),
+                        new PipelineNode("sink", "sink.persistent", "Big", null, Map.of("store", "big"), null)),
+                List.of(PipelineEdge.data("acq", "flt"), PipelineEdge.data("flt", "sink")));
+
+        assertTrue(PipelineDryRun.run(g, SAMPLE).warnings().isEmpty());
+    }
 }

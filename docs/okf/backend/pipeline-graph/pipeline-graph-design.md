@@ -1305,10 +1305,54 @@ absent block reads as the parser's own `stream` default, a valid reference block
 default) + `CapabilityManifestTest` drift guard; full `inspecto` reactor 746/0/0. UI: `PipelineSettingsDialog`
 spec 6/6, production build clean, no regression in `pipeline-editor.component.spec.ts` (50/50).*
 
+## 18. Dry-run grows reference context and an honest empty answer (2026-08-13)
+
+Two §6 findings from driving the UI end-to-end, both closed in one change because they meet at the same
+route and the same result record.
+
+**DRYRUN-1 — a `transform.join` pipeline could not be dry-run at all.** `POST …/pipelines/authored/{id}/dry-run`
+answered 422 `no ReferenceResolver supplied` for every join flow, which is most realistic ones: the walk
+reached the join node and `RowShaper.ReferenceResolver.NONE` refused. No new machinery was needed — the
+seam already existed (`PipelineExecutor.dryRun` has had a resolver overload since the join executor
+shipped); `PipelineDryRun` simply called the arity that refuses. Now `PipelineDryRun.run` takes an optional
+resolver (the two-arg entry point still passes `NONE`, so nothing starts resolving references by accident),
+and `PipelineRoutes.dryRunFlow` supplies one built on the shared `ReferenceReader` — the same resolution
+the production join executor and the Stage-2 `EnrichmentEngine` use, so a versioned reference store's
+current/as-of view cannot mean one thing in a preview and another in a real run. The view is created on the
+throwaway dry-run connection and dies with it.
+
+⚠ **The backlog row's own stated constraint was refuted.** It required that "the write-root/path-jail gate
+has to be honoured on the dry-run route too". It is deliberately *not*: a `path:` reference names a **data**
+file, which routinely lives outside the config write root, so jailing it there refuses legitimate
+references — and it buys nothing, because `POST /enrichment/preview` already resolves the very same `path:`
+references through the very same reader with **no jail and no write root at all**. A jail on this route
+alone would be security theatre that breaks working configs. If arbitrary-path reads through a preview are
+a concern, they are a concern about *both* surfaces and need one deliberate answer.
+
+**DRYRUN-2 — a dry-run that reached nothing returned a silent empty 200**, indistinguishable from success.
+`Result` gained a `warnings` list (the shape the sink preview already returns; a compact constructor keeps
+the old 3-arg arity for `@PublicApi` compatibility), populated for two silences: the sample reached no node
+past the seed, and no sink received a row.
+
+⚠ **The second rule is about SINKS, not "every relation is empty" — and a test caught the difference.** The
+first implementation warned when no relation anywhere carried rows; a filter that drops all three sample
+rows produces `data`=0 **and `dropped`=3**, so the warning was both false and noise. That run *is*
+informative. What the operator cannot see from row counts alone is that **nothing would be written**.
+
+The warning is rendered by `pipeline-dry-run-panel.component.html` and mirrored in the mock handler —
+DRYRUN-2's complaint was explicitly "indistinguishable from success **in the UI**", so a server-only field
+would not have closed it. The panel spec asserts the rendered text, not the signal.
+
+*Verified: `PipelineDryRunTest` 10/10 (+5: join-with-resolver, join-still-refuses-without, reached-no-node,
+no-sink-row with a non-empty `dropped` branch, and no-warning-on-a-normal-run), `RowShaperTest` 16/16,
+`PipelineExecutorTest` 5/5, `ControlApiPipelineCrudTest` 14/14 (+2 real-HTTP: a `path:` CSV reference
+resolving through the route, and the warning reaching the response body); full backend reactor green. UI:
+panel + mock-handler specs 34/34, production build clean.*
+
 ---
 
-**Last Updated**: 2026-08-13 (§17 — pipeline settings surface)
-**Earlier**: 2026-08-01 (§16 — W5 editable round-trip)
+**Last Updated**: 2026-08-13 (§18 — dry-run reference context + empty-run warnings)
+**Earlier**: 2026-08-13 (§17 — pipeline settings surface) · 2026-08-01 (§16 — W5 editable round-trip)
 **Status**: design finalised (decisions §9, boundaries §12); **reviewed 2026-06-16 against the engine — corrections
 + re-scoping in §13, implementation checklist in §14; pipeline-vs-job execution model formalised 2026-06-17 in §3.8
 (R6 / T23–T25).** **Phase 1 (Flow IR + legacy lift) is BUILT and green** (T1/T2/T3/T4/T5a done; full inspecto suite

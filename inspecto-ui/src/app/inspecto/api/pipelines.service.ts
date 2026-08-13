@@ -194,6 +194,12 @@ export interface PipelineDryRunResult {
     seedNode: string;
     nodes: DryRunNode[];
     sinks: DryRunSink[];
+    /**
+     * Warnings about a run that SUCCEEDED yet reports nothing useful — the sample reached no node, or no
+     * sink received a row. Optional because an older server omits the key; never an error, so the counts
+     * still render alongside.
+     */
+    warnings?: string[];
 }
 
 /** Result of testing a single processor node over a bounded sample (POST /components/{type}/{id}/test). */

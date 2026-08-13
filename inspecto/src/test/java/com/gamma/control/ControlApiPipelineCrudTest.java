@@ -349,6 +349,58 @@ class ControlApiPipelineCrudTest {
     }
 
     /**
+     * DRYRUN-1: a {@code transform.join} pipeline dry-runs. Before the route supplied a
+     * {@link com.gamma.pipeline.exec.RowShaper.ReferenceResolver}, every join flow 422'd with
+     * "no ReferenceResolver supplied", leaving the preview blind to the most realistic pipelines.
+     * The reference here is a {@code path:} CSV, resolved through the shared {@code ReferenceReader} —
+     * the same resolution a production run does.
+     */
+    @Test
+    void dryRunResolvesATransformJoinReference(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Path refCsv = dir.resolve("region_dim.csv");
+        Files.createDirectories(dir);
+        Files.writeString(refCsv, "id,region\n1,North\n3,South\n");
+        seedFlow(wr, """
+            {"name":"join_flow","active":false,
+             "nodes":[{"id":"acq","type":"acquisition"},
+                      {"id":"j","type":"transform.join","config":{"reference":"%s","on":"id"}},
+                      {"id":"sink","type":"sink.persistent","config":{"store":"joined"}}],
+             "edges":[{"from":"acq","rel":"data","to":"j"},{"from":"j","rel":"data","to":"sink"}]}"""
+                .formatted(refCsv.toString().replace("\\", "/")));
+        try (Ctx c = open(dir, wr)) {
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/join_flow/dry-run",
+                    "{\"sampleRows\":[{\"id\":\"1\"},{\"id\":\"2\"},{\"id\":\"3\"}]}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode body = json(r);
+            // LEFT JOIN: id 2 has no reference row and survives with NULLs, so all three reach the sink.
+            assertEquals(3, body.get("sinks").get(0).get("rowCount").asInt(), body.toString());
+            assertTrue(body.get("warnings").isEmpty(), body.toString());
+        }
+    }
+
+    /**
+     * DRYRUN-2: a dry-run whose sample reaches nothing carries a warning instead of an empty 200 that
+     * reads as success in the UI.
+     */
+    @Test
+    void dryRunThatReachesNoNodeCarriesAWarning(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        seedFlow(wr, """
+            {"name":"lonely_flow","active":false,
+             "nodes":[{"id":"acq","type":"acquisition"}],
+             "edges":[]}""");
+        try (Ctx c = open(dir, wr)) {
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/lonely_flow/dry-run",
+                    "{\"sampleRows\":[{\"id\":\"1\"}]}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode warnings = json(r).get("warnings");
+            assertEquals(1, warnings.size(), r.body());
+            assertTrue(warnings.get(0).asText().contains("reached no node"), warnings.toString());
+        }
+    }
+
+    /**
      * A {@code pipeline} body key dry-runs a candidate graph instead of the stored one — the editor's "preview
      * before you save" seam. Pinning three things: the candidate's own topology drives the result (not the
      * stored flow's, which differs); a candidate that would fail {@code /graph}'s own validation 422s the
