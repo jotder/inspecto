@@ -92,6 +92,7 @@ export class RunDetailComponent implements OnInit {
         this.rows = [];
         this.allFiles = [];
         this.inbox = null;
+        this.stepAgeText = '';
         this.report = null;
         this.lineageBatchId = '';
         this.loadTab();
@@ -116,6 +117,9 @@ export class RunDetailComponent implements OnInit {
     // files tab
     allFiles: AuditRow[] = [];
     inbox: InboxStatus | null = null;
+    /** Age of the step gauge's `startedAt`, computed ONCE per load — a template call to a
+     *  Date.now()-based formatter changes between change-detection passes and throws NG0100. */
+    stepAgeText = '';
     fileStatus: FileFilter = 'ALL';
     readonly fileFilters: FileFilter[] = ['ALL', 'SUCCESS', 'REJECTED', 'ERRORED'];
 
@@ -177,11 +181,13 @@ export class RunDetailComponent implements OnInit {
             next: ({ files, inbox }) => {
                 this.allFiles = files;
                 this.inbox = inbox;
+                this.stepAgeText = inbox?.step ? this.stepAge(inbox.step.startedAt) : '';
                 this.loading = false;
             },
             error: () => {
                 this.allFiles = [];
                 this.inbox = null;
+                this.stepAgeText = '';
                 this.loading = false;
             },
         });
@@ -254,6 +260,21 @@ export class RunDetailComponent implements OnInit {
     }
 
     // ── file-processing status ───────────────────────────────────────────────────
+    /**
+     * Age of the step gauge's `startedAt`, e.g. "12s" / "3m 05s" / "2h 14m". The AGE is the gauge's
+     * hang signal by design (consignment-status-flow OKF): the snapshot is in-memory and always
+     * "present", so a step that stopped advancing shows only as a growing age.
+     */
+    stepAge(startedAt: string): string {
+        const ms = Date.now() - Date.parse(startedAt);
+        if (!Number.isFinite(ms) || ms < 0) return '0s';
+        const s = Math.floor(ms / 1000);
+        if (s < 60) return `${s}s`;
+        const m = Math.floor(s / 60);
+        if (m < 60) return `${m}m ${String(s % 60).padStart(2, '0')}s`;
+        return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+    }
+
     private isSuccess(f: AuditRow): boolean {
         return (f['status'] || '').toUpperCase() === 'SUCCESS';
     }

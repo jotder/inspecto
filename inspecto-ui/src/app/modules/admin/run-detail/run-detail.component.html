@@ -132,6 +132,17 @@
                         <div class="text-secondary text-xs">Current file ({{ cur.index }} of {{ cur.total }})</div>
                     </div>
                 }
+                @if (inbox?.step; as st) {
+                    <div
+                        class="rounded-xl border border-blue-500 px-4 py-2"
+                        [matTooltip]="'consignment ' + st.consignmentId + ' · started ' + st.startedAt"
+                    >
+                        <div class="font-mono text-sm font-bold">{{ st.step }}</div>
+                        <div class="text-secondary text-xs">
+                            Step {{ st.index }} of {{ st.total }} · in step for {{ stepAgeText }}
+                        </div>
+                    </div>
+                }
                 <div class="mx-2 h-10 w-px bg-gray-300 dark:bg-gray-600"></div>
                 <button
                     class="rounded-xl border px-4 py-2 text-center"

@@ -173,6 +173,44 @@ describe('RunDetailComponent', () => {
         expect(spy).toHaveBeenCalledWith('run_b');
     });
 
+    it('renders the live step gauge with its AGE on the Files tab (S7 follow-on)', () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
+        vi.spyOn(TestBed.inject(RunsService), 'pending').mockReturnValue(
+            of({
+                pipeline: 'cdr_ingest',
+                inbox: 'inboxes/cdr_ingest',
+                pending: 1,
+                running: true,
+                current: null,
+                step: {
+                    consignmentId: 'cdr_ingest-b7',
+                    step: 'transform',
+                    index: 2,
+                    total: 4,
+                    startedAt: new Date(Date.now() - 5000).toISOString(),
+                },
+            }),
+        );
+        c.selectedIndex = c.tabs.findIndex((t) => t.id === 'files');
+        c.onTabChange();
+        fixture.detectChanges();
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('transform');
+        expect(text).toContain('Step 2 of 4');
+        // the age is the design's only hang signal — assert it actually renders, not just "3/5"
+        expect(text).toMatch(/in step for \d+s/);
+    });
+
+    it('formats the step age across second/minute/hour scales', () => {
+        const c = create().componentInstance;
+        const at = (ms: number) => new Date(Date.now() - ms).toISOString();
+        expect(c.stepAge(at(12_000))).toBe('12s');
+        expect(c.stepAge(at(185_000))).toBe('3m 05s');
+        expect(c.stepAge(at(8_040_000))).toBe('2h 14m');
+        expect(c.stepAge('not-a-date')).toBe('0s');
+    });
+
     it('renders with no a11y violations', async () => {
         const fixture = create();
         await expectNoA11yViolations(fixture.nativeElement);

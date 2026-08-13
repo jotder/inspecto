@@ -427,6 +427,16 @@ PIPELINES.forEach((name, i) => {
                       startedAt: new Date(NOW - 5000).toISOString(),
                   }
                 : null,
+        step:
+            i === 0
+                ? {
+                      consignmentId: `${name}-b1025`,
+                      step: 'transform',
+                      index: 2,
+                      total: 4,
+                      startedAt: new Date(NOW - 5000).toISOString(),
+                  }
+                : null,
     };
 });
 
