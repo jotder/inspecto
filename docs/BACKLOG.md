@@ -777,16 +777,23 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   current source returns a proper array). It did **not** reproduce on a freshly built server, which points at
   the stale `file-processor-deploy` bundle rather than current code. Adding the guard converts a crash into a
   silent wrong-state, so it is worth doing **but is not a fix** — do not close this by guarding alone.
-- **⚠ Running the reactor MUTATES tracked sample-space TOON files** (found 2026-07-28). `mvn -o clean test`
-  boots services against `spaces/`, and the write-back is **not byte-stable with the committed form**:
-  `spaces/demo/space.toon` came back with its `description`/`created_at` values newly **double-quoted**,
-  `spaces/default/config/registry/widgets/events_by_type.toon` came back **key-reordered with a `name:`
-  injected**, and both lost their **trailing newline**. It also leaves new untracked files behind
-  (`nav-menus.toon`, `branding.toon`, `registry/widgets/.history/`, stray `*_pipeline.toon`).
-  **Two costs:** a shift cannot tell its own edits from test noise in `git status` (and this shift nearly
-  committed two such files), and the TOON writer is not idempotent against what is checked in. **Fix the
-  round-trip, not the samples** — re-committing the rewritten form just moves the diff. Until then: after a
-  reactor run, `git checkout --` any tracked `spaces/**` file you did not deliberately edit.
+- ~~**⚠ Running the reactor MUTATES tracked sample-space TOON files**~~ **CLOSED 2026-08-13 — no longer
+  reproduces; refuted BOTH ways** (found 2026-07-28). (1) **Dynamic:** a full `mvn -o clean test` run
+  (23 modules, BUILD SUCCESS, 0 failures) against a clean tree left **zero tracked `spaces/**` files
+  modified and zero new untracked files** — no `nav-menus.toon`, no `branding.toon`, no `.history/`.
+  (2) **Static:** every test that touches the real `spaces/` corpus (`RepoSpacesConfigValidationTest`,
+  `RecipeConverterTest`, `RecipeVerbParityTest`, `ShippedCatalogSamplesTest`) is read-only, and every
+  test exercising a write path uses `@TempDir` — there is no writer in the committed suite. The
+  2026-07-28 observation was most likely a live server / manual run sharing the tree with the build
+  (the named untracked files are only ever created by settings/component **PUT routes**,
+  `NavMenus.write`/`BrandingSettings.write`/`ComponentStore.write` — none has a boot-time or test-time
+  caller). ⚠ Two of the row's framings were also wrong and matter for any future recurrence:
+  `JToon.encode`'s re-quoting/canonicalizing is `ConfigCodec.toToon`'s **documented contract**
+  ("canonical, comment-free, strict-decodable"), not a broken round-trip — so "fix the round-trip, not
+  the samples" prescribed fixing a behavior that is by design; and the `name:` injection is
+  `ComponentStore.write`'s deliberate id-stamp (`:171`), not drift. The standing "checkout tracked
+  `spaces/**` after a reactor run" hygiene is obsolete; if mutation is ever seen again, catch the
+  writer in the act (`git status` before/after the specific process) — the JUnit suite is exonerated.
 - ~~**`InvRoutes`' hand-escaped literal can now become a bind**~~ **CLOSED 2026-08-13** (found 2026-07-28
   while building Rule Template execution). The stale *"No bind-parameter support in `QueryExecutor.Request`"*
   comment is gone with the code it justified: `neighborsOf` is now two positional `?` binds passed through
