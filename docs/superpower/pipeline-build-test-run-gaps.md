@@ -176,6 +176,71 @@ a backend job, not a rebuild. What is missing on the server (per the feasibility
   which must stay scratch-only and never fire a production run.
 Estimated **medium/large**. Flip `mockFlows`-gating off for run-to-here when it lands.
 
+#### Step 5 — re-grounded 2026-08-14, and sliced
+
+**Every premise above was re-verified against current source and all of it holds.** Stated explicitly
+because the neighbouring BACKLOG rows have a poor record (four of five taken on 2026-08-13 had stale
+premises) — **this one is accurate; do not spend another shift re-scoping it.** Corrections and detail:
+
+- `PipelineRoutes.java` registers only `dry-run` and `trigger` — **`:77-81`**, not `:69` (citation drift).
+  The in-place comment already states `run?to=` "must never fire a production run".
+- `PipelineDryRun.run` requires non-empty `sampleRows` (`:66-114`, guard at `:77-78`) and seeds at the
+  parser/entry node (`seedNodeOf`, `:174-180`). Its own javadoc `:24-25` concedes "the acquisition/parse
+  stage upstream of the seed is not exercised here".
+- `PipelineExecutor.dryRun` (`:203-229`) walks `topoOrder(g)` over the **whole** graph. No stop-at parameter.
+- ⚠ **DRYRUN-1/DRYRUN-2 (2026-08-13) did not shrink this.** They added a `ReferenceResolver` param and a
+  `warnings` list to the same file — orthogonal to all three gaps.
+- **The UI is fully built, not a sketch:** `pipelines.service.ts:495-505` `runToNode(id, nodeId, files)`
+  already POSTs this exact URL with a `files` body; `run-to-here.dialog.ts:29-33` already picks inbox files
+  through the connection "Explore" tree. **The backend route is the only absent piece.**
+
+⚠ **The hard part is NOT reading the files — it is suppressing the ingest path's side effects.** The real
+path (`BatchProcessor` / `BatchIngestStrategy`) does not merely parse: it writes the file-status and batch
+ledgers, moves/consumes inbox files, writes to `dirs.database`, and emits events. **A test run must do none
+of these**, and a test run that does even one of them is worse than no feature at all. Three ways to get
+that, in descending order of preference:
+
+- **(c) Isolation by construction — RECOMMENDED.** Run the real path against a config whose every output
+  path is redirected to scratch. Mirrors the 2026-08-13 launcher lesson (derive it so the rule holds *by
+  construction* rather than by a flag someone can forget). **Prerequisite to verify first: that every
+  side-effecting destination is redirectable by config** — `dirs.database`, the ledgers, the event sink,
+  and inbox consumption. If any one is not, this degrades to (b).
+- **(b) Extract the pure parse step** (file → rows) and skip `BatchProcessor` entirely. Safer than (a),
+  but risks duplicating the CSV-builtin vs plugin-ingester dispatch — extract, do not copy.
+- **(a) Thread a `dry`/`scratch` boolean through the ingest path — ⛔ AVOID.** One missed branch means a
+  *test* run mutates production state. This is the trap; do not take it because it looks smallest.
+
+**Reusable seams (this does not start from zero):** `BatchIngestStrategy.openTempDb`/`scratchDir`
+(`:308-329`) already resolves a scratch dir from `dirs.temp` / `processing.duckdb.temp_directory`
+**independent of the production `dirs.database` root** — i.e. the row's "must stay scratch-only"
+guarantee already exists rather than needing invention. `DuckDbUtil.tempDbFile`/`deleteTempDb`
+(`:64,84,261`) is the scratch-DB lifecycle `PipelineDryRun` already uses. Stage A's earlier extraction of
+`BatchProcessor.finalizeSource` (so `commit` delegates to it) is evidence the parse half and the commit
+half **are** separable — confirm that before designing against it.
+
+**Slices — ship in this order, each independently valuable:**
+
+- **5a · real files, full graph, no cutoff.** Parse N picked inbox files into a scratch DuckDB and run the
+  whole graph, replacing `sampleRows`. Converts "synthetic rows" into "real files" and is the bulk of the
+  user value on its own. Settle (c)-vs-(b) here.
+- **5b · stop-at-node cutoff.** Thread a target set through the `topoOrder` walk. ⚠ **That walk is shared
+  with production `execute`** — add an overload whose default is "no cutoff" so the production path stays
+  byte-identical, and pin that with a test. This is the slice most likely to cause a regression far from
+  where it was edited.
+- **5c · route + ungate.** Register `POST /pipelines/authored/{id}/run?to={nodeId}`, then flip the
+  `environment.mockFlows` gate off for run-to-here. Two things to get right:
+  - ⚠ **Jail the `files` body to the pipeline's configured inbox.** As specified it accepts caller-supplied
+    paths, so without containment this is an arbitrary-file-read over HTTP. This is the one place where the
+    still-open "config-declared paths resolve unjailed" BACKLOG row becomes **reachable rather than
+    defence-in-depth** — do not ship 5c without it.
+  - **Permission gate:** follow the `DecisionRoutes` precedent — `/simulate` is `canAuthorWorkbench`,
+    `/apply` is `canOperateRuns`. A test run is a simulate, so **`canAuthorWorkbench`**.
+  - **Response shape is already pinned by the mock** the UI renders against (per-relation counts + sample
+    table). Match it, and pin it by spec the way Step 2 pinned the node-type list in
+    `pipelines.handler.spec.ts` — a laxer mock is the exact failure mode that convention exists to kill.
+
+**Sizing: multi-shift.** Three separable hard problems, not one task. 5a alone is a plausible shift.
+
 ---
 
 ## Links

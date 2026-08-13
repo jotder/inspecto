@@ -265,7 +265,11 @@ former root reference docs** (each index lists them):
   grandfathered-flow warning banner (G5, not read-only as first drafted — see the plan's inline
   correction). **Step 5 — a bounded test run over real inbox files — is the one gap left**, and is a
   backend job (`PipelineDryRun` is synthetic-only; no stop-at-node primitive; the run-to-here route is
-  reserved but unregistered). Gaps tracked in [`BACKLOG.md`](BACKLOG.md) §Pipelines.
+  reserved but unregistered). **Step 5 re-grounded + sliced 2026-08-14** (5a real files / 5b stop-at-node
+  / 5c route+ungate): every premise verified accurate, sized **multi-shift**, and the real difficulty
+  identified as **suppressing the ingest path's side effects**, not reading the files. Read the plan's
+  "Step 5 — re-grounded" section before starting — it names the approach to avoid and the containment
+  5c cannot ship without. Gaps tracked in [`BACKLOG.md`](BACKLOG.md) §Pipelines.
 
 - ~~`superpower/sinks-config-format-plan.md`~~ — **SHIPPED end-to-end 2026-08-02 (all 4 slices, `0cdc9dff`
   + `79dcb3e6`), plan archived** to

@@ -592,8 +592,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     — parse N picked inbox files into a scratch DuckDB and run the **full** graph with no cutoff, reusing the
     scratch pattern above in place of `sampleRows`. That converts "synthetic rows" into "real files" and is
     independently valuable; the cutoff and the route's `to=` semantics follow as a second slice.
-    **Write a `docs/superpower/` plan before starting** — it is multi-shift, and mid-task compaction is the
-    failure mode this repo externalizes against.
+    ✅ **Plan written 2026-08-14 — see [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md)
+    "Step 5 — re-grounded 2026-08-14, and sliced"** (extended the existing plan of record rather than
+    opening a second one for the same journey). It carries the slice order (5a real files / 5b stop-at-node
+    / 5c route+ungate), the three candidate approaches to side-effect suppression with the trap named, and
+    two things 5c cannot ship without: an inbox path-jail on the `files` body, and the `canAuthorWorkbench`
+    gate per the `DecisionRoutes` `/simulate` precedent. ⚠ **The difficulty is suppressing the ingest
+    path's side effects (ledgers, inbox consumption, `dirs.database` writes, events), not reading the
+    files** — a test run that mutates production state is worse than no feature.
 - **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
   unification W5). W5 made the graph editor *author* the canonical `*_pipeline.toon` for the
   single-source subset, refusing everything else with `UNSUPPORTED_NODE`. **11 of the 20
