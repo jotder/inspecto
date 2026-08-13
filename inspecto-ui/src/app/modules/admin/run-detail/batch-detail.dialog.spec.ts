@@ -10,8 +10,8 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { BatchDetailDialog } from './batch-detail.dialog';
 
 const BATCHES: AuditRow[] = [
-    { consignment_id: 'b-1', status: 'COMMITTED', files: '2' },
-    { consignment_id: 'b-2', status: 'OPEN', files: '1' },
+    { consignment_id: 'b-1', status: 'SUCCESS', member_count: '2' },
+    { consignment_id: 'b-2', status: 'FAILED', member_count: '1' },
 ];
 const FILES: AuditRow[] = [
     { consignment_id: 'b-1', file: 'a.csv', rows: '10' },

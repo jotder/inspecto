@@ -85,6 +85,44 @@ describe('demoHandler', () => {
         expect(rows[0]['start_time']).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     });
 
+    /**
+     * Pin the batches-ledger spellings the same way: the rows are the BatchAuditWriter `batches` CSV
+     * header verbatim, and batch status is the IngestOutcome vocabulary — `COMMITTED` (the mock's old
+     * invention) was never an engine batch status.
+     */
+    it('serves /runs/{n}/batches rows with the exact batches-ledger header keys', () => {
+        const rows = handler(req('GET', '/api/runs/cdr_ingest/batches'), seededStore())?.body as Record<
+            string,
+            string
+        >[];
+        expect(Object.keys(rows[0])).toEqual([
+            'consignment_id',
+            'pipeline',
+            'schema_name',
+            'output_table',
+            'start_time',
+            'end_time',
+            'status',
+            'member_count',
+            'rejected_count',
+            'total_input_rows',
+            'total_output_rows',
+            'output_file_count',
+            'total_output_bytes',
+            'duration_ms',
+            'error',
+            'cast_failures',
+        ]);
+        // batch status is exactly the IngestOutcome vocabulary (SUCCESS | EMPTY | FAILED)
+        const statuses = new Set(rows.map((r) => r['status']));
+        for (const s of statuses) expect(s).toMatch(/^(SUCCESS|EMPTY|FAILED)$/);
+        // the ledger's timestamp format is "yyyy-MM-dd HH:mm:ss", not ISO
+        expect(rows[0]['end_time']).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+        // -1 = "not measured" is a BLANK cast_failures cell, never "-1"
+        expect(rows.some((r) => r['cast_failures'] === '')).toBe(true);
+        expect(rows.every((r) => r['cast_failures'] !== '-1')).toBe(true);
+    });
+
     it('serves /runs/{n}/quarantine rows with only the keys the server synthesizes', () => {
         const rows = handler(req('GET', '/api/runs/cdr_ingest/quarantine'), seededStore())?.body as Record<
             string,
