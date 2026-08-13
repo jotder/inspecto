@@ -93,6 +93,10 @@ final class PipelineRoutes implements RouteModule {
         // T3: the full identity migration `label` deliberately doesn't do — see `rename`'s javadoc.
         api.post("/pipelines/([^/]+)/rename", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> rename(api, e, ApiContext.name(m), api.body(e))));
+        // The finishing move for an interrupted rename — reads rename.journal back (resumeRename's javadoc).
+        // No {name} segment: after a mid-migration crash the pipeline may be registered under neither id.
+        api.post("/pipelines/rename/resume", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> resumeRename(api, e, api.body(e))));
     }
 
     /** Lift every registered pipeline to a {@link PipelineGraph} and project a compact summary (GET /pipelines). */
@@ -517,6 +521,15 @@ final class PipelineRoutes implements RouteModule {
 
         List<String> journal = new ArrayList<>();
         Path journalFile = writeRoot.resolve("rename.journal");
+        String newNameRaw = ApiContext.str(body, "newName");
+
+        // Step 0: bracket the migration in the journal BEFORE any state moves. `begin` records the source
+        // file name and the request parameters; `completed` (after step 9) closes the bracket. A begin with
+        // no completed is what POST /pipelines/rename/resume looks for — and the params recorded here are
+        // what let it finish the job. newName stays last on the line: it may contain spaces.
+        journalStep(journalFile, oldId, newId, "begin src=" + srcPath.getFileName()
+                + " rewriteDependents=" + rewriteDependents
+                + (newNameRaw == null || newNameRaw.isBlank() ? "" : " newName=" + newNameRaw.trim()), journal);
 
         // Step 1 (S9): evict per-pipeline bookkeeping + the run registry. Cheaply reversible on failure —
         // re-registering the same path restores exactly what this undid.
@@ -542,40 +555,11 @@ final class PipelineRoutes implements RouteModule {
             // remove the old file. Landing this after the state moves (not before) is deliberate: a crash
             // here leaves the old config's file in place, so the catch block's recovery has something to
             // re-register.
-            Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
-            String newRawName = ApiContext.str(body, "newName");
-            String label = (newRawName == null || newRawName.isBlank())
-                    ? String.valueOf(src.getOrDefault("name", oldId)) : newRawName.trim();
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("name", label);
-            out.put("id", newId);
-            src.forEach((k, v) -> {
-                if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
-            });
-
-            // As in `relabel`: `dirs.*` are untouched (plan §1.1), so a config whose data lives outside the
-            // default allowed roots was never subject to the write-time safety policy — re-punishing it here
-            // would make any such deployment unrenameable. Block only on findings the rewrite INTRODUCES.
-            List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-            findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
-            Set<String> preExisting = new HashSet<>();
-            ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(findingKey(f)));
-            ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
-                    .forEach(f -> preExisting.add(findingKey(f)));
-            List<Finding> introduced = findings.stream()
-                    .filter(f -> f.severity() == Severity.ERROR)
-                    .filter(f -> !preExisting.contains(findingKey(f)))
-                    .toList();
-            if (!introduced.isEmpty()) {
-                api.service().registerPipeline(srcPath);   // the config write never happened — restore visibility
-                return ApiContext.respondJson(e, 422, Map.of("written", false,
-                        "error", "the renamed config introduces ERROR-level findings; not written",
-                        "findings", introduced, "journal", journal));
-            }
-            byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
-            AtomicFiles.write(newPath, bytes, ".cfg-");
-            Files.deleteIfExists(srcPath);
-            journalStep(journalFile, oldId, newId, "wrote " + newFileName + "; removed source config", journal);
+            ConfigWrite cw = writeRenamedConfig(api, e, srcPath, newPath, newFileName,
+                    oldId, newId, newNameRaw, journalFile, journal);
+            if (cw.refused() != null) return cw.refused();
+            String label = cw.label();
+            List<Finding> findings = cw.findings();
 
             // Step 7: dependent configs (plan §1 table) — enrich/job triggers, expectation/decision-rule
             // targets, dataset store references. Best-effort per file (see rewriteDependents); never
@@ -593,6 +577,7 @@ final class PipelineRoutes implements RouteModule {
                     .source(PipelineRoutes.class.getName()).pipeline(newId)
                     .message("Pipeline '" + oldId + "' renamed to '" + newId + "'")
                     .attr("oldId", oldId).attr("newId", newId));
+            journalStep(journalFile, oldId, newId, "completed", journal);
             log.info("[PIPELINE-RENAME] '{}' -> '{}' ({} ledger row(s), {} audit file(s), {} dependent(s))",
                     oldId, newId, ledgerRows, auditFiles, dependents);
 
@@ -621,6 +606,240 @@ final class PipelineRoutes implements RouteModule {
         }
     }
 
+    /** One incomplete migration recovered from {@code rename.journal}: a {@code begin} line (which records
+     *  the source file name and the request parameters) with no matching {@code completed}. */
+    private record PendingRename(String oldId, String newId, String srcFileName,
+                                 boolean rewriteDependents, String newName) {}
+
+    private static final java.util.regex.Pattern JOURNAL_LINE =
+            java.util.regex.Pattern.compile("^\\S+ (\\S+) -> (\\S+) : (.*)$");
+    private static final java.util.regex.Pattern BEGIN_STEP =
+            java.util.regex.Pattern.compile("^begin src=(\\S+) rewriteDependents=(true|false)(?: newName=(.*))?$");
+
+    /**
+     * Read {@code rename.journal} back into the still-open migrations, in journal order. A later
+     * {@code begin} for the same id pair supersedes an earlier open one (a retried rename); a
+     * {@code completed} closes the pair. Lines from before the begin/completed bracket existed never open a
+     * bracket, so pre-bracket-era migrations are invisible here — they stay manual-reconciliation cases.
+     */
+    private List<PendingRename> readPendingRenames(Path journalFile) throws IOException {
+        if (!Files.exists(journalFile)) return List.of();
+        Map<String, PendingRename> open = new LinkedHashMap<>();
+        for (String line : Files.readAllLines(journalFile, StandardCharsets.UTF_8)) {
+            java.util.regex.Matcher m = JOURNAL_LINE.matcher(line);
+            if (!m.matches()) continue;
+            String key = m.group(1) + " -> " + m.group(2);
+            String step = m.group(3);
+            java.util.regex.Matcher b = BEGIN_STEP.matcher(step);
+            if (b.matches())
+                open.put(key, new PendingRename(m.group(1), m.group(2), b.group(1),
+                        Boolean.parseBoolean(b.group(2)), b.group(3)));
+            else if ("completed".equals(step))
+                open.remove(key);
+        }
+        return List.copyOf(open.values());
+    }
+
+    /**
+     * {@code POST /pipelines/rename/resume} — finish an interrupted identity migration. {@code rename}'s
+     * steps 2–7 are not one transaction (see its javadoc), and two of its failure windows a plain retry
+     * cannot heal: a crash between writing the new config and deleting the old leaves both files on disk
+     * (retry → 409 file-exists), and a failure after the old config is deleted leaves the pipeline
+     * registered under neither id (retry → 404). This route reads {@code rename.journal} back — a
+     * {@code begin} with no {@code completed} is an incomplete migration — and re-runs the remaining steps.
+     * Every step is idempotent (the ledger/status-mirror renames match zero rows once moved; the audit-file
+     * and dependent rewrites match nothing once rewritten), so resuming after ANY failure point is safe and
+     * a resume that itself fails can be resumed again. The journal supplies discovery + the recorded
+     * parameters; the on-disk file state decides what the config-write step still owes.
+     *
+     * <p>Deliberately an explicit operator action, never a startup hook — an automatic state migration at
+     * boot would act without operator intent. The {@code PIPELINE_RENAMED} event is at-least-once: a crash
+     * between the emit and the {@code completed} line duplicates it on the next resume — history noise,
+     * never state corruption.
+     *
+     * <p>Body (optional): {@code { oldId, newId }} to pick one migration when several are incomplete.
+     */
+    private Object resumeRename(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
+        Path journalFile = writeRoot.resolve("rename.journal");
+
+        String selOld = ApiContext.str(body, "oldId");
+        String selNew = ApiContext.str(body, "newId");
+        List<PendingRename> pending = readPendingRenames(journalFile).stream()
+                .filter(p -> selOld == null || selOld.isBlank() || p.oldId().equals(selOld.trim().toLowerCase()))
+                .filter(p -> selNew == null || selNew.isBlank() || p.newId().equals(selNew.trim().toLowerCase()))
+                .toList();
+        if (pending.isEmpty())
+            throw new ApiException(404, "no incomplete rename found in rename.journal"
+                    + (selOld != null || selNew != null ? " matching the given oldId/newId" : ""));
+        if (pending.size() > 1)
+            throw new ApiException(409, "several incomplete renames — specify {oldId, newId}: "
+                    + pending.stream().map(p -> p.oldId() + " -> " + p.newId()).toList());
+        PendingRename p = pending.get(0);
+        String oldId = p.oldId(), newId = p.newId();
+
+        Path srcPath = WriteGates.jail(writeRoot, writeRoot.resolve(p.srcFileName()), "source path");
+        String newFileName = WriteGates.safeName(newId, "pipeline id") + "_pipeline.toon";
+        Path newPath = WriteGates.jail(writeRoot, writeRoot.resolve(newFileName), "resolved path");
+        boolean srcExists = Files.exists(srcPath);
+        boolean newExists = Files.exists(newPath);
+        if (!srcExists && !newExists)
+            throw new ApiException(409, "cannot resume '" + oldId + "' -> '" + newId + "': neither "
+                    + p.srcFileName() + " nor " + newFileName + " exists — manual reconciliation needed");
+
+        // Fail-closed identity checks before touching anything: each surviving file must still be the
+        // migration's own — the operator may have replaced either since the failed attempt.
+        if (newExists) {
+            Map<String, Object> chk = ConfigLoader.filesystem().decode(newPath.toString());
+            if (!newId.equals(chk.get("id")))
+                throw new ApiException(409, newFileName + " exists but is not this rename's product "
+                        + "(id: " + chk.get("id") + ") — manual reconciliation needed");
+        }
+        PipelineConfig srcCfg = null;
+        if (srcExists) {
+            srcCfg = PipelineConfig.load(srcPath.toString());
+            if (!oldId.equals(srcCfg.identity().pipelineName()))
+                throw new ApiException(409, p.srcFileName() + " no longer carries id '" + oldId
+                        + "' (now '" + srcCfg.identity().pipelineName() + "') — manual reconciliation needed");
+            // The failed attempt's recovery re-registers the source, and it may have been reactivated or
+            // started since — the same lifecycle gates a fresh rename runs.
+            WriteGates.conflictIf(srcCfg.active(), "pipeline '" + oldId
+                    + "' is active; deactivate (active: false) before resuming the rename");
+            WriteGates.conflictIf(api.service().isRunning(oldId), "pipeline '" + oldId
+                    + "' is currently running; wait for it to finish before resuming the rename");
+        }
+        Optional<Path> registeredNew = api.service().pathFor(newId);
+        if (registeredNew.isPresent()
+                && !registeredNew.get().toAbsolutePath().normalize().equals(newPath.toAbsolutePath().normalize()))
+            throw new ApiException(409, "pipeline id '" + newId + "' is registered to a different config ("
+                    + registeredNew.get().getFileName() + ") — manual reconciliation needed");
+
+        List<String> journal = new ArrayList<>();
+        journalStep(journalFile, oldId, newId, "resume", journal);
+        if (srcExists) api.service().unregisterPipeline(srcPath);
+        try {
+            int ledgerRows = com.gamma.acquire.AcquisitionLedgers.shared().renameSource(oldId, newId);
+            journalStep(journalFile, oldId, newId, "ledger rows moved: " + ledgerRows, journal);
+
+            // dirs.* are identical on both sides (rename never relocates them), so whichever config file
+            // survives supplies the audit-file locations; renameAuditFiles derives file NAMES from oldId.
+            PipelineConfig cfgForDirs = srcCfg != null ? srcCfg : PipelineConfig.load(newPath.toString());
+            int auditFiles = renameAuditFiles(cfgForDirs, oldId, newId);
+            journalStep(journalFile, oldId, newId, "audit files renamed: " + auditFiles, journal);
+
+            if (api.service().statusStore() instanceof DbStatusStore db) {
+                db.renamePipeline(oldId, newId);
+                journalStep(journalFile, oldId, newId, "status DB rows updated", journal);
+            }
+
+            String label;
+            List<Finding> findings = List.of();
+            if (srcExists && !newExists) {
+                ConfigWrite cw = writeRenamedConfig(api, e, srcPath, newPath, newFileName,
+                        oldId, newId, p.newName(), journalFile, journal);
+                if (cw.refused() != null) return cw.refused();
+                label = cw.label();
+                findings = cw.findings();
+            } else {
+                if (srcExists) {
+                    // The crash window between AtomicFiles.write(newPath) and deleting the source: the new
+                    // config is already written (identity verified above) — only the delete is owed.
+                    Files.deleteIfExists(srcPath);
+                    journalStep(journalFile, oldId, newId,
+                            "removed source config (new config already written)", journal);
+                }
+                Map<String, Object> written = ConfigLoader.filesystem().decode(newPath.toString());
+                label = String.valueOf(written.getOrDefault("name", newId));
+            }
+
+            int dependents = p.rewriteDependents() ? rewriteDependents(writeRoot, oldId, newId) : 0;
+            if (p.rewriteDependents())
+                journalStep(journalFile, oldId, newId, "dependents rewritten: " + dependents, journal);
+
+            api.service().registerPipeline(newPath);
+            journalStep(journalFile, oldId, newId, "registered " + newId, journal);
+
+            api.service().eventLog().emit(Event.builder(EventType.PIPELINE_RENAMED)
+                    .source(PipelineRoutes.class.getName()).pipeline(newId)
+                    .message("Pipeline '" + oldId + "' renamed to '" + newId + "' (resumed)")
+                    .attr("oldId", oldId).attr("newId", newId));
+            journalStep(journalFile, oldId, newId, "completed", journal);
+            log.info("[PIPELINE-RENAME] resumed '{}' -> '{}' ({} ledger row(s), {} audit file(s), {} dependent(s))",
+                    oldId, newId, ledgerRows, auditFiles, dependents);
+
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("written", true);
+            r.put("resumed", true);
+            r.put("oldId", oldId);
+            r.put("id", newId);
+            r.put("name", label);
+            r.put("path", writeRoot.relativize(newPath).toString().replace('\\', '/'));
+            r.put("ledgerRowsMoved", ledgerRows);
+            r.put("auditFilesRenamed", auditFiles);
+            r.put("dependentsRewritten", dependents);
+            r.put("findings", findings);
+            r.put("journal", journal);
+            return r;
+        } catch (RuntimeException | IOException ex) {
+            // Same posture as rename's catch: keep the pipeline reachable if its old config survives; the
+            // bracket stays open, so the NEXT resume picks up from here.
+            if (Files.exists(srcPath)) api.service().registerPipeline(srcPath);
+            log.warn("[PIPELINE-RENAME] resume '{}' -> '{}' failed after {}", oldId, newId, journal, ex);
+            throw new ApiException(500, "resume of '" + oldId + "' to '" + newId + "' failed after "
+                    + journal.size() + " step(s) — see server log / rename.journal for detail: " + ex.getMessage());
+        }
+    }
+
+    /** Outcome of {@link #writeRenamedConfig}: on success {@code label} + {@code findings}; on refusal only
+     *  {@code refused} — the 422 (findings included) has already been sent on the exchange. */
+    private record ConfigWrite(String label, List<Finding> findings, Object refused) {}
+
+    /**
+     * Step 6 of the identity migration, shared by {@code rename} and {@code resume}: build the renamed
+     * config from the source file, gate on ERROR findings the rewrite <em>introduces</em> (as in
+     * {@code relabel}: never pre-existing ones — {@code dirs.*} are untouched, so a config whose data lives
+     * outside the default allowed roots was never subject to the write-time policy, and re-punishing it
+     * here would make any such deployment unrenameable), write atomically to {@code newPath}, then delete
+     * the source file.
+     */
+    private ConfigWrite writeRenamedConfig(ApiContext api, HttpExchange e, Path srcPath, Path newPath,
+            String newFileName, String oldId, String newId, String newNameRaw,
+            Path journalFile, List<String> journal) throws IOException {
+        Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
+        String label = (newNameRaw == null || newNameRaw.isBlank())
+                ? String.valueOf(src.getOrDefault("name", oldId)) : newNameRaw.trim();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("name", label);
+        out.put("id", newId);
+        src.forEach((k, v) -> {
+            if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
+        });
+
+        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+        Set<String> preExisting = new HashSet<>();
+        ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(findingKey(f)));
+        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+                .forEach(f -> preExisting.add(findingKey(f)));
+        List<Finding> introduced = findings.stream()
+                .filter(f -> f.severity() == Severity.ERROR)
+                .filter(f -> !preExisting.contains(findingKey(f)))
+                .toList();
+        if (!introduced.isEmpty()) {
+            journalStep(journalFile, oldId, newId,
+                    "refused: renamed config introduces ERROR findings — source restored", journal);
+            api.service().registerPipeline(srcPath);   // the config write never happened — restore visibility
+            return new ConfigWrite(null, null, ApiContext.respondJson(e, 422, Map.of("written", false,
+                    "error", "the renamed config introduces ERROR-level findings; not written",
+                    "findings", introduced, "journal", journal)));
+        }
+        byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
+        AtomicFiles.write(newPath, bytes, ".cfg-");
+        Files.deleteIfExists(srcPath);
+        journalStep(journalFile, oldId, newId, "wrote " + newFileName + "; removed source config", journal);
+        return new ConfigWrite(label, findings, null);
+    }
+
     /** Append one line to {@code <writeRoot>/rename.journal} (plan §3.3) — best-effort; a journal write
      *  failure must never abort a migration step that already succeeded. */
     private void journalStep(Path journalFile, String oldId, String newId, String step, List<String> journal) {
@@ -640,20 +859,23 @@ final class PipelineRoutes implements RouteModule {
      * itself uses to read them, so a rename here is exactly what makes them findable under the new id
      * afterwards. Returns the count of files renamed.
      */
-    private int renameAuditFiles(PipelineConfig oldCfg, String oldId, String newId) throws IOException {
+    private int renameAuditFiles(PipelineConfig cfg, String oldId, String newId) throws IOException {
         int count = 0;
         Path statusParent = null;
-        String commitLogPath = oldCfg.dirs().commitLogPath();
+        String commitLogPath = cfg.dirs().commitLogPath();
         if (commitLogPath != null && !commitLogPath.isBlank()) {
-            Path clp = Path.of(commitLogPath);
-            statusParent = clp.getParent();
-            if (Files.exists(clp)) {
-                Files.move(clp, statusParent.resolve(newId + "_commits.log"));
+            // The commit-log FILE name is derived from oldId, not taken from cfg: commitLogPath is always
+            // <parent>/<pipelineName>_commits.log (PipelineConfigParser), and resume may only have the NEW
+            // config to read dirs from — whose own commitLogPath already carries the new id.
+            statusParent = Path.of(commitLogPath).getParent();
+            Path oldLog = statusParent.resolve(oldId + "_commits.log");
+            if (Files.exists(oldLog)) {
+                Files.move(oldLog, statusParent.resolve(newId + "_commits.log"));
                 count++;
             }
         }
         if (statusParent == null) {
-            String statusFile = oldCfg.dirs().statusFilePath();
+            String statusFile = cfg.dirs().statusFilePath();
             if (statusFile == null || statusFile.isBlank()) return count;
             statusParent = Path.of(statusFile).toAbsolutePath().getParent();
         }

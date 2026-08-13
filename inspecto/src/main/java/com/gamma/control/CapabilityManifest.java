@@ -104,6 +104,7 @@ final class CapabilityManifest {
             new Entry("POST", "/pipelines/([^/]+)/save-as-template", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/label", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/rename", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/pipelines/rename/resume", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/pipelines/authored/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             // QueueRoutes

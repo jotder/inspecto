@@ -101,9 +101,46 @@ three different failure domains; steps 2–7 cannot be wrapped in a single commi
 config write lands *after* the state moves: a crash before it leaves the old config's file in place, so
 the route's `catch` block can re-register it and keep the pipeline reachable — but ledger/audit state
 already moved under earlier steps stays moved (a documented residual risk, not a bug). Every completed
-step is appended to `<writeRoot>/rename.journal` — **evidence for manual reconciliation, not an automated
-resume mechanism.** A retried rename after a partial failure is a fresh call with its own gates; nothing
-reads the journal back.
+step is appended to `<writeRoot>/rename.journal`, and since 2026-08-13 the journal is **read back by
+`POST /pipelines/rename/resume`** (below) — an interrupted migration is finished, not reconciled by hand.
+
+## `resume` — finishing an interrupted migration (shipped 2026-08-13)
+
+`POST /pipelines/rename/resume` closes the failure-posture gap. The journal now **brackets** each
+migration: a `begin` line (written before any state moves, recording the source file name, `newName` and
+`rewriteDependents`) and a `completed` line (after the event emit). A `begin` with no `completed` is an
+incomplete migration, and resume re-runs its remaining steps. Design points worth keeping:
+
+- **Why a plain retry can't heal everything.** Two crash windows defeat it: between `AtomicFiles.write`
+  of the new config and the source delete, both files exist → retry 409s on file-exists; after the source
+  delete but before re-registration, the pipeline is registered under *neither* id → retry 404s. Resume
+  handles both from journal + file state.
+- **The journal supplies discovery + parameters; the file state is truth for the config step.** Resume
+  never step-skips off journal lines (journal writes are best-effort and can be lost) — instead every
+  step is idempotent and simply re-run: the ledger/status-mirror renames match zero rows once moved
+  (verified on both ledger backends), the audit-file glob matches nothing once renamed, and each
+  dependent rewrite checks `equalsIgnoreCase` before touching a file. Only the config write branches on
+  what exists: src-only → full validated write; new-only → skip; both → delete the source; neither → 409,
+  manual reconciliation.
+- **Fail-closed identity checks before touching anything.** A surviving `<newId>_pipeline.toon` must
+  decode with `id == newId` (else 409 — never delete the source under a squatter), the source file must
+  still carry the old identity, and the lifecycle gates re-run (the failed attempt's recovery re-registers
+  the source, which may have been *reactivated or started* since).
+- ⚠ `renameAuditFiles` derives the old commit-log **file name from `oldId`**, taking only the *parent*
+  from the config's `commitLogPath` — because resume may hold only the NEW config, whose own
+  `commitLogPath` already carries the new id (it is parser-derived as `<parent>/<pipelineName>_commits.log`).
+  Trusting the config's file name verbatim would have moved the new log onto itself.
+- **Explicitly operator-invoked, never a startup hook** — an automatic state migration at boot would act
+  without operator intent. Several incomplete migrations → 409 listing them; body `{oldId, newId}` picks
+  one. Migrations journaled before the bracket existed have no recorded parameters and stay
+  manual-reconciliation cases (deliberate). The `PIPELINE_RENAMED` event is at-least-once: a crash between
+  the emit and the `completed` line duplicates it on the next resume — history noise, never state
+  corruption.
+- A 422 findings-refusal now journals a `refused:` line but leaves the bracket **open** — honest, because
+  ledger/audit state moved in steps 2–4 before the refusal; fixing the config and resuming (or re-running
+  rename, whose `completed` closes every open bracket for the pair) completes the half-moved state.
+- No UI or mock surface: resume is an operator/API recovery action; the offline mock has no
+  partial-failure model and must not pretend to (mock never claims work it didn't do).
 
 ## UI wiring (shipped 2026-08-13)
 
@@ -132,4 +169,4 @@ As-built notes worth keeping:
 
 ## Backlog (not built)
 
-- **Automated resumability from `rename.journal`.** Today it is an audit trail an operator reads by hand.
+- Nothing open. ~~Automated resumability from `rename.journal`~~ shipped 2026-08-13 (§ above).
