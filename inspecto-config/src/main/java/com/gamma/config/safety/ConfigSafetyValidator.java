@@ -8,9 +8,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * The hard-fail config safety gate (M5 / v3.5.0; security guardrail R6). A config can pass
@@ -33,6 +37,10 @@ import java.util.Map;
  *       marker — a data-loss footgun the advisory validator only warns about).</li>
  *   <li><b>Output allow-list</b> — {@code output.format} and {@code output.compression} restricted to
  *       known-safe values; DuckLake targets require their connection fields when enabled.</li>
+ *   <li><b>Enrichment references</b> — each {@code references.<name>} entry mirrors the hard-fails
+ *       {@code EnrichmentConfig.fromMap} applies at load ({@code ref} XOR {@code path}, SQL-identifier
+ *       names, ISO {@code as_of} requiring a by-name {@code ref}), so a bad reference is refused at
+ *       the write gate instead of only at registration.</li>
  * </ul>
  *
  * <p>Only the path-bearing config types ({@code pipeline}, {@code enrichment}) have a surface to gate;
@@ -44,6 +52,9 @@ import java.util.Map;
 public final class ConfigSafetyValidator {
 
     private ConfigSafetyValidator() {}
+
+    /** Same rule as the ETL layer's {@code Identifiers.validate} — values interpolated into SQL. */
+    private static final Pattern SQL_IDENTIFIER = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
 
     private static final String[] PIPELINE_DIRS = {
             "dirs.poll", "dirs.database", "dirs.backup", "dirs.temp", "dirs.errors",
@@ -171,12 +182,57 @@ public final class ConfigSafetyValidator {
         Object refs = RawConfig.at(raw, "references");
         if (refs instanceof Map<?, ?> m) {
             for (Map.Entry<?, ?> e : m.entrySet()) {
-                if (e.getValue() instanceof Map<?, ?> ref && ref.get("path") != null) {
-                    checkPathValue("references." + e.getKey() + ".path", ref.get("path").toString(), p, out);
+                if (e.getValue() instanceof Map<?, ?> ref) {
+                    checkReference(String.valueOf(e.getKey()), ref, p, out);
+                } else {
+                    out.add(Finding.error("references." + e.getKey(),
+                            "each references.<name> entry must be a map"));
                 }
             }
         }
         checkOutput(raw, "output.format", "output.compression", p, out);
+    }
+
+    /**
+     * Per-entry gate for one {@code references.<name>} map entry, mirroring the hard-fails
+     * {@code EnrichmentConfig.fromMap} applies at load — so a hand-authored or API-written config with
+     * a bad reference is refused at the write-time 422 gate instead of only failing at registration.
+     * The identifier and {@code as_of} checks are safety-proper: both values are spliced into the
+     * as-of view's SQL downstream.
+     */
+    private static void checkReference(String name, Map<?, ?> ref, SafetyPolicy p, List<Finding> out) {
+        String prefix = "references." + name;
+        if (!SQL_IDENTIFIER.matcher(name).matches()) {
+            out.add(Finding.error(prefix, "reference name '" + name
+                    + "' is not a valid SQL identifier ([A-Za-z_][A-Za-z0-9_]*)"));
+        }
+        Object pathV = ref.get("path");
+        Object refV = ref.get("ref");
+        boolean hasPath = pathV != null && !pathV.toString().isBlank();
+        boolean hasRef = refV != null && !refV.toString().isBlank();
+        if (hasPath == hasRef) {
+            out.add(Finding.error(prefix, prefix + " needs exactly one of 'path' or 'ref'"));
+        }
+        if (hasPath) checkPathValue(prefix + ".path", pathV.toString(), p, out);
+        if (hasRef && !SQL_IDENTIFIER.matcher(refV.toString().trim()).matches()) {
+            out.add(Finding.error(prefix + ".ref", "reference id '" + refV.toString().trim()
+                    + "' is not a valid SQL identifier ([A-Za-z_][A-Za-z0-9_]*)"));
+        }
+        Object asOf = ref.get("as_of");
+        if (asOf != null && !asOf.toString().isBlank()) {
+            String s = asOf.toString().trim();
+            try {
+                if (s.length() == 10) LocalDate.parse(s);
+                else LocalDateTime.parse(s.replace(' ', 'T'));
+            } catch (DateTimeParseException ex) {
+                out.add(Finding.error(prefix + ".as_of", prefix + ".as_of must be an ISO-8601 "
+                        + "date or date-time (2026-07-24 or 2026-07-24T10:00:00), got: '" + s + "'"));
+            }
+            if (!hasRef) {
+                out.add(Finding.error(prefix + ".as_of", prefix
+                        + ".as_of needs a by-name 'ref' — a plain 'path' file carries no version history"));
+            }
+        }
     }
 
     // ── path jail ────────────────────────────────────────────────────────────────────

@@ -178,6 +178,104 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "output.database"), "enrichment output escaping the root must be rejected: " + f);
     }
 
+    // ── enrichment references.<name> entries (mirrors EnrichmentConfig.fromMap's load-time hard-fails) ──
+
+    /** A minimal valid enrichment map under {@code root} with the given references block. */
+    private static Map<String, Object> enrichment(Path root, Map<String, Object> references) {
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("name", "ENR");
+        raw.put("input", new LinkedHashMap<>(Map.of("database", root.resolve("events").toString())));
+        raw.put("output", new LinkedHashMap<>(Map.of(
+                "database", root.resolve("enriched").toString(), "format", "PARQUET")));
+        raw.put("references", references);
+        return raw;
+    }
+
+    @Test
+    void referenceEntriesWithOneOriginEachAreSafe(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("rates", Map.of("ref", "fx_rates", "as_of", "2026-07-24"));
+        refs.put("plans", Map.of("ref", "plans", "as_of", "2026-07-24T10:00:00"));
+        refs.put("lut", Map.of("path", root.resolve("lut.parquet").toString(), "format", "PARQUET"));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(f.isEmpty(), "by-name refs (with both as_of forms) and an under-root path are safe: " + f);
+    }
+
+    @Test
+    void referenceWithBothPathAndRefIsRejected(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("rates", Map.of("ref", "fx_rates", "path", root.resolve("lut.parquet").toString()));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.rates"), "both 'path' and 'ref' must be rejected: " + f);
+    }
+
+    @Test
+    void referenceWithNeitherPathNorRefIsRejected(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("rates", Map.of("format", "PARQUET"));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.rates"), "an entry with neither origin must be rejected: " + f);
+    }
+
+    @Test
+    void referenceIdMustBeSqlIdentifier(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("rates", Map.of("ref", "fx-rates; DROP TABLE x"));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.rates.ref"), "a non-identifier ref must be rejected: " + f);
+    }
+
+    @Test
+    void referenceNameMustBeSqlIdentifier(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("bad name", Map.of("ref", "fx_rates"));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.bad name"), "a non-identifier entry name must be rejected: " + f);
+    }
+
+    @Test
+    void asOfOnPathReferenceIsRejected(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("lut", Map.of("path", root.resolve("lut.parquet").toString(), "as_of", "2026-07-24"));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.lut.as_of"),
+                "as_of on a plain path file must be rejected (no version history): " + f);
+    }
+
+    @Test
+    void malformedAsOfIsRejected(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("rates", Map.of("ref", "fx_rates", "as_of", "1' OR '1'='1"));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.rates.as_of"),
+                "a non-ISO as_of must be rejected (the value reaches SQL): " + f);
+    }
+
+    @Test
+    void nonMapReferenceEntryIsRejected(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("rates", "fx_rates"); // scalar, not a {ref/path,…} map — silently dropped at load
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.rates"), "a scalar entry must be rejected, not dropped: " + f);
+    }
+
+    @Test
+    void referencePathEscapingRootIsRejected(@TempDir Path root) {
+        Map<String, Object> refs = new LinkedHashMap<>();
+        refs.put("lut", Map.of("path", Path.of("/var/exfil/lut.parquet").toAbsolutePath().toString()));
+        List<Finding> f = ConfigSafetyValidator.check("enrichment", enrichment(root, refs),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "references.lut.path"), "a reference path escaping the root must be rejected: " + f);
+    }
+
     @Test
     void nonPathTypesHaveNoSafetySurface(@TempDir Path root) {
         Map<String, Object> job = Map.of("job", Map.of("name", "j", "cron", "0 2 * * *"));

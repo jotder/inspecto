@@ -659,14 +659,21 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     The legacy `ControlApi.main` path is the exposed one — it feeds raw CLI paths to a recursive
     `resolveConfigs` walk with no directory exclusions, so pointing it at a tree containing
     `_templates` now fails loudly instead of double-running `orders`.
-- **`ConfigSpecs.enrichment()` does not spec the `references:` map** (surfaced 2026-08-01 by
-  unification W4b). Per-entry keys (`ref` XOR `path`, `format`, `as_of` — `EnrichmentConfig.fromMap`
-  hard-fails them at LOAD) are validated only in the UI; a hand-authored or API-written config with a
-  bad reference passes `POST /config/write` clean and fails at registration/first run. Close it
-  server-side (fail-closed at write, like every other spec'd shape). The urgency dropped with W4b —
-  both authoring UIs now share ONE validator (`inspecto/enrichment/enrichment-editor.component.ts`)
-  — but API/hand-authored writes remain unchecked. Needs a ConfigSpec map-of-objects notion (the same
-  wall `references` hit when it was first left unspecced).
+- ~~**`ConfigSpecs.enrichment()` does not spec the `references:` map**~~ **CLOSED 2026-08-13 — gated,
+  but NOT via a ConfigSpec.** ⚠ The row's stated prerequisite ("needs a ConfigSpec map-of-objects
+  notion") was a **wrong premise about where the fix belongs**: `FieldSpec`/`ConfigSpec` are
+  flat-dotted-path only (`FieldType.MAP`/`LIST` assert the container type and never walk entries —
+  `ConfigLoader.validate`), and **every** repeated sub-shape in this codebase is already validated by
+  hand-written Java in `ConfigSafetyValidator` instead — `checkSink` (`sinks[]`) is the shipped
+  precedent. The fix follows it: a new `checkReference` per `references.<name>` entry mirroring
+  `EnrichmentConfig.fromMap`'s load-time hard-fails — `ref` XOR `path`, SQL-identifier entry name and
+  `ref`, ISO `as_of` requiring a by-name `ref`, plus the pre-existing path-jail — so the 422 write gate
+  now catches what previously only threw at registration. A **non-map** entry is also an error now,
+  slightly stricter than load (which silently drops it). `format` is deliberately NOT allow-listed
+  per-entry: `fromMap` doesn't validate it either, and inventing a stricter rule at the gate would
+  refuse configs the engine accepts. 9 new adversarial cases in `ConfigSafetyValidatorTest`.
+  Waiting-for: a real map-of-objects notion in the spec layer would subsume both this and `checkSink`;
+  nothing schedules it. → `okf/backend/config/config-safety.md`
 - **AI drafting has no applicable component kind** (created 2026-07-31 by unification W1a, a deliberate
   and recorded feature loss). `component_draft` was offered ONLY on the `component-form.dialog` `schema`
   kind, because of that dialog's kinds only `schema` had a structural `ConfigSpec`. `schema` is no longer a
