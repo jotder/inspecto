@@ -17,7 +17,7 @@ const PIPELINES: RunStatus[] = [
         committedBatches: 120,
         quarantineFiles: 2,
         lastBatchId: 'batch-1000',
-        lastBatchStatus: 'COMMITTED',
+        lastBatchStatus: 'SUCCESS',
         lastBatchTime: '2026-06-30T00:00:00.000Z',
     },
     {

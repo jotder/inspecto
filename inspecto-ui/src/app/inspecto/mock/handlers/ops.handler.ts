@@ -1121,20 +1121,25 @@ function rowsInWindow(rows: Record<string, string>[], window: string, nowMs: num
     if (m[2] === 'b') return rows.slice(0, n); // rows are newest-first already
     const spanMs = n * ({ s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as Record<string, number>)[m[2]];
     const cutoff = nowMs - spanMs;
-    return rows.filter((r) => new Date(r['committed_at']).getTime() >= cutoff);
+    // Ledger timestamps are "yyyy-MM-dd HH:mm:ss" (mock-generated from UTC), end_time falling back
+    // to start_time exactly like AlertService.inWindow.
+    const ts = (r: Record<string, string>): number =>
+        Date.parse(((r['end_time'] || r['start_time']) ?? '').replace(' ', 'T') + 'Z');
+    return rows.filter((r) => ts(r) >= cutoff);
 }
 
 function ledgerMetric(metric: string, rows: Record<string, string>[]): number {
     switch (metric) {
         case 'error_rate': {
-            const totalIn = rows.reduce((s, r) => s + Number(r['input_rows']), 0);
-            const totalOut = rows.reduce((s, r) => s + Number(r['output_rows']), 0);
+            const totalIn = rows.reduce((s, r) => s + Number(r['total_input_rows']), 0);
+            const totalOut = rows.reduce((s, r) => s + Number(r['total_output_rows']), 0);
             return totalIn === 0 ? 0 : 1 - Math.min(totalOut, totalIn) / totalIn;
         }
         case 'failed_batches':
             return rows.filter((r) => r['status'] === 'FAILED').length;
         case 'rejected_files':
-            return rows.reduce((s, r) => s + Number(r['rejected_files']), 0);
+            // the METRIC keeps its name; the ledger COLUMN it sums is rejected_count (AlertService)
+            return rows.reduce((s, r) => s + Number(r['rejected_count']), 0);
         case 'duration_ms':
             return rows.reduce((s, r) => s + Number(r['duration_ms']), 0) / rows.length;
         default:

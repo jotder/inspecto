@@ -52,7 +52,7 @@ const PIPELINE_STATUSES = PIPELINES.map((name, i) => ({
     committedBatches: 120 + i * 37,
     quarantineFiles: i % 3 === 0 ? 2 : 0,
     lastBatchId: `batch-${1000 + i}`,
-    lastBatchStatus: i === 4 ? 'FAILED' : 'COMMITTED',
+    lastBatchStatus: i === 4 ? 'FAILED' : 'SUCCESS',
     lastBatchTime: new Date(NOW - i * 3_600_000).toISOString(),
 }));
 
@@ -343,19 +343,36 @@ const PIPELINE_VIEWS = PIPELINES.map((name, i) => ({
     committedBatches: 120 + i * 37,
 }));
 
-/** One pipeline's committed-batch ledger, newest-first — also the alert-evaluation metric source. */
+/**
+ * One pipeline's batch ledger rows exactly as BatchAuditWriter writes them (header order
+ * consignment_id…cast_failures; mock-never-more-lenient — `input_files`/`input_rows`/`output_rows`/
+ * `rejected_files`/`committed_at` were mock inventions, and `COMMITTED` was never an engine batch
+ * status: IngestOutcome is SUCCESS | EMPTY | FAILED). Newest-first — also the alert-evaluation
+ * metric source (ops.handler mirrors AlertService's column reads over these rows).
+ */
 export function batches(pipeline: string): Record<string, string>[] {
     return Array.from({ length: 25 }, (_, i) => {
-        const ts = NOW - i * 3_600_000;
+        const failed = i % 8 === 0;
+        const durationMs = 800 + ((i * 137) % 6000);
+        const end = NOW - i * 3_600_000;
         return {
             consignment_id: `${pipeline}-b${1000 + i}`,
-            status: i % 8 === 0 ? 'FAILED' : 'COMMITTED',
-            input_files: String(3 + (i % 5)),
-            input_rows: String(1200 + ((i * 311) % 8000)),
-            output_rows: String(1100 + ((i * 293) % 7500)),
-            rejected_files: String(i % 8 === 0 ? 1 : 0),
-            duration_ms: String(800 + ((i * 137) % 6000)),
-            committed_at: new Date(ts).toISOString(),
+            pipeline,
+            schema_name: pipeline,
+            output_table: failed ? '' : pipeline,
+            start_time: ledgerTime(end - durationMs),
+            end_time: ledgerTime(end),
+            status: failed ? 'FAILED' : 'SUCCESS',
+            member_count: String(3 + (i % 5)),
+            rejected_count: String(failed ? 1 : 0),
+            total_input_rows: String(1200 + ((i * 311) % 8000)),
+            total_output_rows: String(failed ? 0 : 1100 + ((i * 293) % 7500)),
+            output_file_count: String(failed ? 0 : 1 + (i % 3)),
+            total_output_bytes: String(failed ? 0 : 250_000 + ((i * 7919) % 400_000)),
+            duration_ms: String(durationMs),
+            error: failed ? 'COPY failed: could not cast column 3 to BIGINT' : '',
+            // -1 = "not measured" is written as a BLANK cell (never 0) — mirror both forms
+            cast_failures: i % 5 === 0 ? '' : String(failed ? 2 : 0),
         };
     });
 }
