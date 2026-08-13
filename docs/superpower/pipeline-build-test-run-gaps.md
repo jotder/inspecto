@@ -251,6 +251,28 @@ containment. A hardlink would also work on one filesystem (moving one link leave
 would avoid the I/O, but it fails across volumes — treat it as a later optimisation behind a fallback,
 never the default.
 
+##### 5a SHIPPED 2026-08-14 — as-built, and one lesson about testing this
+
+`PipelineConfig.forScratchRun(Path)` (the config half) + `PipelineTestRun` (`com.gamma.inspector` — it
+must live there, since `BatchIngestStrategy`, `CsvBatchStrategy`, `StreamingPluginBatchStrategy` and
+`IngestOutcome` are all package-private). Batches come from the real `ConsignmentPlanner.plan` with the
+same `SchemaResolver` idiom `CollectorProcessor` uses, so schema selection is not re-implemented.
+
+`forScratchRun` also nulls the **commit-half** destinations (`backup`, `markers`, status/batches/lineage,
+manifests, commit log) even though the commit half is never called — defence in depth, so a future caller
+that does call it still cannot write to production state. `backup == null` is what makes the source-file
+backup a no-op. Scratch lifecycle is deliberately the **caller's** (`deleteScratch`), because the parsed
+output under the scratch root is what a preview reads back.
+
+⚠ **Lesson — "the file is still there" is a test that can pass for the wrong reason.** The suite's first
+version asserted only that the picked inbox files survived. A falsification probe (make `stage` hand over
+the *original* paths instead of the copies) **did not fail that test**: `QuarantineManager`'s own
+poll-root guard (`:59-61`) threw instead of moving, so the file survived for an entirely unrelated reason
+and the batch merely went `FAILED`. The assertion now also pins the containment **positively** — the
+staged copy must be found quarantined *inside the scratch root*, proving the move happened and landed on
+the copy rather than never happening at all. Re-probed after strengthening: 2 tests fail, including that
+one, for the right reason. **If you touch the staging logic, re-run that probe rather than trusting green.**
+
 **Reusable seams (this does not start from zero):** `BatchIngestStrategy.openTempDb`/`scratchDir`
 (`:308-329`) already resolves a scratch dir from `dirs.temp` / `processing.duckdb.temp_directory`
 **independent of the production `dirs.database` root** — i.e. the row's "must stay scratch-only"
@@ -264,6 +286,13 @@ half **are** separable — confirm that before designing against it.
 - **5a · real files, full graph, no cutoff.** Parse N picked inbox files into a scratch DuckDB and run the
   whole graph, replacing `sampleRows`. Converts "synthetic rows" into "real files" and is the bulk of the
   user value on its own. Settle (c)-vs-(b) here.
+  - **5a-i · the parse half — ✅ SHIPPED 2026-08-14.** `PipelineTestRun.run(cfg, pickedFiles, scratchRoot)`
+    parses real files through the real ingest path with zero production side effects (6 tests, incl. a
+    falsification probe). See the as-built note below.
+  - **5a-ii · feed the parsed rows into the graph — ⬜ NEXT.** Read the scratch outputs back and hand them
+    to `PipelineDryRun.run` in place of its synthetic `sampleRows`, so the existing per-relation counts +
+    sample table (which the UI already renders) are computed from real data. `PipelineTestRun.Result`
+    already returns the scratch `outputs` for exactly this; that is why scratch cleanup is caller-owned.
 - **5b · stop-at-node cutoff.** Thread a target set through the `topoOrder` walk. ⚠ **That walk is shared
   with production `execute`** — add an overload whose default is "no cutoff" so the production path stays
   byte-identical, and pin that with a test. This is the slice most likely to cause a regression far from

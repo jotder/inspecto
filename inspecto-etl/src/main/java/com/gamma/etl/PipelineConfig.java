@@ -1019,28 +1019,46 @@ public final class PipelineConfig {
      * are reused from {@code src}, so re-running a cached config each cycle costs only a few string ops.
      */
     private PipelineConfig(PipelineConfig src, String runTimestamp) {
-        this.identity = new Identity(src.identity.name(), src.identity.pipelineName(), runTimestamp);
+        this(src,
+             new Identity(src.identity.name(), src.identity.pipelineName(), runTimestamp),
+             runTimestampedDirs(src, runTimestamp),
+             src.sinks);
+    }
+
+    /**
+     * The run-timestamped status/batch/lineage/manifest paths for {@link #forNewRun()}. Returns the
+     * source dirs unchanged for a literal {@code status_file} (or when status is disabled) — nothing
+     * is run-timestamped in that case. The commit log is persistent and never re-stamped.
+     */
+    private static Dirs runTimestampedDirs(PipelineConfig src, String runTimestamp) {
         Dirs d = src.dirs;
-        if (src.statusDirToPrepare != null && !src.statusDirToPrepare.isBlank()) {
-            String pn = src.identity.pipelineName();
-            String statusFile = Paths.get(src.statusDirToPrepare,
-                    pn + "_status_" + runTimestamp + ".csv").toString();
-            Path parent = Paths.get(statusFile).toAbsolutePath().getParent();
-            this.dirs = new Dirs(d.poll(), d.database(), d.backup(), d.temp(), d.errors(),
-                    d.quarantine(), d.markers(), d.logDir(),
-                    statusFile,
-                    parent.resolve(pn + "_batches_" + runTimestamp + ".csv").toString(),
-                    parent.resolve(pn + "_lineage_" + runTimestamp + ".csv").toString(),
-                    parent.resolve("manifests").toString(),
-                    d.commitLogPath());   // persistent — never run-timestamped
-        } else {
-            this.dirs = d;   // literal status_file (or status disabled): nothing is run-timestamped
-        }
+        if (src.statusDirToPrepare == null || src.statusDirToPrepare.isBlank()) return d;
+        String pn = src.identity.pipelineName();
+        String statusFile = Paths.get(src.statusDirToPrepare,
+                pn + "_status_" + runTimestamp + ".csv").toString();
+        Path parent = Paths.get(statusFile).toAbsolutePath().getParent();
+        return new Dirs(d.poll(), d.database(), d.backup(), d.temp(), d.errors(),
+                d.quarantine(), d.markers(), d.logDir(),
+                statusFile,
+                parent.resolve(pn + "_batches_" + runTimestamp + ".csv").toString(),
+                parent.resolve(pn + "_lineage_" + runTimestamp + ".csv").toString(),
+                parent.resolve("manifests").toString(),
+                d.commitLogPath());   // persistent — never run-timestamped
+    }
+
+    /**
+     * Clone {@code src} verbatim except for its identity, dirs and sinks — the shared body behind
+     * {@link #forNewRun()} and {@link #forScratchRun(Path)}. Performs <b>no disk I/O</b>: schemas,
+     * grammar and every parsed group are reused by reference.
+     */
+    private PipelineConfig(PipelineConfig src, Identity identity, Dirs dirs, List<Sink> sinks) {
+        this.identity = identity;
+        this.dirs = dirs;
+        this.sinks = sinks;
         this.processing = src.processing;
         this.csv = src.csv;
         this.output = src.output;
-        this.sinks = src.sinks;   // already resolved + validated on the original build
-        this.steps = src.steps;   // ditto — the projection is order-sensitive, never re-derive it here
+        this.steps = src.steps;   // the projection is order-sensitive, never re-derive it here
         this.explicitSteps = src.explicitSteps;
         this.schemas = src.schemas;
         this.duckdb = src.duckdb;
@@ -1075,6 +1093,55 @@ public final class PipelineConfig {
     public PipelineConfig forNewRun() {
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         return new PipelineConfig(this, ts);
+    }
+
+    /**
+     * Return a copy of this config with <b>every filesystem destination re-rooted under
+     * {@code scratchRoot}</b> — the containment half of a bounded test run over real inbox files
+     * (Build→Test→Run Step 5a). Parsing logic, schemas, grammar and transforms are reused verbatim,
+     * so a test run exercises the real ingest code rather than a parallel imitation of it.
+     *
+     * <p>The ingest half touches exactly five dirs — {@code poll}, {@code database}, {@code errors},
+     * {@code quarantine}, {@code temp} — plus each {@link Sink#database()} on a multi-destination
+     * fan-out. All are re-rooted here. ⚠ Re-rooting {@code poll} is <b>not</b> cosmetic: a test run
+     * must be handed <em>copies</em> staged under {@code scratchRoot/poll}, because
+     * {@link QuarantineManager#quarantine} does a {@code Files.move} of the <em>source</em> file for an
+     * unreadable/mismatched/empty member. Point this at the real inbox and testing a malformed file
+     * would delete it from the user's inbox.
+     *
+     * <p>The commit-half destinations ({@code backup}, {@code markers}, the status/batches/lineage CSVs,
+     * manifests, the commit log) are set to {@code null} — <b>defence in depth</b>. A test run reaches
+     * them only by calling {@code BatchProcessor.commit}/{@code writeAudit}, which it must never do; if
+     * some future caller does anyway, {@code null} disables the writes rather than letting them land in
+     * production state. {@code backup == null} in particular is what makes {@code BatchProcessor}'s
+     * source-file backup a no-op.
+     *
+     * <p>⚠ This does <b>not</b> contain the destinations that are resolved from JVM system properties
+     * or per-space registries rather than from a config — the acquisition ledger, the consignment output
+     * registry, file stages, Signals and provenance. Those are avoided <em>by not calling</em> the three
+     * statements that reach them; see the plan's Step 5 section. Config redirection alone is not enough.
+     */
+    public PipelineConfig forScratchRun(Path scratchRoot) {
+        Path root = scratchRoot.toAbsolutePath().normalize();
+        Dirs d = new Dirs(
+                root.resolve("poll").toString(),
+                root.resolve("database").toString(),
+                null,                                    // backup: no source-file move
+                root.resolve("temp").toString(),
+                root.resolve("errors").toString(),
+                root.resolve("quarantine").toString(),
+                null,                                    // markers: no dedup marker writes
+                root.resolve("logs").toString(),
+                null, null, null, null, null);           // status/batches/lineage/manifests/commit-log
+        List<Sink> scratchSinks = new ArrayList<>();
+        for (int i = 0; i < sinks.size(); i++) {
+            Sink s = sinks.get(i);
+            // Distinct subdir per destination so a fan-out's outputs stay distinguishable in the preview.
+            String dbDir = (sinks.size() == 1)
+                    ? d.database() : Paths.get(d.database(), "sink" + i).toString();
+            scratchSinks.add(new Sink(dbDir, s.format(), s.compression(), Map.of()));  // duckLake: never register
+        }
+        return new PipelineConfig(this, identity, d, List.copyOf(scratchSinks));
     }
 
     /**
