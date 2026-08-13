@@ -738,8 +738,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   missing. `hive_partitioning` deliberately stays off — enabling it would add partition columns to every
   existing Dataset, a product decision rather than a bug fix. Pinned by an **executing** mixed-schema
   partition test (two partitions, one predating the column), not a string assertion.
-  ⚠ Noticed, NOT fixed: `DatasetRelation`'s class javadoc documents `{physicalRef, format}` but the code
-  ignores `format` and always reads Parquet. → `okf/backend/engine/db-layer.md`
+  ~~⚠ Noticed, NOT fixed: `DatasetRelation`'s class javadoc documents `{physicalRef, format}` but the code
+  ignores `format` and always reads Parquet.~~ **RESOLVED 2026-08-13 as doc drift, not capability**: no
+  dataset author anywhere (shipped fixtures, Studio's publish pane, `BackupTask`/`MaintenanceJob`/
+  `MaterializeTask` registrars) writes a `format` key — the javadoc now says Parquet-always instead of
+  advertising an option nobody can author. Build CSV support only when a real author needs it.
+  → `okf/backend/engine/db-layer.md`
 - **`SpacesService.reconcile` — ⚠ CONTAINED + INSTRUMENTED 2026-07-28, STILL OPEN, but the search space is
   now CLOSED.** ⚠ **Do not re-run the by-inspection hunt — all four candidate mechanisms in current source
   were positively ELIMINATED 2026-07-28:**

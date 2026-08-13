@@ -17,8 +17,10 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>{@code {view: "<store>"}} — the flow-produced {@link ViewDefinition}'s
  *       {@link ViewDefinition#derivedSql() derived SQL} (which already embeds its physical paths).</li>
- *   <li>{@code {physicalRef: "<store>"[, format]}} — a {@code read_parquet('<dataDir>/<store>/**')} glob
- *       over the space's at-rest data (the same physical layout {@code ViewQuery} reads).</li>
+ *   <li>{@code {physicalRef: "<store>"}} — a {@code read_parquet('<dataDir>/<store>/**')} glob
+ *       over the space's at-rest data (the same physical layout {@code ViewQuery} reads). Always
+ *       Parquet: no dataset author (fixtures, Studio, or the job registrars) writes a {@code format}
+ *       key, so a once-documented option was removed from the doc rather than built.</li>
  * </ul>
  * The returned SQL is <b>trusted</b> (server-built) and is the only place file-reading functions appear —
  * a query's own text is {@code SqlGuard}-checked and can never smuggle one.
