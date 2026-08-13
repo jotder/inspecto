@@ -47,10 +47,11 @@ import static com.gamma.acquire.CollectorConnector.Capability.*;
  * then released by {@link #close()}. {@link #fetchTo} resumes a partial download (the {@link Capability#RESUMABLE}
  * contract); {@link #open} streams directly with no local copy.
  *
- * <p>A {@link ConnectionProfile.Proxy} of type {@code SOCKS5} is honoured (2026-07-20): the connect dials
- * through it via {@link SocksProxySocketFactory}, ignored when an SSH bastion {@link ConnectionProfile.Tunnel}
- * is also configured (the tunnel already rewrites the dial target to a local loopback forward). An {@code HTTP}
- * proxy type is rejected fail-closed — see {@link #applyProxy}.
+ * <p>A {@link ConnectionProfile.Proxy} of type {@code SOCKS5} (2026-07-20) or {@code HTTP} (2026-08-13) is
+ * honoured: the connect dials through it via {@link SocksProxySocketFactory} / {@link HttpProxySocketFactory},
+ * ignored when an SSH bastion {@link ConnectionProfile.Tunnel} is also configured (the tunnel already rewrites
+ * the dial target to a local loopback forward). Any other proxy type is rejected fail-closed — see
+ * {@link #applyProxy}.
  */
 public final class SftpConnector implements CollectorConnector {
 
@@ -244,20 +245,23 @@ public final class SftpConnector implements CollectorConnector {
     /**
      * Route the SSH connect through {@code proxy} (2026-07-20 — the connector-proxy dial-through gap;
      * {@code ConnectionProfile.proxy} was previously parsed/persisted but never consulted by any real
-     * connector). Only {@code SOCKS5} is supported: a plain JDK {@link java.net.Socket} constructed with a
-     * SOCKS {@link java.net.Proxy} transparently tunnels the subsequent {@code connect(host, port)} call,
-     * so {@link SocksProxySocketFactory} needs no protocol handshake of its own. {@code HTTP} is rejected
-     * fail-closed rather than silently ignored — a JDK {@code Socket} can't transparently CONNECT-tunnel
-     * an arbitrary (non-HTTP) protocol the way it can for SOCKS, and this connector has no HTTP CONNECT
-     * handshake implementation (yet).
+     * connector). {@code SOCKS5}: a plain JDK {@link java.net.Socket} constructed with a SOCKS
+     * {@link java.net.Proxy} transparently tunnels the subsequent {@code connect(host, port)} call, so
+     * {@link SocksProxySocketFactory} needs no protocol handshake of its own. {@code HTTP}
+     * (2026-08-13): {@link HttpProxySocketFactory} sends an explicit {@code CONNECT} to the proxy naming
+     * the real target before handing back the socket.
      */
     private void applyProxy(ConnectionProfile.Proxy proxy) throws AcquisitionException {
         String type = proxy.type() == null ? "" : proxy.type().trim().toUpperCase(java.util.Locale.ROOT);
-        if (!"SOCKS5".equals(type)) {
-            throw new AcquisitionException("SFTP connector supports proxy type SOCKS5 only (got '"
+        if ("SOCKS5".equals(type)) {
+            ssh.setSocketFactory(new SocksProxySocketFactory(proxy.host(), proxy.port()));
+        } else if ("HTTP".equals(type)) {
+            ssh.setSocketFactory(new HttpProxySocketFactory(proxy.host(), proxy.port(),
+                    proxy.username(), proxy.password()));
+        } else {
+            throw new AcquisitionException("SFTP connector supports proxy type SOCKS5 or HTTP only (got '"
                     + proxy.type() + "') for profile targeting " + profile.host());
         }
-        ssh.setSocketFactory(new SocksProxySocketFactory(proxy.host(), proxy.port()));
     }
 
     private void authenticate(SSHClient client, String user, String passwordRef) throws IOException {

@@ -223,14 +223,30 @@ class FtpConnectorTest {
     }
 
     @Test
-    void httpProxyTypeIsRejectedFailClosedNotSilentlyIgnored() throws Exception {
+    @Timeout(30)   // a broken tunnel would otherwise block on an FTP data connection indefinitely
+    void dialsThroughAnHttpConnectProxyToTheRealFtpServer() throws Exception {
+        Files.writeString(serverRoot.resolve("a.csv"), "ID\n1\n");
+        try (MiniHttpConnectRelay relay = MiniHttpConnectRelay.start()) {
+            ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("HTTP", "127.0.0.1", relay.port(), null, null);
+            try (CollectorConnector c = new FtpConnector(profileWithProxy(proxy), null)) {
+                assertEquals(1, c.discover(anyCsv()).size(),
+                        "FTP works when the control connection is routed through the HTTP CONNECT proxy");
+            }
+            assertEquals("127.0.0.1:" + port, relay.firstConnectTarget(2000),
+                    "the proxy relayed the control-connection CONNECT to the real FTP server, proving the tunnel was used");
+        }
+    }
+
+    @Test
+    void anUnknownProxyTypeIsRejectedFailClosedNotSilentlyIgnored() throws Exception {
         // A nonsense proxy host — if this were silently ignored (direct connect) the assertion below would
         // still pass by connecting straight to the real server, masking the bug. Asserting fail-fast, not
-        // "still works", is the point: an HTTP proxy dial-through isn't implemented and must say so loudly.
-        ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("HTTP", "127.0.0.1", 1, null, null);
+        // "still works", is the point: an unsupported proxy dial-through must say so loudly.
+        ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("SOCKS4", "127.0.0.1", 1, null, null);
         try (CollectorConnector c = new FtpConnector(profileWithProxy(proxy), null)) {
             AcquisitionException ex = assertThrows(AcquisitionException.class, () -> c.discover(anyCsv()));
-            assertTrue(ex.getMessage().contains("SOCKS5"), "rejection explains only SOCKS5 is supported: " + ex.getMessage());
+            assertTrue(ex.getMessage().contains("SOCKS5") && ex.getMessage().contains("HTTP"),
+                    "rejection names the supported types: " + ex.getMessage());
         }
     }
 }

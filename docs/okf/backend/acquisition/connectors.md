@@ -115,16 +115,29 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
   sshj's `SocketClient.connect(host, port)` already calls `socketFactory.createSocket()` then
   `socket.connect(target, timeout)` on the result, so a plain JDK socket built on a SOCKS `Proxy` tunnels
   transparently with no protocol handshake of our own); ignored when an SSH bastion `tunnel` is also
-  configured (the tunnel already rewrites the dial target to a local loopback forward). `HTTP` proxy type
-  is rejected fail-closed for SFTP — a JDK socket can't transparently CONNECT-tunnel an arbitrary protocol
-  the way it can for SOCKS, so this needs its own handshake, not yet built. **2026-07-24 SHIPPED FTP/FTPS
-  dial-through too:** `FtpConnector.applyProxy` calls the same `SocksProxySocketFactory` via commons-net's
-  `FTPClient.setSocketFactory` — same SOCKS5-only / HTTP-fail-closed contract, same tunnel-precedence rule,
-  and it covers both `ftp` and `ftps` schemes since they share one client class (FTPS just layers TLS on
-  top of the already-proxied socket). Test-only note: FTP opens a *second*, separate passive data connection
-  through the same factory (unlike SFTP, which multiplexes everything over one), so the shared test fixture
-  `MiniSocks5Relay` had to become multi-connection to avoid hanging on the data channel. **Still not dialing
-  through any proxy:** the JDBC-based connectors (proxying is driver-URL-param territory, not a uniform hook).
+  configured (the tunnel already rewrites the dial target to a local loopback forward). **2026-07-24 SHIPPED
+  FTP/FTPS dial-through too:** `FtpConnector.applyProxy` calls the same `SocksProxySocketFactory` via
+  commons-net's `FTPClient.setSocketFactory` — same tunnel-precedence rule, and it covers both `ftp` and
+  `ftps` schemes since they share one client class (FTPS just layers TLS on top of the already-proxied
+  socket). Test-only note: FTP opens a *second*, separate passive data connection through the same factory
+  (unlike SFTP, which multiplexes everything over one), so the shared test fixture `MiniSocks5Relay` had to
+  become multi-connection to avoid hanging on the data channel.
+* **2026-08-13 SHIPPED the `HTTP` proxy type for both connectors** — previously rejected fail-closed because
+  a JDK socket can't transparently CONNECT-tunnel an arbitrary protocol the way it can for SOCKS. The
+  handshake now exists as `HttpProxySocketFactory`: dial the proxy, send `CONNECT host:port HTTP/1.1` naming
+  the real target (plus `Proxy-Authorization: Basic` when the profile carries proxy credentials), require a
+  `200` status, drain the response headers, then hand the raw socket over — sshj/commons-net layer SSH or
+  FTP/FTPS on top exactly as on a direct connection. ⚠ **The redirect must live in the socket's own
+  `connect()`, not in the factory's connecting overloads** — sshj takes the *unconnected* socket from the
+  no-arg `createSocket()` and calls `connect(target)` on it itself, so a factory that only tunnelled in
+  `createSocket(host, port)` is silently bypassed and dials the target **directly**. The first
+  implementation did exactly that and the tests caught it: `discover()` still returned the right file (the
+  direct connect worked) while the relay recorded no CONNECT at all. Hence the inner `TunnellingSocket`
+  overriding both `connect` arities. Test double: `MiniHttpConnectRelay`, mirroring `MiniSocks5Relay`
+  (multi-connection for the same FTP data-channel reason) and additionally recording the auth header.
+  An unrecognised proxy `type` is still rejected fail-closed, now naming both supported types. **Still not
+  dialing through any proxy:** the JDBC-based connectors (proxying is driver-URL-param territory, not a
+  uniform hook).
 * **Secrets are never literals** — `SecretResolver` (`com/gamma/acquire/SecretResolver.java`) resolves
   `${ENV:VAR}` / `${SYS:prop}` / `${FILE:/path}` / `${KEYSTORE:alias}` / `${NAME}` at connect time, never at
   load; `isResolvable()` powers the test endpoint without exposing values. `${FILE:…}` reads a mounted secret

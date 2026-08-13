@@ -446,15 +446,43 @@ class SftpConnectorTest {
     }
 
     @Test
-    void httpProxyTypeIsRejectedFailClosedNotSilentlyIgnored() throws Exception {
+    void dialsThroughAnHttpConnectProxyToTheRealSftpServer() throws Exception {
+        Files.writeString(serverRoot.resolve("a.csv"), "ID\n1\n");
+        try (MiniHttpConnectRelay relay = MiniHttpConnectRelay.start()) {
+            ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("HTTP", "127.0.0.1", relay.port(), null, null);
+            try (CollectorConnector c = new SftpConnector(profileWithProxy(proxy), null)) {
+                assertEquals(1, c.discover(anyCsv()).size(), "SFTP works when routed through the HTTP CONNECT proxy");
+            }
+            assertEquals("127.0.0.1:" + port, relay.firstConnectTarget(2000),
+                    "the proxy actually relayed a CONNECT to the real SFTP server, proving the tunnel was used");
+        }
+    }
+
+    @Test
+    void anHttpProxyWithCredentialsSendsProxyAuthorization() throws Exception {
+        Files.writeString(serverRoot.resolve("a.csv"), "ID\n1\n");
+        try (MiniHttpConnectRelay relay = MiniHttpConnectRelay.start()) {
+            ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("HTTP", "127.0.0.1", relay.port(), "pu", "pp");
+            try (CollectorConnector c = new SftpConnector(profileWithProxy(proxy), null)) {
+                assertEquals(1, c.discover(anyCsv()).size());
+            }
+            relay.firstConnectTarget(2000);
+            assertEquals("Basic " + java.util.Base64.getEncoder().encodeToString("pu:pp".getBytes()),
+                    relay.firstAuthorization(), "proxy credentials travel as HTTP Basic on the CONNECT");
+        }
+    }
+
+    @Test
+    void anUnknownProxyTypeIsRejectedFailClosedNotSilentlyIgnored() throws Exception {
         // A nonsense proxy host — if this were silently ignored (direct connect) the assertion below would
         // still pass by connecting straight to the real server, masking the bug. Asserting fail-fast, not
-        // "still works", is the point: an HTTP proxy dial-through isn't implemented and must say so loudly.
-        ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("HTTP", "127.0.0.1", 1, null, null);
+        // "still works", is the point: an unsupported proxy dial-through must say so loudly.
+        ConnectionProfile.Proxy proxy = new ConnectionProfile.Proxy("SOCKS4", "127.0.0.1", 1, null, null);
         CollectorConnector c = new SftpConnector(profileWithProxy(proxy), null);
         try {
             AcquisitionException ex = assertThrows(AcquisitionException.class, () -> c.discover(anyCsv()));
-            assertTrue(ex.getMessage().contains("SOCKS5"), "rejection explains only SOCKS5 is supported: " + ex.getMessage());
+            assertTrue(ex.getMessage().contains("SOCKS5") && ex.getMessage().contains("HTTP"),
+                    "rejection names the supported types: " + ex.getMessage());
         } finally {
             c.close();
         }
