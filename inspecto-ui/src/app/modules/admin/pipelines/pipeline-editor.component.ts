@@ -56,6 +56,8 @@ import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
+import { PipelineSettingsDialog } from './pipeline-settings.dialog';
+import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
@@ -1097,6 +1099,31 @@ export class PipelineEditorComponent implements OnInit {
                     error: (err) => this.onWriteError(err, 'Change id failed'),
                 });
             });
+    }
+
+    /**
+     * D8 (pipeline-graph backlog): edit the pipeline-level `produces`/`reference` block. Opaque to
+     * {@link PipelineGraph} — this dialog has its own read/write pair rather than riding through
+     * `PUT .../graph`.
+     */
+    pipelineSettings(): void {
+        const id = this.selectedId();
+        if (!id) return;
+        this.api.settings(id).subscribe({
+            next: (settings) => {
+                this.dialog
+                    .open(PipelineSettingsDialog, { width: '32rem', data: { id, settings } })
+                    .afterClosed()
+                    .subscribe((res?: PipelineSettings) => {
+                        if (!res) return;
+                        this.api.saveSettings(id, res).subscribe({
+                            next: () => this.toast.success('Pipeline settings saved'),
+                            error: (err) => this.onWriteError(err, 'Save settings failed'),
+                        });
+                    });
+            },
+            error: (err) => this.toast.error(apiErrorMessage(err, 'Could not load pipeline settings')),
+        });
     }
 
     async deletePipeline(): Promise<void> {

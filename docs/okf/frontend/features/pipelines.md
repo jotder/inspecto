@@ -423,3 +423,19 @@ advertise a vocabulary the compiler refuses. Consequences worth carrying:
   `branch()`) now pass `null` instead of the hand-written label; `stepLabel(kind)` returns `null` for
   every chain-step kind except `filter`, whose legacy "Row filter" name is kept because it differs from
   the type's own "Filter" label and is a real (more specific) name. See [BACKLOG](../../../BACKLOG.md) §4.
+
+### D8 shipped: pipeline settings, a surface independent of the graph editor (2026-08-13)
+
+The `key_columns`/`mode: 'upsert'` renaming this file's earlier section pointed at (**A key with zero
+readers may be MISNAMED, not phantom**, above) is now built: **"Settings…"** in the pipeline editor's ⋮
+menu opens `PipelineSettingsDialog` (produces select; when `reference`, a load-mode select, a
+comma-separated key field, and refresh-seconds). It talks to a dedicated `GET`/`POST
+/pipelines/{name}/settings` pair — **not** `PUT .../graph` — because `produces`/`reference` are
+pipeline-level, and `PipelineEditable` deliberately never models non-node keys (§ above, "Node config
+specs are SERVED"). Full design + backend detail in
+[pipeline-graph-design.md §17](../../backend/pipeline-graph/pipeline-graph-design.md#17-pipeline-level-settings--a-dedicated-surface-for-what-the-graph-editor-never-models-2026-08-13).
+
+A plain reactive form, not `<inspecto-schema-form>`: `reference.key` is server-specced as `FieldType.LIST`,
+and `fieldSpecsToAttributes`'s `TYPE_MAP` (see "Node config specs are SERVED" above) still deliberately
+skips served `LIST` — unchanged by this work, so a hand-built form was the smaller, honest choice over
+half-wiring generic list rendering for one field.

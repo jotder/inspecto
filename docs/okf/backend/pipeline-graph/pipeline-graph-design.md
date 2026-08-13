@@ -1274,7 +1274,41 @@ refusals so the offline preview cannot pass a topology the server 422s.*
 
 ---
 
-**Last Updated**: 2026-08-01 (§16 — W5 editable round-trip)
+## 17. Pipeline-level settings — a dedicated surface for what the graph editor never models (2026-08-13)
+
+The `produces`/`reference` block (`produces: stream|reference`; `reference: {load, key, refresh_seconds}`)
+is a **pipeline-level** property, not a node's — it names what the whole pipeline outputs (an ordinary
+Stream, or a versioned Reference dataset other pipelines' enrichments can bind to by name), and
+`PipelineEditable` deliberately never models it: §16's "keys the graph does not model … travel through a
+save untouched" already covered it as opaque passthrough, but that meant it had **no write path at all**
+outside hand-editing the `.toon` file, since there is no node to put a pipeline-level property on.
+
+Rather than teach `PipelineEditable`/`PUT .../graph` about a non-node key (which would blur the "the flat
+graph editor authors topology" boundary §16 draws), this got its own dedicated pair:
+[`PipelineRoutes.pipelineSettings`/`savePipelineSettings`](../../../../inspecto/src/main/java/com/gamma/control/PipelineRoutes.java)
+(`GET`/`POST /pipelines/{name}/settings`) read/write `produces`/`reference` straight off the config file,
+independent of the graph route. `savePipelineSettings` mirrors `relabel`'s gate: the full `ConfigSpecs.pipeline()`
++ `ConfigSafetyValidator` check runs, but only findings the write **itself introduces** (not ones already
+present in the on-disk file) block it — a config already on disk was never subjected to the write-time
+safety policy, so re-punishing it here would make most real deployments' pipelines un-settable. The
+pre-existing `ConfigSpecs.pipeline()` cross-field rule (`reference-upsert-requires-key`) already enforced
+`load: upsert|scd2` needing a non-empty `key` — no backend validation gap needed closing.
+
+The Angular side is a plain reactive-form dialog (`PipelineSettingsDialog`, opened from the pipeline
+editor's ⋮ menu → "Settings…"), not `<inspecto-schema-form>` — `reference.key` is a `FieldType.LIST` and
+`fieldSpecsToAttributes`'s `TYPE_MAP` still deliberately skips served `LIST` (unchanged here; its only
+other driver remains `transform.route`'s `branches`).
+
+*Verified: `ControlApiPipelineSettingsTest` (5, real HTTP round-trip via `V1Body.of` envelope unwrapping —
+absent block reads as the parser's own `stream` default, a valid reference block persists and reads back,
+`upsert` with no key is refused with the on-disk file untouched, clearing a saved block restores the
+default) + `CapabilityManifestTest` drift guard; full `inspecto` reactor 746/0/0. UI: `PipelineSettingsDialog`
+spec 6/6, production build clean, no regression in `pipeline-editor.component.spec.ts` (50/50).*
+
+---
+
+**Last Updated**: 2026-08-13 (§17 — pipeline settings surface)
+**Earlier**: 2026-08-01 (§16 — W5 editable round-trip)
 **Status**: design finalised (decisions §9, boundaries §12); **reviewed 2026-06-16 against the engine — corrections
 + re-scoping in §13, implementation checklist in §14; pipeline-vs-job execution model formalised 2026-06-17 in §3.8
 (R6 / T23–T25).** **Phase 1 (Flow IR + legacy lift) is BUILT and green** (T1/T2/T3/T4/T5a done; full inspecto suite

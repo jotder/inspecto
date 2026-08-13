@@ -289,6 +289,30 @@ export interface PipelineRenameResult {
     dependentsRewritten: number;
 }
 
+/** A pipeline's `reference:` block (D8) — set only when `produces` is `'reference'`. */
+export interface PipelineReferenceSettings {
+    load: 'replace' | 'upsert' | 'scd2';
+    key?: string[];
+    refresh_seconds?: number;
+}
+
+/**
+ * The pipeline-level `produces`/`reference` block (D8, pipeline-graph backlog). Opaque passthrough to
+ * the graph editor — {@link PipelineGraph} never carries it — so it has its own dedicated read/write
+ * pair instead of riding through `PUT .../graph`.
+ */
+export interface PipelineSettings {
+    produces: 'stream' | 'reference';
+    reference: PipelineReferenceSettings | null;
+}
+
+export interface PipelineSettingsResult {
+    written: boolean;
+    path: string;
+    produces: string;
+    reference: PipelineReferenceSettings | null;
+}
+
 /** Read-only pipeline-graph projection + authored-pipeline CRUD/dry-run for the editor (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class PipelinesService {
@@ -402,6 +426,19 @@ export class PipelinesService {
             ...(opts.newName ? { newName: opts.newName } : {}),
             ...(opts.rewriteDependents === false ? { rewriteDependents: false } : {}),
         });
+    }
+
+    /** The pipeline-level `produces`/`reference` block, read straight off the config file (D8). */
+    settings(name: string): Observable<PipelineSettings> {
+        return this.http.get<PipelineSettings>(apiUrl(`/pipelines/${encodeURIComponent(name)}/settings`));
+    }
+
+    /** Write the `produces`/`reference` block. `reference: null` clears a previously-saved one. */
+    saveSettings(name: string, settings: PipelineSettings): Observable<PipelineSettingsResult> {
+        return this.http.post<PipelineSettingsResult>(
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/settings`),
+            settings,
+        );
     }
 
     // ── authored-pipeline CRUD + dry-run (editor; all writes 503 without -Dassist.write.root) ──

@@ -90,6 +90,12 @@ final class PipelineRoutes implements RouteModule {
                 (e, m) -> saveAsTemplate(api, e, ApiContext.name(m), api.body(e))));
         api.post("/pipelines/([^/]+)/label", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> relabel(api, e, ApiContext.name(m), api.body(e))));
+        // D8 (pipeline-graph backlog): the pipeline-level produces/reference block is opaque
+        // passthrough to the graph editor (PipelineEditable never models it) — this pair of
+        // routes is its own dedicated authoring surface, independent of PUT .../graph.
+        api.get("/pipelines/([^/]+)/settings", (e, m) -> pipelineSettings(api, ApiContext.name(m)));
+        api.post("/pipelines/([^/]+)/settings", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> savePipelineSettings(api, e, ApiContext.name(m), api.body(e))));
         // T3: the full identity migration `label` deliberately doesn't do — see `rename`'s javadoc.
         api.post("/pipelines/([^/]+)/rename", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> rename(api, e, ApiContext.name(m), api.body(e))));
@@ -461,6 +467,69 @@ final class PipelineRoutes implements RouteModule {
         r.put("id", id);
         r.put("name", label);
         r.put("stampedId", stampedId);
+        r.put("findings", findings);
+        return r;
+    }
+
+    /**
+     * {@code GET /pipelines/{name}/settings} — the pipeline-level {@code produces}/{@code reference}
+     * block, read straight off the config file rather than through {@link PipelineEditable}, which
+     * never models it (D8, pipeline-graph backlog). {@code produces} defaults to {@code "stream"}
+     * (the parser's own default) so a config that omits the key round-trips as an explicit choice.
+     */
+    private Object pipelineSettings(ApiContext api, String name) throws IOException {
+        Path srcPath = api.service().pathFor(name)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+        Map<String, Object> raw = ConfigLoader.filesystem().decode(srcPath.toString());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("produces", raw.getOrDefault("produces", "stream"));
+        out.put("reference", raw.get("reference"));
+        return out;
+    }
+
+    /**
+     * {@code POST /pipelines/{name}/settings} — write the {@code produces}/{@code reference} block.
+     * Mirrors {@link #relabel}'s gate order and "only ERROR findings the write itself introduces
+     * block it" policy, since this route also edits an on-disk config that was never subjected to the
+     * write-time safety gate. {@code reference}, if given, REPLACES the block wholesale — there is no
+     * partial-field patch, so a caller wanting to keep {@code refresh_seconds} must resend it.
+     */
+    private Object savePipelineSettings(ApiContext api, HttpExchange e, String name, Map<String, Object> body)
+            throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
+        Path srcPath = api.service().pathFor(name)
+                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+        WriteGates.jail(writeRoot, srcPath, "config path");
+
+        Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
+        Map<String, Object> out = new LinkedHashMap<>(src);
+        if (body.containsKey("produces")) out.put("produces", body.get("produces"));
+        if (body.containsKey("reference")) out.put("reference", body.get("reference"));
+
+        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+        Set<String> preExisting = new HashSet<>();
+        ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(findingKey(f)));
+        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+                .forEach(f -> preExisting.add(findingKey(f)));
+        List<Finding> introduced = findings.stream()
+                .filter(f -> f.severity() == Severity.ERROR)
+                .filter(f -> !preExisting.contains(findingKey(f)))
+                .toList();
+        if (!introduced.isEmpty())
+            return ApiContext.respondJson(e, 422, Map.of("written", false,
+                    "error", "the new settings introduce ERROR-level findings; not written",
+                    "findings", introduced));
+
+        byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
+        AtomicFiles.write(srcPath, bytes, ".cfg-");
+        log.info("[PIPELINE-SETTINGS] pipeline '{}' produces/reference block updated", name);
+
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("written", true);
+        r.put("path", writeRoot.relativize(srcPath).toString().replace('\\', '/'));
+        r.put("produces", out.getOrDefault("produces", "stream"));
+        r.put("reference", out.get("reference"));
         r.put("findings", findings);
         return r;
     }

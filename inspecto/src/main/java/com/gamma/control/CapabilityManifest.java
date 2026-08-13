@@ -103,6 +103,7 @@ final class CapabilityManifest {
             new Entry("PUT", "/pipelines/([^/]+)/graph", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/save-as-template", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/label", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/pipelines/([^/]+)/settings", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/([^/]+)/rename", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/rename/resume", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/pipelines/authored/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
