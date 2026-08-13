@@ -197,18 +197,59 @@ premises) — **this one is accurate; do not spend another shift re-scoping it.*
 ⚠ **The hard part is NOT reading the files — it is suppressing the ingest path's side effects.** The real
 path (`BatchProcessor` / `BatchIngestStrategy`) does not merely parse: it writes the file-status and batch
 ledgers, moves/consumes inbox files, writes to `dirs.database`, and emits events. **A test run must do none
-of these**, and a test run that does even one of them is worse than no feature at all. Three ways to get
-that, in descending order of preference:
+of these**, and a test run that does even one of them is worse than no feature at all.
 
-- **(c) Isolation by construction — RECOMMENDED.** Run the real path against a config whose every output
-  path is redirected to scratch. Mirrors the 2026-08-13 launcher lesson (derive it so the rule holds *by
-  construction* rather than by a flag someone can forget). **Prerequisite to verify first: that every
-  side-effecting destination is redirectable by config** — `dirs.database`, the ledgers, the event sink,
-  and inbox consumption. If any one is not, this degrades to (b).
-- **(b) Extract the pure parse step** (file → rows) and skip `BatchProcessor` entirely. Safer than (a),
-  but risks duplicating the CSV-builtin vs plugin-ingester dispatch — extract, do not copy.
-- **(a) Thread a `dry`/`scratch` boolean through the ingest path — ⛔ AVOID.** One missed branch means a
-  *test* run mutates production state. This is the trap; do not take it because it looks smallest.
+##### ✅ DECIDED 2026-08-14 — approach, and why the drafted options were both wrong
+
+The three drafted options were **(a)** thread a `dry` boolean ⛔, **(b)** extract a pure parse step, **(c)**
+redirect every output path by config. Grounding the ingest path retired all three in favour of a fourth
+that is strictly safer, because **the separation already exists structurally and needs no new code at all**:
+
+**The side effects are not interleaved with the parse — they are three separate statements after it.**
+`BatchProcessor.process` (`:51-87`) is exactly: `strategy.ingest(batch, cfg)` (`:58`), then
+`commit` (`:70`), then `writeAudit` (`:82`), then `recordProvenance` (`:86`). **Call the first and stop.**
+
+That single decision disposes of every destination that is *not* config-derived — and there are four,
+which is precisely why option (c) as drafted would **not** have been airtight:
+
+| Not config-derived | Resolved by | Lives in |
+|---|---|---|
+| `AcquisitionLedgers` (dedup fingerprint + DB-export watermark) | `-Dacquire.ledger.backend` / `.db.url` | `finalizeSource` (inside `commit`) |
+| `ConsignmentOutputStores.record` | `-Dconsignment.outputs.backend`, per-space registry | `finalizeSource` |
+| `FileStages.record` | `-Dfile.stages.backend`, per-space registry | `finalizeSource` |
+| `PipelineBatchSignal::emit` | ambient `EventLog.current()` (space MDC, not the config) | `writeAudit` |
+| `ProvenanceStores.record` | process-wide registry | `recordProvenance` |
+
+**All five live inside the three statements we do not call.** So they are avoided by the call graph, not by
+a flag and not by config redirection — nothing can forget to set them.
+
+⚠ **But the ingest half is NOT side-effect-free on its own — one thing bites, and config redirection alone
+does not fix it.** `CsvBatchStrategy` calls `QuarantineManager.quarantine` (`:109,117,131`) for an
+unreadable / field-mismatched / empty member, and that does
+**`Files.move(inputFile, …, REPLACE_EXISTING)`** on the **real inbox file**
+(`QuarantineManager.java:69`). Its *destination* is `dirs.quarantine` and so is redirectable — but the
+**source** is the user's actual file, so redirecting the destination just moves their file somewhere else.
+**A test run over a malformed file would make that file vanish from the inbox** — the single worst outcome
+this feature could have, and the one a "just point the dirs at scratch" reading would have shipped.
+
+**⇒ The design is two structural containments, both by construction:**
+
+1. **Call-graph containment** — invoke `strategy.ingest(batch, cfg)` only; never `commit` / `writeAudit` /
+   `recordProvenance`. Kills all five non-config-derived destinations above.
+2. **Filesystem containment** — **copy the picked files into a scratch poll dir** and point the config's
+   `dirs` at a scratch tree. The quarantine move then can only ever touch our copy. The ingest half
+   touches exactly **five** dirs — verified by enumeration, a closed set:
+   `poll` · `database` · `errors` · `quarantine` · `temp` — plus each `cfg.sinks()[i].database()` on
+   fan-out. Redirect all of them.
+
+Neither containment relies on the other, which is the point: a mistake in one is still caught by the other.
+Note also that constructing the `Batch` directly bypasses `CollectorProcessor.ingest` entirely, so the
+dedup/marker layer (`MarkerManager`, `ledgerFilter`) never runs either.
+
+⚠ **Do not "optimise" the copy in step 2 into a move or a bare path hand-off.** The copy *is* the
+containment. A hardlink would also work on one filesystem (moving one link leaves the other intact) and
+would avoid the I/O, but it fails across volumes — treat it as a later optimisation behind a fallback,
+never the default.
 
 **Reusable seams (this does not start from zero):** `BatchIngestStrategy.openTempDb`/`scratchDir`
 (`:308-329`) already resolves a scratch dir from `dirs.temp` / `processing.duckdb.temp_directory`
