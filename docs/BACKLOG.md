@@ -446,10 +446,13 @@ pipeline whether or not it already has an explicit `id` — (c) above is moot no
   Files/Quarantine rows now spell every field as the server does — this also surfaced that Quarantine
   rows carry no `consignment_id` at all, so Lineage/Reprocess now correctly hide there (`c86a1917`,
   `fba2e9e1`/PR #6). (c) the Batches tab now explains, only when a `FAILED` row is present, that its
-  files retry automatically on the next poll (`a427cdac`). **New residual found while fixing (b):** the
-  mock's **batches** rows still say `status: 'COMMITTED'`, a value the engine never writes (real values
-  are exactly `SUCCESS`/`EMPTY`/`FAILED`, `IngestOutcome`) — same drift class as (b), tracked separately
-  (in flight as a background session at handoff time).
+  files retry automatically on the next poll (`a427cdac`). The residual found while fixing (b) — the
+  mock's **batches** rows saying `status: 'COMMITTED'`, a value the engine never writes — is **also now
+  SHIPPED 2026-08-13** (`de781124`, merged to master `c726365e`): `batches()` returns the real
+  `BatchAuditWriter` header verbatim (`consignment_id…cast_failures`), status is exactly
+  `SUCCESS`/`FAILED` (mock never emits `EMPTY`), and `ops.handler`'s alert-evaluation math
+  (`rowsInWindow`/`ledgerMetric`) was updated to read the real column names. Pinned in
+  `demo.handler.spec.ts`. Consignment-chain program has no open items left in this section.
 
 **Security module.** The RBAC/ABAC plan is **COMPLETE** (R0–R5 + A1–A5); the plan was archived and the
 durable as-builts now live in **`okf/backend/editions/auth-security.md`** — read them there, not the

@@ -46,5 +46,11 @@ further needed. The all-`SUCCESS` case renders no banner.
 ⚠ **The offline mock must mirror the server's exact row shapes** (`inspecto/mock/handlers/demo.handler.ts`) —
 this was drifted before 2026-08-13 (invented `file_name`/`quarantined_at`/`PROCESSED` spellings that also made
 the offline Files tab always show "0 Succeeded"), pinned now in `demo.handler.spec.ts`. The mock's **batches**
-rows still use an invented `COMMITTED` status the engine never writes (real values: `SUCCESS`/`EMPTY`/`FAILED`)
-— tracked as an open residual, same drift class.
+rows had the same drift class (invented `status: 'COMMITTED'`, `input_files`/`input_rows`/`output_rows`/
+`rejected_files`/`committed_at` columns) — also fixed 2026-08-13 (`de781124`): `batches()` now returns the
+real `BatchAuditWriter` header verbatim (`consignment_id, pipeline, schema_name, output_table, start_time,
+end_time, status, member_count, rejected_count, total_input_rows, total_output_rows, output_file_count,
+total_output_bytes, duration_ms, error, cast_failures`), status is `SUCCESS`/`FAILED` (the mock never
+generates `EMPTY`), `cast_failures` of `-1` ("not measured") is written blank not as `"-1"`, and
+`ops.handler`'s alert-evaluation math (`rowsInWindow`/`ledgerMetric`) reads the same real column names
+`AlertService` does. Pinned in `demo.handler.spec.ts`. No open residual remains in this area.
