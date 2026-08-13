@@ -22,7 +22,8 @@ import {
     PipelinesService,
 } from 'app/inspecto/api';
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
-import { AttributeSpec, KEY_SEP, flattenBlock, mergeBlock, nestKeys } from 'app/inspecto/component-model';
+import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
+import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
@@ -352,8 +353,7 @@ export class NodeConfigDialog {
      * the file already had.
      */
     readonly isAcquisition = this.data.node.type === 'acquisition';
-    /** `use: connection/<name>` prefix — the one place the binding's shape is spelled. */
-    private static readonly CONNECTION_REF = 'connection/';
+    // The `use: connection/<name>` prefix is spelled once, in `node-config-build.ts` (CONNECTION_REF).
     /** The node's stored `connector`, so the shared component can grandfather a hand-authored one. */
     readonly storedConnector = String(this.data.node.config?.['connector'] ?? '');
 
@@ -408,35 +408,13 @@ export class NodeConfigDialog {
             description: n.description ?? '',
             use: n.use ?? '',
         });
-        // Split the stored config: schema-known keys seed the schema-form; the rest become free-form rows.
-        //
-        // ⚠ Spec keys are FLAT (`__` = nesting) while the stored config is NESTED, so the split has to
-        // compare FLATTENED keys. Comparing raw top-level keys meant a real `duplicate: {mode: …}` block
-        // matched no spec, fell into the free-form editor as a JSON *string*, and then — free-form being
-        // applied last in `save()` — overwrote the schema form's own nested value. D4, load half.
-        const schemaKeys = new Set(this.specs().map((s) => s.key));
-        for (const [key, value] of Object.entries(flattenBlock(n.config))) {
-            if (schemaKeys.has(key)) this.schemaInitial[key] = value;
-        }
-        // An acquisition node's Connection lives on `use:`, never in cfg (see isAcquisition), so it is
-        // seeded from there — the loop above can never find it.
-        if (this.isAcquisition && (n.use ?? '').startsWith(NodeConfigDialog.CONNECTION_REF)) {
-            this.schemaInitial['connection'] = n.use!.slice(NodeConfigDialog.CONNECTION_REF.length);
-        }
-        // A top-level key is schema-owned when a spec names it or names a leaf beneath it (`duplicate` is
-        // owned by `duplicate__mode`). Owned roots are seeded above and must NOT also appear as free-form
-        // rows; sub-keys the schema does not model survive via the merge in `save()`.
-        const ownsRoot = (root: string): boolean =>
-            schemaKeys.has(root) || this.specs().some((s) => s.key.startsWith(root + KEY_SEP));
-        let extraKeys = 0;
-        for (const [key, value] of Object.entries(n.config ?? {})) {
-            if (ownsRoot(key)) continue;
-            // `connector` is DERIVED, never asked (see storedConnector) — a free-form row for it would
-            // be a second control writing a field the save already computes, and free-form wins last.
-            if (this.isAcquisition && key === 'connector') continue;
-            this.configRows.push(this.configRow(key, typeof value === 'string' ? value : JSON.stringify(value)));
-            extraKeys++;
-        }
+        // Split the stored config: schema-known keys seed the schema-form; the rest become free-form
+        // rows. The subtle parts (flat-vs-nested key comparison, the `use:` Connection seed, the
+        // derived-connector skip) live in `splitNodeConfig` — shared with the definition drawer.
+        const split = splitNodeConfig(n, this.specs(), this.isAcquisition);
+        Object.assign(this.schemaInitial, split.schemaInitial);
+        for (const row of split.extraRows) this.configRows.push(this.configRow(row.key, row.value));
+        const extraKeys = split.extraRows.length;
         // Show the free-form editor up front only when it's the primary surface or already carries
         // keys. For an enrichment node the primary surface is the shared editor (W4b), so free-form
         // only opens when legacy keys are actually present.
@@ -570,67 +548,20 @@ export class NodeConfigDialog {
         const connector = this.isAcquisition ? this.collector?.resolveConnector() ?? null : null;
         if (this.isAcquisition && !connector) return;
         const v = this.form.getRawValue();
-        const config: Record<string, unknown> = {};
-        // Schema-driven values first (numbers coerced per spec), then free-form rows for keys outside it.
-        //
-        // ⚠ Spec keys are FLAT — `__` means nesting (`AttributeSpec.key` convention, `flat-keys.ts`) — so
-        // they MUST go through `nestKeys` before they reach `node.config`. The flat pipeline's `collector:`
-        // block reads `duplicate`, `stability` and `post_action` as nested MAPS
-        // (`PipelineConfigParser.java:450,459,518`), so a literal `duplicate__mode` key is read by nothing.
-        // See `docs/okf/frontend/features/pipelines.md` (recorded as D4 in the archived plan); the enrichment branch
-        // below (`:496`) and every onboarding pane already did this — only the generic save was missing it.
-        // `nestKeys` also splits the LIST_KEYS (`include`/`exclude`) comma-string into a list, which is the
-        // shape the seeds use and which `PipelineConfigParser.strList` prefers (it accepts either).
-        if (configForm) {
-            const values = configForm.value();
-            const flat: Record<string, unknown> = {};
-            for (const s of this.specs()) {
-                let val = values[s.key];
-                if (s.type === 'number') val = val === '' || val == null ? null : Number(val);
-                // A cleared list is blank, not `[]` — otherwise clearing every chip writes an empty
-                // array the engine would read as "a list is configured" instead of dropping the key.
-                if (s.type === 'list' && Array.isArray(val) && val.length === 0) val = null;
-                if (val !== '' && val != null) flat[s.key] = val;
-            }
-            // Deep-merge each nested root over what the node already had, so sub-keys the schema does not
-            // model survive a guided save — `duplicate.algorithm`, `stability.size_checks`/`ready_marker`/
-            // `exclude_temp_patterns`, `post_action.tags`/`on_unsupported` are all real, engine-read keys
-            // with no AttributeSpec (`PipelineConfigParser.java:449-470,516-527`). Same guarantee the
-            // enrichment branch gives. A root the form cleared entirely is absent from `nestKeys` output and
-            // so is dropped, which keeps delete-on-clear working at root granularity.
-            const plain = (x: unknown): x is Record<string, unknown> =>
-                x !== null && typeof x === 'object' && !Array.isArray(x);
-            const prior = this.data.node.config ?? {};
-            for (const [root, val] of Object.entries(nestKeys(flat))) {
-                config[root] = plain(val) && plain(prior[root]) ? mergeBlock(prior[root], val) : val;
-            }
-        }
-        // Free-form rows stay LITERAL — a hand-typed key means exactly what was typed (this is the escape
-        // hatch for keys outside the schema), and it keeps overriding the schema as it did before.
-        for (const row of v.config as { key: string; value: string }[]) {
-            if (row.key && row.key.trim()) config[row.key.trim()] = row.value;
-        }
-        // An acquisition node's Connection is a binding: move it off cfg (where lower strips it) onto
-        // `use: connection/<name>`, which is where the engine reads it from. Clearing it clears the
-        // binding. See isAcquisition for why this is not a `bindKind`.
-        let use = v.use?.trim() || undefined;
-        if (this.isAcquisition) {
-            const picked = String(config['connection'] ?? '').trim();
-            delete config['connection'];
-            use = picked ? NodeConfigDialog.CONNECTION_REF + picked : undefined;
-            // The derived connector is written LAST so it beats a stale value the file already had —
-            // `CollectorConnectors.forConfig` dispatches on it and never checks it agrees with the
-            // Connection it is handed, so the two must be decided in one place.
-            config['connector'] = connector;
-        }
-        const node: AuthoredNode = {
-            id: this.data.node.id,
-            type: this.data.node.type,
-            name: v.name?.trim() || undefined,
-            description: v.description?.trim() || undefined,
-            use,
-            config: Object.keys(config).length ? config : undefined,
-        };
+        // The assembly — nest-then-merge over the prior config, literal free-form rows last, the
+        // acquisition Connection→`use:` move — is `buildConfiguredNode`, shared with the definition
+        // drawer (see `node-config-build.ts` for the D4 nesting + unmodeled-sub-key rationale).
+        const node = buildConfiguredNode({
+            node: this.data.node,
+            specs: this.specs(),
+            formValues: configForm ? configForm.value() : null,
+            freeRows: v.config as { key: string; value: string }[],
+            name: v.name ?? undefined,
+            description: v.description ?? undefined,
+            use: v.use ?? undefined,
+            isAcquisition: this.isAcquisition,
+            connector,
+        });
         this.ref.close({ node });
     }
 

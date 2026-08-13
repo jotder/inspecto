@@ -122,6 +122,78 @@ describe('PipelineEditorComponent', () => {
     });
 
     /**
+     * Definition-surface P1: the collector path opens in the right-dock definition drawer, never in
+     * a popup — the first slice of the one-host plan. Every other kind keeps its dialog for now.
+     */
+    describe('definition drawer (collector path)', () => {
+        it('routes an acquisition node to the drawer, not a dialog', async () => {
+            const c = make();
+            c.select('demo');
+            await c.openDefinition(c.model()!.nodes[0]);
+            c.openNodeConfig(c.model()!.nodes[0]); // the double-click path lands in the same place
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(c.definitionNode()?.id).toBe('src');
+            expect(c.rightTab()).toBe('properties');
+            expect(c.inspectorOpen()).toBe(true);
+        });
+
+        it('keeps the dialog for every other node kind', () => {
+            const c = make();
+            c.select('demo');
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            c.openNodeConfig(c.model()!.nodes[1]); // transform.filter
+            expect(dialog.open).toHaveBeenCalled();
+            expect(c.definitionNode()).toBeNull();
+        });
+
+        it('an applied definition patches the model in memory and never persists (D2)', async () => {
+            const c = make();
+            c.select('demo');
+            await c.openDefinition(c.model()!.nodes[0]);
+            c.onDefinitionApplied({ id: 'src', type: 'acquisition', config: { connector: 'local' } });
+            expect(c.model()!.nodes.find((n) => n.id === 'src')!.config).toEqual({ connector: 'local' });
+            expect(c.dirty()).toBe(true);
+            expect(api.savePipelineGraph).not.toHaveBeenCalled();
+            expect(c.definitionDirty()).toBe(false); // Apply consumed the edits; the drawer stays open
+            expect(c.definitionNode()?.config).toEqual({ connector: 'local' });
+        });
+
+        it('discard recreates the pane (epoch bump) and clears the dirty flag', async () => {
+            const c = make();
+            c.select('demo');
+            await c.openDefinition(c.model()!.nodes[0]);
+            const before = c.definitionEpoch();
+            c.definitionDirty.set(true);
+            c.discardDefinition();
+            expect(c.definitionEpoch()).toBe(before + 1);
+            expect(c.definitionDirty()).toBe(false);
+        });
+
+        it('switching tabs guards unapplied drawer edits and closes the drawer', async () => {
+            const confirm = TestBed.inject(InspectoConfirmService) as unknown as {
+                confirmDestructive: ReturnType<typeof vi.fn>;
+            };
+            const c = make();
+            c.select('demo');
+            api.pipelineGraphRaw.mockReturnValue(of({ name: 'other', active: false, nodes: [], edges: [] }));
+            c.select('other');
+            await c.activateTab('demo');
+            await c.openDefinition(c.model()!.nodes[0]);
+            c.definitionDirty.set(true);
+
+            confirm.confirmDestructive.mockResolvedValueOnce(false);
+            await c.activateTab('other');
+            expect(c.selectedId()).toBe('demo'); // refused — nothing moved
+            expect(c.definitionNode()).not.toBeNull();
+
+            confirm.confirmDestructive.mockResolvedValueOnce(true);
+            await c.activateTab('other');
+            expect(c.selectedId()).toBe('other');
+            expect(c.definitionNode()).toBeNull();
+        });
+    });
+
+    /**
      * The Pipeline Document export (ELT amendment §5.1, S6a). What matters here is that the sign-off
      * fingerprint actually reaches the operator, and that a READ failing never latches the editor into
      * the writes-disabled state a WRITE failure sets — they take different error paths for that reason.

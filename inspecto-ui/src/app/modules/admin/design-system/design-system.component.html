@@ -281,6 +281,48 @@
             <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.dialogResize }}</code></pre>
         </section>
 
+        <!-- ── Definition drawer (definition-surface P1) ─────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Definition drawer</h2>
+                <button mat-stroked-button (click)="copy(snippets.definitionDrawer)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-definition-drawer&gt;</code>
+                (<code>inspecto/components/definition-drawer.component.ts</code>) — the shared shell for
+                defining one pipeline object in an editor's right dock: title + kind header, an
+                <em>unapplied</em> badge, projected definition content, and an Apply/Discard footer.
+                <b>Apply is always an in-memory patch</b> — persistence belongs to the host's toolbar Save
+                (one save path, definition-surface D2). A dirty close confirms first; the shell owns that
+                guard. Non-modal by design: it is a dock resized by the host's
+                <code>[inspectoSplit]</code> handle, never an overlay. Adopter: the Pipelines editor's
+                Collector definition.
+            </p>
+            <div class="bg-card rounded-2xl p-6 shadow">
+                <div class="h-72 max-w-sm overflow-hidden rounded-lg border" style="border-color: var(--gamma-border)">
+                    <inspecto-definition-drawer
+                        title="sftp inbox"
+                        kindLabel="Collector"
+                        icon="heroicons_outline:inbox-arrow-down"
+                        [dirty]="drawerDemoDirty()"
+                        (apply)="drawerDemoDirty.set(false)"
+                        (discard)="drawerDemoDirty.set(false)"
+                    >
+                        <p class="text-secondary text-sm">
+                            The host projects the definition pane here. Toggle the demo's dirty state:
+                        </p>
+                        <button class="mt-2" mat-stroked-button (click)="drawerDemoDirty.set(!drawerDemoDirty())">
+                            {{ drawerDemoDirty() ? 'Mark clean' : 'Edit something' }}
+                        </button>
+                    </inspecto-definition-drawer>
+                </div>
+            </div>
+            <pre class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"><code>{{ snippets.definitionDrawer }}</code></pre>
+        </section>
+
         <!-- ── Inline AI assist (AGT-6a A1) ──────────────────────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">

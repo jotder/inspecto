@@ -486,9 +486,34 @@
                         id="pipe-panel-right"
                         role="tabpanel"
                         [attr.aria-labelledby]="rightTab() === 'properties' ? 'pipe-tab-properties' : 'pipe-tab-assist'"
-                        class="min-h-0 flex-1 overflow-y-auto p-3"
+                        class="min-h-0 flex-1 overflow-y-auto"
+                        [class.p-3]="!(rightTab() === 'properties' && definitionNode())"
                     >
-                        @if (rightTab() === 'properties') {
+                        @if (rightTab() === 'properties' && definitionNode(); as dn) {
+                            <!-- Definition drawer (definition-surface P1): the collector path is DEFINED
+                                 here in the dock, not in a popup. Apply is an in-memory patch (D2);
+                                 Discard recreates the pane from the model (the @for tracks the epoch,
+                                 so bumping it is the recreation). -->
+                            @for (epoch of [definitionEpoch()]; track epoch) {
+                                <inspecto-definition-drawer
+                                    class="block h-full"
+                                    [title]="dn.name || dn.id"
+                                    kindLabel="Collector"
+                                    icon="heroicons_outline:inbox-arrow-down"
+                                    [dirty]="definitionDirty()"
+                                    (apply)="applyDefinition()"
+                                    (discard)="discardDefinition()"
+                                    (closed)="closeDefinition()"
+                                >
+                                    <app-pipeline-collection-definition
+                                        [node]="dn"
+                                        [attributes]="definitionAttributes()"
+                                        (applied)="onDefinitionApplied($event)"
+                                        (dirtyChange)="definitionDirty.set($event)"
+                                    />
+                                </inspecto-definition-drawer>
+                            }
+                        } @else if (rightTab() === 'properties') {
                             <div>
                                 <app-pipeline-inspector
                                     [node]="selectedNode()"

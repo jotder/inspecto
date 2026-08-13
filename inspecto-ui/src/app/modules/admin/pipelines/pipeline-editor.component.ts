@@ -39,6 +39,7 @@ import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
@@ -50,6 +51,7 @@ import { PipelinePaletteComponent } from './pipeline-palette.component';
 import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.component';
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
+import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
@@ -125,6 +127,8 @@ import {
         MatMenuModule,
         MatTooltipModule,
         InspectoAlertComponent,
+        DefinitionDrawerComponent,
+        PipelineCollectionDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
@@ -278,6 +282,24 @@ export class PipelineEditorComponent implements OnInit {
     readonly paletteOpen = signal(true);
     /** Which surface the right dock shows: the selection's properties, or the AI authoring surfaces. */
     readonly rightTab = signal<'properties' | 'assist'>('properties');
+
+    // ── definition drawer (definition-surface P1 — collector path only for now) ────────────────────
+    /** The node open for DEFINITION in the right-dock drawer (null = drawer closed, inspector shows). */
+    readonly definitionNode = signal<AuthoredNode | null>(null);
+    /**
+     * Bumped to recreate the drawer's content pane. Discard = recreate-from-model rather than an
+     * in-place reset, so the shared collector surface's mode/seed state is trivially correct.
+     */
+    readonly definitionEpoch = signal(0);
+    /** Unapplied edits inside the drawer — reported by the pane, drives the badge + close guards. */
+    readonly definitionDirty = signal(false);
+    @ViewChild(PipelineCollectionDefinitionComponent) private definitionPane?: PipelineCollectionDefinitionComponent;
+
+    /** Served specs for the drawer's node type (`undefined` until the catalog resolves — the pane falls back). */
+    definitionAttributes(): AttributeSpec[] | undefined {
+        const n = this.definitionNode();
+        return n ? this.typeAttributes().get(n.type) : undefined;
+    }
     /** Hover preview: the node under the cursor + its viewport position (null when not hovering). */
     readonly hoverTip = signal<{
         name: string;
@@ -654,8 +676,18 @@ export class PipelineEditorComponent implements OnInit {
      * Make an already-open tab the active one, parking the outgoing tab's graph and dirty flag.
      * Named `activateTab`, not `activate` — {@link activate} already means "arm this pipeline to run".
      */
-    activateTab(id: string): void {
+    async activateTab(id: string): Promise<void> {
         if (this.selectedId() === id) return;
+        // The definition drawer's edits live outside the parked graph — switching away loses them,
+        // so it gets the same courtesy the model's dirty flag gets.
+        if (this.definitionDirty()) {
+            const ok = await this.confirm.confirmDestructive(
+                'The open definition has edits that have not been applied. Switching tabs discards them.',
+                { title: 'Discard unapplied edits?', confirmText: 'Discard' },
+            );
+            if (!ok) return;
+        }
+        this.closeDefinition();
         this.parkCurrent();
         this.clearSelection();
         const cached = this.cachedModels.get(id);
@@ -671,7 +703,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Close one tab. A dirty tab asks first — this is the only path that can discard edits. */
     async closeTab(id: string): Promise<void> {
-        if (this.dirtyIds().has(id)) {
+        if (this.dirtyIds().has(id) || (id === this.selectedId() && this.definitionDirty())) {
             const ok = await this.confirm.confirmDestructive(
                 `'${id}' has edits that have not been saved. Closing the tab discards them.`,
                 { title: 'Discard unsaved changes?', confirmText: 'Discard' },
@@ -697,6 +729,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** No active tab — the empty canvas state. */
     private clearActive(): void {
+        this.closeDefinition();
         this.clearSelection();
         this.selectedId.set(null);
         this.model.set(null);
@@ -717,7 +750,10 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Fetch and open a pipeline's graph, adding a tab for it if it is not already open. */
     select(id: string): void {
-        if (this.selectedId() !== id) this.parkCurrent();
+        if (this.selectedId() !== id) {
+            this.parkCurrent();
+            this.closeDefinition(); // the drawer's node belongs to the outgoing graph
+        }
         this.clearSelection();
         if (!this.openIds().includes(id)) this.openIds.update((ids) => [...ids, id]);
         // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
@@ -1046,6 +1082,13 @@ export class PipelineEditorComponent implements OnInit {
 
     openNodeConfig(node: AuthoredNode): void {
         if (!this.canAuthor()) return; // read-only (Business lens or View mode): no-op — double-click/Configure can't mutate
+        // Definition-surface P1: the collector path opens in the right-dock definition drawer, not a
+        // popup — the first slice of the one-host plan. Every other kind keeps its dialog until its
+        // own slice lands (P3a–P3d, P4).
+        if (node.type === 'acquisition') {
+            void this.openDefinition(node);
+            return;
+        }
         const category = this.typeCategory(node.type);
         // Parse nodes get THE shared Grammar editor; every other category uses the generic config popup.
         const ref =
@@ -1071,6 +1114,49 @@ export class PipelineEditorComponent implements OnInit {
         ref.afterClosed().subscribe((res?: NodeConfigResult) => {
             if (res?.node) this.applyNodePatch(res.node);
         });
+    }
+
+    // ── definition drawer lifecycle (definition-surface P1) ────────────────────────────────────────
+
+    /** Open a node for definition in the right dock, guarding another node's unapplied edits. */
+    async openDefinition(node: AuthoredNode): Promise<void> {
+        const open = this.definitionNode();
+        if (open && open.id !== node.id && this.definitionDirty()) {
+            const ok = await this.confirm.confirmDestructive(
+                `'${open.id}' has edits that have not been applied. Opening another definition discards them.`,
+                { title: 'Discard unapplied edits?', confirmText: 'Discard' },
+            );
+            if (!ok) return;
+        }
+        this.definitionNode.set(node);
+        this.definitionEpoch.update((e) => e + 1);
+        this.definitionDirty.set(false);
+        this.rightTab.set('properties');
+        this.inspectorOpen.set(true);
+    }
+
+    /** Drawer Apply: ask the pane to rebuild the node (it emits `applied` → {@link onDefinitionApplied}). */
+    applyDefinition(): void {
+        this.definitionPane?.submit();
+    }
+
+    /** The pane's rebuilt node — an in-memory patch (D2), persisted only by the toolbar Save. */
+    onDefinitionApplied(node: AuthoredNode): void {
+        this.applyNodePatch(node);
+        this.definitionNode.set(node);
+        this.definitionDirty.set(false);
+    }
+
+    /** Drawer Discard: recreate the pane from the model — the epoch is what the `@for` tracks. */
+    discardDefinition(): void {
+        this.definitionEpoch.update((e) => e + 1);
+        this.definitionDirty.set(false);
+    }
+
+    /** Close the drawer (the shell already dirty-confirmed); the inspector summary returns. */
+    closeDefinition(): void {
+        this.definitionNode.set(null);
+        this.definitionDirty.set(false);
     }
 
     /** Preview a `sink.view` node's data: bounded rows from its captured `derived_sql` (T32 follow-up). */

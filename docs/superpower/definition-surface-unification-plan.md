@@ -1,6 +1,6 @@
 # Definition-Surface Unification — ONE way to define a pipeline
 
-**Status: DRAFT for discussion — nothing scheduled.** Owner: UI + engine. Created 2026-08-13.
+**Status: ACCEPTED — P0 complete 2026-08-13 (all §11 questions resolved by operator).** Owner: UI + engine. Created 2026-08-13.
 
 ---
 
@@ -322,8 +322,8 @@ written together by the host.
 
 | Phase | Scope | Verify |
 |---|---|---|
-| **P0 — decisions** | Pin D1–D5 with the operator; record reversal-of-W5 rationale. | This doc updated to ACCEPTED; open questions §11 resolved. |
-| **P1 — drawer shell** | `<inspecto-definition-drawer>` in the design system + gallery + axe spec; editor right dock hosts it; **collector path only** (smallest node kind) rendered inside, dialogs untouched elsewhere. | Editor opens Collection drawer; Apply patches node in memory; existing `node-config.dialog` specs for collector path re-pinned on the drawer; GAUNTLET green. |
+| **P0 — decisions** ✅ | Pin D1–D5 with the operator; record reversal-of-W5 rationale. | **DONE 2026-08-13** — doc ACCEPTED; §11 all resolved (dock+maximize, chips-only, run-to-here deferred, hard redirect). |
+| **P1 — drawer shell** ✅ | `<inspecto-definition-drawer>` in the design system + gallery + axe spec; editor right dock hosts it; **collector path only** (smallest node kind) rendered inside, dialogs untouched elsewhere. | **DONE 2026-08-13.** Drawer opens in the dock (preview-verified on `cdr_ingest`); Apply = in-memory patch; the dialog's split/build logic extracted to `node-config-build.ts` (shared, not copied); collector dialog specs re-pinned on `pipeline-collection-definition.component`; UI gate green (2308 passed / 5 skipped). |
 | **P2 — pure-pane refactor** | Panes lose `OnboardingStateService` injection → `@Input`/`@Output`; `DefinitionStateService` (sample thread only) lands; wizard temporarily *hosts* the pure panes so both surfaces run the same components during transition. | All five pane specs pass against the pure contract; wizard still fully functional. |
 | **P3a — Delimited parser** | First per-format slice, end to end: `parser.delimited` node type (engine + node-types publish + lift/lower of existing `frontend: delimited` configs), palette icon, Parse drawer with grammar-as-properties + output schema + sample rail + parsed `tier="pro"` table; `grammar-editor.dialog`'s delimited path retired. Covers 75%+ of real data. | A delimited stream defined entirely from the editor; legacy `frontend: delimited` configs lift into the new node and lower back byte-identical; parse preview + SQL-over-sample work; contract tests updated. |
 | **P3b — Fixed length** | Same pattern, isolated: `parser.fixedwidth` node + `{name, start, length}` grammar table + drawer. Nothing outside fixed-width handling is touched. | Fixed-width stream end-to-end; delimited slice unaffected (regression suite). |
@@ -337,20 +337,19 @@ written together by the host.
 Ordering rationale: P1–P3 are pure-UI and reversible; P4–P5 need the backend items; P6 is the only
 destructive step and comes last, after both surfaces have run on identical components for several phases.
 
-## 11. Open questions for the discussion
+## 11. Open questions — ALL RESOLVED 2026-08-13 (operator)
 
-1. **Drawer vs widened right dock**: §5.1 draws the drawer *as* the right dock (persistent, resizable via
-   `[inspectoSplit]`). The alternative is a floating slide-over (dashboard-drill style) that overlays the
-   canvas. Dock keeps the graph visible; slide-over gives more width for the schema grid. Recommendation: dock,
-   with a maximize toggle.
-2. **Guided mode depth**: are checklist chips + finding counts enough to replace the wizard's lifecycle
-   ("first open stage", resume position), or do we keep a "next suggested step" affordance?
+1. **Drawer vs widened right dock — RESOLVED: right dock + maximize toggle.** The drawer replaces the
+   right-dock Properties content (persistent, resizable via `[inspectoSplit]`); a maximize toggle covers
+   wide grids (schema/Load). Not a floating slide-over.
+2. **Guided mode depth — RESOLVED: chips only.** Checklist chips + finding counts; no "next suggested
+   step" affordance, no wizard lifecycle/resume state carried over.
 3. ~~Mapping expressions~~ **RESOLVED 2026-08-13 (§4b-C)**: the expression column is read-write in P4,
    backed by the existing `transformType: EXPR` (verbatim DuckDB scalar, author-owned validity).
-4. **`run-to-here` is still mock-only** (`PipelineRoutes.java:77` reserved). Does "test while defining" in this
-   plan justify pulling its backend forward, or does dry-run + previews cover the bar for now?
-5. **Wizard deprecation window**: hard redirect in P6, or keep the wizard read-only for one release behind a
-   flag for operator comfort?
+4. **`run-to-here` — RESOLVED: deferred.** Dry-run + previews cover "test while defining"; the
+   run-to-here backend (`PipelineRoutes.java:77` reserved) stays a separate future item, not this plan.
+5. **Wizard deprecation — RESOLVED: hard redirect in P6.** No read-only flag release; by P6 both
+   surfaces will have run identical components for several phases.
 
 ---
 

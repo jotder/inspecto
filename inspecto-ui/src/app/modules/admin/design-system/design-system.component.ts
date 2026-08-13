@@ -12,6 +12,7 @@ import { ColDef, GridApi } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
@@ -64,6 +65,7 @@ interface DemoRow {
         AgGridAngular,
         StatusBadgeComponent,
         InspectoAlertComponent,
+        DefinitionDrawerComponent,
         ChipComponent,
         InspectoEmptyStateComponent,
         InspectoSchemaFormComponent,
@@ -261,6 +263,10 @@ export class DesignSystemComponent {
         this.dialog.open(ResizeDemoDialog, { width: '32rem' });
     }
 
+    // ── Definition drawer (definition-surface P1) ────────────────────────────────────────────
+    /** Demo-only dirty flag — a real host derives this from its definition pane. */
+    readonly drawerDemoDirty = signal(false);
+
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {
         badge: `<inspecto-status-badge [value]="event.level" />\n// in an ag-Grid cellRenderer:\ncellRenderer: (p) => statusBadgeHtml(p.value)`,
@@ -275,6 +281,7 @@ export class DesignSystemComponent {
         aiExplain: `<!-- the read-only half — one icon button for a pane header (AGT-6a A4) -->\n<!-- the PANE declares the terms; nothing is typed, nothing is inferred -->\n<inspecto-ai-explain\n  screen="Pipelines"                       // reads as "About Pipelines" in the title + aria-label\n  [terms]="['Pipeline', 'Step', 'Trigger']" />  // canonical GLOSSARY.md spellings, never synonyms\n// No draft, no diff, no Apply — there is no write path at all, so this is NOT\n// gated on canAuthorWorkbench: a Business-lens user is who needs it most.\n// glossary_lookup, falling back to docs_search; a 503 explains itself.`,
         dataTable: `<!-- one component, four tiers; logic lives in inspecto/data-table/{core,sql} + inspecto/query -->\n<!-- standard: icon toolbar (columns · search · export) -->\n<!-- pro: + a CodeMirror SQL editor (runs offline via AlaSQL) + filter builder -->\n<!-- proMax: + "save as rule" (parameterized :fieldValue template) -->\n<inspecto-data-table\n  [tier]="'pro'"                 // 'mini' | 'standard' | 'pro' | 'proMax'\n  [rows]="rows"\n  [columns]="columnDefs"         // optional; omitted ⇒ one column per row key\n  [rowActions]="actions"\n  sourceName="cdr"\n  (rowClick)="open($event)"\n  (ruleSaved)="onRuleSaved($event)" />  // pro max`,
         mapView: `<!-- offline MapLibre host (bundled Natural Earth basemap, no network) -->\n<inspecto-map-view\n  [data]="geoData"          // GeoData { points, routes }; null ⇒ unmounted (show an empty state)\n  [fill]="true"             // grow into a flex column (default: 62vh page band)\n  (pointClick)="open($event)" />\n// colours live in theme/map-tokens.ts (the map's chart-tokens analog)`,
+        definitionDrawer: `<!-- the shared definition shell for an editor's right dock (definition-surface D1/D2) -->\n<inspecto-definition-drawer\n  [title]="node.name || node.id"\n  kindLabel="Collector"\n  icon="heroicons_outline:inbox-arrow-down"\n  [dirty]="paneDirty()"          // reported by the projected pane\n  (apply)="pane.submit()"         // Apply = in-memory patch — the toolbar Save persists (D2)\n  (discard)="recreatePane()"      // Discard = recreate the pane from the model\n  (closed)="closeDrawer()">       // dirty close already confirmed by the shell\n  <app-my-definition-pane [node]="node" (applied)="applyPatch($event)" (dirtyChange)="paneDirty.set($event)" />\n</inspecto-definition-drawer>`,
         dialogResize: `<!-- shared resizable/maximizable dialog chrome (inspecto/components/dialog-resize.directive.ts) -->\n<!-- the attribute goes on the dialog title; the drag grip is appended automatically -->\n<h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">\n  <span class="min-w-0 truncate">Edit Grammar · {{ node.id }}</span>\n  <span class="flex-1"></span>\n  <!-- big dialogs add a maximize button; it reuses the .dialog-fullscreen panel class -->\n  <button mat-icon-button type="button" (click)="chrome.toggleMaximize()"\n          [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'">\n    <mat-icon [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in'\n                                            : 'heroicons_outline:arrows-pointing-out'" />\n  </button>\n</h2>\n// panel styles live in styles.scss (.inspecto-dialog-resizable); outside a dialog the directive is inert`,
         menuFavorites: `// personal, client-local overlay — never PUT to the server (inspecto/menu/menu-favorites.ts)\n// storage key: inspecto.menuFavorites.v1, keyed by space id\nfavIds = signal<Set<string>>(loadForSpace());\ntoggleFavorite(id): void { /* mutate the set, persist to localStorage */ }\n\n<!-- a star toggle on each leaf row (aria-pressed, mirrors the sql-editor favorites idiom) -->\n<button [attr.aria-pressed]="isFav(id)" (click)="toggleFavorite(id)"\n        [attr.aria-label]="isFav(id) ? 'Unfavorite' : 'Favorite'">\n  <mat-icon [svgIcon]="isFav(id) ? 'heroicons_solid:star' : 'heroicons_outline:star'" />\n</button>\n\n// a virtual top-of-sidebar "Favorites" group (favoritesNavGroup in menu-nav.ts), prepended in\n// NavigationService: resolves ids against the current tree, drops stale/deleted, re-ids fav-<id>.`,
     };
