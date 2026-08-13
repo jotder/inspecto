@@ -3,9 +3,9 @@
 # Working directory must be the sandbox root (the directory containing this script).
 set -euo pipefail
 cd "$(dirname "$0")"
-jar=$(ls -1 inspecto/target/file-processor-*.jar 2>/dev/null | head -n1)
+jar=$(ls -1 inspecto/target/inspecto-processor-*.jar 2>/dev/null | head -n1)
 if [[ -z "${jar:-}" ]]; then
-  echo "ERROR: no JAR found matching inspecto/target/file-processor-*.jar" >&2
+  echo "ERROR: no JAR found matching inspecto/target/inspecto-processor-*.jar" >&2
   echo "       Run 'mvn clean package' first." >&2
   exit 1
 fi

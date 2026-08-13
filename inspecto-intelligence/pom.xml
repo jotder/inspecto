@@ -35,7 +35,7 @@
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- S9: no longer depends on file-processor-agent. The pack's ModelProfile + LlmGateway are built
+        <!-- S9: no longer depends on inspecto-agent. The pack's ModelProfile + LlmGateway are built
              from the core-owned read-side model settings (com.gamma.model.ModelSettings/ModelSettingsStore),
              which read the same assist-settings.properties the agent module's settings screen writes — so
              operators still configure one model provider, without a sibling-internal compile edge. -->

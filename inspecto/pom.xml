@@ -12,9 +12,9 @@
     </parent>
 
     <!-- The lean, deployable ETL engine + control plane (the "core" of the v3 split).
-         Renamed from "file-processor" on 2026-08-10; the DEPLOYMENT name is unchanged
-         because package.ps1 copies this module's shaded jar to "file-processor.jar"
-         inside the bundle, so CI and the release flow still see that filename. Stays
+         Renamed from "file-processor" on 2026-08-10; the DEPLOYMENT name followed on
+         2026-08-13 — package.ps1 copies this module's shaded jar to "inspecto.jar"
+         inside the bundle. Stays
          zero-new-dependency; the optional agent lives in a sibling module (inspecto-agent). -->
     <artifactId>inspecto-processor</artifactId>
 
@@ -187,8 +187,8 @@
             <!--
                 Fat JAR — bundles all runtime dependencies into a single deployable JAR.
                 Build with:  mvn clean package
-                Run ETL:     java -cp file-processor-<version>.jar com.gamma.inspector.CollectorProcessor  <pipeline.toon>
-                Gen schema:  java -cp file-processor-<version>.jar com.gamma.inspector.SchemaExtractor <args>
+                Run ETL:     java -cp inspecto-processor-<version>.jar com.gamma.inspector.CollectorProcessor  <pipeline.toon>
+                Gen schema:  java -cp inspecto-processor-<version>.jar com.gamma.inspector.SchemaExtractor <args>
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

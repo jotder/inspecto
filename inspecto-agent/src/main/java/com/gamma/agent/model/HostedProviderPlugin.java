@@ -6,7 +6,7 @@ import java.util.Set;
 
 /**
  * ServiceLoader SPI for hosted model providers (v4.1). The optional
- * {@code file-processor-agent-hosted} module contributes an implementation backing the hosted
+ * {@code inspecto-agent-hosted} module contributes an implementation backing the hosted
  * provider ids (Anthropic / OpenAI / Gemini / Grok and the OpenAI-compatible llama.cpp server);
  * without that jar on the classpath only local Ollama is selectable — the air-gapped packaging
  * guarantee stays intact ({@link ModelProviderFactory} simply finds no plugin).

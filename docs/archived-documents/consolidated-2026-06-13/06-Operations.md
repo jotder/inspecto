@@ -26,7 +26,7 @@ dependencies — no JVM classpath setup on the target.
 ## 1. Build & toolchain
 
 ```powershell
-# Lean core only (artifactId file-processor → file-processor-<version>.jar, ~90 MB):
+# Lean core only (artifactId file-processor → inspecto-processor-<version>.jar, ~90 MB):
 cd inspecto && mvn clean package
 # Whole reactor (core + optional assist agent):
 mvn clean package          # at repo root
@@ -46,24 +46,24 @@ powershell -ExecutionPolicy Bypass -File inspecto\package.ps1            # build
 powershell -ExecutionPolicy Bypass -File inspecto\package.ps1 -NoBuild   # reuse current JAR
 ```
 
-Produces **`file-processor-deploy.zip`** in the sandbox root. `package.ps1`: builds the fat JAR,
+Produces **`inspecto-deploy.zip`** in the sandbox root. `package.ps1`: builds the fat JAR,
 builds the optional operator UI (`inspecto-ui/` via npm → bundled as `ui/`; skip with `-NoUi`),
 assembles JAR + configs + `run`/`serve`/`ura` scripts, rewrites `schema_file` paths relative to the
 bundle root, creates placeholder dirs, and zips it.
 
-**Bundle contents:** `file-processor.jar` (~94 MB), `config/<source>/*.toon`, the working dirs
+**Bundle contents:** `inspecto.jar` (~94 MB), `config/<source>/*.toon`, the working dirs
 (`inbox`/`database`/`backup`/`temp`/`errors`/`quarantine`/`markers`), `ui/` (when built),
 `run.sh`/`run.bat`, `serve.sh`/`serve.bat`, `ura.sh`/`ura.bat`, `warehouse_setup.sql`, README.
 
 ```bash
-unzip file-processor-deploy.zip && cd file-processor-deploy
+unzip inspecto-deploy.zip && cd inspecto-deploy
 # one-shot ETL:
 bash run.sh <data_source>                                   # Linux/Mac
 run.bat <data_source>                                       # Windows
 # always-on control plane + operator console:
 CONTROL_TOKEN=secret ASSIST_TOKEN=secret bash serve.sh      # → http://localhost:8080/
 # direct invocation:
-java --enable-native-access=ALL-UNNAMED -jar file-processor.jar config/<source>/<source>_pipeline.toon
+java --enable-native-access=ALL-UNNAMED -jar inspecto.jar config/<source>/<source>_pipeline.toon
 ```
 
 `SourceProcessor.main` exit codes: `0` all batches succeeded, no quarantine · `1` invalid
@@ -141,7 +141,7 @@ dep; local file `inspecto-status.db` if no URL). Schema created on first connect
 in place; legacy `ucc-status.db` still picked up). Syncs at startup + after every poll cycle
 (transactional DELETE-then-INSERT per pipeline — idempotent, doubles as backfill).
 ```bash
-java -cp file-processor.jar com.gamma.control.ControlApi -Dcontrol.token=secret \
+java -cp inspecto.jar com.gamma.control.ControlApi -Dcontrol.token=secret \
      -Dstatus.backend=db -Dstatus.db.url="jdbc:duckdb:/var/lib/inspecto/status.db" config/
 ```
 **Distributed future:** point at `jdbc:postgresql://host:5432/inspecto` + put the PG driver on the

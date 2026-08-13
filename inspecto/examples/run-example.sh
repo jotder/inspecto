@@ -3,7 +3,7 @@
 #
 # Output lands under the example's own out/ dir; nothing else on disk is touched.
 # Works from the source tree (inspecto/examples/) and the release bundle (examples/).
-# JAR resolution: $INSPECTO_JAR -> ../file-processor.jar (bundle) -> ../target/file-processor-*.jar (tree).
+# JAR resolution: $INSPECTO_JAR -> ../inspecto.jar (bundle) -> ../target/inspecto-processor-*.jar (tree).
 #
 # Usage:  bash run-example.sh 01-ingest/hello-csv [--clean]
 set -euo pipefail
@@ -14,8 +14,8 @@ EX="${1:-}"; CLEAN="${2:-}"
 
 resolve_jar() {
   if [ -n "${INSPECTO_JAR:-}" ] && [ -f "$INSPECTO_JAR" ]; then echo "$INSPECTO_JAR"; return; fi
-  if [ -f "$EXAMPLES_ROOT/../file-processor.jar" ]; then echo "$EXAMPLES_ROOT/../file-processor.jar"; return; fi
-  local j; j="$(ls "$EXAMPLES_ROOT"/../target/file-processor-*.jar 2>/dev/null | grep -vE 'sources|javadoc' | head -1 || true)"
+  if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ]; then echo "$EXAMPLES_ROOT/../inspecto.jar"; return; fi
+  local j; j="$(ls "$EXAMPLES_ROOT"/../target/inspecto-processor-*.jar 2>/dev/null | grep -vE 'sources|javadoc' | head -1 || true)"
   if [ -n "$j" ]; then echo "$j"; return; fi
   echo "Engine JAR not found. Set \$INSPECTO_JAR or build it (mvn -o clean package)." >&2; exit 1
 }

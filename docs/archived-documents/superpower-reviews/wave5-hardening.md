@@ -89,7 +89,7 @@ switchers icon-only, grid self-scrolls.
   2/0/0/0).
 - [x] Bundle: `mvn -o clean package -DskipTests` → `file-processor-4.0.0-SNAPSHOT.jar` (96.4 MB) ·
   `package.ps1 -NoBuild` → succeeded first try, jlink runtime built clean (91.5 MB) — the previously-seen
-  jlink rough edge did **not** reproduce this run · final `file-processor-deploy.zip` (160.5 MB).
+  jlink rough edge did **not** reproduce this run · final `inspecto-deploy.zip` (160.5 MB).
 - [x] Boot smoke: booted the bundle's jar directly (`--enable-native-access=ALL-UNNAMED
   -Dcontrol.port=8091 -Dspaces.root=spaces -Dui.dir=./ui`) — port 8080 was another session's server
   (left untouched) and the originally-planned 8090 was occupied by an unrelated Windows process

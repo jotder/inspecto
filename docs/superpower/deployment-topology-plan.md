@@ -56,14 +56,14 @@ the `package.ps1 -Edition Enterprise` flavor, a bind-address flag, and upgrade/r
 
 ### 1.1 The bundle (exists today — `inspecto/package.ps1`)
 
-`package.ps1 [-Edition Personal|Standard] [-Sign] [-NoRuntime]` emits `file-processor-deploy.zip`
-(+ `file-processor-deploy-linux.zip` when the Linux jmods cache is present), each **always** with a
+`package.ps1 [-Edition Personal|Standard] [-Sign] [-NoRuntime]` emits `inspecto-deploy.zip`
+(+ `inspecto-deploy-linux.zip` when the Linux jmods cache is present), each **always** with a
 `.sha256`, optionally GPG-signed (`.asc`, SOC 2 CC8-04):
 
 ```
-file-processor-deploy/
-├─ file-processor.jar            # fat JAR (core)
-├─ file-processor-security.jar   # Standard only — OIDC/JWKS resource-server module
+inspecto-deploy/
+├─ inspecto.jar            # fat JAR (core)
+├─ inspecto-security.jar   # Standard only — OIDC/JWKS resource-server module
 ├─ ui/                           # built Angular SPA (served via -Dui.dir=./ui)
 ├─ runtime/                      # jlink-trimmed JVM (omit with -NoRuntime → host JDK 24+ / 25+ with agent modules)
 ├─ spaces/                       # config tree, pruned of runtime state (keeps _templates, config/, data/samples/)
@@ -78,7 +78,7 @@ file-processor-deploy/
   (DuckDB JNI — the JVM crashes on DuckDB init without it).
 - `serve.*` reads environment: `PORT`, `SPACES_ROOT`, `CORS_ORIGIN`, `HTTPS_KEYSTORE`/`HTTPS_KEYSTORE_PASSWORD`,
   `AUTH_OIDC_*` — secrets are forwarded as `${ENV:…}` **references**, never literal values. It auto-detects
-  `file-processor-security.jar` and flips to `-Dauth.mode=oidc` (Standard).
+  `inspecto-security.jar` and flips to `-Dauth.mode=oidc` (Standard).
 - **Enterprise flavor gap**: `-Edition` currently validates only `Personal|Standard`. Enterprise is fully
   buildable (`mvn -Pedition-enterprise` = Standard + `inspecto-policy`) but has **no packaging flavor** —
   BACKLOG §6, deliverable SCR-8 in §7.
@@ -151,7 +151,7 @@ users ──HTTPS(TLS 1.3, -Dhttps.keystore)──┐      (T2b: in-process TLS,
         monitoring ──scrape──► /metrics · /health · /ready
 ```
 
-Standard edition (`file-processor-security.jar`): AuthN **delegated to the client's IAM** — Inspecto is an
+Standard edition (`inspecto-security.jar`): AuthN **delegated to the client's IAM** — Inspecto is an
 OIDC resource server (Nimbus + JWKS; issuer/audience/expiry). A misconfigured IAM **fails the boot** rather
 than serving open — deliberate fail-closed posture. AuthZ = capability RBAC from token claims (`roles.toon`,
 per-space overlay, fail-closed). Two TLS variants: **T2a** proxy-terminated (proxy adds gzip for static UI,

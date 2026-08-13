@@ -3,7 +3,7 @@
 The deliberative AI layer, distinct from the reflex [[assist-agent]]: a multi-turn agent on the
 vendored **eoiagent** platform (`com.eoiagent.*`, built from `jotder/inspect-agent` into the local
 `.m2`), discovered via the `IntelligenceAgent` SPI and absent from a minimal/air-gapped build. Lives
-in the optional `inspecto-intelligence` module (`file-processor-intelligence`); the lean core holds
+in the optional `inspecto-intelligence` module (`inspecto-intelligence`); the lean core holds
 only the SPI seam (`com.gamma.intelligence.spi.IntelligenceAgent`) and the `/agent/*` routes
 (`AgentRoutes`), every one of which degrades to **503** when the module is absent.
 

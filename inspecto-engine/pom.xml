@@ -13,7 +13,7 @@
 
     <!-- The engine cluster (WS-D): the strongly-connected component that sits BELOW the
          composition root — signal, query, pipeline, inspector, ingester, ops, job, enrich, alert,
-         notify, catalog. Extracted out of file-processor so the core
+         notify, catalog. Extracted out of inspecto so the core
          (service/control/report/assist/exchange/expectation/intelligence/model) depends DOWN onto a
          cyclic-free engine layer. The cluster is import-clean of the composition root (both real
          edges — job→Scheduler and job→ReportService — were cut in WS-D Steps 1–2 via the util move

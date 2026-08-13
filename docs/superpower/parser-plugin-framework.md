@@ -59,7 +59,7 @@ authored options; already the `grammar` component kind in the UI) — add Gramma
   - `ParseResult` (sealed): `Table(columns, rows, rowCount, rejectedRows)` |
     `Tree(recordCount, nodes)` with `Node(label, type, value, children)` — mirrors the UI's
     `ParserPreview`/`ParserTreeNode` exactly.
-  - pom: add `file-processor-config` dependency.
+  - pom: add `inspecto-config` dependency.
 - **inspecto-engine** `com.gamma.parse.Parsers` registry (PipelineNodeTypes precedent): four
   builtin adapters — `delimited`, `fixedwidth`, `json`, `text_regex` — id/label/hints from today's
   catalog, `grammarSchema()` = FieldSpec translations of

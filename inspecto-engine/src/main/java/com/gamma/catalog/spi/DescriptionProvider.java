@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Fills <em>empty</em> column/table descriptions in the metadata graph. This is the seam through
  * which AI-authored descriptions enter: the lean core ships only a no-op provider, and the
- * {@code file-processor-agent} module contributes an AI-backed provider at M3 via
+ * {@code inspecto-agent} module contributes an AI-backed provider at M3 via
  * {@link java.util.ServiceLoader} — with no change to core.
  *
  * <p>Providers are consulted only for nodes whose description has {@link com.gamma.catalog.Provenance#NONE}.

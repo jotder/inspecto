@@ -6,7 +6,7 @@
 ## Remote source connectors (SFTP / FTP / FTPS)
 
 Inspecto can pull input files from remote SFTP/FTP/FTPS servers instead of a local `dirs.poll` tree. The
-connectors live in the **optional `inspecto-connectors` module** (artifact `file-processor-connectors`) so their
+connectors live in the **optional `inspecto-connectors` module** (artifact `inspecto-connectors`) so their
 network dependencies — sshj (+BouncyCastle) for SFTP, Apache commons-net for FTP/FTPS — never bloat the lean core
 JAR. Put that JAR on the classpath and the connectors are discovered automatically via `ServiceLoader`; without
 it, only the built-in `local` connector exists. New protocols (S3/GCS/Azure, NFS/SMB) are future connectors that

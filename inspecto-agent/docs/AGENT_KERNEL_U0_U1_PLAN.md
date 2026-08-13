@@ -1,6 +1,6 @@
 # UCC 4.x — U0 + U1 Migration Plan (consume `agent-kernel`)
 
-**Status:** **SHIPPED — U0 + U1 complete; cut as UCC 4.0** (`v4.0.0`, 2026-06-05) · consumed `agent-kernel 0.1.0-SNAPSHOT` · branch **`4.x`** of `ucc-file-processor` (chain `253cebe..26bbda9`, pushed to `origin/4.x`).
+**Status:** **SHIPPED — U0 + U1 complete; cut as UCC 4.0** (`v4.0.0`, 2026-06-05) · consumed `agent-kernel 0.1.0-SNAPSHOT` · branch **`4.x`** of `inspecto` (chain `253cebe..26bbda9`, pushed to `origin/4.x`).
 **Date:** 2026-06-04 (planned) · 2026-06-05 (shipped)
 **Locked context:** UCC assist is **pre-production**, so UCC 4.x may **reshape the `com.gamma.assist` SPI** (real numeric confidence, richer status) — no frozen-adapter constraint. The ETL **engine** (data path) is untouched; the lean ETL **core keeps zero AI dependencies**. Java floor is **25** (UCC bumps 24→25 here). Sync orchestrator is **deferred to R1** — U1 keeps UCC's own in-module dispatch.
 **Companion to:** `AGENT_ARCHITECTURE.md` (§3.1 orchestration, §8 responsibility matrix, §12 phases, §13 governance) and `AGENT_KERNEL_K0_K1_PLAN.md` (what the kernel ships).

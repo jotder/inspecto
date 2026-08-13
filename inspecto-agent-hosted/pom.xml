@@ -22,7 +22,7 @@
         seam.
 
         This module exists so the AIR-GAPPED GUARANTEE stays a packaging fact: the default build
-        ships file-processor-agent with local Ollama only; dropping THIS jar on the classpath is
+        ships inspecto-agent with local Ollama only; dropping THIS jar on the classpath is
         what lights up the hosted options in the settings screen. No core or agent code changes
         either way.
     </description>

@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * Assist agent routes ({@code /assist*}): recent failure diagnoses (v3.7.0), the model-provider
  * settings read/write/test surface (v4.1), and the {@code POST /assist/{intent}} skill dispatch
- * (v3.3.0). The agent lives in the optional {@code file-processor-agent} module — the core holds
+ * (v3.3.0). The agent lives in the optional {@code inspecto-agent} module — the core holds
  * only this seam — so every route degrades to 503 (or an empty list) when it is absent.
  *
  * <p>Registration order is significant: the {@code /assist/settings*} and {@code /assist/metrics}
@@ -46,14 +46,14 @@ final class AssistRoutes implements RouteModule {
     /** The in-process assist agent, or 503 when the optional module is absent (v4.1 settings routes). */
     private AssistAgent assistAgentOr503(ApiContext api) {
         return api.service().assistAgent().orElseThrow(() -> new ApiException(503,
-                "assist agent not available (file-processor-agent not on classpath)"));
+                "assist agent not available (inspecto-agent not on classpath)"));
     }
 
     /**
      * Dispatch one assist request to the in-process {@link AssistAgent} (v3.3.0). The {@code intent}
      * (path segment) selects the skill; the JSON body supplies {@code screenContext},
      * {@code partialInput}, and {@code userText}. The agent lives in the optional
-     * {@code file-processor-agent} module — core holds only this seam — so the agent may be absent.
+     * {@code inspecto-agent} module — core holds only this seam — so the agent may be absent.
      *
      * <p>Status mapping (fail-safe, never throws to the model): no agent on the classpath → 503;
      * an unknown intent ({@link AssistResult.Status#UNSUPPORTED}) → 404; a skill whose model is
@@ -63,7 +63,7 @@ final class AssistRoutes implements RouteModule {
     private Object assist(ApiContext api, String intent, Map<String, Object> body) {
         Optional<AssistAgent> agent = api.service().assistAgent();
         if (agent.isEmpty())
-            throw new ApiException(503, "assist agent not available (file-processor-agent not on classpath)");
+            throw new ApiException(503, "assist agent not available (inspecto-agent not on classpath)");
         AssistRequest req = new AssistRequest(
                 intent, mapField(body, "screenContext"), mapField(body, "partialInput"), ApiContext.str(body, "userText"));
         AssistResult result = agent.get().assist(req);

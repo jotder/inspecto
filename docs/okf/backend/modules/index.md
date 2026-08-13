@@ -16,7 +16,7 @@ modules. Reactor shape, version management, and the module-extraction playbook:
 * `inspecto-event/` — `com.gamma.event` + `metrics`: the Operational-Intelligence event store + metric registry; owns `logback.xml` (`inspecto-event`).
 * `inspecto-acquire/` — `com.gamma.acquire`: connectors, connection profiles/registry/workbench, fingerprint ledger, stability gate, retry/circuit-breaker (`inspecto-acquire`).
 * `inspecto-engine/` — the engine cluster: `signal`/`query`/`pipeline`/`inspector`/`ingester`/`ops`/`job`/`enrich`/`alert`/`notify`/`catalog`; holds the fat-jar entry points (`inspecto-engine`).
-* [Core](engine.md) - `inspecto/` — the composition root: control plane + application packages, ships `file-processor.jar`. The engine was extracted to sibling modules `inspecto-engine`/`-etl`/`-event`/`-acquire` in WS-D (see [reactor.md](reactor.md)).
+* [Core](engine.md) - `inspecto/` — the composition root: control plane + application packages, ships `inspecto.jar`. The engine was extracted to sibling modules `inspecto-engine`/`-etl`/`-event`/`-acquire` in WS-D (see [reactor.md](reactor.md)).
 * [Connectors](connectors.md) - `inspecto-connectors/` — SFTP/FTP/FTPS/DB connectors (all network deps).
 * [Agent](agent.md) - `inspecto-agent/` — optional AI assist skills (vendored kernel layer + eoiagent model transport).
 * [Agent (hosted)](agent-hosted.md) - `inspecto-agent-hosted/` — hosted model providers (omitted from air-gapped builds).

@@ -12,7 +12,7 @@ import java.util.Map;
 /**
  * Service-provider interface for the optional embedded assist agent (v3.0, milestone M0).
  *
- * <p>The agent implementation lives in the separate {@code file-processor-agent} module so
+ * <p>The agent implementation lives in the separate {@code inspecto-agent} module so
  * the core fat-JAR stays dependency-lean. When that module — and a provider declared via
  * {@code META-INF/services/com.gamma.assist.spi.AssistAgent} — is on the classpath,
  * {@link CollectorService} discovers it with {@link java.util.ServiceLoader} at startup and

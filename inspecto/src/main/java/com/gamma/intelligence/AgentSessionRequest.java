@@ -5,7 +5,7 @@ import java.util.Map;
 /**
  * A request to open an embedded-intelligence session (AGT-5, P0) — the wire shape of
  * {@code POST /agent/sessions}. {@code role} is the caller's product role (mapped onto the
- * eoiagent platform {@code Role} inside the optional {@code file-processor-intelligence} module);
+ * eoiagent platform {@code Role} inside the optional {@code inspecto-intelligence} module);
  * {@code page} is the current UI page context (id + entity ids + filters), or empty when the
  * caller has none. {@code goalKind} (AGT-5 P1 slice B) optionally pins the session's goal kind
  * (e.g. {@code INVESTIGATION}); {@code null}/blank leaves the eoiagent default ({@code QA}). The

@@ -41,6 +41,6 @@ class ModelProviderFactoryTest {
     void availableProvidersAlwaysIncludesOllamaOnly_withoutHostedJar() {
         assertTrue(ModelProviderFactory.availableProviders().contains("ollama"));
         assertFalse(ModelProviderFactory.availableProviders().contains("anthropic"),
-                "hosted ids appear only when file-processor-agent-hosted is on the classpath");
+                "hosted ids appear only when inspecto-agent-hosted is on the classpath");
     }
 }

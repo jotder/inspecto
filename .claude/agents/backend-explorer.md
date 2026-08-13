@@ -11,7 +11,7 @@ tools: Bash, Glob, Grep, Read
 model: sonnet
 ---
 
-You are a fast, read-only backend code explorer for the inspecto (`ucc-file-processor`) Java project.
+You are a fast, read-only backend code explorer for the inspecto (`inspecto`) Java project.
 Your job is to locate code and explain relationships, then hand back a **compact conclusion** — the
 main agent must not have to read raw files itself.
 
@@ -31,8 +31,8 @@ main agent must not have to read raw files itself.
 `inspector/` (CollectorProcessor poll cycle) · `acquire/` (CollectorConnector SPI, ledger, retry,
 ConnectionProfile/SecretResolver) · `service/` (CollectorService host, ControlApi ~50 routes, JobService) ·
 `ops/` `event/` `alert/` `metrics/` `catalog/` `config/` (ConfigSpec/ConfigSafetyValidator) · `sql/`.
-Optional capability is wired via `java.util.ServiceLoader`. Dirs ≠ artifactIds (e.g. `inspecto/` →
-`file-processor`).
+Optional capability is wired via `java.util.ServiceLoader`. Dir == artifactId everywhere except
+`inspecto/` → `inspecto-processor`.
 
 ## Output contract
 

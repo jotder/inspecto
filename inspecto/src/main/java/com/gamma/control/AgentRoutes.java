@@ -15,7 +15,7 @@ import java.util.Map;
 
 /**
  * Embedded-intelligence routes ({@code /agent*}, AGT-5 P0): open a session, then ask it questions.
- * The agent lives in the optional {@code file-processor-intelligence} module — the core holds only
+ * The agent lives in the optional {@code inspecto-intelligence} module — the core holds only
  * this seam — so every route degrades to 503 when it is absent. Sibling to {@link AssistRoutes}
  * (the reflex layer): that module answers one skill call per request, this one hosts multi-turn
  * sessions on the deliberative loop.
@@ -296,7 +296,7 @@ final class AgentRoutes implements RouteModule {
     /** The in-process intelligence agent, or 503 when the optional module is absent. */
     private IntelligenceAgent agentOr503(ApiContext api) {
         return api.service().intelligenceAgent().orElseThrow(() -> new ApiException(503,
-                "intelligence agent not available (file-processor-intelligence not on classpath)"));
+                "intelligence agent not available (inspecto-intelligence not on classpath)"));
     }
 
     /** A nested JSON object from a request body as a {@code Map}, or an empty map when absent/not an object. */

@@ -29,8 +29,8 @@ verbatim before touching anything. Baseline as of 2026-07-15: reactor **1467 pas
 
 Recipe (agents: `SMOKE` invokes `.claude/skills/smoke/`):
 
-1. `mvn -o clean package -q` if `inspecto/target/file-processor-*.jar` is stale.
-2. `java --enable-native-access=ALL-UNNAMED -cp inspecto\target\file-processor-*.jar com.gamma.control.ControlApi inspecto\config`
+1. `mvn -o clean package -q` if `inspecto/target/inspecto-processor-*.jar` is stale.
+2. `java --enable-native-access=ALL-UNNAMED -cp inspecto\target\inspecto-processor-*.jar com.gamma.control.ControlApi inspecto\config`
 3. `GET /health` must be 200, then probe the endpoints under test; capture status + body.
 4. UI e2e (suite: `inspecto-ui/src/e2e/`): `E2E_BASE_URL=http://localhost:8080 npm run test:ci -- --include src/e2e/**`
 5. Always stop the server. Evidence = endpoint → status → one-line body; "smoke passed" without

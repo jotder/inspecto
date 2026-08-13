@@ -13,7 +13,7 @@ import java.util.Map;
  * CLI entry point for the Stage-2 enrichment engine.
  *
  * <pre>
- *   java -cp file-processor.jar com.gamma.enrich.EnrichmentProcessor &lt;enrich.toon&gt; [--partitions SPEC]
+ *   java -cp inspecto.jar com.gamma.enrich.EnrichmentProcessor &lt;enrich.toon&gt; [--partitions SPEC]
  * </pre>
  *
  * <ul>

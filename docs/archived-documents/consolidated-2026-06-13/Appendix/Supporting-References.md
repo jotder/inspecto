@@ -135,7 +135,7 @@ contradictory.)
 ## D. Toolchain & paths (reference workstation)
 
 - JDK: `C:\.jdks\openjdk-26.0.1`; Maven: `C:\maven\apache-maven-3.9.16\bin` (neither on `PATH`).
-- Repo: `C:\sandbox\ucc-file-processor`, branch `4.x`. (Historical docs reference stale paths
+- Repo: `C:\sandbox\inspecto`, branch `4.x`. (Historical docs reference stale paths
   `C:\sandbox\URA\sandbox` and `c:/sandbox/ucc-inspecto` — see Conflict Report.)
 - Dev SPA: `inspecto-ui`, `npm start` → `:4204` (proxy `/api/*` → `:8080`).
 - Companion repos (separate projects): `agent-kernel` (`C:/sandbox/agent-kernel`),

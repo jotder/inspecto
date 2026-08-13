@@ -49,7 +49,7 @@ The platform is organized into two **data stages** under one **control plane**, 
 | **Control plane** (`com.gamma.service` / `.control` / `.report` / `.job` / `.metrics`) | `SourceService` hub, `BatchEventBus` pub/sub, cron + fixed-delay `Scheduler`, `ControlApi` (JDK `HttpServer`, ~30 routes, bearer auth), dependency-free Prometheus metrics, job runner, reporting, and a pluggable `StatusStore` (file or DuckDB).                                                                                        |
 | **Smart Config** (`com.gamma.config.spec` / `.io` / `.safety`) | A machine-readable `ConfigSpec` per config type (one source of truth for the loader, the AI, and a future UI), a pure parse→validate→prepare pipeline, structured `Finding`s, a canonical `.toon` serializer, a stable-id `ConfigRegistry`, and a hard-fail config **safety validator** (path jail / numeric bounds / output allow-list). |
 | **Metadata Graph** (`com.gamma.catalog`) | A typed, traversable graph: sources → schemas → columns → emitted event tables → Stage-2 transforms → KPIs/reports, with a lazy operational overlay (status/lineage/completeness). Fed by `description`/`unit`/`classification` columns in the schema `.toon` plus a `*_meta.toon` KPI catalog. Served at `/catalog*`.                    |
-| **Assist Agent** (optional `file-processor-agent` module) | An in-JVM, scoped **Assist API** backed by a skill registry over local Ollama (or, in connected builds, a hosted model). Seven skills turn a sentence into a *validated, confirm-first draft*. Built on the reusable **agent-kernel** library since v4.0 (shared `SyncOrchestrator` / capability / confidence-escalation / audit primitives). All AI deps live in this module only — the core fat-JAR stays zero-new-dependency.                                                         |
+| **Assist Agent** (optional `inspecto-agent` module) | An in-JVM, scoped **Assist API** backed by a skill registry over local Ollama (or, in connected builds, a hosted model). Seven skills turn a sentence into a *validated, confirm-first draft*. Built on the reusable **agent-kernel** library since v4.0 (shared `SyncOrchestrator` / capability / confidence-escalation / audit primitives). All AI deps live in this module only — the core fat-JAR stays zero-new-dependency.                                                         |
 
 ### The assist skill catalog (all shipped, all draft-only / confirm-first)
 
@@ -82,7 +82,7 @@ A two-module Maven reactor (parent POM at the repo root) plus a standalone web U
 | `inspecto-ui/` | **Optional** operator web console — *Inspector* (Angular + Material/Tailwind SPA: ag-Grid, Chart.js, AntV G6). Its Node/npm toolchain is **not** part of the Maven reactor; `package.ps1` builds it and bundles `dist/` next to the JAR, served by `ControlApi` from `-Dui.dir`. See the [Operator Console guide](../docs/operator-console.md) and [`inspecto-ui/README.md`](../inspecto-ui/README.md). |
 
 ```powershell
-cd file-processor && mvn clean package   # builds just the lean core (parent resolved by relativePath)
+cd inspecto && mvn clean package   # builds just the lean core (parent resolved by relativePath)
 mvn clean package                        # at repo root: builds the whole reactor (core + agent)
 ```
 
@@ -148,9 +148,9 @@ layers. Each step links to the deep-dive doc when you need more.
 runtime dependencies — the fat JAR bundles DuckDB, univocity, JToon, and the rest.
 
 ```powershell
-cd file-processor
+cd inspecto
 mvn clean package
-# Produces: target/file-processor-<version>.jar  (~90 MB, all deps bundled)
+# Produces: target/inspecto-processor-<version>.jar  (~90 MB, all deps bundled)
 ```
 
 To build the whole reactor (core **plus** the optional assist agent), run `mvn clean package`
@@ -206,7 +206,7 @@ bash run-voucher.sh      # Linux / Mac
 Or run any pipeline config directly (the scripts just wrap this):
 
 ```powershell
-java -jar inspecto/target/file-processor-<version>.jar config/<source>/<source>_pipeline.toon
+java -jar inspecto/target/inspecto-processor-<version>.jar config/<source>/<source>_pipeline.toon
 ```
 
 > The deploy bundle produced by `package.ps1` ships a generic `run.sh <adapter>` /
@@ -222,7 +222,7 @@ start. Wrong-schema or unreadable files are moved to `quarantine/<adapter>/` and
 ## 5. Run many sources at once
 
 ```bash
-java -cp target/file-processor-<version>.jar com.gamma.inspector.MultiCollectorProcessor \
+java -cp target/inspecto-processor-<version>.jar com.gamma.inspector.MultiCollectorProcessor \
      -Dsources.max=4 config/
 ```
 
@@ -330,7 +330,7 @@ set CONTROL_TOKEN=secret && serve.bat         # Windows
 
 # Dev: run the SPA on :4204 with a live backend (CORS + proxy)
 java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4204 \
-     -cp file-processor.jar com.gamma.control.ControlApi config/
+     -cp inspecto.jar com.gamma.control.ControlApi config/
 cd inspecto-ui && npm install && npm start  # ng serve, /api proxied to :8080
 ```
 
@@ -358,7 +358,7 @@ and `kpi-to-sql` skills ground on.
 The agent is a separate module loaded in-process when present — it never bloats the lean core.
 
 **Enable it:**
-1. Build the whole reactor (`mvn clean package` at the repo root) so `file-processor-agent` is on
+1. Build the whole reactor (`mvn clean package` at the repo root) so `inspecto-agent` is on
    the classpath.
 2. Provide a model: a local **Ollama** server (default; air-gapped-safe) or, in connected builds,
    a hosted provider (Gemini/Claude/ChatGPT). Tiers auto-select per hardware profile

@@ -9,7 +9,7 @@ timestamp: 2026-06-28T00:00:00Z
 
 # Connectors Module (`inspecto-connectors/`)
 
-artifactId `file-processor-connectors`. Holds **all network dependencies** (sshj + BouncyCastle for SFTP,
+artifactId `inspecto-connectors`. Holds **all network dependencies** (sshj + BouncyCastle for SFTP,
 Apache commons-net for FTP/FTPS, the PostgreSQL JDBC driver) so the [engine core](engine.md) JAR has none.
 
 Drop this jar on the classpath and `ServiceLoader` auto-discovers the `CollectorConnectorFactory` providers;

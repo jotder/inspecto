@@ -19,15 +19,15 @@ bash run-example.sh  01-ingest/hello-csv          # Linux / Git-Bash
 #   add  -Clean  (ps1)  or  --clean  (sh)  to wipe out/ and start fresh
 ```
 
-The runner resolves the engine JAR automatically (`$INSPECTO_JAR` → `../file-processor.jar` in the
-bundle → `../target/file-processor-*.jar` in the source tree), creates the output dirs, seeds a
+The runner resolves the engine JAR automatically (`$INSPECTO_JAR` → `../inspecto.jar` in the
+bundle → `../target/inspecto-processor-*.jar` in the source tree), creates the output dirs, seeds a
 fresh `out/inbox/` from the pristine `samples/`, and runs the pipeline with the mandatory DuckDB
 flag. To run by hand instead:
 
 ```bash
 cd 01-ingest/hello-csv
 mkdir -p out/inbox && cp samples/* out/inbox/
-java --enable-native-access=ALL-UNNAMED -jar <path-to>/file-processor.jar pipeline.toon
+java --enable-native-access=ALL-UNNAMED -jar <path-to>/inspecto.jar pipeline.toon
 #   output lands in out/database/  (Hive-partitioned: year=/month=/day=)
 ```
 

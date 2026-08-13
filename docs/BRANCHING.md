@@ -168,8 +168,8 @@ git tag -a vX.Y.Z -m "vX.Y.Z — <summary>"
 git push origin <branch> --tags
 
 # Build + publish both edition artifacts from the tagged commit:
-#   mvn -Pedition-personal package   → file-processor-X.Y.Z-personal.jar
-#   mvn -Pedition-standard package   → file-processor-X.Y.Z-standard.jar
+#   mvn -Pedition-personal package   → inspecto-processor-X.Y.Z-personal.jar
+#   mvn -Pedition-standard package   → inspecto-processor-X.Y.Z-standard.jar
 # Release integrity (SOC 2 CC8-04): publish a SHA-256 checksum + a GPG detached signature for EVERY
 # artifact so customers can verify integrity AND authenticity. package.ps1 emits .sha256/.asc for the
 # deploy zips; for the raw edition JARs, generate them here (INSPECTO_SIGNING_KEY = the release key id;

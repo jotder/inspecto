@@ -17,8 +17,8 @@
     (schema_file, dirs.poll) resolve exactly as in one-shot mode. Everything is written under the
     example's own out/ directory.
 
-    JAR resolution order: $env:INSPECTO_JAR -> ../file-processor.jar (bundle) ->
-    ../target/file-processor-*.jar (source tree).
+    JAR resolution order: $env:INSPECTO_JAR -> ../inspecto.jar (bundle) ->
+    ../target/inspecto-processor-*.jar (source tree).
 
 .EXAMPLE
     pwsh serve-example.ps1 06-serve/sequence-gap            # start & explore
@@ -42,9 +42,9 @@ $examplesRoot = $PSScriptRoot
 
 function Resolve-Jar {
     if ($env:INSPECTO_JAR -and (Test-Path $env:INSPECTO_JAR)) { return (Resolve-Path $env:INSPECTO_JAR).Path }
-    $bundle = Join-Path $examplesRoot '..\file-processor.jar'
+    $bundle = Join-Path $examplesRoot '..\inspecto.jar'
     if (Test-Path $bundle) { return (Resolve-Path $bundle).Path }
-    $tree = Get-ChildItem (Join-Path $examplesRoot '..\target') -Filter 'file-processor-*.jar' -ErrorAction SilentlyContinue |
+    $tree = Get-ChildItem (Join-Path $examplesRoot '..\target') -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch 'sources|javadoc' } | Select-Object -First 1
     if ($tree) { return $tree.FullName }
     throw "Engine JAR not found. Set `$env:INSPECTO_JAR, or build it (mvn -o clean package)."

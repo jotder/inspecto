@@ -94,7 +94,7 @@ export class AssistPanelComponent implements OnInit {
                     this.loading = false;
                     this.toastr.error(
                         e?.status === 503
-                            ? 'Assist agent is not available (file-processor-agent absent).'
+                            ? 'Assist agent is not available (inspecto-agent absent).'
                             : e?.status === 404
                               ? `Unknown assist intent "${this.intent}".`
                               : 'Assist request failed.',

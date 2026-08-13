@@ -27,7 +27,7 @@ A path from a clean checkout to a running, observable pipeline, then into the op
 
 ```powershell
 cd inspecto
-mvn clean package      # → target/file-processor-<version>.jar (~90 MB, all deps bundled)
+mvn clean package      # → target/inspecto-processor-<version>.jar (~90 MB, all deps bundled)
 ```
 Requires Java 25+ and Maven 3.9+. Build the whole reactor (`mvn clean package` at the repo root) to
 include the optional assist agent. Full build/deploy detail: [06-Operations](06-Operations.md).
@@ -113,7 +113,7 @@ the Conflict Report.*
 
 ```powershell
 run-adjustment.bat                                              # bundled sample (Windows)
-java -jar inspecto/target/file-processor-<version>.jar config/<source>/<source>_pipeline.toon
+java -jar inspecto/target/inspecto-processor-<version>.jar config/<source>/<source>_pipeline.toon
 ```
 Drop input files under `inbox/<source>/` (date sub-folders). Already-processed files are skipped via
 `.processed` markers in `markers/<source>/` (pruned by `retention_days`, default 90). Wrong-schema
@@ -121,7 +121,7 @@ or unreadable files move to `quarantine/<source>/` and are never retried.
 
 Run many sources at once:
 ```bash
-java -cp file-processor.jar com.gamma.inspector.MultiSourceProcessor -Dsources.max=4 config/
+java -cp inspecto.jar com.gamma.inspector.MultiSourceProcessor -Dsources.max=4 config/
 ```
 
 ## 5. Plugin ingester (binary / proprietary / multi-event-type)

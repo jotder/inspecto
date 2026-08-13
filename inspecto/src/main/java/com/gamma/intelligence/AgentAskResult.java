@@ -6,7 +6,7 @@ import java.util.Map;
 /**
  * A complete answer from the embedded intelligence agent (AGT-5, P0) — the wire shape of
  * {@code POST /agent/sessions/{id}/ask}. A pure, JSON-serializable record in the lean core; the
- * model that produces it lives in the optional {@code file-processor-intelligence} module.
+ * model that produces it lives in the optional {@code inspecto-intelligence} module.
  *
  * @param kind             one of {@code TEXT}, {@code NAVIGATION}, {@code CLARIFICATION},
  *                          {@code ERROR}, {@code INLINE_ARTIFACT} (mirrors the platform's

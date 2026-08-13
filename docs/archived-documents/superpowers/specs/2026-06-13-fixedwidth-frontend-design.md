@@ -16,7 +16,7 @@
 ## ROLE & OBJECTIVE
 
 Implement a new **`fixedwidth` parsing frontend** in the Inspecto repo
-(`C:\sandbox\ucc-file-processor`, branch `4.x`, Java 25+, embedded DuckDB) so a fixed-width **text**
+(`C:\sandbox\inspecto`, branch `4.x`, Java 25+, embedded DuckDB) so a fixed-width **text**
 file *or* a fixed-length **binary** file can be onboarded with `.toon` configuration — **reusing the
 existing typing/transform/partition/lineage backend verbatim**. This is build-order step 2 of
 `parsing-options-reference.md` §8.

@@ -17,7 +17,7 @@
         <div class="bg-card mt-6 max-w-160 rounded-2xl p-6 shadow">
             <div class="font-semibold">Settings not supported</div>
             <p class="text-secondary mt-1 text-sm">
-                The running assist agent does not expose model-provider settings (older file-processor-agent build, or
+                The running assist agent does not expose model-provider settings (older inspecto-agent build, or
                 no agent on the classpath).
             </p>
         </div>
@@ -28,7 +28,7 @@
             @if (hostedJarMissing) {
                 <inspecto-alert class="mb-6 block" variant="warning">
                     Hosted providers are greyed out because the
-                    <code>file-processor-agent-hosted</code> jar is not on the server classpath (air-gapped build).
+                    <code>inspecto-agent-hosted</code> jar is not on the server classpath (air-gapped build).
                 </inspecto-alert>
             }
 

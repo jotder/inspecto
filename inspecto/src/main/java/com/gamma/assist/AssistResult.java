@@ -8,7 +8,7 @@ import java.util.Map;
 /**
  * The output of an assist skill (v3.3.0) — the wire shape of the {@code POST /assist/{intent}}
  * response. A pure, JSON-serializable record in the lean core; the AI that produces it lives in
- * the optional {@code file-processor-agent} module.
+ * the optional {@code inspecto-agent} module.
  *
  * <p>{@link #status} is the discriminator the control plane uses to choose an HTTP status:
  * <ul>

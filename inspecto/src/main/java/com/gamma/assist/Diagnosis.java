@@ -8,7 +8,7 @@ import java.util.List;
  * A diagnosis of a {@code FAILED} batch produced by the optional assist agent's failure-diagnosis
  * reactor (v3.7.0, M7) — the wire shape of one entry in the {@code GET /assist/diagnoses} response.
  * A pure, JSON-serializable record in the lean core; the AI that produces it (and the in-memory
- * store it is held in) lives in the optional {@code file-processor-agent} module and is reached
+ * store it is held in) lives in the optional {@code inspecto-agent} module and is reached
  * through the {@link com.gamma.assist.spi.AssistAgent#recentDiagnoses(int)} SPI seam — core never
  * depends on the agent.
  *

@@ -9,13 +9,13 @@
     example's own out/ directory — nothing else on disk is touched.
 
     Works both from the source tree (inspecto/examples/) and the release bundle (examples/).
-    JAR resolution order: $env:INSPECTO_JAR → ../file-processor.jar (bundle) →
-    ../target/file-processor-*.jar (source tree).
+    JAR resolution order: $env:INSPECTO_JAR → ../inspecto.jar (bundle) →
+    ../target/inspecto-processor-*.jar (source tree).
 
 .EXAMPLE
     pwsh run-example.ps1 01-ingest/hello-csv
 .EXAMPLE
-    $env:INSPECTO_JAR="C:\path\file-processor.jar"; pwsh run-example.ps1 02-parsing/tsv-pipe
+    $env:INSPECTO_JAR="C:\path\inspecto.jar"; pwsh run-example.ps1 02-parsing/tsv-pipe
 #>
 [CmdletBinding()]
 param(
@@ -28,9 +28,9 @@ $examplesRoot = $PSScriptRoot
 
 function Resolve-Jar {
     if ($env:INSPECTO_JAR -and (Test-Path $env:INSPECTO_JAR)) { return (Resolve-Path $env:INSPECTO_JAR).Path }
-    $bundle = Join-Path $examplesRoot '..\file-processor.jar'
+    $bundle = Join-Path $examplesRoot '..\inspecto.jar'
     if (Test-Path $bundle) { return (Resolve-Path $bundle).Path }
-    $tree = Get-ChildItem (Join-Path $examplesRoot '..\target') -Filter 'file-processor-*.jar' -ErrorAction SilentlyContinue |
+    $tree = Get-ChildItem (Join-Path $examplesRoot '..\target') -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -notmatch 'sources|javadoc' } | Select-Object -First 1
     if ($tree) { return $tree.FullName }
     throw "Engine JAR not found. Set `$env:INSPECTO_JAR, or build it (mvn -o clean package)."

@@ -121,7 +121,7 @@ function safeParse(json: string): unknown {
 
 /**
  * Embedded intelligence agent (AGT-5 / S4): open a session, then ask it questions — plain or
- * streamed. The agent lives in the optional file-processor-intelligence module; when absent every
+ * streamed. The agent lives in the optional inspecto-intelligence module; when absent every
  * route answers 503 and callers degrade gracefully (mirror the assist-panel UX).
  *
  * The non-streaming calls ride HttpClient (v1 envelope unwrapped, auth/space interceptors apply).

@@ -274,12 +274,12 @@ memory either way.
 
 End-to-end recipe for shipping a custom `StreamingFileIngester` to a deployed pipeline:
 
-**1. Set up your project.** Depend on the file-processor fat JAR. The minimal Maven snippet:
+**1. Set up your project.** Depend on the inspecto fat JAR. The minimal Maven snippet:
 
 ```xml
 <dependency>
     <groupId>com.gamma.inspector</groupId>
-    <artifactId>file-processor</artifactId>
+    <artifactId>inspecto-processor</artifactId>
     <version>4.0.0</version>
     <scope>provided</scope>
 </dependency>
@@ -296,7 +296,7 @@ Use `<scope>provided</scope>` because the deployment server already has the fat 
 **5. Package and deploy.**
 
 - `mvn package` produces `your-ingester-x.y.z.jar`
-- On the server, put your JAR on the classpath alongside the file-processor JAR. The `run.sh` / `run.bat` wrappers shipped by `package.ps1` use `-jar file-processor.jar`; switch them to `-cp "file-processor.jar:your-ingester-*.jar" com.gamma.inspector.CollectorProcessor <pipeline.toon>` (use `;` instead of `:` on Windows).
+- On the server, put your JAR on the classpath alongside the inspecto JAR. The `run.sh` / `run.bat` wrappers shipped by `package.ps1` use `-jar inspecto.jar`; switch them to `-cp "inspecto.jar:your-ingester-*.jar" com.gamma.inspector.CollectorProcessor <pipeline.toon>` (use `;` instead of `:` on Windows).
 - Reference your class by FQCN in the pipeline toon: `processing.ingester: com.acme.events.MyIngester`. The framework loads it via `Class.forName(...).getDeclaredConstructor().newInstance()` — the class must be public with a no-arg constructor.
 
 **6. Production health checks.** The framework reports plugin loading at startup:

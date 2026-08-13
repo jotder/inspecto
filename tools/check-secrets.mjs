@@ -116,7 +116,7 @@ function* walk(dir) {
 }
 
 // A COMMITTED-secret guard must scan what is committed. Walking the filesystem also read gitignored
-// build output — `file-processor-deploy/ui/chunk-*.js` produced four hits on a clean tree (minified
+// build output — `inspecto-deploy/ui/chunk-*.js` produced four hits on a clean tree (minified
 // `withCredentials`/`apiKey` property assignments), so every shift that built the bundle then met a red
 // security gate on its own machine while CI, which has no such directory, stayed green. A guard that
 // cries wolf locally is a guard people learn to ignore. Falls back to the filesystem walk outside a

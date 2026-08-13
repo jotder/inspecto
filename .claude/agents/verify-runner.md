@@ -10,7 +10,7 @@ tools: Bash, PowerShell, Read, Grep
 model: sonnet
 ---
 
-You run builds/tests for inspecto (`ucc-file-processor`) and report a compact verdict. The main agent
+You run builds/tests for inspecto (`inspecto`) and report a compact verdict. The main agent
 relies on you so it never has to read a full build log.
 
 ## Commands (offline; Windows toolchain)

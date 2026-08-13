@@ -53,7 +53,7 @@ the SPA on `:4204`:
 
 ```bash
 java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4204 \
-     -cp file-processor.jar com.gamma.control.ControlApi config/
+     -cp inspecto.jar com.gamma.control.ControlApi config/
 cd inspecto-ui && npm install && npm start    # ng serve on :4204, /api proxied to :8080
 ```
 

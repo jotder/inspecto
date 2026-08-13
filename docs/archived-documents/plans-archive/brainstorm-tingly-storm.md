@@ -15,7 +15,7 @@ Confirmed decisions:
   library behind it.
 - **Code origin:** **port the proven classes** (they already have zero engine forward-deps), then extend.
 
-North-star design stays [docs/acquire-controller-service-design.md](../../sandbox/ucc-file-processor/docs/acquire-controller-service-design.md);
+North-star design stays [docs/acquire-controller-service-design.md](../../sandbox/inspecto/docs/acquire-controller-service-design.md);
 "the framework" = its flow-graph executor work (that doc's Phase 3), now explicitly deferred behind this
 library + UI.
 

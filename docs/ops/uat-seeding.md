@@ -25,7 +25,7 @@ DuckDB projections are all genuinely produced, which is exactly what UAT should 
 pwsh tools/seed-uat.ps1                     # -Days 60 -MinRows 150 -MaxRows 500 by default
 
 # 2. RESTART the backend — spaces are discovered by the boot scan, never adopted live.
-#    (dev: restart the 'inspector-backend' launch config)
+#    (dev: restart the 'inspecto-backend' launch config)
 
 # 3. Drive the live seeding:
 pwsh tools/seed-uat.ps1 -Phase drive        # prints a summary of what landed

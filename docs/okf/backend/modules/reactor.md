@@ -25,7 +25,7 @@ Build order (root `pom.xml`, parent `inspecto-parent`):
 
 Binding constraints (unchanged by the split): framework-free (JDK HttpServer, manual DI,
 ServiceLoader SPI); **one deployable** — modularization is reactor-internal, the fat
-`file-processor.jar` is unchanged; editions are build flavors, never branches.
+`inspecto.jar` is unchanged; editions are build flavors, never branches.
 
 ## Version management (M1)
 

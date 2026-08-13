@@ -20,7 +20,7 @@
         SFTP (over sshj) and FTP/FTPS (over Apache commons-net), discovered via the core's
         SourceConnectorFactory ServiceLoader seam.
 
-        This module exists so the lean core (file-processor) stays dep-free: the network client
+        This module exists so the lean core (inspecto) stays dep-free: the network client
         libraries (sshj + its BouncyCastle transitive deps, commons-net) live HERE only. The
         default deployment ships the core fat-JAR with the built-in local connector; dropping THIS
         jar on the classpath is what lights up the sftp:/ftp: source schemes. No core code changes

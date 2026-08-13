@@ -45,7 +45,7 @@ import java.util.Set;
 
 /**
  * The real embedded assist agent (v3.3.0, M3) — the {@link AssistAgent} the optional
- * {@code file-processor-agent} module contributes via {@code ServiceLoader}. It captures the host
+ * {@code inspecto-agent} module contributes via {@code ServiceLoader}. It captures the host
  * service's read-only handles in {@link #init} (into a {@link UccAgentContext}), builds the
  * {@link CapabilityRegistry}, and dispatches {@code POST /assist/{intent}} calls through the shared
  * {@link SyncOrchestrator} (R1): it resolves the matching
@@ -251,7 +251,7 @@ public final class UccAssistAgent implements AssistAgent {
                     + ProviderSettings.knownProviders());
         if (!ModelProviderFactory.availableProviders().contains(provider))
             throw new IllegalArgumentException("provider '" + provider + "' requires the "
-                    + "file-processor-agent-hosted jar on the classpath");
+                    + "inspecto-agent-hosted jar on the classpath");
 
         ProviderSettings defaults = ProviderSettings.defaults(provider);
         java.util.EnumMap<ModelTier, String> models = new java.util.EnumMap<>(ModelTier.class);

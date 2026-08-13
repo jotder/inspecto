@@ -1,6 +1,6 @@
 # Quick Start Commands
 
-Inspecto (`ucc-file-processor`) — Java 26 / Maven reactor (`file-processor-parent`).
+Inspecto (`inspecto`) — Java 26 / Maven reactor (`inspecto-parent`).
 Toolchain: JDK `C:\.jdks\openjdk-26.0.1`, Maven `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`.
 
 ---
@@ -12,9 +12,9 @@ Toolchain: JDK `C:\.jdks\openjdk-26.0.1`, Maven `C:\maven\apache-maven-3.9.16\bi
 mvn -o clean test
 
 # Build fat JAR only (skip tests)
-mvn -o clean package -q          # → inspecto/target/file-processor-*.jar
+mvn -o clean package -q          # → inspecto/target/inspecto-processor-*.jar
 
-# Build deployment bundle (JAR + UI + configs + run scripts + embedded JVM → file-processor-deploy.zip)
+# Build deployment bundle (JAR + UI + configs + run scripts + embedded JVM → inspecto-deploy.zip)
 # NOTE: run package.ps1 under pwsh 7 (UTF-8) — the script is BOM-less UTF-8; Windows PowerShell 5.1 garbles it.
 pwsh -File inspecto\package.ps1                # full (embeds trimmed Windows JVM via jlink → bundle\runtime\)
 pwsh -File inspecto\package.ps1 -NoBuild       # reuse target/ JAR
@@ -30,17 +30,17 @@ JVM flag required at every launch: `--enable-native-access=ALL-UNNAMED` (DuckDB 
 
 ```powershell
 # One-shot ETL pipeline
-java --enable-native-access=ALL-UNNAMED -jar inspecto\target\file-processor-*.jar `
+java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-*.jar `
      inspecto\config\voucher\voucher_unknown_pipeline.toon
 # convenience wrappers (sandbox root):  bash run-voucher.sh  /  bash run-adjustment.sh
 
 # Long-running control plane + operator UI (ControlApi, default :8080)
-$env:CONTROL_TOKEN="secret"; .\file-processor-deploy\serve.bat   # then http://localhost:8080/
+$env:CONTROL_TOKEN="secret"; .\inspecto-deploy\serve.bat   # then http://localhost:8080/
 
 # Pre-ETL utility CLI (com.gamma.inspector.MainApp)
 #   commands: search, copy, copy-tars, extract, backup, prepare-inbox,
 #             create-schema, move-by-date, extract-unknown, extract-move, help
-java --enable-native-access=ALL-UNNAMED -cp inspecto\target\file-processor-*.jar `
+java --enable-native-access=ALL-UNNAMED -cp inspecto\target\inspecto-processor-*.jar `
      com.gamma.inspector.MainApp help
 ```
 

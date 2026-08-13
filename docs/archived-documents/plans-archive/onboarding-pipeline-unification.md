@@ -74,7 +74,7 @@ so **Onboarding's engine-real keys are the source of truth for the merge**, not 
   **addressing** difference, not a format one. **No converter exists** between them.
 - On disk: **16** `*_schema.toon` vs **one** real `registry/schemas/*.toon`
   (`spaces/demo/.../payments_schema.toon`; the second apparent copy is the packaged
-  `file-processor-deploy/` build artifact, byte-identical). Migration was therefore a single move.
+  `inspecto-deploy/` build artifact, byte-identical). Migration was therefore a single move.
 
 **Three export pipes exist for "a pipeline", not two.**
 - Backend `BundleExporter.exportDataSource`/`exportSpace` + `DataSourceBundleResolver.resolve`

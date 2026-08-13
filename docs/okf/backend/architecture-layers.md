@@ -14,7 +14,7 @@
 
 ## 1. Layer model
 
-The backend (`inspecto/`, artifact `file-processor`, ~285 files / ~38,000 lines under `com.gamma`)
+The backend (`inspecto/`, artifact `inspecto-processor`, ~285 files / ~38,000 lines under `com.gamma`)
 is a **layered monolith** with satellite plug-in modules discovered via ServiceLoader:
 
 ```

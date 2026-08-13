@@ -214,11 +214,11 @@ unsynthesized. The rest of `data/` is created on first run and gitignored.
 
 ## 3. Packaging (`inspecto/package.ps1`)
 
-Builds `file-processor-deploy.zip`. Bundle layout:
+Builds `inspecto-deploy.zip`. Bundle layout:
 
 ```
-file-processor-deploy/
-  file-processor.jar          shaded fat JAR
+inspecto-deploy/
+  inspecto.jar          shaded fat JAR
   spaces/                     every committed space (default/demo/ucc) + the _templates gallery;
                               config trees + space.toon + data/samples/ ship, runtime state
                               (audit/duckdb/data-other-than-samples) and the generated uat /
@@ -307,7 +307,7 @@ the rest are planned in subsequent phases. Features that can't run offline (remo
   samples remain unsynthesized.
 - ~~`package.ps1` pre-creates inbox/database dirs only for `adjustment` + `voucher`~~ **stale, corrected
   2026-07-20**: `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own
-  comment (line 21) tells the operator to create `file-processor-deploy/inbox/<adapter>/` manually;
+  comment (line 21) tells the operator to create `inspecto-deploy/inbox/<adapter>/` manually;
   dir creation is the `ura` CLI's `prepare-inbox` command (adapter-agnostic, not adjustment/voucher-
   specific). The example suite sidesteps all of this by being self-contained (each example owns its
   `out/`).

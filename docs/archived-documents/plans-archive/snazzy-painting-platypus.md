@@ -2,7 +2,7 @@
 
 ## Context
 
-The UCC File Processor (`C:/sandbox/ucc-file-processor`, v4.1.0-SNAPSHOT) is a backend-only ETL
+The UCC File Processor (`C:/sandbox/inspecto`, v4.1.0-SNAPSHOT) is a backend-only ETL
 platform with a complete REST control plane (~30 routes on the JDK `HttpServer` in
 `com.gamma.control.ControlApi`, no Spring) but **no operator UI**. Operators today drive it with
 `curl`/CLI. The goal is a web console — built on the **DevExtreme Angular template**
@@ -192,11 +192,11 @@ Config authoring; diagnose-and-alert from Diagnoses; report-narrative from any R
 - Alert rules are draft-only (no live alert engine yet) — the UI manages drafts, not firing rules.
 
 ## Verification
-- **Backend:** `cd C:/sandbox/ucc-file-processor && mvn -q test` green (incl. new
+- **Backend:** `cd C:/sandbox/inspecto && mvn -q test` green (incl. new
   `ControlApiStaticAndCorsTest`); CI **lean-core guard still passes** (no new deps in
   `file-processor`); existing ControlApi tests unchanged.
 - **Frontend dev:** start backend
-  `java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4200 -cp file-processor.jar com.gamma.control.ControlApi <config dir>`;
+  `java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4200 -cp inspecto.jar com.gamma.control.ControlApi <config dir>`;
   `cd ui && npm ci && ng serve`; connect with the dev token; exercise each screen against live data.
 - **Frontend build/lint/test:** `ng lint`, `ng build --configuration production`, `ng test`.
 - **Prod static serving:** build the deploy bundle via `package.ps1`, run the jar with `-Dui.dir=./ui`
@@ -291,7 +291,7 @@ launching `com.gamma.control.ControlApi -Dui.dir=./ui`. **`mvn -pl file-processo
 BUILD SUCCESS.** Lean-core preserved (only `java.nio.file.*` added). NOT committed (guardrail).
 
 **BRAND: "Inspector"** (user directive). Applied to user-facing UI only (NOT Java packages / Maven
-artifact / `file-processor.jar`): `AppInfoService.title='Inspector'` (+`tagline`), `index.html` `<title>`,
+artifact / `inspecto.jar`): `AppInfoService.title='Inspector'` (+`tagline`), `index.html` `<title>`,
 `package.json` name `inspector-ui`, Connect screen + `unauthenticated-content` ("Connect to Inspector"),
 token-store keys `inspector.control.token`/`inspector.assist.token`. Resonates with existing
 `com.gamma.inspector` package. (Backend rebrand was deliberately out of scope — offer if asked.)
@@ -314,7 +314,7 @@ sections; `app.routes.ts` (connect + 8 pages + `**`→dashboard); 8 placeholder 
 NOT yet run.
 
 API URL convention: services call `apiUrl('/pipelines')`; dev→`/api/pipelines`→proxy→`:8080`; prod→`/pipelines`.
-Backend dev launch: `java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4200 -cp file-processor.jar com.gamma.control.ControlApi <config-dir>`.
+Backend dev launch: `java -Dcontrol.token=dev -Dassist.read.token=dev -Dcontrol.cors=http://localhost:4200 -cp inspecto.jar com.gamma.control.ControlApi <config-dir>`.
 Shell to use Node/pnpm: first run `$env:Path = [System.Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path','User')`.
 
 **P2 — DONE & GREEN (uncommitted).** Three real monitoring screens replace the placeholders, all on the

@@ -1,4 +1,4 @@
-# package.ps1 — Build and bundle file-processor for remote server deployment.
+# package.ps1 — Build and bundle inspecto for remote server deployment.
 #
 # Usage (run from inside inspecto/ or from the sandbox root):
 #   pwsh -File inspecto\package.ps1 [-NoBuild] [-Edition Standard|Enterprise]
@@ -7,31 +7,31 @@
 # characters (see .claude/skills/build-verify/SKILL.md).
 #
 # -Edition Enterprise is Standard + inspecto-policy (the ABAC AccessDecider SPI implementation),
-# bundled as file-processor-policy.jar. It needs NO extra flag: the module is discovered purely
+# bundled as inspecto-policy.jar. It needs NO extra flag: the module is discovered purely
 # through META-INF/services/com.gamma.control.AccessDecider, so being on the classpath is what
 # turns policy evaluation on. serve.sh/serve.bat auto-detect it the same way they do the security jar.
 #
 # -Edition Standard (default: Personal) additionally builds inspecto-security (W6, the OIDC
-# Authenticator SPI implementation) and bundles it as file-processor-security.jar; serve.sh/
+# Authenticator SPI implementation) and bundles it as inspecto-security.jar; serve.sh/
 # serve.bat auto-detect its presence, add it to the classpath, and turn on -Dauth.mode=oidc
 # (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle). The embedded
 # jlink runtime's module set (below) is VERIFIED sufficient for inspecto-security too (PKG-4,
-# 2026-07-07): jdeps on file-processor-security.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
+# 2026-07-07): jdeps on inspecto-security.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
 # java.base/java.sql/java.net.http/jdk.httpserver, and RS256/ES256 resolve via SunRsaSign/SunEC
 # (jdk.crypto.ec) on a jlink image built from exactly this list — Standard bundles may embed the
 # runtime. jlink can target either platform from this Windows host by pointing --module-path at
 # the target JDK's jmods (the invoked jlink.exe is always the Windows one; -NoRuntime skips both).
 #
 # Output:
-#   file-processor-deploy.zip        (Windows target, embedded Windows JVM)
-#   file-processor-deploy-linux.zip  (Linux target, embedded Linux JVM — only when a Linux
+#   inspecto-deploy.zip        (Windows target, embedded Windows JVM)
+#   inspecto-deploy-linux.zip  (Linux target, embedded Linux JVM — only when a Linux
 #                                      GraalVM jmods cache is present under .graalvm-cache)
 #   (both in the sandbox root, alongside inbox/ and database/)
 #
 # The zip is a self-contained deployment unit.  On the target server:
-#   1. Unzip file-processor-deploy.zip  →  file-processor-deploy/
-#   2. Create your inbox directories under file-processor-deploy/inbox/<adapter>/
-#   3. java -jar file-processor-deploy/file-processor.jar file-processor-deploy/config/<adapter>/<adapter>_pipeline.toon
+#   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
+#   2. Create your inbox directories under inspecto-deploy/inbox/<adapter>/
+#   3. java -jar inspecto-deploy/inspecto.jar inspecto-deploy/config/<adapter>/<adapter>_pipeline.toon
 #      (or use the bundled run.bat / run.sh — they cd to the bundle root automatically)
 #
 param(
@@ -92,8 +92,8 @@ $adjParserDir = if ((Split-Path -Leaf $scriptDir) -eq 'inspecto') { $scriptDir }
                else { Join-Path $scriptDir 'inspecto' }
 $sandboxRoot  = Split-Path -Parent $adjParserDir
 $targetDir    = Join-Path $adjParserDir 'target'
-$outZip       = Join-Path $sandboxRoot  'file-processor-deploy.zip'
-$outZipLinux  = Join-Path $sandboxRoot  'file-processor-deploy-linux.zip'
+$outZip       = Join-Path $sandboxRoot  'inspecto-deploy.zip'
+$outZipLinux  = Join-Path $sandboxRoot  'inspecto-deploy-linux.zip'
 
 # ── resolve the GraalVM cache dir (jlink.exe + per-target jmods/) ─────────────
 # Historically assumed nested at <repo>/.graalvm-cache; on this sandbox it is a SIBLING of the
@@ -112,11 +112,11 @@ if ($graalvmCacheDir) {
 } else {
     Write-Host "  (no .graalvm-cache found — tried: $($cacheCandidates -join ', '))" -ForegroundColor Yellow
 }
-$bundleDir    = Join-Path $sandboxRoot  'file-processor-deploy'
+$bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
 
 # ── step 1: build ─────────────────────────────────────────────────────────────
 # Built from the repo root with -pl inspecto -am (same idiom as step 1c) because since S5 the
-# core depends on reactor siblings (file-processor-api, …) — a core-alone build from inspecto/
+# core depends on reactor siblings (inspecto-api, …) — a core-alone build from inspecto/
 # would only resolve them after a root `mvn install`. -am builds the needed siblings in-pass;
 # the shaded JAR still lands in inspecto/target/.
 if (-not $NoBuild) {
@@ -152,8 +152,8 @@ if (-not $NoUi -and (Test-Path (Join-Path $uiDir 'package.json'))) {
 # Discover the shaded JAR by pattern so we don't pin to a specific version number. The
 # 'file-processor-*' → 'inspecto-*' artifactId rename settled on 2026-08-10, so the two-pattern
 # compatibility shim this line carried since 2026-07-31 is gone: one name, one glob. The BUNDLE
-# file name below stays 'file-processor.jar' deliberately — that is the deployment surface
-# (serve.sh, the run-example scripts, docs/EDITIONS.md), renamed separately or not at all.
+# file name below followed on 2026-08-13 — the deployment surface (serve.sh, the run-example
+# scripts, docs/EDITIONS.md) is now 'inspecto.jar', so nothing ships as 'file-processor' anymore.
 $jarSrc = Get-ChildItem -Path $targetDir -Filter 'inspecto-processor-*.jar' -ErrorAction SilentlyContinue |
           Select-Object -First 1 -ExpandProperty FullName
 if (-not $jarSrc -or -not (Test-Path $jarSrc)) {
@@ -206,14 +206,14 @@ if (Test-Path $bundleDir) {
 # runtime dirs (data/audit/duckdb/flows) are created on first run, so nothing to pre-create here.
 
 # ── step 3: copy JAR (canonical name for deployment) ──────────────────────────
-Copy-Item $jarSrc "$bundleDir\file-processor.jar"
+Copy-Item $jarSrc "$bundleDir\inspecto.jar"
 if ($securityJarSrc) {
-    Copy-Item $securityJarSrc "$bundleDir\file-processor-security.jar"
-    Write-Host "Bundled Standard-edition security module → file-processor-security.jar" -ForegroundColor Green
+    Copy-Item $securityJarSrc "$bundleDir\inspecto-security.jar"
+    Write-Host "Bundled Standard-edition security module → inspecto-security.jar" -ForegroundColor Green
 }
 if ($policyJarSrc) {
-    Copy-Item $policyJarSrc "$bundleDir\file-processor-policy.jar"
-    Write-Host "Bundled Enterprise-edition policy module → file-processor-policy.jar" -ForegroundColor Green
+    Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
+    Write-Host "Bundled Enterprise-edition policy module → inspecto-policy.jar" -ForegroundColor Green
 }
 
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
@@ -286,7 +286,7 @@ if (Test-Path $spacesSrc) {
 # The examples/ tree is self-contained (each example uses paths relative to its own
 # dir and writes only under its own out/), so no path rewrite is needed — copy as-is,
 # then drop any out/ left over from local test runs. Users run an example with the
-# bundled examples/run-example.(ps1|sh), which resolves the JAR at ../file-processor.jar.
+# bundled examples/run-example.(ps1|sh), which resolves the JAR at ../inspecto.jar.
 $examplesSrc = Join-Path $adjParserDir 'examples'
 if (Test-Path $examplesSrc) {
     $examplesOut = Join-Path $bundleDir 'examples'
@@ -315,7 +315,7 @@ fi
 echo "[run.sh] Using pipeline: $PIPELINE"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 exec "$JAVA" --enable-native-access=ALL-UNNAMED \
-          -jar file-processor.jar \
+          -jar inspecto.jar \
           "$PIPELINE"
 '@
 Write-LfScript -Path "$bundleDir\run.sh" -Content $runShContent
@@ -344,7 +344,7 @@ echo [run.bat] Using pipeline: %PIPELINE%
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 "%JAVA%" --enable-native-access=ALL-UNNAMED ^
-     -jar file-processor.jar ^
+     -jar inspecto.jar ^
      "%PIPELINE%"
 '@
 Write-CrlfScript -Path "$bundleDir\run.bat" -Content $runBatContent
@@ -367,7 +367,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 exec "$JAVA" --enable-native-access=ALL-UNNAMED \
-          -cp file-processor.jar \
+          -cp inspecto.jar \
           com.gamma.inspector.MainApp "$@"
 '@
 Write-LfScript -Path "$bundleDir\ura.sh" -Content $uraShContent
@@ -384,7 +384,7 @@ cd /d "%~dp0"
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 "%JAVA%" --enable-native-access=ALL-UNNAMED ^
-     -cp file-processor.jar ^
+     -cp inspecto.jar ^
      com.gamma.inspector.MainApp %*
 '@
 Write-CrlfScript -Path "$bundleDir\ura.bat" -Content $uraBatContent
@@ -409,14 +409,14 @@ JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces
 [ -n "${CORS_ORIGIN:-}" ]   && JAVA_OPTS+=("-Dcontrol.cors=${CORS_ORIGIN}")
 [ -n "${HTTPS_KEYSTORE:-}" ]          && JAVA_OPTS+=("-Dhttps.keystore=${HTTPS_KEYSTORE}")
 [ -n "${HTTPS_KEYSTORE_PASSWORD:-}" ] && JAVA_OPTS+=("-Dhttps.keystore.password=${HTTPS_KEYSTORE_PASSWORD}")
-# Edition auto-detects from the bundle (W6, docs/EDITIONS.md): file-processor-security.jar present
+# Edition auto-detects from the bundle (W6, docs/EDITIONS.md): inspecto-security.jar present
 # ⇒ Standard — put it on the classpath and turn on OIDC (issuer/JWKS/audience from env, never baked
-# into the bundle); + file-processor-policy.jar ⇒ Enterprise. Neither ⇒ Personal, byte-for-byte the
+# into the bundle); + inspecto-policy.jar ⇒ Enterprise. Neither ⇒ Personal, byte-for-byte the
 # historic auth-free classpath/flags.
-CP="file-processor.jar"
+CP="inspecto.jar"
 EDITION="Personal"
-if [ -f file-processor-security.jar ]; then
-    CP="file-processor.jar:file-processor-security.jar"
+if [ -f inspecto-security.jar ]; then
+    CP="inspecto.jar:inspecto-security.jar"
     EDITION="Standard"
     JAVA_OPTS+=("-Dauth.mode=oidc")
     [ -n "${AUTH_OIDC_ISSUER:-}" ]    && JAVA_OPTS+=("-Dauth.oidc.issuer=${AUTH_OIDC_ISSUER}")
@@ -426,10 +426,10 @@ if [ -f file-processor-security.jar ]; then
     # Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value —
     # the backend expands ${ENV:...} at use, so the secret never appears on the process command line.
     [ -n "${AUTH_OIDC_CLIENT_SECRET:-}" ] && JAVA_OPTS+=('-Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}')
-    # file-processor-policy.jar present ⇒ Enterprise (Standard + ABAC). No flag: the module is found
+    # inspecto-policy.jar present ⇒ Enterprise (Standard + ABAC). No flag: the module is found
     # via META-INF/services/com.gamma.control.AccessDecider, so the classpath entry IS the switch.
-    if [ -f file-processor-policy.jar ]; then
-        CP="${CP}:file-processor-policy.jar"
+    if [ -f inspecto-policy.jar ]; then
+        CP="${CP}:inspecto-policy.jar"
         EDITION="Enterprise"
     fi
 fi
@@ -455,14 +455,14 @@ if not "%ASSIST_TOKEN%"=="" set "OPTS=%OPTS% -Dassist.read.token=%ASSIST_TOKEN%"
 if not "%CORS_ORIGIN%"=="" set "OPTS=%OPTS% -Dcontrol.cors=%CORS_ORIGIN%"
 if not "%HTTPS_KEYSTORE%"=="" set "OPTS=%OPTS% -Dhttps.keystore=%HTTPS_KEYSTORE%"
 if not "%HTTPS_KEYSTORE_PASSWORD%"=="" set "OPTS=%OPTS% -Dhttps.keystore.password=%HTTPS_KEYSTORE_PASSWORD%"
-rem Edition auto-detects from the bundle (W6, docs/EDITIONS.md): file-processor-security.jar present
+rem Edition auto-detects from the bundle (W6, docs/EDITIONS.md): inspecto-security.jar present
 rem => Standard - put it on the classpath and turn on OIDC (issuer/JWKS/audience from env);
-rem + file-processor-policy.jar => Enterprise. Neither => Personal, byte-for-byte the historic
+rem + inspecto-policy.jar => Enterprise. Neither => Personal, byte-for-byte the historic
 rem auth-free classpath/flags.
-set "CP=file-processor.jar"
+set "CP=inspecto.jar"
 set "EDITION=Personal"
-if exist file-processor-security.jar (
-    set "CP=file-processor.jar;file-processor-security.jar"
+if exist inspecto-security.jar (
+    set "CP=inspecto.jar;inspecto-security.jar"
     set "EDITION=Standard"
     set "OPTS=%OPTS% -Dauth.mode=oidc"
     if not "%AUTH_OIDC_ISSUER%"=="" set "OPTS=%OPTS% -Dauth.oidc.issuer=%AUTH_OIDC_ISSUER%"
@@ -471,10 +471,10 @@ if exist file-processor-security.jar (
     if not "%AUTH_OIDC_CLIENT_ID%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientId=%AUTH_OIDC_CLIENT_ID%"
     rem Confidential-client secret (optional; W6d BFF): pass a SecretResolver REFERENCE, not the value.
     if not "%AUTH_OIDC_CLIENT_SECRET%"=="" set "OPTS=%OPTS% -Dauth.oidc.clientSecret=${ENV:AUTH_OIDC_CLIENT_SECRET}"
-    rem file-processor-policy.jar present => Enterprise (Standard + ABAC). No flag needed: the module
+    rem inspecto-policy.jar present => Enterprise (Standard + ABAC). No flag needed: the module
     rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
-    if exist file-processor-policy.jar (
-        set "CP=file-processor.jar;file-processor-security.jar;file-processor-policy.jar"
+    if exist inspecto-policy.jar (
+        set "CP=inspecto.jar;inspecto-security.jar;inspecto-policy.jar"
         set "EDITION=Enterprise"
     )
 )
@@ -512,7 +512,7 @@ function New-JlinkRuntime {
 
 $builtLinuxRuntime = $false
 if (-not $NoRuntime) {
-    # Module set = jdeps core for file-processor.jar (java.base, java.compiler, java.desktop,
+    # Module set = jdeps core for inspecto.jar (java.base, java.compiler, java.desktop,
     # java.naming, java.scripting, java.sql, jdk.httpserver) + runtime-only safety modules that
     # jdeps cannot see in a fat JAR: jdk.crypto.ec (TLS/JDBC ciphers), jdk.unsupported
     # (sun.misc.Unsafe), java.net.http (HttpClient), jdk.zipfs (.zip via NIO), java.management (JMX).
@@ -541,7 +541,7 @@ if (-not $NoRuntime) {
                       Select-Object -First 1
     }
     if ($linuxJmods) {
-        $linuxRuntimeOut = Join-Path $sandboxRoot 'file-processor-deploy-linux-runtime'
+        $linuxRuntimeOut = Join-Path $sandboxRoot 'inspecto-deploy-linux-runtime'
         try {
             New-JlinkRuntime -JlinkExe $jlink -Modules $runtimeModules -OutputDir $linuxRuntimeOut -ModulePath $linuxJmods -PlatformLabel 'Linux'
             $builtLinuxRuntime = $true
@@ -591,10 +591,10 @@ if ($builtLinuxRuntime) {
     # only the runtime/ folder differs per target, so swap it in place and re-zip rather than
     # rebuilding the whole bundle a second time.
     $windowsRuntimeOut = Join-Path $bundleDir 'runtime'
-    $windowsRuntimeTmp = Join-Path $sandboxRoot 'file-processor-deploy-windows-runtime'
+    $windowsRuntimeTmp = Join-Path $sandboxRoot 'inspecto-deploy-windows-runtime'
     if (Test-Path $windowsRuntimeTmp) { Remove-Item $windowsRuntimeTmp -Recurse -Force }
     Move-Item $windowsRuntimeOut $windowsRuntimeTmp
-    Move-Item (Join-Path $sandboxRoot 'file-processor-deploy-linux-runtime') $windowsRuntimeOut
+    Move-Item (Join-Path $sandboxRoot 'inspecto-deploy-linux-runtime') $windowsRuntimeOut
 
     if (Test-Path $outZipLinux) { Remove-Item $outZipLinux -Force }
     Compress-Archive -Path $bundleDir -DestinationPath $outZipLinux
@@ -665,9 +665,9 @@ if (-not (Test-Path (Join-Path $bundleDir 'ui\index.html'))) {
 Write-Host ""
 Write-Host "Deploy to remote server:" -ForegroundColor Cyan
 Write-Host "  1. Copy $outZip to the server"
-Write-Host "  2. Expand-Archive file-processor-deploy.zip   (PowerShell)"
-Write-Host "     or:  unzip file-processor-deploy.zip       (Linux)"
-Write-Host "  3. cd file-processor-deploy"
+Write-Host "  2. Expand-Archive inspecto-deploy.zip   (PowerShell)"
+Write-Host "     or:  unzip inspecto-deploy.zip       (Linux)"
+Write-Host "  3. cd inspecto-deploy"
 Write-Host "  4. ETL pipeline (one-shot):"
 Write-Host "       run.bat voucher         (Windows)"
 Write-Host "       bash run.sh voucher     (Linux)"
@@ -694,7 +694,7 @@ if (-not $NoRuntime) {
         Write-Host "  $outZipLinux  → Linux-native embedded JVM" -ForegroundColor Green
     } else {
         Write-Host "  $outZip → Windows-native embedded JVM" -ForegroundColor Green
-        Write-Host "  (no Linux GraalVM jmods cache found — file-processor-deploy-linux.zip not built;" -ForegroundColor Yellow
+        Write-Host "  (no Linux GraalVM jmods cache found — inspecto-deploy-linux.zip not built;" -ForegroundColor Yellow
         Write-Host "   the bundled *.sh launchers fall back to system java on Linux instead.)" -ForegroundColor Yellow
     }
     Write-Host "The run/serve/ura launchers auto-prefer the embedded runtime when present."

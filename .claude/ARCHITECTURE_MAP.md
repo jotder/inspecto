@@ -1,7 +1,7 @@
 # Architecture Map
 
-Inspecto (repo `ucc-file-processor`) — Java 26 build / Maven `release=24`, multi-module reactor
-(`file-processor-parent`). DuckDB · TOON config (JToon) · OpenCSV · Commons Compress.
+Inspecto (repo `inspecto`) — Java 26 build / Maven `release=24`, multi-module reactor
+(`inspecto-parent`). DuckDB · TOON config (JToon) · OpenCSV · Commons Compress.
 
 ---
 
@@ -9,10 +9,10 @@ Inspecto (repo `ucc-file-processor`) — Java 26 build / Maven `release=24`, mul
 
 | Dir | artifactId | Role |
 |---|---|---|
-| `inspecto/` | `file-processor` | Lean engine + control plane (fat-JAR `file-processor.jar`). No network/AI deps. |
-| `inspecto-agent/` | `file-processor-agent` | Assist skills on `agent-kernel` (the 7-skill catalog). |
-| `inspecto-agent-hosted/` | `file-processor-agent-hosted` | Hosted model providers (langchain4j Anthropic/OpenAI/Gemini). |
-| `inspecto-connectors/` | `file-processor-connectors` | **Optional** remote source connectors (SFTP/sshj, FTP/commons-net). ServiceLoader-discovered. |
+| `inspecto/` | `inspecto-processor` | Lean engine + control plane (fat-JAR `inspecto.jar`). No network/AI deps. |
+| `inspecto-agent/` | `inspecto-agent` | Assist skills on `agent-kernel` (the 7-skill catalog). |
+| `inspecto-agent-hosted/` | `inspecto-agent-hosted` | Hosted model providers (langchain4j Anthropic/OpenAI/Gemini). |
+| `inspecto-connectors/` | `inspecto-connectors` | **Optional** remote source connectors (SFTP/sshj, FTP/commons-net). ServiceLoader-discovered. |
 | `inspecto-ui/` | — | Angular SPA (Material/Tailwind, ag-Grid, Chart.js, AntV G6); dev serve `:4204`. |
 
 ## Key packages (under `inspecto/src/main/java/com/gamma/`)

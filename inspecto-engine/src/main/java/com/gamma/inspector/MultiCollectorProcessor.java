@@ -37,7 +37,7 @@ import java.util.stream.Stream;
  *
  * <h3>CLI</h3>
  * <pre>
- *   java -cp file-processor.jar com.gamma.inspector.MultiCollectorProcessor \
+ *   java -cp inspecto.jar com.gamma.inspector.MultiCollectorProcessor \
  *        [-Dsources.max=N] &lt;path&gt; [&lt;path&gt; ...]
  * </pre>
  * Each {@code path} is either a {@code *_pipeline.toon} file or a directory, which

@@ -74,9 +74,9 @@ reuse debt, and dead weight.
   uses raw `AgGridAngular`~~ **(S3: migrated onto `<inspecto-data-table tier="standard">`).**
 - `inspecto/grid/index.ts` registers `AllCommunityModule` — every one of ~30 lazy grid chunks carries
   all ag-Grid community modules.
-- Root clutter: `file-processor-deploy-old/` (stale Jun-20 bundle), `test-run.log` (410 KB), two
+- Root clutter: `inspecto-deploy-old/` (stale Jun-20 bundle), `test-run.log` (410 KB), two
   mangled `C:Users…build.log` files, `HANDOVER-multi-space.md` (superseded by
-  `SESSION_STATUS.local.md`), tracked `*.iml`, stray `file-processor-deploy/serve-8091.log`.
+  `SESSION_STATUS.local.md`), tracked `*.iml`, stray `inspecto-deploy/serve-8091.log`.
 
 ### 1.5 Structural performance smells
 
@@ -163,7 +163,7 @@ uncaught, so a throw leaves the space half-removed.
 
 1. **Framework-free stays** — JDK HttpServer, manual DI, ServiceLoader SPI. No Spring/Quarkus
    (per `docs/EDITIONS.md` + security-hardening direction).
-2. **One deployable stays** — the fat `file-processor.jar`; modularization is *reactor-internal*,
+2. **One deployable stays** — the fat `inspecto.jar`; modularization is *reactor-internal*,
    not a microservice split.
 3. **Editions = build flavors, never branches** (`docs/BRANCHING.md`).
 4. Glossary vocabulary is binding across every touched layer (`docs/GLOSSARY.md` §13).
@@ -267,7 +267,7 @@ last (it depends on everything). Each step = move packages + fix imports + full 
 A1. Parent `<dependencyManagement>` + shared properties (`junit.version` actually used, `langchain4j.version`,
     `eoiagent.version`, `postgresql.version`); delete per-module literals.
 A2. Move jacoco `coverage` profile to the parent so all modules instrument.
-A3. Delete `file-processor-deploy-old/`, root logs, mangled build-log files, `serve-8091.log`,
+A3. Delete `inspecto-deploy-old/`, root logs, mangled build-log files, `serve-8091.log`,
     `HANDOVER-multi-space.md`; untrack `*.iml`; extend `.gitignore`.
 
 ### WS-B · UI reuse & dead weight

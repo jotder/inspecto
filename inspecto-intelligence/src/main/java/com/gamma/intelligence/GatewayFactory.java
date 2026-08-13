@@ -55,7 +55,7 @@ final class GatewayFactory {
         return StubLlmGateway.builder()
                 .defaultReplyText("No reachable local model is configured for the embedded intelligence "
                         + "agent (provider '" + settings.provider() + "'); hosted providers are not wired "
-                        + "into file-processor-intelligence yet. Configure a local Ollama endpoint under "
+                        + "into inspecto-intelligence yet. Configure a local Ollama endpoint under "
                         + "Assist Settings.")
                 .build();
     }

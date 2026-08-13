@@ -4,9 +4,9 @@ rem Working directory must be the sandbox root (the directory containing this sc
 setlocal
 cd /d "%~dp0"
 set "JAR="
-for %%F in (inspecto\target\file-processor-*.jar) do set "JAR=%%F"
+for %%F in (inspecto\target\inspecto-processor-*.jar) do set "JAR=%%F"
 if not defined JAR (
-    echo ERROR: no JAR found matching inspecto\target\file-processor-*.jar
+    echo ERROR: no JAR found matching inspecto\target\inspecto-processor-*.jar
     echo        Run 'mvn clean package' first.
     exit /b 1
 )

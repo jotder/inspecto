@@ -14,7 +14,7 @@ import java.util.Set;
  * Maps {@link ProviderSettings} to a concrete {@link ModelRouter} (v4.1) — the one place a provider
  * id becomes a client. Local Ollama is built directly (the dependency this module always carries);
  * hosted ids are resolved through the {@link HostedProviderPlugin} ServiceLoader seam so hosted SDKs
- * stay out of the default classpath ({@code file-processor-agent-hosted} contributes them).
+ * stay out of the default classpath ({@code inspecto-agent-hosted} contributes them).
  *
  * <p>Construction never touches the network — every provider builds its client lazily and reports
  * {@code available()} from configuration alone (the kernel's abstain-safe contract).
@@ -55,7 +55,7 @@ public final class ModelProviderFactory {
             }
         }
         String why = ProviderSettings.knownProviders().contains(id)
-                ? "provider '" + id + "' requires the file-processor-agent-hosted jar on the classpath"
+                ? "provider '" + id + "' requires the inspecto-agent-hosted jar on the classpath"
                 : "unknown model provider '" + id + "'";
         return tier -> ModelProvider.unavailable(why);
     }

@@ -13,7 +13,7 @@
 # for, and the engine runs with CWD = the example dir, so relative paths (schema_file, dirs.poll)
 # resolve exactly as in one-shot mode. Everything is written under the example's own out/.
 #
-# JAR resolution: $INSPECTO_JAR -> ../file-processor.jar (bundle) -> ../target/file-processor-*.jar.
+# JAR resolution: $INSPECTO_JAR -> ../inspecto.jar (bundle) -> ../target/inspecto-processor-*.jar.
 #
 # Usage: bash serve-example.sh 06-serve/sequence-gap [--demo] [--port N] [--poll N] [--wait N] [--clean]
 set -euo pipefail
@@ -34,8 +34,8 @@ done
 
 resolve_jar() {
   if [ -n "${INSPECTO_JAR:-}" ] && [ -f "$INSPECTO_JAR" ]; then echo "$INSPECTO_JAR"; return; fi
-  if [ -f "$EXAMPLES_ROOT/../file-processor.jar" ]; then echo "$EXAMPLES_ROOT/../file-processor.jar"; return; fi
-  local t; t="$(ls "$EXAMPLES_ROOT"/../target/file-processor-*.jar 2>/dev/null | grep -Ev 'sources|javadoc' | head -1 || true)"
+  if [ -f "$EXAMPLES_ROOT/../inspecto.jar" ]; then echo "$EXAMPLES_ROOT/../inspecto.jar"; return; fi
+  local t; t="$(ls "$EXAMPLES_ROOT"/../target/inspecto-processor-*.jar 2>/dev/null | grep -Ev 'sources|javadoc' | head -1 || true)"
   if [ -n "$t" ]; then echo "$t"; return; fi
   echo "Engine JAR not found. Set \$INSPECTO_JAR or build it (mvn -o clean package)." >&2; exit 1
 }

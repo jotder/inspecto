@@ -13,7 +13,7 @@ timestamp: 2026-06-28T00:00:00Z
 
 ```
 mvn -o clean test          # full reactor; "verified" = this passes
-mvn -o clean package -q    # → inspecto/target/file-processor-*.jar (fat JAR)
+mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar (fat JAR)
 ```
 
 Always offline (`-o`). Tests spin up a real `CollectorService`/[`ControlApi`](../control-plane/control-api.md) on

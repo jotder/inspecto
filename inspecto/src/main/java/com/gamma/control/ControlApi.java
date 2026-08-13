@@ -147,7 +147,7 @@ import java.util.regex.Pattern;
  * <p>The {@code /catalog*}, {@code /config/spec/*} and {@code /assist/*} routes require the
  * {@code assist.read} scope (satisfied by {@code control}); they expose the M1 metadata graph, the
  * M2 declarative config specs, and the M3 in-process assist agent for the UI and the agent. The
- * {@code /assist/*} route delegates to the optional {@code file-processor-agent} module when it is
+ * {@code /assist/*} route delegates to the optional {@code inspecto-agent} module when it is
  * on the classpath; with no agent present it returns {@code 503}, leaving the core unchanged.</p>
  *
  * <p>Report routes accept an optional inclusive date range {@code ?from=&to=} (v2.10.0) —
@@ -332,7 +332,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     /**
      * Run the service <em>with</em> the control plane attached:
      * <pre>
-     *   java -cp file-processor.jar com.gamma.control.ControlApi \
+     *   java -cp inspecto.jar com.gamma.control.ControlApi \
      *        [-Dcontrol.port=8080] \
      *        [-Dservice.poll.seconds=N] [-Dservice.max.runs=M] &lt;config.toon | dir&gt; ...
      * </pre>

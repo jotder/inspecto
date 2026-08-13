@@ -9,7 +9,7 @@ timestamp: 2026-07-22T00:00:00Z
 
 # Core Module (`inspecto/`)
 
-The **composition root** (artifactId `inspecto-processor`, jar `file-processor.jar`) — the module that wires
+The **composition root** (artifactId `inspecto-processor`, jar `inspecto.jar`) — the module that wires
 the object graph together and shades the single deployable fat JAR. It keeps **zero network/AI
 dependencies**: remote protocols live in [connectors](connectors.md), hosted models in
 [agent-hosted](agent-hosted.md).
@@ -45,7 +45,7 @@ The concept docs are unchanged by the move; only the home module changed:
   helpers), **`inspecto-config`** ([TOON config](../config/toon-config.md) — spec/io/safety), and
   **`inspecto-sql`** (the sandboxed read-only DuckDB SQL surface).
 
-Modularization is reactor-internal — the single `file-processor.jar` is unchanged (shade has no
+Modularization is reactor-internal — the single `inspecto.jar` is unchanged (shade has no
 include-list, so the sibling modules' classes and resources bundle automatically).
 
 Build/run: see [build & test](../build-run/build-test.md).

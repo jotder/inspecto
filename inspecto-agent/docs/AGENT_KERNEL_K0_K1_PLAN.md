@@ -10,7 +10,7 @@
 
 ## 0. Scope & sequencing rules
 
-- K0/K1 happen entirely in a **new `agent-kernel` repo**. They are **purely additive** — nothing in `ucc-file-processor` changes. UCC's `file-processor-agent` retains its current classes; it only switches to depending on the kernel at **U1** (a later phase, separate plan).
+- K0/K1 happen entirely in a **new `agent-kernel` repo**. They are **purely additive** — nothing in `inspecto` changes. UCC's `file-processor-agent` retains its current classes; it only switches to depending on the kernel at **U1** (a later phase, separate plan).
 - This avoids any broken intermediate state: the kernel reaches a green, self-contained `0.x` *before* UCC touches it.
 - Build only what UCC needs to consume at U1: **ring-1 core**, **`agent-provider-ollama`**, **`agent-eval`**. The Spring/Postgres/HITL/orchestration companions are R1 work, driven by the first CVVE/CxO build.
 
@@ -424,7 +424,7 @@ public final class EvalCaseLoader {               // fixtures as classpath JSON 
 
 - `agent-kernel-spring`, `agent-store-postgres`, `agent-hitl`, `agent-orchestration`, `agent-provider-langchain4j` → **R1** (detailed in [`AGENT_KERNEL_R1_PLAN.md`](AGENT_KERNEL_R1_PLAN.md)), driven by the first CVVE/CxO build.
 - **The sync orchestrator** (run-capability → estimate-confidence → escalate → ground → audit pipeline) → **deferred to R1** (locked). K1 ships the *ingredients* — `EscalationPolicy`, `ConfidenceEstimator`, `GroundingGuard`, `Deadline`, `RepairLoop`, `AuditSink` — and `CapabilityRegistry.dispatch()` for plain dispatch, but **not** the assembled pipeline. UCC keeps running its own in-module orchestrator until R1 lands the shared one (then U-phase swaps it in). Rationale: the orchestrator is exactly the part most likely to be reshaped by the 2nd consumer (async/state-machine for CVVE, streaming for CxO), so freezing it on UCC alone is premature.
-- Any change to `ucc-file-processor` → **U0/U1** (separate plan: [`AGENT_KERNEL_U0_U1_PLAN.md`](AGENT_KERNEL_U0_U1_PLAN.md)). **U0 includes the Java 24→25 bump** (kernel-floor prerequisite).
+- Any change to `inspecto` → **U0/U1** (separate plan: [`AGENT_KERNEL_U0_U1_PLAN.md`](AGENT_KERNEL_U0_U1_PLAN.md)). **U0 includes the Java 24→25 bump** (kernel-floor prerequisite).
 - Kernel `1.0` API freeze → after a 2nd consumer reshapes the API.
 
 ---

@@ -18,7 +18,7 @@ import java.util.Optional;
  * single-shot skill call, this one hosts multi-turn sessions on the eoiagent deliberative loop.
  * Both stay live side by side — the reflex layer is the fallback when this module is absent.
  *
- * <p>The implementation lives in the separate {@code file-processor-intelligence} module so the
+ * <p>The implementation lives in the separate {@code inspecto-intelligence} module so the
  * core fat-JAR stays dependency-lean. When that module — and a provider declared via
  * {@code META-INF/services/com.gamma.intelligence.spi.IntelligenceAgent} — is on the classpath,
  * {@link CollectorService} discovers it with {@link java.util.ServiceLoader} at startup. A provider
@@ -132,7 +132,7 @@ public interface IntelligenceAgent extends AutoCloseable {
     /**
      * The most recent investigation Cases (AGT-5 P1 slice D), newest first, as plain JSON-friendly
      * maps — the core stays free of the {@code Case} record type, which lives in the optional
-     * {@code file-processor-intelligence} module. Default empty: an implementation without an
+     * {@code inspecto-intelligence} module. Default empty: an implementation without an
      * investigation tier (or the module absent) yields no cases rather than a 503 — {@code GET
      * /agent/cases} is a read that degrades, mirroring {@code GET /assist/diagnoses}.
      */
@@ -159,7 +159,7 @@ public interface IntelligenceAgent extends AutoCloseable {
     /**
      * Recent agent-action approvals (AGT-5 P3, autonomy L2), newest first, as plain JSON-friendly
      * maps — the core stays free of the {@code Approval} type, which lives in the optional
-     * {@code file-processor-intelligence} module. Includes both pending and already-decided entries so
+     * {@code inspecto-intelligence} module. Includes both pending and already-decided entries so
      * {@code GET /agent/approvals} can show recent history. Default empty: an implementation without an
      * act tier (or the module absent) yields no approvals rather than a 503, mirroring {@link #recentCases}.
      */
@@ -185,7 +185,7 @@ public interface IntelligenceAgent extends AutoCloseable {
     /**
      * The bounded-autonomy policy (AGT-5 P4, autonomy L3) as a plain JSON-friendly map — the core stays
      * free of the {@code AutonomyPolicy} type, which lives in the optional
-     * {@code file-processor-intelligence} module. Empty when the implementation has no autonomy tier (or
+     * {@code inspecto-intelligence} module. Empty when the implementation has no autonomy tier (or
      * the module is absent), which the control route maps to 503 — unlike the read-degrading
      * {@link #recentApprovals}, an absent policy engine is a genuine "feature not present" rather than
      * "nothing yet".

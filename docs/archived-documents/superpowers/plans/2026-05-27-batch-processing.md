@@ -2114,7 +2114,7 @@ import java.util.stream.Stream;
  * <p>A batch of one file is the legacy single-file case and keeps the
  * {@code <basename>_out.<ext>} output name.
  *
- * <p>Run via: {@code java -jar file-processor.jar <pipeline.toon>}
+ * <p>Run via: {@code java -jar inspecto.jar <pipeline.toon>}
  */
 public class SourceProcessor {
 

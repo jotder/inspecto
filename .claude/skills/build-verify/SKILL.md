@@ -1,7 +1,7 @@
 ---
 name: build-verify
 description: >
-  Canonical build / test / package / run recipes for inspecto (ucc-file-processor). Use whenever you
+  Canonical build / test / package / run recipes for inspecto. Use whenever you
   need to compile, run tests, build the fat JAR, produce the per-edition deployment bundle, or build/
   serve the Angular UI — and to confirm a change actually works before reporting done. Encodes the
   offline Maven reactor verify loop, the mandatory DuckDB native-access JVM flag, package.ps1 edition
@@ -26,7 +26,7 @@ mvn -o clean package -q          # → inspecto/target/inspecto-processor-*.jar 
 ```
 ⚠ **`file-processor-*` is no longer a reactor artifact** (artifactIds renamed to `inspecto-*` on
 2026-08-10, `a1da65f5`). It survives ONLY as the deployment surface `package.ps1` copies to —
-`file-processor.jar` inside `file-processor-deploy/`. A `target/file-processor-*.jar` glob matches nothing.
+`inspecto.jar` inside `inspecto-deploy/`. A `target/file-processor-*.jar` glob matches nothing.
 **Every JVM launch needs `--enable-native-access=ALL-UNNAMED`** (DuckDB JNI) — including test runs.
 Tests stand up a real `SourceService`/`ControlApi` on an ephemeral port and exercise the HTTP surface.
 
@@ -109,7 +109,7 @@ node tools/check-secrets.mjs > /dev/null 2>&1; echo "EXIT=$?"
 output you trim — the Maven reactor, the two Node guards, and the npm scripts.
 
 ⚠ **Known pre-existing FALSE RED — `check-secrets.mjs` exits 1 on a clean tree.** Its 4 hits are all in
-`file-processor-deploy/ui/chunk-*.js`, which is **gitignored with zero tracked files** (`.gitignore:44`), and are
+`inspecto-deploy/ui/chunk-*.js`, which is **gitignored with zero tracked files** (`.gitignore:44`), and are
 minified library property assignments (`withCredentials`, `apiKey`), not credentials. CI is unaffected (a fresh
 clone has no such directory). Don't chase it as a regression, and never silence it with `secret-allow` on
 generated bundle files. → `docs/BACKLOG.md` §6.
@@ -170,8 +170,8 @@ Editions are build flavors (Personal HTTP/no-auth · Standard HTTPS/OIDC · Ente
 policy) — see [docs/EDITIONS.md](../../docs/EDITIONS.md). All three flavors exist today:
 
 ```powershell
-pwsh -File inspecto\package.ps1 -Edition Standard    # + file-processor-security.jar (OIDC)
-pwsh -File inspecto\package.ps1 -Edition Enterprise  # + security AND file-processor-policy.jar (ABAC)
+pwsh -File inspecto\package.ps1 -Edition Standard    # + inspecto-security.jar (OIDC)
+pwsh -File inspecto\package.ps1 -Edition Enterprise  # + security AND inspecto-policy.jar (ABAC)
 ```
 
 Enterprise is a **superset** of Standard, matching `-Pedition-enterprise` = `edition-standard` + policy;
@@ -181,7 +181,7 @@ Enterprise is a **superset** of Standard, matching `-Pedition-enterprise` = `edi
 ### Two-target (Windows + Linux) embedded runtime — GraalVM cache location matters
 
 `package.ps1` always builds the Windows bundle; it **additionally** builds
-`file-processor-deploy-linux.zip` with a genuinely Linux-native embedded JVM (real `libjvm.so`/ELF
+`inspecto-deploy-linux.zip` with a genuinely Linux-native embedded JVM (real `libjvm.so`/ELF
 `bin/java`, not a copy) whenever it can find a Linux GraalVM jmods directory — no separate flag,
 it just needs to locate the cache. **Fixed 2026-07-31:** the lookup used to be hardcoded to
 `<repo>/.graalvm-cache`, which never matches a cache kept as a **sibling of the repo**
@@ -202,11 +202,11 @@ pwsh -File inspecto\package.ps1 -NoUi -GraalvmCache 'D:\jdks\.graalvm-cache'   #
 
 ```powershell
 # One-shot ETL pipeline
-java --enable-native-access=ALL-UNNAMED -jar inspecto\target\file-processor-*.jar `
+java --enable-native-access=ALL-UNNAMED -jar inspecto\target\inspecto-processor-*.jar `
      inspecto\config\voucher\voucher_unknown_pipeline.toon
 
 # Long-running control plane + UI (ControlApi, default :8080)
-.\file-processor-deploy\serve.bat               # then http://localhost:8080/
+.\inspecto-deploy\serve.bat               # then http://localhost:8080/
 ```
 
 ## UI (Angular SPA — inspecto-ui/)

@@ -7,7 +7,7 @@ import com.gamma.service.CollectorService;
  * Placeholder assist-agent provider (v3.0, milestone M0).
  *
  * <p>Its only job is to prove the cross-module SPI wiring: the optional
- * {@code file-processor-agent} module implements {@link AssistAgent} (defined in core) and
+ * {@code inspecto-agent} module implements {@link AssistAgent} (defined in core) and
  * can be wired into a running {@link CollectorService}. It intentionally does nothing else.
  *
  * <p>It is <b>not</b> registered as a {@code ServiceLoader} provider yet (no

@@ -17,15 +17,18 @@
 
 ## 1. Identity & module map
 
-**Inspecto** (formerly *UCC File Processor*; repo `C:/sandbox/ucc-file-processor`). Java (core bytecode
+**Inspecto** (formerly *UCC File Processor*; repo `inspecto`, checked out here as
+`C:/sandbox/inspecto-clean`). Java (core bytecode
 `release=24`; agent modules need a **JDK 25+ runtime**; built & bundled on **JDK 26**) / Maven
 multi-module · embedded **DuckDB** · **TOON** config · OpenCSV. Mainline = `master`; current release line
 = `4.x`. Editions = build flavors (see below), **never branches**.
 
 Module dirs were renamed 2026-06-12; the **artifactIds caught up on 2026-08-10** (`a1da65f5`), so dir ==
 artifactId everywhere — with one deliberate exception: `inspecto/` is `inspecto-processor`, because a bare
-`inspecto` would collide with the aggregator. The shipped bundle is still named `file-processor.jar`; that
-is the deployment surface, not an artifactId:
+`inspecto` would collide with the aggregator. The shipped bundle is named `inspecto.jar` (renamed from
+`file-processor.jar` on 2026-08-13, along with the `inspecto-deploy/` bundle dir and the
+`inspecto-security.jar` / `inspecto-policy.jar` edition jars); that is the deployment surface, not an
+artifactId:
 
 Reactor = **13 modules** (build order below; WS-D 2026-07-22 added `inspecto-engine`, then split
 `inspecto-etl`, `inspecto-event`, and `inspecto-acquire` out of it the same day, increments 2–4).
@@ -42,7 +45,7 @@ Authoritative shape, version management, and the module-extraction playbook:
 | `inspecto-event/` | `com.gamma.event`+`metrics` — Operational-Intelligence event store + metrics | `inspecto-event` |
 | `inspecto-acquire/` | `com.gamma.acquire` — file/remote acquisition, ledger, stability/gap/retry | `inspecto-acquire` |
 | `inspecto-engine/` | the remaining engine cluster (`pipeline`/`job`/`inspector`/… ) below core | `inspecto-engine` |
-| `inspecto/` | control plane + composition root (lean core), ships the fat JAR | `inspecto-processor` / `file-processor.jar` |
+| `inspecto/` | control plane + composition root (lean core), ships the fat JAR | `inspecto-processor` / `inspecto.jar` |
 | `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB), all network deps | `inspecto-connectors` |
 | `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
 | `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
@@ -234,8 +237,10 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   as anything louder than console noise. ⚠ Two lessons that generalize: a per-kind fan-out behind
   `Promise.allSettled` **hides a contract break as missing data**, and a docstring claiming a backend enum
   is "still closed / real backend later" is a claim to re-verify, not to trust — that one was ~15 kinds stale.
-- **Hand-assembling a backend classpath will trip the edition model** (`.claude/launch.json`, fixed
-  2026-07-27). `inspecto-connectors` is an *optional* ServiceLoader module carrying `SmtpEmailChannel`, and it
+- **Hand-assembling a backend classpath will trip the edition model** — which is why nobody assembles one
+  by hand anymore: since 2026-08-13 the `inspecto-backend` launch config runs `tools/run-backend.ps1`, which
+  derives the classpath at launch and gets the rule below right *by construction*. Read on before editing it.
+  `inspecto-connectors` is an *optional* ServiceLoader module carrying `SmtpEmailChannel`, and it
   is deliberately **not** in `inspecto`'s dependency tree — putting its `target/classes` on the classpath makes
   `NotificationService.discoverChannels` find a channel whose `javax.mail` dep was never shipped, and boot dies
   with `NoClassDefFoundError: javax/mail/Message`. Derive the list from

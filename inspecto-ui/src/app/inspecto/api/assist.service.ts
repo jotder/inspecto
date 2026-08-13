@@ -5,7 +5,7 @@ import { apiUrl, toParams } from './api-base';
 import { AssistIntent, AssistRequest, AssistResult, Diagnosis } from './models';
 
 /**
- * Embedded assist agent (ASSIST_READ scope). The agent lives in the optional file-processor-agent
+ * Embedded assist agent (ASSIST_READ scope). The agent lives in the optional inspecto-agent
  * module; when absent, POST /assist/{intent} returns 503 and /assist/diagnoses returns []. Callers
  * should degrade gracefully (see error.interceptor + per-screen handling).
  */

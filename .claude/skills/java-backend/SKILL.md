@@ -40,9 +40,9 @@ years. Do not reach for a framework; this design is intentional (see [docs/EDITI
 
 ## Module map (artifactIds renamed `file-processor-*` → `inspecto-*` on 2026-08-10, `a1da65f5`)
 
-⚠ **`file-processor` now names only the DEPLOYMENT surface, never a reactor artifact.** `package.ps1`
-deliberately copies the fat JAR to `file-processor.jar` inside `file-processor-deploy/` (see its
-comment at `:153-157`), so bundle filenames and the zip names keep the old word while every
+⚠ **`file-processor` names nothing anymore** — not a reactor artifact, and since 2026-08-13 not the
+deployment surface either. `package.ps1` copies the fat JAR to `inspecto.jar` inside
+`inspecto-deploy/`, and the edition jars are `inspecto-security.jar` / `inspecto-policy.jar`. Every
 **artifactId and `target/` jar** is `inspecto-*`. A glob like `inspecto/target/file-processor-*.jar`
 matches nothing.
 

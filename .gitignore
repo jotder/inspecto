@@ -40,13 +40,13 @@
 /packs-dev/
 
 # Local build / deploy artifacts and ad-hoc run output
-/file-processor-deploy.zip
-/file-processor-deploy-linux.zip
+/inspecto-deploy.zip
+/inspecto-deploy-linux.zip
 # Release-integrity sidecars package.ps1 always emits beside each artifact (SOC 2 CC8-04)
-/file-processor-deploy*.zip.sha256
-/file-processor-deploy*.zip.asc
-/file-processor-deploy/
-/file-processor-deploy-old/
+/inspecto-deploy*.zip.sha256
+/inspecto-deploy*.zip.asc
+/inspecto-deploy/
+/inspecto-deploy-old/
 /.graalvm-cache/
 /file-processor-4.0/
 /data/

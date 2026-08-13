@@ -78,7 +78,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *       schedule. See {@link EnrichmentService}.</li>
  * </ul>
  *
- * <p>CLI: {@code java -cp file-processor.jar com.gamma.service.CollectorService
+ * <p>CLI: {@code java -cp inspecto.jar com.gamma.service.CollectorService
  * [-Dservice.poll.seconds=N] [-Dservice.max.runs=M] <config.toon | dir> [more ...]}.
  * Paths are scanned for {@code *_pipeline.toon} (Stage-1 sources) and
  * {@code *_enrich.toon} (Stage-2 enrichment jobs).
@@ -215,12 +215,12 @@ public final class CollectorService implements AutoCloseable {
                               String status, int total, int failed, String message) {}
     /** Optional embedded assist agent (v3.0, M0): discovered via {@link ServiceLoader} at
      *  {@link #start()} or registered explicitly with {@link #registerAgent(AssistAgent)};
-     *  empty when the {@code file-processor-agent} module is absent. */
+     *  empty when the {@code inspecto-agent} module is absent. */
     private final OptionalAgentSlot<AssistAgent> assistSlot =
             new OptionalAgentSlot<>("Assist", AssistAgent::name);
     /** Optional embedded-intelligence agent (AGT-5, P0): the deliberative-session successor to the
      *  {@link #assistSlot}, discovered/registered the same way; empty when the
-     *  {@code file-processor-intelligence} module is absent. */
+     *  {@code inspecto-intelligence} module is absent. */
     private final OptionalAgentSlot<IntelligenceAgent> intelligenceSlot =
             new OptionalAgentSlot<>("Intelligence", IntelligenceAgent::name);
     /** Push discovery for local {@code source.discovery: watch} sources (ACQ-6); {@code null} when no
@@ -882,7 +882,7 @@ public final class CollectorService implements AutoCloseable {
             ServiceLoader.load(AssistAgent.class).findFirst().ifPresent(this::registerAgent);
         }
         // AGT-5 (P0): discover an optional embedded intelligence agent, same pattern as the
-        // reflex-layer AssistAgent above; no-op when file-processor-intelligence is absent.
+        // reflex-layer AssistAgent above; no-op when inspecto-intelligence is absent.
         if (intelligenceSlot.get().isEmpty()) {
             ServiceLoader.load(IntelligenceAgent.class).findFirst().ifPresent(this::registerIntelligenceAgent);
         }

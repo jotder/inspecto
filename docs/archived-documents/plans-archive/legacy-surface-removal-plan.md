@@ -65,7 +65,7 @@ This is why the code+tests commit is **atomic**: the routing change red-lines ~6
 
 ### Scripts / runbooks (tracked files only)
 
-`file-processor-deploy/` and `.claude/worktrees/` are **untracked build output** — ignore their copies.
+`inspecto-deploy/` and `.claude/worktrees/` are **untracked build output** — ignore their copies.
 
 - `inspecto/examples/serve-example.ps1` — `Probe '/pipelines'`, `/events?limit=20`, and a printed
   `curl` hint. (`/health` at line 95 stays.)

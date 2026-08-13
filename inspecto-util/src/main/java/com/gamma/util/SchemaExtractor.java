@@ -17,13 +17,13 @@ import java.util.*;
  *
  * <p>Usage (standalone):
  * <pre>
- *   java -cp file-processor.jar com.gamma.util.SchemaExtractor \
+ *   java -cp inspecto.jar com.gamma.util.SchemaExtractor \
  *        &lt;source_name&gt; &lt;sample_csv&gt; &lt;gen_config.toon&gt;
  * </pre>
  *
  * Or via MainApp:
  * <pre>
- *   java -jar file-processor.jar create-schema &lt;source_name&gt; &lt;sample_csv&gt; &lt;gen_config.toon&gt;
+ *   java -jar inspecto.jar create-schema &lt;source_name&gt; &lt;sample_csv&gt; &lt;gen_config.toon&gt;
  * </pre>
  *
  * <p>The generation config ({@code gen_config.toon}) supplies CSV parsing hints

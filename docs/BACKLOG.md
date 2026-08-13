@@ -283,7 +283,7 @@ wired 2026-08-13, journal-backed resume shipped the same day (see the *Pipeline 
 > ### 🔴 SEC-INCIDENT-1 — leaked client secrets, ROTATION OUTSTANDING (opened 2026-07-25)
 >
 > Five OAuth client secrets sat in `inspecto-ui/src/environments/*.ts` and were pushed to a **PUBLIC**
-> GitHub remote (`jotder/ucc-file-processor`, `isPrivate:false`) from **2026-06-12** until removed in
+> GitHub remote (`jotder/inspecto`, `isPrivate:false`) from **2026-06-12** until removed in
 > `8dd072c6` (2026-07-25) — roughly six weeks, 4 commits. **Removing them from HEAD did not remediate anything:**
 > the values remain in git history, in every clone and fork, and in GitHub's caches. **Treat all five as
 > compromised and rotate at the issuer.** This row closes only when rotation is confirmed, not when the
@@ -750,7 +750,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   1. **Backend envelope** — `Envelope.success` (`inspecto/…/control/Envelope.java:30-47`) *unconditionally*
      puts `data` **and** `metadata.apiVersion="v1"`, so an enveloped success can never fail `isV1Envelope`;
      a legacy (non-`/api/v1`) response is the bare array. Neither shape is a non-array object.
-  2. **The deployed jar is NOT the culprit** — `javap` on `file-processor-deploy/file-processor.jar`'s
+  2. **The deployed jar is NOT the culprit** — `javap` on `inspecto-deploy/inspecto.jar`'s
      `Envelope.class` shows the `apiVersion` constant present. The "stale bundle" suspicion named in the
      original finding is **disproved for the backend**; only the *UI* bundle remains unverified.
   3. **Interceptor order is correct** — `v1Interceptor` is first in `app.config.ts`'s `withInterceptors([…])`,
@@ -765,7 +765,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   the version seen. Deliberately narrow (legacy JSON with a bare `data` key must stay quiet) and deliberately
   **not** a widening of `isV1Envelope`, which must keep declining text/blobs/unknown contracts. This is
   **global**, not `/spaces`-specific: a declined unwrap was previously silent in every service.
-  **Close this row when that error is seen once (it names its own cause) — or when the `file-processor-deploy`
+  **Close this row when that error is seen once (it names its own cause) — or when the `inspecto-deploy`
   UI bundle is rebuilt and the symptom is confirmed gone.** Original finding follows.
   **`SpacesService.reconcile` is unguarded against a non-array `GET /spaces` body** (found 2026-07-27,
   `inspecto-ui/src/app/inspecto/api/spaces.service.ts`). `spaces.some(...)` runs on the raw response; the
@@ -775,7 +775,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   ⚠ **Root cause of the observed non-array is NOT known** — the envelope contract was checked and is correct
   (backend emits `{data:[…],metadata:{apiVersion:'v1'}}`, `isV1Envelope` matches, and a live server built from
   current source returns a proper array). It did **not** reproduce on a freshly built server, which points at
-  the stale `file-processor-deploy` bundle rather than current code. Adding the guard converts a crash into a
+  the stale `inspecto-deploy` bundle rather than current code. Adding the guard converts a crash into a
   silent wrong-state, so it is worth doing **but is not a fix** — do not close this by guarding alone.
 - ~~**⚠ Running the reactor MUTATES tracked sample-space TOON files**~~ **CLOSED 2026-08-13 — no longer
   reproduces; refuted BOTH ways** (found 2026-07-28). (1) **Dynamic:** a full `mvn -o clean test` run
@@ -829,12 +829,19 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   operators to learn and for us to secure independently — and `$` is the one already hardened and audited.
   Route precedent = `DecisionRoutes:62/64` (`/simulate` on `canAuthorWorkbench`, `/apply` on `canOperateRuns`);
   `rule-template` has no dedicated routes class yet, unlike `decision-rule`/`expectation`.
-- **`.claude/launch.json`'s `inspector-backend` classpath is hand-maintained and machine-specific** (rebuilt
-  2026-07-27 after it had rotted to a single module and could no longer boot). It hardcodes
-  `C:/sandbox/ucc-file-processor` and 9 module `target/classes` + 30 `.m2` jars. **It goes stale whenever a
-  module's dependencies change** — regenerate with `mvn -o dependency:build-classpath -pl inspecto -am` and see
-  the `PROJECT_NOTES.md` §4 note on why `*/target/classes` globbing breaks the edition model. A launcher that
-  derives the classpath at run time (or uses the fat JAR) would retire this whole class of breakage.
+- ~~**`.claude/launch.json`'s `inspector-backend` classpath is hand-maintained and machine-specific**~~
+  **CLOSED 2026-08-13** — the ~40-entry hardcoded classpath (and the baked-in checkout root) is gone. The
+  config is now `inspecto-backend` and runs `tools/run-backend.ps1`, which derives the classpath at launch:
+  `mvn -o dependency:build-classpath -pl inspecto` resolves the runtime deps, then every
+  `com.gamma.inspector` jar in that list is mapped back to its reactor `<module>/target/classes` and
+  **prepended**, so working-tree code shadows the stale installed jars. ⚠ Two properties are load-bearing
+  and must survive any edit: **(1)** deriving the module list *from inspecto's own dependency tree* is what
+  keeps an optional ServiceLoader module off the classpath — `inspecto-connectors` is deliberately not a
+  dependency, and adding it makes `NotificationService.discoverChannels` find `SmtpEmailChannel` and die
+  with `NoClassDefFoundError: javax/mail/Message` (PROJECT_NOTES §4); **(2)** `-am` is deliberately OMITTED
+  from the build-classpath call — it isn't needed to resolve, and resolving siblings from `.m2` is precisely
+  what makes step 2's discovery work. Missing `target/classes` fails with a pointed message rather than a
+  mystery `NoClassDefFoundError`; `-Rebuild` compiles first, `$env:MVN_CMD` overrides the Maven binary.
 - ~~**`tools/check-secrets.mjs` gives a FALSE RED on a local deploy bundle**~~ **CLOSED 2026-07-28** — the
   guard now enumerates **git-tracked files** (`git ls-files -z`) instead of walking the filesystem, matching
   its own name: a *committed*-secret guard should only read what is committed. It falls back to the walk
@@ -842,12 +849,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   list cannot be pruned by refusing to descend. Verified both ways: exit 0 on a clean tree, and still exit 1
   on a planted `clientSecret = '<40 hex>'`. ⚠ **The `4.x` copy is unchanged and now DIVERGES** — the file's
   own header requires the two be identical. Port it. Original finding follows. It reports
-  *"Committed-secret guard: 4 probable secret(s)"* against `file-processor-deploy/ui/chunk-*.js`, but that
+  *"Committed-secret guard: 4 probable secret(s)"* against `inspecto-deploy/ui/chunk-*.js`, but that
   directory is **gitignored** (`.gitignore:44`) with **zero tracked files** — nothing is committed, and the four
   hits are minified library property assignments (`withCredentials`, `apiKey`), not credentials. CI is unaffected
   (a fresh clone has no such directory), but **any shift that builds the deploy bundle then follows the
   Definition of Done sees a red security gate** and may waste time or, worse, learn to ignore it. Fix: either add
-  `file-processor-deploy` to `SKIP_DIRS`, or — better, matching the guard's own name — have it scan only
+  `inspecto-deploy` to `SKIP_DIRS`, or — better, matching the guard's own name — have it scan only
   git-tracked files. ⚠ Do not "fix" this by adding `secret-allow` to generated bundle files; they are rebuilt.
 - ~~**`dependency:build-classpath` litters `cp.txt` into every module dir**~~ **CLOSED 2026-07-28** —
   `cp.txt` is gitignored.
@@ -1091,7 +1098,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     parent `inspecto-parent`; the core is `inspecto-processor`, since `inspecto` would collide with the
     aggregator directory). `groupId` (`com.gamma.inspector`) and the version are unchanged. Operator-visible
     only to someone **building from source or depending on these coordinates** — anyone consuming the
-    shipped bundle sees nothing, because the deployment file name **`file-processor.jar` is deliberately
+    shipped bundle sees nothing, because the deployment file name **`inspecto.jar` is deliberately
     unchanged** (`serve.sh`, `run-example`, `docs/EDITIONS.md` all still reference it); only the artifact in
     `inspecto/target/` is now `inspecto-processor-<version>.jar`. Release notes should carry the coordinate
     table for downstream poms. Renaming the bundle itself is a **separate, unmade decision** — do not treat

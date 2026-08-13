@@ -20,7 +20,7 @@ import java.util.Map;
  *
  * <p>Usage:
  * <pre>
- *   java -cp file-processor.jar com.gamma.inspector.MainApp [--dry-run] &lt;command&gt; &lt;pipeline.toon&gt; [args...]
+ *   java -cp inspecto.jar com.gamma.inspector.MainApp [--dry-run] &lt;command&gt; &lt;pipeline.toon&gt; [args...]
  * </pre>
  *
  * <p>Commands and their toon sections:
@@ -209,9 +209,9 @@ public class MainApp {
         System.out.println("Usage:");
         System.out.println("  ura [--dry-run] <command> <pipeline.toon> [args...]");
         System.out.println();
-        System.out.println("  (ura = ura.sh on Linux/Mac, ura.bat on Windows — shipped alongside file-processor.jar)");
+        System.out.println("  (ura = ura.sh on Linux/Mac, ura.bat on Windows — shipped alongside inspecto.jar)");
         System.out.println("  (dev: ./ura.sh or ura.bat from the inspecto/ source directory)");
-        System.out.println("  (raw: java --enable-native-access=ALL-UNNAMED -cp file-processor.jar com.gamma.inspector.MainApp ...)");
+        System.out.println("  (raw: java --enable-native-access=ALL-UNNAMED -cp inspecto.jar com.gamma.inspector.MainApp ...)");
         System.out.println();
         System.out.println("Pre-ETL commands (all read from pipeline.toon sections):");
         System.out.println("  search    <pipeline.toon>   Scan base_dirs for manifest files — log only, no copy.");
@@ -241,7 +241,7 @@ public class MainApp {
         System.out.println("ETL pipeline (runs the CollectorProcessor on a pipeline config, not via ura):");
         System.out.println("  run-adjustment.sh | run-adjustment.bat   Polls inbox, processes adjustment CSVs to Parquet.");
         System.out.println("  run-voucher.sh    | run-voucher.bat      Polls inbox, processes voucher CSVs to Parquet.");
-        System.out.println("  java -jar file-processor-<version>.jar <pipeline.toon>   (direct form)");
+        System.out.println("  java -jar inspecto-processor-<version>.jar <pipeline.toon>   (direct form)");
         System.out.println();
         System.out.println("Legacy / low-level commands:");
         System.out.println("  move-by-date                    Move files matching pattern into YYYYMMDD sub-folders.");

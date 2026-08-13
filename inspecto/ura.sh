@@ -13,13 +13,13 @@
 #   ./ura.sh create-schema    adjustment  samples/adj_sample.csv  config/adjustment/adj_gen.toon
 #
 # This script targets the fat JAR in target/ — build once with 'mvn clean package'.
-# For deployed servers use ura.sh bundled alongside file-processor.jar.
+# For deployed servers use ura.sh bundled alongside inspecto.jar.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-JAR=$(ls target/file-processor-*.jar 2>/dev/null | head -1)
+JAR=$(ls target/inspecto-processor-*.jar 2>/dev/null | head -1)
 if [[ -z "$JAR" || ! -f "$JAR" ]]; then
-    echo "ERROR: no JAR found matching target/file-processor-*.jar" >&2
+    echo "ERROR: no JAR found matching target/inspecto-processor-*.jar" >&2
     echo "       Run 'mvn clean package' first." >&2
     exit 1
 fi

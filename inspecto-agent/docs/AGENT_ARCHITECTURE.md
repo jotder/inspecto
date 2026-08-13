@@ -335,7 +335,7 @@ A **new** agent: depend on `agent-kernel` (+ a provider module), write N capabil
 
 **Ring 3 — application bindings** · always app-specific · live in each app's own repo · never travel
 ```
-  UCC  → file-processor-agent (stays in ucc-file-processor): UccAssistAgent, 7 capabilities,
+  UCC  → file-processor-agent (stays in inspecto): UccAssistAgent, 7 capabilities,
          SqlOracle, FailureReactor, UccAgentContext; consumes ring-1 + agent-provider-ollama.
   CVVE → its repo: schema registry, OCR/rule tools, HITL queue, state machine, tenant isolation;
          consumes ring-1 + spring + store-postgres + hitl + orchestration + provider-langchain4j.
@@ -372,7 +372,7 @@ A **new** agent: depend on `agent-kernel` (+ a provider module), write N capabil
 - **K0 — Bootstrap.** New repo; groupId + SemVer starting `0.1.0-SNAPSHOT`; CI; ring-1 package skeleton; `agent-eval` harness skeleton. Publish `0.1.0-SNAPSHOT` to the registry.
 - **K1 — Ring-1 core.** Port the generic runtime out of `file-processor-agent`, de-UCC'd: model layer, `RepairLoop`, `DocRetriever`, `AuditEvent`, `AssistProfile`. Add `Tool`/`ToolResult`/`Evidence`, `Capability`/`CapabilitySpec`, `GroundingGuard`, `ConfidenceEstimator`, `EscalationPolicy` (abstain rung), `Deadline`, `AgentError`, `AuditSink`. Kernel's own tests + eval harness green **with zero apps present**. Add `agent-provider-ollama`.
 
-**`ucc-file-processor` repo (branch `4.x`)** — detailed in [`AGENT_KERNEL_U0_U1_PLAN.md`](AGENT_KERNEL_U0_U1_PLAN.md)
+**`inspecto` repo (branch `4.x`)** — detailed in [`AGENT_KERNEL_U0_U1_PLAN.md`](AGENT_KERNEL_U0_U1_PLAN.md)
 - **U0 — Eval net.** Golden fixtures for the 7 capabilities (KPI→SQL etc.) against a `FakeModelProvider`; establishes the regression baseline. *(Gap E)*
 - **U1 — Consume the kernel.** `file-processor-agent` depends on the published kernel (`0.x-SNAPSHOT`). The 7 skills become `Capability` impls; `UccAgentContext` implements `AgentContext`; `NarrativeGuard`→`GroundingGuard`; `SqlOracle`/etc. become `Tool`s. **Reshape** the core assist SPI (`AssistResult.confidence` `String`→`double`, richer status); `ControlApi` maps at the HTTP boundary. Wire real confidence + the **abstain** escalation rung. Update the suite for the reshaped API (target: full suite green). *(Gaps A, B, C, D, G, H)* → cut **UCC 4.0**.
 

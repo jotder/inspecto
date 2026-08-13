@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The AI-backed {@link DescriptionProvider} (v3.3.0, M3) — the seam through which model-authored
- * prose enters the metadata catalog, contributed by the optional {@code file-processor-agent}
+ * prose enters the metadata catalog, contributed by the optional {@code inspecto-agent}
  * module via {@code ServiceLoader} with <b>zero change to core</b>. It uses the small/fast model
  * tier to one-line a column or table that has no description yet.
  *

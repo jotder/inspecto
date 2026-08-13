@@ -243,12 +243,12 @@ Each concurrent batch opens its own DuckDB connection, and DuckDB defaults to on
 
 ```bash
 # one or more pipeline toons and/or directories (searched for *_pipeline.toon)
-java -cp file-processor.jar com.gamma.inspector.MultiCollectorProcessor \
+java -cp inspecto.jar com.gamma.inspector.MultiCollectorProcessor \
      -Dsources.max=4 \
      spaces/default/config/subscriber/subscriber_pipeline.toon \
      spaces/ucc/config/voucher/voucher_pipeline.toon
 # or point it at a directory tree of configs:
-java -cp file-processor.jar com.gamma.inspector.MultiCollectorProcessor spaces/ucc/config
+java -cp inspecto.jar com.gamma.inspector.MultiCollectorProcessor spaces/ucc/config
 ```
 
 Collectors run on a virtual-thread executor bounded by `-Dsources.max` (default: all resolved collectors in parallel). Each collector is isolated — one collector failing (bad config or batch failures) is logged and counted but never aborts the others; the process exits non-zero if any collector failed. A failed collector does not stop the rest.
@@ -262,7 +262,7 @@ For continuous operation, `CollectorService` keeps the JVM up and runs the regis
 ```bash
 # Scan paths for *_pipeline.toon (sources), *_enrich.toon (Stage-2 jobs)
 # and *_job.toon (config-driven cron/event jobs, v2.8.0)
-java -cp file-processor.jar com.gamma.service.CollectorService \
+java -cp inspecto.jar com.gamma.service.CollectorService \
      -Dservice.poll.seconds=60 -Dservice.max.runs=4 config/
 ```
 
@@ -274,9 +274,9 @@ The multiplexer (Stage 1) deliberately does no joins/aggregation. The separate *
 
 ```bash
 # Full recompute over all input partitions
-java -cp file-processor.jar com.gamma.enrich.EnrichmentProcessor spaces/default/config/events/events_daily_kpi.toon
+java -cp inspecto.jar com.gamma.enrich.EnrichmentProcessor spaces/default/config/events/events_daily_kpi.toon
 # Incremental — recompute only the given partitions (semicolon-separated)
-java -cp file-processor.jar com.gamma.enrich.EnrichmentProcessor spaces/default/config/events/events_daily_kpi.toon \
+java -cp inspecto.jar com.gamma.enrich.EnrichmentProcessor spaces/default/config/events/events_daily_kpi.toon \
      --partitions "event_type=CALL/year=2020/month=04/day=03"
 ```
 
@@ -304,7 +304,7 @@ Chains form naturally — set `on_pipeline` to an upstream enrichment's `name` a
 `ControlApi` runs the service **with** an embedded REST surface (JDK `HttpServer`, no extra deps), so every CLI operation is reachable over HTTP — for operators now, UI/agent later.
 
 ```bash
-java -cp file-processor.jar com.gamma.control.ControlApi \
+java -cp inspecto.jar com.gamma.control.ControlApi \
      -Dcontrol.port=8080 \
      -Dservice.poll.seconds=60 config/
 ```
@@ -585,7 +585,7 @@ URL given it opens a local file `inspecto-status.db`:
 
 ```bash
 # DuckDB (default DB backend — embedded, single-process, zero extra deps)
-java -cp file-processor.jar com.gamma.control.ControlApi \
+java -cp inspecto.jar com.gamma.control.ControlApi \
      -Dcontrol.token=secret \
      -Dstatus.backend=db \
      -Dstatus.db.url="jdbc:duckdb:/var/lib/inspecto/status.db" \
@@ -618,7 +618,7 @@ engine-neutral JDBC-over-DuckDB pattern as the status backend (no extra dependen
 `inspecto-ops.db`:
 
 ```bash
-java -cp file-processor.jar com.gamma.control.ControlApi \
+java -cp inspecto.jar com.gamma.control.ControlApi \
      -Dcontrol.token=secret \
      -Dobjects.backend=db \
      -Dobjects.db.url="jdbc:duckdb:/var/lib/inspecto/ops.db" \
@@ -673,7 +673,7 @@ alongside the issue's activity. The cadence is `-Dobjects.sla.sweep.seconds` (de
 to disable):
 
 ```bash
-java -cp file-processor.jar com.gamma.control.ControlApi \
+java -cp inspecto.jar com.gamma.control.ControlApi \
      -Dcontrol.token=secret -Dobjects.sla.sweep.seconds=30 config/
 # find breached issues via the event feed
 curl -s -H "Authorization: Bearer secret" "localhost:8080/api/v1/events/search?type=OBJECT_SLA_BREACH"
@@ -868,19 +868,19 @@ powershell -ExecutionPolicy Bypass -File inspecto\package.ps1
 powershell -ExecutionPolicy Bypass -File inspecto\package.ps1 -NoBuild
 ```
 
-This produces **`file-processor-deploy.zip`** in the sandbox root. The script:
+This produces **`inspecto-deploy.zip`** in the sandbox root. The script:
 1. Runs `mvn clean package` to build a fresh fat JAR
 2. Builds the optional operator UI (`inspecto-ui/` via npm) and bundles its `dist/` as `ui/` — skip with `-NoUi`, or omitted automatically when `inspecto-ui/` is absent
 3. Assembles a self-contained bundle with the JAR, config files, and run/serve scripts
 4. Rewrites `schema_file` paths in the bundled configs so they are relative to the bundle root
 5. Creates all placeholder directories (inbox, database, backup, temp, errors, quarantine)
-6. Zips everything into `file-processor-deploy.zip`
+6. Zips everything into `inspecto-deploy.zip`
 
 ### Bundle contents
 
 ```
-file-processor-deploy/
-  file-processor.jar              ← fat JAR, all dependencies included (~94 MB)
+inspecto-deploy/
+  inspecto.jar              ← fat JAR, all dependencies included (~94 MB)
   config/
     <data_source>/<data_source>_pipeline.toon
                   <data_source>_schema.toon
@@ -909,8 +909,8 @@ file-processor-deploy/
 
 ```bash
 # 1. Copy the zip to the server and extract
-unzip file-processor-deploy.zip
-cd file-processor-deploy
+unzip inspecto-deploy.zip
+cd inspecto-deploy
 
 # 2. Stage files (optional — use pre-ETL utilities if source is on a network share or in tarballs)
 bash ura.sh copy-tars config/<data_source>/<data_source>_pipeline.toon
@@ -933,7 +933,7 @@ set CONTROL_TOKEN=secret && serve.bat                     # Windows
 **Direct invocation** (without the run scripts):
 ```bash
 java --enable-native-access=ALL-UNNAMED \
-     -jar file-processor.jar \
+     -jar inspecto.jar \
      config/<data_source>/<data_source>_pipeline.toon
 ```
 
@@ -998,7 +998,7 @@ Note: the 20200117 <data_source> file is ~4.3 GB uncompressed (~2.97 M rows) due
    bash run.sh mysource      # after adding mysource to run.sh
    # or directly:
    java --enable-native-access=ALL-UNNAMED \
-        -jar target/file-processor-<version>.jar \
+        -jar target/inspecto-processor-<version>.jar \
         config/mysource/mysource_pipeline.toon
    ```
 

@@ -9,7 +9,7 @@ timestamp: 2026-07-07T00:00:00Z
 
 # Agent Module (`inspecto-agent/`)
 
-artifactId `file-processor-agent`. The **optional** AI assist module: when present on the classpath the core
+artifactId `inspecto-agent`. The **optional** AI assist module: when present on the classpath the core
 discovers it via `ServiceLoader<com.gamma.assist.spi.AssistAgent>`; when absent, the assist routes degrade
 gracefully. The concrete implementation `UccAssistAgent` registers seven read-only/draft-only skills with an
 abstain-only escalation policy — see [Assist agent](../agent/assist-agent.md).

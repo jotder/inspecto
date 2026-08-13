@@ -28,7 +28,7 @@ The directory names were renamed 2026-06-12; the Maven **artifactIds were not** 
 
 | Dir | Role | artifactId / jar |
 |---|---|---|
-| `inspecto/` | engine + control plane (lean core) | `inspecto-processor` / `file-processor.jar` |
+| `inspecto/` | engine + control plane (lean core) | `inspecto-processor` / `inspecto.jar` |
 | `inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB) — all network deps | `inspecto-connectors` |
 | `inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
 | `inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |

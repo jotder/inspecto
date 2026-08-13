@@ -15,7 +15,7 @@ import java.util.Map;
  *
  * <p>This is a pure, JSON-serializable record in the lean core — the wire shape of the
  * {@code POST /assist/{intent}} request body. The AI that consumes it lives entirely in the
- * optional {@code file-processor-agent} module; core never depends on a model.
+ * optional {@code inspecto-agent} module; core never depends on a model.
  *
  * <p>The two maps are defensively copied and never {@code null} (an absent map becomes empty),
  * so skills can read them without null checks. {@code null} <em>values</em> inside the maps are

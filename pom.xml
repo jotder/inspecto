@@ -14,15 +14,15 @@
         Aggregator for the v3.x line. Two modules:
         - inspecto              : the lean ETL engine + control plane (the deployable fat-JAR;
                                  stays zero-new-dependency). Plays the "core" role in the v3
-                                 redesign (artifactId stays "file-processor" so the jar name,
-                                 CI guard, and the release flow remain unchanged).
+                                 redesign (artifactId "inspecto-processor"; the bundle it ships as
+                                 is "inspecto.jar").
         - inspecto-agent        : OPTIONAL embedded assist agent. All AI/LLM dependencies live
                                  here only; loaded in-process by SourceService when present
-                                 (artifactId stays "file-processor-agent").
+                                 (artifactId "inspecto-agent").
         - inspecto-agent-hosted : OPTIONAL hosted-model providers (Claude/ChatGPT/Gemini/
                                  Grok/llama.cpp) behind the agent's HostedProviderPlugin SPI; the
-                                 default (air-gapped) packaging omits this jar (artifactId stays
-                                 "file-processor-agent-hosted"; "Inspecto" is the display tier).
+                                 default (air-gapped) packaging omits this jar (artifactId
+                                 "inspecto-agent-hosted"; "Inspecto" is the display tier).
     </description>
 
     <!--
@@ -112,8 +112,8 @@
 
     <properties>
         <!-- Target JDK 24. Uses `release` so the build cannot accidentally rely on a newer JDK's API
-             than the target. NOTE: the lean ETL core (file-processor) runs on JDK 24 cleanly. The
-             optional file-processor-agent module depends on eoiagent (agent-kernel's replacement,
+             than the target. NOTE: the lean ETL core (inspecto) runs on JDK 24 cleanly. The
+             optional inspecto-agent module depends on eoiagent (agent-kernel's replacement,
              2026-07-07 — the kernel is discontinued and its reasoning layer is vendored in-tree at
              release=24), whose bytecode is Java 25 (class-file v69) — those classes cannot LOAD on
              a JDK 24 runtime (UnsupportedClassVersionError). The agent modules therefore require a

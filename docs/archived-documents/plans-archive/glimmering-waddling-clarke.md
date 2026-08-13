@@ -118,7 +118,7 @@ Add to `file-processor-agent/pom.xml` (version via existing `${agentkernel.versi
 - `agent-kernel-core/.../agent/CapabilityRegistry.java` (comment only)
 - `docs/AGENT_KERNEL_R1_PLAN.md` *(also mirrored in UCC `file-processor-agent/docs/`)* — §4 delivered note
 
-**UCC (`C:\sandbox\ucc-file-processor`) — edited:**
+**UCC (`C:\sandbox\inspecto`) — edited:**
 - `file-processor-agent/pom.xml` (add `agent-orchestration` dep)
 - `file-processor-agent/.../com/gamma/agent/UccAssistAgent.java` (consume orchestrator; delete `audit(...)`;
   wrap sink)
@@ -148,7 +148,7 @@ the identical event, so they pass without edits.
 ## Verification
 - **Per phase, local, CPU-only:** build+install kernel then run the UCC reactor —
   `mvn -f C:\sandbox\agent-kernel\pom.xml install` then
-  `mvn -f C:\sandbox\ucc-file-processor\pom.xml test` (JAVA_HOME `C:\.jdks\openjdk-26.0.1`, Maven
+  `mvn -f C:\sandbox\inspecto\pom.xml test` (JAVA_HOME `C:\.jdks\openjdk-26.0.1`, Maven
   `C:\maven\apache-maven-3.9.16`, `mvn.cmd` from PowerShell). Expect **372 core + 138 agent green**, plus
   the new `SyncOrchestrator` tests in the kernel reactor.
 - **Behavior-preservation proof:** the named UCC suites pass **unmodified** — same statuses, same single

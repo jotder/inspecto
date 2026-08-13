@@ -1,8 +1,10 @@
 // One-off: fetch Natural Earth GeoJSON + Noto glyphs into inspecto-ui/src/assets/basemap/
 // Slims properties to what the map style needs, to keep the bundle small.
 import { mkdir, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
-const OUT = 'C:/sandbox/ucc-file-processor/inspecto-ui/src/assets/basemap';
+// Derived from this script's own location, so the checkout can live anywhere.
+const OUT = fileURLToPath(new URL('../src/assets/basemap', import.meta.url));
 const NE = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson';
 const FONTS = 'https://raw.githubusercontent.com/protomaps/basemaps-assets/main/fonts/Noto%20Sans%20Regular';
 
