@@ -566,6 +566,34 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     skips parsing), a stop-at-node cutoff (`PipelineExecutor.dryRun` has no partial-graph primitive),
     and registering the reserved `POST /pipelines/authored/{id}/run?to=` (`PipelineRoutes.java:69`,
     must stay scratch-only). **Medium/large.**
+    ✅ **RE-GROUNDED 2026-08-14 — every premise above VERIFIED, nothing stale.** Worth stating explicitly
+    because the surrounding rows have a poor record (four of five taken on 2026-08-13 had stale premises):
+    **this one is accurate, so trust it and skip the re-scoping pass.** Confirmed against current source:
+    only `dry-run` and `trigger` are registered (`PipelineRoutes.java:77-81` — the citation had drifted from
+    `:69`; the in-place comment already says `run?to=` "must never fire a production run");
+    `PipelineDryRun.run` requires non-empty `sampleRows` and seeds at the parser/entry node
+    (`PipelineDryRun.java:66-114`, `seedNodeOf` `:174-180`), its own javadoc `:24-25` conceding "the
+    acquisition/parse stage upstream of the seed is not exercised here"; and `PipelineExecutor.dryRun`
+    (`:203-229`) walks `topoOrder(g)` over the **whole** graph with no stop-at/until parameter.
+    ⚠ **DRYRUN-1/DRYRUN-2 (2026-08-13) did NOT shrink this** — they added a `ReferenceResolver` param and a
+    `warnings` list to the same file, orthogonal to the synthetic-rows/no-parse/no-cutoff gaps.
+    **The UI half is already fully built, not just mocked-up:** `pipelines.service.ts:495-505` `runToNode`
+    already POSTs to this exact `?to=` URL with a `files` body, and `run-to-here.dialog.ts:29-33` already
+    picks inbox files through the connection "Explore" tree. **The backend route is the only absent piece.**
+    **Reusable seams found, so this does not start from zero:** `BatchIngestStrategy`/`BatchProcessor` are the
+    real ingest+parse+write path, and `BatchIngestStrategy.openTempDb`/`scratchDir` (`:308-329`) already
+    resolves a scratch dir (`dirs.temp` / `processing.duckdb.temp_directory`) **independent of the production
+    `dirs.database` root** — which is exactly the "must stay scratch-only" guarantee, already available rather
+    than needing invention. `DuckDbUtil.tempDbFile`/`deleteTempDb` (`:64,84,261`) is the scratch-DB mechanism
+    `PipelineDryRun` already uses.
+    **Sizing: genuinely MULTI-SHIFT** (three separable hard problems). ⚠ The stop-at-node cutoff is the
+    dangerous one — it threads a target set through `topoOrder`, which production `execute` also walks, so it
+    is not an isolated addition. **Smallest useful vertical slice, if scheduled: ship real-file ingest ALONE**
+    — parse N picked inbox files into a scratch DuckDB and run the **full** graph with no cutoff, reusing the
+    scratch pattern above in place of `sampleRows`. That converts "synthetic rows" into "real files" and is
+    independently valuable; the cutoff and the route's `to=` semantics follow as a second slice.
+    **Write a `docs/superpower/` plan before starting** — it is multi-shift, and mid-task compaction is the
+    failure mode this repo externalizes against.
 - **Branch-aware executor — run what the graph editor can now author** (surfaced 2026-08-01 by
   unification W5). W5 made the graph editor *author* the canonical `*_pipeline.toon` for the
   single-source subset, refusing everything else with `UNSUPPORTED_NODE`. **11 of the 20
