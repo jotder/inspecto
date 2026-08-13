@@ -57,6 +57,42 @@ describe('demoHandler', () => {
         expect(after.find((r) => r.category === 'PIPELINE')?.channels.email).toBe(true);
     });
 
+    /**
+     * Pin the audit-row spellings to the server's (mock-never-more-lenient): the files rows are the
+     * `_status_` CSV header verbatim (BatchAuditWriter) and the quarantine rows are what
+     * FileStatusStore.quarantine synthesizes. The mock's own `file_name`/`rows`/`received_at`/
+     * `quarantined_at` inventions hid the real spellings through an offline rehearsal.
+     */
+    it('serves /runs/{n}/files rows with the exact status-ledger header keys', () => {
+        const rows = handler(req('GET', '/api/runs/cdr_ingest/files'), seededStore())?.body as Record<string, string>[];
+        expect(Object.keys(rows[0])).toEqual([
+            'start_time',
+            'end_time',
+            'filename',
+            'status',
+            'parsed_rows',
+            'error_rows',
+            'output_paths',
+            'output_sizes_bytes',
+            'duration_ms',
+            'error',
+            'consignment_id',
+        ]);
+        // per-file status is SUCCESS or QUARANTINED_* — there is no per-file FAILED (MemberAudit)
+        const statuses = new Set(rows.map((r) => r['status']));
+        for (const s of statuses) expect(s).toMatch(/^(SUCCESS|QUARANTINED_(UNREADABLE|MISMATCH|EMPTY))$/);
+        // the ledger's timestamp format is "yyyy-MM-dd HH:mm:ss", not ISO
+        expect(rows[0]['start_time']).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    });
+
+    it('serves /runs/{n}/quarantine rows with only the keys the server synthesizes', () => {
+        const rows = handler(req('GET', '/api/runs/cdr_ingest/quarantine'), seededStore())?.body as Record<
+            string,
+            string
+        >[];
+        expect(Object.keys(rows[0])).toEqual(['file', 'reason', 'path', 'size_bytes']);
+    });
+
     it('serves the health / status surface', () => {
         const store = seededStore();
         expect(handler(req('GET', '/api/health'), store)?.body).toEqual({ status: 'UP' });

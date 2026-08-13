@@ -332,12 +332,12 @@ export class RunDetailComponent implements OnInit {
     }
 
     /**
-     * Open the rejected-row detail for an audit row. The file NAME is the route's key, and the three
+     * Open the rejected-row detail for an audit row. The file NAME is the route's key, and the two
      * surfaces spell it differently (`filename` in the status ledger, `file` in the quarantine
-     * listing, `file_name` in the offline mock), so take the first one present rather than assuming.
+     * listing), so take the first one present rather than assuming.
      */
     openRejectedRows(r: AuditRow): void {
-        const file = (r['filename'] || r['file'] || r['file_name'] || '').trim();
+        const file = (r['filename'] || r['file'] || '').trim();
         if (!file) {
             this.toastr.warning('No file name on this row');
             return;

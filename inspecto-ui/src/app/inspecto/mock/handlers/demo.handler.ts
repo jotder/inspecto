@@ -360,18 +360,38 @@ export function batches(pipeline: string): Record<string, string>[] {
     });
 }
 
+/** "yyyy-MM-dd HH:mm:ss" — the status ledger's timestamp format (DuckDbUtil.DT_FMT), NOT ISO. */
+function ledgerTime(ms: number): string {
+    return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+/**
+ * The per-file `_status_` ledger rows exactly as BatchAuditWriter writes them (header order
+ * start_time…consignment_id; mock-never-more-lenient — `file_name`/`rows`/`received_at` were mock
+ * inventions that hid the real spellings until 2026-08-13). `status` is SUCCESS or one of the three
+ * QUARANTINED_* literals MemberAudit produces — there is no per-file FAILED. `error` is empty on
+ * success; per-file output_sizes_bytes is a run of zeros in the real writer too.
+ */
 function files(pipeline: string): Record<string, string>[] {
-    return Array.from({ length: 20 }, (_, i) => ({
-        file_name: `${pipeline}_${20260601 + i}.csv`,
-        consignment_id: `${pipeline}-b${1000 + (i % 10)}`,
-        status: i % 12 === 0 ? 'QUARANTINED' : 'PROCESSED',
-        rows: String(400 + ((i * 71) % 3000)),
-        // The real status ledger carries error_rows per file; every 4th file rejected some rows, so
-        // the "View the rejected rows" affordance (which keys off this count) is reachable offline.
-        error_rows: String(i % 4 === 0 ? 3 + (i % 7) : 0),
-        size_bytes: String(48000 + ((i * 997) % 500000)),
-        received_at: new Date(NOW - i * 1_800_000).toISOString(),
-    }));
+    return Array.from({ length: 20 }, (_, i) => {
+        const start = NOW - i * 1_800_000;
+        const quarantined = i % 12 === 0;
+        return {
+            start_time: ledgerTime(start),
+            end_time: ledgerTime(start + 40_000 + ((i * 173) % 9000)),
+            filename: `${pipeline}_${20260601 + i}.csv`,
+            status: quarantined ? 'QUARANTINED_MISMATCH' : 'SUCCESS',
+            parsed_rows: String(quarantined ? 0 : 400 + ((i * 71) % 3000)),
+            // The real status ledger carries error_rows per file; every 4th file rejected some rows, so
+            // the "View the rejected rows" affordance (which keys off this count) is reachable offline.
+            error_rows: String(i % 4 === 0 ? 3 + (i % 7) : 0),
+            output_paths: quarantined ? '' : `out/${pipeline}/day=${20260601 + i}/part-0.parquet`,
+            output_sizes_bytes: quarantined ? '' : '0',
+            duration_ms: String(40_000 + ((i * 173) % 9000)),
+            error: quarantined ? 'column count mismatch: expected 12, found 14' : '',
+            consignment_id: `${pipeline}-b${1000 + (i % 10)}`,
+        };
+    });
 }
 
 function lineage(pipeline: string): Record<string, string>[] {
@@ -401,13 +421,23 @@ function rejectedRows(file: string): Record<string, string>[] {
     }));
 }
 
+/**
+ * The quarantine listing exactly as FileStatusStore.quarantine synthesizes it off the on-disk
+ * layout `<relParent>/<reason>/<filename>`: keys are `file, reason, path, size_bytes` — no
+ * consignment_id and no timestamp exist there (the previous mock invented both, which made the
+ * Quarantine tab's batch-keyed actions look wired offline when the server can't feed them).
+ */
 function quarantine(pipeline: string): Record<string, string>[] {
-    return Array.from({ length: 4 }, (_, i) => ({
-        file_name: `${pipeline}_bad_${i}.csv`,
-        consignment_id: `${pipeline}-b${990 + i}`,
-        reason: ['parse_error', 'schema_mismatch', 'empty_file', 'encoding_error'][i % 4],
-        quarantined_at: new Date(NOW - i * 86_400_000).toISOString(),
-    }));
+    return Array.from({ length: 4 }, (_, i) => {
+        const reason = ['parse_error', 'schema_mismatch', 'empty_file', 'encoding_error'][i % 4];
+        const file = `${pipeline}_bad_${i}.csv`;
+        return {
+            file,
+            reason,
+            path: `${pipeline}/${reason}/${file}`,
+            size_bytes: String(12000 + ((i * 911) % 90000)),
+        };
+    });
 }
 
 const INBOX_STATUSES: Record<string, unknown> = {};

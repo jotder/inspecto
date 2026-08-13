@@ -12,7 +12,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { RunDetailComponent } from './run-detail.component';
 
 const BATCH: AuditRow = { consignment_id: 'b1', status: 'SUCCESS' };
-const QUARANTINED: AuditRow = { consignment_id: 'q1', file_name: 'bad.csv', reason: 'parse_error' };
+const QUARANTINED: AuditRow = { consignment_id: 'q1', file: 'bad.csv', reason: 'parse_error' };
 
 /** `inputs` exercises the embedded side-panel mode (R5); without it the route snapshot drives the name.
  *  `confirmResult` controls what the (stubbed) confirm dialog resolves to for reprocess tests. */
@@ -124,11 +124,9 @@ describe('RunDetailComponent', () => {
 
         c.openRejectedRows({ filename: 'a.csv' }); // status ledger
         c.openRejectedRows({ file: 'b.csv' }); // quarantine listing
-        c.openRejectedRows({ file_name: 'c.csv' }); // offline mock
         expect(spy.mock.calls.map((call) => (call[1] as { data: { file: string } }).data.file)).toEqual([
             'a.csv',
             'b.csv',
-            'c.csv',
         ]);
 
         spy.mockClear();
