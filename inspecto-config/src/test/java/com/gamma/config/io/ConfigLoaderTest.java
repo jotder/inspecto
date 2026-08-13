@@ -128,16 +128,67 @@ class ConfigLoaderTest {
         ConfigSpec spec = ConfigSpecs.enrichment();
         Map<String, Object> missing = Map.of(
                 "name", "K",
-                "input", Map.of("database", "db/in"),
-                "output", Map.of("database", "db/out")); // no transform / transform_file
+                "input", Map.of("database", "db/in", "partitions", List.of("year")),
+                "output", Map.of("database", "db/out", "partitions", List.of("year"))); // no transform / transform_file
         assertFalse(errors(loader.validate(spec, missing)).isEmpty());
 
         Map<String, Object> ok = Map.of(
                 "name", "K",
+                "input", Map.of("database", "db/in", "partitions", List.of("year")),
+                "output", Map.of("database", "db/out", "partitions", List.of("year")),
+                "transform", "SELECT 1");
+        assertTrue(errors(loader.validate(spec, ok)).isEmpty());
+    }
+
+    /**
+     * The partition keys are required at the WRITE gate because {@code EnrichmentConfig.fromMap}
+     * requires them at load — while they were optional here, a draft missing them passed the 422
+     * gate, saved, and then could never register. An EMPTY list stays legal (an unpartitioned
+     * store): {@code RawConfig.present} is true for {@code []}, so required means "the author
+     * stated the grain", not "the grain has entries".
+     */
+    @Test
+    void enrichmentPartitionKeysAreRequiredButMayBeEmpty() {
+        ConfigSpec spec = ConfigSpecs.enrichment();
+        Map<String, Object> absent = Map.of(
+                "name", "K",
                 "input", Map.of("database", "db/in"),
                 "output", Map.of("database", "db/out"),
                 "transform", "SELECT 1");
-        assertTrue(errors(loader.validate(spec, ok)).isEmpty());
+        List<Finding> errs = errors(loader.validate(spec, absent));
+        assertTrue(hasFindingAt(errs, "input.partitions"), "absent input.partitions must be an ERROR");
+        assertTrue(hasFindingAt(errs, "output.partitions"), "absent output.partitions must be an ERROR");
+
+        Map<String, Object> unpartitioned = Map.of(
+                "name", "K",
+                "input", Map.of("database", "db/in", "partitions", List.of()),
+                "output", Map.of("database", "db/out", "partitions", List.of()),
+                "transform", "SELECT 1");
+        assertTrue(errors(loader.validate(spec, unpartitioned)).isEmpty(),
+                "an explicit empty grain is the legal unpartitioned declaration");
+    }
+
+    /**
+     * The empty grain must survive the CODEC too, or the UI's {@code partitions: []} draft would
+     * pass the write gate and then lose the key on its trip through the file — the steps:/sinks:
+     * lesson: a config-format property is only proven through {@code toToon} → decode, never a
+     * hand-built map alone.
+     */
+    @Test
+    void emptyPartitionListsSurviveTheToonRoundTrip() {
+        Map<String, Object> draft = Map.of(
+                "name", "K",
+                "input", Map.of("database", "db/in", "partitions", List.of()),
+                "output", Map.of("database", "db/out", "partitions", List.of()),
+                "transform", "SELECT 1");
+        String toon = ConfigCodec.toToon(draft);
+        Map<String, Object> back = ConfigCodec.toMapStrict(toon);
+        assertEquals(List.of(), ((Map<?, ?>) back.get("input")).get("partitions"),
+                "input.partitions must decode back as an empty LIST, not vanish");
+        assertEquals(List.of(), ((Map<?, ?>) back.get("output")).get("partitions"),
+                "output.partitions must decode back as an empty LIST, not vanish");
+        assertTrue(errors(loader.validate(ConfigSpecs.enrichment(), back)).isEmpty(),
+                "the decoded file must still pass the required-partitions gate");
     }
 
     @Test

@@ -267,16 +267,20 @@ public final class ConfigSpecs {
                         "Root of the Stage-1 Hive-partitioned output to read."),
                 FieldSpec.enumField("input.format", "Input format", List.of("PARQUET", "CSV"), "PARQUET",
                         "Format of the Stage-1 output."),
-                FieldSpec.of("input.partitions", "Input partitions", FieldType.LIST,
-                        "Hive partition columns present on the input."),
+                // Both partition keys are REQUIRED to mirror EnrichmentConfig.fromMap, which throws
+                // when either is absent — optional here meant the write route's 422 gate never fired
+                // and the config only failed at registration. An EMPTY list is legal (unpartitioned):
+                // RawConfig.present is true for [], so required checks presence, not entries.
+                FieldSpec.required("input.partitions", "Input partitions", FieldType.LIST,
+                        "Hive partition columns present on the input; empty = unpartitioned."),
                 FieldSpec.required("output.database", "Output database", FieldType.FILEPATH,
                         "Where enriched output is written."),
                 FieldSpec.enumField("output.format", "Output format", List.of("PARQUET", "CSV"), "PARQUET",
                         "Enriched output format."),
                 FieldSpec.of("output.compression", "Output compression", FieldType.STRING,
                         "Codec for the output (e.g. snappy)."),
-                FieldSpec.of("output.partitions", "Output partitions", FieldType.LIST,
-                        "Output grain; may differ from the input grain."),
+                FieldSpec.required("output.partitions", "Output partitions", FieldType.LIST,
+                        "Output grain; may differ from the input grain. Empty = unpartitioned."),
                 FieldSpec.of("transform", "Transform SQL", FieldType.SQL,
                         "Inline SQL reading from the 'input' view and any references; or use transform_file."),
                 FieldSpec.of("transform_file", "Transform SQL file", FieldType.FILEPATH,

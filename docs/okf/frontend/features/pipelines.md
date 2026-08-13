@@ -194,9 +194,14 @@ are specced as `list` chips, and the shape is load-bearing in three ways worth k
   would ripple into the parser dialog and Onboarding. **Any future `list` spec on a flat-key surface
   needs the same treatment or a decision to unify the two conventions.**
 
-⛔ Known hole, not fixed here: `ConfigSpecs.enrichment()` declares both keys with `FieldSpec.of`
-(**optional**) while the parser requires them, so the write route's 422 gate does not fire and a non-UI
-client can still land a config that only fails at registration.
+~~⛔ Known hole, not fixed here: `ConfigSpecs.enrichment()` declares both keys optional while the parser
+requires them~~ **CLOSED 2026-08-13 (follow-up commit)**: both keys are now `FieldSpec.required`, so a
+non-UI client missing them gets the 422 at write instead of a config that only fails at registration.
+An empty list still passes — `RawConfig.present` is true for `[]`, so required means "the grain is
+stated", matching the engine. `ConfigLoaderTest` pins the gate both ways **and** pins that
+`partitions: []` survives `toToon` → strict decode → re-validate (the steps:/sinks: file-level lesson —
+JToon writes it as `partitions[0]:` and decodes it back as an empty list, so the UI's empty-grain draft
+does not lose its key on the trip through the file).
 
 ## A spec `key` *is* the engine's config key — there is no mapping layer (2026-08-03)
 
