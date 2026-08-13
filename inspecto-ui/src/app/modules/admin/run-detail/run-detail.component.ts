@@ -212,13 +212,17 @@ export class RunDetailComponent implements OnInit {
     }
 
     // ── row actions (audit rows are loose maps; columns are auto-derived by the data table) ──
-    /** Batch/quarantine rows can be reprocessed by batch id; lineage/commits are read-only. Reprocess is
+    /** Batch rows can be reprocessed by batch id; lineage/commits are read-only. Reprocess is
      *  hidden in the Business lens (read-only observe, plan §1) — Lineage & details stays available. */
     get auditRowActions(): InspectoRowAction<AuditRow>[] {
         if (this.activeTab !== 'batches' && this.activeTab !== 'quarantine') return [];
+        // Quarantine rows are synthesized off the on-disk layout (file/reason/path/size_bytes) and never
+        // carry a batch id — a quarantined file was rejected before any batch existed — so both
+        // batch-keyed actions hide themselves on rows without one.
         const details: InspectoRowAction<AuditRow> = {
             icon: 'heroicons_outline:rectangle-group',
             hint: 'Lineage & details',
+            visible: (r) => !!r['consignment_id'],
             onClick: (r) => this.openBatchById(r['consignment_id']),
         };
         const rejects = this.rejectedRowsAction;
@@ -228,6 +232,7 @@ export class RunDetailComponent implements OnInit {
             {
                 icon: 'heroicons_outline:arrow-path',
                 hint: 'Reprocess this batch',
+                visible: (r) => !!r['consignment_id'],
                 onClick: (r) => this.reprocessRow(r),
             },
         ];

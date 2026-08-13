@@ -12,7 +12,8 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { RunDetailComponent } from './run-detail.component';
 
 const BATCH: AuditRow = { consignment_id: 'b1', status: 'SUCCESS' };
-const QUARANTINED: AuditRow = { consignment_id: 'q1', file: 'bad.csv', reason: 'parse_error' };
+// The server's quarantine listing is synthesized off the on-disk layout and carries no batch id.
+const QUARANTINED: AuditRow = { file: 'bad.csv', reason: 'parse_error', path: 'quarantine/bad.csv', size_bytes: '42' };
 
 /** `inputs` exercises the embedded side-panel mode (R5); without it the route snapshot drives the name.
  *  `confirmResult` controls what the (stubbed) confirm dialog resolves to for reprocess tests. */
@@ -97,17 +98,25 @@ describe('RunDetailComponent', () => {
         expect(spy).not.toHaveBeenCalled();
     });
 
-    it('shows quarantined rows and offers Reprocess on the Quarantine tab', () => {
+    it('hides the batch-keyed actions on quarantine rows, which carry no batch id', () => {
         const c = create().componentInstance;
         c.selectedIndex = c.tabs.findIndex((t) => t.id === 'quarantine');
         c.onTabChange();
         expect(c.rows).toEqual([QUARANTINED]);
-        // A quarantined file's whole content was rejected, so its rejected-row detail is always offered.
-        expect(c.auditRowActions.map((a) => a.hint)).toEqual([
+        const actions = c.auditRowActions;
+        expect(actions.map((a) => a.hint)).toEqual([
             'Lineage & details',
             'Reprocess this batch',
             'View the rejected rows',
         ]);
+        // The quarantine listing is synthesized off the on-disk layout with no consignment_id, so the
+        // two batch-keyed actions hide per row — a batch row (Batches tab) still shows them.
+        expect(actions.find((a) => a.hint === 'Lineage & details')!.visible!(QUARANTINED)).toBe(false);
+        expect(actions.find((a) => a.hint === 'Reprocess this batch')!.visible!(QUARANTINED)).toBe(false);
+        expect(actions.find((a) => a.hint === 'Lineage & details')!.visible!(BATCH)).toBe(true);
+        expect(actions.find((a) => a.hint === 'Reprocess this batch')!.visible!(BATCH)).toBe(true);
+        // A quarantined file's whole content was rejected, so its rejected-row detail is always offered.
+        expect(actions.find((a) => a.hint === 'View the rejected rows')!.visible).toBeUndefined();
     });
 
     it('offers the rejected rows only on files that actually rejected some', () => {
@@ -134,17 +143,17 @@ describe('RunDetailComponent', () => {
         expect(spy).not.toHaveBeenCalled();
     });
 
-    it('reprocessing a quarantined row asks for confirmation before calling the API', async () => {
+    it('reprocessing a batch row asks for confirmation before calling the API', async () => {
         const c = create().componentInstance;
         const spy = vi.spyOn(TestBed.inject(RunsService), 'reprocess');
-        await c.reprocessRow(QUARANTINED);
-        expect(spy).toHaveBeenCalledWith('cdr_ingest', 'q1');
+        await c.reprocessRow(BATCH);
+        expect(spy).toHaveBeenCalledWith('cdr_ingest', 'b1');
     });
 
     it('cancelling the confirm dialog skips the reprocess call', async () => {
         const c = create(undefined, false).componentInstance;
         const spy = vi.spyOn(TestBed.inject(RunsService), 'reprocess');
-        await c.reprocessRow(QUARANTINED);
+        await c.reprocessRow(BATCH);
         expect(spy).not.toHaveBeenCalled();
     });
 
