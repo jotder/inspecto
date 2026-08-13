@@ -304,7 +304,10 @@ half **are** separable — confirm that before designing against it.
   with production `execute`** — add an overload whose default is "no cutoff" so the production path stays
   byte-identical, and pin that with a test. This is the slice most likely to cause a regression far from
   where it was edited.
-- **5c · route + ungate.** Register `POST /pipelines/authored/{id}/run?to={nodeId}`, then flip the
+- **5c · route + ungate. ✅ SHIPPED 2026-08-14** — `PipelineRoutes.testRun` + `ControlApiPipelineTestRunTest`
+  (5 tests over real HTTP). The gate is off (`scratchRunAvailable = true`), so **run-to-here now works
+  against a real server**. As-built notes after the original requirements below.
+  Register `POST /pipelines/authored/{id}/run?to={nodeId}`, then flip the
   `environment.mockFlows` gate off for run-to-here. With 5a shipped the body is: resolve the graph,
   `PipelineTestRun.run(...)` → `sampleRows(...)` → `PipelineDryRun.run(graph, rows, references)`, and
   `deleteScratch` in a `finally`. Two things to get right:
@@ -352,6 +355,31 @@ half **are** separable — confirm that before designing against it.
     5c shippable ahead of 5b and keeps the affordance honest.
 
 **Sizing: multi-shift.** Three separable hard problems, not one task. 5a alone is a plausible shift.
+
+##### 5c SHIPPED 2026-08-14 — as-built
+
+`POST /pipelines/authored/{id}/run?to=` → `PipelineRoutes.testRun`, gated `canAuthorWorkbench`. The
+jail landed as designed: `LocalConnectionWorkbench.jail(Path, String)` was **extracted to a public
+static** (the private instance method now delegates), so the picker and the runner share one
+containment. The root comes from `testRunRoot` — the pipeline's `source.connection` profile `base_path`,
+or `dirs.poll` when it binds none — **derived from the pipeline, never from the request**. Non-`local`
+connectors are **501**, not silently resolved.
+
+⚠ **The jail's test was falsification-probed** (replace `jail(...)` with a plain `resolve()`): the escape
+test goes red, and the failure output is the vulnerability in the clear — `../secret.csv` was read and
+**its parsed contents returned in the response body**. Keep that test; it is the whole reason the route
+is safe to expose.
+
+**Two grains meet in the response, deliberately.** `relations[]` counts the seeded **sample**
+(`TEST_RUN_SEED_ROWS` = 1000, because `PipelineDryRun` is in-memory and a picked file is unbounded),
+while `output.rowCount` is the **full** parse. A warning names the difference whenever they can
+disagree, so neither number is quietly mistaken for the other. Per-file quarantine outcomes also surface
+as warnings — the operator is told the malformed file *would* be quarantined even though nothing moved.
+
+⚠ **The offline mock was made LESS capable on purpose.** It truncates the graph via `subgraphTo`, so it
+honoured `to=` while the server (no 5b) does not. A mock that over-promises is exactly the G2 failure
+mode, so it now appends the same "ran the whole graph" warning. **When 5b lands, remove that warning in
+both `pipelines.handler.ts` and `PipelineRoutes.testRun` together.**
 
 ---
 

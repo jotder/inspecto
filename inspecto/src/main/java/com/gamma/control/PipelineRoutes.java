@@ -22,7 +22,12 @@ import com.gamma.pipeline.PipelineStore;
 import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.RecipeConverter;
 import com.gamma.pipeline.PipelineLift;
+import com.gamma.acquire.ConnectionProfile;
+import com.gamma.acquire.ConnectionWorkbench;
+import com.gamma.acquire.LocalConnectionWorkbench;
 import com.gamma.enrich.ReferenceReader;
+import com.gamma.etl.PipelineConfig;
+import com.gamma.inspector.PipelineTestRun;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.service.CollectorService;
@@ -39,6 +44,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -75,9 +81,14 @@ final class PipelineRoutes implements RouteModule {
         api.get("/pipelines/authored/([^/]+)/raw", (e, m) -> authoredPipelineRaw(api, ApiContext.name(m)));
         api.delete("/pipelines/authored/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deletePipeline(api, ApiContext.name(m))));
         api.post("/pipelines/authored/([^/]+)/dry-run", (e, m) -> dryRunFlow(api, ApiContext.name(m), api.body(e)));
+        // Run-to-here (Build→Test→Run Step 5c): a bounded, scratch-only run over REAL inbox files.
+        // canAuthorWorkbench, not canOperateRuns — this is a simulate, and it mirrors DecisionRoutes'
+        // /simulate vs /apply split. It writes nothing outside a scratch root; see PipelineTestRun.
+        api.post("/pipelines/authored/([^/]+)/run", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> testRun(api, ApiContext.name(m), ApiContext.query(e, "to"), api.body(e))));
         // A real run is an operational verb (canOperateRuns) and mirrors POST /jobs/{name}/trigger — deliberately
         // NOT ".../run": that path is the editor's scratch-only run-to-here contract (POST …/run?to={nodeId},
-        // pipelines.service.ts, mock-only today) and must never fire a production run.
+        // pipelines.service.ts) and must never fire a production run.
         api.post("/pipelines/authored/([^/]+)/trigger", ApiContext.withCapability("canOperateRuns", (e, m) -> runPipeline(api, e, ApiContext.name(m))));
         api.get("/pipelines/([^/]+)/graph", (e, m) -> graphForPipeline(api, ApiContext.name(m)));
         // The Pipeline Document (ELT amendment §5.1): a read-only Markdown projection of config for
@@ -1411,6 +1422,172 @@ final class PipelineRoutes implements RouteModule {
         } catch (Exception e) {
             throw new ApiException(422, "dry-run failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * How many parsed rows are fed to the graph preview. Bounded because {@link PipelineDryRun} works
+     * in memory — a picked file can be arbitrarily large. When the parse produced more than this, the
+     * response says so in {@code warnings} rather than quietly reporting sample counts as totals.
+     */
+    private static final int TEST_RUN_SEED_ROWS = 1000;
+
+    /**
+     * {@code POST /pipelines/authored/{id}/run?to={nodeId}} — <b>run-to-here</b>: parse the caller's
+     * <em>real</em> inbox files through the real ingest path into a scratch root, then preview the graph
+     * over the parsed rows. Build→Test→Run Step 5c. Never writes outside the scratch root and never fires
+     * a production run — see {@link PipelineTestRun} for the two containments that guarantee that.
+     *
+     * <p><b>The {@code files} body is caller-supplied, so it is jailed.</b> Entries are
+     * <em>connection-relative</em> (the picker fills them from {@code GET /connections/{id}/explore},
+     * whose {@code ResourceNode.path} is relativized against the profile's {@code base_path}). The jail
+     * root is <b>derived here from the pipeline's own config</b> — its {@code source.connection} profile,
+     * or {@code dirs.poll} when it binds none — and is <b>never</b> taken from the request, which is why
+     * the body carries no connection id. Containment reuses {@link LocalConnectionWorkbench#jail}, the
+     * same primitive the picker uses, so the two cannot disagree about what is reachable. An escape is
+     * {@code PathEscape} → <b>403</b>.
+     *
+     * <p>404 unknown pipeline · 400 empty/absent {@code files} · 403 path escape · 422 parse or preview
+     * failure · 501 a non-local connection (nothing local to stage from; those files reach the inbox via
+     * acquisition first).
+     */
+    private Object testRun(ApiContext api, String id, String to, Map<String, Object> body) {
+        PipelineConfig cfg = api.service().configFor(id)
+                .orElseThrow(() -> new ApiException(404, "no authored pipeline '" + id + "'"));
+        List<String> files = fileList(body);
+        Path jailRoot = testRunRoot(api, cfg);
+
+        List<Path> picked = new ArrayList<>();
+        for (String f : files) {
+            try {
+                Path p = LocalConnectionWorkbench.jail(jailRoot, f);
+                if (!Files.isRegularFile(p)) throw new ApiException(404, "no such file: " + f);
+                picked.add(p);
+            } catch (ConnectionWorkbench.PathEscape e) {
+                throw new ApiException(403, "file '" + f + "' escapes the pipeline's source root");
+            }
+        }
+
+        PipelineGraph g = graphFor(api, id);
+        Path scratch;
+        try {
+            scratch = Files.createTempDirectory("inspecto_testrun_");
+        } catch (IOException e) {
+            throw new ApiException(500, "could not create a scratch root: " + e.getMessage());
+        }
+        try {
+            PipelineTestRun.Result parsed = PipelineTestRun.run(cfg, picked, scratch);
+            List<Map<String, Object>> seed =
+                    PipelineTestRun.sampleRows(parsed, cfg.output().format(), TEST_RUN_SEED_ROWS);
+
+            List<String> warnings = new ArrayList<>();
+            if (to != null && !to.isBlank())
+                // 5b (the stop-at-node cutoff) is not built. Echoing toNode while having run the whole
+                // graph would paint the canvas ✓ on nodes that were never bounded — say so instead.
+                warnings.add("the run covered the whole graph: stopping at a chosen step is not "
+                        + "supported yet, so every node below '" + to + "' also ran");
+            if (parsed.totalInputRows() > seed.size())
+                warnings.add("per-step row counts are over a sample of " + seed.size() + " of "
+                        + parsed.totalInputRows() + " parsed rows; the output row count is the full figure");
+            for (PipelineTestRun.FileResult f : parsed.files())
+                if (!"SUCCESS".equals(f.status()))
+                    warnings.add("file '" + f.filename() + "' was " + f.status().toLowerCase()
+                            + (f.error() == null || f.error().isBlank() ? "" : ": " + f.error()));
+
+            if (seed.isEmpty()) {
+                warnings.add("no rows were parsed from the chosen file(s), so no step could be previewed");
+                return runResult(null, to, files, parsed, cfg, warnings);
+            }
+            PipelineDryRun.Result preview = PipelineDryRun.run(
+                    componentRegistry(api).effectiveGraph(g), seed, dryRunReferences(api));
+            warnings.addAll(preview.warnings());
+            return runResult(preview, to, files, parsed, cfg, warnings);
+        } catch (ApiException e) {
+            throw e;
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, e.getMessage());
+        } catch (Exception e) {
+            throw new ApiException(422, "test run failed: " + e.getMessage());
+        } finally {
+            PipelineTestRun.deleteScratch(scratch);
+        }
+    }
+
+    /**
+     * The jail root for a run-to-here, derived from the pipeline itself: its bound {@code source.connection}
+     * profile's {@code base_path}, or {@code dirs.poll} when it binds no connection (plain local inbox).
+     * A non-{@code local} connector has no local path to stage from — 501 rather than resolving to
+     * something surprising.
+     */
+    private Path testRunRoot(ApiContext api, PipelineConfig cfg) {
+        if (!cfg.collector().hasConnection())
+            return Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        String connId = cfg.collector().connection();
+        ConnectionProfile p = api.service().connection(connId)
+                .orElseThrow(() -> new ApiException(404, "pipeline's connection '" + connId + "' is not registered"));
+        if (!"local".equalsIgnoreCase(p.connector()))
+            throw new ApiException(501, "run-to-here supports local sources only; connection '" + connId
+                    + "' is '" + p.connector() + "' — those files reach the inbox via acquisition first");
+        if (p.basePath() == null || p.basePath().isBlank())
+            throw new ApiException(422, "connection '" + connId + "' has no base_path configured");
+        return Paths.get(p.basePath().trim()).toAbsolutePath().normalize();
+    }
+
+    /** The authored graph for a run-to-here: the stored pipeline, else the lifted config. 404 if neither. */
+    private PipelineGraph graphFor(ApiContext api, String id) {
+        Path root = pipelinesRootOrNull(api);
+        PipelineGraph g = null;
+        try {
+            g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, e.getMessage());
+        }
+        if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
+        if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
+        return g;
+    }
+
+    /** The {@code files} body key — a non-empty list of connection-relative paths. */
+    private static List<String> fileList(Map<String, Object> body) {
+        Object raw = body == null ? null : body.get("files");
+        if (!(raw instanceof List<?> l) || l.isEmpty())
+            throw new ApiException(400, "body must include a non-empty 'files' list");
+        List<String> out = new ArrayList<>();
+        for (Object o : l) {
+            String s = o == null ? null : String.valueOf(o).trim();
+            if (s == null || s.isEmpty()) throw new ApiException(400, "'files' contains a blank entry");
+            out.add(s);
+        }
+        return out;
+    }
+
+    /**
+     * Project to the UI's {@code PipelineRunResult}. ⚠ Two grains meet here deliberately: {@code relations}
+     * count the <b>seeded sample</b>, while {@code output.rowCount} is the <b>full</b> parse — a warning
+     * names the difference whenever they can disagree.
+     */
+    private static Map<String, Object> runResult(PipelineDryRun.Result preview, String to, List<String> files,
+                                                 PipelineTestRun.Result parsed, PipelineConfig cfg,
+                                                 List<String> warnings) {
+        List<Map<String, Object>> relations = new ArrayList<>();
+        if (preview != null)
+            for (PipelineDryRun.NodeDryRun n : preview.nodes())
+                for (PipelineDryRun.RelationCount r : n.relations())
+                    relations.add(Map.of("node", n.node(), "rel", r.rel(),
+                            "rowCount", r.rowCount(), "rows", r.rows()));
+        Map<String, Object> out = null;
+        if (!parsed.outputs().isEmpty())
+            out = Map.of("store", "scratch",
+                    "format", String.valueOf(cfg.output().format()),
+                    "path", parsed.outputs().get(0).outputFile(),
+                    "rowCount", parsed.rowsWritten());
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("seedNode", preview == null ? "" : preview.seedNode());
+        m.put("toNode", to == null ? "" : to);
+        m.put("files", files);
+        m.put("relations", relations);
+        m.put("output", out);
+        m.put("warnings", List.copyOf(warnings));
+        return m;
     }
 
     /** View-name prefix for a reference resolved during a dry-run (its own scratch database). */

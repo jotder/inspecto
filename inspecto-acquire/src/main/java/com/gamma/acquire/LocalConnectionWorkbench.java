@@ -101,6 +101,24 @@ public final class LocalConnectionWorkbench implements ConnectionWorkbench {
     /** Resolve a connector-relative path under the root; escaping it is a {@link PathEscape} (HTTP 403). */
     private Path jail(String path) {
         if (root == null) throw new IllegalArgumentException("connection has no base_path configured");
+        return jail(root, path);
+    }
+
+    /**
+     * Resolve {@code path} (connector-relative) under {@code root}, refusing any escape with
+     * {@link ConnectionWorkbench.PathEscape} — which the HTTP edge maps to <b>403</b>.
+     *
+     * <p>Shared deliberately rather than duplicated: the run-to-here test run
+     * ({@code PipelineRoutes}) contains the caller-supplied {@code files} with the <em>same</em>
+     * primitive the explore/sample picker uses, so the two surfaces cannot disagree about what is
+     * reachable. A picker that allows X beside a runner that allows Y is how this class of hole appears.
+     *
+     * <p>⚠ Not to be confused with {@code ConfigSafetyValidator.checkPathValue}, which is
+     * <b>advisory</b> (it collects {@code Finding}s at authoring time). This one <b>enforces</b>.
+     *
+     * @param root an absolute, normalized root
+     */
+    public static Path jail(Path root, String path) {
         Path resolved = root.resolve(norm(path)).normalize();
         if (!resolved.startsWith(root)) throw new PathEscape("path escapes the connection base path");
         return resolved;

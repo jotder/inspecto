@@ -560,7 +560,22 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   - ~~G5 silent one-way door~~ **CLOSED** — warning banner naming the offending types on load. ⚠ The
     plan said "mark the editor read-only"; **that was wrong** — deleting the offending node is the only
     repair path, so read-only would have locked users out of the fix.
-  - **⬜ REMAINING — bounded test run over real inbox files.** The *only* thing left between Build and
+  - ~~**⬜ REMAINING — bounded test run over real inbox files.**~~ **✅ SHIPPED 2026-08-14 (5a + 5c).**
+    A user can now test a pipeline against their own data: `POST /pipelines/authored/{id}/run` parses
+    picked inbox files through the **real** ingest path into a scratch root and previews the graph over
+    the parsed rows, with **zero production side effects**; the UI gate is off, so run-to-here works
+    against a real server. As-built + rationale:
+    [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) Step 5.
+    ⚠ **Only the stop-at-node cutoff (5b) remains** — the run covers the whole graph and *says so in
+    `warnings`* rather than pretending otherwise; the offline mock was deliberately made to match. When
+    5b lands, drop that warning in **both** places together.
+    ⚠ Two findings worth carrying: **the containment is the call graph, not config** (five destinations —
+    both ledgers, the consignment registry, file stages, Signals, provenance — are resolved by JVM `-D`
+    or per-space registries and are avoided by *not calling* `commit`/`writeAudit`/`recordProvenance`);
+    and **`QuarantineManager` does `Files.move` on the SOURCE file from inside the ingest half**, so
+    picked files are copied into a scratch poll dir — ⛔ do not "optimise" that copy away.
+    Original scoping follows.
+    The *only* thing left between Build and
     Run. UI already exists and works against the mock; this is a backend job. Missing: reading actual
     inbox files + running the real ingest/parse stage (`PipelineDryRun` is synthetic-rows-only and
     skips parsing), a stop-at-node cutoff (`PipelineExecutor.dryRun` has no partial-graph primitive),

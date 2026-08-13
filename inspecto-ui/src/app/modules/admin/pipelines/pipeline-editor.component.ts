@@ -61,7 +61,6 @@ import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
-import { environment } from 'environments/environment';
 import {
     PipelineFinding,
     NodeStatus,
@@ -250,10 +249,15 @@ export class PipelineEditorComponent implements OnInit {
      * closes the other rather than stacking two bands under the graph.
      */
     /**
-     * `POST /pipelines/authored/{id}/run?to=` has no real route — PipelineRoutes reserves the path
-     * and never registers it, so run-to-here only works against the offline mock. Gate, don't 404.
+     * Run-to-here works against a real server since 2026-08-14 (Build→Test→Run Step 5c):
+     * `POST /pipelines/authored/{id}/run?to=` is registered, runs the picked inbox files through the
+     * real ingest path into a scratch root, and writes nothing to production. Ungated — it was
+     * `environment.mockPipelines` only while the route was reserved-but-unregistered.
+     *
+     * ⚠ The `to=` cutoff itself is still unbuilt (Step 5b): the server runs the whole graph and says so
+     * in `warnings`, which the dock renders. Do not re-gate this on the cutoff landing.
      */
-    readonly scratchRunAvailable = environment.mockPipelines;
+    readonly scratchRunAvailable = true;
 
     readonly bottomTab = signal<'dryrun' | 'validation' | null>(null);
 
