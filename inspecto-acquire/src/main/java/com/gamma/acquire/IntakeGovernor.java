@@ -20,6 +20,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * returns {@link #UNBOUNDED} and nothing in the ingest path changes. Setting a base cap enables both the hard
  * cap and (unless {@code -Dingest.backpressure.adaptive=false}) the controller.
  *
+ * <h3>Per-flow override (T15 follow-up)</h3>
+ * A pipeline's {@code processing.intake} TOON block installs its own {@link Policy} via {@link #configure}
+ * (resolved against the globals by the caller), so one noisy flow can be capped while the fleet stays
+ * unbounded — or one flow exempted (base cap 0) from a fleet-wide cap. {@link #capFor} and
+ * {@link #observeCycle} resolve thresholds per pipeline via {@link #policyFor}.
+ *
  * <h3>Why cycle overrun, not inbox lag</h3>
  * §3.5's sketch halves the cap when {@code oldestInboxAge > 3 × pollInterval} or {@code pending > 10 × cap}.
  * Both are <em>positive</em> feedback: admitting fewer files cannot reduce inbox age or pending depth — it
@@ -92,24 +98,51 @@ public final class IntakeGovernor {
 
     private final Policy policy;
     private final Map<String, Integer> caps = new ConcurrentHashMap<>();
+    /** Per-pipeline TOON overrides ({@code processing.intake}), installed via {@link #configure}. */
+    private final Map<String, Policy> overrides = new ConcurrentHashMap<>();
 
     /** Visible for tests; production code uses {@link #shared()}. */
     public IntakeGovernor(Policy policy) {
         this.policy = policy;
     }
 
-    /** The thresholds in force. */
+    /** The process-wide thresholds (the {@code -D} globals); a pipeline override never changes these. */
     public Policy policy() {
         return policy;
     }
 
     /**
+     * Install (or clear, with {@code null}) {@code pipelineId}'s own thresholds — the per-flow
+     * {@code processing.intake} TOON override. Called idempotently by the ingest path every cycle with
+     * the policy resolved from the pipeline's config, so a hot-reloaded edit takes effect on the next
+     * cycle and removing the block restores the globals — no registration-lifecycle wiring needed.
+     *
+     * <p>A <em>changed</em> policy drops the pipeline's learned cap (the controller state was learned
+     * under the old thresholds and could sit above the new base or below the new floor); an unchanged
+     * one is a no-op, so the per-cycle call does not disturb adaptation.
+     */
+    public void configure(String pipelineId, Policy override) {
+        if (override == null) {
+            if (overrides.remove(pipelineId) != null) caps.remove(pipelineId);
+            return;
+        }
+        Policy previous = overrides.put(pipelineId, override);
+        if (!override.equals(previous)) caps.remove(pipelineId);
+    }
+
+    /** The thresholds in force for {@code pipelineId} — its override when configured, else the globals. */
+    public Policy policyFor(String pipelineId) {
+        return overrides.getOrDefault(pipelineId, policy);
+    }
+
+    /**
      * How many candidates {@code pipelineId} may admit this cycle — {@link #UNBOUNDED} when admission control
-     * is off, otherwise the controller's current cap (the base cap until a cycle overruns).
+     * is off for this pipeline, otherwise the controller's current cap (the base cap until a cycle overruns).
      */
     public int capFor(String pipelineId) {
-        if (!policy.active()) return UNBOUNDED;
-        return caps.getOrDefault(pipelineId, policy.baseCap());
+        Policy p = policyFor(pipelineId);
+        if (!p.active()) return UNBOUNDED;
+        return caps.getOrDefault(pipelineId, p.baseCap());
     }
 
     /**
@@ -127,28 +160,33 @@ public final class IntakeGovernor {
      * @param pollIntervalMs the scheduler's fixed poll delay — the budget one run is expected to fit inside
      */
     public void observeCycle(Iterable<String> pipelineIds, long cycleMillis, long pollIntervalMs) {
-        if (!policy.active() || !policy.adaptive() || pollIntervalMs <= 0) return;
+        if (pollIntervalMs <= 0) return;
         boolean overran = cycleMillis > pollIntervalMs;
         boolean comfortable = cycleMillis * 2 < pollIntervalMs;
         if (!overran && !comfortable) return;                      // inside the hysteresis band — hold
-        int min = policy.effectiveMinCap();
         for (String id : pipelineIds) {
+            Policy p = policyFor(id);                              // per-pipeline thresholds (T15 follow-up)
+            if (!p.active() || !p.adaptive()) continue;
+            int min = p.effectiveMinCap();
             caps.compute(id, (k, current) -> {
-                int cap = (current == null) ? policy.baseCap() : current;
+                int cap = (current == null) ? p.baseCap() : current;
                 int next = overran ? Math.max(min, cap / 2)
-                                   : Math.min(policy.baseCap(), cap * 2);
+                                   : Math.min(p.baseCap(), cap * 2);
                 return next == cap ? cap : next;
             });
         }
     }
 
-    /** Drop {@code pipelineId}'s cap state when it is unregistered, so the map cannot leak under churn. */
+    /** Drop {@code pipelineId}'s cap + override state when it is unregistered, so the maps cannot leak
+     *  under churn. */
     public void forget(String pipelineId) {
         caps.remove(pipelineId);
+        overrides.remove(pipelineId);
     }
 
-    /** Forget all cap state — for test isolation. */
+    /** Forget all cap + override state — for test isolation. */
     public void reset() {
         caps.clear();
+        overrides.clear();
     }
 }

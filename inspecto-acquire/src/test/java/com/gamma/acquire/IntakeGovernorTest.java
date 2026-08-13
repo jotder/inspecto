@@ -98,4 +98,70 @@ class IntakeGovernorTest {
         gov.forget("p");
         assertEquals(100, gov.capFor("p"), "forgotten ⇒ back to the base cap, no leaked entry");
     }
+
+    // ── per-flow processing.intake overrides (T15 follow-up) ───────────────────────
+
+    @Test
+    void anOverrideCapsOneFlowWhileTheFleetStaysUnbounded() {
+        IntakeGovernor gov = new IntakeGovernor(new IntakeGovernor.Policy(0, 1, true)); // globals: off
+        gov.configure("noisy", new IntakeGovernor.Policy(10, 1, true));
+        assertEquals(10, gov.capFor("noisy"));
+        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("other"), "the override is that flow's alone");
+        gov.observeCycle(List.of("noisy"), POLL_MS + 1, POLL_MS);
+        assertEquals(5, gov.capFor("noisy"), "the controller adapts against the OVERRIDE thresholds");
+    }
+
+    @Test
+    void aZeroOverrideExemptsOneFlowFromAFleetWideCap() {
+        IntakeGovernor gov = capped(100, 1);
+        gov.configure("exempt", new IntakeGovernor.Policy(0, 1, true));
+        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("exempt"));
+        gov.observeCycle(List.of("exempt"), POLL_MS * 10, POLL_MS);
+        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("exempt"), "explicitly unbounded ⇒ never throttled");
+        assertEquals(100, gov.capFor("other"), "the global cap still governs the rest of the fleet");
+    }
+
+    @Test
+    void aChangedOverrideDropsTheLearnedCapAndAnUnchangedOneKeepsIt() {
+        IntakeGovernor gov = capped(100, 1);
+        gov.configure("p", new IntakeGovernor.Policy(40, 1, true));
+        gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS);
+        assertEquals(20, gov.capFor("p"));
+
+        // Re-installing the SAME policy (the ingest path does this every cycle) must not reset adaptation.
+        gov.configure("p", new IntakeGovernor.Policy(40, 1, true));
+        assertEquals(20, gov.capFor("p"), "an idempotent re-configure keeps the learned cap");
+
+        // A DIFFERENT policy drops it — the old learned value was learned under other thresholds.
+        gov.configure("p", new IntakeGovernor.Policy(60, 1, true));
+        assertEquals(60, gov.capFor("p"), "a changed override restarts from its own base cap");
+    }
+
+    @Test
+    void clearingTheOverrideRestoresTheGlobals() {
+        IntakeGovernor gov = capped(100, 1);
+        gov.configure("p", new IntakeGovernor.Policy(10, 1, true));
+        gov.observeCycle(List.of("p"), POLL_MS + 1, POLL_MS);
+        assertEquals(5, gov.capFor("p"));
+        gov.configure("p", null);   // block removed from the TOON
+        assertEquals(100, gov.capFor("p"), "no override ⇒ the -D globals, with no stale learned cap");
+    }
+
+    @Test
+    void forgetDropsTheOverrideToo() {
+        IntakeGovernor gov = new IntakeGovernor(new IntakeGovernor.Policy(0, 1, true));
+        gov.configure("p", new IntakeGovernor.Policy(10, 1, true));
+        assertEquals(10, gov.capFor("p"));
+        gov.forget("p");
+        assertEquals(IntakeGovernor.UNBOUNDED, gov.capFor("p"), "churn must not leak the override map");
+    }
+
+    @Test
+    void perFlowAdaptiveFalsePinsThatFlowOnly() {
+        IntakeGovernor gov = capped(100, 1);
+        gov.configure("pinned", new IntakeGovernor.Policy(30, 1, false));
+        gov.observeCycle(List.of("pinned", "global"), POLL_MS + 1, POLL_MS);
+        assertEquals(30, gov.capFor("pinned"), "adaptive=false in the override is a hard cap for that flow");
+        assertEquals(50, gov.capFor("global"), "the globally-governed flow in the same cycle still adapts");
+    }
 }

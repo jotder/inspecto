@@ -975,11 +975,26 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   the halving floor — a capped pipeline always makes progress) · `-Dingest.backpressure.adaptive` (true; `false`
   pins a hard static cap). **Opt-in by default** — with no base cap the ingest path is byte-for-byte pre-T15,
   matching how the other risky ingest/resource knobs shipped (`-Djobs.maxConcurrentRuns` 0=unbounded,
-  `-Dprocessing.duckdb.*` caps). *Deferred:* per-flow TOON override of the thresholds (globals only today) ·
-  flipping the cap on by default (needs a soak) · remote-fetch economy — the cap is applied post-dedup, so a
-  remote source still materialises its full ready set before truncation (unchanged from pre-T15 fetch volume,
-  but a pre-materialise cap would save bandwidth). 19 tests (`IntakeGovernorTest` 10 +
-  `CollectorProcessorAdmissionCapTest` 3 + `CollectorProcessorPollTest` 6 regression).
+  `-Dprocessing.duckdb.*` caps). ~~*Deferred:* per-flow TOON override of the thresholds (globals only
+  today)~~ **SHIPPED 2026-08-13** — optional `processing.intake.{max_files_per_cycle, min_files_per_cycle,
+  adaptive}` (`PipelineConfig.Intake`, nullable — absent block = inherit the globals whole). Each field
+  is independently optional, so an operator can cap one noisy flow while the fleet stays unbounded,
+  exempt one flow from a fleet-wide cap (`max_files_per_cycle: 0`, distinct from an absent key), or pin
+  one flow's cap hard (`adaptive: false`) without touching a `-D`. `IntakeGovernor.configure`/`policyFor`
+  hold a per-id override map alongside the existing per-id learned-cap map; `CollectorProcessor.admit`
+  installs the resolved policy idempotently every cycle (a *changed* override drops the learned cap, an
+  unchanged re-install does not disturb adaptation, since a hot-reloaded TOON edit must take effect next
+  cycle and removing the block must restore the globals with no stale state). `forget` clears both maps.
+  Resolution against the `-D` globals lives at the call site (`CollectorProcessor.intakePolicy`), not in
+  the config module, which has no notion of the runtime defaults. 25 new tests (`IntakeGovernorTest` +6,
+  `PipelineIntakeConfigTest` — real-file TOON round-trip per the config-format lesson below, not a
+  hand-built map — 6, `CollectorProcessorAdmissionCapTest` +1 proving one flow capped while the fleet
+  stays unbounded); the config module's own read-side test, `ConfigLoaderTest`, is unaffected since this
+  block has no cross-field rule. *Still deferred:* flipping the cap on by default (needs a soak) ·
+  remote-fetch economy — the cap is applied post-dedup, so a remote source still materialises its full
+  ready set before truncation (unchanged from pre-T15 fetch volume, but a pre-materialise cap would save
+  bandwidth). 19 tests (`IntakeGovernorTest` 10 + `CollectorProcessorAdmissionCapTest` 3 +
+  `CollectorProcessorPollTest` 6 regression) — now 44 with the per-flow override slice above.
 
 ### Phase 4 — Flow-graph API + G6 visualisation (read-first)
 - [x] **T16 (done — shipped by T31, checklist row was stale).** `GET /pipelines/{id}/graph` (`PipelineRoutes.java`,

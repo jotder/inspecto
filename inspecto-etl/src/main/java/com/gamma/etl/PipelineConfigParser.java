@@ -223,6 +223,17 @@ final class PipelineConfigParser {
             b.chunkTargetBytes  = toLong(chunk.get("target_chunk_bytes"));
         }
 
+        // ── per-flow intake admission-control override (T15 follow-up, additive, optional) ──
+        // Each key is independently optional: an absent key inherits its -Dingest.* global at the
+        // IntakeGovernor call site, which is why these stay nullable rather than defaulted here.
+        Map<String, Object> intake = (Map<String, Object>) proc.get("intake");
+        if (intake != null) {
+            b.intake = new PipelineConfig.Intake(
+                    intOrNull(intake.get("max_files_per_cycle"), "processing.intake.max_files_per_cycle"),
+                    intOrNull(intake.get("min_files_per_cycle"), "processing.intake.min_files_per_cycle"),
+                    boolOrNull(intake.get("adaptive"), "processing.intake.adaptive"));
+        }
+
         // ── duplicate check ───────────────────────────────────────────────────
         Map<String, Object> dup = (Map<String, Object>) proc.get("duplicate_check");
         if (dup != null) {
@@ -905,6 +916,29 @@ final class PipelineConfigParser {
 
     private static int toInt(Object v) {
         return Integer.parseInt(String.valueOf(v));
+    }
+
+    /** Parse an optional int; {@code null}/blank ⇒ {@code null} (unset). Garbage is a named load error,
+     *  never a silent fallback — a mistyped threshold must not quietly mean "inherit the global". */
+    private static Integer intOrNull(Object v, String where) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return null;
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(where + " must be an integer, got: " + s);
+        }
+    }
+
+    /** Parse an optional boolean; {@code null}/blank ⇒ {@code null} (unset); only true/false accepted. */
+    private static Boolean boolOrNull(Object v, String where) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return null;
+        if (s.equalsIgnoreCase("true")) return Boolean.TRUE;
+        if (s.equalsIgnoreCase("false")) return Boolean.FALSE;
+        throw new IllegalArgumentException(where + " must be true or false, got: " + s);
     }
 
     /** Parse a size/count to long; {@code null}/blank ⇒ 0. Accepts plain digits (bytes). */

@@ -250,6 +250,28 @@ public final class PipelineConfig {
     }
 
     /**
+     * Optional per-pipeline intake admission-control override (T15 follow-up, additive). Parsed from
+     * {@code processing.intake}; {@code null} (block absent) means the process-wide {@code -Dingest.*}
+     * thresholds apply whole, so every existing config is byte-identical in behaviour.
+     *
+     * <p>Each field is independently optional — an unset field inherits its global counterpart — so an
+     * operator can cap one noisy flow while the fleet stays unbounded ({@code max_files_per_cycle: N}),
+     * exempt one flow from a fleet-wide cap ({@code max_files_per_cycle: 0}), or pin one flow's cap hard
+     * ({@code adaptive: false}) without touching any {@code -D}. This record carries only what the author
+     * <b>stated</b>; merging with the globals happens at the {@code IntakeGovernor} call site
+     * ({@code CollectorProcessor}), never here — the config module does not know the runtime defaults.
+     */
+    @PublicApi(since = "5.7.0")
+    public record Intake(Integer maxFilesPerCycle, Integer minFilesPerCycle, Boolean adaptive) {
+        public Intake {
+            if (maxFilesPerCycle != null && maxFilesPerCycle < 0)
+                throw new IllegalArgumentException("processing.intake.max_files_per_cycle must be >= 0 (0 = unbounded)");
+            if (minFilesPerCycle != null && minFilesPerCycle < 1)
+                throw new IllegalArgumentException("processing.intake.min_files_per_cycle must be >= 1");
+        }
+    }
+
+    /**
      * Fixed-width parsing frontend (additive, 4.1). Non-null only when the resolved grammar/
      * {@code csv_settings} sets {@code frontend: fixedwidth}; {@code null} for the default delimited
      * frontend (so every existing pipeline is unaffected).
@@ -750,6 +772,7 @@ public final class PipelineConfig {
     private final Schemas    schemas;
     private final DuckDbSettings duckdb;
     private final Chunking       chunking;
+    private final Intake         intake;
     private final FixedWidth     fixedWidth;
     private final Json           json;
     private final TextRegex      textRegex;
@@ -882,6 +905,8 @@ public final class PipelineConfig {
     public DuckDbSettings duckdb()   { return duckdb; }
     /** Optional large-file chunking config; never null ({@code maxFileBytes <= 0} ⇒ disabled). */
     public Chunking       chunking() { return chunking; }
+    /** Per-pipeline intake admission-control override, or {@code null} = inherit the {@code -D} globals. */
+    public Intake         intake()   { return intake; }
     /** Fixed-width frontend config, or {@code null} for the default delimited frontend. */
     public FixedWidth     fixedWidth() { return fixedWidth; }
     /** JSON/NDJSON frontend config, or {@code null} unless {@code frontend: json}. */
@@ -963,6 +988,7 @@ public final class PipelineConfig {
                         : Collections.emptyMap());
         this.duckdb   = new DuckDbSettings(b.duckMemoryLimit, b.duckTempDirectory, b.duckMaxTempSize);
         this.chunking = new Chunking(b.chunkMaxFileBytes, b.chunkTargetBytes);
+        this.intake = b.intake;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
         this.textRegex = b.textRegex;
@@ -1019,6 +1045,7 @@ public final class PipelineConfig {
         this.schemas = src.schemas;
         this.duckdb = src.duckdb;
         this.chunking = src.chunking;
+        this.intake = src.intake;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
         this.textRegex = src.textRegex;
@@ -1286,6 +1313,7 @@ public final class PipelineConfig {
         // Set processing.chunking.max_file_bytes: 0 to disable.
         long   chunkMaxFileBytes = 8_589_934_592L;
         long   chunkTargetBytes  = 0;
+        Intake intake            = null;   // absent block = inherit the -Dingest.* globals whole
         String batchesFilePath;
         String lineageFilePath;
         String manifestsDir;

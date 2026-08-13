@@ -299,7 +299,8 @@ public class CollectorProcessor {
         List<File> candidates = dedupLocal(cfg, ready, emitSignals);
         // T15 admission control: bound what ONE cycle admits (§3.5). Applied only on the run path — a
         // read-only pending scan must keep reporting the true backlog — and only when an operator set
-        // -Dingest.maxFilesPerCycle, so the default path is byte-for-byte the pre-T15 behaviour. Files
+        // -Dingest.maxFilesPerCycle or the pipeline's own processing.intake block (per-flow override),
+        // so the default path is byte-for-byte the pre-T15 behaviour. Files
         // beyond the cap are simply not admitted this cycle: they stay in the durable inbox (uncommitted,
         // so no marker/ledger entry hides them) and the next cycle sees them again.
         return emitSignals ? admit(cfg, candidates) : candidates;
@@ -346,13 +347,32 @@ public class CollectorProcessor {
      * {@code candidates} untouched when admission control is off (the default).
      */
     private static List<File> admit(PipelineConfig cfg, List<File> candidates) {
-        int cap = IntakeGovernor.shared().capFor(cfg.identity().pipelineName());
+        IntakeGovernor gov = IntakeGovernor.shared();
+        // Per-flow processing.intake override, installed idempotently every cycle so a hot-reloaded
+        // edit applies next cycle and removing the block restores the -D globals (T15 follow-up).
+        gov.configure(cfg.identity().pipelineName(), intakePolicy(cfg, gov.policy()));
+        int cap = gov.capFor(cfg.identity().pipelineName());
         if (cap == IntakeGovernor.UNBOUNDED || candidates.size() <= cap) return candidates;
         List<File> ordered = new ArrayList<>(candidates);
         ordered.sort(java.util.Comparator.comparingLong(File::lastModified));
         log.info("Admission cap: taking {} of {} pending file(s) for {} this cycle; the rest wait in the inbox",
                 cap, candidates.size(), cfg.identity().pipelineName());
         return new ArrayList<>(ordered.subList(0, cap));
+    }
+
+    /**
+     * The pipeline's {@code processing.intake} block resolved against the {@code -D} globals — the per-flow
+     * {@link IntakeGovernor.Policy}, or {@code null} when the block is absent (inherit the globals whole).
+     * Resolution lives here rather than in the config module because only this side knows the runtime
+     * defaults; each stated field wins, each unset field inherits its global counterpart.
+     */
+    private static IntakeGovernor.Policy intakePolicy(PipelineConfig cfg, IntakeGovernor.Policy globals) {
+        PipelineConfig.Intake in = cfg.intake();
+        if (in == null) return null;
+        return new IntakeGovernor.Policy(
+                in.maxFilesPerCycle() != null ? in.maxFilesPerCycle() : globals.baseCap(),
+                in.minFilesPerCycle() != null ? in.minFilesPerCycle() : globals.minCap(),
+                in.adaptive() != null ? in.adaptive() : globals.adaptive());
     }
 
     /**
