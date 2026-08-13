@@ -813,13 +813,32 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   ignores `prerequisites`**, so for `kpi_report_builder` the "review before apply" diff shows the **dashboard
   only** and the N widgets are invisible to review. Deliberately deferred: `kpi_report_builder` is the sole
   tool with prerequisites, so a shared helper would have exactly one caller. **Close this when a second tool
-  gains prerequisites** — at that point extract the sequencing and make the diff cover them. — build it on the `$` namespace.**
+  gains prerequisites** — at that point extract the sequencing and make the diff cover them.
+- ~~**Rule Template execution has no engine — build it on the `$` namespace.**~~ **CLOSED 2026-08-14 —
+  shipped differently from the 2026-07-28 decision below, and the shipped design is correct; don't redo it.**
+  `44205ff0` ("feat(agent): execute rule templates via :name bound parameters") added the missing engine half:
+  a real Java `RuleTemplate` record (`inspecto-engine/…/query/RuleTemplate.java`, `from(Map)` + `compile(Map)`)
+  and a dedicated `RuleRoutes.java` (`POST /rule-templates/{id}/simulate`, gated `canAuthorWorkbench`, per the
+  `DecisionRoutes` precedent), with a real-HTTP test suite (`ControlApiRuleTemplateTest`).
+  ⚠ **It did NOT take the `$`-params/`DecisionRuleApplier` path the operator decision below specified — it
+  built a `:name`→`?` JDBC-bind tokenizer instead, which is exactly the "second param language" the decision
+  said not to build.** Re-grounded 2026-08-14 before treating that as unfinished work: the UI's
+  `compileSqlWithParams` (`inspecto-ui/…/query/query-sql.ts:100-168`) already emits `:name` binds in the
+  `{name,field,operator,value}` shape, `rule-save.dialog.ts` already persists `params`/`paramSql` on the
+  component, and `RuleTemplate.from(Map)` reads that exact shape back — the UI producer and the Java consumer
+  are **already wired end-to-end**, not two disconnected halves. `Parameters.resolve` is still called, but only
+  as a second pass over stray `$`-tokens inside the compiled SQL, not as the template's param mechanism.
+  Do not "finish" this by rerouting it through `DecisionRuleApplier` — that would break the shipped,
+  tested, wired feature to satisfy a decision made before the simpler design was tried and found to work.
+  If the two-param-language concern still matters, it is a documentation/rationale gap, not a missing build.
+  Original finding + decision, kept for provenance:
   Persistence landed 2026-07-27 (`rule-template` component kind), but the engine half was never scoped.
   ⚠ **Two premises in the original row were wrong:** there is **no Java `RuleTemplate` at all** (it is a
   TS-only type, `inspecto-ui/src/app/inspecto/rule/rule-types.ts`; the backend treats `rule-template` as an
   opaque TOON blob through generic `/components` CRUD), and `:fieldValue` is **not a placeholder awaiting a
   binder** — it is a display string built by `compileSqlWithParams` (`inspecto-ui/…/query/query-sql.ts:94-96`)
-  and consumed by nothing. So "wire up `paramSql`" was never the task.
+  and consumed by nothing. So "wire up `paramSql`" was never the task. **(This premise is also now stale — see
+  above; it IS consumed, by the shipped `RuleTemplate.from`.)**
   **DECISION (operator, 2026-07-28): reuse the existing seams — do NOT build a second bind namespace.** Add a
   Java `RuleTemplate` whose params **are** `$`-params resolved by `Parameters.resolve`
   (`inspecto-engine/…/query/Parameters.java:41-108`, which already does safe SQL-literal quoting), and execute
