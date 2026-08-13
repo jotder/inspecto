@@ -211,7 +211,7 @@ public final class PipelineLift {
         if (cfg.triggerConfig() != null) c.put("trigger", cfg.triggerConfig());   // T13: entry-node trigger (§3.6)
         String use = src.hasConnection() ? "connection/" + src.connection() : null;
         return new PipelineNode(ACQ, BuiltinNodeType.ACQUISITION.type(),
-                "Collect", "Collector: " + src.connector(), c, use);
+                null, "Collector: " + src.connector(), c, use);
     }
 
     private static PipelineNode dedupMarkerNode(PipelineConfig cfg) {
@@ -220,7 +220,7 @@ public final class PipelineLift {
         c.put("retention_days", cfg.processing().retentionDays());
         put(c, "markers_dir", cfg.dirs().markers());
         return new PipelineNode(DEDUP_MARKER, BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
-                "Dedup (marker)", null, c, null);
+                null, null, c, null);
     }
 
     private static PipelineNode parserNode(PipelineConfig cfg) {
@@ -241,7 +241,7 @@ public final class PipelineLift {
             c.put("schema", s.single());         // raw.fields the parser tokenises against
         }
         String use = (s.ingesterClass() != null) ? "ingester/" + s.ingesterClass() : null;
-        return new PipelineNode(PARSE, BuiltinNodeType.PARSER.type(), "Parser", null, c, use);
+        return new PipelineNode(PARSE, BuiltinNodeType.PARSER.type(), null, null, c, use);
     }
 
     /** Build one {@code [filter →] map → sink(s)} chain off {@code parse} via {@code rel}; {@code key} is null for
@@ -293,7 +293,8 @@ public final class PipelineLift {
                 int nth = seen.merge(kind, 1, Integer::sum);
                 String id = kind + suffix + (nth == 1 ? "" : "__s" + i);
                 Map<String, Object> sc = new LinkedHashMap<>(step.config());
-                nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null, sc, null));
+                nodes.add(new PipelineNode(id, "transform." + kind, stepLabel(kind), null,
+ sc, null));
                 edges.add(PipelineEdge.data(sinkUpstream, id));
                 sinkUpstream = id;
                 if (PipelineConfig.Step.ROUTE.equals(kind)) { routeId = id; routeCfg = sc; }
@@ -310,7 +311,7 @@ public final class PipelineLift {
             jc.put("reference", cfg.join().reference());
             jc.put("on", cfg.join().on());
             nodes.add(new PipelineNode(joinId, BuiltinNodeType.TRANSFORM_JOIN.type(),
-                    "Join", null, jc, null));
+                    null, null, jc, null));
             edges.add(PipelineEdge.data(sinkUpstream, joinId));
             sinkUpstream = joinId;
         }
@@ -323,7 +324,7 @@ public final class PipelineLift {
             dc.put("keys", cfg.dedup().keys());
             put(dc, "order_by", cfg.dedup().orderBy());
             nodes.add(new PipelineNode(dedupId, BuiltinNodeType.TRANSFORM_DEDUP.type(),
-                    "Dedup (record)", null, dc, null));
+                    null, null, dc, null));
             edges.add(PipelineEdge.data(sinkUpstream, dedupId));
             sinkUpstream = dedupId;
         }
@@ -336,7 +337,7 @@ public final class PipelineLift {
             sc.put("group_by", cfg.summarize().groupBy());
             sc.put("measures", cfg.summarize().measures());
             nodes.add(new PipelineNode(summarizeId, BuiltinNodeType.TRANSFORM_SUMMARIZE.type(),
-                    "Summarize", null, sc, null));
+                    null, null, sc, null));
             edges.add(PipelineEdge.data(sinkUpstream, summarizeId));
             sinkUpstream = summarizeId;
         }
@@ -347,7 +348,7 @@ public final class PipelineLift {
         if (routeCfg != null) {
             routeId = "route" + suffix;
             nodes.add(new PipelineNode(routeId, BuiltinNodeType.TRANSFORM_ROUTE.type(),
-                    "Route", null, routeCfg, null));
+                    null, null, routeCfg, null));
             edges.add(PipelineEdge.data(sinkUpstream, routeId));
             sinkUpstream = routeId;
         }
@@ -384,17 +385,12 @@ public final class PipelineLift {
         }
     }
 
-    /** A chain step's display name — the same label the legacy emission gives that kind, so a pipeline
-     *  reads identically on the canvas whichever spelling its file uses. */
+    /** A chain step's display name — {@code null} for every kind whose legacy emission gives it no name
+     *  of its own (the type's own served label already captions the card; see {@code stepTitle} /
+     *  {@code stepTypeLabel} in {@code pipeline-step-cards.component.ts}), except {@code filter}, whose
+     *  legacy name ("Row filter") is more specific than its type's label ("Filter") and is kept. */
     private static String stepLabel(String kind) {
-        return switch (kind) {
-            case PipelineConfig.Step.FILTER    -> "Row filter";
-            case PipelineConfig.Step.JOIN      -> "Join";
-            case PipelineConfig.Step.DEDUP     -> "Dedup (record)";
-            case PipelineConfig.Step.SUMMARIZE -> "Summarize";
-            case PipelineConfig.Step.ROUTE     -> "Route";
-            default -> kind;
-        };
+        return PipelineConfig.Step.FILTER.equals(kind) ? "Row filter" : null;
     }
 
     /** The route branch key whose declared {@code database} matches {@code database}, or {@code null}. */

@@ -380,3 +380,11 @@ advertise a vocabulary the compiler refuses. Consequences worth carrying:
   which is not user-facing vocabulary.
 - ⚠ **`uniqueNodeId` still bakes the type into the id** (`transform_join_1`), which is what a card falls
   back to when the node is unnamed. Any future retype affordance makes that id a lie.
+- **`PipelineLift` no longer stamps a lifted node's `name` with its own type label.** `isNamed()` /
+  `stepTitle()` show the caption twice when `name` is non-blank (title = name, plus the `[typeLabel]`
+  caption beside it) — so a name that happens to equal the type's label ("Collect"/"Collect") reads as a
+  visible duplicate, not a real operator-given name. `PipelineLift.java`'s node builders
+  (`acquisitionNode`, `dedupMarkerNode`, `parserNode`, and the join/dedup/summarize/route builders in
+  `branch()`) now pass `null` instead of the hand-written label; `stepLabel(kind)` returns `null` for
+  every chain-step kind except `filter`, whose legacy "Row filter" name is kept because it differs from
+  the type's own "Filter" label and is a real (more specific) name. See [BACKLOG](../../../BACKLOG.md) §4.
