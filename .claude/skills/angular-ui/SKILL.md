@@ -532,12 +532,34 @@ src/app/
    **The preview browser does NOT deliver `ResizeObserver` callbacks** (it renders from DOM snapshots, no
    continuous paint loop) — RO-driven behavior (chart/graph/map container-resize) can't be exercised
    in-preview; rely on the unit test (observer wired + disconnected) + the shared RO→`resize()` precedent.
-4b. **Upgrading Angular (`ng update`) — read this first.** Four traps, all hit on the v21→v22 jump:
-   - **It reformats every file it touches.** Angular's codemods rewrite through the TypeScript printer,
-     emitting 2-space/double-quote against the house 4-space/single-quote style. The v22 core migrations
-     touched 116 files and produced ~36k diff lines for a few hundred lines of real content. **There is
-     no `.prettierrc` in this repo**, so nothing pins the house style and this recurs on every upgrade.
-     Commit the upgrade ALONE, never mixed with feature work, or the feature becomes unreviewable.
+4b. **Formatting is pinned by `.prettierrc.json`/`.prettierignore`** (added 2026-08-13: printWidth 120,
+   tabWidth 4, singleQuote, trailingComma all — measured off the pre-upgrade tree, not guessed).
+   **`.prettierignore` excludes** `src/@gamma/` + `modules/auth/` (vendored, §3 bans restyling it — stays
+   mergeable with upstream), `src/app/inspecto/mock/*.contract.json` (Jackson-written,
+   byte/string-compared by `NodeAttributesContractTest`/`StepTypesContractTest`/
+   `MeasureGrammarContractTest` in `inspecto-engine` — reformatting these breaks the **Java** build, a
+   gate the UI verify loop never runs), and `src/assets/` (fixture payloads). ⚠ **Prettier's HTML
+   reflow can silently change whitespace that carries MEANING**, in two ways seen so far:
+   - **The `lint:tokens` `ds-allow` escape hatch is per raw SOURCE LINE** (`tools/check-design-tokens.mjs`
+     just checks `line.includes('ds-allow')`). Prose reflow can wrap the flagged text onto a different
+     line than its own escape-hatch comment, silently re-triggering the guard.
+   - **Angular collapses inter-node whitespace by default** (`preserveWhitespaces: false`). A
+     zero-width adjacency like `{{ c.source }}@if (c.locator) { … }` renders with NO gap; reflowing it
+     onto separate lines inserts a newline Angular then collapses into an extra space at runtime — a
+     silent rendering change (`"runs (r-9)"` → `"runs  (r-9)"`) that only a test with an exact-string
+     assertion will catch, and a reformat commit's own gate won't flag by construction (it's a
+     behavior check, not a diff review).
+
+   **The fix for either is `<!-- prettier-ignore -->` immediately before the affected node** (a preceding
+   *explanatory* comment above it does not defeat the ignore — confirmed by re-running `--write` and
+   checking for "(unchanged)"). Always re-run `prettier --write` on a fix to confirm it actually holds
+   before trusting it — "looks pinned" is not "is pinned". After ANY repo-wide `prettier --write`, grep
+   for the zero-space interpolation-adjacency pattern (`}}@if`, `}}@for`, `}}@switch`) across `*.html`
+   as a cheap way to surface the second failure mode before the test suite does.
+   - **`ng update`'s own codemods reformat every file they touch**, on top of whatever `.prettierrc` says
+     — Angular's codemod rewrites through the TypeScript printer, which does NOT read `.prettierrc`. The
+     v22 core migration alone touched 116 files. Run `prettier --write` as a separate follow-up commit
+     after an upgrade lands, never mixed into the upgrade commit or feature work — each stays reviewable.
    - **`ng update` refuses a dirty tree**, so land each package group as its own commit
      (core+cli, then material+cdk) — which is the right granularity anyway.
    - **Peer conflicts need `--force`.** `ngx-toastr` (20.0.5, its latest) still peers
