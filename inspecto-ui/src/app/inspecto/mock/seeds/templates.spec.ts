@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_SOURCES } from '../sample-sources';
+import { dbBrowserHandler } from '../handlers/db-browser.handler';
+import { MockRequest } from '../mock-http';
 import { componentCollection } from '../handlers/components.handler';
 import { PIPELINES_COLL } from '../handlers/pipelines.handler';
 import { MockStore } from '../mock-store';
@@ -22,10 +23,29 @@ interface ReconContent {
 
 /**
  * Referential coherence of every W5 Space-Template seed pack: the blueprint must hang together —
- * datasets resolve to real sample rows (with matching columns), widgets to seeded datasets (with
+ * datasets resolve to a **catalogued store** (with matching columns), widgets to seeded datasets (with
  * real fields), dashboard tiles to seeded widgets, reconciliations to seeded datasets — so a space
  * created from any template demos end-to-end with zero manual fixes.
+ *
+ * ⚠ The store assertions go through the SAME door the app uses — `/db/catalog` and `/db/table`, served
+ * offline by {@link dbBrowserHandler} — not through the `SAMPLE_SOURCES` map directly. Since split S2 no
+ * feature reads that map, so asserting against it would prove only that a seed names a key in a table
+ * nothing consults.
  */
+const db = dbBrowserHandler({ mockDb: true } as never);
+
+function ask(method: string, url: string, params: Record<string, string> = {}): { status: number; body: unknown } {
+    const req: MockRequest = { method, url, params, body: null, space: 'default' };
+    const res = db(req, new MockStore());
+    expect(res, `${method} ${url} was not handled`).toBeDefined();
+    return { status: res!.status ?? 200, body: res!.body };
+}
+
+/** The store names `/db/catalog` offers a Dataset — its business groups only. */
+function cataloguedStores(): string[] {
+    const body = ask('GET', '/api/db/catalog').body as { groups: { id: string; tables: { name: string }[] }[] };
+    return body.groups.filter((g) => !g.id.startsWith('ops:')).flatMap((g) => g.tables.map((t) => t.name));
+}
 describe('space template seed packs', () => {
     for (const template of SPACE_TEMPLATES) {
         describe(template.id, () => {
@@ -44,15 +64,19 @@ describe('space template seed packs', () => {
                 expect(store.list(space, componentCollection('requirement')).length).toBe(1);
             });
 
-            it('every dataset resolves to SAMPLE_SOURCES rows and declares real columns', () => {
+            it('every dataset names a CATALOGUED store that serves rows and its declared columns', () => {
+                const catalogued = cataloguedStores();
                 for (const d of datasets) {
-                    const rows = SAMPLE_SOURCES[d.content.sourceName];
-                    expect(rows, `source ${d.content.sourceName}`).toBeDefined();
-                    expect(rows.length).toBeGreaterThan(0);
+                    const source = d.content.sourceName;
+                    // A store the picker would not offer cannot be chosen back after a reload.
+                    expect(catalogued, `source ${source}`).toContain(source);
+                    const res = ask('GET', '/api/db/table', { name: source });
+                    expect(res.status, `GET /db/table?name=${source}`).toBe(200);
+                    const page = res.body as { rows: Record<string, unknown>[]; columns: { name: string }[] };
+                    expect(page.rows.length, `rows of ${source}`).toBeGreaterThan(0);
+                    const served = new Set(page.columns.map((c) => c.name));
                     for (const col of d.content.columns) {
-                        expect(Object.keys(rows[0]), `column ${col.name} of ${d.content.sourceName}`).toContain(
-                            col.name,
-                        );
+                        expect(served, `column ${col.name} of ${source}`).toContain(col.name);
                     }
                 }
             });

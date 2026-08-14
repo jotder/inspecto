@@ -45,3 +45,18 @@ packs.
   had. The version comment should say *why* it moved, so the next bump can tell which data it invalidated.
 * The Pro [data-table](../design-system/data-table.md) SQL editor runs SQL **in-browser** via AlaSQL (no
   backend) — independent of the mock layer.
+* ⚠ **`MockHandler` is synchronous, and that is load-bearing.** Its return type was widened to
+  `MockResponse | Promise<MockResponse>` in 2026-08-14 so the `/db/query` mock could await the lazily
+  imported SQL engine; it compiles, but **17 handler specs** call handlers directly and read `.status` /
+  `.body` off the result, so all of them break. That is far too much blast radius for one endpoint —
+  the change was reverted. If a mock genuinely needs to await, give the interceptor a separate,
+  explicitly typed async list rather than widening the shared type.
+* **`/db/*` offline IS `SAMPLE_SOURCES`** (2026-08-14, Catalog split S2 slice C): `/db/catalog` lists every
+  sample store and `/db/table` pages the named one with server-derived DuckDB types, roles and cardinality
+  (a port of `ResultSetDescriptor`), the same 200-default / 5000-max clamp, and real `truncated`. One
+  offline reality for the Data Browser, the Dataset store picker and the seeded space templates — before
+  it, the handler answered every request with three fixed `orders` rows regardless of the table asked for.
+  ⚠ **`/db/query` answers a 501 for valid SQL** rather than executing it (see the sync rule above). That is
+  deliberate: the old echo-the-table behaviour meant an offline query "worked" while proving nothing. A
+  guard-shaped **422** (non-SELECT, `;`-chained) is checked FIRST, so a refusal the server would make is
+  still rehearsed offline. ⛔ Do not restore the echo.
