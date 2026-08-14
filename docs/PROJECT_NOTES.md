@@ -533,6 +533,12 @@ touching `inspecto-ui/`.** Highlights (full detail there):
   active-space rewrite 404s it; the call is token/credential-addressed, not space-scoped.
 - **`<inspecto-empty-state>` inputs are `title` + `message`** (not `heading`); `message` is required. Wrong
   input names fail silently (dropped in prod, caught only by a text assertion).
+- **A Dataset's rows come from `DatasetRowsService`** (`inspecto/viz/dataset-rows.service.ts`, split S2
+  2026-08-14) — `/db/table`, or `/db/query` with its Query Core model compiled by `compileSql`, live; the
+  offline sample page otherwise. ⛔ Never re-introduce a `SAMPLE_SOURCES[ds.sourceName]` lookup in a
+  feature: that synchronous read is why Studio showed sample data against a real backend. Results are
+  **pages** (honour `truncated`, surface `error`). Detail + the ⛔ on the three offline arms that must NOT
+  be converted: `okf/frontend/features/studio.md` and the `angular-ui` skill.
 - **BI widget/dashboard content shape** — a `widget` component is `{vizType, datasetId, controls, options}`
   (channel mapping, NOT a raw query spec); a `dashboard` is `{name, tiles:[{widgetId, span}]}`. Anything
   writing these server-side (e.g. `BiTemplates`) must emit this shape or the Studio can't render it.
