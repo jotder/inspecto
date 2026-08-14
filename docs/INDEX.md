@@ -258,17 +258,8 @@ former root reference docs** (each index lists them):
   `PartitionOutput` does not carry. Build order + verify conditions in §14.4. New model surface listed in §13;
   unverified items and open decisions in §15.
 
-- [`superpower/path-containment-unification.md`](superpower/path-containment-unification.md) —
-  **IN FLIGHT (opened 2026-08-14).** Supersedes the BACKLOG's "Config-declared paths resolve unjailed"
-  scoping, which grounding found **wrong in both directions**: group (i) and `processing.grammar` are
-  already done, "~80 call sites" is not a real number, and "routed through `resolveSchemaRef`" does not
-  mean contained (it silently falls back to the unjailed path). Bigger than recorded in one way — there
-  were **five** divergent containment implementations, and the weakest guarded the HTTP write surface.
-  Operator decisions: **enforce (throw)**, measured against the **spaces/server root** — *not*
-  `configDir`, because every shipped config authors refs relative to the server root and `configDir`
-  would break every space (§2). ✅ **S1 shipped**: `PathJail` in `inspecto-config`, falsification-probed,
-  **and it exposed that `ConfigSafetyValidatorTest`'s symlink-escape test had never run on Windows**.
-  S2 (migrate the five) / S3 (job tasks) / S4 (config layer) / S5 (422 gate blind spot) remain.
+*(Path containment shipped and was archived 2026-08-14 — current knowledge lives in
+[`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md).)*
 
 - ~~`superpower/pipeline-build-test-run-gaps.md`~~ — **COMPLETE end-to-end 2026-08-14; plan ARCHIVED**
   to `archived-documents/plans-archive/`. Opened 2026-08-02. **Steps 0–4 shipped same day** (`4fe388a1`):

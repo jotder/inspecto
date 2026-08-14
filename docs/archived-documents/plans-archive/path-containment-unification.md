@@ -1,6 +1,10 @@
 # Path containment: one primitive, then load-time enforcement
 
-**Status:** IN FLIGHT (opened 2026-08-14). Supersedes the scoping in
+**Status:** ✅ **COMPLETE + ARCHIVED 2026-08-14.** All five slices shipped — `60ff0c8f` (S1+S2),
+`86c0306f` (S3), `3b200b52` (S4+S5). Current knowledge is
+[`okf/backend/config/config-safety.md`](../../okf/backend/config/config-safety.md); this file is kept
+for provenance only and its relative links are not maintained.
+Opened 2026-08-14. Supersedes the scoping in
 [`../BACKLOG.md`](../BACKLOG.md) "Config-declared paths resolve unjailed against the server CWD",
 whose inventory (2026-07-31) is **wrong in both directions** — see §1.
 **Trigger:** operator — "take on the unjailed config paths", the last buildable BACKLOG §6 row.

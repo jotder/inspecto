@@ -739,58 +739,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   (`grammar`/`transform`/`sink`) a structural `ConfigSpec`; the dialog then renders `<inspecto-ai-assist>`
   again with no further wiring. Related: the guided Schema stage keeps its own derive-from-sample, so a
   Stream's schema authoring did NOT regress — only the registry pane's. `okf/frontend/features/inline-ai-authoring.md`
-- **Config-declared paths resolve unjailed against the server CWD** — ⚠ **TAKEN 2026-08-14; the
-  scoping below is SUPERSEDED by
-  [`superpower/path-containment-unification.md`](superpower/path-containment-unification.md).**
-  Grounding found this row wrong in both directions: group (i) and `processing.grammar` are **already
-  done**, **"~80 call sites" is not a real number** (222 raw path constructions; the config-derived
-  subset needs per-line judgment), and **"routed through `resolveSchemaRef`" does not mean contained** —
-  it silently falls back to the unjailed path, so the reads this row treats as safe are not. Bigger in
-  one way: there were **five** divergent containment implementations, the weakest guarding the HTTP
-  write surface. Read the plan, not the text below. Original scoping follows.
-  one systemic pass, **not** the
-  "3 sites" an earlier note claimed (inventoried 2026-07-31). Hardening, **not an open hole**: config
-  writes are already privilege-gated, so this is defence-in-depth against a mis-authored or hostile
-  config, not a reachable-by-anonymous escape. Scope, accurately:
-  - **~80 call sites** turn a config string into a filesystem path. Three groups, and the group
-    decides the difficulty: **(i) route/server layer** — a space root IS in scope (`ConfigRoutes`,
-    `RunRoutes`, `EnrichmentRoutes`); **(ii) job tasks** — `writeRoot`/`dataDir` are already sibling
-    locals (used to build `ComponentStore`) but are not applied to the neighbouring `cfg.require(...)`
-    path fields (`BackupTask`, `MaintenanceJob`, `MaterializeTask`, `ReportJob`, …); **(iii) the config
-    layer — NO root in scope at all**, the actual blocker.
-  - ⚠ **The blocker as recorded was overstated — corrected 2026-07-31 by unification W1b.** The claim was
-    that the config layer has *no root in scope at all* and so needs a root threaded through public
-    signatures. Not so for the **loaded-from-file** path: `PipelineConfig.load(configPath)` trivially knows
-    `Paths.get(configPath).getParent()`, and W1b now passes exactly that into
-    `PipelineConfigParser.parse(Map, String, Path)` **with zero caller changes**. The three schema reads
-    (`parsing.plugin.segments[]`, `processing.schemas[].schema_file`, legacy `processing.schema_file`) already
-    route through `resolveSchemaRef`, whose config-relative branch **is** contained. So the remaining work is
-    smaller than recorded:
-    - `processing.grammar` (`PipelineConfigParser.java:857-861`) and `Asn1RecordIngester:96`
-      (`ingester_config.grammar`) are **not** yet routed through it — the same `configDir` is available to the
-      grammar branch and should reuse `resolveSchemaRef`.
-    - The genuinely rootless case is the **in-memory draft** (`PipelineConfig.fromMap`, and
-      `Asn1RecordIngester.ingest(File, RecordSink, int, PipelineConfig)` which receives a config, not a path).
-      A draft has no directory by definition, so containment there needs a root supplied by the *caller* —
-      which is the route/server layer, group (i), where a space root already IS in scope.
-    - `resolveSchemaRef`'s **legacy working-directory branch stays unjailed** and is explicitly documented
-      as not a security boundary. Closing that is the load-time enforcement this item is really about.
-  - **A containment primitive already exists and should be reused, not rewritten:**
-    `SafetyPolicy` + `ConfigSafetyValidator.checkPathValue`/`underAnyRoot`
-    (`inspecto-config/…/config/safety/`) already normalize-to-absolute, `startsWith(root)`, and
-    re-check symlink escape via `toRealPath()`. Two gaps: it is **advisory-only** (findings from
-    `RunRoutes:168` / `EnrichmentRoutes:100` at authoring time, never called from
-    `PipelineConfigParser`/`PipelineConfig.load`/any job task, so nothing enforces at load time), and
-    its checked-field list **omits `schema_file` and `grammar`** — precisely the keys above.
-    ⚠ It also **cannot simply be called from the parser**: `SafetyPolicy`/`ConfigSafetyValidator` live in
-    `inspecto-config`, which `inspecto-etl` does not depend on (checked 2026-07-31). Either add the dependency
-    deliberately or move the primitive down — W1b's containment check is a local few-liner precisely because
-    of this, and that duplication should be resolved when this pass is scheduled, not left to drift.
-  - **Do it as one pass or not at all.** Fixing one site in isolation is inconsistent and gives false
-    assurance. Sequence when scheduled: extend the field list → make containment a
-    resolve-and-fail-fast helper → thread a root into the config layer → apply at (i), (ii), (iii).
-  - **No test today** exercises `../../etc/passwd`-style escape for `schema_file`/`grammar`, or
-    `Asn1RecordIngester`'s grammar path. `ConfigSafetyValidatorTest` covers only the primitive.
+- ~~**Config-declared paths resolve unjailed against the server CWD**~~ **CLOSED 2026-08-14 — shipped
+  in five slices** (`60ff0c8f` S1+S2, `86c0306f` S3, `3b200b52` S4+S5). As-built:
+  [`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md); plan archived to
+  `archived-documents/plans-archive/path-containment-unification.md`. One primitive
+  (`com.gamma.config.safety.PathJail`) replaced five divergent containment implementations; the HTTP
+  write gate, connector paths, nine operator-supplied job path fields, and the config layer's
+  schema/grammar/mapping refs all now enforce against the **`-Dassist.safety.roots`** list, which is
+  also what the 422 authoring gate checks.
+  ⚠ **The row's own scoping was wrong in both directions and should not be mined for future work:**
+  group (i) and `processing.grammar` were already done; **"~80 call sites" was not a real number**
+  (the actual surface was ~9 job fields + 2 config-layer sites); and **"routed through
+  `resolveSchemaRef`" did not mean contained** — it silently fell back to the unjailed path.
+  ⚠ Its prescribed sequence ("thread a root into the config layer") was also refuted: the root is read
+  from the existing `SafetyPolicy` seam, and `PipelineConfig.fromMap` needed no root parameter at all.
+  **Deliberately still open, and each is a separate decision — do not fold them in silently:**
+  `PipelineJobRunner`'s documented `ConfigSafetyValidator` bypass (`PipelineJobRunner:377`), and
+  `requireTopLevelSinks`, which is a **depth** rule about literal directory nesting where resolving
+  real paths would change the answer for the wrong reason.
 - ~~**`DatasetRelation.baseRelationSql` bypasses `SqlViews.reader`**~~ **CLOSED 2026-08-13** (found
   2026-07-30, Catalog lifecycle review). The defect was real and reproduced: a `physicalRef`-backed Dataset
   failed on additive schema drift where a `view`-backed read of the SAME store unioned by name. Neither
