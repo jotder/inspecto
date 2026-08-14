@@ -175,13 +175,21 @@ export class CatalogComponent implements OnInit {
         { field: 'description.text', headerName: 'Description', flex: 2 },
     ];
 
-    /** Resume/open the guided onboarding for a data-origin row (its backing pipeline). */
+    /** Resume/open the guided onboarding for a data-origin row (its backing pipeline), and jump to
+     *  its run history — the Catalog↛Runs cross-link the lineage walkthrough flagged. Run history is
+     *  read-only, so unlike onboarding it carries no lens gate. */
     readonly originRowActions: InspectoRowAction<MetadataNode>[] = [
         {
             icon: 'heroicons_outline:pencil-square',
             hint: (row) => (row.attrs?.['active'] === false ? 'Resume onboarding' : 'Open onboarding'),
             visible: (row) => this.lens.canAuthorWorkbench() && !!row.attrs?.['pipeline'],
             onClick: (row) => this.router.navigate(['/catalog', 'onboard', String(row.attrs?.['pipeline'])]),
+        },
+        {
+            icon: 'heroicons_outline:clock',
+            hint: () => 'Run history',
+            visible: (row) => !!row.attrs?.['pipeline'],
+            onClick: (row) => this.router.navigate(['/runs', String(row.attrs?.['pipeline'])]),
         },
     ];
 

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
@@ -161,5 +161,18 @@ describe('CatalogComponent', () => {
         c.runGraph();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('every origin row offers a run-history jump — a read-only affordance with no lens gate', () => {
+        const fixture = create({ streams: () => of([STREAM]) });
+        const c = fixture.componentInstance;
+        const router = TestBed.inject(Router);
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+
+        const history = c.originRowActions[1];
+        expect(history.visible?.(STREAM)).toBe(true);
+        expect(history.visible?.({ ...STREAM, attrs: {} })).toBe(false); // nothing to jump to
+        history.onClick(STREAM);
+        expect(navigate).toHaveBeenCalledWith(['/runs', 'orders']);
     });
 });

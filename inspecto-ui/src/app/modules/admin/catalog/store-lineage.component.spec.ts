@@ -2,7 +2,8 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { afterEach, describe, expect, it } from 'vitest';
+import { Router, provideRouter } from '@angular/router';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { StoreLineage } from 'app/inspecto/api';
@@ -35,6 +36,7 @@ describe('StoreLineageComponent', () => {
                 provideHttpClient(withXhr()),
                 provideHttpClientTesting(),
                 provideNoopAnimations(),
+                provideRouter([]),
                 // Mock the grid theme (mirrors audit-logs / data-table specs) so no gamma config is needed.
                 {
                     provide: InspectoGridThemeService,
@@ -73,5 +75,15 @@ describe('StoreLineageComponent', () => {
     it('has no a11y violations', async () => {
         const fixture = await create('events_raw', LINEAGE);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('offers a run-history jump per upstream row — lineage is walkable, not dead text', async () => {
+        const fixture = await create('events_raw', LINEAGE);
+        const router = TestBed.inject(Router);
+        const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
+        const action = fixture.componentInstance.upstreamActions[0];
+        expect(action.visible?.(LINEAGE.upstream[0])).toBe(true);
+        action.onClick(LINEAGE.upstream[0]);
+        expect(navigate).toHaveBeenCalledWith(['/runs', 'events_etl']);
     });
 });

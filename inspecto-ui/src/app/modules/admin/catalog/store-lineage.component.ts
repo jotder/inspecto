@@ -2,9 +2,11 @@ import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angu
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DestroyRef } from '@angular/core';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { Router } from '@angular/router';
 import { ColDef } from 'ag-grid-community';
-import { LineageService, StoreLineage } from 'app/inspecto/api';
+import { LineageService, StoreLineage, UpstreamRow } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
+import { InspectoRowAction } from 'app/inspecto/grid';
 
 /**
  * Store lineage panel (catalog node inspector, table-kind nodes): the files that fed this store (ingest
@@ -32,6 +34,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
                 sourceName="store-upstream"
                 [rows]="d.upstream"
                 [columns]="upstreamColumns"
+                [rowActions]="upstreamActions"
                 height="10rem"
                 noRowsTitle="No ingest lineage recorded"
             />
@@ -55,6 +58,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 export class StoreLineageComponent {
     private api = inject(LineageService);
     private destroyRef = inject(DestroyRef);
+    private router = inject(Router);
 
     readonly loading = signal(false);
     readonly failed = signal(false);
@@ -70,6 +74,17 @@ export class StoreLineageComponent {
         { field: 'partition', headerName: 'Partition', flex: 1 },
         { field: 'rowCount', headerName: 'Rows', width: 100, type: 'numericColumn' },
         { field: 'pipeline', headerName: 'Pipeline', width: 140 },
+    ];
+
+    /** The panel used to display lineage as dead text — this is the walkable half of the bridge.
+     *  Navigation closes the hosting node-detail dialog (MatDialog's default closeOnNavigation). */
+    readonly upstreamActions: InspectoRowAction<UpstreamRow>[] = [
+        {
+            icon: 'heroicons_outline:clock',
+            hint: (row) => `Run history of ${row.pipeline}`,
+            visible: (row) => !!row.pipeline,
+            onClick: (row) => this.router.navigate(['/runs', row.pipeline]),
+        },
     ];
 
     private fetch(store: string): void {
