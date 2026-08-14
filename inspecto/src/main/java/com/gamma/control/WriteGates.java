@@ -1,5 +1,7 @@
 package com.gamma.control;
 
+import com.gamma.config.safety.PathJail;
+
 import java.nio.file.Path;
 
 /**
@@ -30,10 +32,18 @@ final class WriteGates {
         return safe;
     }
 
-    /** Gate 3 — a resolved path escaping the write root → 403. Returns the normalised path. */
+    /**
+     * Gate 3 — a resolved path escaping the write root → 403. Returns the normalised path.
+     *
+     * <p>⚠ This was the <b>weakest</b> of the codebase's five containment checks — a bare
+     * {@code normalize()} + {@code startsWith()} with no absolutisation and no symlink re-check —
+     * despite guarding the HTTP write surface. It now delegates the verdict to
+     * {@link PathJail#contains}, so the gate a caller hits at the edge and the one the config
+     * validator applies at authoring time cannot disagree.
+     */
     static Path jail(Path root, Path target, String what) {
         Path normalized = target.normalize();
-        if (!normalized.startsWith(root))
+        if (!PathJail.contains(root, normalized))
             throw new ApiException(403, what + " escapes the write root");
         return normalized;
     }

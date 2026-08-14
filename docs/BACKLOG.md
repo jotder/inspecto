@@ -739,7 +739,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   (`grammar`/`transform`/`sink`) a structural `ConfigSpec`; the dialog then renders `<inspecto-ai-assist>`
   again with no further wiring. Related: the guided Schema stage keeps its own derive-from-sample, so a
   Stream's schema authoring did NOT regress — only the registry pane's. `okf/frontend/features/inline-ai-authoring.md`
-- **Config-declared paths resolve unjailed against the server CWD** — one systemic pass, **not** the
+- **Config-declared paths resolve unjailed against the server CWD** — ⚠ **TAKEN 2026-08-14; the
+  scoping below is SUPERSEDED by
+  [`superpower/path-containment-unification.md`](superpower/path-containment-unification.md).**
+  Grounding found this row wrong in both directions: group (i) and `processing.grammar` are **already
+  done**, **"~80 call sites" is not a real number** (222 raw path constructions; the config-derived
+  subset needs per-line judgment), and **"routed through `resolveSchemaRef`" does not mean contained** —
+  it silently falls back to the unjailed path, so the reads this row treats as safe are not. Bigger in
+  one way: there were **five** divergent containment implementations, the weakest guarding the HTTP
+  write surface. Read the plan, not the text below. Original scoping follows.
+  one systemic pass, **not** the
   "3 sites" an earlier note claimed (inventoried 2026-07-31). Hardening, **not an open hole**: config
   writes are already privilege-gated, so this is defence-in-depth against a mis-authored or hostile
   config, not a reachable-by-anonymous escape. Scope, accurately:

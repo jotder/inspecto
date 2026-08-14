@@ -1,5 +1,7 @@
 package com.gamma.acquire;
 
+import com.gamma.config.safety.PathJail;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -114,13 +116,19 @@ public final class LocalConnectionWorkbench implements ConnectionWorkbench {
      * reachable. A picker that allows X beside a runner that allows Y is how this class of hole appears.
      *
      * <p>⚠ Not to be confused with {@code ConfigSafetyValidator.checkPathValue}, which is
-     * <b>advisory</b> (it collects {@code Finding}s at authoring time). This one <b>enforces</b>.
+     * <b>advisory</b> (it collects {@code Finding}s at authoring time). This one <b>enforces</b> —
+     * but both now reach the same verdict through {@link PathJail#contains}.
+     *
+     * <p><b>Resolution stays here on purpose.</b> A connector path is <em>root-relative</em> (the
+     * picker hands back paths relative to the connection base), whereas a config value is
+     * CWD-relative. That difference is real and must not be unified away; only the containment
+     * decision is shared. Delegating it also gains the symlink re-check this method never had.
      *
      * @param root an absolute, normalized root
      */
     public static Path jail(Path root, String path) {
         Path resolved = root.resolve(norm(path)).normalize();
-        if (!resolved.startsWith(root)) throw new PathEscape("path escapes the connection base path");
+        if (!PathJail.contains(root, resolved)) throw new PathEscape("path escapes the connection base path");
         return resolved;
     }
 

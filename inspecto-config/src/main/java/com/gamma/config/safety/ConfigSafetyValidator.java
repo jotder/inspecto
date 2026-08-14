@@ -4,8 +4,6 @@ import com.gamma.api.PublicApi;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.RawConfig;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
@@ -255,30 +253,31 @@ public final class ConfigSafetyValidator {
             out.add(Finding.error(field, "path '" + s + "' is not a valid path: " + ex.getMessage()));
             return;
         }
-        if (!underAnyRoot(norm, p.allowedRoots())) {
-            out.add(Finding.error(field, "path '" + s + "' resolves to " + norm
-                    + ", outside the allowed roots " + p.allowedRoots()));
-            return;
-        }
-        // Symlink escape: re-check the nearest existing ancestor's real path.
-        try {
-            Path existing = norm;
-            while (existing != null && !Files.exists(existing)) existing = existing.getParent();
-            if (existing != null) {
-                Path real = existing.toRealPath();
-                if (!underAnyRoot(real, p.allowedRoots())) {
-                    out.add(Finding.error(field, "path '" + s
-                            + "' escapes the allowed roots via a symlink (real path " + real + ")"));
-                }
-            }
-        } catch (IOException ignored) {
-            // Couldn't resolve a real path (perms, race); the normalised containment check already passed.
-        }
+        if (underAnyRoot(norm, p.allowedRoots())) return;
+
+        // Say WHICH failure it was: a path that looks contained but is not has escaped through a link,
+        // and telling an operator "outside the allowed roots" for a path that visibly is not would
+        // send them hunting the wrong thing.
+        boolean looksContained = p.allowedRoots().stream().anyMatch(norm::startsWith);
+        out.add(looksContained
+                ? Finding.error(field, "path '" + s
+                        + "' escapes the allowed roots via a symlink (resolves to " + norm + ")")
+                : Finding.error(field, "path '" + s + "' resolves to " + norm
+                        + ", outside the allowed roots " + p.allowedRoots()));
     }
 
+    /**
+     * Containment against any allowed root, delegated to {@link PathJail#contains} — which also
+     * performs the symlink-escape re-check this method used to open-code.
+     *
+     * <p>Sharing the verdict with the enforcing surface is the point: an advisory gate that disagrees
+     * with the jail it is supposed to pre-empt lets a draft pass authoring and then fail at load, or
+     * worse, the reverse. The <em>resolution</em> policy stays here (config values are CWD-relative);
+     * only the containment decision is shared.
+     */
     private static boolean underAnyRoot(Path candidate, List<Path> roots) {
         for (Path root : roots) {
-            if (candidate.startsWith(root)) return true;
+            if (PathJail.contains(root, candidate)) return true;
         }
         return false;
     }

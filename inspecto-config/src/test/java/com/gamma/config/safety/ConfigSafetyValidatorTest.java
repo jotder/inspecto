@@ -6,14 +6,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Adversarial tests for the hard-fail config safety gate (R6). This is the security core of M5, so
@@ -79,12 +77,9 @@ class ConfigSafetyValidatorTest {
 
     @Test
     void symlinkEscapeIsRejected(@TempDir Path root, @TempDir Path outside) throws IOException {
-        Path link = root.resolve("sneaky");
-        try {
-            Files.createSymbolicLink(link, outside);
-        } catch (IOException | UnsupportedOperationException e) {
-            assumeTrue(false, "OS cannot create symlinks here; skipping symlink-escape case");
-        }
+        // ⚠ This used to assumeTrue(false) when the OS refused a symlink, so it never actually ran on
+        // Windows — the one test covering the real-path re-check, silently skipped in every green run.
+        Path link = TestLinks.linkDirectory(root.resolve("sneaky"), outside);
         Map<String, Object> dirs = safeDirs(root);
         // Normalised path is under root (root/sneaky/db), but the real path resolves into `outside`.
         dirs.put("database", link.resolve("db").toString());
