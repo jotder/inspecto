@@ -41,6 +41,13 @@ block vs. a node's raw config plus a `use: connection/<id>` binding.
 - ⚠ **Un-binding a Connection is the mode toggle, not blanking the picker.** An empty picker while
   still in Connection mode is refused; a Connection-less non-local collector is the state that used
   to fail at run time.
+- ⚠ **An unreachable Connections service is not a verdict.** `connections.list()` degrades to `[]` on
+  error, which reads exactly like a list that answered and lacks the id — so the ghost-id refusal used
+  to fire on an unchanged, previously-valid node whenever the service was down. The component tracks
+  `loading | ok | failed` separately from the array: only `ok` licenses *"not a saved Connection"*, and
+  under `failed` the id the node was **loaded with** keeps its stored connector. A *newly picked* id is
+  still refused there — there is nothing to derive its connector from — with a distinct "could not be
+  loaded, retry" message, so the guard is narrowed, not weakened.
 - ⚠ **A host swapping the spec list at runtime must carry the live values across the swap.**
   Reassigning `<inspecto-schema-form>`'s `specs` rebuilds every control from its declared default,
   so the mode toggle silently wiped the form until this component started re-seeding.

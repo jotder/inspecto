@@ -1,7 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ConnectionsService } from 'app/inspecto/api';
@@ -15,6 +15,7 @@ function create(
     initial: Record<string, unknown> = {},
     storedConnector = '',
     profiles: { id: string; connector: string }[] = [],
+    listFails = false,
 ): ComponentFixture<CollectorConfigComponent> {
     TestBed.configureTestingModule({
         imports: [CollectorConfigComponent],
@@ -22,7 +23,10 @@ function create(
             provideNoopAnimations(),
             {
                 provide: ConnectionsService,
-                useValue: { list: () => of(profiles), test: vi.fn(() => of({ reachable: true, detail: 'ok' })) },
+                useValue: {
+                    list: () => (listFails ? throwError(() => new Error('offline')) : of(profiles)),
+                    test: vi.fn(() => of({ reachable: true, detail: 'ok' })),
+                },
             },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
@@ -94,6 +98,33 @@ describe('CollectorConfigComponent', () => {
         const c = create({}, 'sftp').componentInstance;
         expect(c.resolveConnector()).toBe('sftp');
         expect(c.error()).toBeNull();
+    });
+
+    /**
+     * Regression (BACKLOG "Collector config"): an unreachable `ConnectionsService` degrades the
+     * profile list to `[]`, which is NOT the same as a list that answered and lacks the id. It used
+     * to refuse a save of an unchanged, previously-valid node. Absence is only evidence when the
+     * list actually answered — and only the id the node was LOADED with is vouched for.
+     */
+    it('keeps the stored connector for an unchanged Connection when the list cannot load', () => {
+        const c = create({ connection: 'sftp_prod' }, 'sftp', [], true).componentInstance;
+        expect(c.mode()).toBe('connection');
+        expect(c.resolveConnector()).toBe('sftp');
+        expect(c.error()).toBeNull();
+    });
+
+    it('refuses a newly picked Connection when the list cannot load — nothing to derive from', () => {
+        const fixture = create({ connection: 'sftp_prod' }, 'sftp', [], true);
+        const c = fixture.componentInstance;
+        c.schemaForm.form.get('connection')?.setValue('blob_prod');
+        expect(c.resolveConnector()).toBeNull();
+        expect(c.error()).toContain('could not be loaded');
+    });
+
+    it('refuses when the list cannot load and no connector was ever stored', () => {
+        const c = create({ connection: 'sftp_prod' }, '', [], true).componentInstance;
+        expect(c.resolveConnector()).toBeNull();
+        expect(c.error()).toContain('could not be loaded');
     });
 
     /**

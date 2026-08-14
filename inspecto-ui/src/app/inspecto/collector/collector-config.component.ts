@@ -135,6 +135,7 @@ export class CollectorConfigComponent {
     /** Existing flat values to edit (`__` = nesting, per `flat-keys.ts`). */
     @Input() set initial(value: Record<string, unknown> | null | undefined) {
         this.seed.set({ ...(value ?? {}) });
+        this.storedConnection.set(String(this.seed()['connection'] ?? '').trim());
         this.deriveMode();
     }
 
@@ -175,6 +176,15 @@ export class CollectorConfigComponent {
 
     /** Saved Connection profiles — the lookup that derives the picked Connection's connector. */
     readonly profiles = signal<{ id: string; connector: string }[]>([]);
+    /**
+     * Whether {@link profiles} is ANSWERING or merely EMPTY. An unreachable `ConnectionsService`
+     * degrades to `[]`, which is indistinguishable from a loaded list that does not contain the id —
+     * and that ambiguity used to refuse a save of an unchanged, previously-valid node. Only `ok`
+     * licenses the "not a saved Connection" verdict.
+     */
+    private readonly profilesState = signal<'loading' | 'ok' | 'failed'>('loading');
+    /** The Connection id this node was loaded with — the one value a failed list can still vouch for. */
+    private readonly storedConnection = signal('');
 
     readonly testing = signal(false);
     readonly testResult = signal<ConnectionTestResult | null>(null);
@@ -183,8 +193,14 @@ export class CollectorConfigComponent {
 
     constructor() {
         this.connections.list().subscribe({
-            next: (list) => this.profiles.set(list.map((p) => ({ id: p.id, connector: p.connector }))),
-            error: () => this.profiles.set([]),
+            next: (list) => {
+                this.profiles.set(list.map((p) => ({ id: p.id, connector: p.connector })));
+                this.profilesState.set('ok');
+            },
+            error: () => {
+                this.profiles.set([]);
+                this.profilesState.set('failed');
+            },
         });
     }
 
@@ -263,6 +279,16 @@ export class CollectorConfigComponent {
         if (id) {
             const known = this.profiles().find((p) => p.id === id)?.connector;
             if (known) return known;
+            if (this.profilesState() !== 'ok') {
+                // The list never answered, so absence is not evidence. An UNCHANGED id keeps the
+                // connector it was authored with; a newly picked one has nothing to derive from.
+                const stored = this.stored();
+                if (id === this.storedConnection() && stored && stored !== 'local') return stored;
+                this.error.set(
+                    `Connections could not be loaded, so "${id}" cannot be confirmed — retry once the service is reachable.`,
+                );
+                return null;
+            }
             this.error.set(`"${id}" is not a saved Connection — pick one from the list or create it.`);
             return null;
         }
