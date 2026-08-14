@@ -1245,12 +1245,42 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   split-brain lesson).
 - **Named refusals, not silent truncation.**
   [`PipelineCompileException`](../../../../inspecto-engine/src/main/java/com/gamma/pipeline/PipelineCompileException.java)
-  carries stable codes — `UNSUPPORTED_NODE` (a node type the flat config has no home for), `MULTI_SINK`
+  carries stable codes — `UNSUPPORTED_NODE` (a node type the flat config has no home for),
+  `UNSUPPORTED_BINDING` (a home for the *node*, but not for the `use:` component ref it carries — see
+  below), `MULTI_SINK`
   (>1 distinct persistent `database` dir — the flat config expresses exactly one), and the strict
   completeness set `NO_ACQUISITION`/`NO_PARSER`/`NO_PERSISTENT_SINK`/`PARSER_NO_SCHEMA`. This closes the
   old `toConfigMap` behaviour of silently picking the first sink. `strict` = an `active` save or a
   brand-new file; an **inactive draft may be partial** (it overlays only what its present nodes own, so a
   half-built pipeline saves without erasing the rest — the same model Onboarding's stage saves use).
+- **A `use:` ref has a home for two node kinds only** (`PipelineEditable.USE_HOME`, fixed 2026-08-14 —
+  AUTHOR-1): acquisition's `connection/<id>` lands in the collector block, and the parser's
+  `grammar/<id>` (authored Grammar) or `ingester/<fqcn>` (a plugin parser's synthesized binding) land in
+  `parsing:`/`processing:`. **Every other node kind carries its settings inline**, so a ref on one is
+  refused `UNSUPPORTED_BINDING`.
+
+  ⚠ This matters because the editor's component picker is keyed on a node's **category, not its type**
+  (`bindKindFor`), so it offers `transform/<id>` on *every* transform node — map, filter, join, dedup,
+  summarize, route — and `sink/<id>` on every sink. Before the fix, `lower` read `use:` for the two
+  homed kinds and **dropped every other ref in silence**: `PUT /pipelines/{name}/graph` returned
+  `200 written:true` while `graph/raw` still showed the node with `{}`.
+
+  **Why refuse rather than preserve:** no code path in the engine resolves `transform/<id>` or
+  `sink/<id>`, so writing the ref would produce a config that loads and then does nothing. That is the
+  objection that removed the registry `schema` kind in unification W1, re-admitted only once
+  `PipelineConfigParser.resolveSchemaRef` made such a ref executable. A named refusal tells the author
+  at Save; an inert file tells them much later.
+
+  ⛔ Two traps recorded here because the first diagnosis hit both. **`transform.map`'s absence from
+  `STEP_KIND` was never the cause** — the five chain kinds *are* in `STEP_KIND` and their refs were
+  dropped too, because `stepsOf` emits config only. And **"a map node is never author-configurable" is
+  false**: `RowShaper.columnsOf` honours an authored `columns` list, `mappingSchemaOf` honours authored
+  `rules`, and the flat file holds an authored mapping at `processing.mapping_file`. What a map node has
+  no home for is the *ref*. Giving map a `steps:` entry remains wrong for a separate reason — a map node
+  never enters the chain, so it would change **when `steps:` is emitted at all**.
+
+  The offline mirror (`inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts`) refuses identically, in
+  the same commit — a preview that accepts what the backend refuses is the same defect reversed.
 - **Routes** ([`PipelineRoutes`](../../../../inspecto/src/main/java/com/gamma/control/PipelineRoutes.java)):
   `GET /pipelines/{name}/graph/raw` (lift + a synthesized node per registered enrichment companion whose
   `triggers.on_pipeline` names this pipeline) and `PUT /pipelines/{name}/graph` (lower over the existing

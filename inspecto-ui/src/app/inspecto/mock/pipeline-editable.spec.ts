@@ -285,3 +285,69 @@ describe('mock pipeline-editable — processing-key transforms (dedup / join / s
         expect(processing['dedup']).toEqual({ keys: ['call_id'], order_by: 'event_ts DESC' });
     });
 });
+
+/**
+ * AUTHOR-1 parity: a `use:` component ref the flat config has no home for must refuse on BOTH sides.
+ *
+ * The editor's component picker is keyed on a node's category, not its type, so it writes
+ * `transform/<id>` onto any TRANSFORM node and `sink/<id>` onto any sink — and nothing, in either
+ * language, resolves those refs. Both lowerings dropped them in silence: the save reported success and
+ * the binding was gone. If only the backend refused, the offline preview would rehearse a save the
+ * real route 422s, which is the hole this whole file exists to close.
+ */
+describe('mock pipeline-editable — UNSUPPORTED_BINDING', () => {
+    const saveable = (extra: Record<string, unknown>[] = []) => ({
+        name: 'B',
+        active: true,
+        nodes: [
+            { id: 'src', type: 'acquisition', use: 'connection/cdr', config: { poll: '/in' } },
+            { id: 'parse', type: 'parser', config: { schema_file: 's.toon' } },
+            ...extra,
+            { id: 'write', type: 'sink.persistent', config: { database: '/db' } },
+        ],
+        edges: [],
+    });
+
+    const refusalsOf = (g: ReturnType<typeof saveable>) => {
+        const res = lowerGraph(g as never, {}, true);
+        expect('refusals' in res, 'expected a refusal').toBe(true);
+        return (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
+    };
+
+    it('refuses a transform component ref on a map node, naming the node and the ref', () => {
+        const refusals = refusalsOf(saveable([{ id: 'map', type: 'transform.map', use: 'transform/orders_std' }]));
+        expect(refusals).toHaveLength(1);
+        expect(refusals[0].code).toBe('UNSUPPORTED_BINDING');
+        expect(refusals[0].nodeId).toBe('map');
+        expect(refusals[0].message).toContain('transform/orders_std');
+    });
+
+    it('refuses the same ref on every other transform kind, and on a sink', () => {
+        for (const type of [
+            'transform.filter',
+            'transform.join',
+            'transform.dedup',
+            'transform.summarize',
+            'transform.route',
+        ]) {
+            const refusals = refusalsOf(saveable([{ id: 't', type, use: 'transform/x' }]));
+            expect(refusals[0].code, type).toBe('UNSUPPORTED_BINDING');
+        }
+        const g = saveable();
+        (g.nodes.at(-1) as Record<string, unknown>)['use'] = 'sink/warehouse';
+        expect(refusalsOf(g)[0].code).toBe('UNSUPPORTED_BINDING');
+    });
+
+    it('leaves the two homed bindings alone — the refusal is per-kind, not a ban on use:', () => {
+        const res = lowerGraph(saveable() as never, {}, true);
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect((config['collector'] as Record<string, unknown>)['connection']).toBe('cdr');
+    });
+
+    it('does not refuse a plugin parser\u2019s synthesized ingester/ binding', () => {
+        const g = saveable();
+        g.nodes[1] = { id: 'parse', type: 'parser', use: 'ingester/com.acme.Ingester', config: { ingester: 'com.acme.Ingester' } };
+        expect('config' in lowerGraph(g as never, {}, true)).toBe(true);
+    });
+});

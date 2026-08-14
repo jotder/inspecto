@@ -226,6 +226,43 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /**
+     * <b>AUTHOR-1 over real HTTP.</b> The builder's Configure dialog binds a transform component to a map
+     * node ({@code use: transform/<id>}), and this used to answer <b>200 {@code written:true}</b> while the
+     * binding never reached the file — {@code graph/raw} still showed the node with {@code {}}.
+     *
+     * <p>The component is <b>registered</b> on purpose: a missing one is caught earlier by
+     * {@code UNKNOWN_USE_REF} (above), and passing that check is exactly what made the drop look like a
+     * success. So the fixture has to be the ref that resolves, or the test proves the wrong thing.
+     */
+    @Test
+    void aTransformComponentBoundToAMapNodeIsRefusedInsteadOfSilentlyDropped(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr.resolve("registry/transforms"));
+        Files.writeString(wr.resolve("registry/transforms/orders_std.toon"),
+                "name: orders_std\nsubtype: map\n");
+
+        try (Ctx c = open(dir, wr)) {
+            String b = dir.toString().replace('\\', '/');
+            String bound = """
+                {"active":true,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
+                          {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
+                          {"id":"map","type":"transform.map","use":"transform/orders_std"},
+                          {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],
+                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"map"},
+                          {"from":"map","rel":"data","to":"out"}]}""".formatted(b);
+
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/author1/graph", bound);
+            assertEquals(422, r.statusCode(), r.body());
+            JsonNode refusal = V1Body.envelope(r.body()).get("error").get("details").get("refusals").get(0);
+            assertEquals("UNSUPPORTED_BINDING", refusal.get("code").asText());
+            assertEquals("map", refusal.get("nodeId").asText());
+            assertFalse(Files.exists(wr.resolve("author1_pipeline.toon")),
+                    "a refused save writes nothing — the old behaviour wrote a file WITHOUT the binding");
+        }
+    }
+
     /** Two distinct-database sinks are no longer refused — they save as a multi-destination sinks: pipeline. */
     @Test
     void twoDistinctDatabasesSaveAsAMultiSinkPipeline(@TempDir Path dir) throws Exception {

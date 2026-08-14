@@ -67,6 +67,90 @@ class PipelineEditableTest {
         assertEquals("d1", ex.refusals().get(0).nodeId());
     }
 
+    // ── AUTHOR-1: a use: component ref the flat file has no home for ───────────────────
+    // The editor's component picker is keyed on a node's CATEGORY, so it offers `transform/<id>` on
+    // every TRANSFORM node and `sink/<id>` on every sink. lower() read use: for two kinds only and
+    // dropped the rest without a word — a 200 written:true save whose binding never reached the file.
+    // These pin the refusal, and that it names the offending node.
+
+    /** The reported case: a map node bound to a transform component. Refused, not swallowed. */
+    @Test
+    void aTransformComponentRefOnAMapNodeRefusesWithNamedCode() {
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(graphBinding(
+                        bound("map", "transform.map", "transform/orders_std")), new LinkedHashMap<>(), true));
+        assertEquals(1, ex.refusals().size(), ex.getMessage());
+        assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
+        assertEquals("map", ex.refusals().get(0).nodeId());
+        assertTrue(ex.refusals().get(0).message().contains("transform/orders_std"),
+                "the refusal names the ref, so the author can see what was rejected");
+    }
+
+    /**
+     * ⚠ The same picker writes the same ref onto the five CHAIN kinds and onto a sink — so the defect was
+     * never about map's absence from STEP_KIND (as first diagnosed): a chain node IS in STEP_KIND and its
+     * ref was dropped too, because stepsOf emits config only.
+     */
+    @Test
+    void everyOtherNodeKindRefusesAnUnhomedRefToo() {
+        for (String type : List.of("transform.filter", "transform.join", "transform.dedup",
+                "transform.summarize", "transform.route")) {
+            PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                    () -> PipelineEditable.lower(graphBinding(
+                            bound("t", type, "transform/x")), new LinkedHashMap<>(), true), type);
+            assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code(), type);
+        }
+        PipelineCompileException sink = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                        node("acq", "acquisition", Map.of("poll", "in")),
+                        node("parse", "parser", Map.of("schema_file", "s.toon")),
+                        new PipelineNode("sink", "sink.persistent", null, null,
+                                Map.of("database", "db"), "sink/warehouse")), List.of()),
+                        new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.UNSUPPORTED_BINDING, sink.refusals().get(0).code());
+    }
+
+    /** The two refs that DO have a home keep saving — the refusal is per-kind, not a blanket ban on use:. */
+    @Test
+    void theTwoHomedBindingsStillLower() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                new PipelineNode("acq", "acquisition", null, null, Map.of("poll", "in"), "connection/sftp1"),
+                new PipelineNode("parse", "parser", null, null, Map.of(), "grammar/cdr_v2"),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+        assertEquals("sftp1", section(lowered, "collector").get("connection"));
+        assertEquals("grammar/cdr_v2", section(lowered, "parsing").get("grammar"));
+    }
+
+    /** A plugin parser's synthesized ingester/<fqcn> binding is the third homed prefix — lift emits it. */
+    @Test
+    void aPluginParsersIngesterBindingIsNotRefused() {
+        PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                new PipelineNode("parse", "parser", null, null,
+                        Map.of("ingester", "com.acme.Ingester"), "ingester/com.acme.Ingester"),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+    }
+
+    /** A minimal saveable graph whose one transform node carries {@code bound}'s ref. */
+    private static PipelineGraph graphBinding(PipelineNode bound) {
+        return new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of("schema_file", "s.toon")),
+                bound,
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
+    }
+
+    private static PipelineNode bound(String id, String type, String use) {
+        return new PipelineNode(id, type, null, null, Map.of(), use);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> section(Map<String, Object> m, String key) {
+        return (Map<String, Object>) m.getOrDefault(key, Map.of());
+    }
+
     // ── the four kinds that used to hold a single slot ─────────────────────────────────
     // These four were last-one-wins (a second node vanished silently), then briefly REFUSED
     // (MULTI_DEDUP / MULTI_ROUTE / MULTI_SUMMARIZE joining MULTI_JOIN, 2026-08-11). Both were stations

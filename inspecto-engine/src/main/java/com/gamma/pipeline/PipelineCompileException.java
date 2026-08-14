@@ -10,7 +10,9 @@ import java.util.List;
  * replacing the silent truncation the compile-back used to do (it picked the first sink and
  * dropped the rest).
  *
- * <p>Codes: {@code UNSUPPORTED_NODE} (the flat config has no home for this node type) and the
+ * <p>Codes: {@code UNSUPPORTED_NODE} (the flat config has no home for this node type),
+ * {@code UNSUPPORTED_BINDING} (it has a home for the node, but not for the {@code use:} component ref
+ * the node carries — added 2026-08-14 for AUTHOR-1, where such a ref was dropped in silence) and the
  * strict-mode completeness set {@code NO_ACQUISITION} / {@code NO_PARSER} /
  * {@code NO_PERSISTENT_SINK} / {@code PARSER_NO_SCHEMA} (an {@code active} pipeline must be whole; an
  * inactive draft may be partial).

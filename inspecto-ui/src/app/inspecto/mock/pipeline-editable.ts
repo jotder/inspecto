@@ -1,6 +1,7 @@
 /**
  * The mock's editable lift/lower — a faithful TS port of the backend `PipelineEditable` (W5). It
- * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE + the completeness set), or the
+ * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE, UNSUPPORTED_BINDING + the
+ * completeness set), or the
  * offline preview passes a topology the real backend 422s — the textbook "mock more lenient than the
  * server" hole this project has been bitten by before. Node config is the raw config-file vocabulary
  * end to end, so lift→lower is a verbatim map round-trip.
@@ -34,6 +35,39 @@ export const LOWERABLE = new Set([
     'transform.summarize', // group-by rollup → processing.summarize (ELT P3), authoring-only
     'transform.join', // reference join → processing.join (ELT P3 S2), authoring-only
 ]);
+
+/**
+ * Node type → the `use:` ref prefixes the flat config has a home for (mirrors
+ * `PipelineEditable.USE_HOME`). Two kinds only: acquisition's `connection/`, and the parser's
+ * `grammar/` (authored Grammar) or `ingester/` (a plugin parser's synthesized binding).
+ */
+const USE_HOME: Record<string, string[]> = {
+    acquisition: ['connection/'],
+    parser: ['grammar/', 'ingester/'],
+};
+
+/**
+ * Why this node's `use:` ref cannot be lowered, or `undefined` when it can — the TS mirror of
+ * `PipelineEditable.unhomedBinding`.
+ *
+ * ⚠ `bindKindFor` keys the component picker on a node's CATEGORY, so the editor offers
+ * `transform/<id>` on every TRANSFORM node and `sink/<id>` on every sink — but nothing resolves those
+ * refs, on either side. Both lowerings dropped them in silence until 2026-08-14 (AUTHOR-1: save
+ * returned `written:true`, the binding never reached the file). They now refuse, together: a preview
+ * that accepts what the backend refuses is the same bug as the reverse.
+ */
+function unhomedBinding(n: AuthoredNode): string | undefined {
+    const use = n.use?.trim();
+    if (!use) return undefined;
+    const homes = USE_HOME[n.type];
+    if (homes?.some((p) => use.startsWith(p))) return undefined;
+    return (
+        `the flat pipeline config has no home for a '${use}' binding on a '${n.type}' node` +
+        (homes
+            ? `; it accepts ${homes.join(' or ')}`
+            : ' — this node kind carries its settings inline, not as a component reference')
+    );
+}
 
 type Cfg = Record<string, unknown>;
 const asMap = (v: unknown): Cfg => (v && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Cfg) } : {});
@@ -279,6 +313,8 @@ export function lowerGraph(
             });
             continue;
         }
+        const unhomed = unhomedBinding(n);
+        if (unhomed) refusals.push({ code: 'UNSUPPORTED_BINDING', nodeId: n.id, message: unhomed });
         if (n.type === 'acquisition') acq = n;
         else if (n.type === 'parser') parser = n;
         else if (n.type === 'gap') gap = n;

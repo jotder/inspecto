@@ -1440,7 +1440,33 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   directly for OLTP, reserve the plugin (or a materialize-to-Parquet CQRS split) for cross-engine
   analytical joins. Editions: DuckDB-file stays the Personal default (zero external deps / jlink),
   Postgres for Standard/Enterprise via the existing toggle. `okf/backend/engine/db-layer.md`
-- 🔴 **AUTHOR-1 — an authored `transform.map` config is SILENTLY DROPPED on save.** Found
+- ~~🔴 **AUTHOR-1 — an authored `transform.map` config is SILENTLY DROPPED on save.**~~ **SHIPPED
+  2026-08-14 — decided (b), refuse with a named code, under standing operator delegation.** Grounding
+  settled the row's "decide first" question and **refuted its stated cause**:
+  - **The cause was not map's absence from `STEP_KIND`.** `lower()` read `use:` for exactly **two** node
+    kinds (acquisition `connection/`, parser `grammar/`) and dropped every other ref silently — so all
+    five *chain* kinds, which **are** in `STEP_KIND`, lost their `transform/<id>` binding too (`stepsOf`
+    emits config only), and so did every sink's `sink/<id>`. The defect was **7 node kinds wide**, not
+    one. The editor's picker is keyed on a node's **category, not type** (`bindKindFor`), which is why.
+  - **The engine's "a map node's config is never author-set" premise (`PipelineEditable:60-62`) was also
+    false**: `RowShaper.columnsOf:348` honours an authored `columns` list, `mappingSchemaOf:397` honours
+    authored `rules`, and `processing.mapping_file` is the flat home for an authored mapping
+    (`PipelineConfigParser:884`, ELT amendment slice 3). The comment predated that slice; it is corrected.
+  - **(b) was the only honest option**: nothing in the engine resolves `transform/<id>` or `sink/<id>`
+    (grep: zero), so preserving the ref would write a config that loads and does nothing — the exact
+    objection that removed the registry `schema` kind in unification W1. New code `UNSUPPORTED_BINDING`,
+    per-kind prefix allow-list (`USE_HOME`), mirrored in the offline `pipeline-editable.ts` in the same
+    commit. The row's ⛔ is honoured — no `steps:` entry for map.
+  - **Follow-on, NOT done (a real second gap, flagged not absorbed):** a map node's *inline* config is
+    still dropped by `lower` — an author can type `columns` into the dialog's free-form rows (map has no
+    AttributeSpec) and lose it. Narrower than it looks: legacy map nodes carry a lift-derived `schema`
+    that lower drops **on purpose**, so a blanket "map has config ⇒ refuse" would refuse every existing
+    pipeline's save. Needs a keys-that-are-not-derived rule.
+  - **Follow-on, NOT done (UI):** the picker is still offered on kinds that now hard-refuse. The end
+    state is `bindKindFor` returning null for TRANSFORM/SINK, but that also feeds `pipeline-graph.ts`'s
+    `needsRef` status logic — entangled, design-first. Refusing beats the silent drop meanwhile.
+
+  Original row, for provenance: Found
   2026-08-12 driving the UI end-to-end (create → save → open → test). The builder offers a Configure
   dialog with a transform picker and a "New transform" flow for a `map` step; the component is created
   and persisted (`registry/transforms/<id>.toon`), the step renders **"Configured"**, and

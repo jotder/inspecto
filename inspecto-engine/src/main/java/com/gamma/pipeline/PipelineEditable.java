@@ -44,6 +44,7 @@ public final class PipelineEditable {
     public static final String NO_PARSER = "NO_PARSER";
     public static final String NO_PERSISTENT_SINK = "NO_PERSISTENT_SINK";
     public static final String PARSER_NO_SCHEMA = "PARSER_NO_SCHEMA";
+    public static final String UNSUPPORTED_BINDING = "UNSUPPORTED_BINDING";
 
     /** Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE. */
     private static final Set<String> LOWERABLE = Set.of(
@@ -58,8 +59,15 @@ public final class PipelineEditable {
 
     /**
      * Node type → the {@code steps:} kind it lowers to: the five kinds the flat file's transform chain
-     * can hold. {@code transform.map} is deliberately absent — it is the schema projection the lift
-     * always emits, not something an author places in a chain.
+     * can hold. {@code transform.map} is deliberately absent — the lift emits it as the schema
+     * projection between parser and sink, so it never enters the chain, and giving it a {@code steps:}
+     * entry would change <b>when {@code steps:} is emitted at all</b> (AUTHOR-1's ⛔).
+     *
+     * <p>⚠ Do not read that as "a map node is never author-configurable" — an earlier version of this
+     * comment did, and it is not true: {@code RowShaper.columnsOf} honours an authored {@code columns}
+     * list and {@code mappingSchemaOf} honours authored {@code rules}, and the flat file has a home for
+     * an authored mapping in {@code processing.mapping_file}. What the map node has no home for is a
+     * {@code use:} component ref — see {@link #unhomedBinding}.
      */
     private static final Map<String, String> STEP_KIND = Map.of(
             BuiltinNodeType.TRANSFORM_FILTER.type(),    PipelineConfig.Step.FILTER,
@@ -75,6 +83,33 @@ public final class PipelineEditable {
      */
     public static boolean isLowerable(String type) {
         return LOWERABLE.contains(type);
+    }
+
+    /**
+     * Why this node's {@code use:} ref cannot be lowered, or {@code null} when it can.
+     *
+     * <p>⚠ The editor offers a component picker for <b>every</b> TRANSFORM and SINK node — its bind kind
+     * is keyed on the node's category, not its type — so it can write {@code use: transform/<id>} onto a
+     * map / filter / join / dedup / summarize / route node, and {@code use: sink/<id>} onto a sink. Until
+     * 2026-08-14 {@link #lower} read {@code use:} for exactly the two kinds in {@link #USE_HOME} and
+     * dropped every other one <b>silently</b>: the save returned {@code 200 written:true} while the
+     * binding never reached the file (AUTHOR-1).
+     *
+     * <p>The binding is <b>refused, not preserved</b>, because no engine path resolves
+     * {@code transform/<id>} or {@code sink/<id>} — keeping it would write a config that loads and then
+     * does nothing. That is the exact objection that removed the registry {@code schema} kind in
+     * unification W1, and it was only re-admitted once {@code PipelineConfigParser.resolveSchemaRef}
+     * made such a ref executable ({@code ComponentStore.WRITABLE_TYPES}). A named refusal tells the
+     * author at Save; a silent drop tells them nothing, and an inert file tells them at 3am.
+     */
+    private static String unhomedBinding(PipelineNode n) {
+        if (!n.hasUse()) return null;
+        List<String> homes = USE_HOME.get(n.type());
+        if (homes != null && homes.stream().anyMatch(p -> n.use().startsWith(p))) return null;
+        return "the flat pipeline config has no home for a '" + n.use() + "' binding on a '" + n.type()
+                + "' node" + (homes == null
+                ? " — this node kind carries its settings inline, not as a component reference"
+                : "; it accepts " + String.join(" or ", homes));
     }
 
     /**
@@ -94,6 +129,18 @@ public final class PipelineEditable {
 
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
+
+    /**
+     * Node type → the {@code use:} ref prefixes the flat config has a home for. Two kinds, three
+     * prefixes: acquisition's {@code connection/} lands in the collector block, and the parser's
+     * {@code grammar/} (an authored Grammar) or {@code ingester/} (a plugin parser's synthesized
+     * binding) land in {@code parsing:}/{@code processing:}. Every other node type is absent, which is
+     * the whole point — a type not listed here carries its settings <b>inline</b>, and a ref on it is
+     * refused with {@link #UNSUPPORTED_BINDING} rather than dropped.
+     */
+    private static final Map<String, List<String>> USE_HOME = Map.of(
+            BuiltinNodeType.ACQUISITION.type(), List.of("connection/"),
+            BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"));
 
     /**
      * Sink-owned FLAT processing keys (write tuning carried on the persistent sink node). Consignment
@@ -265,6 +312,9 @@ public final class PipelineEditable {
                         "the flat pipeline config has no home for a '" + t + "' node"));
                 continue;
             }
+            String unhomed = unhomedBinding(n);
+            if (unhomed != null)
+                refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_BINDING, n.id(), unhomed));
             if (BuiltinNodeType.ACQUISITION.type().equals(t)) acq = n;
             else if (BuiltinNodeType.PARSER.type().equals(t)) parser = n;
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
