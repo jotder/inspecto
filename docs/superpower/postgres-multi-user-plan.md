@@ -6,6 +6,13 @@
 > re-open that call, it makes the build schedulable when it is taken.
 >
 > As-built persistence reference: [`okf/backend/engine/db-layer.md`](../okf/backend/engine/db-layer.md).
+>
+> ⚠ **Not the same work as `OperationalDb` (shipped 2026-08-14, `da92dbf3`).** That shipped a single
+> `-Dinspecto.db=duckdb|postgres` selection so a Standard deployment names its database once instead of
+> ten times — pure config consolidation, no pool, no `JdbcDrivers` change, Personal untouched. This plan
+> is the separate, still-deferred question of concurrent operators sharing one connection per store
+> (F1–F4 below). They compose: `OperationalDb.url()` is exactly the URL a future pool would sit behind.
+> See `BACKLOG.md` **PG-1** for what is now open around `OperationalDb` (driver bundling, UI).
 
 ## 1. What this is for
 
