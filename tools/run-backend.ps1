@@ -52,8 +52,12 @@ if ($Rebuild) {
 $cpFile = Join-Path $repo 'target/backend-cp.txt'
 New-Item -ItemType Directory -Force -Path (Split-Path $cpFile) | Out-Null
 Write-Host "Deriving classpath (mvn -o dependency:build-classpath)..." -ForegroundColor Cyan
+# ⚠ Every -D argument is QUOTED, including the ones with no variable in them. PowerShell parses an
+# unquoted native argument that starts with `-` as a parameter token and ENDS THE TOKEN at the `.`,
+# so a bare -Dmdep.includeScope=runtime arrives as two arguments (`-Dmdep` and `.includeScope=runtime`)
+# and Maven reports the tail as an unknown lifecycle phase. Quoting is what keeps it one argument.
 & $mvn -o -q -f (Join-Path $repo 'pom.xml') -pl inspecto dependency:build-classpath `
-       "-Dmdep.outputFile=$cpFile" -Dmdep.includeScope=runtime
+       "-Dmdep.outputFile=$cpFile" "-Dmdep.includeScope=runtime"
 if ($LASTEXITCODE -ne 0) { throw "dependency:build-classpath failed — is the .m2 repository populated?" }
 
 $entries = (Get-Content $cpFile -Raw).Trim() -split ';' | Where-Object { $_ }
@@ -87,14 +91,14 @@ Write-Host "Classpath: $($moduleDirs.Count) module classes dirs + $($entries.Cou
 # ── step 3: launch ────────────────────────────────────────────────────────────
 & java --enable-native-access=ALL-UNNAMED `
     "-Dcontrol.port=$Port" `
-    -Dcontrol.token=dev `
-    -Dassist.read.token=dev `
+    "-Dcontrol.token=dev" `
+    "-Dassist.read.token=dev" `
     "-Dassist.write.root=$WriteRoot" `
     "-Dspaces.root=$SpacesRoot" `
-    -Djobs.backend=duckdb `
-    -Dprovenance.backend=duckdb `
-    -Dobjects.backend=db `
-    -Devents.backend=parquet `
+    "-Djobs.backend=duckdb" `
+    "-Dprovenance.backend=duckdb" `
+    "-Dobjects.backend=db" `
+    "-Devents.backend=parquet" `
     "-Dui.dir=$UiDir" `
     -cp $cp `
     com.gamma.control.ControlApi
