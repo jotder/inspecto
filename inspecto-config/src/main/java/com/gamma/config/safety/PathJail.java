@@ -61,7 +61,9 @@ public final class PathJail {
 
     /**
      * The roots that config-declared paths must resolve under: {@code -Dassist.safety.roots} (a
-     * {@code ;}-separated list), falling back to the working directory.
+     * {@code ;}-separated list). ⚠ There is <b>no</b> working-directory fallback — see
+     * {@link SafetyPolicy#defaultPolicy()}; blank yields an empty list and {@link #requireUnderAny}
+     * throws on that. <i>(This sentence claimed a CWD fallback until 2026-08-14.)</i>
      *
      * <p>This is deliberately the <em>same</em> list {@link ConfigSafetyValidator} enforces at the 422
      * write gate, so a value refused at authoring time is refused at run time for the same reason and
