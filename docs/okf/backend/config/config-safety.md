@@ -90,11 +90,56 @@ the roots is a deployment step. *(The method's own Javadoc promised a CWD fallba
 containment test that does not narrow the roots passes vacuously.
 
 ⚠ **`PathJail` unified the CONFIG-path implementations, not every containment check in the codebase.**
-A 2026-08-14 sweep found ~15 more outside that scope — the registry stores (three byte-identical
-copies), archive extraction, static file serving, remote listings — disagreeing on symlinks,
-absolutisation and failure mode. They are **four different problems**, and ⛔ putting them all on
-`PathJail` is the wrong fix: remote object keys are not local `Path`s, and id-shaped names are not
-containment at all. The family split and the ranked fix order are `BACKLOG.md` §6 **PATH-2**.
+A 2026-08-14 sweep found ~15 more outside that scope — the registry stores (three near-identical
+copies; `ComponentStore` actually splits the logic in two), archive extraction, static file serving,
+remote listings — disagreeing on symlinks, absolutisation and failure mode. They are **four different
+problems**, and ⛔ putting them all on `PathJail` is the wrong fix: remote object keys are not local
+`Path`s, and id-shaped names are not containment at all. The family split and the ranked fix order are
+`BACKLOG.md` §6 **PATH-2** — which also records that grounding the sweep **refuted three of its own
+claims**, so trust that row's 2026-08-14 close-out over the original framing.
+
+## Data refs: a second verdict, deliberately not `PathJail`
+
+`com.gamma.config.safety.DataRef` (2026-08-14) is the one answer for a `physicalRef`-shaped value — a
+store ref resolved under a **space's data root**. It sits beside `PathJail` and is emphatically *not* a
+caller of it.
+
+⛔ **A data ref must never be routed through `PathJail`.** `PathJail` resolves a relative value against
+the **working directory** — load-bearing for config refs, as above — while a data ref is meaningless
+except relative to the data root. Forcing one onto the other would silently resolve `orders` against the
+server CWD. Two roots, two verdicts.
+
+The shape rule is a character class, and that is what makes these refs **structurally** safe rather than
+merely filtered: `[A-Za-z0-9][A-Za-z0-9._/-]*` admits no `\` (no UNC, no Windows separator) and no `:`
+(no drive prefix), and the alphanumeric first character rejects a leading `/`, `-` or `.`. Traversal is
+excluded by a separate `".."` substring test because `.` must stay legal *inside* a segment (a store
+named `orders.v2`). `requireShape` is for the branch that resolves elsewhere — an Exchange
+`shared/<owner>/<item>` snapshot; `requireUnder` adds containment. Violations throw
+`IllegalArgumentException` → **422**: an unusable ref is a bad request about a dataset, not a containment
+incident, so it deliberately does *not* throw `PathJail.Escape`.
+
+⚠ **`requireUnder`'s containment branch is unreachable while the shape rule holds — and is kept anyway.**
+It exists so the two rules cannot drift apart, which is the failure this class was created to end:
+`DatasetRelation` and `ExpectationEvaluator` each carried their **own copy** of that pattern (the
+latter's Javadoc admitted it was the "same shape as" the former), and the copies *had* drifted — both
+checked shape, only one re-checked containment after resolving. Nothing was reachable through the gap,
+but a boundary spelled twice is a boundary that drifts.
+
+⚠ **Test the reason, not the throw.** Both rules raise `IllegalArgumentException`, so a type-only
+assertion cannot tell "refused by shape" from "refused by containment" — and since shape refuses first
+in every case, such a test reports the containment half as covered when it never ran. `DataRefTest`
+asserts each exclusion's message individually.
+
+⚠ **Still unfixed under both readers: symlinks.** `normalize()` is purely structural; neither reader
+re-checks symlink escape, and `PathJail` is the only thing in the codebase that does. That is PATH-2
+tier 4, sequenced behind the tier-3 root-set decision.
+
+⚠ **The store glob is interpolated into SQL, never bound** — DuckDB's table functions take a literal.
+`SqlViews.reader`/`pathList` double `'` → `''` (so a store under `O'Brien` renders a valid literal
+rather than a broken one); `SqlViewsTest` pins it and ⛔ it must not be "simplified" away. The caller-supplied
+store name on `DbBrowserRoutes` is sound on both axes — normalize + `startsWith` against an already
+normalised `dataRoot`, then the escaped literal — and is now pinned at **403** (not merely "some 4xx":
+a 404 would mean the jail never ran and the name fell through to the existence check).
 
 ⛔ **A containment check must never report success when it refuses.** Two did, and both were fixed
 2026-08-14: `MetadataValidateTask.missingPhysical` skipped an escaping `physicalRef` as "not ours to

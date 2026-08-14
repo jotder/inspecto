@@ -1,5 +1,6 @@
 package com.gamma.query;
 
+import com.gamma.config.safety.DataRef;
 import com.gamma.pipeline.ViewDefinition;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.sql.SqlViews;
@@ -37,7 +38,6 @@ public final class DatasetRelation {
 
     private DatasetRelation() {}
 
-    private static final Pattern SAFE_REF = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._/-]*");
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /**
@@ -63,13 +63,13 @@ public final class DatasetRelation {
         }
         String ref = str(datasetConfig, "physicalRef");
         if (ref != null) {
-            if (ref.contains("..") || !SAFE_REF.matcher(ref).matches())
-                throw new IllegalArgumentException("unsafe dataset physicalRef '" + ref + "'");
             // A shared/<owner>/<item> ref routes to the owner's Exchange snapshot (grant-checked, fail-closed)
             // instead of this space's data root — everything downstream reads it as an ordinary Parquet glob.
+            // Only the shape is answerable for a shared ref; the local branch also gets containment, so the
+            // two readers of a physicalRef (here and ExpectationEvaluator) now apply one rule, not two.
             Path base = ref.startsWith(SHARED_PREFIX)
-                    ? resolveShared(ref)
-                    : localBase(ref, dataRoot);
+                    ? resolveShared(DataRef.requireShape(ref, REF_LABEL))
+                    : DataRef.requireUnder(dataRoot, ref, REF_LABEL);
             String root = base.normalize().toString().replace('\\', '/');
             // Store-layout contract: a pipeline-shaped store (one with a database/ subtree) reads its
             // mapped output only — quarantine/backup/nested trees stay out of the dataset. An explicit
@@ -92,12 +92,7 @@ public final class DatasetRelation {
     }
 
     private static final String SHARED_PREFIX = "shared/";
-
-    private static Path localBase(String ref, Path dataRoot) {
-        if (dataRoot == null)
-            throw new IllegalArgumentException("no data root for this space; cannot resolve physicalRef");
-        return dataRoot.resolve(ref);
-    }
+    private static final String REF_LABEL = "dataset physicalRef";
 
     /** Resolve a {@code shared/<owner>/<item>} ref to its snapshot dir via the installed {@link SharedRefResolver}. */
     private static Path resolveShared(String ref) {

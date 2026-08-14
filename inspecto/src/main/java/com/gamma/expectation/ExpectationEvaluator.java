@@ -1,5 +1,6 @@
 package com.gamma.expectation;
 
+import com.gamma.config.safety.DataRef;
 import com.gamma.sql.SqlSandbox;
 import com.gamma.sql.SqlSandboxPolicy;
 
@@ -15,8 +16,8 @@ import java.util.regex.Pattern;
  * an ephemeral DuckDB sandbox (ING-6). Mirrors {@code QueryExecutor}: the sandbox is opened
  * <b>unsealed</b> because the count query legitimately reads Parquet by absolute path. Unlike a user
  * query there is no untrusted SQL phase — the <em>entire</em> statement is server-built here from
- * validated inputs (column/ref identifiers pass {@link #SAFE_IDENT}, dataset refs pass {@link #SAFE_REF}
- * and a path-jail, numeric bounds are formatted as numbers, the regex is a single-quote-escaped literal),
+ * validated inputs (column/ref identifiers pass {@link #SAFE_IDENT}, dataset refs pass
+ * {@link DataRef#requireUnder}, numeric bounds are formatted as numbers, the regex is a single-quote-escaped literal),
  * so no {@code SqlGuard} pass is needed.
  */
 public final class ExpectationEvaluator {
@@ -25,8 +26,8 @@ public final class ExpectationEvaluator {
 
     /** Plain SQL identifier (column / ref column) — anything else is rejected before it reaches the SQL. */
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** A dataset/target ref usable as a path segment under the data root (same shape as {@code DatasetRelation}). */
-    private static final Pattern SAFE_REF = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._/-]*");
+    /** What to call an unusable target in the 422 message; the rule itself is {@link DataRef}'s. */
+    private static final String REF_LABEL = "expectation target/ref";
 
     /** The outcome of one evaluation. {@code status} is {@code PASSED} or {@code FAILED}. */
     public record Result(String status, long violations, long checkedAt) {}
@@ -97,13 +98,7 @@ public final class ExpectationEvaluator {
      * never count against an expectation.
      */
     private static String parquetGlob(Path dataRoot, String ref) {
-        if (dataRoot == null)
-            throw new IllegalArgumentException("no data root for this space; cannot resolve target");
-        if (ref == null || ref.contains("..") || !SAFE_REF.matcher(ref).matches())
-            throw new IllegalArgumentException("unsafe expectation target/ref '" + ref + "'");
-        Path resolved = dataRoot.resolve(ref).normalize();
-        if (!resolved.startsWith(dataRoot.normalize()))
-            throw new IllegalArgumentException("expectation target escapes the data root");
+        Path resolved = DataRef.requireUnder(dataRoot, ref, REF_LABEL);
         String glob = com.gamma.sql.SqlViews.storeReadRoot(
                 resolved.toString().replace('\\', '/')) + "/**/*.parquet";
         return "read_parquet(" + literal(glob) + ")";

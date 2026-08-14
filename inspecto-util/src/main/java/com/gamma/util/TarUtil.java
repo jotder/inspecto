@@ -91,6 +91,11 @@ public final class TarUtil {
      */
     public static int extractTar(Path archive, Path destDir) throws IOException {
         int count = 0;
+        // Compare both sides in ONE frame. The entry side was always normalized and this side never was,
+        // so a destDir carrying a redundant component ("work/./out") made a perfectly safe entry fail
+        // startsWith. That direction is fail-closed — a normalized candidate cannot match a longer,
+        // un-normalized prefix — so it refused good archives rather than admitting bad ones.
+        Path dest = destDir.toAbsolutePath().normalize();
         try (InputStream fi  = Files.newInputStream(archive);
              InputStream bi  = new BufferedInputStream(fi);
              InputStream ci  = isGzipped(archive) ? new GzipCompressorInputStream(bi) : bi;
@@ -99,8 +104,8 @@ public final class TarUtil {
             TarArchiveEntry entry;
             while ((entry = tar.getNextEntry()) != null) {
                 if (!tar.canReadEntryData(entry)) continue;
-                Path out = destDir.resolve(entry.getName()).normalize();
-                if (!out.startsWith(destDir))
+                Path out = dest.resolve(entry.getName()).normalize();
+                if (!out.startsWith(dest))
                     throw new IOException("Unsafe path in archive: " + entry.getName());
                 if (entry.isDirectory()) {
                     Files.createDirectories(out);

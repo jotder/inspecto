@@ -608,6 +608,54 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     the exact failure mode PATH-2 exists to fix. `ArtifactRecorder` is for a *produced thing*, not for
     a report the Run Log already carries. Retention would not have been the blocker (`runlog_prune`
     already prunes `auditRoot/artifacts` alongside `auditRoot/runlog`).
+  - **Family (a)/(b)/(d) re-grounded 2026-08-14 — and this row's own claims were WRONG in three places.
+    What was left ungated is now SHIPPED; ⛔ do not build the "one shared `safeEntry`" this row asks for.**
+    Grounding each of the ~15 sites before touching any of them refuted the plan:
+    - ⛔ **Family (b) is 2/3 already correct.** `BundleImporter:85` does
+      `configDir.toAbsolutePath().normalize()` *before* deriving the entry path, and `BackupTask:247`
+      gets its `target` from `PathJail.requireUnderAny`, which absolutises and normalises. Both compare in
+      **one frame**; the "different frames" characterisation applies only to `TarUtil`. A shared
+      `safeEntry` would therefore refactor two correct call sites to fix a third — churn, not a fix.
+    - ⚠ **`TarUtil`'s mismatch was real but FAIL-CLOSED, not a slip.** `out` was normalised and `destDir`
+      was not, and a normalised candidate can only *fail* `startsWith` an un-normalised prefix — so it
+      **refused safe archives** (any `destDir` carrying a redundant component) and never admitted an
+      unsafe one. Fixed 2026-08-14 by normalising `destDir` once; the severity ranking that put this
+      under a zip-slip heading was overstated.
+    - ⛔ **`DbBrowserRoutes` is NOT a defect on either axis this row implies.** The param is `name`
+      (query) / `table` (POST body), never `?table=`; containment is `normalize()` + `startsWith` against
+      an already-normalised `dataRoot`, which neutralises `..`; and the glob is **not** an unescaped
+      interpolation — `SqlViews.reader`/`pathList` double `'` → `''` (deliberate, for a store under a dir
+      like `O'Brien`). It was **unpinned**, not unsafe: `ControlApiDbBrowserTest.storeNameCannotEscapeTheDataRoot`
+      now asserts **403** for four escaping names (403 specifically — a 404 would mean the gate never ran)
+      plus a contained `orders/../ghost` that must reach the *existence* check, and a new `SqlViewsTest`
+      pins the quote-doubling in both renderers. ⛔ Do not "simplify" the `replace("'", "''")` away.
+    - ✅ **The two-readers-disagree item (family (d), listed under tier 4) is CLOSED 2026-08-14.**
+      `DatasetRelation` and `ExpectationEvaluator` each held their **own copy** of one `SAFE_REF` pattern
+      (the latter's Javadoc admitted it was the "same shape as" the former) and had drifted: both checked
+      shape, only one re-checked containment after resolving. Both now delegate to one
+      **`DataRef`** (`com.gamma.config.safety`, beside `PathJail`) — `requireShape` for the branch that
+      resolves elsewhere (an Exchange `shared/<owner>/<item>` snapshot), `requireUnder` for a data-root
+      ref. ⛔ **A data ref must NOT be routed through `PathJail`**: `PathJail` resolves a relative value
+      against the **working directory** (deliberate and load-bearing for *config* refs), whereas a
+      `physicalRef` is meaningless except relative to the space's data root — hence a sibling verdict, not
+      a `PathJail` call. Violations stay `IllegalArgumentException` (→ **422**): an unusable ref is a bad
+      request about a dataset, not a containment incident.
+      ⚠ **Honest severity: the gap was never reachable.** `SAFE_REF` admits no `\` (so no UNC, no Windows
+      separator) and no `:` (so no drive prefix), requires an alphanumeric first character (so no leading
+      `/`), and `".."` is excluded by substring test — traversal and absolute refs are **structurally**
+      impossible, so the missing `startsWith` was redundancy, not an escape. The containment branch of
+      `requireUnder` is consequently **unreachable while the shape rule holds**, and is kept precisely so
+      the two rules cannot drift apart again. `DataRefTest` pins each exclusion **individually** and
+      asserts the failure **reason**, not just that something threw — a type-only assertion cannot tell
+      "refused by shape" from "refused by containment", and would have reported the containment half as
+      covered when it had never run.
+    - **Still open and unchanged:** tier 3 (root-set widening — operator security-posture call) and tier 4's
+      **symlink** half, which is the one genuinely unfixed hole under both readers (`normalize()` is
+      structural; neither re-checks symlink escape, and `PathJail` is the only thing that does). Family (a)'s
+      three near-identical store helpers (`ComponentStore`/`PipelineStore`/`ViewStore`) are **untidy, not
+      buggy** — ⚠ and not byte-identical as claimed: `ComponentStore` splits the same logic into
+      `validId` + `fileFor(type,id)`. `ViewStore` has **no test class at all** — that is the real gap there.
+      Verified: full reactor 23 modules, **3252 tests, 0 failures** (3237 baseline + 15 new).
 - ~~🔴 BUILD-1 — the offline reactor build is BROKEN~~ **CLOSED 2026-08-06 — NOT A BUILD DEFECT. The
   diagnosis was an artifact of running as the wrong Windows profile.** `mvn -o clean test` completes
   the full **23-module reactor: BUILD SUCCESS, 2799 tests, 0 failures, 0 errors, 6 skipped** (3m32s),

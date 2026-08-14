@@ -194,6 +194,23 @@ class ControlApiDbBrowserTest {
         }
     }
 
+    /**
+     * The store name is caller-supplied and lands in a {@code read_parquet} glob, so its containment gate is
+     * pinned here. 403 specifically, not "some 4xx": an escaping name that fell through to the existence
+     * check would answer 404 — indistinguishable from a typo, and it would mean the gate never ran.
+     */
+    @Test
+    void storeNameCannotEscapeTheDataRoot(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            for (String name : new String[]{"..", "../ghost", "../../etc", "orders/../../etc"}) {
+                HttpResponse<String> r = get(c.port, "/spaces/s1/db/table?name=" + name);
+                assertEquals(403, r.statusCode(), () -> "name=" + name + " → " + r.body());
+            }
+            // A name that stays inside is refused by existence, not by the jail — the gate is not over-eager.
+            assertEquals(404, get(c.port, "/spaces/s1/db/table?name=orders/../ghost").statusCode());
+        }
+    }
+
     @Test
     void writeRootDisabledIs503(@TempDir Path cfg) throws Exception {
         // Legacy single-space harness with no -Dassist.write.root → writeRoot() is null → 503.
