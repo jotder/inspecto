@@ -16,7 +16,7 @@
 | Secrets | env / file | `SecretsProvider` (file + OS keystore, or Vault) | Vault / cloud secrets manager |
 | At-rest encryption | optional (volume) | Volume encryption + AES-GCM for stored creds | Volume + shared-store encryption |
 | Audit | local append-only logs | **actor-attributed**, tamper-evident compliance log | shared, centralized audit store |
-| State | local disk | local disk (or optional Postgres) | **shared backends** (Postgres / object store / Vault) |
+| State | local disk | local disk (or optional Postgres — driver bundled as the `postgresql.jar` sidecar, selected by `-Dinspecto.db`) | **shared backends** (Postgres / object store / Vault) |
 | Scheduler | in-JVM | in-JVM | **distributed coordination** (leader election / locks) |
 | Compliance scope | none | SOC 2 / ISO 27001 / FedRAMP / HIPAA / PCI | inherits Standard + multi-node controls |
 | Packaging | core fat-JAR, `-Dauth.mode=none` | core + `security` module, `-Dauth.mode=oidc`, TLS on | + `policy` module (ABAC; shipped) — later + shared-store modules, coordinator |

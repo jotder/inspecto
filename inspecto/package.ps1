@@ -13,7 +13,9 @@
 #
 # -Edition Standard (default: Personal) additionally builds inspecto-security (W6, the OIDC
 # Authenticator SPI implementation) and bundles it as inspecto-security.jar; serve.sh/
-# serve.bat auto-detect its presence, add it to the classpath, and turn on -Dauth.mode=oidc
+# serve.bat auto-detect its presence, add it to the classpath, and turn on -Dauth.mode=oidc.
+# Standard/Enterprise also bundle the PostgreSQL JDBC driver as postgresql.jar (PG-1) — same
+# auto-detect mechanism, inert until -Dinspecto.db=postgres; the fat JAR stays driver-free.
 # (issuer/JWKS/audience from AUTH_OIDC_* env vars — never baked into the bundle). The embedded
 # jlink runtime's module set (below) is VERIFIED sufficient for inspecto-security too (PKG-4,
 # 2026-07-07): jdeps on inspecto-security.jar + Nimbus JOSE+JWT 10.9.1 needs nothing beyond
@@ -214,6 +216,22 @@ if ($securityJarSrc) {
 if ($policyJarSrc) {
     Copy-Item $policyJarSrc "$bundleDir\inspecto-policy.jar"
     Write-Host "Bundled Enterprise-edition policy module → inspecto-policy.jar" -ForegroundColor Green
+}
+
+# ── step 3a: Standard/Enterprise — bundle the PostgreSQL JDBC driver as a sidecar (PG-1) ─────────
+# The fat JAR and its SBOM stay JDBC-driver-free by design (inspecto/pom.xml, inspecto-engine/pom.xml);
+# the driver rides the bundle as postgresql.jar, auto-detected by serve.sh/serve.bat exactly like
+# inspecto-security.jar. Personal ships DuckDB only — OperationalDb.verifySelectable fails a
+# -Dinspecto.db=postgres boot there, naming this sidecar as the thing to drop in.
+if ($Edition -ne 'Personal') {
+    $pgVersion = ([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.properties.'postgresql.version'
+    if (-not $pgVersion) { throw "postgresql.version not found in the parent pom — cannot bundle the driver" }
+    $pgJar = Join-Path $env:USERPROFILE ".m2\repository\org\postgresql\postgresql\$pgVersion\postgresql-$pgVersion.jar"
+    if (-not (Test-Path $pgJar)) {
+        throw "PostgreSQL driver $pgVersion not in the local Maven repo ($pgJar). Run a build once (it is a test-scope dependency) or fetch it, then re-package."
+    }
+    Copy-Item $pgJar "$bundleDir\postgresql.jar"
+    Write-Host "Bundled PostgreSQL JDBC driver $pgVersion → postgresql.jar" -ForegroundColor Green
 }
 
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
@@ -433,6 +451,9 @@ if [ -f inspecto-security.jar ]; then
         EDITION="Enterprise"
     fi
 fi
+# PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
+# bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
+[ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
@@ -478,6 +499,9 @@ if exist inspecto-security.jar (
         set "EDITION=Enterprise"
     )
 )
+rem PostgreSQL JDBC driver sidecar (PG-1): present in Standard/Enterprise bundles, and honored on ANY
+rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
+if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 set "JAVA=java"
 if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)

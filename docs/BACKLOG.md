@@ -487,20 +487,25 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   absent driver; previously each store caught it, logged WARN and returned `null`, so a Postgres-pointed
   deployment came up "healthy" with job reporting, provenance and Objects **switched off rather than
   moved**. As-built: `okf/backend/engine/db-layer.md` §5.0.
-  **Open 1 — the Standard bundle does not ship a JDBC driver, so Postgres is not deployable out of the
-  box in ANY edition today.** `inspecto/pom.xml` has no `postgresql` dependency and does not depend on
-  `inspecto-connectors`; `inspecto-engine/pom.xml:130` states the runtime is JDBC-driver-free by design
-  and its own PG dependency is `test` scope. ⚠ Edition profiles today gate **auth/authz only**
-  (`inspecto-security`/`inspecto-policy` via the `Authenticator`/`AccessDecider` SPIs) — so this would be
-  the **first edition seam gating a runtime dependency rather than an SPI**, which is a precedent, not a
-  pom edit. The cheaper alternative is to bundle the driver in every edition and let `-Dinspecto.db`
-  decide, since the property already gates behaviour. **Needs an operator call.**
-  **Open 2 — UI configurability.** ⚠ **Bootstrap problem, not a build task:** the UI is served by the
-  process that needs the operational database, so it cannot configure the thing it depends on, and a
-  live change cannot take effect without a restart. Workable shape: the UI *reads* the current selection,
-  *validates* a proposed connection (a real test-connection round-trip), writes it to server config, and
-  it applies at next restart. ⚠ Also undecided: whether a database password belongs in a server config
-  file at all, or in the existing `secrets.keystore.*`. **Both are decisions, not defaults.**
+  ~~**Open 1 — no bundle ships a JDBC driver**~~ **DECIDED + SHIPPED 2026-08-14 (under the standing
+  "decide yourself" delegation): the driver rides the Standard/Enterprise bundle as the `postgresql.jar`
+  SIDECAR** — `package.ps1` copies it from the local Maven repo (version = the parent pom's
+  `postgresql.version`, cached because it is already a test-scope dependency), and `serve.sh`/`serve.bat`
+  auto-detect it exactly as they do `inspecto-security.jar`; the entry is inert until
+  `-Dinspecto.db=postgres`, and a drop-in beside `inspecto.jar` works on any bundle. ⛔ Both considered
+  alternatives were rejected: an edition Maven profile gating the dependency (the first runtime-dependency
+  edition seam — a precedent, and the sidecar mechanism already existed) and baking the driver into every
+  fat JAR (two poms pin *"must never leak into the shipped fat-JAR / SBOM"* as a design invariant).
+  ~~password location~~ **the password half of Open 2 DECIDED + SHIPPED the same day:**
+  `-Dinspecto.db.password` (and per-family `*.db.password`) is a **`SecretResolver` reference** resolved
+  at use — `${ENV:…}`, `${KEYSTORE:alias}` (so `secrets.keystore.*` is supported with no new mechanism),
+  `${FILE:…}`, or a literal (pass-through, back-compat) — the `auth.oidc.clientSecret` precedent.
+  As-built: `okf/backend/engine/db-layer.md` §5.0; pinned by `OperationalDbTest`.
+  **Open 2 (remaining) — UI configurability.** ⚠ **Bootstrap problem, not a build task:** the UI is
+  served by the process that needs the operational database, so it cannot configure the thing it depends
+  on, and a live change cannot take effect without a restart. Workable shape: the UI *reads* the current
+  selection, *validates* a proposed connection (a real test-connection round-trip), writes it to server
+  config, and it applies at next restart. Design-first.
   **Context — `-D` is the ONLY configuration surface today.** `serve.sh`/`serve.bat` (embedded in
   `package.ps1`) translate env vars → `-D` for port, spaces root, tokens, CORS, HTTPS and OIDC only; not
   one persistence property is wired in. `space.toon`'s manifest carries only

@@ -83,6 +83,28 @@ class OperationalDbTest {
                 });
     }
 
+    /**
+     * PG-1's second decision: {@code -Dinspecto.db.password} takes a {@code SecretResolver} reference —
+     * the {@code auth.oidc.clientSecret} precedent — so the value never has to sit on the command line.
+     * {@code ${SYS:…}} is the scope a test can control; a literal must keep passing through unchanged,
+     * and the per-family override must resolve too (a family pointed at a second reference gets that
+     * secret, not the shared one's).
+     */
+    @Test
+    void aPasswordReferenceIsResolvedAtUse_andALiteralPassesThrough() {
+        withProps(Map.of("inspecto.db.password", "${SYS:test.pg.secret}",
+                        "test.pg.secret", "resolved-secret",
+                        "status.db.password", "${SYS:test.status.secret}",
+                        "test.status.secret", "status-secret"),
+                () -> {
+                    assertEquals("resolved-secret", OperationalDb.passwordFor("objects.db.password"));
+                    assertEquals("status-secret", OperationalDb.passwordFor("status.db.password"),
+                            "a per-family reference resolves to ITS secret, not the shared one");
+                });
+        withProps(Map.of("inspecto.db.password", "plain-literal"),
+                () -> assertEquals("plain-literal", OperationalDb.passwordFor("objects.db.password")));
+    }
+
     @Test
     void postgresWithoutAUrlFailsAtBoot_namingTheSettingToFix() {
         withProps(Map.of("inspecto.db", "postgres"), () -> {

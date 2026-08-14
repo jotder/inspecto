@@ -460,12 +460,23 @@ acquisition ledger. Personal sets nothing at all.
 - ⛔ **An unhonourable `postgres` selection now fails at boot** (`SpaceManager.discover` →
   `OperationalDb.verifySelectable`), naming the missing property or driver. It used to be caught *per
   store*, logged WARN, and leave that store `null` — so a deployment pointed at Postgres came up
-  "healthy" with job reporting, provenance and Objects **switched off rather than moved**. ⚠ The shipped
+  "healthy" with job reporting, provenance and Objects **switched off rather than moved**. The shipped
   `inspecto.jar` bundles **no JDBC driver** (`inspecto-engine/pom.xml`: *"runtime stays JDBC-driver-free
-  by design"* — `inspecto/pom.xml` has no `postgresql` dependency and does not depend on
-  `inspecto-connectors`), so Postgres is **not yet deployable out of the box in any edition**; shipping
-  the driver in the Standard bundle is open work, and it would be the first edition seam gating a
-  *runtime dependency* rather than a ServiceLoader SPI.
+  by design"*) and that stays true — **the driver rides the Standard/Enterprise bundle as the
+  `postgresql.jar` sidecar** (PG-1 Open 1, decided 2026-08-14): `package.ps1` copies it from the local
+  Maven repo (version = the parent pom's `postgresql.version`), and `serve.sh`/`serve.bat` auto-detect
+  it exactly as they do `inspecto-security.jar`. ⛔ The considered alternative — an edition Maven profile
+  gating the dependency — was rejected: it would be the first edition seam gating a *runtime dependency*
+  rather than a ServiceLoader SPI, and the sidecar mechanism already existed. The classpath entry is
+  inert until `-Dinspecto.db=postgres` selects it, and the serve scripts honour a `postgresql.jar`
+  dropped beside `inspecto.jar` on **any** bundle (the boot-failure message says exactly that).
+- **The password is a `SecretResolver` reference, resolved at use** (PG-1 Open 2's password half,
+  decided 2026-08-14): `-Dinspecto.db.password` (and any per-family `*.db.password`) takes
+  `${ENV:PGPASSWORD}`, `${KEYSTORE:alias}` (the existing `secrets.keystore.*` machinery), `${FILE:…}`,
+  or a literal — the `auth.oidc.clientSecret` precedent, so the secret need not sit on the process
+  command line. A literal passes through unchanged, which is what keeps existing deployments working.
+  ⚠ Open 2's **UI half stays open** — it is the bootstrap design problem (the UI is served by the
+  process that needs the database), not a build task.
 
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 

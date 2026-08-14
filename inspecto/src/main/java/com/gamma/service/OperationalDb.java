@@ -1,5 +1,7 @@
 package com.gamma.service;
 
+import com.gamma.acquire.SecretResolver;
+
 /**
  * The <b>operational database</b>: one selection covering every transactional/operational store the
  * service hosts (job runs, provenance, status, Objects/links/notes/tags, consignment outputs, file
@@ -24,8 +26,18 @@ package com.gamma.service;
  * caught per store and logged at WARN, leaving the store {@code null} — so a deployment pointed at
  * Postgres came up "healthy" with job reporting, provenance and Objects silently switched OFF rather
  * than moved. The shipped {@code inspecto.jar} carries no JDBC driver by design (see
- * {@code inspecto-engine/pom.xml}: "runtime stays JDBC-driver-free"), so this is the expected failure
- * on a Personal bundle and the message says so instead of leaving an operator to infer it.
+ * {@code inspecto-engine/pom.xml}: "runtime stays JDBC-driver-free"); the driver rides the
+ * <b>Standard/Enterprise bundle as the {@code postgresql.jar} sidecar</b> (PG-1, decided 2026-08-14),
+ * which {@code serve.sh}/{@code serve.bat} auto-detect and add to the classpath — the same mechanism
+ * as {@code inspecto-security.jar}, so the fat JAR and its SBOM stay driver-free. On a Personal
+ * bundle this is the expected failure and the message says what to drop in rather than leaving an
+ * operator to infer it.
+ *
+ * <p><b>The password is a {@link SecretResolver} reference, never required in the clear</b> (PG-1's
+ * second decision, same date): {@code -Dinspecto.db.password} takes {@code ${ENV:PGPASSWORD}},
+ * {@code ${KEYSTORE:opsdb}}, {@code ${FILE:/run/secrets/pg}} or a literal, expanded at use — the
+ * exact {@code auth.oidc.clientSecret} precedent, so the value need not sit on the process command
+ * line and {@code secrets.keystore.*} is supported without a new mechanism.
  */
 final class OperationalDb {
 
@@ -51,7 +63,9 @@ final class OperationalDb {
     }
 
     static String user()     { return System.getProperty("inspecto.db.user"); }
-    static String password() { return System.getProperty("inspecto.db.password"); }
+
+    /** The shared password, with a {@code ${…}} reference expanded at use; a literal passes through. */
+    static String password() { return SecretResolver.resolve(System.getProperty("inspecto.db.password")); }
 
     /**
      * Fail closed at boot if {@code postgres} was selected but cannot be honoured — a missing driver or
@@ -70,8 +84,9 @@ final class OperationalDb {
         } catch (ClassNotFoundException missing) {
             throw new IllegalStateException(
                     "-Dinspecto.db=postgres was selected but the PostgreSQL JDBC driver (" + PG_DRIVER
-                            + ") is not on the classpath. The Personal bundle ships DuckDB only; use the"
-                            + " Standard bundle, or add postgresql.jar to the classpath.", missing);
+                            + ") is not on the classpath. The Standard/Enterprise bundle ships it as the"
+                            + " postgresql.jar sidecar (auto-detected by serve.sh/serve.bat); the Personal"
+                            + " bundle ships DuckDB only — drop postgresql.jar beside inspecto.jar.", missing);
         }
     }
 
@@ -93,9 +108,9 @@ final class OperationalDb {
         return explicit != null ? explicit : user();
     }
 
-    /** As {@link #userFor}, for the password. */
+    /** As {@link #userFor}, for the password — a per-family value may also be a {@code ${…}} reference. */
     static String passwordFor(String familyPasswordProperty) {
         String explicit = System.getProperty(familyPasswordProperty);
-        return explicit != null ? explicit : password();
+        return explicit != null ? SecretResolver.resolve(explicit) : password();
     }
 }
