@@ -167,6 +167,11 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
                         id: store,
                         name: display,
                         kind: 'physical',
+                        // The store IS the source. Leaving this blank used to fall through to a
+                        // sample-source default that names nothing, so the dataset silently read
+                        // zero rows everywhere; naming the store is honest whether or not a preview
+                        // for it exists yet (BACKLOG §4 split S2, slice B).
+                        sourceName: store,
                         physicalRef: store,
                         description: `Landed data of stream "${display}" — registered at go-live.`,
                     })

@@ -97,7 +97,12 @@ export class DatasetEditorComponent implements OnInit {
     }
 
     readonly kinds = KINDS;
-    readonly sourceNames = SAMPLE_SOURCE_NAMES;
+    /** Sample sources, plus the saved dataset's own source when that is not one of them — a
+     *  go-live-registered dataset names its real store, and a `mat-select` whose value is absent
+     *  from its options renders BLANK, which reads as "no source chosen" rather than the truth. */
+    readonly sourceNames = signal<string[]>(SAMPLE_SOURCE_NAMES);
+    /** The selected source has no sample rows behind it — a real store, not previewable yet. */
+    readonly sourceUnpreviewable = computed(() => !!this.sourceName() && !(this.sourceName() in SAMPLE_SOURCES));
     readonly editing = signal(false);
     readonly saving = signal(false);
     readonly writesDisabled = signal(false);
@@ -185,6 +190,9 @@ export class DatasetEditorComponent implements OnInit {
     }
 
     private seed(d: Dataset): void {
+        if (d.sourceName && !SAMPLE_SOURCE_NAMES.includes(d.sourceName)) {
+            this.sourceNames.set([d.sourceName, ...SAMPLE_SOURCE_NAMES]);
+        }
         this.form.patchValue({
             name: d.name,
             kind: d.kind,

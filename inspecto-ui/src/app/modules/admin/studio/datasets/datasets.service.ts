@@ -54,7 +54,10 @@ function fromContent(name: string, content: Record<string, unknown>): Dataset {
         id: name,
         name: (content['name'] as string) ?? name,
         kind: (content['kind'] as DatasetKind) ?? 'virtual',
-        sourceName: (content['sourceName'] as string) ?? 'data',
+        // ⛔ Never default this to a source name. The old `?? 'data'` named a key SAMPLE_SOURCES
+        // does not have, so a dataset written without a sourceName read `[]` rows in every consumer
+        // and was indistinguishable from an empty store. An absent source stays absent.
+        sourceName: (content['sourceName'] as string) ?? '',
         query: (content['query'] as Dataset['query']) ?? null,
         physicalRef: (content['physicalRef'] as string | null) ?? null,
         columns: (content['columns'] as DatasetColumn[]) ?? [],

@@ -10,13 +10,13 @@ import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { DatasetEditorComponent } from './dataset-editor.component';
 
-function create(save = vi.fn((d: Dataset) => of(d)), list: Dataset[] = []) {
+function create(save = vi.fn((d: Dataset) => of(d)), list: Dataset[] = [], existing: Dataset | null = null) {
     TestBed.configureTestingModule({
         imports: [DatasetEditorComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: DatasetsService, useValue: { get: () => of(null), list: () => of(list), save } },
+            { provide: DatasetsService, useValue: { get: () => of(existing), list: () => of(list), save } },
             {
                 provide: ToastrService,
                 useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
@@ -84,6 +84,33 @@ describe('DatasetEditorComponent', () => {
         fixture.componentInstance.save();
         expect(save).not.toHaveBeenCalled();
         expect(fixture.componentInstance.form.controls.name.hasError('duplicate')).toBe(true);
+    });
+
+    it('shows a real store as a source rather than a blank picker, and says it has no preview rows', () => {
+        // A go-live-registered dataset names its store, which is not a sample source. A mat-select
+        // whose value is missing from its options renders empty — that reads as "no source chosen".
+        const live = {
+            id: 'orders_feed',
+            name: 'orders_feed',
+            kind: 'physical',
+            sourceName: 'orders_feed',
+            physicalRef: 'orders_feed',
+            columns: [],
+            measures: [],
+            calculated: [],
+        } as unknown as Dataset;
+        const fixture = create(vi.fn((d: Dataset) => of(d)), [], live);
+        fixture.componentInstance.id = 'orders_feed';
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.sourceNames()).toContain('orders_feed');
+        expect(c.sourceUnpreviewable()).toBe(true);
+    });
+
+    it('a sample source is not flagged as unpreviewable', () => {
+        const fixture = create();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.sourceUnpreviewable()).toBe(false);
     });
 
     // This editor embeds the query panel + an ag-Grid preview, making it the heaviest a11y

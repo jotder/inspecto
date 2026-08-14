@@ -5,7 +5,8 @@ import { ComponentsService } from 'app/inspecto/api';
 import { DatasetsService } from './datasets.service';
 import { buildDataset } from './dataset-types';
 
-function setup() {
+/** @param content override the single listed dataset's stored content (default: a virtual `d1`). */
+function setup(content?: Record<string, unknown>) {
     const create = vi.fn((_t: string, c: Record<string, unknown>) =>
         of({ type: 'dataset', name: String(c['id']), ref: `dataset/${c['id']}`, content: c }),
     );
@@ -18,7 +19,7 @@ function setup() {
                 type: 'dataset',
                 name: 'd1',
                 ref: 'dataset/d1',
-                content: { name: 'd1', kind: 'virtual', sourceName: 'cdr', columns: [], measures: [] },
+                content: content ?? { name: 'd1', kind: 'virtual', sourceName: 'cdr', columns: [], measures: [] },
             },
         ]),
     );
@@ -41,6 +42,14 @@ describe('DatasetsService', () => {
             expect.objectContaining({ id: 'd1', kind: 'virtual', sourceName: 'cdr' }),
         );
         expect(saved?.id).toBe('d1');
+    });
+
+    it('a dataset stored without a sourceName reads back blank, never a fabricated source', () => {
+        // What go-live writes: a physical dataset over a real store, with no sourceName.
+        const { svc } = setup({ name: 'orders_feed', kind: 'physical', physicalRef: 'orders_feed' });
+        let datasets: { sourceName: string }[] = [];
+        svc.list().subscribe((d) => (datasets = d));
+        expect(datasets[0].sourceName).toBe('');
     });
 
     it('edits go through PUT — save with {update: true} never re-creates (the backend 409s that)', () => {

@@ -133,6 +133,9 @@ describe('OnboardingPublishPaneComponent', () => {
             id: 'orders_feed',
             name: 'orders_feed',
             kind: 'physical',
+            // Names its own store. Omitting this let DatasetsService fall through to a source name
+            // that resolves to no rows, so every consumer read the live dataset as empty.
+            sourceName: 'orders_feed',
             physicalRef: 'orders_feed',
             description: expect.stringContaining('orders_feed'),
         });
