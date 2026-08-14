@@ -222,4 +222,48 @@ class ConfigSpecsTest {
         assertTrue(fire(d, "at-least-one-tile", Map.of("tiles", List.of())).isPresent(),
                 "an empty tiles list → ERROR (required alone would accept [])");
     }
+
+    // ── meta cross-field rules ─────────────────────────────────────────────
+
+    /**
+     * {@code domain.timezone} took any string at all before 2026-08-14 — the value is served to
+     * {@code /catalog/kpis} and read by {@code ExplainEntitySkill}, so a typo travelled as fact.
+     *
+     * <p>⚠ An abbreviation is the case worth pinning, not gibberish: {@code IST} looks like a zone and
+     * is what an author reaches for, but {@link java.time.ZoneId#of} rejects it (it is a
+     * {@code SHORT_IDS} alias, and {@code ZoneId.of} does not consult that map. {@code EST} goes the
+     * same way, while {@code EST5EDT} <b>is</b> a real id — which is exactly why the rule asks
+     * {@code ZoneId.of} instead of reasoning about a value's shape. (This test was written asserting
+     * the opposite for {@code EST}; the JVM corrected it.)
+     */
+    @Test
+    void metaDomainTimezoneMustResolveToARealZone() {
+        ConfigSpec m = ConfigSpecs.meta();
+        String rule = "domain-timezone-resolvable";
+
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "Asia/Kolkata"))).isEmpty(),
+                "an IANA id is the canonical spelling");
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "UTC"))).isEmpty());
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "+05:30"))).isEmpty(),
+                "a fixed offset resolves, so the rule must not demand a region id");
+
+        // absent / blank: legal. The field is optional and the row's ⛔ stands — nothing forces a zone.
+        assertTrue(fire(m, rule, Map.of()).isEmpty(), "no domain block at all is legal");
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("currency", "INR"))).isEmpty());
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "  "))).isEmpty(),
+                "blank is unset, not a violation");
+
+        Optional<Finding> bad = fire(m, rule, Map.of("domain", Map.of("timezone", "IST")));
+        assertTrue(bad.isPresent(), "IST is an abbreviation ZoneId.of rejects");
+        assertEquals(Severity.ERROR, bad.get().severity());
+        assertEquals("domain.timezone", bad.get().fieldPath(), "the finding anchors on the field the author typed");
+
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "Asia/Kolkatta"))).isPresent(),
+                "a misspelt region id is the other half of the gap");
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "EST"))).isPresent(),
+                "EST is rejected too — it lives in ZoneId.SHORT_IDS, which ZoneId.of does NOT consult");
+        assertTrue(fire(m, rule, Map.of("domain", Map.of("timezone", "EST5EDT"))).isEmpty(),
+                "EST5EDT, by contrast, IS a real zone id — so the rule asks ZoneId.of rather than "
+                        + "guessing from a value's shape");
+    }
 }

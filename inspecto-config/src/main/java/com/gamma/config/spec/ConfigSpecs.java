@@ -554,6 +554,33 @@ public final class ConfigSpecs {
                 FieldSpec.of("domain", "Domain notes", FieldType.MAP,
                         "{currency, timezone, notes[]} — cross-cutting domain context.")
         );
-        return new ConfigSpec("meta", fields, List.of());
+        return new ConfigSpec("meta", fields, List.of(
+                // ⛔ Deliberately a RULE, not an ENUM of ZoneId.getAvailableZoneIds(): an enum field
+                // generates a form control, and a timezone picker would imply the zone governs date
+                // math — which it does not yet (BACKLOG §4 D6: PipelineScheduler and JobService both
+                // still hardcode ZoneId.systemDefault()). A control that lies is worse than the gap.
+                //
+                // ⚠ The value is INERT today, so this is hardening ahead of the behaviour half rather
+                // than a live bug fix: it costs nothing to author a resolvable zone now, and once a
+                // zone does drive cron firing an unresolvable one becomes a runtime failure instead of
+                // a save-time one. The trade accepted: a pre-existing meta file with a typo'd zone can
+                // no longer be saved until it is corrected.
+                new CrossFieldRule(
+                        "domain-timezone-resolvable",
+                        "domain.timezone must be a zone this JVM can resolve — an IANA id such as "
+                                + "UTC or Asia/Kolkata, not an abbreviation like IST. Leave it unset "
+                                + "rather than guessing.",
+                        Severity.ERROR,
+                        List.of("domain.timezone"),
+                        raw -> {
+                            String tz = str(raw, "domain.timezone");
+                            if (tz == null || tz.isBlank()) return true;   // absent is legal
+                            try {
+                                java.time.ZoneId.of(tz);
+                                return true;
+                            } catch (java.time.DateTimeException e) {
+                                return false;
+                            }
+                        })));
     }
 }
