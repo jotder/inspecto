@@ -87,6 +87,15 @@ distinct and the refusal throws. ⚠ Neither was a live escape: `spacesRoot` is 
 `discover()` and `SpaceId` forbids separators, so that guard held by construction. These were *reporting*
 defects, which is exactly why they survived — a guard whose failure reads as success is not a guard.
 
+⚠ **A Job's findings do not travel in its `JobResult`** — that record carries status + one message +
+duration, and it is what `JobRunLedger`/`DbJobRunStore` persist. Detail goes to `JobContext.log()`
+(persisted per-run) and to the Signal ledger (`metadata_validate` puts the whole list in
+`maintenance.metadata.findings`), so **RCA is served**; ⛔ do not "fix" this by widening `JobResult`
+(72 construction sites, and a findings list does not belong in a ledger column). The consequence is for
+*tests*: driving the ctx-less `Job.run()` overload discards every finding and can only count them,
+which cannot tell "reported the right thing" from "reported the wrong thing the right number of
+times". Drive `run(ctx)` with `CapturingJobContext` (`inspecto-engine` test sources) instead.
+
 **Why these live here and not in a `ConfigSpec`.** `FieldSpec`/`ConfigSpec` are flat-dotted-path only —
 `FieldType.MAP`/`LIST` assert the container type and never walk into entries, and there is no
 map-of-objects/list-of-objects primitive. Every repeated sub-shape in the codebase (`sinks[]`, and now

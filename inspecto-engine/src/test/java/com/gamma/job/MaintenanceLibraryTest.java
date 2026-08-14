@@ -876,13 +876,20 @@ class MaintenanceLibraryTest {
             store.write("dataset", "escape_ds", Map.of("physicalRef", "../outside"));
             Files.createDirectories(dataDir.resolve("present").resolve("database"));
 
-            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate")), dataDir.toString()).run();
+            // Driven through run(ctx) so the findings themselves are assertable: a count alone cannot
+            // tell "reported the right thing" from "reported the wrong thing the right number of times".
+            var ctx = new CapturingJobContext();
+            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate")), dataDir.toString()).run(ctx);
             // The missing store, PLUS the escaping ref. The escape used to be skipped silently, which
             // let a space with a hostile physicalRef audit clean — a worse outcome than a missing store.
-            // gone_ds (missing store) + escape_ds; ok_ds contributes nothing. ⚠ Findings reach the
-            // operator via ctx.log()/signals, not JobResult — with a null ctx the count is all this
-            // surface exposes, so the count IS the assertion.
             assertTrue(r.message().contains("2 finding(s)"), r.message());
+            assertTrue(ctx.warned("unsafe physical reference"), ctx.warnings.toString());
+            assertTrue(ctx.warned("escape_ds"), ctx.warnings.toString());
+            assertTrue(ctx.warned("gone_ds"), ctx.warnings.toString());
+            assertFalse(ctx.warned("ok_ds"), ctx.warnings.toString());
+            // The same detail rides the Signal ledger — what an RCA actually reads back.
+            assertTrue(ctx.signals.stream().anyMatch(s -> "maintenance.metadata.findings".equals(s.get("__type"))),
+                    ctx.signals.toString());
         } finally {
             System.clearProperty("assist.write.root");
         }

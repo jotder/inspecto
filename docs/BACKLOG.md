@@ -524,8 +524,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     disk · escaping) instead of logging "Deleted + purged" for all three, and the escape branch throws.
     ⚠ **Both roots there are already absolute and normalized** (`spacesRoot` at `discover():84`) and
     `SpaceId` forbids separators, so the guard held by construction — this was a *reporting* defect, not
-    a live escape. ⚠ Findings reach the operator via `ctx.log()`/signals, **not** `JobResult`, so with a
-    null `ctx` the finding COUNT is the only assertable surface.
+    a live escape. ⚠ Findings reach the operator via `ctx.log()` (persisted per-run) and the
+    Signal ledger, **not** `JobResult` — that is by design and **RCA is served**; ⛔ do not "fix" it by
+    widening `JobResult` (72 construction sites, and `JobRunLedger`/`DbJobRunStore` persist `message()`
+    into a ledger column). The consequence is for *tests*: the ctx-less `Job.run()` overload discards
+    every finding, so the first cut of this test could only assert a count — which cannot tell "reported
+    the right thing" from "reported the wrong thing the right number of times". Now driven through
+    `run(ctx)` with a shared `CapturingJobContext`, asserting the finding text, both offending datasets,
+    that the healthy one contributes nothing, and that the signal fires. ⚠ **Residual:**
+    `ConsignmentProcessJobTypeTest:77` holds a near-identical `FakeJobContext` — a second copy of the
+    same double, worth collapsing onto the shared one.
 - ~~🔴 BUILD-1 — the offline reactor build is BROKEN~~ **CLOSED 2026-08-06 — NOT A BUILD DEFECT. The
   diagnosis was an artifact of running as the wrong Windows profile.** `mvn -o clean test` completes
   the full **23-module reactor: BUILD SUCCESS, 2799 tests, 0 failures, 0 errors, 6 skipped** (3m32s),
