@@ -132,10 +132,30 @@ describe('OnboardingStateService', () => {
         s.name.set('orders_feed');
         let result: unknown;
         s.discardDraft().subscribe((r) => (result = r));
-        expect(remove).toHaveBeenCalledWith('pipeline', 'orders_feed');
+        // The pipeline delete carries the force flag (false unless the caller saw dependents and
+        // confirmed anyway); the companion deletes are unconditional and take no flag.
+        expect(remove).toHaveBeenCalledWith('pipeline', 'orders_feed', undefined, false);
         expect(remove).toHaveBeenCalledWith('schema', 'orders_feed_schema');
         expect(remove).toHaveBeenCalledWith('enrichment', 'orders_feed_enrich');
         expect(result).toMatchObject({ type: 'pipeline' });
+    });
+
+    it('forwards force to the pipeline delete when the caller passes it', () => {
+        const remove = vi.fn((type: string) => of({ type, deleted: true }));
+        const s = create({ remove } as unknown as Partial<ConfigService>);
+        s.name.set('orders_feed');
+        s.discardDraft(true).subscribe();
+        expect(remove).toHaveBeenCalledWith('pipeline', 'orders_feed', undefined, true);
+    });
+
+    it('a failed impact read degrades to null rather than blocking the discard', () => {
+        const impact = vi.fn(() => throwError(() => ({ status: 503 })));
+        const s = create({ impact } as unknown as Partial<ConfigService>);
+        s.name.set('orders_feed');
+        let result: unknown = 'unset';
+        s.draftImpact().subscribe((r) => (result = r));
+        expect(impact).toHaveBeenCalledWith('orders_feed');
+        expect(result).toBeNull();
     });
 
     it('discard succeeds even when the companions were never authored (404)', () => {

@@ -7,7 +7,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { LensService, apiErrorMessage } from 'app/inspecto/api';
+import { firstValueFrom } from 'rxjs';
+import { ConfigImpact, LensService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -21,6 +22,17 @@ import { OnboardingPlaceholderPaneComponent } from './placeholder-pane.component
 import { OnboardingPublishPaneComponent } from './publish-pane.component';
 import { OnboardingSchemaMappingPaneComponent } from './schema-mapping-pane.component';
 import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './onboarding-state.service';
+
+/**
+ * "2 datasets, 1 widget" — the impact report as a phrase for a confirm dialog. Names kinds and
+ * counts rather than listing every id: the dialog has to be readable, and the operator only needs
+ * to know the shape of what breaks before deciding.
+ */
+function describeDependents(impact: ConfigImpact): string {
+    return Object.entries(impact.dependents)
+        .map(([kind, items]) => `${items.length} ${kind}${items.length === 1 ? '' : 's'}`)
+        .join(', ');
+}
 
 /**
  * Stream/Reference onboarding shell (`/catalog/onboard/:name/:stage?`) — a stage RAIL over the
@@ -180,15 +192,27 @@ export class OnboardingShellComponent {
         });
     }
 
+    /**
+     * Discard, after telling the operator what it would break. The impact read is advisory — the
+     * server re-checks and 409s on its own — so a failed read still lets the discard proceed and be
+     * refused there. Confirming with dependents present is what sends `force`: the operator has been
+     * shown the list and chosen anyway.
+     */
     async discard(): Promise<void> {
         if (!this.lens.canAuthorWorkbench() || this.state.active()) return;
         const name = this.state.name();
+        const impact = await firstValueFrom(this.state.draftImpact());
+        const breaks = impact?.total ?? 0;
         const ok = await this.confirm.confirmDestructive(
-            `Delete the draft "${name}" and its config file? This cannot be undone.`,
+            breaks === 0
+                ? `Delete the draft "${name}" and its config file? This cannot be undone.`
+                : `"${name}" is still referenced by ${breaks} config${breaks === 1 ? '' : 's'}: ` +
+                      `${describeDependents(impact!)}. Deleting it leaves ${breaks === 1 ? 'that reference' : 'those references'} ` +
+                      `pointing at nothing. Delete anyway? This cannot be undone.`,
             { title: 'Discard draft', confirmText: 'Discard draft' },
         );
         if (!ok) return;
-        this.state.discardDraft().subscribe({
+        this.state.discardDraft(breaks > 0).subscribe({
             next: () => {
                 this.toastr.success(`Draft "${name}" discarded`);
                 this.router.navigate(['/catalog']);

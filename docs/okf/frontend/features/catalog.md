@@ -18,13 +18,29 @@ attributes, walkable neighbours, and a per-store lineage panel via `GET /lineage
 TABLE/DERIVED_TABLE/REFERENCE_DATASET nodes). Streams/References rows carry a lifecycle badge from
 `attrs.active` (Draft/Live, `—` when absent) and ONE row action — the pencil to
 `/catalog/onboard/<attrs.pipeline>` ("Resume onboarding" on drafts). ⚠ There is **no
-delete/rename/take-offline row action anywhere in the Catalog** — the lifecycle gaps (no UI deactivation
-⇒ a Live stream is UI-undeletable; live saves hot-reload silently; no dependent check on delete; no
-per-date retention) are recorded in `BACKLOG.md` §4 *Catalog lifecycle*, and the user-facing truths
-(config-delete never deletes data; Space purge is the only data purge; schema changes are forward-only)
-are written up in `USER_GUIDE.md` §4.3. `?onboard=stream|reference` raises the create dialog after rows
-load (inline duplicate-name check); `?tab=` and `?from=` deep-link the Lineage traversal. Backed by
-`CatalogService` (`/catalog/streams|references|tables/{id}|kpis|graph`).
+rename/take-offline row action anywhere in the Catalog grid itself** — take-offline lives in the
+onboarding publish pane (**Take offline**, `saveBlock({active:false})`); the remaining lifecycle gaps
+(live saves hot-reload silently — mitigated by a Live-state warning banner; no per-date retention) are
+recorded in `BACKLOG.md` §4 *Catalog lifecycle*, and the user-facing truths (config-delete never
+deletes data; Space purge is the only data purge; schema changes are forward-only) are written up in
+`USER_GUIDE.md` §4.3. `?onboard=stream|reference` raises the create dialog after rows load (inline
+duplicate-name check); `?tab=` and `?from=` deep-link the Lineage traversal. Backed by `CatalogService`
+(`/catalog/streams|references|tables/{id}|kpis|graph`).
+
+**Discarding a draft now checks dependents first (2026-08-14).** `DELETE /config/pipeline/{name}`
+(the onboarding discard path) used to gate only on `active`; something else still referencing the
+origin — an enrichment trigger/by-name reference, an Expectation/Decision Rule target, a Dataset
+`physicalRef`/`sourceName`, or (transitively) a Widget/Dashboard tile bound to that Dataset — dangled
+silently, detected only later by the read-only `metadata_validate` sweep (and even that missed most of
+the kinds, plus any `physicalRef` containing a slash). It now **409s with the dependent list unless
+`?force=true`** (`ConfigRoutes.deleteConfig` → `PipelineDependents.scan`), mirroring
+`ComponentRoutes.deleteComponent`'s existing pattern. A companion read, `GET
+/config/pipeline/{name}/impact`, reports the same scan without deleting anything (the `/import/preview`
+report-only shape); the onboarding shell's discard confirm calls it first and names what would break,
+and confirming anyway resends the delete with `force`. `PipelineDependents`
+(`inspecto/src/main/java/com/gamma/service/PipelineDependents.java`) is a deliberate **non**-extraction
+of `PipelineRoutes.rewriteDependents` (that scanner reads-and-writes in one loop; this one is read-only)
+— the two key sets must be kept in sync by hand if a new binding is ever added to either.
 
 ## Data Browser
 

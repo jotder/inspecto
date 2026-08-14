@@ -4,6 +4,7 @@ import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
     ConfigDeleteResult,
+    ConfigImpact,
     ConfigService,
     ConfigWriteResult,
     Finding,
@@ -330,6 +331,15 @@ export class OnboardingStateService {
     }
 
     /**
+     * What still references this stream — the shell reads it before confirming a discard, so the
+     * operator is told what would dangle instead of finding out from a later job failure. A failure
+     * to read it must NOT block the discard: the server re-checks and refuses on its own.
+     */
+    draftImpact(): Observable<ConfigImpact | null> {
+        return this.configApi.impact(this.name()).pipe(catchError(() => of(null)));
+    }
+
+    /**
      * Draft discard — the server refuses an active pipeline (409); the shell confirms first. Deletes
      * the pipeline first (the authoritative, gated op), then best-effort cascades the guided companions
      * so no orphan `<name>_schema` / `<name>_enrich` configs linger. Companion failures (404 = never
@@ -338,10 +348,10 @@ export class OnboardingStateService {
      * synchronously — `CollectorService.unregisterPipeline` — so the registry no longer ghosts the
      * deleted pipeline for up to a poll cycle.)
      */
-    discardDraft(): Observable<ConfigDeleteResult> {
+    discardDraft(force = false): Observable<ConfigDeleteResult> {
         const name = this.name();
         return this.configApi
-            .remove('pipeline', name)
+            .remove('pipeline', name, undefined, force)
             .pipe(
                 switchMap((res) =>
                     forkJoin([

@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import {
     ConfigDeleteResult,
+    ConfigImpact,
     ConfigReadResult,
     ConfigSpec,
     ConfigType,
@@ -74,10 +75,26 @@ export class ConfigService {
             { params: toParams({ subdir }) },
         );
     }
-    /** Discard a config file. The server refuses an `active: true` pipeline (409) — deactivate first. */
-    remove(type: ConfigType, name: string, subdir?: string): Observable<ConfigDeleteResult> {
+    /**
+     * Discard a config file. The server refuses an `active: true` pipeline (409) — deactivate first —
+     * and, for a pipeline, also refuses one that other configs still reference. Pass `force` to delete
+     * over those dependents; it does NOT bypass the active gate, which is a separate refusal.
+     */
+    remove(
+        type: ConfigType,
+        name: string,
+        subdir?: string,
+        force?: boolean,
+    ): Observable<ConfigDeleteResult> {
         return this.http.delete<ConfigDeleteResult>(
             apiUrl(`/config/${encodeURIComponent(type)}/${encodeURIComponent(name)}`),
+            { params: toParams({ subdir, force: force ? 'true' : undefined }) },
+        );
+    }
+    /** What still references this pipeline — read-only, so a caller can warn before deleting. */
+    impact(name: string, subdir?: string): Observable<ConfigImpact> {
+        return this.http.get<ConfigImpact>(
+            apiUrl(`/config/pipeline/${encodeURIComponent(name)}/impact`),
             { params: toParams({ subdir }) },
         );
     }

@@ -357,6 +357,25 @@ export interface ConfigDeleteResult {
     path: string;
 }
 
+/** One config that references a pipeline — `via` names the key carrying the reference. */
+export interface ConfigDependent {
+    name: string;
+    via: string;
+}
+
+/**
+ * `GET /config/pipeline/{name}/impact` — what still references this pipeline, so a delete can say
+ * what it would break before it breaks it. `dependents` is grouped by kind (`enrichment`, `job`,
+ * `expectation`, `decision-rule`, `dataset`, `widget`, `dashboard`); `total` is the TRUE count even
+ * when the list is `truncated`.
+ */
+export interface ConfigImpact {
+    pipeline: string;
+    total: number;
+    truncated: boolean;
+    dependents: Record<string, ConfigDependent[]>;
+}
+
 /** POST /runs result — a written pipeline file registered with the running service. */
 export interface PipelineRegisterResult {
     registered: boolean;

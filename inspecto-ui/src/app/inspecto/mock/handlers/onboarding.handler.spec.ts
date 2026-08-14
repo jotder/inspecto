@@ -294,3 +294,104 @@ describe('onboardingHandler POST /config/suggest/schema', () => {
         expect(body.mapping.rules[0].transformType).toBe('DIRECT');
     });
 });
+
+/**
+ * Pins the dependents gate on `DELETE /config/pipeline/{name}` and the `…/impact` read to the
+ * server's behaviour (`ControlApiConfigImpactTest`). ⚠ If the mock reported no dependents where the
+ * backend reports some, the offline rehearsal of a delete would pass and the real one would 409.
+ */
+describe('onboardingHandler pipeline delete — dependents gate', () => {
+    const reqWith = (method: string, url: string, params: Record<string, string>): MockRequest => ({
+        method,
+        url,
+        body: null,
+        params,
+        space: 'default',
+    });
+
+    /** A stored draft named "Orders Feed", i.e. registered id `orders_feed`. */
+    function seedOrigin(store: MockStore): void {
+        store.put<StoredPipelineConfig>('default', PIPELINE_CONFIGS_COLL, 'orders_feed', {
+            id: 'orders_feed',
+            path: 'orders_feed_pipeline.toon',
+            config: { name: 'Orders Feed', active: false },
+            registered: true,
+        });
+    }
+
+    function seedDataset(store: MockStore): void {
+        store.put('default', componentCollection('dataset'), 'orders_ds', {
+            type: 'dataset',
+            name: 'orders_ds',
+            ref: 'dataset/orders_ds',
+            content: { physicalRef: 'orders_feed/database' },
+        });
+    }
+
+    it('reports nothing for an unreferenced origin, keyed on the DERIVED id', () => {
+        const store = new MockStore();
+        seedOrigin(store);
+        const res = handler(req('GET', '/api/config/pipeline/orders_feed/impact'), store);
+        expect(res?.status ?? 200).toBe(200);
+        const body = res?.body as { pipeline: string; total: number };
+        expect(body.pipeline).toBe('orders_feed');
+        expect(body.total).toBe(0);
+    });
+
+    it('follows the dataset → widget → dashboard chain', () => {
+        const store = new MockStore();
+        seedOrigin(store);
+        seedDataset(store);
+        store.put('default', componentCollection('widget'), 'orders_chart', {
+            type: 'widget',
+            name: 'orders_chart',
+            ref: 'widget/orders_chart',
+            content: { datasetId: 'orders_ds' },
+        });
+        store.put('default', componentCollection('dashboard'), 'ops', {
+            type: 'dashboard',
+            name: 'ops',
+            ref: 'dashboard/ops',
+            content: { tiles: [{ widgetId: 'orders_chart' }] },
+        });
+        const body = handler(req('GET', '/api/config/pipeline/orders_feed/impact'), store)?.body as {
+            total: number;
+            dependents: Record<string, { name: string; via: string }[]>;
+        };
+        expect(body.total).toBe(3);
+        expect(body.dependents['widget'][0].via).toBe('datasetId');
+        expect(body.dependents['dashboard'][0].name).toBe('ops');
+    });
+
+    it('409s the delete when something still references it, and keeps the config', () => {
+        const store = new MockStore();
+        seedOrigin(store);
+        seedDataset(store);
+        const res = handler(req('DELETE', '/api/config/pipeline/orders_feed'), store);
+        expect(res?.status).toBe(409);
+        expect(String((res?.body as { error?: string })?.error)).toContain('dataset/orders_ds');
+        expect(store.get('default', PIPELINE_CONFIGS_COLL, 'orders_feed')).toBeTruthy();
+    });
+
+    it('force=true deletes over the dependents', () => {
+        const store = new MockStore();
+        seedOrigin(store);
+        seedDataset(store);
+        const res = handler(reqWith('DELETE', '/api/config/pipeline/orders_feed', { force: 'true' }), store);
+        expect(res?.status ?? 200).toBe(200);
+        expect(store.get('default', PIPELINE_CONFIGS_COLL, 'orders_feed')).toBeFalsy();
+    });
+
+    it('force does NOT bypass the active gate — that is a separate refusal', () => {
+        const store = new MockStore();
+        store.put<StoredPipelineConfig>('default', PIPELINE_CONFIGS_COLL, 'orders_feed', {
+            id: 'orders_feed',
+            path: 'orders_feed_pipeline.toon',
+            config: { name: 'Orders Feed', active: true },
+            registered: true,
+        });
+        const res = handler(reqWith('DELETE', '/api/config/pipeline/orders_feed', { force: 'true' }), store);
+        expect(res?.status).toBe(409);
+        expect(String((res?.body as { error?: string })?.error)).toContain('is active');
+    });
+});

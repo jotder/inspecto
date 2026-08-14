@@ -1,3 +1,5 @@
+import type { ComponentDef } from '../../api/components.service';
+import type { ConfigDependent } from '../../api/models';
 import { MockFlags } from '../mock-flags';
 import { error, json, match, MockHandler, MockRequest } from '../mock-http';
 import { MockStore } from '../mock-store';
@@ -48,8 +50,85 @@ const PREVIEW_PARSING = /\/config\/preview\/parsing$/;
 const PREVIEW_SCHEMA = /\/config\/preview\/schema$/;
 const SUGGEST_SCHEMA = /\/config\/suggest\/schema$/;
 const CONFIG_FILE = /\/config\/(pipeline|schema|enrichment)\/([^/?]+)$/;
+const CONFIG_IMPACT = /\/config\/pipeline\/([^/?]+)\/impact$/;
 const RUNS = /\/runs$/;
 const ENRICHMENT = /\/enrichment$/;
+
+/**
+ * Reverse-dependency scan mirroring the backend `PipelineDependents` — same binding keys, same
+ * matching rules, same two transitive Studio hops (dataset → widget → dashboard). ⚠ It must stay
+ * exactly as strict as the server: a mock that reports no dependents where the backend reports some
+ * turns a 409 into a passing offline rehearsal of a delete that will fail for real.
+ */
+function scanDependents(store: MockStore, space: string, id: string): Record<string, ConfigDependent[]> {
+    const out: Record<string, ConfigDependent[]> = {};
+    const add = (kind: string, name: string, via: string): void => {
+        (out[kind] ??= []).push({ name, via });
+    };
+    const matches = (v: unknown): boolean => String(v ?? '').trim().toLowerCase() === id.toLowerCase();
+
+    for (const rec of store.list<StoredEnrichmentConfig>(space, ENRICHMENT_CONFIGS_COLL)) {
+        const cfg = rec.config;
+        const triggers = cfg['triggers'] as Record<string, unknown> | undefined;
+        if (triggers && matches(triggers['on_pipeline'])) add('enrichment', rec.id, 'triggers.on_pipeline');
+        const refs = cfg['references'] as Record<string, Record<string, unknown>> | undefined;
+        for (const [rname, rv] of Object.entries(refs ?? {})) {
+            if (rv && matches(rv['ref'])) add('enrichment', rec.id, `references.${rname}.ref`);
+        }
+    }
+
+    for (const kind of ['expectation', 'decision-rule']) {
+        for (const def of store.list<ComponentDef>(space, componentCollection(kind))) {
+            const targetType = String(def.content?.['targetType'] ?? 'pipeline');
+            if (targetType.toLowerCase() !== 'pipeline') continue;
+            if (matches(def.content?.['target'])) add(kind, def.name, 'target');
+        }
+    }
+
+    const datasets = new Set<string>();
+    for (const def of store.list<ComponentDef>(space, componentCollection('dataset'))) {
+        if (matches(def.content?.['sourceName'])) {
+            add('dataset', def.name, 'sourceName');
+            datasets.add(def.name);
+            continue;
+        }
+        const ref = String(def.content?.['physicalRef'] ?? '').trim();
+        if (!ref) continue;
+        const head = ref.includes('/') ? ref.slice(0, ref.indexOf('/')) : ref;
+        if (head.toLowerCase() === id.toLowerCase()) {
+            add('dataset', def.name, 'physicalRef');
+            datasets.add(def.name);
+        }
+    }
+
+    const widgets = new Set<string>();
+    if (datasets.size) {
+        for (const def of store.list<ComponentDef>(space, componentCollection('widget'))) {
+            const dsId = String(def.content?.['datasetId'] ?? '').trim();
+            if (dsId && datasets.has(dsId)) {
+                add('widget', def.name, 'datasetId');
+                widgets.add(def.name);
+            }
+        }
+    }
+    if (widgets.size) {
+        for (const def of store.list<ComponentDef>(space, componentCollection('dashboard'))) {
+            const tiles = (def.content?.['tiles'] as { widgetId?: string }[] | undefined) ?? [];
+            if (tiles.some((t) => t?.widgetId && widgets.has(String(t.widgetId).trim()))) {
+                add('dashboard', def.name, 'tiles[].widgetId');
+            }
+        }
+    }
+    return out;
+}
+
+/** A pipeline's registered id: explicit `id:`, else `name` lower-cased with spaces underscored. */
+function pipelineIdOf(config: Record<string, unknown>, fallback: string): string {
+    const explicit = String(config['id'] ?? '').trim();
+    if (explicit) return explicit;
+    const name = String(config['name'] ?? '').trim();
+    return name ? name.toLowerCase().replace(/ /g, '_') : fallback;
+}
 
 function collFor(type: string): string {
     return type === 'schema'
@@ -269,12 +348,33 @@ export function onboardingHandler(flags: MockFlags): MockHandler {
             return json({ type, name: rec.id, path: rec.path, config: rec.config });
         }
 
+        if (method === 'GET' && (m = match(url, CONFIG_IMPACT))) {
+            const rec = store.get<StoredPipelineConfig>(space, PIPELINE_CONFIGS_COLL, m[1]);
+            if (!rec) return error(404, `no such config: ${m[1]}.toon`);
+            const id = pipelineIdOf(rec.config, rec.id);
+            const dependents = scanDependents(store, space, id);
+            const total = Object.values(dependents).reduce((n, xs) => n + xs.length, 0);
+            return json({ pipeline: id, total, truncated: false, dependents });
+        }
+
         if (method === 'DELETE' && (m = match(url, CONFIG_FILE))) {
             const [, type, name] = m;
             const rec = store.get<StoredPipelineConfig | StoredSchemaConfig>(space, collFor(type), name);
             if (!rec) return error(404, `no such config: ${name}.toon`);
             if (type === 'pipeline' && (rec as StoredPipelineConfig).config['active'] === true) {
                 return error(409, `pipeline '${rec.id}' is active; deactivate (active: false) before deleting`);
+            }
+            if (type === 'pipeline' && String(req.params['force'] ?? '').toLowerCase() !== 'true') {
+                const id = pipelineIdOf((rec as StoredPipelineConfig).config, rec.id);
+                const dependents = scanDependents(store, space, id);
+                const names = Object.entries(dependents).flatMap(([kind, xs]) => xs.map((x) => `${kind}/${x.name}`));
+                if (names.length) {
+                    return error(
+                        409,
+                        `pipeline '${id}' is referenced by ${names.length} config(s): ${names.join(', ')}` +
+                            ` — repoint or remove them, or re-send with ?force=true`,
+                    );
+                }
             }
             store.delete(space, collFor(type), rec.id);
             return json({ type, name: rec.id, deleted: true, path: rec.path });
