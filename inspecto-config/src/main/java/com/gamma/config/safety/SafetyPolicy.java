@@ -65,8 +65,15 @@ public record SafetyPolicy(
     }
 
     /**
-     * The production default: roots from {@code -Dassist.safety.roots} (a {@code ;}-separated list)
-     * and, failing that, the working directory; caps sized to this box.
+     * The production default: roots from {@code -Dassist.safety.roots} (a {@code ;}-separated list);
+     * caps sized to this box.
+     *
+     * <p>⚠ There is <b>no working-directory fallback</b> — an unset or blank property yields an
+     * <b>empty</b> root list, and {@link PathJail#requireUnderAny} throws on that, so every jailed
+     * reference fails rather than silently jailing to the CWD. That is deliberate (fail-closed: a
+     * misconfigured deployment must not quietly grant the server's working directory), and it is why
+     * configuring the roots is a documented deployment step, not an optional tuning knob. This
+     * Javadoc claimed the opposite until 2026-08-14.
      */
     public static SafetyPolicy defaultPolicy() {
         List<Path> roots = new ArrayList<>();

@@ -498,11 +498,30 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   Apply S2's proven trick again — **unify the verdict, never the resolution.** Ranked by what is a *bug*
   rather than what is untidy: **1. silent-success** — ~~`MetadataValidateTask:94` `continue`s past an
   escaping `physicalRef` so the audit reports the space CLEAN, and `SpaceManager:379` skips the purge but
-  still logs "Deleted + purged"~~ **CLOSED 2026-08-14** (see below). **2. gate/loader disagreement** —
-  `ConfigRoutes.resolves:793` says it mirrors `PipelineConfigParser.resolveSchemaRef` but copies only the
-  *preference* half and **omits the closing `PathJail.requireUnderAny`** (`PipelineConfigParser:841`), so
-  the 422 write gate accepts refs the loader later refuses: the write succeeds and the *load* fails.
-  Not a security hole — the loader still enforces — but the worst place to find out. **3. two root
+  still logs "Deleted + purged"~~ **CLOSED 2026-08-14** (see below). ~~**2. gate/loader disagreement** — `ConfigRoutes.resolves:793`
+  omits the closing `PathJail.requireUnderAny`~~ **CLOSED 2026-08-14 — and the named site was WRONG.**
+  `resolves()` is a pure **existence** check and correctly has no jail: making it answer containment
+  would report *"schema file does not resolve on the server"* for a ref that resolves perfectly but
+  escapes, the exact wrong-message trap S2 fixed in the validator. Containment at the 422 gate already
+  existed via `ConfigSafetyValidator` (S5), and `ConfigRoutes:113/137/330`, `PipelineRoutes:380` and
+  `RunRoutes:261` all pair the two checks. **One caller did not:** `DataSourceRoutes` — the bundle-import
+  gate — called `schemaFileFindings` and never ran the validator (the file had no import for it). That
+  mattered because an escaping `schema_file`/`grammar`/`mapping_file` then reached `registerPipeline`
+  and was refused **one file at a time**, i.e. the mid-walk partial registration the gate's own comment
+  says it exists to prevent. Both halves now run the validator — **preview too**: fixing only commit
+  would have created a fresh preview/commit disagreement, and `validatePipeline` ran spec validation
+  only despite the route's Javadoc claiming "the same spec + safety checks as /validate" (an intent, not
+  the code — corrected). ⚠ Containment **is** answerable at preview (it needs the roots, not the
+  filesystem); only *existence* is not, and that gap stays. Blast radius measured before landing: zero —
+  full `inspecto` module 774/774, every existing bundle fixture's paths sit under an allowed root.
+  ⚠ **The first cut of the new test passed vacuously**: surefire allows the WHOLE temp dir
+  (`assist.safety.roots=C:\sandbox\inspecto-clean;…\Temp\`), so an `outside/` subdir under a `@TempDir`
+  is still *contained*. It now narrows the roots and uses a second `@TempDir`, and asserts the finding
+  names `processing.schema_file` — a status-only assertion would pass for the wrong reason.
+  ⛔ **`SafetyPolicy.defaultPolicy()` has NO working-directory fallback**, though its Javadoc claimed one
+  until 2026-08-14: an unset/blank `assist.safety.roots` yields an **empty** root list and
+  `PathJail.requireUnderAny` **throws** on that, so every jailed ref fails rather than quietly jailing to
+  the CWD. Fail-closed and deliberate — configuring the roots is a deployment step, not a tuning knob. **3. two root
   sources for "the" jail** — `-Dassist.write.root` (→403, `WriteGates`) vs `-Dassist.safety.roots`
   (→422, `PathJail`/`ConfigSafetyValidator`); `PathJail`'s own Javadoc argues against a second root
   source while `WriteGates` is one. **4. symlinks split the codebase cleanly in two** — everything on

@@ -137,6 +137,51 @@ class ControlApiBundleImportTest {
         }
     }
 
+    /**
+     * PATH-2 tier 2, 2026-08-14 — the import gate asked whether a schema reference EXISTS but never whether
+     * it is CONTAINED, so a bundle naming a schema outside the allowed roots passed here and was refused
+     * later by {@code registerPipeline}, one file at a time: the mid-walk partial registration this gate
+     * exists to prevent. The referenced file is deliberately created, so the existence half passes and only
+     * the containment half can be what fires.
+     */
+    @Test
+    void aBundleWhoseSchemaRefEscapesTheAllowedRootsIsRejectedAndRegistersNothing(
+            @TempDir Path root, @TempDir Path elsewhere) throws Exception {
+        // ⚠ The surefire config allows the WHOLE temp dir, so nothing under a @TempDir escapes by
+        // default — an "outside/" subdir inside `root` is still contained, and this test passed
+        // vacuously until the roots were narrowed. Narrow them to `root`, and put the schema under a
+        // second @TempDir that is therefore genuinely outside. ⛔ Restore the previous value rather than
+        // clearing it: surefire reuses one JVM per module and a cleared root poisons every later test.
+        String prior = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", root.toAbsolutePath().toString());
+        try (Ctx c = open(root)) {
+            Path escaping = elsewhere.resolve("stolen_schema.toon");
+            Files.writeString(escaping, PipelineConfigBatchTest.miniSchema());
+
+            byte[] bundle = bundleWithSchemaRef(root, escaping.toAbsolutePath().toString());
+
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundle);
+            assertEquals(422, imp.statusCode(), imp.body());
+            String details = V1Body.envelope(imp.body()).get("error").get("details").toString();
+            // Attribute it, or this passes for the wrong reason — every other path in the bundle is
+            // under `root` and contained, so schema_file must be what fired.
+            assertTrue(details.contains("processing.schema_file"), "names the escaping key: " + details);
+            assertTrue(details.contains("outside the allowed roots"), "says WHY it was refused: " + details);
+            assertTrue(idList(c.port, "/spaces/beta/datasources").isEmpty(),
+                    "nothing was registered — containment is part of the all-or-nothing gate");
+
+            // Preview must say the same thing, or `valid: true` invites a 422. Containment needs the roots,
+            // not the filesystem, so unlike existence it IS answerable before the files land.
+            HttpResponse<String> pv = post(c.port, "/spaces/beta/import/preview", bundle);
+            assertEquals(200, pv.statusCode(), pv.body());
+            assertFalse(V1Body.of(pv.body()).get("valid").asBoolean(),
+                    "preview and commit must agree about an escaping ref: " + pv.body());
+        } finally {
+            if (prior == null) System.clearProperty("assist.safety.roots");
+            else System.setProperty("assist.safety.roots", prior);
+        }
+    }
+
     /** A bundle that brings its own connection is complete, even though it is not registered yet when the
      *  gate runs — the check is the union of the target's registry and the bundle's own contents. */
     @Test
@@ -175,6 +220,20 @@ class ControlApiBundleImportTest {
      * file. Constructed directly rather than exported from a live space on purpose: a space whose pipeline
      * names a missing connection would not boot, so exporting could not produce this bundle.
      */
+    /** A one-pipeline bundle whose {@code processing.schema_file} is rewritten to {@code ref}. No schema
+     *  rides along — {@code ref} is meant to point somewhere the bundle does not carry. */
+    private static byte[] bundleWithSchemaRef(Path root, String ref) throws Exception {
+        Path config = root.resolve("scratch-schema-ref").resolve("config");
+        Files.createDirectories(config);
+        Path pipeline = config.resolve("etl_pipeline.toon");
+        Files.move(TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write(), pipeline);
+        Files.writeString(pipeline, Files.readString(pipeline)
+                .replaceAll("(?m)^(\\s*schema_file:).*$", "$1 " + java.util.regex.Matcher.quoteReplacement(ref)));
+        return BundleExporter.exportDataSource(
+                new DataSourceBundle("test_etl", pipeline, null, java.util.List.of(),
+                        java.util.List.of(), java.util.List.of()), config, "alpha");
+    }
+
     private static byte[] bundleReferencingConnection(Path root, String connId, boolean carryConnection)
             throws Exception {
         Path config = root.resolve("scratch-" + connId).resolve("config");

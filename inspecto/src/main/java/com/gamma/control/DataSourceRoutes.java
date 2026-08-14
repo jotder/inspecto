@@ -3,6 +3,8 @@ package com.gamma.control;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
+import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
@@ -67,11 +69,16 @@ final class DataSourceRoutes implements RouteModule {
      * which needs no filesystem, so preview and commit agree about a missing one).
      *
      * <p>⚠ {@code valid: true} is <b>not</b> the full commit gate. Commit additionally checks that every
-     * schema/grammar reference resolves, and that cannot be answered here: a schema reference resolves
+     * schema/grammar reference <b>exists</b>, and that cannot be answered here: a schema reference resolves
      * relative to the config file naming it, so it only becomes answerable once the files are written. So a
      * bundle can preview clean and still be rejected at commit for an unresolvable schema path. Narrowing
      * that gap means resolving references against the zip's own entry list, which is worth doing but is not
      * what this does today — do not "simplify" the two into one by dropping the commit-side check.
+     *
+     * <p>⚠ <b>Containment is NOT part of that gap</b> — it needs the allowed roots, not the filesystem, so
+     * both sides run {@link ConfigSafetyValidator} and agree about a ref that escapes. Until 2026-08-14
+     * neither side ran it: the sentence above about "the same spec + safety checks" described an intent, not
+     * the code, and an escaping ref reached {@code registerPipeline} to be refused one file at a time.
      */
     private Object previewImport(ApiContext api, HttpExchange e) throws IOException {
         Path config = requireConfig(api);
@@ -135,7 +142,13 @@ final class DataSourceRoutes implements RouteModule {
         } catch (RuntimeException parseErr) {
             return List.of(new Finding(Severity.ERROR, "(parse)", "cannot parse pipeline: " + parseErr.getMessage()));
         }
-        return ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), map);
+        List<Finding> fs = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), map));
+        // The safety half, which this route's own doc claimed it already had. Containment IS answerable
+        // here — jailing a path value needs the roots, not the filesystem — so preview and commit can and
+        // must agree about an escaping schema_file/grammar/mapping_file. Only *existence* is unanswerable
+        // before the files land.
+        fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy()));
+        return fs;
     }
 
     /**
@@ -149,6 +162,9 @@ final class DataSourceRoutes implements RouteModule {
      * .resolveSchemaRef} — instead of re-deriving path resolution here. Re-deriving it is exactly the trap
      * W1b hit: a validator that predicts resolution differently from the reader rejects configs the engine
      * would run, or passes ones it would not.
+     *
+     * <p>⚠ That reuse answers <b>existence</b> only. Containment is a separate question and comes from
+     * {@link ConfigSafetyValidator}, which is why both are called here — see the note at the call site.
      *
      * <p>A connection is checked by <b>id</b>, against the union of this space's registry and the ids the
      * bundle itself carries — a bundle that brings its own connection is complete, even though that
@@ -179,6 +195,13 @@ final class DataSourceRoutes implements RouteModule {
             }
             List<Finding> fs = new ArrayList<>(
                     ConfigRoutes.schemaFileFindings("pipeline", map, Severity.ERROR, file.getParent()));
+            // ⚠ schemaFileFindings answers "does this ref EXIST", never "is it contained" — the two are
+            // separate questions and only the validator asks the second. Every other pipeline gate pairs
+            // them (ConfigRoutes:113/137/330, PipelineRoutes:380, RunRoutes:261); this one did not, so a
+            // bundle whose schema_file/grammar/mapping_file escapes the allowed roots passed here and was
+            // then refused one file at a time by registerPipeline below — the exact mid-walk partial
+            // registration this whole gate exists to prevent.
+            fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy()));
             String conn = connectionRef(map);
             if (conn != null && !knownConnections.contains(conn))
                 fs.add(new Finding(Severity.ERROR, "collector.connection",

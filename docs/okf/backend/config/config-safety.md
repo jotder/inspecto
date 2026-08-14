@@ -71,6 +71,24 @@ Two implementations were deliberately **not** migrated: `PipelineConfigParser.va
 `PipelineJobRunner.requireTopLevelSinks` is a **depth** rule about literal directory nesting, where
 resolving real paths would change the answer for the wrong reason.
 
+⛔ **Existence and containment are two questions, and a gate needs both.** `ConfigRoutes.resolves` asks
+only "does this ref exist" and must stay that way — teaching it containment would report *"schema file
+does not resolve on the server"* about a ref that resolves fine but escapes, sending the operator after
+the wrong thing. Containment comes from `ConfigSafetyValidator`, and every pipeline gate pairs the two:
+`ConfigRoutes` validate/write/patch, `PipelineRoutes`, `RunRoutes` — and, since 2026-08-14,
+**`DataSourceRoutes` bundle import on both the commit and preview sides**, which had the existence half
+only. The consequence there was not a read escape (the loader still jails) but a *partial import*: the
+escaping ref survived the all-or-nothing gate and was refused later by `registerPipeline`, one file at a
+time. ⚠ Containment **is** answerable at preview — it needs the allowed roots, not the filesystem —
+unlike existence, which only becomes answerable once the bundle's files land.
+
+⚠ **`SafetyPolicy.defaultPolicy()` has no working-directory fallback.** An unset or blank
+`-Dassist.safety.roots` yields an **empty** root list, and `PathJail.requireUnderAny` throws on that, so
+every jailed reference fails rather than silently jailing to the CWD. Fail-closed by design; configuring
+the roots is a deployment step. *(The method's own Javadoc promised a CWD fallback until 2026-08-14.)*
+⚠ Surefire sets the roots to `<repo>;<temp>`, so **nothing under a `@TempDir` escapes by default** — a
+containment test that does not narrow the roots passes vacuously.
+
 ⚠ **`PathJail` unified the CONFIG-path implementations, not every containment check in the codebase.**
 A 2026-08-14 sweep found ~15 more outside that scope — the registry stores (three byte-identical
 copies), archive extraction, static file serving, remote listings — disagreeing on symlinks,
