@@ -530,11 +530,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `dirs.poll`/`dirs.database` **at parse time**, so a table-sourced draft cannot even load. Revisit only
   when S3 lands. Two deliberate non-goals recorded there: a structured per-measure builder (drift risk
   against the string grammar) and `group_by` entry validation (same shape, easy follow-up).
-- **Build → Test → Run authoring journey — G1–G5 SHIPPED 2026-08-02; only "test against real data"
-  remains.** Plan of record:
-  [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md).
-  Build and Run both work. The journey is now *honest* — no dead buttons, no silent activation
-  failure, no save-time surprises — but **a user still cannot test a pipeline against their own data.**
+- **Build → Test → Run authoring journey — FULLY CLOSED.** G1–G5 shipped 2026-08-02, Step 5 (the real
+  test run) shipped 2026-08-14; the plan of record is **archived**, and the durable as-built is
+  [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).
+  Build, Test and Run all work: no dead buttons, no silent activation failure, no save-time surprises,
+  and **a user can test a pipeline against their own data before arming it.** ⚠ One residual only — the
+  node config dialog's `/components/*` "Test" affordance, still `mockFlows`-gated (see G1 below).
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —
@@ -566,7 +567,7 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     picked inbox files through the **real** ingest path into a scratch root and previews the graph over
     the parsed rows, with **zero production side effects**; the UI gate is off, so run-to-here works
     against a real server. As-built + rationale:
-    [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) Step 5.
+    [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).
     **5b landed the same day:** `to=` now bounds the walk to the **ancestor closure** of the chosen node
     (`PipelineExecutor.ancestorsOf`), matching the offline mock's `subgraphTo`, and the "ran the whole
     graph anyway" warning was dropped from both places together. ⚠ The plan's premise that the walk is
@@ -612,9 +613,10 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     — parse N picked inbox files into a scratch DuckDB and run the **full** graph with no cutoff, reusing the
     scratch pattern above in place of `sampleRows`. That converts "synthetic rows" into "real files" and is
     independently valuable; the cutoff and the route's `to=` semantics follow as a second slice.
-    ✅ **Plan written 2026-08-14 — see [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md)
-    "Step 5 — re-grounded 2026-08-14, and sliced"** (extended the existing plan of record rather than
-    opening a second one for the same journey). It carries the slice order (5a real files / 5b stop-at-node
+    ✅ **Plan written 2026-08-14, shipped the same day, now archived** (it extended the existing plan of
+    record rather than opening a second one for the same journey); current knowledge is
+    [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).
+    It carried the slice order (5a real files / 5b stop-at-node
     / 5c route+ungate), the three candidate approaches to side-effect suppression with the trap named, and
     two things 5c cannot ship without: an inbox path-jail on the `files` body, and the `canAuthorWorkbench`
     gate per the `DecisionRoutes` `/simulate` precedent. ⚠ **The difficulty is suppressing the ingest

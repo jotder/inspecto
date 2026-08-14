@@ -258,19 +258,19 @@ former root reference docs** (each index lists them):
   `PartitionOutput` does not carry. Build order + verify conditions in §14.4. New model surface listed in §13;
   unverified items and open decisions in §15.
 
-- [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) —
-  **IN FLIGHT (opened 2026-08-02). Steps 0–4 SHIPPED same day** (`4fe388a1`): the armed-pipeline silent
-  failure closed (G4), the two 404ing test affordances gated off rather than deleted (G1), a
-  `lowerable` signal added to the palette (G2), refusals routed to the Validation dock (G3), a
-  grandfathered-flow warning banner (G5, not read-only as first drafted — see the plan's inline
-  correction). **Step 5 — a bounded test run over real inbox files — is the one gap left**, and is a
-  backend job (`PipelineDryRun` is synthetic-only; no stop-at-node primitive; the run-to-here route is
-  reserved but unregistered). **Step 5 re-grounded + sliced 2026-08-14** (5a real files / 5b stop-at-node
-  / 5c route+ungate). ✅ **5a and 5c SHIPPED 2026-08-14** — a user can now test a pipeline against their
-  own data, and run-to-here works against a real server. Durable as-built moved to
-  [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md); the plan **stays
-  in-flight** because **5b (the stop-at-node cutoff) is still open** — until it lands the whole graph
-  runs and both server and mock say so in `warnings`. Gaps tracked in [`BACKLOG.md`](BACKLOG.md) §Pipelines.
+- ~~`superpower/pipeline-build-test-run-gaps.md`~~ — **COMPLETE end-to-end 2026-08-14; plan ARCHIVED**
+  to `archived-documents/plans-archive/`. Opened 2026-08-02. **Steps 0–4 shipped same day** (`4fe388a1`):
+  the armed-pipeline silent failure closed (G4), the two 404ing test affordances gated off rather than
+  deleted (G1), a `lowerable` signal added to the palette (G2), refusals routed to the Validation dock
+  (G3), a grandfathered-flow warning banner (G5, not read-only as first drafted). **Step 5 — a bounded
+  test run over real inbox files — shipped 2026-08-14 in three slices**: 5a real files (`1f0937ee`,
+  `141caf84`), 5c route + ungate (`0b2a80ba`, `0c542829`), 5b stop-at-node cutoff (`4c99c12a`). A user
+  can now test a pipeline against their own data, and run-to-here bounds the run where they asked.
+  **Current knowledge → [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md)**
+  (containment, the `files` jail, the `to=` cutoff, the falsification probes) and
+  [`okf/frontend/features/pipelines.md`](okf/frontend/features/pipelines.md). The one residual — the node
+  config dialog's `/components/*` "Test" affordance, still mock-gated because a node with inline config
+  binds no registered component — is a [`BACKLOG.md`](BACKLOG.md) §Pipelines row.
 
 - ~~`superpower/sinks-config-format-plan.md`~~ — **SHIPPED end-to-end 2026-08-02 (all 4 slices, `0cdc9dff`
   + `79dcb3e6`), plan archived** to

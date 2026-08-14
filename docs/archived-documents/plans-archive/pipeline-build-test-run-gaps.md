@@ -1,9 +1,15 @@
 # Build → Test → Run: the ingestion authoring journey, and where it breaks
 
-**Status:** IN FLIGHT (opened 2026-08-02). Gap analysis + remediation plan.
-**Steps 0–4 SHIPPED 2026-08-02.** Step 5 (test against real data) is the remaining product gap — see §3.
-Three findings from implementation changed the plan as written; they are recorded inline below (§2.1,
-§2.4, §3 Step 4). Read those before assuming the original text still holds.
+**Status:** ✅ **COMPLETE — ARCHIVED 2026-08-14.** Opened 2026-08-02; gap analysis + remediation plan.
+**Steps 0–4 SHIPPED 2026-08-02, Step 5 (5a/5b/5c) SHIPPED 2026-08-14.** The whole journey is closed.
+⚠ **This file is history, not current knowledge.** The durable as-built lives in
+[`../../okf/backend/engine/pipeline-test-run.md`](../../okf/backend/engine/pipeline-test-run.md) and
+[`../../okf/frontend/features/pipelines.md`](../../okf/frontend/features/pipelines.md); the one residual
+(the node-config dialog's `/components/*` test affordance, still mock-gated) is a
+[`../../BACKLOG.md`](../../BACKLOG.md) §Pipelines row. Read those, not this.
+Several findings from implementation changed the plan as written; they are recorded inline below (§2.1,
+§2.4, §3 Step 4, and the three Step-5 as-built sections). Read those before assuming the original text
+still holds — **the plan was wrong about 5b's regression risk**, and says so at the end.
 **Trigger:** operator question — *"how would a user build and run a data pipeline? we need to give
 users a decent way to build → test → run data ingestion."* The inventory existed; the **journey** had
 never been traced end-to-end.
@@ -164,7 +170,8 @@ path. The editor now shows a warning banner naming the offending types and stays
 wolf), then lists the non-lowerable node ids. Not reproducible in the live preview — every pipeline
 lifted from a flat config is lowerable by construction, which is the point.
 
-**Step 5 — the real one: test against real data. ⬜ REMAINING.** Give the user a bounded run over
+**Step 5 — the real one: test against real data. ✅ SHIPPED 2026-08-14** (5a + 5b + 5c; as-built in the
+three sections below). Give the user a bounded run over
 actual inbox files with no writes. This is now the *only* thing standing between Build and Run.
 Notably, the UI is already built and working against the mock (`run-to-here.dialog.ts`, file picker,
 per-relation counts, sample table) — Step 1 gated it rather than deleting it precisely so this step is
@@ -416,7 +423,8 @@ answer narrower, never the work smaller.
 
 ## Links
 
-- Node-type / execution inventory + the three gates: [`../BACKLOG.md`](../BACKLOG.md) "Branch-aware executor"
-- Pipeline vs Job (in-motion vs at-rest): [`../okf/backend/pipeline-graph/pipeline-graph-design.md`](../okf/backend/pipeline-graph/pipeline-graph-design.md) §3.8
-- Editor shell as-built: [`../okf/frontend/features/pipelines.md`](../okf/frontend/features/pipelines.md)
-- Onboarding authoring: [`../okf/backend/control-plane/onboarding-authoring.md`](../okf/backend/control-plane/onboarding-authoring.md)
+- **Test run as-built (the current knowledge): [`../../okf/backend/engine/pipeline-test-run.md`](../../okf/backend/engine/pipeline-test-run.md)**
+- Node-type / execution inventory + the three gates: [`../../BACKLOG.md`](../../BACKLOG.md) "Branch-aware executor"
+- Pipeline vs Job (in-motion vs at-rest): [`../../okf/backend/pipeline-graph/pipeline-graph-design.md`](../../okf/backend/pipeline-graph/pipeline-graph-design.md) §3.8
+- Editor shell as-built: [`../../okf/frontend/features/pipelines.md`](../../okf/frontend/features/pipelines.md)
+- Onboarding authoring: [`../../okf/backend/control-plane/onboarding-authoring.md`](../../okf/backend/control-plane/onboarding-authoring.md)
