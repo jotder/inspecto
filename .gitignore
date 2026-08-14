@@ -48,6 +48,8 @@
 /inspecto-deploy/
 /inspecto-deploy-old/
 /.graalvm-cache/
+# Angular CLI's build cache — regenerated on every `ng build`/`ng serve`.
+/.angular/
 /file-processor-4.0/
 /data/
 
