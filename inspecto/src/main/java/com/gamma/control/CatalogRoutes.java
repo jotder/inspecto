@@ -38,7 +38,22 @@ final class CatalogRoutes implements RouteModule {
                 nodeKinds(ApiContext.query(e, "kinds")),
                 edgeKinds(ApiContext.query(e, "edgeKinds")),
                 "true".equalsIgnoreCase(ApiContext.query(e, "overlay"))));
+        // Resolve a batch ledger row's output_table to its catalog node, so a run/batch surface can link
+        // into the Catalog. Query param, not a /catalog/tables/... path: that route's (.+) is greedy and
+        // would swallow any sub-path added under it.
+        api.get("/catalog/resolve", (e, m) -> resolveTable(api, ApiContext.query(e, "table")));
         api.get("/catalog/tables/(.+)", (e, m) -> catalogNodeDetail(api, ApiContext.name(m)));
+    }
+
+    /**
+     * {@code GET /catalog/resolve?table=<store>} — the catalog node that store name names, or 404 when
+     * it resolves to none or to several. 404 is the honest answer for "ambiguous": the caller's contract
+     * is to render a link only when the target is proven, never a best guess.
+     */
+    private Map<String, Object> resolveTable(ApiContext api, String table) {
+        MetadataNode node = api.service().catalog().nodeByTable(table);
+        if (node == null) throw new ApiException(404, "no unique catalog node for table '" + table + "'");
+        return Map.of("id", node.id(), "label", node.label());
     }
 
     /** {@code GET /catalog/streams} — every Collector's data-origin stream as a browsable node (MET-4). */

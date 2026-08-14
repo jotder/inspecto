@@ -289,6 +289,78 @@ class MetadataGraphServiceTest {
         return PipelineConfig.load(toon.toString());
     }
 
+    /**
+     * A pipeline whose schemas are declared through the <b>selector</b> (the {@code schemas[]} table),
+     * which is the only branch that records an explicit {@code table} — and so the only one whose event
+     * nodes {@link MetadataGraphService#nodeByTable} can resolve.
+     */
+    private static PipelineConfig tablePipeline(Path dir, String name, String table) throws Exception {
+        Path schema = dir.resolve(name + "_schema.toon");
+        Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
+        Path toon = dir.resolve(name + "_pipeline.toon");
+        String d = dir.toString().replace("\\", "/");
+        String lc = name.toLowerCase();
+        Files.writeString(toon, """
+                name: %s
+                dirs:
+                  poll: %s/%s_inbox
+                  database: %s/%s_db
+                output:
+                  format: CSV
+                processing:
+                  threads: 1
+                  schemas[1]{column_count,file_pattern,schema_file,table}:
+                    3, "", "%s", %s
+                """.formatted(name, d, lc, d, lc,
+                schema.toString().replace("\\", "/"), table));
+        return PipelineConfig.load(toon.toString());
+    }
+
+    @Test
+    void resolvesABatchOutputTableToItsCatalogNode(@TempDir Path dir) throws Exception {
+        Fixture f = new Fixture();
+        f.pipelines.add(tablePipeline(dir, "VOUCHER", "voucher_main"));
+        MetadataNode n = new MetadataGraphService(f).nodeByTable("voucher_main");
+
+        assertNotNull(n, "the store a batch row names must resolve to its event table node");
+        assertEquals(NodeKind.TABLE, n.kind());
+        assertEquals("voucher_main", n.attrs().get("table"));
+    }
+
+    @Test
+    void refusesToResolveWhenTwoStoresAnswerToTheName(@TempDir Path dir) throws Exception {
+        // Two pipelines writing the same store name: the batch row cannot say which one is meant, so
+        // the only honest answer is none. A best guess here would draw a wrong lineage edge.
+        Fixture f = new Fixture();
+        f.pipelines.add(tablePipeline(dir, "FEED_A", "shared_store"));
+        f.pipelines.add(tablePipeline(dir, "FEED_B", "shared_store"));
+        assertNull(new MetadataGraphService(f).nodeByTable("shared_store"));
+    }
+
+    @Test
+    void refusesToResolveNodesBuiltWithoutATableAttr(@TempDir Path dir) throws Exception {
+        // The single-schema branch passes table = null, so its event node carries no table attr at all.
+        // Matching on the node's *label* would appear to work here and would be wrong — the label falls
+        // back to the schema key, which is not the store name a batch row records.
+        Fixture f = new Fixture();
+        f.pipelines.add(PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString()));
+        MetadataGraphService svc = new MetadataGraphService(f);
+
+        assertNotNull(svc.node("event:mini_etl/mini"), "the node exists…");
+        assertNull(svc.nodeByTable("mini"), "…but it is not resolvable by store name");
+    }
+
+    @Test
+    void treatsABlankTableAsUnresolvable(@TempDir Path dir) throws Exception {
+        // A failed batch writes an empty output_table — that must not match a node with no table attr.
+        Fixture f = new Fixture();
+        f.pipelines.add(tablePipeline(dir, "VOUCHER", "voucher_main"));
+        MetadataGraphService svc = new MetadataGraphService(f);
+
+        assertNull(svc.nodeByTable(""));
+        assertNull(svc.nodeByTable(null));
+    }
+
     @Test
     void pipelinesSharingAStreamGroupUnderOneNode(@TempDir Path dir) throws Exception {
         Fixture f = new Fixture();

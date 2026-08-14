@@ -100,6 +100,53 @@ class ControlApiCatalogTest {
         }
     }
 
+    /** As {@link #open} but with a selector-declared schema, the only branch that records a {@code table}. */
+    private Ctx openWithTable(Path dir, String table) throws Exception {
+        Path schema = dir.resolve("t_schema.toon");
+        java.nio.file.Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Path pipe = dir.resolve("t_pipeline.toon");
+        String d = dir.toString().replace("\\", "/");
+        java.nio.file.Files.writeString(pipe, """
+                name: VOUCHER
+                dirs:
+                  poll: %s/inbox
+                  database: %s/db
+                output:
+                  format: CSV
+                processing:
+                  threads: 1
+                  schemas[1]{column_count,file_pattern,schema_file,table}:
+                    3, "", "%s", %s
+                """.formatted(d, d, schema.toString().replace("\\", "/"), table));
+        CollectorService svc = new CollectorService(List.of(pipe), List.of(), List.of(),
+                List.of(semantics()), 3600, 1, null);
+        ControlApi api = new ControlApi(svc, 0);
+        api.start();
+        return new Ctx(svc, api, api.port());
+    }
+
+    @Test
+    void resolveMapsABatchOutputTableToItsCatalogNodeId(@TempDir Path dir) throws Exception {
+        try (Ctx c = openWithTable(dir, "voucher_main")) {
+            HttpResponse<String> r = get(c.port, "/catalog/resolve?table=voucher_main");
+            assertEquals(200, r.statusCode());
+            JsonNode body = V1Body.of(r.body());
+            assertEquals("voucher_main", body.get("label").asText());
+            // the id must be the one /catalog/tables/{id} serves — i.e. the link actually lands
+            assertEquals(200, get(c.port, "/catalog/tables/" + body.get("id").asText()).statusCode());
+        }
+    }
+
+    @Test
+    void resolveIs404WhenTheStoreNameCannotBeProven(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            // this pipeline's event node exists but carries no table attr (single-schema branch)
+            assertEquals(404, get(c.port, "/catalog/resolve?table=mini").statusCode());
+            assertEquals(404, get(c.port, "/catalog/resolve?table=nope").statusCode());
+            assertEquals(404, get(c.port, "/catalog/resolve").statusCode());
+        }
+    }
+
     @Test
     void unknownNodeIs404AndBadFilterIs400(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

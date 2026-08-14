@@ -2,15 +2,17 @@ import { Component, inject, OnInit, ChangeDetectionStrategy } from '@angular/cor
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { forkJoin } from 'rxjs';
-import { AuditRow, RunsService } from 'app/inspecto/api';
+import { RouterLink } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { AuditRow, CatalogService, RunsService } from 'app/inspecto/api';
 import { DataTableComponent } from 'app/inspecto/data-table';
 
 /** Batch detail — summary + member files + input→output lineage for one batch. */
 @Component({
     selector: 'app-batch-detail-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule, DataTableComponent],
+    imports: [MatDialogModule, MatButtonModule, MatProgressSpinnerModule, DataTableComponent, RouterLink],
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
         <h2 mat-dialog-title>Batch {{ data.batchId }}</h2>
@@ -34,6 +36,16 @@ import { DataTableComponent } from 'app/inspecto/data-table';
                             }
                         </tbody>
                     </table>
+                    @if (catalogNodeId) {
+                        <a
+                            class="mt-2 inline-block text-primary hover:underline"
+                            [routerLink]="['/catalog']"
+                            [queryParams]="{ tab: 'graph', from: catalogNodeId }"
+                            mat-dialog-close
+                        >
+                            View {{ outputTable }} in the Catalog
+                        </a>
+                    }
                 }
 
                 <div class="mt-4 font-semibold">Member files ({{ batchFiles.length }})</div>
@@ -63,11 +75,16 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 export class BatchDetailDialog implements OnInit {
     readonly data = inject<{ pipeline: string; batchId: string }>(MAT_DIALOG_DATA);
     private api = inject(RunsService);
+    private catalog = inject(CatalogService);
 
     loading = true;
     batchRow: AuditRow | null = null;
     batchFiles: AuditRow[] = [];
     batchLineage: AuditRow[] = [];
+
+    /** The store this batch wrote, and the catalog node it resolved to — blank/null when unresolvable. */
+    outputTable = '';
+    catalogNodeId: string | null = null;
 
     get batchSummary(): { key: string; value: string }[] {
         return this.batchRow ? Object.entries(this.batchRow).map(([key, value]) => ({ key, value })) : [];
@@ -85,10 +102,25 @@ export class BatchDetailDialog implements OnInit {
                 this.batchFiles = files.filter((f) => f['consignment_id'] === batchId);
                 this.batchLineage = lineage;
                 this.loading = false;
+                this.resolveCatalogNode();
             },
             error: () => {
                 this.loading = false;
             },
         });
+    }
+
+    /**
+     * Offer the Catalog jump only when the backend can prove which node this batch's store is. A 404
+     * (unknown store, or a name several stores answer to) leaves the link off — a lineage link to the
+     * wrong store is worse than no link at all.
+     */
+    private resolveCatalogNode(): void {
+        this.outputTable = this.batchRow?.['output_table'] || '';
+        if (!this.outputTable) return;
+        this.catalog
+            .resolveTable(this.outputTable)
+            .pipe(catchError(() => of(null)))
+            .subscribe((hit) => (this.catalogNodeId = hit?.id ?? null));
     }
 }

@@ -816,6 +816,7 @@ const CATALOG_TABLES_RE = /\/catalog$/;
 const CATALOG_KPIS_RE = /\/catalog\/kpis$/;
 const CATALOG_STREAMS_RE = /\/catalog\/streams$/;
 const CATALOG_REFERENCES_RE = /\/catalog\/references$/;
+const CATALOG_RESOLVE = /\/catalog\/resolve(\?|$)/;
 const CATALOG_NODE = /\/catalog\/tables\/([^/]+)$/;
 const CATALOG_GRAPH = /\/catalog\/graph$/;
 const DIAGNOSES_RE = /\/diagnoses$/;
@@ -1002,6 +1003,14 @@ export function demoHandler(flags: MockFlags): MockHandler {
         if (method === 'GET' && CATALOG_REFERENCES_RE.test(url))
             return json([...CATALOG_REFERENCES, ...draftReferenceRows(store, space)]);
         if (method === 'GET' && CATALOG_TABLES_RE.test(url)) return json(CATALOG_TABLES);
+        // A batch row's output_table → its catalog node, or 404 when it names no node the mock knows.
+        // The 404 half is the one the UI depends on: it is what keeps the link off an unprovable store.
+        if (method === 'GET' && CATALOG_RESOLVE.test(url)) {
+            const table = new URLSearchParams(url.split('?')[1] ?? '').get('table') ?? '';
+            const node = table ? CATALOG_TABLES.find((t) => t.label === table) : undefined;
+            if (!node) return error(404, `no unique catalog node for table '${table}'`);
+            return json({ id: node.id, label: node.label });
+        }
         if (method === 'GET' && (m = match(url, CATALOG_NODE))) {
             const id = m[1];
             const all = [...CATALOG_TABLES, ...CATALOG_STREAMS];

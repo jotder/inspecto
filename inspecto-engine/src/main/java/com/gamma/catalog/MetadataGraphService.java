@@ -112,6 +112,30 @@ public final class MetadataGraphService {
         return out;
     }
 
+    /**
+     * The table node a batch ledger row's {@code output_table} names, or {@code null} when it cannot be
+     * resolved <em>unambiguously</em>.
+     *
+     * <p>A batch row carries a store name, not a node id — the id is {@code event:<pipeline>/<schemaKey>}
+     * and a row's {@code schema_name} is {@code raw.name}, which is not that key, so the id cannot be
+     * derived. Matching on the {@code table} attribute is the only sound join, and it is deliberately
+     * strict: {@link MetadataGraphBuilder} records that attribute only for the selection branch, so
+     * nodes built by the other two branches carry no {@code table} at all and simply do not match.
+     * Zero matches and several matches both return {@code null} — a caller must render no link rather
+     * than a link to a store the graph cannot prove is the right one.
+     */
+    public MetadataNode nodeByTable(String table) {
+        if (table == null || table.isBlank()) return null;
+        MetadataNode found = null;
+        for (MetadataNode n : tables()) {
+            Object t = n.attrs().get("table");
+            if (t == null || !table.equals(t.toString())) continue;
+            if (found != null) return null;   // ambiguous — two stores answer to this name
+            found = n;
+        }
+        return found;
+    }
+
     /** All nodes of a given kind (no overlay). */
     public List<MetadataNode> nodesOfKind(NodeKind kind) {
         List<MetadataNode> out = new ArrayList<>();

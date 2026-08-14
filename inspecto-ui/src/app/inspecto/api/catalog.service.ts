@@ -23,6 +23,15 @@ export class CatalogService {
     references(): Observable<MetadataNode[]> {
         return this.http.get<MetadataNode[]>(apiUrl('/catalog/references'));
     }
+    /**
+     * The catalog node a batch row's `output_table` names. 404s when the store name resolves to no node
+     * or to several — callers must treat that as "no link", never as a reason to guess.
+     */
+    resolveTable(table: string): Observable<{ id: string; label: string }> {
+        return this.http.get<{ id: string; label: string }>(apiUrl('/catalog/resolve'), {
+            params: toParams({ table }),
+        });
+    }
     node(id: string): Observable<NodeDetail> {
         return this.http.get<NodeDetail>(apiUrl(`/catalog/tables/${encodeURIComponent(id)}`));
     }

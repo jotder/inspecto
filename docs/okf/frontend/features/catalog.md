@@ -42,6 +42,22 @@ and confirming anyway resends the delete with `force`. `PipelineDependents`
 of `PipelineRoutes.rewriteDependents` (that scanner reads-and-writes in one loop; this one is read-only)
 — the two key sets must be kept in sync by hand if a new binding is ever added to either.
 
+**A batch links back to the store it wrote (2026-08-14).** The batch-detail dialog
+(`run-detail/batch-detail.dialog.ts`) offers *"View &lt;store&gt; in the Catalog"*, landing on the
+existing `?tab=graph&from=<nodeId>` deep link. The join is **not** derivable client-side: a batch row
+carries `output_table` (the store name) but a catalog node's id is `event:<pipeline>/<schemaKey>`, and
+the row's `schema_name` is `raw.name`, which is a different thing — so the id is resolved server-side by
+`GET /catalog/resolve?table=` → `MetadataGraphService.nodeByTable`, a **unique** match on the node's
+`table` attribute.
+
+⛔ **Zero matches and several matches both 404, and the dialog then renders no link** — that is the
+contract, not a limitation to be relaxed. Only `MetadataGraphBuilder`'s selector branch records a
+`table` attr (the segments and single-schema branches pass `null`), so plenty of real batches will show
+no link until that is fixed (`BACKLOG.md` §4). Widening the match to labels or prefixes would "fix" the
+missing link by pointing at a store the graph cannot prove is the right one, and a wrong lineage edge is
+worse than an absent one. ⚠ The route is `/catalog/resolve?table=`, deliberately **not** a path under
+`/catalog/tables/` — that route's `(.+)` pattern is greedy and swallows any sub-path added beneath it.
+
 ## Data Browser
 
 The per-space raw table browser (`modules/admin/data-browser/`, nav item under Catalog): store/table
