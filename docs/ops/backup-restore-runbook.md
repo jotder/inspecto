@@ -4,6 +4,26 @@
 restore-into-a-new-space. Everything here runs through the `maintenance` Job Type; no shell scripts.
 Plan of record: `docs/superpower/system-maintenance-plan.md`.
 
+## ⚠ Path containment — read this before pointing a job outside the server root
+
+Every path field on a maintenance job (`dir`, `backup_dir`, `archive_dir`, `archive`, `target_dir`,
+and `out_dir` on reports) must resolve under an **allowed root**. The roots come from
+`-Dassist.safety.roots` (a `;`-separated list) and default to the server's working directory — the
+same list the control plane's 422 write gate enforces, so a value refused at authoring is refused at
+run time for the same reason.
+
+Values like `spaces/<space>/data/backups` are already under the default root and need nothing. But a
+backup destination **outside** the server root — a mount, a NAS, another drive — must be declared:
+
+```
+java ... -Dassist.safety.roots="/opt/inspecto;/mnt/backups" -cp inspecto.jar com.gamma.control.ControlApi
+```
+
+Without it the job **fails** with `path '/mnt/backups' declared by 'backup_dir' resolves to …,
+outside the root …`. That is the intended behaviour, not a regression: an undeclared destination is
+how a traversal value (`../../..`) turns into a write outside the deployment. Declare the root;
+don't work around it by relocating the archive.
+
 ## Backup
 
 Author a `maintenance` job with `task: backup` (see the live example

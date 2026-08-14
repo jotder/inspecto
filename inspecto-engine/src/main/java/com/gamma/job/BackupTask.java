@@ -2,6 +2,7 @@ package com.gamma.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.acquire.Checksums;
+import com.gamma.config.safety.PathJail;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.signal.Severity;
 import org.slf4j.Logger;
@@ -66,8 +67,9 @@ final class BackupTask {
     // ── backup (MNT-5) ───────────────────────────────────────────────────────────
 
     static JobResult backup(JobConfig cfg, JobContext ctx, boolean dryRun, String dataDir) throws IOException {
-        Path dir = Path.of(cfg.require("dir")).normalize();
-        Path backupDir = Path.of(cfg.require("backup_dir")).normalize();
+        List<Path> roots = PathJail.allowedRoots();
+        Path dir = PathJail.requireUnderAny(roots, cfg.require("dir"), "dir");
+        Path backupDir = PathJail.requireUnderAny(roots, cfg.require("backup_dir"), "backup_dir");
         String prefix = cfg.opt("prefix",
                 dir.getFileName() == null ? "backup" : dir.getFileName().toString());
         long t0 = System.nanoTime();
@@ -155,13 +157,16 @@ final class BackupTask {
     /** Read-only: verify the newest archive in {@code backup_dir} (or one named {@code archive}, or
      *  {@code all: true}) against its sidecar manifest — archive hash first, then every entry hash. */
     static JobResult verify(JobConfig cfg, JobContext ctx) throws IOException {
-        Path backupDir = Path.of(cfg.require("backup_dir")).normalize();
+        Path backupDir = PathJail.requireUnderAny(
+                PathJail.allowedRoots(), cfg.require("backup_dir"), "backup_dir");
         String one = cfg.opt("archive", null);
         boolean all = Boolean.parseBoolean(cfg.opt("all", "false"));
         long t0 = System.nanoTime();
         List<Path> targets = new ArrayList<>();
         if (one != null) {
-            targets.add(backupDir.resolve(one));
+            // `archive` names a file *inside* backup_dir, so it is jailed against that dir, not the
+            // server root — otherwise `archive: ../../secrets.zip` would read back out of the box.
+            targets.add(PathJail.require(backupDir, backupDir.resolve(one).toString(), "archive"));
         } else if (Files.isDirectory(backupDir)) {
             try (Stream<Path> s = Files.list(backupDir)) {
                 List<Path> zips = new ArrayList<>(s.filter(p -> p.getFileName().toString().endsWith(".zip")).toList());
@@ -237,8 +242,9 @@ final class BackupTask {
     // ── restore (MNT-6) ──────────────────────────────────────────────────────────
 
     static JobResult restore(JobConfig cfg, JobContext ctx, boolean dryRun) throws IOException {
-        Path zip = Path.of(cfg.require("archive")).normalize();
-        Path target = Path.of(cfg.require("target_dir")).toAbsolutePath().normalize();
+        List<Path> roots = PathJail.allowedRoots();
+        Path zip = PathJail.requireUnderAny(roots, cfg.require("archive"), "archive");
+        Path target = PathJail.requireUnderAny(roots, cfg.require("target_dir"), "target_dir");
         boolean overwrite = Boolean.parseBoolean(cfg.opt("overwrite", "false"));
         long t0 = System.nanoTime();
         // Fail-closed (MNT-6): restore never bypasses validation — the sidecar manifest must exist and

@@ -124,9 +124,24 @@ in **no new third-party** (etl already has jtoon and jackson). The row's "either
 deliberately or move the primitive down" is a false dilemma — moving it down means pushing security
 code into either the annotations leaf (`inspecto-api`) or the heavyweight `inspecto-util`.
 
-**How the config layer learns the root.** `-Dspaces.root`, defaulting to CWD — read once, the same
-seam `MaterializeTask` already uses for `-Ddata.dir`. This is what makes group (iii) tractable without
-threading a root through public signatures, which is what the row claimed was the blocker.
+**How the config layer learns the root.** ⛔ **This paragraph was wrong; S3 corrected it.** It read:
+*"`-Dspaces.root`, defaulting to CWD — read once, the same seam `MaterializeTask` already uses for
+`-Ddata.dir`."* Both halves are false, and neither survives grounding:
+
+- `spaces.root` is read in **exactly one place** — `ControlApi.java:343`, for space *discovery*. That
+  is in module `inspecto/`, which sits **above** `inspecto-engine`, so no job task can call it. It is
+  also unset in single-tenant mode, in the job runner and in every test, and has no operator override.
+- **`-Ddata.dir` is never read anywhere.** It appears only inside error-message strings
+  (`MaterializeTask:59`, `ReconRunJob:67`). There was no seam to copy.
+
+**The real seam already existed and is better:** `SafetyPolicy.defaultPolicy()` reads
+**`-Dassist.safety.roots`** (a `;`-separated list), falling back to the working directory
+(`SafetyPolicy.java:67-79`). It is plural, operator-overridable, and it is *the list
+`ConfigSafetyValidator` already enforces at the 422 write gate* — so containment at load and refusal
+at authoring measure against the same roots. `PathJail.allowedRoots()` returns it and
+`PathJail.requireUnderAny` enforces against it, still delegating each root's verdict to `contains`.
+⛔ Do not reintroduce a second root source: a jail whose root disagrees with the gate's is a jail with
+a documented bypass.
 
 ---
 
@@ -172,10 +187,77 @@ wrong thing. The distinction is now derived from a structural pre-check.
   question about *literal* nesting, so resolving real paths would change the answer for the wrong
   reason. ⛔ Do not "finish the job" by folding it in.
 
-- **S3 · apply at group (ii), the job tasks.** ~7 `cfg.require(...)` path fields across `BackupTask`,
-  `MaintenanceJob`, `MaterializeTask`, `ReportJob`, each with `writeRoot`/`dataDir` already in scope.
-  Mechanical. ⚠ Removing `PipelineJobRunner`'s documented validator bypass is a separate decision — do
-  not fold it in silently.
+- **S3 · apply at group (ii), the job tasks. ✅ SHIPPED 2026-08-14** — see the as-built below.
+  ⚠ Removing `PipelineJobRunner`'s documented validator bypass is a separate decision — do
+  not fold it in silently. *(Still not folded in.)*
+
+### S3 SHIPPED 2026-08-14 — and it was not "mechanical"
+
+**The surface was 9 fields / 6 call sites / 3 files**, not "~7 across 4 files":
+
+| Site | Fields |
+|---|---|
+| `BackupTask.backup` | `dir`, `backup_dir` |
+| `BackupTask.verify` | `backup_dir`, `archive` |
+| `BackupTask.restore` | `archive`, `target_dir` |
+| `MaintenanceJob.storageReport` | `dir` |
+| `MaintenanceJob.cleanup` | `dir`, `archive_dir` |
+| `ReportJob.deliver` | `out_dir` |
+
+⚠ **`MaterializeTask` is NOT in the list and needs no change.** Its `target` is already contained by a
+one-segment `SAFE_TARGET` regex plus an explicit `..` check, resolved under `dataRoot`
+(`MaterializeTask:64-77`) — stronger than a jail. The plan named it as one of the four files.
+
+⚠ **"`writeRoot`/`dataDir` already in scope" was true at one site of six.** `verify`, `restore`,
+`storageReport` and `cleanup` take no root parameter at all. That is *why* the roots come from
+`PathJail.allowedRoots()` rather than a threaded argument — the alternative was changing six
+signatures.
+
+⚠ **`archive` on `backup_verify` is jailed against `backup_dir`, not against the allowed roots.** It
+names a file *inside* the backup dir, so `archive: ../outside.zip` reads back out of the box while
+`backup_dir` itself stays perfectly legal. Two different roots for two different fields in the same
+method — pinned by `verifyRefusesAnArchiveThatTraversesOutOfTheBackupDir`.
+
+⚠ **`storage_report` is read-only and is jailed anyway.** The walk logs the largest files by full
+path, so an unjailed `dir` is directory enumeration of anything the server can read.
+
+**The blast radius the plan did not price (operator decision, 2026-08-14: enforce).** Job path fields
+are operator-supplied *output destinations*, unlike the in-repo config refs D2 was decided for. With
+the roots defaulting to the CWD, an absolute destination outside the server root now **fails the
+job** — a normal deployment wanting `backup_dir: /mnt/backups` must declare it via
+`-Dassist.safety.roots`. The operator chose enforcement with declared roots over a
+context-dependent allow-list. Documented in `docs/ops/backup-restore-runbook.md`.
+
+⚠ **~40 existing test call sites pass absolute `@TempDir` paths, which are outside the CWD.** Rather
+than edit all of them, surefire declares the execution root and the temp dir as allowed roots in the
+parent `pom.xml`. ⛔ That is a test sandbox, **not** a relaxation — `JobPathContainmentTest` narrows
+the roots to a single temp dir before every assertion, because under the permissive sandbox an
+"escape" would be contained by the temp root and **every test would pass while testing nothing**.
+For the same reason its escape fixtures are real sibling directories reached via `..`, never a literal
+like `/etc/passwd`: on Windows that normalises onto the current drive and can land *inside* the root.
+`escapesTo` asserts the fixture really is an escape before the test relies on it.
+
+**The falsification probe took three attempts, and the first two were wrong in ways worth keeping.**
+Final result: with the shared `contains` short-circuited, **6 of 7 job tests, 5 of 14 `PathJailTest`
+and 6 of 23 `ConfigSafetyValidatorTest` went red** — one chokepoint, both surfaces, falsified rather
+than asserted. Getting there:
+
+1. ⛔ **A `-DargLine` kill switch is not a probe in this repo.** Probe #1 disabled containment behind
+   `-Dpathjail.probe.disable` passed via `-DargLine`; the property never reached the forked test JVM
+   and **all 7 tests passed with containment "off"**. That looks exactly like a suite of vacuous
+   tests and would have been read as one. **Probe by editing the source** (`if (true) return …`), where
+   there is no plumbing to be wrong about.
+2. ⛔ **A probe scoped to one method can miss a caller that uses a different one.** Probe #2 disabled
+   only `requireUnderAny`, and `verifyRefusesAnArchiveThatTraversesOutOfTheBackupDir` stayed green —
+   not because it was vacuous but because `verify`'s `archive` field jails through **`require`**
+   against `backup_dir`. Probing the shared `contains` is what covered both.
+3. ⚠ **The reactor stops at the first failing module, so a probe spanning modules needs
+   `--fail-at-end`.** Without it `inspecto-config` failed, `inspecto-engine` was SKIPPED, and the run
+   reported the engine tests as neither passed nor failed — an easy result to misread as a pass.
+
+⚠ **The `escapesTo` guard earned its place:** 5 of the 6 failures landed on *it* ("fixture is not an
+escape"), not on the `assertThrows`. The guard detects a vacuous fixture before the assertion can
+pass for the wrong reason — ⛔ do not "simplify" it into a plain string literal.
 - **S4 · apply at group (iii), the config layer.** `resolveSchemaRef` enforces against the spaces root
   per D1/D2; `Asn1RecordIngester:96` (`ingester_config.grammar`) routed through it; and the genuinely
   rootless `PipelineConfig.fromMap` in-memory draft takes a root **supplied by the caller** (the route

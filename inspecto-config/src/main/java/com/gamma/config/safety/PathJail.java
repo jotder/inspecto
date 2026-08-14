@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 
 /**
  * The one answer to "is this path under this root", shared by every layer that needs it.
@@ -56,6 +57,46 @@ public final class PathJail {
 
         /** The value exactly as authored — never the resolved path, which may leak layout. */
         public String value() { return value; }
+    }
+
+    /**
+     * The roots that config-declared paths must resolve under: {@code -Dassist.safety.roots} (a
+     * {@code ;}-separated list), falling back to the working directory.
+     *
+     * <p>This is deliberately the <em>same</em> list {@link ConfigSafetyValidator} enforces at the 422
+     * write gate, so a value refused at authoring time is refused at run time for the same reason and
+     * against the same roots. ⛔ Do not introduce a second root source here — an earlier draft of this
+     * reached for {@code -Dspaces.root}, which is read only by {@code ControlApi} for space
+     * <em>discovery</em>, is unset in single-tenant mode and in the job runner, and carries no operator
+     * override. A jail whose root disagrees with the gate's is a jail with a documented bypass.
+     *
+     * <p>The list is plural on purpose: a backup destination outside the server root is a legitimate
+     * deployment ({@code backup_dir: /mnt/backups}), and the supported way to allow one is to declare
+     * it, not to weaken the check.
+     */
+    public static List<Path> allowedRoots() {
+        return SafetyPolicy.defaultPolicy().allowedRoots();
+    }
+
+    /**
+     * Enforcing, against a set of roots: returns the contained absolute path if {@code value} lies
+     * under <em>any</em> root, else throws.
+     *
+     * <p>Each root is tested with {@link #contains}, so this shares its verdict with the advisory
+     * surface exactly as {@link #require} does — there is still one definition of containment.
+     */
+    public static Path requireUnderAny(List<Path> roots, String value, String field) {
+        if (roots == null || roots.isEmpty())
+            throw new IllegalArgumentException("no allowed roots configured for '" + field + "'");
+        Escape first = null;
+        for (Path root : roots) {
+            try {
+                return require(root, value, field);
+            } catch (Escape e) {
+                if (first == null) first = e;   // report against the first root, the usual one
+            }
+        }
+        throw first;
     }
 
     /**

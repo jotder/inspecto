@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.config.safety.PathJail;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
@@ -120,7 +121,7 @@ final class ReportJob implements Job {
         String outDir = cfg.opt("out_dir", null);
         if (outDir == null) return null;
         String format = cfg.opt("format", rows != null ? "csv" : "json").toLowerCase();
-        Path dir = Path.of(outDir);
+        Path dir = PathJail.requireUnderAny(PathJail.allowedRoots(), outDir, "out_dir");
         Files.createDirectories(dir);
         Path artifact = dir.resolve(cfg.name() + "_" + TS.format(LocalDateTime.now())
                 + ("csv".equals(format) ? ".csv" : "png".equals(format) ? ".png"

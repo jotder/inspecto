@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import com.gamma.config.safety.PathJail;
 import com.gamma.notify.DeliveryReceiptStore;
 import com.gamma.notify.NotificationStore;
 import com.gamma.signal.Severity;
@@ -467,7 +468,9 @@ final class MaintenanceJob implements Job {
      * {@code maintenance.storage.threshold} WARNING signal an Alert Rule can subscribe to.
      */
     private JobResult storageReport(JobContext ctx) {
-        Path dir = Path.of(cfg.require("dir"));
+        // Read-only, but still jailed: the walk logs the largest files by full path, so an unjailed
+        // `dir` is directory enumeration of anywhere the server can read.
+        Path dir = PathJail.requireUnderAny(PathJail.allowedRoots(), cfg.require("dir"), "dir");
         long warnBytes = Long.parseLong(cfg.opt("warn_bytes", "0"));   // 0 = no threshold
         int top = Integer.parseInt(cfg.opt("top", "5"));
         long t0 = System.nanoTime();
@@ -765,7 +768,8 @@ final class MaintenanceJob implements Job {
     }
 
     private JobResult cleanup(boolean dryRun) {
-        Path dir = Path.of(cfg.require("dir"));
+        List<Path> jailRoots = PathJail.allowedRoots();
+        Path dir = PathJail.requireUnderAny(jailRoots, cfg.require("dir"), "dir");
         long days = Long.parseLong(cfg.opt("retention_days", "7"));
         String glob = cfg.opt("glob", "*");
         int maxCount = Integer.parseInt(cfg.opt("max_count", "0"));    // 0 = no count cap
@@ -775,7 +779,8 @@ final class MaintenanceJob implements Job {
         int minKeep = Integer.parseInt(cfg.opt("min_keep", "0"));
         boolean archive = Boolean.parseBoolean(cfg.opt("archive_instead_of_delete", "false"));
         // Archiving needs an explicit destination — no silent default that a later cleanup would re-walk.
-        Path archiveDir = archive ? Path.of(cfg.require("archive_dir")) : null;
+        Path archiveDir = archive
+                ? PathJail.requireUnderAny(jailRoots, cfg.require("archive_dir"), "archive_dir") : null;
         long t0 = System.nanoTime();
         if (!Files.isDirectory(dir)) {
             return JobResult.ok("cleanup: directory not present, nothing to do (" + dir + ")", 0L);

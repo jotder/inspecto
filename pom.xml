@@ -330,6 +330,20 @@
                     <version>3.2.5</version>
                     <configuration>
                         <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+                        <systemPropertyVariables>
+                            <!--
+                              Path containment (PathJail / ConfigSafetyValidator) refuses anything
+                              outside the allowed roots, which default to the working directory. Tests
+                              write to @TempDir, which lives outside it, so the temp dir is declared a
+                              root here rather than in ~40 individual call sites.
+
+                              This is a test sandbox, NOT a relaxation: tests that assert containment
+                              is *enforced* set their own narrower roots (the established
+                              System.setProperty("assist.safety.roots", …) pattern), and clearing the
+                              property still exercises the user.dir default.
+                            -->
+                            <assist.safety.roots>${session.executionRootDirectory};${java.io.tmpdir}</assist.safety.roots>
+                        </systemPropertyVariables>
                     </configuration>
                 </plugin>
             </plugins>
