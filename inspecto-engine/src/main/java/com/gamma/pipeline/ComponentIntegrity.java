@@ -63,6 +63,37 @@ public final class ComponentIntegrity {
         return findings;
     }
 
+    /**
+     * Broken component→pipeline references over {@code byType}, checked against {@code pipelineIds}
+     * (the registered-id universe, which only the caller can know — pipelines are files, not
+     * components). Covers expectation / decision-rule {@code target} when {@code targetType} is
+     * {@code pipeline} (the default when absent) — the same matching rule the delete-impact scan and
+     * the rename path use. Matching is case-insensitive because registered ids are lower-cased at
+     * parse time while authored targets may not be.
+     *
+     * <p>Deliberately does NOT check a dataset's {@code physicalRef}/{@code sourceName} against the
+     * pipeline set: those name <em>stores</em>, and stores legitimately exist that no pipeline owns
+     * (job-created ones like {@code maintenance_backups}). A dangling dataset is caught by the
+     * data-root existence check instead.
+     */
+    public static List<String> brokenPipelineRefs(Map<String, List<ComponentRegistry.Component>> byType,
+                                                  Set<String> pipelineIds) {
+        List<String> findings = new ArrayList<>();
+        Set<String> ids = new HashSet<>();
+        for (String p : pipelineIds) ids.add(p.toLowerCase());
+        for (String type : List.of("expectation", "decision-rule")) {
+            for (ComponentRegistry.Component c : byType.getOrDefault(type, List.of())) {
+                String targetType = String.valueOf(c.content().getOrDefault("targetType", "pipeline"));
+                if (!"pipeline".equalsIgnoreCase(targetType)) continue;
+                String target = str(c.content().get("target"));
+                if (target != null && !ids.contains(target.trim().toLowerCase()))
+                    findings.add("broken reference: " + type + " '" + c.name() + "' → missing pipeline '"
+                            + target.trim() + "'");
+            }
+        }
+        return findings;
+    }
+
     /** Components of one type whose content is identical apart from {@code name}. */
     public static List<String> duplicates(Map<String, List<ComponentRegistry.Component>> byType) {
         List<String> findings = new ArrayList<>();

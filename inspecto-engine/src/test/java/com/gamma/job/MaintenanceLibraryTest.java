@@ -819,6 +819,70 @@ class MaintenanceLibraryTest {
         }
     }
 
+    @Test
+    void metadataValidateFlagsBrokenPipelineTargets(@TempDir Path writeRoot) throws Exception {
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            // One real pipeline, so the pipeline-target checks arm (they skip on an empty universe).
+            Files.writeString(writeRoot.resolve("orders_feed_pipeline.toon"), "name: Orders Feed\n");
+            Files.writeString(writeRoot.resolve("daily_enrich.toon"), """
+                    name: daily
+                    transform: SELECT 1
+                    triggers:
+                      on_pipeline: ghost_pipe
+                    references:
+                      lookup:
+                        ref: also_gone
+                    """);
+            var store = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
+            store.write("expectation", "rowcount", Map.of("target", "ghost_pipe"));
+            store.write("expectation", "ok_target", Map.of("target", "orders_feed"));   // derived id matches
+            store.write("decision-rule", "on_dataset", Map.of("targetType", "dataset", "target", "ghost_pipe"));
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate"))).run();
+            assertEquals("SUCCESS", r.status(), r.message());
+            // expectation target + enrichment trigger + enrichment by-name ref = 3; the matching
+            // expectation and the dataset-targeted rule contribute nothing.
+            assertTrue(r.message().contains("3 finding(s)"), r.message());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    @Test
+    void metadataValidateSkipsPipelineTargetsWhenNoPipelineFileExists(@TempDir Path writeRoot) throws Exception {
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            // Pipelines can be registered from outside the write root — an expectation target must
+            // not be flagged when the audit cannot see the pipeline universe at all.
+            var store = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
+            store.write("expectation", "rowcount", Map.of("target", "elsewhere_pipe"));
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate"))).run();
+            assertTrue(r.message().contains("0 finding(s)"), r.message());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    @Test
+    void metadataValidateChecksSlashedPhysicalRefs(@TempDir Path dataDir, @TempDir Path writeRoot) throws Exception {
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            var store = new com.gamma.pipeline.ComponentStore(writeRoot.resolve("registry"));
+            // The exact shape go-live registers — skipped entirely before 2026-08-14.
+            store.write("dataset", "gone_ds", Map.of("physicalRef", "orders_feed/database"));
+            store.write("dataset", "ok_ds", Map.of("physicalRef", "present/database"));
+            store.write("dataset", "escape_ds", Map.of("physicalRef", "../outside"));   // unverifiable, skipped
+            Files.createDirectories(dataDir.resolve("present").resolve("database"));
+
+            JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate")), dataDir.toString()).run();
+            assertTrue(r.message().contains("1 finding(s)"), r.message());
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
     // ── file_repository_audit (MNT-12, Phase 3) ──────────────────────────────────
 
     @Test
