@@ -376,8 +376,19 @@ public final class SpaceManager implements AutoCloseable {
         com.gamma.pipeline.exec.ProvenanceStores.unregister(id.value());
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
-            if (base.startsWith(spacesRoot) && Files.isDirectory(base)) deleteRecursively(base);
-            log.info("Deleted + purged space '{}' ({})", id.value(), base);
+            // ⛔ The containment verdict must not be reported as a purge. Both roots are absolute and
+            // normalized (spacesRoot at discover()), so this holds today by construction — but the old
+            // form logged "Deleted + purged" whether the delete ran, was skipped for escaping, or found
+            // no directory at all. A guard whose failure reads as success is not a guard.
+            if (!base.startsWith(spacesRoot))
+                throw new IOException("refusing to purge space '" + id.value() + "': " + base
+                        + " escapes the spaces root " + spacesRoot);
+            if (Files.isDirectory(base)) {
+                deleteRecursively(base);
+                log.info("Deleted + purged space '{}' ({})", id.value(), base);
+            } else {
+                log.info("Deleted space '{}' — nothing to purge, no directory at {}", id.value(), base);
+            }
         } else {
             log.info("Deleted space '{}' (files left on disk)", id.value());
         }

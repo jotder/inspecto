@@ -71,6 +71,22 @@ Two implementations were deliberately **not** migrated: `PipelineConfigParser.va
 `PipelineJobRunner.requireTopLevelSinks` is a **depth** rule about literal directory nesting, where
 resolving real paths would change the answer for the wrong reason.
 
+⚠ **`PathJail` unified the CONFIG-path implementations, not every containment check in the codebase.**
+A 2026-08-14 sweep found ~15 more outside that scope — the registry stores (three byte-identical
+copies), archive extraction, static file serving, remote listings — disagreeing on symlinks,
+absolutisation and failure mode. They are **four different problems**, and ⛔ putting them all on
+`PathJail` is the wrong fix: remote object keys are not local `Path`s, and id-shaped names are not
+containment at all. The family split and the ranked fix order are `BACKLOG.md` §6 **PATH-2**.
+
+⛔ **A containment check must never report success when it refuses.** Two did, and both were fixed
+2026-08-14: `MetadataValidateTask.missingPhysical` skipped an escaping `physicalRef` as "not ours to
+verify", so a space carrying one **audited clean** — an escaping ref is a *worse* finding than a missing
+store, and it now emits one; and `SpaceManager.delete` logged *"Deleted + purged"* whether it deleted
+the tree, found nothing on disk, or refused for escaping the spaces root — the three outcomes are now
+distinct and the refusal throws. ⚠ Neither was a live escape: `spacesRoot` is absolute and normalized at
+`discover()` and `SpaceId` forbids separators, so that guard held by construction. These were *reporting*
+defects, which is exactly why they survived — a guard whose failure reads as success is not a guard.
+
 **Why these live here and not in a `ConfigSpec`.** `FieldSpec`/`ConfigSpec` are flat-dotted-path only —
 `FieldType.MAP`/`LIST` assert the container type and never walk into entries, and there is no
 map-of-objects/list-of-objects primitive. Every repeated sub-shape in the codebase (`sinks[]`, and now

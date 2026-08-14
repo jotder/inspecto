@@ -101,6 +101,31 @@ class SpaceManagerTest {
     }
 
     @Test
+    void purgingASpaceWithNothingOnDiskStillSucceeds(@TempDir Path root) throws Exception {
+        // The purge branch used to log "Deleted + purged" for all three outcomes — deleted, skipped for
+        // escaping the spaces root, and nothing there at all. They are now told apart, so pin that the
+        // empty case is still a success and not an error path.
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            mgr.create(SpaceId.of("acme"), null, null);
+            deleteTree(root.resolve("acme"));
+            assertTrue(mgr.delete(SpaceId.of("acme"), true));
+            assertEquals(0, mgr.size());
+        }
+    }
+
+    private static void deleteTree(Path dir) throws Exception {
+        try (var walk = Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.delete(p);
+                } catch (java.io.IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            });
+        }
+    }
+
+    @Test
     void deleteForgetsThePerSpaceConnectionRegistryAndStabilityGate(@TempDir Path root) throws Exception {
         try (SpaceManager mgr = SpaceManager.discover(root)) {
             mgr.create(SpaceId.of("acme"), null, null);

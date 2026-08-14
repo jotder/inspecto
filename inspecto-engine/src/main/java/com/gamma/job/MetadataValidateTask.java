@@ -80,8 +80,8 @@ final class MetadataValidateTask {
 
     /**
      * A Dataset whose {@code physicalRef} has no store dir/file under the data root. A slashed ref
-     * ({@code orders/database} — the exact shape go-live registers) resolves as a relative path;
-     * only a ref that would escape the data root is unverifiable and skipped.
+     * ({@code orders/database} — the exact shape go-live registers) resolves as a relative path; a ref
+     * that would escape the data root is reported as unsafe rather than verified or skipped.
      */
     private static void missingPhysical(List<ComponentRegistry.Component> datasets, String dataDir,
                                         List<String> findings) {
@@ -91,7 +91,14 @@ final class MetadataValidateTask {
             String ref = str(d.content().get("physicalRef"));
             if (ref == null) continue;
             Path resolved = root.resolve(ref.replace('\\', '/')).normalize();
-            if (!resolved.startsWith(root)) continue;   // escapes the data root — not ours to verify
+            if (!resolved.startsWith(root)) {
+                // ⛔ Do not skip this. An escaping ref is a WORSE finding than a merely missing one, and
+                // an audit that stays silent about it reports the space clean. "Not ours to verify" is
+                // true of the target; it is not true of the reference.
+                findings.add("unsafe physical reference: dataset '" + d.name() + "' → '" + ref
+                        + "' escapes the data root");
+                continue;
+            }
             if (!Files.exists(resolved))
                 findings.add("missing physical data: dataset '" + d.name() + "' → no store '" + ref
                         + "' under the data root");

@@ -474,6 +474,58 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- 🟡 **PATH-2 — path containment is unified for CONFIG paths only; ~15 more implementations sit outside
+  it and disagree** (opened 2026-08-14, from an exhaustive sweep). The archived
+  [`path-containment-unification`](archived-documents/plans-archive/path-containment-unification.md)
+  plan is **complete and correct for its scope** — ⛔ do not re-open it. Its §1 counted *five* config-path
+  implementations and unified them onto `PathJail`; nobody counted the adjacent families. ⛔ **The fix is
+  NOT "put the other fifteen on `PathJail`"** — they are four genuinely different problems and only one
+  is "a local path under a local root":
+  **(a) local-path-under-root** → `PathJail`. `ComponentStore:315` / `PipelineStore:109` / `ViewStore:95`
+  are **byte-identical copies** of one another, so that is three→one for free. Others here:
+  `DbBrowserRoutes:176` (caller-supplied `?table=`, then interpolated into a `read_parquet` glob),
+  `ControlApi.serveStatic:747` (`-Dui.dir`; a symlink inside the built SPA dir would serve through it),
+  `RemoteAcquisitionHandler.contained:226` (⚠ its Javadoc claims it "mirrors" `WriteGates` and
+  `LocalConnectionWorkbench` — **stale**, both now delegate).
+  **(b) archive-entry extraction** (zip/tar-slip: `TarUtil:102` — ⚠ its `destDir` is never normalized or
+  absolutised while the entry *is*, so the two sides are compared in different frames — plus
+  `BundleImporter:84`, `BackupTask:265`) → one shared `safeEntry`. Same shape, different lifecycle:
+  per-entry, attacker-controlled names, no config root.
+  **(c) remote key normalisation** (`AbstractRemoteWorkbench:120`) → ⛔ **leave alone.** It is the only
+  protocol-correct one; SFTP/S3 keys are not local `Path`s, and forcing it through `PathJail` is exactly
+  the "tidier" move S2 already refused when it kept `PathEscape` as the thrown type.
+  **(d) id-shaped names** (`WriteGates.safeName`, `SpaceId`, `SummaryWriter`) → not containment at all.
+  Apply S2's proven trick again — **unify the verdict, never the resolution.** Ranked by what is a *bug*
+  rather than what is untidy: **1. silent-success** — ~~`MetadataValidateTask:94` `continue`s past an
+  escaping `physicalRef` so the audit reports the space CLEAN, and `SpaceManager:379` skips the purge but
+  still logs "Deleted + purged"~~ **CLOSED 2026-08-14** (see below). **2. gate/loader disagreement** —
+  `ConfigRoutes.resolves:793` says it mirrors `PipelineConfigParser.resolveSchemaRef` but copies only the
+  *preference* half and **omits the closing `PathJail.requireUnderAny`** (`PipelineConfigParser:841`), so
+  the 422 write gate accepts refs the loader later refuses: the write succeeds and the *load* fails.
+  Not a security hole — the loader still enforces — but the worst place to find out. **3. two root
+  sources for "the" jail** — `-Dassist.write.root` (→403, `WriteGates`) vs `-Dassist.safety.roots`
+  (→422, `PathJail`/`ConfigSafetyValidator`); `PathJail`'s own Javadoc argues against a second root
+  source while `WriteGates` is one. **4. symlinks split the codebase cleanly in two** — everything on
+  `PathJail` re-checks, nothing else does; this is a *consequence* of the above, not separate work.
+  ⚠ Two things to decide, not assume: `PathJail:151` returns **true** when the filesystem will not answer
+  (containment granted on the structural check alone) — deliberate fail-open or oversight? And
+  `DatasetRelation.localBase:95` does a bare `dataRoot.resolve(ref)` with no `normalize()` and no
+  `startsWith`, defended only by a regex + `".."` test — that regex does block absolute refs and
+  traversal, so this is narrower than it looks, but `ExpectationEvaluator:99` consumes the **same**
+  `physicalRef` with the **identical** `SAFE_REF` pattern *and* adds a containment check. Two readers of
+  one value, disagreeing. ⚠ Nothing pins any of the ~15 — the existing tests (`PathJailTest`,
+  `ConfigSafetyValidatorTest`, `JobPathContainmentTest`) cover only the unified five. |
+  `okf/backend/config/config-safety.md`
+  - **Tier 1 (silent-success) SHIPPED 2026-08-14.** `MetadataValidateTask` now emits an *unsafe physical
+    reference* finding instead of `continue`-ing — an escaping ref is a **worse** finding than a merely
+    missing store, and staying silent let the space audit clean. ⚠ The existing test pinned the old
+    behaviour in a comment (`"unverifiable, skipped"`), so the change had to correct a *test that was
+    asserting the bug*. `SpaceManager` now tells its three purge outcomes apart (deleted · nothing on
+    disk · escaping) instead of logging "Deleted + purged" for all three, and the escape branch throws.
+    ⚠ **Both roots there are already absolute and normalized** (`spacesRoot` at `discover():84`) and
+    `SpaceId` forbids separators, so the guard held by construction — this was a *reporting* defect, not
+    a live escape. ⚠ Findings reach the operator via `ctx.log()`/signals, **not** `JobResult`, so with a
+    null `ctx` the finding COUNT is the only assertable surface.
 - ~~🔴 BUILD-1 — the offline reactor build is BROKEN~~ **CLOSED 2026-08-06 — NOT A BUILD DEFECT. The
   diagnosis was an artifact of running as the wrong Windows profile.** `mvn -o clean test` completes
   the full **23-module reactor: BUILD SUCCESS, 2799 tests, 0 failures, 0 errors, 6 skipped** (3m32s),

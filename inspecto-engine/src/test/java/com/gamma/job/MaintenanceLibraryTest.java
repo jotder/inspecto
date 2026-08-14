@@ -873,11 +873,16 @@ class MaintenanceLibraryTest {
             // The exact shape go-live registers — skipped entirely before 2026-08-14.
             store.write("dataset", "gone_ds", Map.of("physicalRef", "orders_feed/database"));
             store.write("dataset", "ok_ds", Map.of("physicalRef", "present/database"));
-            store.write("dataset", "escape_ds", Map.of("physicalRef", "../outside"));   // unverifiable, skipped
+            store.write("dataset", "escape_ds", Map.of("physicalRef", "../outside"));
             Files.createDirectories(dataDir.resolve("present").resolve("database"));
 
             JobResult r = new MaintenanceJob(job(Map.of("task", "metadata_validate")), dataDir.toString()).run();
-            assertTrue(r.message().contains("1 finding(s)"), r.message());
+            // The missing store, PLUS the escaping ref. The escape used to be skipped silently, which
+            // let a space with a hostile physicalRef audit clean — a worse outcome than a missing store.
+            // gone_ds (missing store) + escape_ds; ok_ds contributes nothing. ⚠ Findings reach the
+            // operator via ctx.log()/signals, not JobResult — with a null ctx the count is all this
+            // surface exposes, so the count IS the assertion.
+            assertTrue(r.message().contains("2 finding(s)"), r.message());
         } finally {
             System.clearProperty("assist.write.root");
         }
