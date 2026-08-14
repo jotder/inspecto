@@ -8,11 +8,9 @@ import {
     mergeGraphs,
 } from 'app/inspecto/graph';
 import { InvService, ProjectionTriple } from 'app/inspecto/api';
-import { evaluateRows, inferColumns } from 'app/inspecto/query';
 import { firstValueFrom } from 'rxjs';
-import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { SAMPLE_SOURCES } from 'app/modules/admin/studio/datasets/dataset-sources';
+import { sampleDatasetRows } from 'app/inspecto/viz/dataset-rows.service';
 
 /**
  * The P3 **entity-projection** GraphSource (GLOSSARY §11): fold a Dataset's rows into a business
@@ -172,13 +170,6 @@ export function projectTriples(
     return { nodes: [...nodes.values()], edges, truncated };
 }
 
-/** Resolve a Dataset's offline rows exactly as the editor preview does. */
-export function datasetRows(ds: Dataset): Record<string, unknown>[] {
-    const raw = SAMPLE_SOURCES[ds.sourceName] ?? [];
-    if (!ds.query) return raw;
-    return evaluateRows(ds.query, { name: ds.sourceName, rows: raw, columns: inferColumns(raw) });
-}
-
 /**
  * The pluggable source: backend projection first ({@code POST /inv/projection} → {@link projectTriples});
  * on any failure (offline demo, pre-INV-1 backend) the original client fold over sample rows.
@@ -218,7 +209,7 @@ export class EntityProjectionGraphSource implements GraphSource {
         } catch {
             // Offline / mock (501) or an older backend: the original client-side sample fold.
             const ds = await firstValueFrom(this.datasets.get(p.datasetId));
-            const out = projectEntities(datasetRows(ds), p);
+            const out = projectEntities(sampleDatasetRows(ds), p);
             if (isProjectionError(out)) throw new Error(out.error);
             return out;
         }

@@ -27,7 +27,7 @@ import { ComponentHistoryDialog } from 'app/inspecto/components/component-histor
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { SAMPLE_SOURCES } from '../datasets/dataset-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import { Widget, WidgetOptions, buildWidget } from './widget-types';
 import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
 import { WidgetOptionsDialog } from './widget-options.dialog';

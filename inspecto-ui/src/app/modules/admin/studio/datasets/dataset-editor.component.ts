@@ -25,7 +25,7 @@ import {
 import { DatasetCalculatedComponent } from './dataset-calculated.component';
 import { DatasetColumnsComponent } from './dataset-columns.component';
 import { DatasetMeasuresComponent } from './dataset-measures.component';
-import { SAMPLE_SOURCES, SAMPLE_SOURCE_NAMES } from './dataset-sources';
+import { SAMPLE_SOURCES, SAMPLE_SOURCE_NAMES } from 'app/inspecto/mock/sample-sources';
 import {
     buildDataset,
     CalculatedColumn,

@@ -46,7 +46,7 @@ import { ShareDashboardDialog } from './share-dashboard.dialog';
 import { DashboardTileComponent } from './dashboard-tile.component';
 import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
-import { SAMPLE_SOURCES } from '../datasets/dataset-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import '../widgets/widget.kind'; // register widget kind + viz plugins (tiles call getViz)
 import './dashboard.kind'; // register the dashboard kind
 

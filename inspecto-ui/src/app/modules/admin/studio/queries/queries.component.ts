@@ -36,7 +36,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { SAMPLE_SOURCES } from '../datasets/dataset-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import { Query, QueryType, buildQuery } from './query-types';
 import { QueriesService } from './queries.service';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';

@@ -1,7 +1,11 @@
 /**
- * Mock-first sample sources for the Studio dataset editor's embedded Query Core. Offline, the panel needs
- * rows to infer columns and preview filters; these stand in until the dataset reads from the real Query/DuckDB
- * backend. One representative CDR-style table for the prototype (extend as Studio grows).
+ * Offline sample stores — the rows a Dataset resolves to when the Studio domain is mock-served
+ * (`environment.mockStudio`). Live, {@link DatasetRowsService} reads the real store over `/db/*` instead
+ * and these are never touched; they exist so the Query Core, the widget/dashboard previews and the demo
+ * seeds work with no backend.
+ *
+ * Lives in the mock layer, not under a feature: it is consumed across Studio, Reconciliation, Link
+ * Analysis and Geo, and shared code may not import a feature (`angular-ui` §3).
  */
 export const SAMPLE_SOURCES: Record<string, Record<string, unknown>[]> = {
     cdr: [

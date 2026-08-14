@@ -65,7 +65,7 @@ import {
 import { GeoSettingsService, apiErrorMessage } from 'app/inspecto/api';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { datasetRows } from 'app/modules/admin/studio/link-analysis/entity-projection';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { ICON_COLOR_SWATCHES } from 'app/inspecto/theme/chart-tokens';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 import { GeocoderService } from './geocoder.service';
@@ -152,6 +152,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     private viewsService = inject(GeoMapService);
     private geoSettings = inject(GeoSettingsService);
     private geocoder = inject(GeocoderService);
+    private datasetRowsSvc = inject(DatasetRowsService);
 
     /** Customer tile server (Settings → Map); `null` = the bundled offline basemap. */
     readonly tileServerUrl = signal<string | null>(null);
@@ -406,10 +407,15 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         this.viewsService.list().subscribe({ next: (v) => this.views.set(v), error: () => undefined });
     }
 
-    /** Offer the picked Dataset's columns and preselect obvious coordinate columns by name. */
-    private onDatasetPicked(id: string): void {
+    /**
+     * Offer the picked Dataset's columns and preselect obvious coordinate columns by name. The columns
+     * come from the rows seam (declared, else a 1-row probe of the real store) — reading them out of the
+     * first *sample* row offered nothing at all for a store with no offline fixture, which is every store
+     * a live deployment has.
+     */
+    private async onDatasetPicked(id: string): Promise<void> {
         const ds = this.datasets().find((d) => d.id === id);
-        const cols = ds ? Object.keys(datasetRows(ds)[0] ?? {}) : [];
+        const cols = ds ? (await this.datasetRowsSvc.columns(ds)).map((c) => c.name) : [];
         this.datasetColumns.set(cols);
         const guess = (re: RegExp): string => cols.find((c) => re.test(c)) ?? '';
         this.queryForm.patchValue({
@@ -826,8 +832,12 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         this.notes.set(view.notes ?? []);
         const p = view.query.projection;
         const r = view.query.routes;
+        // Resolve the dataset's columns BEFORE patching the saved mapping over them: the pick offers the
+        // column list and guesses coordinate columns, and it is async now, so letting the subscription
+        // fire would land those guesses *after* the saved values and blank them.
         if (p) {
-            this.queryForm.patchValue({ datasetId: p.datasetId });
+            this.queryForm.patchValue({ datasetId: p.datasetId }, { emitEvent: false });
+            await this.onDatasetPicked(p.datasetId);
             this.queryForm.patchValue({
                 latCol: p.latCol,
                 lonCol: p.lonCol,
@@ -836,7 +846,8 @@ export class GeoMapComponent implements OnInit, OnDestroy {
                 timeCol: p.timeCol ?? '',
             });
         } else if (r) {
-            this.queryForm.patchValue({ datasetId: r.datasetId });
+            this.queryForm.patchValue({ datasetId: r.datasetId }, { emitEvent: false });
+            await this.onDatasetPicked(r.datasetId);
             this.queryForm.patchValue({
                 fromLatCol: r.fromLatCol,
                 fromLonCol: r.fromLonCol,

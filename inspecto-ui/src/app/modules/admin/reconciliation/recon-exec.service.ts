@@ -10,10 +10,8 @@ import {
     ReconRunResult,
     SideKey,
 } from 'app/inspecto/reconciliation';
-import { evaluateRows } from 'app/inspecto/query';
-import { Dataset } from '../studio/datasets/dataset-types';
 import { DatasetsService } from '../studio/datasets/datasets.service';
-import { SAMPLE_SOURCES } from '../studio/datasets/dataset-sources';
+import { sampleDatasetRows } from 'app/inspecto/viz/dataset-rows.service';
 
 /**
  * Reconciliation execution seam — the recon analogue of `DatasetResultService`: when the Studio domain
@@ -62,7 +60,11 @@ export class ReconExecService {
                 third: recon.thirdDataset ? this.datasets.get(recon.thirdDataset) : of(null),
             }),
         );
-        return { left: datasetRows(left), right: datasetRows(right), third: third ? datasetRows(third) : null };
+        return {
+            left: sampleDatasetRows(left),
+            right: sampleDatasetRows(right),
+            third: third ? sampleDatasetRows(third) : null,
+        };
     }
 }
 
@@ -81,12 +83,4 @@ export function serverConfig(recon: Reconciliation): ReconServerConfig {
         })),
         includeRecordCount: true,
     };
-}
-
-/** Resolve an authored dataset to its (mock) rows — sample-source rows, Query-Core-filtered when virtual. */
-export function datasetRows(ds: Dataset | null): Record<string, unknown>[] {
-    if (!ds) return [];
-    const rows = SAMPLE_SOURCES[ds.sourceName] ?? [];
-    if (ds.kind === 'virtual' && ds.query) return evaluateRows(ds.query, { name: ds.sourceName, rows });
-    return rows;
 }

@@ -2,15 +2,17 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ToastrService } from 'ngx-toastr';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { GraphSourceId } from 'app/inspecto/graph';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { LinkAnalysisQueryPanelComponent } from './link-analysis-query-panel.component';
 
-function make(sourceId: GraphSourceId = 'entity-projection') {
+function make(sourceId: GraphSourceId = 'entity-projection', extraProviders: unknown[] = []) {
     TestBed.configureTestingModule({
         imports: [LinkAnalysisQueryPanelComponent],
         providers: [
+            ...(extraProviders as []),
             provideNoopAnimations(),
             // The panel now hosts <inspecto-ai-assist> (projection_author), which injects AgentService +
             // ToastrService — without these every test in this file dies at createComponent.
@@ -189,11 +191,13 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         expect(c.queryForm.dirty).toBe(true);
     });
 
-    it("projection_author args carry the pane's own column list, since no route returns one", () => {
+    it("projection_author args carry the pane's own column list, since no route returns one", async () => {
         const { c } = make('entity-projection');
         // Order matters: picking a dataset RE-RESOLVES datasetColumns from `datasets()`, which is empty
-        // here — so seed the columns after the pick, exactly as onDatasetPicked would from a real Dataset.
+        // here — and that resolution is async now, so let it land BEFORE seeding the columns the way
+        // onDatasetPicked would from a real Dataset. Seeding first would just be overwritten.
         c.queryForm.patchValue({ datasetId: 'cdr' });
+        await Promise.resolve();
         c.datasetColumns.set(['caller_id', 'callee_id']);
         expect(c.aiProjectionArgs()).toEqual({
             datasetId: 'cdr',
@@ -205,6 +209,20 @@ describe('LinkAnalysisQueryPanelComponent', () => {
         expect(c.aiCurrentProjection()).toMatchObject({
             query: { projections: [{ datasetId: 'cdr' }] },
         });
+    });
+
+    it('asks the rows seam for a picked Dataset‘s columns when it declares none', async () => {
+        // The case the old code got wrong: a dataset that declares no columns fell back to the keys of
+        // the store's first OFFLINE SAMPLE row, so a real store — which has no sample — offered nothing.
+        const columns = vi.fn(() => Promise.resolve([{ name: 'caller_id', type: 'string' }]));
+        const { fixture, c } = make('entity-projection', [{ provide: DatasetRowsService, useValue: { columns } }]);
+        fixture.componentRef.setInput('datasets', [
+            { id: 'cdr', name: 'cdr', kind: 'physical', sourceName: 'switch_cdr_live', columns: [] },
+        ]);
+        c.queryForm.patchValue({ datasetId: 'cdr' });
+        await fixture.whenStable();
+        expect(columns).toHaveBeenCalledWith(expect.objectContaining({ sourceName: 'switch_cdr_live' }));
+        expect(c.datasetColumns()).toEqual(['caller_id']);
     });
 
     it('renders with no a11y violations', async () => {

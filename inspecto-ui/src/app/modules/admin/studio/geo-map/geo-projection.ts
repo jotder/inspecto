@@ -12,7 +12,7 @@ import {
 } from 'app/inspecto/geo';
 import { GeoProjectionResult, GeoService } from 'app/inspecto/api';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
-import { datasetRows } from 'app/modules/admin/studio/link-analysis/entity-projection';
+import { sampleDatasetRows } from 'app/inspecto/viz/dataset-rows.service';
 
 /**
  * The `dataset` **GeoSource**: project a Dataset's rows onto the map — each row with a valid
@@ -204,7 +204,7 @@ export class DatasetGeoSource implements GeoSource {
         } catch {
             // Offline / mock (501) or an older backend: the original client-side sample fold.
             const ds = await firstValueFrom(this.datasets.get(p.datasetId));
-            const out = projectPoints(datasetRows(ds), p);
+            const out = projectPoints(sampleDatasetRows(ds), p);
             if (isGeoProjectionError(out)) throw new Error(out.error);
             return out;
         }
@@ -243,7 +243,7 @@ export class RouteProjectionGeoSource implements GeoSource {
         } catch {
             // Offline / mock (501) or an older backend: the original client-side sample fold.
             const ds = await firstValueFrom(this.datasets.get(p.datasetId));
-            const out = projectRoutes(datasetRows(ds), p);
+            const out = projectRoutes(sampleDatasetRows(ds), p);
             if (isGeoProjectionError(out)) throw new Error(out.error);
             return out;
         }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_SOURCES } from 'app/modules/admin/studio/datasets/dataset-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import {
     coLocations,
     frequentLocations,

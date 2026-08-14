@@ -12,6 +12,7 @@ import { GeoSource } from 'app/inspecto/geo';
 import { ElementDetailData } from 'app/inspecto/investigation';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { GeoMapComponent } from './geo-map.component';
 import { GeoSourcesService, ProjectedGeo } from './geo-projection';
 import { GeoMapService, GeoMapView } from './geo-map.service';
@@ -48,7 +49,14 @@ const ROUTES_GEO: ProjectedGeo = {
 };
 
 function create(
-    opts: { fail?: boolean; views?: GeoMapView[]; geo?: ProjectedGeo; queryParams?: Record<string, string> } = {},
+    opts: {
+        fail?: boolean;
+        views?: GeoMapView[];
+        geo?: ProjectedGeo;
+        queryParams?: Record<string, string>;
+        /** What the rows seam answers for the picked Dataset's columns (`DS` declares none). */
+        columns?: { name: string; type: string }[];
+    } = {},
 ) {
     const queried: unknown[] = [];
     const fakeSource: GeoSource = {
@@ -75,6 +83,7 @@ function create(
             provideRouter([]),
             { provide: GeoSourcesService, useValue: { sources: [fakeSource, fakeRouteSource] } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
+            { provide: DatasetRowsService, useValue: { columns: () => Promise.resolve(opts.columns ?? []) } },
             { provide: GeoMapService, useValue: { list: () => of(opts.views ?? []), save } },
             { provide: GeoSettingsService, useValue: { get: () => of({ tileServerUrl: null }) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
@@ -107,6 +116,28 @@ describe('GeoMapComponent', () => {
         await fixture.componentInstance.run(); // nothing picked yet → invalid form, no query
         expect(queried).toHaveLength(0);
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('offers the picked Dataset‘s columns from the rows seam and guesses the coordinate ones', async () => {
+        // `DS` declares no columns and its store has no offline sample, so the old
+        // `Object.keys(datasetRows(ds)[0] ?? {})` offered NOTHING and the lat/lon guesses stayed blank.
+        const { fixture } = create({
+            columns: [
+                { name: 'site', type: 'string' },
+                { name: 'latitude', type: 'number' },
+                { name: 'longitude', type: 'number' },
+                { name: 'seen_time', type: 'date' },
+            ],
+        });
+        fixture.detectChanges();
+        fixture.componentInstance.queryForm.patchValue({ datasetId: 'towers-ds' });
+        await fixture.whenStable();
+        expect(fixture.componentInstance.datasetColumns()).toEqual(['site', 'latitude', 'longitude', 'seen_time']);
+        expect(fixture.componentInstance.queryForm.getRawValue()).toMatchObject({
+            latCol: 'latitude',
+            lonCol: 'longitude',
+            timeCol: 'seen_time',
+        });
     });
 
     it('runs the query, surfaces skipped rows, and search/kind filters drive emphasis + rows', async () => {

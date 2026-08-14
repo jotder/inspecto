@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SAMPLE_SOURCES } from '../../../modules/admin/studio/datasets/dataset-sources';
+import { SAMPLE_SOURCES } from '../sample-sources';
 import { componentCollection } from '../handlers/components.handler';
 import { PIPELINES_COLL } from '../handlers/pipelines.handler';
 import { MockStore } from '../mock-store';

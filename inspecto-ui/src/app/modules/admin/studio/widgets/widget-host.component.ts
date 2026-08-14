@@ -22,7 +22,7 @@ import { Widget } from './widget-types';
 import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { SAMPLE_SOURCES } from '../datasets/dataset-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 
 /** A drilled-down click: filter `field = value` on whatever consumes this widget's data (a dashboard). */
 export interface DrillEvent {

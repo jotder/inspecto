@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { of, throwError } from 'rxjs';
-import { SAMPLE_SOURCES } from 'app/modules/admin/studio/datasets/dataset-sources';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import {
     EntityProjectionGraphSource,

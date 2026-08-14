@@ -10,8 +10,8 @@ import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { PipelineSummary } from 'app/inspecto/api';
 import { EntityProjection, GraphSource, GraphSourceId, GraphSourceQuery } from 'app/inspecto/graph';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
-import { SAMPLE_SOURCES } from 'app/modules/admin/studio/datasets/dataset-sources';
 import { LinkAnalysisView } from './link-analysis.service';
 
 /** One line of the collapsed-query summary (also used by the host's canvas status bar). */
@@ -46,6 +46,7 @@ export interface QuerySummaryItem {
 })
 export class LinkAnalysisQueryPanelComponent implements OnInit {
     private fb = inject(FormBuilder);
+    private datasetRows = inject(DatasetRowsService);
 
     readonly sources = input<GraphSource[]>([]);
     readonly datasets = input<Dataset[]>([]);
@@ -80,7 +81,8 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         extraPipelines: [[] as string[]],
     });
 
-    /** Columns offered by the projection mapping selects — the picked Dataset's columns (or its sample rows'). */
+    /** Columns offered by the projection mapping selects — the picked Dataset's declared columns, or the
+     *  ones the rows seam probes off its store. */
     readonly datasetColumns = signal<string[]>([]);
 
     /**
@@ -110,8 +112,8 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
     addMapping(): void {
         const group = this.newMappingGroup();
         const i = this.extraMappings.length;
-        group.controls.datasetId.valueChanges.subscribe((id) => {
-            const cols = this.columnsForDataset(id);
+        group.controls.datasetId.valueChanges.subscribe(async (id) => {
+            const cols = await this.columnsForDataset(id);
             this.extraMappingColumns.update((all) => all.map((c, idx) => (idx === i ? cols : c)));
         });
         this.extraMappings.push(group);
@@ -123,17 +125,15 @@ export class LinkAnalysisQueryPanelComponent implements OnInit {
         this.extraMappingColumns.update((all) => all.filter((_, idx) => idx !== i));
     }
 
-    private onDatasetPicked(id: string): void {
-        this.datasetColumns.set(this.columnsForDataset(id));
+    private async onDatasetPicked(id: string): Promise<void> {
+        this.datasetColumns.set(await this.columnsForDataset(id));
     }
 
-    /** The columns a mapping row's Dataset select should offer — declared columns, or sampled ones. */
-    private columnsForDataset(id: string): string[] {
+    /** The columns a mapping row's Dataset select should offer — declared, else probed from the store. */
+    private async columnsForDataset(id: string): Promise<string[]> {
         const ds = this.datasets().find((d) => d.id === id);
         if (!ds) return [];
-        const declared = ds.columns.map((c) => c.name);
-        const sampled = Object.keys(SAMPLE_SOURCES[ds.sourceName]?.[0] ?? {});
-        return declared.length ? declared : sampled;
+        return (await this.datasetRows.columns(ds)).map((c) => c.name);
     }
 
     /** The query the current form + source amounts to (also what a saved view persists). */
