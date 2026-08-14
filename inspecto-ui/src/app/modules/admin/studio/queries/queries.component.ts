@@ -18,14 +18,13 @@ import {
     QueryChange,
     QueryModel,
     QueryPanelComponent,
+    QuerySource,
     emptyGroup,
-    evaluateRows,
     findParameters,
     resolveParameters,
 } from 'app/inspecto/query';
-import { ResultSet, describeResultSet, recommend } from 'app/inspecto/viz';
+import { ResultColumn, ResultSet, describeResultSet, recommend } from 'app/inspecto/viz';
 import { registerBuiltinViz } from 'app/inspecto/viz/plugins';
-import { runSql } from 'app/inspecto/data-table/sql/sql-run';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -36,7 +35,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
+import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { Query, QueryType, buildQuery } from './query-types';
 import { QueriesService } from './queries.service';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
@@ -58,6 +57,8 @@ interface PreviewState {
     rows?: Record<string, unknown>[];
     recommended?: string[];
     error?: string;
+    /** The store held more rows than the page the preview describes. */
+    truncated?: boolean;
 }
 
 /** Strip a `$token` (e.g. `$day(-7)`) to its name (`day`). */
@@ -68,11 +69,12 @@ function tokenName(raw: string): string {
 /**
  * **Query Library** — R3 of the living-operational-system roadmap (§4): author reusable `query`
  * components. A query reads a source dataset and is either **SQL** (text, may reference `$`-parameters;
- * resolve params → AlaSQL `runSql` → {@link describeResultSet}) or **structured** (the shared Query Core
- * builder, `<inspecto-query-panel>` → {@link evaluateRows} → {@link describeResultSet}; no `$`-parameters
- * in this slice — there is no SQL text to scan them from). One saved query can then be bound by many
- * widgets. Mock-first; everything runs in-browser. Follows the house form rules (ask-the-minimum,
- * duplicate-name = inline block).
+ * resolve params → {@link DatasetRowsService.sql}) or **structured** (the shared Query Core builder,
+ * `<inspecto-query-panel>` → the model sent as the dataset's query; no `$`-parameters in this slice —
+ * there is no SQL text to scan them from). Either way the preview is {@link describeResultSet} over what
+ * came back. One saved query can then be bound by many widgets. Both runs go through the rows seam, so
+ * live they execute against the real store and offline against its sample page. Follows the house form
+ * rules (ask-the-minimum, duplicate-name = inline block).
  */
 @Component({
     selector: 'app-queries',
@@ -101,6 +103,7 @@ export class QueriesComponent implements OnInit {
     private fb = inject(FormBuilder);
     private queriesApi = inject(QueriesService);
     private datasetsApi = inject(DatasetsService);
+    private datasetRows = inject(DatasetRowsService);
     private paramCtx = inject(ParameterContextService);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
@@ -133,15 +136,10 @@ export class QueriesComponent implements OnInit {
     readonly structuredModel = signal<QueryModel>(emptyModel());
     readonly structuredSql = signal('');
 
-    /** The panel's data source — the selected dataset's sample rows + column metadata. */
-    readonly panelSource = computed(() => {
-        const ds = this.selectedDataset();
-        return {
-            name: ds?.sourceName ?? 'data',
-            rows: SAMPLE_SOURCES[ds?.sourceName ?? ''] ?? [],
-            columns: ds?.columns,
-        };
-    });
+    /** The builder panel's data source — one PAGE of the selected dataset's store, plus its columns. The
+     *  panel previews a filter in-browser as it is built, so it needs rows; the authoritative run below
+     *  goes back to the store. */
+    readonly panelSource = signal<QuerySource>({ name: 'data', rows: [] });
 
     /** Live mirror of the SQL text (drives parameter detection) + the user-declared param defaults/types.
      *  Types are preserved from a loaded/seeded query (no type picker in the MVP — new tokens default to string). */
@@ -168,6 +166,11 @@ export class QueriesComponent implements OnInit {
         this.form.controls.text.valueChanges
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((t) => this.text.set(t));
+        // The builder panel previews in-browser while a filter is built, so it needs a page of the picked
+        // store's rows; re-read it whenever the pick changes.
+        this.form.controls.datasetId.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(() => void this.loadPanelSource());
         this.datasetsApi.list().subscribe({
             next: (d) => this.datasets.set(d),
             error: () => this.toastr.warning('Could not load datasets.'),
@@ -267,6 +270,16 @@ export class QueriesComponent implements OnInit {
         }));
     }
 
+    private async loadPanelSource(): Promise<void> {
+        const ds = this.selectedDataset();
+        if (!ds) {
+            this.panelSource.set({ name: 'data', rows: [] });
+            return;
+        }
+        const page = await this.datasetRows.rows(ds);
+        this.panelSource.set({ name: ds.sourceName, rows: page.rows, columns: page.columns });
+    }
+
     private selectedDataset(): Dataset | undefined {
         return this.datasets().find((d) => d.id === this.form.controls.datasetId.value);
     }
@@ -277,34 +290,37 @@ export class QueriesComponent implements OnInit {
         this.running.set(true);
 
         if (this.form.controls.type.value === 'structured') {
-            const source = this.panelSource();
-            const rows = evaluateRows(this.structuredModel(), {
-                name: source.name,
-                rows: source.rows,
-                columns: source.columns,
+            // The model goes to the store as the dataset's own query, so the preview is the real result
+            // rather than the model evaluated over whatever page the panel happened to hold.
+            const page = await this.datasetRows.rows({
+                sourceName: ds?.sourceName ?? 'data',
+                columns: ds?.columns,
+                query: this.structuredModel(),
             });
-            const resultSet = describeResultSet(rows, hints);
-            const recommended = recommend(resultSet)
-                .slice(0, 3)
-                .map((p) => p.meta.label);
-            this.preview.set({ resolvedSql: this.structuredSql(), resultSet, rows: rows.slice(0, 20), recommended });
-            this.running.set(false);
+            this.setPreview(this.structuredSql(), page, hints);
             return;
         }
 
         const resolvedSql = resolveParameters(this.form.controls.text.value, this.paramDefs(), this.paramCtx.context());
-        const rows = SAMPLE_SOURCES[ds?.sourceName ?? ''] ?? [];
-        const res = await runSql(resolvedSql, ds?.sourceName ?? 'data', rows);
-        if (!res.ok) {
-            this.preview.set({ resolvedSql, error: res.error });
-            this.running.set(false);
-            return;
+        this.setPreview(resolvedSql, await this.datasetRows.sql(ds?.sourceName ?? 'data', resolvedSql), hints);
+    }
+
+    /** One preview from a resolved page: the error when it failed, otherwise the described result set. */
+    private setPreview(resolvedSql: string, page: DatasetRows, hints: ResultColumn[]): void {
+        if (page.error) {
+            this.preview.set({ resolvedSql, error: page.error });
+        } else {
+            const resultSet = describeResultSet(page.rows, hints);
+            this.preview.set({
+                resolvedSql,
+                resultSet,
+                rows: page.rows.slice(0, 20),
+                recommended: recommend(resultSet)
+                    .slice(0, 3)
+                    .map((p) => p.meta.label),
+                truncated: page.truncated,
+            });
         }
-        const resultSet = describeResultSet(res.rows, hints);
-        const recommended = recommend(resultSet)
-            .slice(0, 3)
-            .map((p) => p.meta.label);
-        this.preview.set({ resolvedSql, resultSet, rows: res.rows.slice(0, 20), recommended });
         this.running.set(false);
     }
 

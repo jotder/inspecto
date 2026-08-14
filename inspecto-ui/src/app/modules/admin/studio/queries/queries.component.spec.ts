@@ -12,6 +12,7 @@ import { DatasetsService } from '../datasets/datasets.service';
 import { Query } from './query-types';
 import { QueriesService } from './queries.service';
 import { QueriesComponent } from './queries.component';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 
 const DS: Dataset = {
     id: 'cdr_sample',
@@ -32,7 +33,14 @@ const Q: Query = {
     parameters: [],
 };
 
-function create(queries: Query[] = [Q], dialogResult: unknown = true) {
+/** Records what the rows seam was asked to run, and answers with one page. */
+function rowsSeam() {
+    const rows = vi.fn(() => Promise.resolve({ rows: [{ cost_usd: 4 }], columns: [], truncated: false }));
+    const sql = vi.fn(() => Promise.resolve({ rows: [{ cost_usd: 4 }], columns: [], truncated: true }));
+    return { rows, sql };
+}
+
+function create(queries: Query[] = [Q], dialogResult: unknown = true, seam = rowsSeam()) {
     const save = vi.fn((q: Query) => of(q));
     const remove = vi.fn(() => of(null));
     const list = vi.fn(() => of(queries));
@@ -44,6 +52,7 @@ function create(queries: Query[] = [Q], dialogResult: unknown = true) {
             provideRouter([]),
             { provide: QueriesService, useValue: { list, get: () => of(Q), save, remove } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
+            { provide: DatasetRowsService, useValue: seam },
             {
                 provide: ToastrService,
                 useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
@@ -54,7 +63,7 @@ function create(queries: Query[] = [Q], dialogResult: unknown = true) {
     // The embedded `<inspecto-query-panel>` mounts `<inspecto-data-table>`, which injects the real
     // MatDialog — a plain `{provide: MatDialog, ...}` above is silently ignored, so it must be overridden.
     TestBed.overrideProvider(MatDialog, { useValue: { open: dialogOpen } });
-    return { fixture: TestBed.createComponent(QueriesComponent), save, remove, list, dialogOpen };
+    return { fixture: TestBed.createComponent(QueriesComponent), save, remove, list, dialogOpen, seam };
 }
 
 describe('QueriesComponent (R3)', () => {
@@ -150,8 +159,8 @@ describe('QueriesComponent (R3)', () => {
         expect(c.form.controls.type.value).toBe('sql');
     });
 
-    it('run() in structured mode evaluates the model and populates the preview', async () => {
-        const { fixture } = create();
+    it('run() in structured mode runs the model against the store and populates the preview', async () => {
+        const { fixture, seam } = create();
         fixture.detectChanges();
         const c = fixture.componentInstance;
         c.newQuery();
@@ -162,6 +171,21 @@ describe('QueriesComponent (R3)', () => {
         });
         await c.run();
         expect(c.preview()?.resolvedSql).toBe('SELECT * FROM cdr');
+        expect(c.preview()?.error).toBeUndefined();
+        // The model went to the store as the dataset's own query — not evaluated over a page held here.
+        expect(seam.rows).toHaveBeenCalledWith(expect.objectContaining({ sourceName: 'cdr' }));
+        expect(c.preview()?.resultSet?.rowCount).toBe(1);
+    });
+
+    it('run() in SQL mode sends the resolved SQL to the store and reports a truncated page', async () => {
+        const { fixture, seam } = create();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.newQuery();
+        c.form.patchValue({ datasetId: 'cdr_sample', type: 'sql', text: 'SELECT * FROM cdr' });
+        await c.run();
+        expect(seam.sql).toHaveBeenCalledWith('cdr', 'SELECT * FROM cdr');
+        expect(c.preview()?.truncated).toBe(true);
         expect(c.preview()?.error).toBeUndefined();
     });
 

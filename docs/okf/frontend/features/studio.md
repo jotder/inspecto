@@ -28,17 +28,32 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   `WidgetHost` render path, and one shared `DatasetResultService` result layer: live it runs
   `POST /bi/query` (DuckDB), offline the same specs run byte-identically on AlaSQL; unmappable specs
   (named-Measure SQL, OR filters) fail honestly. Sharing/RBAC stays gated on the security module.
-* ⛔ **A Dataset's `sourceName` is never defaulted (2026-08-14).** Every Studio consumer resolves rows
-  as `SAMPLE_SOURCES[ds.sourceName] ?? []`, so `DatasetsService.fromContent`'s old `?? 'data'` fallback
-  named a key that does not exist and a dataset stored without a source read **empty everywhere**,
-  indistinguishable from an empty store. It stays blank instead. The write that produced that shape was
-  Catalog go-live's auto-registration ([catalog](catalog.md)), which now sets `sourceName` to the store
-  it registers — the dataset kind's own validator has always said *"A source is required"*, but nothing
-  ran it on that path. ⚠ The editor's `sourceName` picker therefore carries the **saved dataset's own source
-  when it is not a sample key**, hinted "no preview rows here yet": a `mat-select` whose value is absent
-  from its options renders BLANK, which an operator reads as "no source chosen" rather than as a real
-  store with no offline preview. Real rows over a real store are `BACKLOG.md` §4 split S2 **slice B**
-  (the sync→async rows seam) and are deliberately NOT what this affordance claims.
+* **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
+  resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): live it reads the
+  real store over `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by
+  `compileSql`; offline it serves the store's entry in `inspecto/mock/sample-sources.ts`, filtered by
+  `evaluateRows`. `sql()` runs authored SQL the same way (server-guarded live, AlaSQL offline) and
+  `columns()` answers the declared columns, else a 1-row probe. It is the layer UNDER
+  `DatasetResultService`: that one runs a `QuerySpec`, this one supplies rows a screen reads directly.
+  ⚠ **Every result is a PAGE** — it carries `truncated` and an `error` string, and a consumer that
+  counts or lists must say so (the drill-through drawer and the Queries preview both do). Before this,
+  every consumer did a synchronous `SAMPLE_SOURCES[name]` lookup, so a live deployment showed sample data
+  or nothing.
+* ⛔ **Three sample-row folds are CORRECT and must stay** — `EntityProjectionGraphSource`,
+  Geo's point/route sources and `ReconExecService` each already pair a server call with a sample fold as
+  its **offline arm**; routing those through the seam adds a second round-trip behind a path that already
+  has one. They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
+  dropped column metadata and so compared numbers and dates as strings).
+* ⚠ **`DatasetResultService.run` takes rows as a thunk.** Its live branch maps the spec to `/bi/query`
+  and never reads rows — a ten-tile dashboard would otherwise fetch and discard ten pages.
+* ⛔ **A Dataset's `sourceName` is never defaulted (2026-08-14).** `DatasetsService.fromContent`'s old
+  `?? 'data'` fallback named a key that does not exist, so a dataset stored without a source read
+  **empty everywhere**, indistinguishable from an empty store. It stays blank instead. The write that
+  produced that shape was Catalog go-live's auto-registration ([catalog](catalog.md)), which now sets
+  `sourceName` to the store it registers — the dataset kind's own validator has always said *"A source is
+  required"*, but nothing ran it on that path. ⚠ The editor's `sourceName` picker therefore carries the
+  **saved dataset's own source when it is not a sample key**: a `mat-select` whose value is absent from
+  its options renders BLANK, which an operator reads as "no source chosen" rather than as a real store.
 * **Forms** follow ask-the-minimum + `uniqueNameValidator` on create
   ([forms & state](../conventions/forms-and-state.md)).
 

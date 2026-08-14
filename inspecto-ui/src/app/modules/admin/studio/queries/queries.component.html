@@ -172,6 +172,9 @@
                     } @else if (p.resultSet) {
                         <div class="flex flex-wrap items-center gap-2 text-sm">
                             <span class="font-medium">{{ p.resultSet.rowCount }} rows</span>
+                            @if (p.truncated) {
+                                <span class="text-secondary">· first page only — the store holds more</span>
+                            }
                             @if (p.recommended?.length) {
                                 <span class="text-secondary">· fits:</span>
                                 @for (r of p.recommended; track r) {

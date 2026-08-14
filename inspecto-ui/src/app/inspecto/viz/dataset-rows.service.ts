@@ -12,6 +12,7 @@ import {
     evaluateRows,
     inferColumns,
 } from 'app/inspecto/query';
+import { runSql } from 'app/inspecto/data-table/sql/sql-run';
 import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 
 /**
@@ -64,6 +65,27 @@ export class DatasetRowsService {
         const declared = declaredColumns(ds);
         if (declared.length) return declared;
         return (await this.rows(ds, 1)).columns;
+    }
+
+    /**
+     * Run authored SQL against one store: `/db/query` live (guarded server-side — a single read-only
+     * statement), the in-browser AlaSQL engine over the store's sample page offline. Not cached: the SQL
+     * is being edited, so every run is a new question. Never throws.
+     */
+    async sql(sourceName: string, sql: string, limit = DEFAULT_ROW_LIMIT): Promise<DatasetRows> {
+        if (environment.mockStudio) {
+            const page = sampleRows({ sourceName });
+            if (page.error) return page;
+            const res = await runSql(sql, sourceName, page.rows);
+            return res.ok
+                ? { rows: res.rows, columns: inferColumns(res.rows), truncated: false }
+                : { rows: [], columns: [], truncated: false, error: res.error };
+        }
+        try {
+            return fromDbResult(await firstValueFrom(this.db.query({ table: sourceName, sql, limit })), []);
+        } catch (e) {
+            return { rows: [], columns: [], truncated: false, error: apiErrorMessage(e, 'The query failed.') };
+        }
     }
 
     /** Drop every cached page — call when the data behind a store may have changed. */

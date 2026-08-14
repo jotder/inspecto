@@ -221,6 +221,20 @@ src/app/
   ⚠ **A `[rowActions]` column on a wide grid is horizontally virtualized out of view** — ag-Grid reports it
   as displayed while no header/button is in the DOM. Add `[pinActions]="true"` (this cost a preview cycle on
   the Alerts grid, whose 7 columns already fill the viewport).
+- **Reading a Dataset's rows → `DatasetRowsService`** (`inspecto/viz/dataset-rows.service.ts`, split S2
+  slice B 2026-08-14). ONE seam for "what does this `sourceName` resolve to": `rows(ds, limit?)` (live
+  `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by `compileSql`;
+  offline the `inspecto/mock/sample-sources.ts` page filtered by `evaluateRows`), `sql(store, text)` for
+  authored SQL, `columns(ds)` for declared-else-1-row-probe columns. ⛔ **Never write
+  `SAMPLE_SOURCES[ds.sourceName]` in a feature again** — that synchronous lookup is why Studio showed
+  sample data live. ⚠ **A result is a PAGE**: honour `truncated` and surface `error`, never render an
+  empty grid for a store that 404'd. ⚠ It is async, so a `computed()` that read rows becomes an
+  effect-fed `signal` — watch the ordering that creates (a saved view that patches a form AFTER an async
+  column-pick will be clobbered; resolve the pick explicitly with `{emitEvent: false}` first). ⛔ Do NOT
+  convert a fold that is already the **offline arm** of a server-first path (Link Analysis / Geo
+  projections, `ReconExecService`) — those call `sampleDatasetRows` deliberately, after the server call
+  failed. ⚠ `DatasetResultService.run` takes rows as a **thunk** for the same reason: its live branch
+  never reads them.
 - **Tabular surfaces → `<inspecto-data-table [tier]>`** (`app/inspecto/data-table`), the consolidation of
   every ag-Grid host. Tiers: **mini** (grid) · **standard** (+ icon-only toolbar: column chooser · search ·
   CSV export) · **pro** (+ an **icon-toggled CodeMirror SQL editor — hidden by default** — that runs real SQL

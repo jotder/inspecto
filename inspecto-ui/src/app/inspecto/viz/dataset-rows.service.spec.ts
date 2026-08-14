@@ -136,6 +136,42 @@ describe('DatasetRowsService — live', () => {
     });
 });
 
+describe('DatasetRowsService — authored SQL', () => {
+    it('live: posts the SQL to /db/query against the named store', async () => {
+        environment.mockStudio = false;
+        const { svc, query } = setup();
+        const res = await svc.sql('cdr', 'SELECT * FROM "cdr"', 50);
+        expect(query).toHaveBeenCalledWith({ table: 'cdr', sql: 'SELECT * FROM "cdr"', limit: 50 });
+        expect(res.rows).toEqual([{ msisdn: '880', duration_s: 12 }]);
+    });
+
+    it('live: a rejected statement comes back as an error result, never a throw', async () => {
+        environment.mockStudio = false;
+        const { svc } = setup({
+            query: vi.fn(() => throwError(() => ({ status: 422, error: { error: 'SQL failed the check' } }))),
+        });
+        const res = await svc.sql('cdr', 'DROP TABLE cdr');
+        expect(res.rows).toEqual([]);
+        expect(res.error).toBeTruthy();
+    });
+
+    it('offline: runs in-browser over the store‘s sample page, with no request', async () => {
+        environment.mockStudio = true;
+        const { svc, query } = setup();
+        const res = await svc.sql('cdr', 'SELECT tariff FROM cdr');
+        expect(query).not.toHaveBeenCalled();
+        expect(res.rows.length).toBeGreaterThan(0);
+        expect(Object.keys(res.rows[0])).toEqual(['tariff']);
+    });
+
+    it('offline: a store with no sample says so instead of running over nothing', async () => {
+        environment.mockStudio = true;
+        const { svc } = setup();
+        const res = await svc.sql('a_real_store_with_no_sample', 'SELECT 1');
+        expect(res.error).toContain('a_real_store_with_no_sample');
+    });
+});
+
 describe('DatasetRowsService — caching and columns', () => {
     it('dedupes an identical request and clear() drops it', async () => {
         environment.mockStudio = false;
