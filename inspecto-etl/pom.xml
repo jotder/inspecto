@@ -31,6 +31,17 @@
             <artifactId>inspecto-util</artifactId>
         </dependency>
 
+        <!--
+          Path containment (S4): PipelineConfigParser enforces config-declared refs against the
+          allowed roots at LOAD time, using the same com.gamma.config.safety.PathJail the control
+          plane's 422 write gate uses. No cycle (inspecto-config depends only on inspecto-api,
+          jtoon and jackson) and no new third-party — etl already has all three.
+        -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-config</artifactId>
+        </dependency>
+
         <!-- CSV parsing — etl.BoundaryScanner + etl.CsvIngester (parent-managed since WS-D). -->
         <dependency>
             <groupId>com.univocity</groupId>

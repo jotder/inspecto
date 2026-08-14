@@ -258,13 +258,56 @@ than asserted. Getting there:
 ⚠ **The `escapesTo` guard earned its place:** 5 of the 6 failures landed on *it* ("fixture is not an
 escape"), not on the `assertThrows`. The guard detects a vacuous fixture before the assertion can
 pass for the wrong reason — ⛔ do not "simplify" it into a plain string literal.
-- **S4 · apply at group (iii), the config layer.** `resolveSchemaRef` enforces against the spaces root
-  per D1/D2; `Asn1RecordIngester:96` (`ingester_config.grammar`) routed through it; and the genuinely
-  rootless `PipelineConfig.fromMap` in-memory draft takes a root **supplied by the caller** (the route
-  layer, where a space root is already in scope).
-- **S5 · close the 422 gate's blind spot.** `ConfigSafetyValidator`'s field list omits `schema_file`
-  and `grammar` (verified: zero matches in the file). Add them so the write gate refuses at authoring
-  what S4 now refuses at load.
+- **S4 · apply at group (iii), the config layer. ✅ SHIPPED 2026-08-14** — see below.
+- **S5 · close the 422 gate's blind spot. ✅ SHIPPED 2026-08-14** — see below.
+
+### S4 + S5 SHIPPED 2026-08-14
+
+**S4.** The `inspecto-etl → inspecto-config` pom edge added (no cycle, no new third-party — confirmed:
+`inspecto-config` depends only on `inspecto-api`, jtoon and jackson, all of which etl already had).
+`resolveSchemaRef` now enforces the **resolved** path against `PathJail.allowedRoots()`, taking a
+`field` argument so a failure names the key the operator actually wrote (`schema_file`, `grammar`,
+`mapping_file`). `validateDirs` reuses `PathJail.contains` for its verdict only — ⚠ it stays an
+*anti*-containment rule (inverted sense), and the reuse **strengthens** it: a dir reaching the poll dir
+through a symlink now fails too, which it should, because output really would land in the inbox.
+
+⚠ **`Asn1RecordIngester` is in `inspecto-engine`, not `inspecto-etl`** — the plan filed it under the
+pom-edge work. It needed no pom change. Its `ingester_config.grammar` is jailed **before** the
+readability probe, so an escaping ref is refused outright rather than reported as "not readable",
+which would leak whether a path outside the roots exists.
+
+⚠ **`PipelineConfig.fromMap` was NOT changed.** The plan's "rootless draft takes a caller-supplied
+root" is unnecessary: every ref a draft carries flows through `resolveSchemaRef`, which now enforces
+on its own. Adding a root parameter would have changed a public signature for nothing.
+
+**S5.** `ConfigSafetyValidator` now gates `processing.schema_file`, `processing.mapping_file`,
+`parsing.grammar`, `processing.grammar`, and each row of the multi-schema table form. Three findings
+the plan's one-line description ("add `schema_file` and `grammar`") did not anticipate:
+
+1. ⚠ **`grammar` has TWO spellings and the plan named the wrong one.** `parsing.grammar` is the
+   design-of-record and **wins over** the legacy `processing.grammar` (`PipelineConfigParser:299-303`).
+   Gating only the legacy key would have left the *preferred* spelling ungated.
+2. ⚠ **`schema_file` is also a table COLUMN**, not just a scalar key —
+   `schemas[3]{column_count,file_pattern,schema_file,table}` in
+   `spaces/ucc/config/voucher/voucher_pipeline.toon`. A scalar-only check misses every row.
+3. ⛔ **A registry reference is an id, not a path** — and this one was a real production bug, caught
+   by a test. `grammar/<id>`, `schema/<id>`, `mapping/<id>` share the key with a plain path. Jailing
+   one resolves `grammar/foo` against the CWD and reports an escape **whenever the allowed roots are
+   not the CWD** — i.e. on exactly the deployments S3's own runbook now tells operators to configure.
+   Following the S3 docs would have triggered the S5 bug. `checkConfigRef` skips registry-prefixed
+   values; the parser rewrites them to `registry/<kind>/<id>` and jails *that*, the value really read.
+   ⚠ The prefix list is duplicated from `PipelineConfigParser` on purpose — that class is in
+   `inspecto-etl`, **above** this module, so importing it would invert the dependency.
+
+**⚠ The reactor failure that taught the most: 78 failures / 39 errors across 25 unrelated classes,
+one cause, and it was a PRE-EXISTING test bug.** `ControlApiPipelineCreateTest.Ctx.close()`
+unconditionally *cleared* `assist.safety.roots` — a property it never set. Surefire reuses one JVM per
+module, so the first close poisoned every later test in `inspecto-processor`, which then fell back to
+`user.dir` (the module dir) as its only root. Its two sibling tests already saved and restored; this
+one never did. Invisible until load-time containment made the roots load-bearing. ⛔ **Never
+`clearProperty` a shared system property in a test — restore the prior value.** The same test also
+narrowed the jail to one `@TempDir` while its fixture's schema lived under a *different* one, so it
+now allows both (`root;cfg`).
 
 **Sizing: multi-shift.** S1+S2 is a plausible shift on its own.
 

@@ -1,6 +1,7 @@
 package com.gamma.ingester;
 
 import com.gamma.asn.core.ByteSource;
+import com.gamma.config.safety.PathJail;
 import com.gamma.asn.core.Framing;
 import com.gamma.asn.core.ParseError;
 import com.gamma.asn.core.RecoveryPolicy;
@@ -93,7 +94,10 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
             throw new IllegalArgumentException(
                     "ingester_config.root_type is required for Asn1RecordIngester");
 
-        Path grammarFile = Path.of(grammarPath);
+        // Jailed before the readability probe: an escaping ref must be refused outright, not reported
+        // as "not readable", which leaks whether a path outside the roots exists.
+        Path grammarFile = PathJail.requireUnderAny(
+                PathJail.allowedRoots(), grammarPath, "ingester_config.grammar");
         if (!Files.isReadable(grammarFile))
             throw new IllegalArgumentException("ingester_config.grammar not readable: " + grammarFile);
         Asn1Decoder decoder;

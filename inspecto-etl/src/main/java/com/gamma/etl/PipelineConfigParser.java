@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import com.gamma.config.safety.PathJail;
 import com.gamma.etl.PipelineConfig.Builder;
 import com.gamma.etl.PipelineConfig.CircuitBreaker;
 import com.gamma.etl.PipelineConfig.Duplicate;
@@ -790,9 +791,9 @@ final class PipelineConfigParser {
      * as authored, which surfaces as the usual "Grammar file not found".
      */
     private static Path resolveGrammarRef(String ref, Path configDir) {
-        if (!ref.startsWith(GRAMMAR_REF_PREFIX)) return resolveSchemaRef(ref, configDir);
+        if (!ref.startsWith(GRAMMAR_REF_PREFIX)) return resolveSchemaRef(ref, configDir, "grammar");
         String id = ref.substring(GRAMMAR_REF_PREFIX.length());
-        return resolveSchemaRef("registry/grammars/" + id + ".toon", configDir);
+        return resolveSchemaRef("registry/grammars/" + id + ".toon", configDir, "grammar");
     }
 
     /** The registry-reference prefix a Grammar-bound parser node carries ({@code use: grammar/<id>}). */
@@ -810,19 +811,34 @@ final class PipelineConfigParser {
      * in 2026-07-31. A plain path keeps the pre-existing resolution rules.
      */
     private static Path resolveSchemaRef(String ref, Path configDir) {
+        return resolveSchemaRef(ref, configDir, "schema_file");
+    }
+
+    /**
+     * ⚠ <b>Resolution here is a portability preference; containment is the boundary.</b> The
+     * {@code configDir}-relative candidate is <em>preferred</em> when it exists, and the as-authored
+     * (working-directory-relative) form is the documented fallback — that fallback is not a legacy
+     * corner, it is the form <b>every</b> config in this repo uses, so it cannot be removed
+     * (see the plan's §2). What S4 adds is that whichever form wins must still resolve under the
+     * allowed roots, or the load fails.
+     */
+    private static Path resolveSchemaRef(String ref, Path configDir, String field) {
         if (ref.startsWith(SCHEMA_REF_PREFIX)) {
             String id = ref.substring(SCHEMA_REF_PREFIX.length());
-            return resolveSchemaRef("registry/schemas/" + id + ".toon", configDir);
+            return resolveSchemaRef("registry/schemas/" + id + ".toon", configDir, field);
         }
         Path asAuthored = Paths.get(ref);
-        if (configDir == null || asAuthored.isAbsolute()) return asAuthored;
-
-        Path base      = configDir.toAbsolutePath().normalize();
-        Path candidate = base.resolve(asAuthored).normalize();
-        // Only prefer the portable form when it is both contained AND actually present — otherwise a legacy
-        // config (whose ref resolves from the working directory) must keep loading unchanged.
-        if (candidate.startsWith(base) && Files.exists(candidate)) return candidate;
-        return asAuthored;
+        Path resolved;
+        if (configDir == null || asAuthored.isAbsolute()) {
+            resolved = asAuthored;
+        } else {
+            Path base      = configDir.toAbsolutePath().normalize();
+            Path candidate = base.resolve(asAuthored).normalize();
+            // Only prefer the portable form when it is both contained AND actually present — otherwise a legacy
+            // config (whose ref resolves from the working directory) must keep loading unchanged.
+            resolved = candidate.startsWith(base) && Files.exists(candidate) ? candidate : asAuthored;
+        }
+        return PathJail.requireUnderAny(PathJail.allowedRoots(), resolved.toString(), field);
     }
 
     // ── sibling Mapping CSV (ELT amendment Phase 1 slice 1) ───────────────────
@@ -868,8 +884,9 @@ final class PipelineConfigParser {
         String ref = (String) proc.get("mapping_file");
         if (ref == null || ref.isBlank()) return;
         Path csv = ref.startsWith(MAPPING_REF_PREFIX)
-                ? resolveSchemaRef("registry/mappings/" + ref.substring(MAPPING_REF_PREFIX.length()) + ".csv", configDir)
-                : resolveSchemaRef(ref, configDir);
+                ? resolveSchemaRef("registry/mappings/" + ref.substring(MAPPING_REF_PREFIX.length()) + ".csv",
+                        configDir, "mapping_file")
+                : resolveSchemaRef(ref, configDir, "mapping_file");
         b.referencedFiles.add(csv);
         if (!Files.exists(csv))
             throw new FileNotFoundException("Mapping file not found: " + ref);
@@ -893,7 +910,11 @@ final class PipelineConfigParser {
             Object val = dirs.get(key);
             if (val == null) continue;
             java.nio.file.Path dir = Paths.get(val.toString()).toAbsolutePath().normalize();
-            if (dir.startsWith(poll))
+            // ⚠ This is an ANTI-containment business rule ("don't write output into the inbox"), not a
+            // security boundary — hence the inverted sense. It reuses PathJail.contains only for the
+            // verdict, which strengthens it: a dir that reaches the poll dir through a symlink now
+            // fails too, and it genuinely would land output in the inbox.
+            if (PathJail.contains(poll, dir))
                 throw new IllegalArgumentException(String.format(
                         "Config error in %s: dirs.%s (%s) must be outside the poll directory (%s)",
                         configPath, key, dir, poll));

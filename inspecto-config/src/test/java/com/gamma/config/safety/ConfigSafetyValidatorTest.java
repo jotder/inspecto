@@ -67,6 +67,77 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "dirs.database"), "an absolute path outside the root must be rejected: " + f);
     }
 
+    // ── S5: the load-time refs the 422 gate had been blind to ───────────────────
+
+    /** Overlay a {@code processing} block onto a clean pipeline. */
+    private static Map<String, Object> withProcessing(Path root, String key, String value) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        Map<String, Object> proc = new LinkedHashMap<>();
+        proc.put(key, value);
+        raw.put("processing", proc);
+        return raw;
+    }
+
+    @Test
+    void schemaFileOutsideRootIsRejected(@TempDir Path root) {
+        List<Finding> f = ConfigSafetyValidator.check("pipeline",
+                withProcessing(root, "schema_file", Path.of("/etc/evil_schema.toon").toAbsolutePath().toString()),
+                SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "processing.schema_file"),
+                "the write gate must refuse at authoring what the loader refuses at load: " + f);
+    }
+
+    @Test
+    void grammarOutsideRootIsRejectedUnderBothSpellings(@TempDir Path root) {
+        String evil = Path.of("/etc/evil.asn").toAbsolutePath().toString();
+        List<Finding> legacy = ConfigSafetyValidator.check("pipeline",
+                withProcessing(root, "grammar", evil), SafetyPolicy.withRoots(root));
+        assertTrue(hasError(legacy, "processing.grammar"), "legacy spelling must be gated: " + legacy);
+
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        Map<String, Object> parsing = new LinkedHashMap<>();
+        parsing.put("grammar", evil);
+        raw.put("parsing", parsing);
+        List<Finding> preferred = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
+        assertTrue(hasError(preferred, "parsing.grammar"),
+                "parsing.grammar is the design-of-record spelling and WINS over the legacy one, "
+                        + "so gating only the legacy key leaves the preferred one open: " + preferred);
+    }
+
+    /**
+     * ⚠ A registry reference is an <b>id</b>, not a path. Jailing it resolves {@code grammar/<id>}
+     * against the working directory and reports an escape whenever the roots are not the CWD — which
+     * refused a valid config at the 422 gate until {@code checkConfigRef} learned the difference.
+     */
+    @Test
+    void aRegistryReferenceIsNotTreatedAsAPath(@TempDir Path root) {
+        for (String ref : List.of("grammar/pipe-delimited", "schema/orders", "mapping/orders")) {
+            String key = ref.startsWith("grammar/") ? "grammar"
+                    : ref.startsWith("schema/") ? "schema_file" : "mapping_file";
+            List<Finding> f = ConfigSafetyValidator.check("pipeline",
+                    withProcessing(root, key, ref), SafetyPolicy.withRoots(root));
+            assertFalse(hasError(f, "processing." + key),
+                    "'" + ref + "' is a registry id, not a path — it must not be jailed: " + f);
+        }
+    }
+
+    /** The multi-schema table form carries schema_file as a COLUMN; a scalar-only check misses it. */
+    @Test
+    void schemaFileInTheMultiSchemaTableFormIsAlsoRejected(@TempDir Path root) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        Map<String, Object> proc = new LinkedHashMap<>();
+        Map<String, Object> good = new LinkedHashMap<>();
+        good.put("schema_file", root.resolve("ok_schema.toon").toString());
+        Map<String, Object> bad = new LinkedHashMap<>();
+        bad.put("schema_file", Path.of("/etc/evil_schema.toon").toAbsolutePath().toString());
+        proc.put("schemas", List.of(good, bad));
+        raw.put("processing", proc);
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "processing.schemas[1].schema_file"),
+                "the escaping row must be named by index, not silently skipped: " + f);
+        assertFalse(hasError(f, "processing.schemas[0].schema_file"), "the contained row must pass: " + f);
+    }
+
     @Test
     void uncPathIsRejected(@TempDir Path root) {
         Map<String, Object> dirs = safeDirs(root);

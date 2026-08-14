@@ -31,31 +31,42 @@ class ControlApiPipelineCreateTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
-    private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
+    private record Ctx(CollectorService svc, ControlApi api, int port, String priorRoots)
+            implements AutoCloseable {
         public void close() {
             api.close();
             svc.close();
             System.clearProperty("assist.write.root");
-            System.clearProperty("assist.safety.roots");
+            // ⚠ RESTORE, never clear. Surefire reuses one JVM per module and supplies a baseline
+            // assist.safety.roots (the test sandbox, see the parent pom). Clearing it here used to
+            // poison every test that ran afterwards in this JVM — invisible until load-time path
+            // containment landed, then it failed 78 tests across 25 unrelated classes.
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
         }
     }
 
     /** Boot with one startup pipeline (MINI_ETL in {@code cfg}). {@code root==null} ⇒ writes disabled. */
     private Ctx open(Path cfg, Path root) throws Exception {
         Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        String priorRoots = System.getProperty("assist.safety.roots");
         if (root != null) {
             System.setProperty("assist.write.root", root.toString());
-            // The config's own dirs live under the same base, so widen the safety jail to it; the
-            // property is read per-request in defaultPolicy(), so it stays set until Ctx.close().
-            System.setProperty("assist.safety.roots", root.toString());
+            // Widen the safety jail to BOTH temp dirs. `root` is where writes land, but writePipeline
+            // emits the config *and its mini_schema.toon* under `cfg`, a different @TempDir — so once
+            // schema_file is jailed at load time (S4), a jail naming only `root` refuses the fixture's
+            // own schema. The property is `;`-separated and read per-request in defaultPolicy(), so it
+            // stays set until Ctx.close().
+            System.setProperty("assist.safety.roots", root + ";" + cfg);
         } else {
             System.clearProperty("assist.write.root");
-            System.clearProperty("assist.safety.roots");
+            if (priorRoots != null) System.setProperty("assist.safety.roots", priorRoots);
+            else System.clearProperty("assist.safety.roots");
         }
         CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
         ControlApi api = new ControlApi(svc, 0);
         api.start();   // HTTP only; we never start svc polling, so registration adds without ingesting
-        return new Ctx(svc, api, api.port());
+        return new Ctx(svc, api, api.port(), priorRoots);
     }
 
     /** Author a known-loadable pipeline (the test fixture's shape, renamed) under {@code writeRoot}. */

@@ -7,7 +7,8 @@ Plan of record: `docs/superpower/system-maintenance-plan.md`.
 ## ⚠ Path containment — read this before pointing a job outside the server root
 
 Every path field on a maintenance job (`dir`, `backup_dir`, `archive_dir`, `archive`, `target_dir`,
-and `out_dir` on reports) must resolve under an **allowed root**. The roots come from
+and `out_dir` on reports) must resolve under an **allowed root** — as must a pipeline's
+`schema_file` / `grammar` / `mapping_file`, which are now enforced when the config loads. The roots come from
 `-Dassist.safety.roots` (a `;`-separated list) and default to the server's working directory — the
 same list the control plane's 422 write gate enforces, so a value refused at authoring is refused at
 run time for the same reason.

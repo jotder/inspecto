@@ -85,6 +85,29 @@ public final class ConfigSafetyValidator {
     private static void checkPipeline(Map<String, Object> raw, SafetyPolicy p, List<Finding> out) {
         for (String f : PIPELINE_DIRS) checkPath(raw, f, p, out);
         checkPath(raw, "output.ducklake.data_path", p, out);
+        // S5: the refs the parser resolves and jails at LOAD time (PipelineConfigParser's
+        // resolveSchemaRef / resolveGrammarRef). Without these the 422 write gate would accept a
+        // config that the loader then refuses — the operator learns at run time what authoring
+        // should have told them.
+        checkConfigRef(raw, "processing.schema_file", p, out);
+        checkConfigRef(raw, "processing.mapping_file", p, out);
+        // ⚠ TWO spellings, and the design-of-record one is not the legacy one: `parsing.grammar`
+        // wins over `processing.grammar` (PipelineConfigParser:299-303). Checking only the legacy
+        // key would leave the *preferred* spelling ungated.
+        checkConfigRef(raw, "parsing.grammar", p, out);
+        checkConfigRef(raw, "processing.grammar", p, out);
+        // ⚠ `schema_file` is ALSO a column of the multi-schema table form
+        // (`schemas[3]{column_count,file_pattern,schema_file,table}` — see
+        // spaces/ucc/config/voucher/voucher_pipeline.toon). A scalar-only check misses every row of it.
+        if (RawConfig.at(raw, "processing.schemas") instanceof List<?> schemas) {
+            for (int i = 0; i < schemas.size(); i++) {
+                if (schemas.get(i) instanceof Map<?, ?> entry) {
+                    Object sf = entry.get("schema_file");
+                    if (sf != null && !sf.toString().isBlank() && !isRegistryRef(sf.toString()))
+                        checkPathValue("processing.schemas[" + i + "].schema_file", sf.toString(), p, out);
+                }
+            }
+        }
 
         checkIntBound(raw, "processing.threads", 1, p.maxThreads(), out);
         checkIntBound(raw, "processing.duckdb_threads", -1, p.maxThreads(), out);
@@ -234,6 +257,35 @@ public final class ConfigSafetyValidator {
     }
 
     // ── path jail ────────────────────────────────────────────────────────────────────
+
+    /**
+     * Registry-reference prefixes for the component kinds that share a key with a plain path.
+     *
+     * <p>⚠ Duplicated from {@code PipelineConfigParser}, deliberately: that class lives in
+     * {@code inspecto-etl}, which sits <b>above</b> this module, so the constants cannot be imported
+     * without inverting the dependency. Keep the two in step.
+     */
+    private static final List<String> REGISTRY_REF_PREFIXES = List.of("schema/", "grammar/", "mapping/");
+
+    /**
+     * {@code schema_file}/{@code grammar}/{@code mapping_file} accept <b>either</b> a path or a
+     * registry reference ({@code grammar/<id>}), and only the former is a path.
+     *
+     * <p>⚠ A reference is an <b>id</b>, not a relative path. Jailing it resolves {@code grammar/foo}
+     * against the working directory and reports it as escaping whenever the allowed roots are not the
+     * CWD — refusing a perfectly valid config at the 422 gate. The parser rewrites a reference to
+     * {@code registry/<kind>/<id>} and jails <em>that</em>, which is the value that is really read.
+     */
+    private static void checkConfigRef(Map<String, Object> raw, String field, SafetyPolicy p, List<Finding> out) {
+        String v = RawConfig.str(raw, field);
+        if (v == null || v.isBlank() || isRegistryRef(v)) return;
+        checkPathValue(field, v, p, out);
+    }
+
+    private static boolean isRegistryRef(String value) {
+        String s = value.trim();
+        return REGISTRY_REF_PREFIXES.stream().anyMatch(s::startsWith);
+    }
 
     private static void checkPath(Map<String, Object> raw, String field, SafetyPolicy p, List<Finding> out) {
         String v = RawConfig.str(raw, field);
