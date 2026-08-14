@@ -573,7 +573,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   fail-closed empty-list posture stays for a genuinely unconfigured single-tenant deployment. ⚠ Two
   things to pin before building: whether a space created **at runtime** extends the roots immediately or
   at next boot, and whether the legacy flat space keeps property-only behaviour. ⚠ This widens the
-  default root set, so it is a **security-posture decision, not a cleanup** — needs an operator yes. **4. symlinks split the codebase cleanly in two** — everything on
+  default root set, so it is a **security-posture decision, not a cleanup** — needs an operator yes.
+  **→ Tier 3 SHIPPED 2026-08-14** — operator delegated the call ("decide yourself"); adopted the union
+  on the stated rationale: a space's own base is *already trusted* (the write gate grants writes into
+  its `config/` today), so the union removes a misconfiguration class rather than relaxing a boundary.
+  The two pins were decided: **immediately** (`defaultPolicy()` recomputes per call, so a runtime-created
+  space is an allowed root on the next check — no restart) and **yes, property-only for the legacy flat
+  space** (`SpaceManager.single` registers nothing; engine CLI/job-runner entry points never run
+  discovery and keep the property as their only source). Plus one pin the row didn't ask: **a deleted
+  space leaves the union** — otherwise the root set only ever grows within a process lifetime.
+  As-built: `DiscoveredRoots` beside `SafetyPolicy` (the module graph points `inspecto`→`inspecto-config`,
+  so the lifecycle *pushes*); registration happens **before** `SpaceBootstrap.load` — boot is exactly when
+  refs meet the jail — with deregistration on boot failure; the three create paths share one `bootStarted`
+  helper. ⚠ **Grounding falsified the fail-closed premise this row relied on**: the "empty root list →
+  `requireUnderAny` throws" posture (documented 2026-08-14 morning) did not actually hold — the record's
+  compact constructor silently substituted `[CWD]` for an empty list, granting the working directory to
+  every containment check on an unconfigured deployment. A one-file probe caught it; empty now stays
+  empty, and `DiscoveredRootsTest` pins the posture. Full detail: `okf/backend/config/config-safety.md`.
+  **4. symlinks split the codebase cleanly in two** — everything on
   `PathJail` re-checks, nothing else does; this is a *consequence* of the above, not separate work.
   ⚠ Two things to decide, not assume: `PathJail:151` returns **true** when the filesystem will not answer
   (containment granted on the structural check alone) — deliberate fail-open or oversight? And

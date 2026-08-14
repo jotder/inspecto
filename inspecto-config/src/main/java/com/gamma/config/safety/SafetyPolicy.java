@@ -44,9 +44,11 @@ public record SafetyPolicy(
             Set.of("none", "uncompressed", "snappy", "gzip", "zstd", "lz4");
 
     public SafetyPolicy {
-        allowedRoots = (allowedRoots == null || allowedRoots.isEmpty())
-                ? List.of(Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize())
-                : normalizeRoots(allowedRoots);
+        // ⛔ No working-directory substitution here. Until 2026-08-14 an empty list silently became
+        // [CWD] — which quietly granted the server's working directory to every containment check on
+        // an unconfigured deployment, the exact posture defaultPolicy()'s Javadoc forbids. Empty stays
+        // empty; PathJail.requireUnderAny throws on it, so the failure is loud and names the property.
+        allowedRoots = allowedRoots == null ? List.of() : normalizeRoots(allowedRoots);
         if (maxThreads <= 0) maxThreads = Runtime.getRuntime().availableProcessors();
         if (maxBatchFiles <= 0) maxBatchFiles = 1_000_000;
         if (maxBatchBytes <= 0) maxBatchBytes = Long.MAX_VALUE;
@@ -65,15 +67,18 @@ public record SafetyPolicy(
     }
 
     /**
-     * The production default: roots from {@code -Dassist.safety.roots} (a {@code ;}-separated list);
-     * caps sized to this box.
+     * The production default: the <b>union</b> of the operator-declared {@code -Dassist.safety.roots}
+     * (a {@code ;}-separated list — destinations outside the space layout, e.g. {@code /mnt/backups})
+     * and every hosted space base pushed into {@link DiscoveredRoots} by the space lifecycle; caps
+     * sized to this box. Recomputed per call, so a space created at runtime is an allowed root on the
+     * very next check — no restart.
      *
-     * <p>⚠ There is <b>no working-directory fallback</b> — an unset or blank property yields an
-     * <b>empty</b> root list, and {@link PathJail#requireUnderAny} throws on that, so every jailed
-     * reference fails rather than silently jailing to the CWD. That is deliberate (fail-closed: a
-     * misconfigured deployment must not quietly grant the server's working directory), and it is why
-     * configuring the roots is a documented deployment step, not an optional tuning knob. This
-     * Javadoc claimed the opposite until 2026-08-14.
+     * <p>⚠ There is <b>no working-directory fallback</b> — with the property unset and no spaces
+     * hosted the root list is <b>empty</b>, and {@link PathJail#requireUnderAny} throws on that, so
+     * every jailed reference fails rather than silently jailing to the CWD. Fail-closed: a
+     * misconfigured deployment must not quietly grant the server's working directory. (This Javadoc
+     * claimed that posture from 2026-08-14, but the record constructor still substituted the CWD
+     * until later the same day — the claim is now true.)
      */
     public static SafetyPolicy defaultPolicy() {
         List<Path> roots = new ArrayList<>();
@@ -81,6 +86,7 @@ public record SafetyPolicy(
         for (String s : prop.split(";")) {
             if (!s.isBlank()) roots.add(Paths.get(s.trim()).toAbsolutePath().normalize());
         }
+        roots.addAll(DiscoveredRoots.snapshot());
         return new SafetyPolicy(roots, Runtime.getRuntime().availableProcessors(),
                 1_000_000, Long.MAX_VALUE, DEFAULT_FORMATS, DEFAULT_COMPRESSION);
     }

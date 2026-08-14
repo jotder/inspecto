@@ -29,6 +29,50 @@ class SpaceManagerTest {
         }
     }
 
+    /**
+     * PATH-2 tier 3: the allowed safety roots are the union of the operator-declared property and every
+     * hosted space base, so a space minted at runtime never needs `assist.safety.roots` extended by hand.
+     * Asserted on the registry content, not on a containment verdict — surefire's reactor-wide roots
+     * already cover every {@code @TempDir}, so a jail-based assertion here would pass vacuously.
+     */
+    @Test
+    void spaceLifecycleDerivesTheAllowedRoots(@TempDir Path root) throws Exception {
+        com.gamma.config.safety.DiscoveredRoots.clear();
+        try {
+            Files.createDirectories(root.resolve("seeded").resolve("config"));
+            try (SpaceManager mgr = SpaceManager.discover(root)) {
+                Path seeded = root.resolve("seeded").toAbsolutePath().normalize();
+                assertTrue(allowedRoots().contains(seeded), "a discovered space base is an allowed root");
+
+                mgr.create(SpaceId.of("acme"), null, null);
+                Path acme = root.resolve("acme").toAbsolutePath().normalize();
+                assertTrue(allowedRoots().contains(acme),
+                        "a space created at runtime extends the roots immediately, no restart");
+
+                assertTrue(mgr.delete(SpaceId.of("acme"), true));
+                assertFalse(allowedRoots().contains(acme), "a deleted space leaves the union");
+                assertTrue(allowedRoots().contains(seeded), "deleting one space must not evict another's root");
+            }
+        } finally {
+            com.gamma.config.safety.DiscoveredRoots.clear();   // process-global — never leak into other tests
+        }
+    }
+
+    /** The legacy flat space keeps property-only behaviour: {@link SpaceManager#single} registers nothing. */
+    @Test
+    void singleTenantModeRegistersNoDiscoveredRoot() {
+        com.gamma.config.safety.DiscoveredRoots.clear();
+        List<Path> before = allowedRoots();
+        try (SpaceManager mgr = SpaceManager.single(new CollectorService(List.of(), 60, 1))) {
+            assertEquals(1, mgr.size());
+            assertEquals(before, allowedRoots(), "single-tenant mode must not add a discovered root");
+        }
+    }
+
+    private static List<Path> allowedRoots() {
+        return com.gamma.config.safety.SafetyPolicy.defaultPolicy().allowedRoots();
+    }
+
     @Test
     void discoverBootsEachSpaceDirAndSkipsNonSpaces(@TempDir Path root) throws Exception {
         Files.createDirectories(root.resolve("space-a").resolve("config"));

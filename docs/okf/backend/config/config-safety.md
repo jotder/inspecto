@@ -82,12 +82,45 @@ escaping ref survived the all-or-nothing gate and was refused later by `register
 time. ⚠ Containment **is** answerable at preview — it needs the allowed roots, not the filesystem —
 unlike existence, which only becomes answerable once the bundle's files land.
 
-⚠ **`SafetyPolicy.defaultPolicy()` has no working-directory fallback.** An unset or blank
-`-Dassist.safety.roots` yields an **empty** root list, and `PathJail.requireUnderAny` throws on that, so
-every jailed reference fails rather than silently jailing to the CWD. Fail-closed by design; configuring
-the roots is a deployment step. *(The method's own Javadoc promised a CWD fallback until 2026-08-14.)*
+⚠ **`SafetyPolicy.defaultPolicy()` has no working-directory fallback — and until late 2026-08-14 that
+was only a claim.** The record's compact constructor silently substituted `[CWD]` for an empty root
+list, so an unconfigured deployment quietly granted the server's working directory to every containment
+check — the exact posture the Javadoc (corrected that morning) said could not happen. A one-file probe
+falsified the doc; the constructor now keeps empty empty, `PathJail.requireUnderAny` throws on it, and
+`DiscoveredRootsTest` pins it. Fail-closed for real now; configuring the roots is a deployment step.
 ⚠ Surefire sets the roots to `<repo>;<temp>`, so **nothing under a `@TempDir` escapes by default** — a
 containment test that does not narrow the roots passes vacuously.
+
+## The allowed roots are a union: declared ∪ discovered (tier 3, shipped 2026-08-14)
+
+`SafetyPolicy.defaultPolicy()` now returns the **union** of the operator-declared
+`-Dassist.safety.roots` and every hosted space base registered in
+`com.gamma.config.safety.DiscoveredRoots`. This removes the misconfiguration PATH-2 tier 3 named: the
+write root was per-space and **dynamic** (`writeRoot()` derives from the current space) while the
+policy list was global and **static** — create a space and forget to extend the property, and writes
+into its `config/` passed the 403 gate while every schema/grammar ref inside it was refused at load.
+Now both halves derive, and the declared list goes back to meaning only what it is for — destinations
+**outside** the layout (`backup_dir: /mnt/backups`).
+
+- **The seam points downward.** `inspecto` (SpaceManager) depends on `inspecto-config`, never the
+  reverse — so the lifecycle **pushes** bases in and the policy reads. `discover()` registers each
+  space **before** `SpaceBootstrap.load` (boot is exactly when refs meet the jail; registering after
+  would refuse the configs the root exists to allow), and deregisters when the boot fails — a space
+  that never joined leaves no root behind. The three runtime create paths share one `bootStarted`
+  helper with the same order and the same failure cleanup.
+- **A runtime-created space extends the roots immediately** — `defaultPolicy()` recomputes per call,
+  so the next check sees it, no restart. **A deleted space leaves the union** (in `delete`'s
+  per-space-registry teardown block), so the root set cannot only ever grow within a process lifetime.
+- **The legacy flat / single-tenant space keeps property-only behaviour** — `SpaceManager.single`
+  registers nothing, by construction (it never touches `DiscoveredRoots`). Likewise the engine CLI and
+  job-runner entry points (`MainApp`, `CollectorProcessor`, `EnrichmentProcessor`, the job tasks) never
+  run discovery, so for them the set is empty and the property remains their only source — unchanged.
+- ⚠ **The registry is process-global static.** A test that registers must `DiscoveredRoots.clear()` in
+  a finally — a leaked base flips containment verdicts in unrelated tests. And an assertion about a
+  discovered root must inspect `allowedRoots()` **content**, not run a jail check: surefire's
+  reactor-wide roots already cover every `@TempDir`, so a verdict-based test passes vacuously.
+- ⚠ `SafetyPolicy.withRoots(...)` (skill workspace, tests) deliberately **bypasses** the union — an
+  explicit policy is scoped, not widened.
 
 ⚠ **`PathJail` unified the CONFIG-path implementations, not every containment check in the codebase.**
 A 2026-08-14 sweep found ~15 more outside that scope — the registry stores (three near-identical

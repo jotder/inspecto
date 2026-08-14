@@ -1,6 +1,7 @@
 package com.gamma.service;
 
 import com.gamma.acquire.AcquisitionLedgers;
+import com.gamma.config.safety.DiscoveredRoots;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.acquire.StabilityGate;
 import com.gamma.event.EventLog;
@@ -100,11 +101,37 @@ public final class SpaceManager implements AutoCloseable {
     }
 
     private void bootQuietly(Path dir) {
+        // Registered BEFORE load: booting the space is exactly when its schema/grammar refs meet the
+        // jail, so a root registered after would refuse the very configs it exists to allow.
+        DiscoveredRoots.register(dir);
         try {
             SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(dir));
             spaces.put(ctx.id(), ctx);
         } catch (Exception e) {
+            DiscoveredRoots.unregister(dir);   // a space that never joined must not leave a root behind
             log.warn("Skipping space dir {} — failed to load: {}", dir, e.getMessage());
+        }
+    }
+
+    /**
+     * Load + start a space at {@code base} with its base registered as an allowed root <em>first</em>
+     * (see {@link #bootQuietly}), deregistering again on any failure. The shared tail of the three
+     * runtime create paths.
+     */
+    private static SpaceContext bootStarted(Path base) throws IOException {
+        DiscoveredRoots.register(base);
+        try {
+            SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base));
+            try {
+                ctx.start();
+                return ctx;
+            } catch (RuntimeException e) {
+                ctx.close();   // don't leak a started-but-unregistered service
+                throw e;
+            }
+        } catch (IOException | RuntimeException e) {
+            DiscoveredRoots.unregister(base);
+            throw e;
         }
     }
 
@@ -148,13 +175,7 @@ public final class SpaceManager implements AutoCloseable {
             new SpaceContext.SpaceManifest(name, description == null ? "" : description.trim(), Instant.now().toString())
                     .write(base.resolve("space.toon"));
 
-            SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base));
-            try {
-                ctx.start();
-            } catch (RuntimeException e) {
-                ctx.close();   // don't leak a started-but-unregistered service
-                throw e;
-            }
+            SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             log.info("Created space '{}' at {}", id.value(), base);
             return ctx;
@@ -189,13 +210,7 @@ public final class SpaceManager implements AutoCloseable {
             if (bundle.spaceToon() != null) Files.write(manifest, bundle.spaceToon());
             else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString()).write(manifest);
 
-            SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base));
-            try {
-                ctx.start();
-            } catch (RuntimeException e) {
-                ctx.close();
-                throw e;
-            }
+            SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             log.info("Created space '{}' from bundle at {} ({} config file(s))",
                     id.value(), base, bundle.configEntries().size());
@@ -275,13 +290,7 @@ public final class SpaceManager implements AutoCloseable {
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "tagline", "") : description.trim();
             new SpaceContext.SpaceManifest(name, desc, Instant.now().toString()).write(base.resolve("space.toon"));
 
-            SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base));
-            try {
-                ctx.start();
-            } catch (RuntimeException e) {
-                ctx.close();
-                throw e;
-            }
+            SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             log.info("Created space '{}' from template '{}' at {}", id.value(), templateId, base);
             return ctx;
@@ -377,6 +386,7 @@ public final class SpaceManager implements AutoCloseable {
         com.gamma.consignment.ConsignmentOutputStores.unregister(id.value());
         com.gamma.consignment.FileStages.unregister(id.value());
         com.gamma.pipeline.exec.ProvenanceStores.unregister(id.value());
+        DiscoveredRoots.unregister(spacesRoot.resolve(id.value()));   // the root set must not only ever grow
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
             // ⛔ The containment verdict must not be reported as a purge. Both roots are absolute and
