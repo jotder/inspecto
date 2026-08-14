@@ -24,11 +24,9 @@ import {
     CatalogService,
     ComponentDef,
     ComponentsService,
-    ComponentTestResult,
     ComponentType,
     ConfigService,
     LensService,
-    PipelinesService,
 } from 'app/inspecto/api';
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
@@ -42,7 +40,9 @@ import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment
 import { ComponentFormDialog, ComponentFormResult } from 'app/modules/admin/components/component-form.dialog';
 import { groupByValidator, measuresValidator } from './measure-grammar';
 import { nodeAttributesFor } from './node-attributes';
-import { environment } from 'environments/environment';
+
+/** The component families `ComponentRoutes` can dry-run — `schema`/`mapping` have no `/test` route. */
+const TESTABLE_KINDS: ComponentType[] = ['transform', 'grammar', 'sink'];
 
 /**
  * Dialog data: the node to configure, its (already-resolved) type/category labels for the header, and the
@@ -277,34 +277,16 @@ export interface NodeConfigResult {
                     </div>
                 }
 
-                <!-- Run just this processor over a bounded sample (no production write) -->
-                @if (testAvailable) {
+                <!-- Testing a processor needs a sample, and the component editor is where that lives. -->
+                @if (testableComponentId()) {
                     <div class="pt-2">
-                        <button type="button" mat-stroked-button (click)="test()" [disabled]="testing">
-                            @if (testing) {
-                                <mat-spinner diameter="16" class="mr-2"></mat-spinner>
-                            }
+                        <button type="button" mat-stroked-button (click)="openComponentTest()">
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:bolt"></mat-icon>
-                            <span class="ml-1">Test processor</span>
+                            <span class="ml-1">Test {{ testableComponentId() }}…</span>
                         </button>
-                        @if (testResult; as r) {
-                            <inspecto-alert
-                                class="mt-2 block"
-                                [variant]="r.ok ? 'success' : 'error'"
-                                [icon]="r.ok ? 'heroicons_outline:check-circle' : 'heroicons_outline:x-circle'"
-                            >
-                                <span class="font-semibold">{{ r.ok ? 'Passed' : 'Failed' }}</span>
-                                · {{ r.rowCount }} row(s)
-                                <div class="text-secondary mt-0.5">{{ r.detail }}</div>
-                                @if (r.rows.length) {
-                                    <pre
-                                        class="mt-1 max-h-32 overflow-auto rounded p-1 text-xs"
-                                        style="background: var(--gamma-bg-default)"
-                                        >{{ preview(r.rows) }}</pre
-                                    >
-                                }
-                            </inspecto-alert>
-                        }
+                        <div class="text-secondary mt-1 text-sm">
+                            Opens the {{ data.bindKind }} editor, where you can run it over a sample.
+                        </div>
                     </div>
                 }
             </mat-dialog-content>
@@ -322,7 +304,6 @@ export interface NodeConfigResult {
 })
 export class NodeConfigDialog {
     private fb = inject(FormBuilder);
-    private api = inject(PipelinesService);
     private components = inject(ComponentsService);
     private configApi = inject(ConfigService);
     private catalog = inject(CatalogService);
@@ -440,14 +421,18 @@ export class NodeConfigDialog {
     /** Free-form editor open state — open by default when there's no schema, or when extra keys exist. */
     readonly freeFormOpen = signal(false);
 
-    testing = false;
-    testResult: ComponentTestResult | null = null;
     /**
-     * `POST /components/{type}/{id}/test` exists only in the offline mock — the real ControlApi has
-     * no `/components` surface at all, so an authored node's dotted type (`transform.filter`) has
-     * nothing to hit. Hide the action rather than ship a button that 404s.
+     * The registered component this node binds, when it is one of the families the backend can test
+     * (`ComponentRoutes` registers `POST /components/{transform|grammar|sink}/{id}/test`). Null for an
+     * unbound node — one holding inline config binds no registered component, and **no backend surface
+     * tests inline config**: the test routes look the component up in the `ComponentStore` and 404 when
+     * it is absent, while the two config-body previews (`/config/preview/parsing`, `/config/preview/schema`)
+     * cover only grammar parsing and schema casting, not arbitrary node types.
      */
-    readonly testAvailable = environment.mockPipelines;
+    testableComponentId(): string | null {
+        if (!this.data.bindKind || !TESTABLE_KINDS.includes(this.data.bindKind)) return null;
+        return this.selectedComponentId();
+    }
 
     readonly form = this.fb.group({
         name: this.fb.control(''),
@@ -558,35 +543,23 @@ export class NodeConfigDialog {
         this.configRows.removeAt(i);
     }
 
-    /** Run just this processor over a bounded sample through the production logic (scratch-only, no write). */
-    test(): void {
-        this.testing = true;
-        this.testResult = null;
-        this.api.testNode(this.data.node.type, this.data.node.id).subscribe({
-            next: (r) => {
-                this.testing = false;
-                this.testResult = r;
-            },
-            error: (e) => {
-                this.testing = false;
-                this.testResult = {
-                    type: this.data.node.type,
-                    id: this.data.node.id,
-                    ok: false,
-                    detail: apiErrorMessage(e, 'Test failed'),
-                    rowCount: 0,
-                    rows: [],
-                };
-            },
+    /**
+     * Open the bound component in its own editor, where the sample-driven test already lives
+     * (`ComponentFormDialog.runTest`). The node dialog deliberately does **not** grow its own test:
+     * a real test needs sample rows / sample text, and that editor is the one place that collects them.
+     */
+    openComponentTest(): void {
+        const id = this.testableComponentId();
+        if (!id) return;
+        this.components.get(this.data.bindKind!, id).subscribe({
+            next: (def) =>
+                this.dialog.open(ComponentFormDialog, {
+                    width: '560px',
+                    autoFocus: false,
+                    data: { kind: this.data.bindKind, def },
+                }),
+            error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not open the component.')),
         });
-    }
-
-    /** A compact JSON preview of the first few sample rows the test produced. */
-    preview(rows: Record<string, unknown>[]): string {
-        return rows
-            .slice(0, 3)
-            .map((r) => JSON.stringify(r))
-            .join('\n');
     }
 
     /**

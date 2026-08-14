@@ -534,8 +534,17 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   test run) shipped 2026-08-14; the plan of record is **archived**, and the durable as-built is
   [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md).
   Build, Test and Run all work: no dead buttons, no silent activation failure, no save-time surprises,
-  and **a user can test a pipeline against their own data before arming it.** ⚠ One residual only — the
-  node config dialog's `/components/*` "Test" affordance, still `mockFlows`-gated (see G1 below).
+  and **a user can test a pipeline against their own data before arming it.** ✅ **The last residual — the node config dialog's `/components/*` "Test" affordance — CLOSED
+  2026-08-14.** ⚠ Its recorded diagnosis ("the dialog just sends the wrong two segments … a real repoint
+  is plausible") was **incomplete**: `testNode` also posted an **empty body**, while the route requires
+  `sampleRows`/`sampleText`, so a URL repoint would have reached a live route and still failed — the node
+  dialog collects no sample. Replaced, not repointed: a **Test &lt;component&gt;…** action opens the bound
+  component in `ComponentFormDialog`, whose `runTest` was already the only caller of the working
+  `testGrammar`/`testTransform`/`testSink` methods. Gated on the node binding a registered component of a
+  dry-runnable family (transform/grammar/sink — `schema`/`mapping` have no `/test` route), so an
+  inline-config node shows no action. `PipelinesService.testNode` + `ComponentTestResult` deleted with it.
+  ⛔ Testing an inline (unregistered) node config needs a **new route** — the component test routes 404
+  through `ComponentStore`, and the config-body previews cover only grammar parsing and schema casting.
   - ~~G1 two of three test affordances 404~~ **CLOSED** — both gated behind `environment.mockFlows`
     rather than deleted (run-to-here is a complete mock-backed feature and is literally the Step 5 UI).
     ⚠ **Retraction:** a mid-flight note here claimed `/components/*` did not exist in the backend —

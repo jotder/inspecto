@@ -14,7 +14,6 @@ import {
     ConnectionsService,
     LensService,
     MetadataNode,
-    PipelinesService,
 } from 'app/inspecto/api';
 import { CollectorConfigComponent } from 'app/inspecto/collector/collector-config.component';
 import type { AttributeSpec } from 'app/inspecto/component-model';
@@ -54,8 +53,7 @@ async function create(data: Partial<NodeConfigData> = {}, api: Partial<ConfigSer
                     ...data,
                 },
             },
-            { provide: PipelinesService, useValue: { testNode: () => of({}) } },
-            { provide: ComponentsService, useValue: { list: () => of(GRAMMARS) } },
+            { provide: ComponentsService, useValue: { list: () => of(GRAMMARS), get: () => of(GRAMMARS[0]) } },
             {
                 provide: ConfigService,
                 useValue: {
@@ -128,6 +126,28 @@ function editor(fixture: ComponentFixture<NodeConfigDialog>): EnrichmentEditorCo
 
 describe('NodeConfigDialog', () => {
     beforeEach(() => Object.values(TOASTR).forEach((f) => f.mockClear()));
+
+    it('offers the test action only once the node binds a registered component', async () => {
+        const f = await create({ node: { id: 'parse', type: 'parser', use: 'grammar/cdr_csv' } as never });
+        expect(f.componentInstance.testableComponentId()).toBe('cdr_csv');
+        expect(f.nativeElement.textContent).toContain('Test cdr_csv');
+    });
+
+    it('offers no test action for a node holding only inline config', async () => {
+        // No `use` ⇒ no registered component ⇒ nothing the /components/{kind}/{id}/test route can look up.
+        const f = await create();
+        expect(f.componentInstance.testableComponentId()).toBeNull();
+        expect(f.nativeElement.textContent).not.toContain('Test ');
+    });
+
+    it('offers no test action for a kind the backend cannot dry-run', async () => {
+        // schema/mapping have no /test route — a bound component alone is not enough.
+        const f = await create({
+            bindKind: 'schema',
+            node: { id: 'cast', type: 'schema', use: 'schema/mini' } as never,
+        });
+        expect(f.componentInstance.testableComponentId()).toBeNull();
+    });
 
     it('loads existing components of the bound kind for the picker', async () => {
         const c = (await create()).componentInstance;

@@ -130,10 +130,10 @@ it by name. This is the same *mock more lenient than the server* trap described 
 Related: **save refusals all land in the Validation dock** (persistent, click-to-select-node), not a
 first-only toast — an n-problem graph used to mean n save→fix→save cycles.
 
-### Two editor test affordances are mock-only (2026-08-02)
+### Both editor test affordances now work against a real server (2026-08-02 → 2026-08-14)
 
-*Test processor* (node-config dialog) is gated behind `environment.mockFlows` because it 404s against a
-real backend. ⚠ *Run to here* **was** gated for a different reason and is **no longer gated** — see below.
+Neither is mock-gated any more. *Run to here* was ungated when its route landed; *Test processor* was
+**replaced** rather than repointed — see below for why a repoint could not have worked.
 
 - *Run to here* — ✅ **works against a real server since 2026-08-14.**
   `POST /pipelines/authored/{id}/run?to=` is registered (`PipelineRoutes.testRun`,
@@ -143,18 +143,26 @@ real backend. ⚠ *Run to here* **was** gated for a different reason and is **no
   chosen node — the same rule the offline mock's `subgraphTo` uses, so mock and server agree about which
   nodes a run covers. An unknown `to=` is a 400.
   Details: [`../../backend/engine/pipeline-test-run.md`](../../backend/engine/pipeline-test-run.md).
-- *Test processor* — the route **does** exist
-  (`ComponentRoutes.java:42-44`, `POST /components/{transform|grammar|sink}/{id}/test`). The dialog
-  simply addresses it wrongly, sending the node's dotted type (`transform.filter`) and node id
-  (`filter_1`) where the route wants the literal family segment and a **registered component name**.
+- *Test processor* — ✅ **replaced 2026-08-14 by "Test &lt;component&gt;…"**, which opens the bound
+  component in `ComponentFormDialog`, where the sample-driven test already lives (`runTest`). Shown only
+  when the node binds a registered component of a family the backend can dry-run
+  (`TESTABLE_KINDS` = transform/grammar/sink; `schema`/`mapping` have no `/test` route).
 
-⚠ Don't collapse those two into "no backend". The second is a plausible repoint — map dotted type to
-family, pass the node's registry ref — with one catch that makes it more than a URL change: a node
-carrying inline config binds no registered component, so there is nothing to look up.
+⚠ **A repoint was never viable, and the reason is not the one recorded here through 2026-08-13.** The
+old `testNode` sent the wrong two segments — but it also posted an **empty body**, while
+`POST /components/{transform|grammar|sink}/{id}/test` requires `sampleRows` (transform/sink) or
+`sampleText` (grammar). Fixing only the URL yields a button that reaches a live route and still fails,
+because the node dialog collects no sample. `ComponentFormDialog` is the one surface that does, and it
+was already the sole caller of `testGrammar`/`testTransform`/`testSink` — so the node dialog hands off to
+it instead of growing a second sample-collection UI. `PipelinesService.testNode` and
+`ComponentTestResult` were deleted with it (no other callers).
 
-Keeping *Run to here* gated rather than deleting it is what made 5c a backend-only job: the dialog was
-already the finished UI, so ungating it was a one-line change once the route landed. *Test processor*
-stays gated on the same reasoning — see [`../../../BACKLOG.md`](../../../BACKLOG.md).
+⛔ **An inline-config node cannot be tested by any existing backend surface** — do not "finish" this by
+adding a body to the component test routes without deciding that deliberately. Those routes resolve the
+component through `ComponentStore` and 404 when it is absent (`ComponentRoutes.java:266-289`), and the
+two config-body previews (`/config/preview/parsing`, `/config/preview/schema`) cover only grammar parsing
+and schema casting, not arbitrary node types. The test routes are **not** capability-gated — previews run
+on a throwaway DuckDB — so ungating raised no access question.
 
 Corollary worth keeping: **which connector a source uses is carried by its Connection profile**
 (`collector.connection`), not by the node type — hence one `acquisition`, not a file/database/stream split.

@@ -202,16 +202,6 @@ export interface PipelineDryRunResult {
     warnings?: string[];
 }
 
-/** Result of testing a single processor node over a bounded sample (POST /components/{type}/{id}/test). */
-export interface ComponentTestResult {
-    type: string;
-    id: string;
-    ok: boolean;
-    detail: string;
-    rowCount: number;
-    rows: Record<string, unknown>[];
-}
-
 // ── Run-to-here (the in-editor build-and-test loop) ──
 
 /** One relationship a node produced during a run-to-here (success/unmatched/kept/dropped/route:<key>). */
@@ -481,14 +471,6 @@ export class PipelinesService {
         return this.http.post<PipelineDryRunResult>(
             apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/dry-run`),
             candidate ? { sampleRows, pipeline: candidate } : { sampleRows },
-        );
-    }
-
-    /** Test a single processor node over a bounded sample (no production write) — the per-processor test. */
-    testNode(type: string, id: string): Observable<ComponentTestResult> {
-        return this.http.post<ComponentTestResult>(
-            apiUrl(`/components/${encodeURIComponent(type)}/${encodeURIComponent(id)}/test`),
-            {},
         );
     }
 
