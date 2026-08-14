@@ -264,4 +264,105 @@ class PipelineDryRunTest {
 
         assertTrue(PipelineDryRun.run(g, SAMPLE).warnings().isEmpty());
     }
+
+    // ── 5b: the run-to-here cutoff ─────────────────────────────────────────────────────────────
+
+    /**
+     * A fork: the seed feeds two independent branches, each ending in its own sink.
+     * <pre>
+     *   acq ─┬─> left  ─> leftSink
+     *        └─> right ─> rightSink
+     * </pre>
+     * The branches are siblings, so no topological order puts one wholly before the other for a reason the
+     * cutoff could rely on — which is what makes this the shape that tells ancestor-closure apart from a
+     * truncated topo order.
+     */
+    private static PipelineGraph forkedGraph() {
+        return new PipelineGraph("demo", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        PipelineNode.of("left", "transform.filter", Map.of("where", "CAST(amt AS INT) >= 100")),
+                        PipelineNode.of("right", "transform.filter", Map.of("where", "CAST(amt AS INT) < 100")),
+                        new PipelineNode("leftSink", "sink.persistent", "L", null, Map.of("store", "l"), null),
+                        new PipelineNode("rightSink", "sink.persistent", "R", null, Map.of("store", "r"), null)),
+                List.of(PipelineEdge.data("acq", "left"), PipelineEdge.data("left", "leftSink"),
+                        PipelineEdge.data("acq", "right"), PipelineEdge.data("right", "rightSink")));
+    }
+
+    private static boolean ran(PipelineDryRun.Result r, String id) {
+        return r.nodes().stream().anyMatch(n -> n.node().equals(id))
+                || r.sinks().stream().anyMatch(s -> s.node().equals(id));
+    }
+
+    /**
+     * Stopping at {@code right} runs {@code right} and nothing else: not its own sink (below the target), and
+     * crucially not {@code left}, which is neither an ancestor nor a descendant of the target.
+     *
+     * <p>⚠ This is the assertion that pins the <b>ancestor closure</b>, and <b>the target must be {@code right}
+     * specifically</b>. A cutoff implemented as "topological order, truncated at the target" keeps every node
+     * that happens to sort earlier — and Kahn's order here is {@code acq, left, right, …}, so bounding at
+     * {@code left} yields the correct set <em>by coincidence</em> and passes under the broken implementation.
+     * Bounding at the sibling that sorts LATER is what tells the two apart. This was verified by probe: the
+     * prefix implementation leaves this test red and the {@code left} version green.
+     */
+    @Test
+    void stoppingAtANodeRunsItsAncestorsAndNeitherItsDescendantsNorItsSiblings() throws Exception {
+        PipelineDryRun.Result r = PipelineDryRun.run(forkedGraph(), SAMPLE, RowShaper.ReferenceResolver.NONE, "right");
+
+        assertTrue(ran(r, "right"), "the target itself runs");
+        assertEquals(1, relCount(node(r, "right"), PipelineRel.DATA));   // amt 50 — really executed
+        assertFalse(ran(r, "rightSink"), "below the target");
+        assertFalse(ran(r, "left"), "a sibling branch is not an ancestor of the target, even sorting earlier");
+        assertFalse(ran(r, "leftSink"), "nor is anything below that sibling");
+    }
+
+    /**
+     * The same graph with no cutoff runs everything. Pins that the new parameter's default really is "whole
+     * graph" — the production dry-run path passes {@code null} and must be unchanged by 5b.
+     */
+    @Test
+    void noCutoffStillRunsTheWholeGraph() throws Exception {
+        PipelineGraph g = forkedGraph();
+        PipelineDryRun.Result r = PipelineDryRun.run(g, SAMPLE);
+
+        for (String id : List.of("left", "right", "leftSink", "rightSink"))
+            assertTrue(ran(r, id), id + " should run when nothing bounds the walk");
+
+        // and the explicit null is the same answer as the overload that omits it
+        PipelineDryRun.Result viaNull = PipelineDryRun.run(g, SAMPLE, RowShaper.ReferenceResolver.NONE, null);
+        assertEquals(r.nodes().size(), viaNull.nodes().size());
+        assertEquals(r.sinks().size(), viaNull.sinks().size());
+    }
+
+    /** Stopping at a sink includes that sink but still not the other branch. */
+    @Test
+    void stoppingAtASinkIncludesTheSinkItself() throws Exception {
+        PipelineDryRun.Result r =
+                PipelineDryRun.run(forkedGraph(), SAMPLE, RowShaper.ReferenceResolver.NONE, "leftSink");
+
+        assertTrue(ran(r, "leftSink"));
+        assertEquals(2, r.sinks().get(0).rowCount());
+        assertFalse(ran(r, "right"));
+    }
+
+    /**
+     * A cutoff above every sink is a legitimate run, not a silent nothing — and it must NOT trip the DRYRUN-2
+     * "no sink received any rows" warning, which is about a flow that would write nothing. Here no sink ran at
+     * all because the operator bounded the run, which is a different statement.
+     */
+    @Test
+    void aCutoffAboveEverySinkDoesNotWarnThatNoSinkWasReached() throws Exception {
+        PipelineDryRun.Result r = PipelineDryRun.run(forkedGraph(), SAMPLE, RowShaper.ReferenceResolver.NONE, "left");
+
+        assertTrue(r.sinks().isEmpty());
+        assertTrue(r.warnings().isEmpty(), "bounded on purpose is not the same as 'nothing would be written': "
+                + r.warnings());
+    }
+
+    /** An unknown target is rejected by name rather than quietly running the whole graph. */
+    @Test
+    void anUnknownStopNodeIsRejected() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> PipelineDryRun.run(forkedGraph(), SAMPLE, RowShaper.ReferenceResolver.NONE, "nope"));
+        assertTrue(e.getMessage().contains("nope"), e.getMessage());
+    }
 }

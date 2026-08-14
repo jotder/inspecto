@@ -99,19 +99,48 @@ class ControlApiPipelineTestRunTest {
         }
     }
 
+    /**
+     * 5b — {@code to=} really bounds the walk now. Until 2026-08-14 the route ran the whole graph and warned
+     * that it had; that warning is gone precisely because the cutoff is honest, so this asserts its absence
+     * too — a stale "we ran everything anyway" note would now be a lie in the other direction.
+     *
+     * <p>The lifted CSV graph is linear ({@code parse → map → sink}) and only {@code nodes()} project into
+     * {@code relations}, so bounding at the seed is what makes the cutoff observable over HTTP: nothing past
+     * {@code parse} runs, and {@code relations} comes back empty rather than carrying {@code map}.
+     */
     @Test
-    void tellsTheOperatorThatStoppingAtAStepIsNotSupportedYet(@TempDir Path dir) throws Exception {
+    void stoppingAtAStepBoundsTheRun(@TempDir Path dir) throws Exception {
+        seedInbox(dir);
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> full = send(c.port, "POST",
+                    "/pipelines/authored/test_etl/run?to=map", "{\"files\":[\"a.csv\"]}");
+            assertEquals(200, full.statusCode(), full.body());
+            JsonNode fb = json(full);
+            assertEquals("map", fb.get("toNode").asText());
+            assertFalse(fb.get("relations").isEmpty(), "the target step itself must run");
+            assertTrue(warnings(fb).stream().noneMatch(w -> w.contains("whole graph")),
+                    "the cutoff is built — nothing should still claim the whole graph ran: " + warnings(fb));
+
+            HttpResponse<String> bounded = send(c.port, "POST",
+                    "/pipelines/authored/test_etl/run?to=parse", "{\"files\":[\"a.csv\"]}");
+            assertEquals(200, bounded.statusCode(), bounded.body());
+            JsonNode bb = json(bounded);
+            assertTrue(bb.get("relations").isEmpty(),
+                    "bounding at the seed must not run 'map': " + bb.get("relations"));
+            assertFalse(bb.get("output").isNull(),
+                    "the files are still parsed in full — the cutoff bounds the preview, not the parse");
+        }
+    }
+
+    /** A {@code to=} naming no node in the graph is refused, not silently widened to the whole graph. */
+    @Test
+    void rejectsAToNodeThatIsNotInTheGraph(@TempDir Path dir) throws Exception {
         seedInbox(dir);
         try (Ctx c = open(dir)) {
             HttpResponse<String> r = send(c.port, "POST",
                     "/pipelines/authored/test_etl/run?to=some_node", "{\"files\":[\"a.csv\"]}");
-            assertEquals(200, r.statusCode(), r.body());
-            JsonNode b = json(r);
-            assertEquals("some_node", b.get("toNode").asText());
-            // Echoing toNode while having run the whole graph would paint the canvas green on nodes that
-            // were never bounded, so the response has to say so.
-            assertTrue(warnings(b).stream().anyMatch(w -> w.contains("whole graph")),
-                    "a to= run must warn that the cutoff is not implemented: " + warnings(b));
+            assertEquals(400, r.statusCode(), r.body());
+            assertTrue(r.body().contains("some_node"), r.body());
         }
     }
 

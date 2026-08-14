@@ -139,9 +139,10 @@ real backend. ⚠ *Run to here* **was** gated for a different reason and is **no
   `POST /pipelines/authored/{id}/run?to=` is registered (`PipelineRoutes.testRun`,
   `canAuthorWorkbench`) and `scratchRunAvailable` is now plain `true`. It parses the picked inbox files
   through the real ingest path into a scratch root — zero production side effects — then previews the
-  graph over the parsed rows. ⚠ The `to=` **cutoff is still unbuilt**: the whole graph runs and the
-  response says so in `warnings`, and the offline mock was deliberately made to match rather than
-  over-promise. Details: [`../../backend/engine/pipeline-test-run.md`](../../backend/engine/pipeline-test-run.md).
+  graph over the parsed rows. `to=` **bounds the walk since 2026-08-14** to the ancestor closure of the
+  chosen node — the same rule the offline mock's `subgraphTo` uses, so mock and server agree about which
+  nodes a run covers. An unknown `to=` is a 400.
+  Details: [`../../backend/engine/pipeline-test-run.md`](../../backend/engine/pipeline-test-run.md).
 - *Test processor* — the route **does** exist
   (`ComponentRoutes.java:42-44`, `POST /components/{transform|grammar|sink}/{id}/test`). The dialog
   simply addresses it wrongly, sending the node's dotted type (`transform.filter`) and node id

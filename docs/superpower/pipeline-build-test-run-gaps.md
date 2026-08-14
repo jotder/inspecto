@@ -300,7 +300,8 @@ half **are** separable — confirm that before designing against it.
     ⚠ **Scope, stated honestly: this is the bridge, not the composition.** Nothing yet *calls*
     `PipelineDryRun` with these rows, because that needs a `PipelineGraph` — which is resolved at the
     route. **That wiring is 5c's**, and it is now a few lines rather than a design problem.
-- **5b · stop-at-node cutoff.** Thread a target set through the `topoOrder` walk. ⚠ **That walk is shared
+- **5b · stop-at-node cutoff. ✅ SHIPPED 2026-08-14** — see the as-built below. Original brief: thread a
+  target set through the `topoOrder` walk. ⚠ **That walk is shared
   with production `execute`** — add an overload whose default is "no cutoff" so the production path stays
   byte-identical, and pin that with a test. This is the slice most likely to cause a regression far from
   where it was edited.
@@ -380,6 +381,36 @@ as warnings — the operator is told the malformed file *would* be quarantined e
 honoured `to=` while the server (no 5b) does not. A mock that over-promises is exactly the G2 failure
 mode, so it now appends the same "ran the whole graph" warning. **When 5b lands, remove that warning in
 both `pipelines.handler.ts` and `PipelineRoutes.testRun` together.**
+
+##### 5b SHIPPED 2026-08-14 — as-built, and the premise that was wrong
+
+`PipelineExecutor.dryRun(..., String stopAtNodeId)` + `PipelineDryRun.run(..., String stopAtNodeId)`, both
+`null`-defaulting overloads; `PipelineRoutes.testRun` passes `to` straight through. **Step 5 is now closed.**
+
+⚠ **The plan's stated regression risk did not exist, and grounding is what showed it.** The brief said the
+walk "is shared with production `execute`", implying an overload was needed to keep `execute` byte-identical.
+In fact `execute` and `dryRun` are **separate loop bodies** that merely share the private `topoOrder` helper.
+The cutoff therefore threads through `dryRun` only and **`execute` was not touched at all** — a stronger
+guarantee than the overload the plan asked for. Don't inherit the "shared walk" claim; it was never true.
+
+**The cutoff is the ancestor closure of the target, NOT a prefix of the topological order** (`ancestorsOf`,
+reverse BFS over non-`on_commit` edges). Topo order is arbitrary between sibling branches, so a truncated
+prefix runs whichever sibling happens to sort first and reports counts for a branch the operator never asked
+about — which the canvas then marks ✓. This is the same rule the offline mock's `subgraphTo` already used, so
+mock and server now agree; the "ran the whole graph anyway" warning was removed from **both** together, as 5c
+required.
+
+⚠ **The falsification probe caught a bad test before it caught the bad code — the lesson worth carrying.**
+Probing with the prefix implementation, the headline sibling test **passed**: Kahn's order for the fork
+fixture is `acq, left, right, …`, so bounding at `left` yields the correct set *by coincidence*. Only
+bounding at the sibling that sorts **later** discriminates. The test now stops at `right` and says why in a
+comment. A green suite proved nothing here until the probe was run — exactly the trap 5a recorded.
+
+Two smaller decisions: an unknown `to=` **throws → 400** rather than silently widening to the whole graph;
+and a cutoff above every sink does **not** trip DRYRUN-2's "no sink received any rows" warning (that warning
+requires a non-empty `sinks` list, so bounded-on-purpose stays distinct from would-write-nothing). The
+`files` are still parsed in **full** under a cutoff — the parse is what seeds the walk, so `to=` makes the
+answer narrower, never the work smaller.
 
 ---
 

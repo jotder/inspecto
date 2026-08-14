@@ -560,15 +560,18 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   - ~~G5 silent one-way door~~ **CLOSED** — warning banner naming the offending types on load. ⚠ The
     plan said "mark the editor read-only"; **that was wrong** — deleting the offending node is the only
     repair path, so read-only would have locked users out of the fix.
-  - ~~**⬜ REMAINING — bounded test run over real inbox files.**~~ **✅ SHIPPED 2026-08-14 (5a + 5c).**
+  - ~~**⬜ REMAINING — bounded test run over real inbox files.**~~ **✅ SHIPPED 2026-08-14 (5a + 5b + 5c
+    — Step 5 fully closed).**
     A user can now test a pipeline against their own data: `POST /pipelines/authored/{id}/run` parses
     picked inbox files through the **real** ingest path into a scratch root and previews the graph over
     the parsed rows, with **zero production side effects**; the UI gate is off, so run-to-here works
     against a real server. As-built + rationale:
     [`superpower/pipeline-build-test-run-gaps.md`](superpower/pipeline-build-test-run-gaps.md) Step 5.
-    ⚠ **Only the stop-at-node cutoff (5b) remains** — the run covers the whole graph and *says so in
-    `warnings`* rather than pretending otherwise; the offline mock was deliberately made to match. When
-    5b lands, drop that warning in **both** places together.
+    **5b landed the same day:** `to=` now bounds the walk to the **ancestor closure** of the chosen node
+    (`PipelineExecutor.ancestorsOf`), matching the offline mock's `subgraphTo`, and the "ran the whole
+    graph anyway" warning was dropped from both places together. ⚠ The plan's premise that the walk is
+    *shared with production `execute`* was **wrong** — `execute` and `dryRun` are separate loop bodies
+    sharing only the private `topoOrder`, so `execute` was not touched at all.
     ⚠ Two findings worth carrying: **the containment is the call graph, not config** (five destinations —
     both ledgers, the consignment registry, file stages, Signals, provenance — are resolved by JVM `-D`
     or per-space registries and are avoided by *not calling* `commit`/`writeAudit`/`recordProvenance`);
@@ -601,9 +604,11 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     `dirs.database` root** — which is exactly the "must stay scratch-only" guarantee, already available rather
     than needing invention. `DuckDbUtil.tempDbFile`/`deleteTempDb` (`:64,84,261`) is the scratch-DB mechanism
     `PipelineDryRun` already uses.
-    **Sizing: genuinely MULTI-SHIFT** (three separable hard problems). ⚠ The stop-at-node cutoff is the
+    **Sizing: genuinely MULTI-SHIFT** (three separable hard problems). ⚠ ~~The stop-at-node cutoff is the
     dangerous one — it threads a target set through `topoOrder`, which production `execute` also walks, so it
-    is not an isolated addition. **Smallest useful vertical slice, if scheduled: ship real-file ingest ALONE**
+    is not an isolated addition.~~ **REFUTED when 5b was built:** `execute` and `dryRun` are separate loop
+    bodies sharing only the private `topoOrder` helper, so the cutoff went into `dryRun` alone and `execute`
+    was never touched. It was the *cheapest* of the three, not the dangerous one. **Smallest useful vertical slice, if scheduled: ship real-file ingest ALONE**
     — parse N picked inbox files into a scratch DuckDB and run the **full** graph with no cutoff, reusing the
     scratch pattern above in place of `sampleRows`. That converts "synthetic rows" into "real files" and is
     independently valuable; the cutoff and the route's `to=` semantics follow as a second slice.

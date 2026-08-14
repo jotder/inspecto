@@ -1480,11 +1480,6 @@ final class PipelineRoutes implements RouteModule {
                     PipelineTestRun.sampleRows(parsed, cfg.output().format(), TEST_RUN_SEED_ROWS);
 
             List<String> warnings = new ArrayList<>();
-            if (to != null && !to.isBlank())
-                // 5b (the stop-at-node cutoff) is not built. Echoing toNode while having run the whole
-                // graph would paint the canvas ✓ on nodes that were never bounded — say so instead.
-                warnings.add("the run covered the whole graph: stopping at a chosen step is not "
-                        + "supported yet, so every node below '" + to + "' also ran");
             if (parsed.totalInputRows() > seed.size())
                 warnings.add("per-step row counts are over a sample of " + seed.size() + " of "
                         + parsed.totalInputRows() + " parsed rows; the output row count is the full figure");
@@ -1497,8 +1492,11 @@ final class PipelineRoutes implements RouteModule {
                 warnings.add("no rows were parsed from the chosen file(s), so no step could be previewed");
                 return runResult(null, to, files, parsed, cfg, warnings);
             }
+            // `to` bounds the graph preview only: the picked files are always parsed in full, because the
+            // parse is what seeds the walk. So a cutoff makes the answer narrower, never the work smaller.
             PipelineDryRun.Result preview = PipelineDryRun.run(
-                    componentRegistry(api).effectiveGraph(g), seed, dryRunReferences(api));
+                    componentRegistry(api).effectiveGraph(g), seed, dryRunReferences(api),
+                    to == null || to.isBlank() ? null : to);
             warnings.addAll(preview.warnings());
             return runResult(preview, to, files, parsed, cfg, warnings);
         } catch (ApiException e) {

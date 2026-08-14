@@ -81,17 +81,30 @@ be quarantined even though nothing moved.
 `relations[].{node, rel, rowCount}` is load-bearing: the canvas marks a node ✕ on
 `rel === 'unmatched' && rowCount > 0`.
 
-## Known gap: the `to=` cutoff is unbuilt
+## The `to=` cutoff (2026-08-14)
 
-There is no partial-graph primitive — `PipelineExecutor.dryRun` walks `topoOrder(g)` over the whole
-graph. So the run covers everything and **says so in `warnings`** rather than echoing `toNode` as if it
-had stopped, which would paint the canvas green on nodes that were never bounded.
+`PipelineExecutor.dryRun(..., stopAtNodeId)` bounds the walk; `PipelineDryRun.run` and
+`PipelineRoutes.testRun` thread `to` down to it. `null` means the whole graph, which is the only shape any
+production caller passes.
 
-⚠ The offline mock **does** truncate (`subgraphTo`), which made it *more* capable than the server, so it
-now appends the same warning — a mock that over-promises is the failure mode that convention exists to
-kill. **When the cutoff lands, remove that warning from `pipelines.handler.ts` and
-`PipelineRoutes.testRun` together.** Plan of record:
-[`../../../superpower/pipeline-build-test-run-gaps.md`](../../../superpower/pipeline-build-test-run-gaps.md) Step 5b.
+⚠ **The bound is the ancestor closure of the target, not a prefix of `topoOrder`.** Topological order is
+arbitrary between sibling branches, so truncating it runs whichever branch happens to sort first and reports
+counts for nodes the operator never asked about — which the canvas then marks ✓. `ancestorsOf` walks edges
+backwards instead (skipping `on_commit`, which is a cross-flow trigger rather than a data dependency). This
+matches the offline mock's `subgraphTo`, so mock and server agree on what a run-to-here covers.
+
+⚠ **`execute` was not touched.** The plan expected the cutoff to thread through a walk shared with the
+production executor; in fact `execute` and `dryRun` are separate loop bodies sharing only the private
+`topoOrder` helper, so the production path is untouched rather than merely defaulted.
+
+Two boundaries worth keeping straight:
+- **A cutoff bounds the preview, not the parse.** The picked files are always parsed in full, because the
+  parse is what seeds the walk. `to=` narrows the answer, never the work.
+- **Bounded-on-purpose is not "nothing would be written".** A cutoff above every sink leaves `sinks` empty,
+  which deliberately does *not* trip DRYRUN-2's "no sink received any rows" warning — that one requires a
+  non-empty `sinks` list.
+
+An unknown `to=` throws → **400**, rather than silently widening to the whole graph.
 
 ## Testing note worth keeping
 
@@ -103,8 +116,13 @@ Both safety properties were **falsification-probed**, and one probe changed the 
   quarantined *inside* the scratch root.
 - Replacing the jail with a plain `resolve()` turns the escape test red, and the failure output is the
   vulnerability in the clear — `../secret.csv` read, parsed, and its contents returned in the response.
+- **The cutoff probe caught a bad test before it caught bad code.** Swapping `ancestorsOf` for a truncated
+  `topoOrder` left the headline "a sibling branch does not run" test **green**: Kahn's order for the fork
+  fixture is `acq, left, right, …`, so bounding at `left` gives the right set by coincidence. Only bounding
+  at the sibling that sorts **later** discriminates, which is what the test does now.
 
-**Re-run those probes rather than trusting a green suite** when touching staging or the jail.
+**Re-run those probes rather than trusting a green suite** when touching staging, the jail, or the cutoff —
+and when a probe leaves a test green, suspect the test, not the probe.
 
 ## Code
 
@@ -112,4 +130,7 @@ Both safety properties were **falsification-probed**, and one probe changed the 
 - `inspecto-etl/…/etl/PipelineConfig.java` — `forScratchRun(Path)`
 - `inspecto/…/control/PipelineRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
 - `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
-- Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (5, real HTTP)
+- `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
+- `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`
+- Tests: `PipelineTestRunTest` (8), `ControlApiPipelineTestRunTest` (6, real HTTP),
+  `PipelineDryRunTest` (15, of which 5 pin the cutoff)

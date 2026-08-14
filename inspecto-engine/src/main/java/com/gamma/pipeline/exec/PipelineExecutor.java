@@ -208,14 +208,33 @@ public final class PipelineExecutor {
     /** As {@link #dryRun(Connection, PipelineGraph, String, String)}, with reference context for {@code transform.join}. */
     public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId, String seedTable,
                                       RowShaper.ReferenceResolver references) throws Exception {
+        return dryRun(conn, g, seedNodeId, seedTable, references, null);
+    }
+
+    /**
+     * As {@link #dryRun(Connection, PipelineGraph, String, String, RowShaper.ReferenceResolver)}, bounded to the
+     * part of the graph that feeds {@code stopAtNodeId} — the <em>run-to-here</em> cutoff. {@code null} means no
+     * cutoff, which is the only shape the production paths use, so they are unaffected by this parameter.
+     *
+     * <p><b>The cutoff is the ancestor closure of the target, not a prefix of the topological order.</b> Topo
+     * order is arbitrary between sibling branches, so truncating it would run whichever unrelated branch happened
+     * to sort earlier — reporting counts for nodes the operator did not ask about. Walking edges backwards from
+     * the target keeps exactly the nodes whose output it depends on.
+     *
+     * @throws IllegalArgumentException if {@code stopAtNodeId} names no node in {@code g}
+     */
+    public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId, String seedTable,
+                                      RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
+        Set<String> bounds = ancestorsOf(g, stopAtNodeId, byId);
         Map<String, Map<String, String>> produced = new LinkedHashMap<>();
         produced.put(seedNodeId, new LinkedHashMap<>(Map.of(PipelineRel.DATA, seedTable)));
         Map<String, String> sinkInputs = new LinkedHashMap<>();
 
         for (String nodeId : topoOrder(g)) {
             if (nodeId.equals(seedNodeId)) continue;
+            if (bounds != null && !bounds.contains(nodeId)) continue;
             PipelineNode node = byId.get(nodeId);
             if (!node.enabled()) continue;
             List<PipelineEdge> inbound = liveInbound(g, nodeId, produced);
@@ -273,6 +292,32 @@ public final class PipelineExecutor {
 
     private static boolean isShapeable(String type) {
         return type.startsWith("transform.") && !BuiltinNodeType.TRANSFORM_MERGE.type().equals(type);
+    }
+
+    /**
+     * {@code stopAt} plus every node that can reach it, walking edges backwards — the set a run-to-here may
+     * execute. {@code null} in, {@code null} out, meaning "no cutoff"; that is the production shape.
+     *
+     * <p>{@code on_commit} edges are skipped for the same reason {@link #topoOrder} skips them: they are
+     * cross-flow triggers, not within-graph data dependencies, so an upstream flow is not an ancestor here.
+     */
+    private static Set<String> ancestorsOf(PipelineGraph g, String stopAt, Map<String, PipelineNode> byId) {
+        if (stopAt == null || stopAt.isBlank()) return null;
+        if (!byId.containsKey(stopAt))
+            throw new IllegalArgumentException("flow '" + g.name() + "' has no node '" + stopAt + "' to stop at");
+        Map<String, List<String>> incoming = new LinkedHashMap<>();
+        for (PipelineEdge e : g.edges()) {
+            if (PipelineRel.ON_COMMIT.equals(e.rel())) continue;
+            incoming.computeIfAbsent(e.to(), k -> new ArrayList<>()).add(e.from());
+        }
+        Set<String> keep = new LinkedHashSet<>();
+        Deque<String> stack = new ArrayDeque<>(List.of(stopAt));
+        while (!stack.isEmpty()) {
+            String cur = stack.pop();
+            if (!keep.add(cur)) continue;
+            for (String up : incoming.getOrDefault(cur, List.of())) stack.push(up);
+        }
+        return keep;
     }
 
     /**

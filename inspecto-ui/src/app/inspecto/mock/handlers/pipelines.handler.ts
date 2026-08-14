@@ -849,16 +849,10 @@ function runToNode(name: string, f: AuthoredPipeline | undefined, toNode: string
         path: `data/_scratch/${name}/${toNode}/part-0001.parquet`,
         rowCount: primary?.rowCount ?? 0,
     };
-    // ⚠ The real server does NOT stop at `toNode` — Step 5b (the stop-at-node cutoff) is unbuilt, so it
-    // runs the whole graph and says so in `warnings`. This mock still truncates via `subgraphTo`, which
-    // makes it MORE capable than the server; mirroring the warning is what stops the UI being built
-    // against a fiction (the G2 lesson: a mock that over-promises is the failure mode). When 5b lands,
-    // drop this warning here and in PipelineRoutes.testRun together.
+    // `subgraphTo` truncates to the ancestor closure of `toNode` — since 5b (2026-08-14) the server bounds
+    // its walk the same way (`PipelineExecutor.ancestorsOf`), so mock and server now agree about which nodes
+    // a run-to-here covers. The "ran the whole graph anyway" warning both used to carry is gone from both.
     const warnings = files.length ? [] : ['No files selected — ran over a bounded built-in sample.'];
-    if (toNode)
-        warnings.push(
-            `the run covered the whole graph: stopping at a chosen step is not supported yet, so every node below '${toNode}' also ran`,
-        );
     return {
         seedNode: path[0]?.id ?? '',
         toNode,

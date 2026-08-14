@@ -74,6 +74,21 @@ public final class PipelineDryRun {
      */
     public static Result run(PipelineGraph g, List<Map<String, Object>> sampleRows,
                              RowShaper.ReferenceResolver references) throws Exception {
+        return run(g, sampleRows, references, null);
+    }
+
+    /**
+     * As {@link #run(PipelineGraph, List, RowShaper.ReferenceResolver)}, bounded to the part of the graph that
+     * feeds {@code stopAtNodeId} — the <em>run-to-here</em> cutoff. {@code null} means the whole graph.
+     *
+     * <p>The result then describes only the bounded subgraph: nodes below the target are absent rather than
+     * present with zero counts, because "did not run" and "ran and produced nothing" are different answers and
+     * the canvas renders them differently.
+     *
+     * @throws IllegalArgumentException if {@code stopAtNodeId} names no node in {@code g}
+     */
+    public static Result run(PipelineGraph g, List<Map<String, Object>> sampleRows,
+                             RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
         if (sampleRows == null || sampleRows.isEmpty())
             throw new IllegalArgumentException("at least one sample row is required");
         g = withMappingContext(g);
@@ -83,7 +98,8 @@ public final class PipelineDryRun {
         File db = DuckDbUtil.tempDbFile("dryrun_");
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             ScratchTables.seed(conn, SEED, columns, sampleRows);
-            PipelineExecutor.DryRunResult dr = PipelineExecutor.dryRun(conn, g, seedNode, SEED, references);
+            PipelineExecutor.DryRunResult dr =
+                    PipelineExecutor.dryRun(conn, g, seedNode, SEED, references, stopAtNodeId);
             Map<String, PipelineNode> byId = g.byId();
 
             List<NodeDryRun> nodes = new ArrayList<>();
