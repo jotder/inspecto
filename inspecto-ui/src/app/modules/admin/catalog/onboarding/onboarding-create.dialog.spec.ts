@@ -65,10 +65,11 @@ describe('OnboardingCreateDialog', () => {
             log_dir: 'spaces/demo/data/orders_feed/logs',
         });
         // The LOCAL poll path's real dedup — collector-level `duplicate:` is engine-only.
+        // retention_days is deliberately absent — PipelineConfigParser's own default (90) governs;
+        // this used to hardcode 30 with no stated reason, silently overriding it.
         expect((config['processing'] as Record<string, unknown>)['duplicate_check']).toEqual({
             enabled: true,
             marker_extension: '.processed',
-            retention_days: 30,
         });
         expect(api.registerPipeline).toHaveBeenCalledWith('x.toon');
         expect(ref.close).toHaveBeenCalledWith({ name: 'orders_feed' });

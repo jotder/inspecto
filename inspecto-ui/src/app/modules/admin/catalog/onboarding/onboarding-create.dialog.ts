@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { pipelineScaffold } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { StreamBundle, parseStreamBundle, planStreamImport } from 'app/inspecto/transfer/stream-bundle';
@@ -325,33 +326,17 @@ export class OnboardingCreateDialog {
         }
         const v = this.form.getRawValue();
         const name = String(v.name ?? '').trim();
-        // Beyond the two asked-for dirs, the whole space-convention dir set is derived silently —
-        // without dirs.status_dir the run audit never lands (Runs history stays empty), and
-        // without processing.duplicate_check the LOCAL poll path re-ingests the same file every
-        // cycle (the collector-level `duplicate:` block only drives the collection engine, not
-        // the legacy local path) — both found by the P3 live walk.
-        const home = (v.database || `data/${name}/database`).replace(/\/database$/, '');
-        const config: Record<string, unknown> = {
-            name,
-            active: false,
-            dirs: {
-                poll: v.poll || `data/inbox/${name}`,
-                database: v.database || `data/${name}/database`,
-                backup: `${home}/backup`,
-                temp: `${home}/temp`,
-                errors: `${home}/errors`,
-                quarantine: `${home}/quarantine`,
-                markers: `${home}/markers`,
-                status_dir: `${home}/status`,
-                log_dir: `${home}/logs`,
-            },
-            processing: {
-                threads: 1,
-                duplicate_check: { enabled: true, marker_extension: '.processed', retention_days: 30 },
-            },
-        };
-        if (String(v.description ?? '').trim()) config['description'] = String(v.description).trim();
-        if (this.kind() === 'reference') config['produces'] = 'reference';
+        // The space-convention scaffold (dirs beyond poll/database, duplicate_check) is shared with
+        // the Pipelines "New pipeline" path — see pipelineScaffold's own doc for why each derived key
+        // is there. Was a hand-copied literal here until 2026-08-14, which had silently drifted from
+        // the shared one on retention_days (30 vs. the shared/engine default of 90 — no operator
+        // decision favored 30, so the copy is retired rather than reconciled).
+        const config = pipelineScaffold(name, {
+            poll: v.poll,
+            database: v.database,
+            description: v.description,
+            reference: this.kind() === 'reference',
+        });
 
         this.creating.set(true);
         this.configApi.write('pipeline', config).subscribe({
