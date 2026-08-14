@@ -32,6 +32,21 @@ Configured / Validated — Validated is session-only, from a passed sample test)
 Draft → Ready (all required stages configured) → Live (`active: true`). Resume lands on the first
 incomplete stage. Discard = `DELETE /config/pipeline/{name}` (refused while active).
 
+**Take offline (2026-08-14) is the inverse of go-live and the same flag** — `saveBlock({active:
+false})` from the publish pane, no dedicated route (the write surfaces already accepted a false
+value; this was UI-only work). It exists because `active` had **no** UI write of `false` anywhere in
+this flow, while both Discard and `DELETE /config/pipeline` refuse an active pipeline — so **a Live
+stream could not be removed from the Catalog at all**. Taking it offline deliberately **keeps** the
+landed data and the registered Dataset: they describe data already written, which stopping the
+collector does not unwrite.
+
+⚠ **A Live pipeline has no separate publish step — every stage save takes effect.** `/config/patch`
+has no active-pipeline gate (unlike delete and rename, which 409), and `ConfigRegistry` is
+mtime-keyed, so an edit to a live config is picked up on the next poll cycle with no operator action.
+The shell used to claim the opposite ("It runs only when you go live"); it now swaps that copy while
+live and raises a warning banner pointing at Take offline. *(Enrichments are the exception — no mtime
+hot-reload, they need explicit re-registration.)*
+
 **Go-live also registers the Dataset** (2026-07-30, shipped as S1 of the since-superseded
 onboarding↔pipeline *split* plan; the behaviour **stays** under the current
 `superpower/onboarding-pipeline-unification.md` — it is no longer "the handoff artifact between two

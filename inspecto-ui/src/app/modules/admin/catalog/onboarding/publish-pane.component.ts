@@ -61,6 +61,7 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
 
     readonly saving = signal(false);
     readonly activating = signal(false);
+    readonly deactivating = signal(false);
     readonly refreshing = signal(false);
     readonly activity = signal<InboxStatus | null>(null);
     readonly activityError = signal<string | null>(null);
@@ -119,6 +120,29 @@ export class OnboardingPublishPaneComponent implements OnDestroy {
                 this.refreshActivity();
             },
             error: () => this.activating.set(false),
+        });
+    }
+
+    /** The inverse of {@link activate} — the same `active` flag, written false. Without it a live
+     *  pipeline could never be deleted (`DELETE /config/pipeline` 409s while active) and every stage
+     *  edit stayed hot. The registered Dataset is deliberately left in place: it describes data that
+     *  was already landed, which taking the collector offline does not unwrite. */
+    async deactivate(): Promise<void> {
+        if (!this.lens.canAuthorWorkbench() || !this.state.active()) return;
+        const name = this.state.name();
+        const ok = await this.confirm.confirm(
+            `"${name}" will stop collecting after the current poll cycle. Its landed data and Dataset are kept. Continue?`,
+            'Take offline',
+        );
+        if (!ok) return;
+        this.deactivating.set(true);
+        this.state.saveBlock({ active: false }).subscribe({
+            next: () => {
+                this.deactivating.set(false);
+                this.activity.set(null);
+                this.toastr.success(`"${name}" is offline`);
+            },
+            error: () => this.deactivating.set(false),
         });
     }
 

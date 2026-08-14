@@ -38,7 +38,8 @@
         </div>
         <div class="text-secondary mt-1.5">
             Guided onboarding — each stage writes the pipeline draft on the server, so you can leave and resume any
-            time. It runs only when you go live.
+            time.
+            {{ state.active() ? 'It is already live, so every save takes effect.' : 'It runs only when you go live.' }}
         </div>
     </div>
 
@@ -58,6 +59,13 @@
         @if (state.writesDisabled()) {
             <inspecto-alert class="mx-6 mt-4 block sm:mx-10" variant="warning" icon="heroicons_outline:lock-closed">
                 Config writes are disabled on this server (no write root configured) — the draft is read-only.
+            </inspecto-alert>
+        }
+        @if (state.active() && lens.canAuthorWorkbench() && !state.writesDisabled()) {
+            <inspecto-alert class="mx-6 mt-4 block sm:mx-10" variant="warning" icon="heroicons_outline:signal">
+                This {{ state.kind() }} is <strong>live</strong> — there is no separate publish step, so every stage
+                save below takes effect on the next poll cycle. Take it offline from the Go-live stage first if you
+                want to edit it safely.
             </inspecto-alert>
         }
         @if (!lens.canAuthorWorkbench()) {

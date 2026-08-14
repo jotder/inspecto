@@ -180,6 +180,42 @@ describe('OnboardingPublishPaneComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('pending in spaces/demo');
     });
 
+    it('take-offline confirms and writes active:false — the only way off a live pipeline', async () => {
+        const { fixture, patch, confirmFn } = create({ ...READY_CONFIG, active: true, output: { format: 'PARQUET' } });
+        await fixture.componentInstance.deactivate();
+        expect(confirmFn).toHaveBeenCalled();
+        const [, , blockPatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
+        expect(blockPatch['active']).toBe(false);
+        expect(fixture.componentInstance.activity()).toBeNull(); // the glance is meaningless once offline
+    });
+
+    it('declining the take-offline confirm leaves it live', async () => {
+        const { fixture, patch, state } = create(
+            { ...READY_CONFIG, active: true, output: { format: 'PARQUET' } },
+            { confirm: false },
+        );
+        await fixture.componentInstance.deactivate();
+        expect(patch).not.toHaveBeenCalled();
+        expect(state.active()).toBe(true);
+    });
+
+    it('offers Take offline while live', () => {
+        const { fixture } = create({ ...READY_CONFIG, active: true, output: { format: 'PARQUET' } });
+        expect(fixture.nativeElement.textContent).toContain('Take offline');
+    });
+
+    // Pairs with the test above: ready-but-not-live must offer Go live INSTEAD, or that one is vacuous.
+    it('offers Go live, not Take offline, before activation', () => {
+        const { fixture } = create({ ...READY_CONFIG, output: { format: 'PARQUET' } });
+        expect(fixture.nativeElement.textContent).not.toContain('Take offline');
+        expect(fixture.nativeElement.textContent).toContain('Go live');
+    });
+
+    it('warns a live author that stage edits take effect immediately', () => {
+        const { fixture } = create({ ...READY_CONFIG, active: true, output: { format: 'PARQUET' } });
+        expect(fixture.nativeElement.textContent).toContain('every stage edit takes effect immediately');
+    });
+
     it('tells a Reference author the dataset becomes bindable by name', () => {
         const { fixture, state } = create({ ...READY_CONFIG, produces: 'reference' });
         expect(state.kind()).toBe('reference');

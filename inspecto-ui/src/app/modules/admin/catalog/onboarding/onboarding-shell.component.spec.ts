@@ -132,6 +132,31 @@ describe('OnboardingShellComponent', () => {
         expect(nav).toHaveBeenCalledWith(['/catalog'], { queryParams: { tab: 'graph', from: 'ref:region_dim' } });
     });
 
+    it('warns that a live pipeline has no separate publish step, and drops the draft-only copy', () => {
+        const fixture = create(
+            { name: 'orders_feed' },
+            {
+                read: () =>
+                    of({
+                        type: 'pipeline',
+                        name: 'orders_feed',
+                        path: 'p',
+                        config: { name: 'orders_feed', active: true },
+                    }),
+            },
+        );
+        const text = fixture.nativeElement.textContent as string;
+        expect(text).toContain('there is no separate publish step');
+        expect(text).not.toContain('It runs only when you go live.');
+    });
+
+    // Pairs with the test above — without this, the live assertions could hold for every draft too.
+    it('leaves a draft the go-live copy and no live warning', () => {
+        const text = create({ name: 'orders_feed' }).nativeElement.textContent as string;
+        expect(text).toContain('It runs only when you go live.');
+        expect(text).not.toContain('there is no separate publish step');
+    });
+
     it('has no a11y violations', async () => {
         const fixture = create({ name: 'orders_feed' });
         await expectNoA11yViolations(fixture.nativeElement);

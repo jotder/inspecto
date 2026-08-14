@@ -29,8 +29,20 @@
 
         @if (state.active()) {
             <inspecto-alert variant="success" icon="heroicons_outline:signal">
-                This {{ state.kind() }} is live — it collects on every poll cycle.
+                This {{ state.kind() }} is live — it collects on every poll cycle, and every stage edit takes effect
+                immediately.
             </inspecto-alert>
+            <button
+                mat-stroked-button
+                class="self-start"
+                [disabled]="deactivating() || !lens.canAuthorWorkbench()"
+                (click)="deactivate()"
+            >
+                @if (deactivating()) {
+                    <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
+                }
+                Take offline
+            </button>
         } @else if (state.lifecycle() === 'Ready') {
             <p class="text-secondary m-0">
                 Every required stage is configured. Going live flips this draft to active — it starts collecting from
