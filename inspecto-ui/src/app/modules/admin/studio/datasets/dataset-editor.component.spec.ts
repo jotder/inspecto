@@ -9,14 +9,38 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { DatasetEditorComponent } from './dataset-editor.component';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 
-function create(save = vi.fn((d: Dataset) => of(d)), list: Dataset[] = [], existing: Dataset | null = null) {
+/** The rows seam, stubbed: this space's stores, and one page of whichever is picked. */
+function seam(names = ['cdr', 'orders']) {
+    return {
+        stores: vi.fn(() => Promise.resolve({ names })),
+        rows: vi.fn(() =>
+            Promise.resolve({
+                rows: [{ msisdn: '8801700000001', duration_s: 12 }],
+                columns: [
+                    { name: 'msisdn', type: 'string' },
+                    { name: 'duration_s', type: 'number' },
+                ],
+                truncated: false,
+            }),
+        ),
+    };
+}
+
+function create(
+    save = vi.fn((d: Dataset) => of(d)),
+    list: Dataset[] = [],
+    existing: Dataset | null = null,
+    rowsSeam: unknown = seam(),
+) {
     TestBed.configureTestingModule({
         imports: [DatasetEditorComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
             { provide: DatasetsService, useValue: { get: () => of(existing), list: () => of(list), save } },
+            { provide: DatasetRowsService, useValue: rowsSeam },
             {
                 provide: ToastrService,
                 useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
@@ -28,15 +52,33 @@ function create(save = vi.fn((d: Dataset) => of(d)), list: Dataset[] = [], exist
 }
 
 describe('DatasetEditorComponent', () => {
-    it('starts in create mode with inferred columns over the default source', () => {
+    it('starts in create mode on the space‘s first real store, with columns inferred from its page', async () => {
         const fixture = create();
         fixture.detectChanges();
+        await fixture.whenStable();
         const c = fixture.componentInstance;
         expect(c.editing()).toBe(false);
         expect(c.isVirtual()).toBe(true);
+        // The picker offers what /db/catalog lists — never a hardcoded sample table.
+        expect(c.sourceNames()).toEqual(['cdr', 'orders']);
+        expect(c.form.controls.sourceName.value).toBe('cdr');
         expect(c.columns().length).toBeGreaterThan(0);
         // duration_s is numeric & non-id → measure
         expect(c.columns().find((x) => x.name === 'duration_s')?.role).toBe('measure');
+    });
+
+    it('says the catalog could not be read rather than showing an empty picker as "no stores"', async () => {
+        const failing = { ...seam(), stores: vi.fn(() => Promise.resolve({ names: [], error: 'Backend down' })) };
+        const fixture = create(
+            vi.fn((d: Dataset) => of(d)),
+            [],
+            null,
+            failing,
+        );
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(fixture.componentInstance.sourceNames()).toEqual([]);
+        expect(fixture.componentInstance.storesError()).toBe('Backend down');
     });
 
     it('switching kind to physical hides the query panel', () => {
@@ -46,10 +88,11 @@ describe('DatasetEditorComponent', () => {
         expect(fixture.componentInstance.isVirtual()).toBe(false);
     });
 
-    it('saves a valid dataset and navigates back to the list', () => {
+    it('saves a valid dataset and navigates back to the list', async () => {
         const save = vi.fn((d: Dataset) => of(d));
         const fixture = create(save);
         fixture.detectChanges();
+        await fixture.whenStable(); // the store list lands before the default source is picked
         const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
         fixture.componentInstance.form.controls.name.setValue('cdr_view');
         fixture.componentInstance.save();
@@ -86,7 +129,7 @@ describe('DatasetEditorComponent', () => {
         expect(fixture.componentInstance.form.controls.name.hasError('duplicate')).toBe(true);
     });
 
-    it('shows a real store as a source rather than a blank picker, and says it has no preview rows', () => {
+    it('keeps a saved dataset‘s own store in the picker even when the catalog no longer lists it', async () => {
         // A go-live-registered dataset names its store, which is not a sample source. A mat-select
         // whose value is missing from its options renders empty — that reads as "no source chosen".
         const live = {
@@ -99,18 +142,33 @@ describe('DatasetEditorComponent', () => {
             measures: [],
             calculated: [],
         } as unknown as Dataset;
-        const fixture = create(vi.fn((d: Dataset) => of(d)), [], live);
+        // Its store is NOT in the catalog any more (renamed, or registered outside the data root).
+        const unreadable = {
+            ...seam(),
+            rows: vi.fn(() =>
+                Promise.resolve({ rows: [], columns: [], truncated: false, error: 'no store "orders_feed"' }),
+            ),
+        };
+        const fixture = create(
+            vi.fn((d: Dataset) => of(d)),
+            [],
+            live,
+            unreadable,
+        );
         fixture.componentInstance.id = 'orders_feed';
         fixture.detectChanges();
+        await fixture.whenStable();
         const c = fixture.componentInstance;
         expect(c.sourceNames()).toContain('orders_feed');
-        expect(c.sourceUnpreviewable()).toBe(true);
+        // And it says WHY there is no preview, in the store's own words — not a generic hint.
+        expect(c.previewProblem()).toBe('no store "orders_feed"');
     });
 
-    it('a sample source is not flagged as unpreviewable', () => {
+    it('a readable store is not flagged as unpreviewable', async () => {
         const fixture = create();
         fixture.detectChanges();
-        expect(fixture.componentInstance.sourceUnpreviewable()).toBe(false);
+        await fixture.whenStable();
+        expect(fixture.componentInstance.previewProblem()).toBeNull();
     });
 
     // This editor embeds the query panel + an ag-Grid preview, making it the heaviest a11y

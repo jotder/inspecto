@@ -46,14 +46,21 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   dropped column metadata and so compared numbers and dates as strings).
 * ⚠ **`DatasetResultService.run` takes rows as a thunk.** Its live branch maps the spec to `/bi/query`
   and never reads rows — a ten-tile dashboard would otherwise fetch and discard ten pages.
+* **The store picker lists real stores (2026-08-14, split S2 slice A).** The Dataset editor's
+  `sourceName` field offers catalogued stores, not a hardcoded sample table: `DatasetRowsService.stores()`
+  reads `/db/catalog` and offers its **business** groups only — an `ops:*` table needs a group id that a
+  Dataset's `sourceName` cannot carry. Create mode lands on the first catalogued store; an unreadable
+  catalog says so rather than rendering as "this space has no stores"; and a saved dataset's own source
+  stays in the list even when the catalog no longer names it, because a `mat-select` whose value is
+  absent from its options renders BLANK. ⛔ The filed `storeOptionLoader` was deliberately **not** built —
+  the only field naming a store is this `mat-select`, and the expectation form's `target` is a
+  pipeline/job, a different vocabulary. Build it when a schema-form field genuinely names a store.
 * ⛔ **A Dataset's `sourceName` is never defaulted (2026-08-14).** `DatasetsService.fromContent`'s old
   `?? 'data'` fallback named a key that does not exist, so a dataset stored without a source read
   **empty everywhere**, indistinguishable from an empty store. It stays blank instead. The write that
   produced that shape was Catalog go-live's auto-registration ([catalog](catalog.md)), which now sets
   `sourceName` to the store it registers — the dataset kind's own validator has always said *"A source is
-  required"*, but nothing ran it on that path. ⚠ The editor's `sourceName` picker therefore carries the
-  **saved dataset's own source when it is not a sample key**: a `mat-select` whose value is absent from
-  its options renders BLANK, which an operator reads as "no source chosen" rather than as a real store.
+  required"*, but nothing ran it on that path.
 * **Forms** follow ask-the-minimum + `uniqueNameValidator` on create
   ([forms & state](../conventions/forms-and-state.md)).
 

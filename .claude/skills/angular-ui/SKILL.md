@@ -225,7 +225,8 @@ src/app/
   slice B 2026-08-14). ONE seam for "what does this `sourceName` resolve to": `rows(ds, limit?)` (live
   `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by `compileSql`;
   offline the `inspecto/mock/sample-sources.ts` page filtered by `evaluateRows`), `sql(store, text)` for
-  authored SQL, `columns(ds)` for declared-else-1-row-probe columns. ⛔ **Never write
+  authored SQL, `columns(ds)` for declared-else-1-row-probe columns, `stores()` for the space's store
+  list (`/db/catalog`, business groups only — an `ops:*` table needs a group id a `sourceName` can't carry). ⛔ **Never write
   `SAMPLE_SOURCES[ds.sourceName]` in a feature again** — that synchronous lookup is why Studio showed
   sample data live. ⚠ **A result is a PAGE**: honour `truncated` and surface `error`, never render an
   empty grid for a store that 404'd. ⚠ It is async, so a `computed()` that read rows becomes an

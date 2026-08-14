@@ -65,8 +65,12 @@
                     <mat-option [value]="s">{{ s }}</mat-option>
                 }
             </mat-select>
-            @if (sourceUnpreviewable()) {
-                <mat-hint>Real store — no preview rows here yet.</mat-hint>
+            @if (storesError(); as e) {
+                <mat-hint>{{ e }}</mat-hint>
+            } @else if (previewProblem(); as why) {
+                <mat-hint>{{ why }}</mat-hint>
+            } @else if (!sourceNames().length) {
+                <mat-hint>This space has no data stores yet.</mat-hint>
             }
         </mat-form-field>
 

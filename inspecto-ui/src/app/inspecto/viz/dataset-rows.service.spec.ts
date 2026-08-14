@@ -33,14 +33,23 @@ function dbResult(over: Partial<DbResult> = {}): DbResult {
     };
 }
 
+const CATALOG = {
+    groups: [
+        { id: 'stores', label: 'Data Stores', kind: 'parquet', tables: [{ name: 'switch_cdr' }, { name: 'billing' }] },
+        // Operational tables are the control plane's own; a Dataset cannot name them.
+        { id: 'ops:objects', label: 'Objects', kind: 'operational', tables: [{ name: 'inspecto_ops_objects' }] },
+    ],
+};
+
 /** One TestBed per test (house rule); the DbBrowserService stub records every live-path call. */
-function setup(over: Partial<Record<'table' | 'query', unknown>> = {}) {
+function setup(over: Partial<Record<'table' | 'query' | 'catalog', unknown>> = {}) {
     const table = (over.table as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(dbResult()));
     const query = (over.query as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(dbResult()));
+    const catalog = (over.catalog as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(CATALOG));
     TestBed.configureTestingModule({
-        providers: [{ provide: DbBrowserService, useValue: { table, query } }],
+        providers: [{ provide: DbBrowserService, useValue: { table, query, catalog } }],
     });
-    return { svc: TestBed.inject(DatasetRowsService), table, query };
+    return { svc: TestBed.inject(DatasetRowsService), table, query, catalog };
 }
 
 const CDR: RowSourceRef = { sourceName: 'cdr' };
@@ -133,6 +142,29 @@ describe('DatasetRowsService — live', () => {
         expect((await svc.rows(CDR)).error).toBeTruthy();
         expect((await svc.rows(CDR)).rows.length).toBe(1);
         expect(table).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('DatasetRowsService — the store list', () => {
+    it('live: lists the business stores and EXCLUDES the operational groups', async () => {
+        environment.mockStudio = false;
+        const { svc } = setup();
+        expect(await svc.stores()).toEqual({ names: ['billing', 'switch_cdr'] });
+    });
+
+    it('live: an unreadable catalog is explained, not reported as "this space has no stores"', async () => {
+        environment.mockStudio = false;
+        const { svc } = setup({ catalog: vi.fn(() => throwError(() => ({ status: 503 }))) });
+        const res = await svc.stores();
+        expect(res.names).toEqual([]);
+        expect(res.error).toBeTruthy();
+    });
+
+    it('offline: the sample store keys, with no request', async () => {
+        environment.mockStudio = true;
+        const { svc, catalog } = setup();
+        expect((await svc.stores()).names).toEqual(Object.keys(SAMPLE_SOURCES));
+        expect(catalog).not.toHaveBeenCalled();
     });
 });
 

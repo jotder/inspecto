@@ -13,7 +13,7 @@ import {
     inferColumns,
 } from 'app/inspecto/query';
 import { runSql } from 'app/inspecto/data-table/sql/sql-run';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
+import { SAMPLE_SOURCES, SAMPLE_SOURCE_NAMES } from 'app/inspecto/mock/sample-sources';
 
 /**
  * The **rows seam**: what a Dataset's `sourceName` actually resolves to. Live (the default —
@@ -68,6 +68,24 @@ export class DatasetRowsService {
     }
 
     /**
+     * The stores a Dataset may read — the business groups of `/db/catalog` live, the sample keys offline.
+     * Operational (`ops:*`) groups are excluded: they are the control plane's own tables, not business
+     * data, and `/db/table` needs their group id, which a Dataset's `sourceName` cannot carry.
+     */
+    async stores(): Promise<StoreList> {
+        if (environment.mockStudio) return { names: [...SAMPLE_SOURCE_NAMES] };
+        try {
+            const catalog = await firstValueFrom(this.db.catalog());
+            const names = (catalog.groups ?? [])
+                .filter((g) => !g.id.startsWith('ops:'))
+                .flatMap((g) => g.tables.map((t) => t.name));
+            return { names: [...new Set(names)].sort() };
+        } catch (e) {
+            return { names: [], error: apiErrorMessage(e, 'Could not list the stores in this space.') };
+        }
+    }
+
+    /**
      * Run authored SQL against one store: `/db/query` live (guarded server-side — a single read-only
      * statement), the in-browser AlaSQL engine over the store's sample page offline. Not cached: the SQL
      * is being edited, so every run is a new question. Never throws.
@@ -116,6 +134,12 @@ export class DatasetRowsService {
             };
         }
     }
+}
+
+/** The stores a Dataset may name; `error` set when the catalog could not be read (never both empty-silent). */
+export interface StoreList {
+    names: string[];
+    error?: string;
 }
 
 /** One page of a Dataset's rows, plus what the consumer needs to be honest about it. */
