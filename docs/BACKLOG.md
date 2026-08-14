@@ -685,7 +685,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
       structural; neither re-checks symlink escape, and `PathJail` is the only thing that does). Family (a)'s
       three near-identical store helpers (`ComponentStore`/`PipelineStore`/`ViewStore`) are **untidy, not
       buggy** — ⚠ and not byte-identical as claimed: `ComponentStore` splits the same logic into
-      `validId` + `fileFor(type,id)`. `ViewStore` has **no test class at all** — that is the real gap there.
+      `validId` + `fileFor(type,id)`. ~~`ViewStore` has **no test class at all** — that is the real gap
+      there.~~ **CLOSED 2026-08-14 — and writing the test found a live defect** (`ViewStoreTest`, 10 cases):
+      `list()`/`get()` skipped an *unparseable* file but not a **parseable** one, and `ViewDefinition.fromMap`
+      is a lossless mapper that fills absent keys with `null` — so any stray `*_view.toon` under
+      `<write-root>/views/` became a **phantom view with a null `store`**, listed by `GET /views` and served
+      to the UI. Both read paths now go through one `load()` that requires a non-blank `store`. ⚠ **The
+      reusable lesson: "skip the bad file" was implemented as "skip the file that throws".** Parseability was
+      never the property that mattered.
       Verified: full reactor 23 modules, **3252 tests, 0 failures** (3237 baseline + 15 new).
 - ~~🔴 BUILD-1 — the offline reactor build is BROKEN~~ **CLOSED 2026-08-06 — NOT A BUILD DEFECT. The
   diagnosis was an artifact of running as the wrong Windows profile.** `mvn -o clean test` completes

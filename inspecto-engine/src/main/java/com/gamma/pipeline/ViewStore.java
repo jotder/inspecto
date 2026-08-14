@@ -42,7 +42,7 @@ public final class ViewStore {
         return viewsRoot;
     }
 
-    /** Every registered view definition on disk (re-scans), in filename order; an unparseable file is skipped. */
+    /** Every registered view definition on disk (re-scans), in filename order; an unusable file is skipped. */
     public List<ViewDefinition> list() {
         List<ViewDefinition> out = new ArrayList<>();
         if (!Files.isDirectory(viewsRoot)) return out;
@@ -50,13 +50,7 @@ public final class ViewStore {
             files.filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(SUFFIX))
                     .sorted()
-                    .forEach(p -> {
-                        try {
-                            out.add(ViewDefinition.fromMap(ToonHelper.load(p.toString())));
-                        } catch (Exception e) {
-                            log.warn("Could not load view definition {}: {}", p, e.getMessage());
-                        }
-                    });
+                    .forEach(p -> load(p).ifPresent(out::add));
         } catch (IOException e) {
             log.warn("Cannot scan views dir {}: {}", viewsRoot, e.getMessage());
         }
@@ -67,8 +61,27 @@ public final class ViewStore {
     public Optional<ViewDefinition> get(String store) {
         Path file = fileFor(store);
         if (!Files.isRegularFile(file)) return Optional.empty();
+        return load(file);
+    }
+
+    /**
+     * One file → one definition, or empty when the file cannot serve as one. Both read paths go through here
+     * so they cannot disagree about what counts as a view definition.
+     *
+     * <p>⚠ <b>Failing to parse is not the only way a file can be unusable.</b> {@code ToonHelper.load} happily
+     * returns a map for any well-formed file, and {@link ViewDefinition#fromMap} is a lossless mapper that
+     * fills absent keys with {@code null} — so a stray parseable file in this directory used to become a
+     * <em>phantom view with a null identity</em>, listed by {@code GET /views} and handed to the UI. A
+     * definition with no {@code store} is not a definition; it is skipped exactly like an unparseable one.
+     */
+    private Optional<ViewDefinition> load(Path file) {
         try {
-            return Optional.of(ViewDefinition.fromMap(ToonHelper.load(file.toString())));
+            ViewDefinition def = ViewDefinition.fromMap(ToonHelper.load(file.toString()));
+            if (def.store() == null || def.store().isBlank()) {
+                log.warn("Skipping {}: no 'store' key, so it is not a view definition", file);
+                return Optional.empty();
+            }
+            return Optional.of(def);
         } catch (Exception e) {
             log.warn("Could not load view definition {}: {}", file, e.getMessage());
             return Optional.empty();
