@@ -16,7 +16,7 @@ import {
     VizProps,
     allViz,
     autoAssignChannels,
-    bucketRows,
+    bucketSpecRows,
     getViz,
     recommend,
 } from 'app/inspecto/viz';
@@ -253,8 +253,7 @@ export class ExploreComponent implements OnInit {
         if (!plugin || !ds || plugin.meta.viewKind) return;
         const spec = plugin.buildQuery(this.controls(), { datasetId: ds.id, sourceName: ds.sourceName, filters: null });
         this.running.set(true);
-        const x = this.controls().x?.[0];
-        const rows = x ? bucketRows(this.rows(), x.field, x.grain) : this.rows();
+        const rows = bucketSpecRows(this.rows(), spec.grains);
         // Through DatasetResultService (M2): offline AlaSQL in mock mode, POST /bi/query when Studio is
         // live — the builder previews against the same data path the saved widget will render with.
         this.datasetResult

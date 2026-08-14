@@ -92,6 +92,10 @@ export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBo
     const body: BiQueryBody = { dataset: spec.datasetId };
     if (measures.length) body.measures = measures;
     if (spec.groupBy.length) body.groupBy = spec.groupBy;
+    // Only grains on grouped columns cross — the server refuses the rest, and a stale grain on a channel
+    // whose field has since changed would otherwise 422 the whole widget.
+    const grains = Object.entries(spec.grains ?? {}).filter(([f]) => spec.groupBy.includes(f));
+    if (grains.length) body.grains = Object.fromEntries(grains);
     if (filters.length) body.filters = filters;
     if (spec.orderBy?.length) body.orderBy = spec.orderBy;
     if (spec.limit != null) body.limit = spec.limit;

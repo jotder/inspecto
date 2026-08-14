@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bucketRows, bucketValue } from './time-grain';
+import { bucketRows, bucketSpecRows, bucketValue } from './time-grain';
 
 describe('time-grain', () => {
     it('buckets to day / month', () => {
@@ -24,5 +24,14 @@ describe('time-grain', () => {
         expect(bucketRows(rows, 't', 'month')).toEqual([{ t: '2026-06', v: 1 }]);
         expect(bucketRows(rows, 't', 'auto')).toBe(rows);
         expect(bucketRows(rows, 't', undefined)).toBe(rows);
+    });
+
+    it('bucketSpecRows buckets every grained column and only those', () => {
+        const rows = [{ t: '2026-06-24 09:00:00', u: '2026-06-24 09:00:00', v: 1 }];
+        expect(bucketSpecRows(rows, { t: 'month', u: 'day' })).toEqual([
+            { t: '2026-06', u: '2026-06-24', v: 1 },
+        ]);
+        expect(bucketSpecRows(rows, undefined)).toBe(rows);
+        expect(bucketSpecRows(rows, {})).toBe(rows);
     });
 });

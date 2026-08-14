@@ -56,6 +56,20 @@ class MeasureGrammarContractTest {
                 "MeasureCompiler.AGGS and " + CONTRACT + " disagree — decide which is right, then update both");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void theTimeGrainsTheEngineBucketsIntoMatchTheCommittedContract() throws IOException {
+        Map<String, Object> contract = JSON.readValue(contractPath().toFile(), Map.class);
+        List<String> published = (List<String>) contract.get("grains");
+
+        assertNotNull(published, "contract file has no `grains` key");
+        // The UI picks the grain and this side does the bucketing, so a name only one side knows groups
+        // by the wrong period — and silently, because the chart still renders.
+        assertEquals(MeasureCompiler.GRAINS, published,
+                "MeasureCompiler.GRAINS and " + CONTRACT + " disagree — a grain the widget offers would "
+                        + "then be refused by /bi/query, or vice versa");
+    }
+
     @Test
     void theIdentifierPatternTheEngineEnforcesMatchesTheCommittedContract() throws IOException {
         Map<?, ?> contract = JSON.readValue(contractPath().toFile(), Map.class);

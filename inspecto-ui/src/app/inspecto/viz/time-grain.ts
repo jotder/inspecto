@@ -32,6 +32,19 @@ export function bucketRows(
     return rows.map((r) => ({ ...r, [field]: bucketValue(r[field], grain) }));
 }
 
+/**
+ * Bucket every grained column of a {@link QuerySpec} — the offline twin of the `grains` key the live
+ * `/bi/query` body carries, so both paths bucket exactly the columns the spec says and no others.
+ * No-op (same array) when the spec declares no grain.
+ */
+export function bucketSpecRows(
+    rows: Record<string, unknown>[],
+    grains: Record<string, TimeGrain> | undefined,
+): Record<string, unknown>[] {
+    const fields = Object.keys(grains ?? {});
+    return fields.reduce((acc, f) => bucketRows(acc, f, grains?.[f]), rows);
+}
+
 function isoDate(d: Date): string {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

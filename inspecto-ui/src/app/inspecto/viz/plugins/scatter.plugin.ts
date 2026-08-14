@@ -1,6 +1,6 @@
 import { channelMeasure, channelMeasureId } from '../query-spec';
 import { ControlSpec, ControlValues, QuerySpec, VizPlugin, VizProps } from '../viz-types';
-import { QueryCtx } from './plugin-helpers';
+import { channelGrains, QueryCtx } from './plugin-helpers';
 
 /**
  * Scatter plugin — two measures (x/y) grouped by one dimension; each group is a point. Same parallel-series
@@ -19,7 +19,14 @@ function buildScatterQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
         .map((ch) => values[ch]?.[0])
         .filter((cv): cv is NonNullable<typeof cv> => !!cv)
         .map((cv) => channelMeasure({ ...cv, agg: cv.agg ?? 'avg' }));
-    return { datasetId: ctx.datasetId, sourceName: ctx.sourceName, groupBy, measures, filters: ctx.filters ?? null };
+    return {
+        datasetId: ctx.datasetId,
+        sourceName: ctx.sourceName,
+        groupBy,
+        ...(channelGrains([values.series?.[0]]) ?? {}),
+        measures,
+        filters: ctx.filters ?? null,
+    };
 }
 
 function transformScatter(rows: Record<string, unknown>[], values: ControlValues): VizProps {

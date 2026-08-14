@@ -71,3 +71,24 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   (clean 4xx if unknown).
 * The UI's inline `calculated-column-guard.ts` mirrors the three rules for instant feedback but is
   **not authoritative** — the server re-validates at query time regardless.
+
+## Time grain on `/bi/query` (shipped 2026-08-14)
+
+A widget's time bucket is part of the query, not a client-side afterthought:
+
+* **Wire** — the body's optional `grains` object maps a **`groupBy` column** to `day`/`week`/`month`.
+  A grain naming a column that is not grouped is a **422, not a silent no-op** — the caller believes it
+  asked for a bucket. The vocabulary is pinned across the two languages by
+  `inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json` (`MeasureGrammarContractTest`),
+  the same mechanism that pins the aggregate set.
+* **Compilation** — `MeasureCompiler` emits `STRFTIME(DATE_TRUNC('<grain>', "col"), '<fmt>')` in the
+  select list **and repeats the whole expression in the GROUP BY** (the bucketed dimension is aliased
+  back to its own column name, so grouping by the alias would be ambiguous with the raw column).
+* ⚠ **The bucket is TEXT, not a TIMESTAMP** — `%Y-%m-%d` for day/week, `%Y-%m` for month — because
+  those are the exact keys the UI's offline `bucketValue` produces. Returning a timestamp would make
+  one widget label its categories differently live and offline, which is the class of defect this
+  change closed. DuckDB's `DATE_TRUNC('week', …)` is Monday-based and so is the offline bucket; that
+  agreement is held by `MeasureCompilerGrainExecutionTest`, which **runs** the compiled SQL in the
+  sandbox rather than string-comparing it.
+* `SqlGuard` passes the bucketed statement unchanged — neither `STRFTIME` nor `DATE_TRUNC` is a
+  file/extension surface — and the route re-checks it as always.

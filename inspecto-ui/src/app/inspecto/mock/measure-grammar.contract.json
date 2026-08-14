@@ -1,4 +1,5 @@
 {
   "aggregations": [ "count", "countDistinct", "sum", "avg", "min", "max" ],
+  "grains": [ "day", "week", "month" ],
   "identifier": "[A-Za-z_][A-Za-z0-9_]*"
 }

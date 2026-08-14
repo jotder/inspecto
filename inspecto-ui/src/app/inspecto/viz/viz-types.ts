@@ -49,6 +49,9 @@ export interface QuerySpec {
     datasetId: string;
     sourceName: string;
     groupBy: string[];
+    /** Temporal group-by columns → the bucket they group into. The one source of truth for bucketing:
+     *  offline it drives `bucketSpecRows`, live it travels in the `/bi/query` body as `grains`. */
+    grains?: Record<string, TimeGrain>;
     measures: QueryMeasure[];
     filters?: ConditionGroup | null;
     orderBy?: { field: string; dir: SortDir }[];

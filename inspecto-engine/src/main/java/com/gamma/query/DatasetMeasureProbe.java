@@ -58,7 +58,7 @@ public final class DatasetMeasureProbe {
                     : new MeasureCompiler.Measure(m.group(2), m.group(3));
 
             MeasureCompiler.Spec spec = new MeasureCompiler.Spec(
-                    datasetId, List.of(measure), List.of(), List.of(), List.of(), 1);
+                    datasetId, List.of(measure), List.of(), Map.of(), List.of(), List.of(), 1);
             String sql = MeasureCompiler.compile(spec);
 
             ComponentStore store = new ComponentStore(root.resolve("registry"));

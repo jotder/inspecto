@@ -44,6 +44,17 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   its **offline arm**; routing those through the seam adds a second round-trip behind a path that already
   has one. They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
   dropped column metadata and so compared numbers and dates as strings).
+* **A widget's time grain travels on the wire (2026-08-14).** `QuerySpec.grains` (group-by column →
+  `day|week|month`) is the ONE source of truth: each plugin's `buildQuery` fills it from the channel
+  controls, offline `bucketSpecRows` buckets exactly those columns, and live `biQueryBody` sends them as
+  the `/bi/query` body's `grains` key for `MeasureCompiler` to compile to `DATE_TRUNC`
+  ([queries](../../backend/control-plane/queries.md)). Before this the grain existed only as a
+  client-side row rewrite over the x channel, so the server grouped by the un-truncated timestamp while
+  the demo bucketed correctly. ⛔ **Do not re-add a client-side fold for this** — a fold cannot bucket
+  rows the server already aggregated. ⚠ The server returns the bucket as **text** in the UI's own format
+  (`YYYY-MM-DD` / `YYYY-MM`), aliased back to the raw column's name, so both paths label their categories
+  identically. ⚠ Only *grouped* columns may carry a grain — the server 422s otherwise, and `biQueryBody`
+  drops a stale one rather than letting it fail the whole widget.
 * ⚠ **`DatasetResultService.run` takes rows as a thunk.** Its live branch maps the spec to `/bi/query`
   and never reads rows — a ten-tile dashboard would otherwise fetch and discard ten pages.
 * **The store picker lists real stores (2026-08-14, split S2 slice A).** The Dataset editor's

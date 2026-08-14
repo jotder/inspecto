@@ -1,6 +1,6 @@
 import { ConditionGroup } from 'app/inspecto/query';
 import { channelMeasure, channelMeasureId } from '../query-spec';
-import { ChannelValue, ControlValues, QuerySpec, VizProps } from '../viz-types';
+import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps } from '../viz-types';
 
 /**
  * Shared pure helpers for the standard chart plugins: turn the field mapping into a {@link QuerySpec}, and
@@ -42,9 +42,26 @@ function distinct(rows: Record<string, unknown>[], key: string): string[] {
 
 /** Group-by = the x + series (dimension/temporal) channels; measures = the y channels' aggregations. */
 export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
-    const groupBy = [field(values.x), field(values.series)].filter((f): f is string => !!f);
+    const dims = [values.x?.[0], values.series?.[0]].filter((cv): cv is ChannelValue => !!cv?.field);
+    const groupBy = dims.map((cv) => cv.field);
     const measures = (values.y ?? []).map(channelMeasure);
-    return { datasetId: ctx.datasetId, sourceName: ctx.sourceName, groupBy, measures, filters: ctx.filters ?? null };
+    return {
+        datasetId: ctx.datasetId,
+        sourceName: ctx.sourceName,
+        groupBy,
+        ...(channelGrains(dims) ?? {}),
+        measures,
+        filters: ctx.filters ?? null,
+    };
+}
+
+/** The `{grains}` fragment for the dimension channels that picked a real bucket (`auto` = none), or
+ *  `null` so an ungrained spec carries no key at all. Only *grouped* channels may appear — the server
+ *  refuses a grain on a column it is not grouping by. */
+export function channelGrains(dims: (ChannelValue | undefined)[]): Pick<QuerySpec, 'grains'> | null {
+    const grains: Record<string, TimeGrain> = {};
+    for (const cv of dims) if (cv?.field && cv.grain && cv.grain !== 'auto') grains[cv.field] = cv.grain;
+    return Object.keys(grains).length ? { grains } : null;
 }
 
 /** Pivot aggregated rows into {labels (x), one series per `series` value (or a single measure series)}. */

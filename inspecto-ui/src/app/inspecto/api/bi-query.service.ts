@@ -21,6 +21,9 @@ export interface BiQueryBody {
     dataset: string;
     measures?: BiMeasure[];
     groupBy?: string[];
+    /** Group-by column → time bucket (`day`/`week`/`month`); the server compiles it to `DATE_TRUNC`.
+     *  Every key must also appear in `groupBy` — the server 422s on one that does not. */
+    grains?: Record<string, string>;
     filters?: BiFilter[];
     orderBy?: { field: string; dir: 'asc' | 'desc' }[];
     limit?: number;

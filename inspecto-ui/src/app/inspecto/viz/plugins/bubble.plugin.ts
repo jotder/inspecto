@@ -1,6 +1,6 @@
 import { channelMeasure, channelMeasureId } from '../query-spec';
 import { ControlSpec, ControlValues, QuerySpec, VizPlugin, VizProps } from '../viz-types';
-import { QueryCtx } from './plugin-helpers';
+import { channelGrains, QueryCtx } from './plugin-helpers';
 
 /**
  * Bubble plugin — three measures (x/y/size) grouped by one dimension, so each group becomes a point. Stored
@@ -20,7 +20,14 @@ function buildBubbleQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
         .map((ch) => values[ch]?.[0])
         .filter((cv): cv is NonNullable<typeof cv> => !!cv)
         .map((cv) => channelMeasure({ ...cv, agg: cv.agg ?? 'avg' }));
-    return { datasetId: ctx.datasetId, sourceName: ctx.sourceName, groupBy, measures, filters: ctx.filters ?? null };
+    return {
+        datasetId: ctx.datasetId,
+        sourceName: ctx.sourceName,
+        groupBy,
+        ...(channelGrains([values.series?.[0]]) ?? {}),
+        measures,
+        filters: ctx.filters ?? null,
+    };
 }
 
 function transformBubble(rows: Record<string, unknown>[], values: ControlValues): VizProps {

@@ -15,7 +15,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { isSharedRef } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
-import { VizPlugin, VizProps, bucketRows, getViz } from 'app/inspecto/viz';
+import { VizPlugin, VizProps, bucketSpecRows, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
@@ -170,12 +170,10 @@ export class WidgetHostComponent {
                 sourceName: dataset.sourceName,
                 filters: this.filter(),
             });
-            const x = widget.controls.x?.[0];
             // Lazily: only the offline branch reads rows, so a live tile never pays for a page it discards.
-            const rows = async () => {
-                const page = await this.datasetRows.rows(dataset);
-                return x ? bucketRows(page.rows, x.field, x.grain) : page.rows;
-            };
+            // The spec's own `grains` drives the bucketing, so offline buckets exactly what the live
+            // `/bi/query` body asks the server to DATE_TRUNC.
+            const rows = async () => bucketSpecRows((await this.datasetRows.rows(dataset)).rows, spec.grains);
             this.datasetResult
                 .run(spec, rows, this.colMetas())
                 .then((res) => {

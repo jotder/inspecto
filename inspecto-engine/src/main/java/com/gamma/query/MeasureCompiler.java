@@ -1,6 +1,7 @@
 package com.gamma.query;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -25,6 +26,11 @@ public final class MeasureCompiler {
      *  {@code inspecto-ui/src/app/inspecto/mock/measure-grammar.contract.json} the Angular authoring form
      *  validates from, so adding an aggregate here fails that test until the client agrees. */
     static final List<String> AGGS = List.of("count", "countDistinct", "sum", "avg", "min", "max");
+    /** Time buckets a temporal dimension may be grouped into. Package-private and contract-pinned for the
+     *  same reason as {@link #AGGS}: the UI picks the grain, this side does the bucketing, and a grain the
+     *  two disagree on silently groups by the wrong period. The UI's extra {@code auto} means "no grain"
+     *  and is never sent. */
+    static final List<String> GRAINS = List.of("day", "week", "month");
 
     private MeasureCompiler() {}
 
@@ -42,9 +48,13 @@ public final class MeasureCompiler {
     /** One ORDER BY term. */
     public record Sort(String field, boolean descending) {}
 
-    /** The parsed spec: at least one measure or one dimension; {@code dataset} is resolved by the route. */
+    /**
+     * The parsed spec: at least one measure or one dimension; {@code dataset} is resolved by the route.
+     * {@code grains} maps a {@code groupBy} column to the time bucket it is grouped into — absent = the
+     * raw value, which is what every widget sent before the grain reached the wire.
+     */
     public record Spec(String dataset, List<Measure> measures, List<String> groupBy,
-                       List<Filter> filters, List<Sort> orderBy, int limit) {}
+                       Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {}
 
     /** Parse the {@code POST /bi/query} body into a validated {@link Spec}. */
     public static Spec parse(Map<String, Object> body, int defaultLimit, int maxLimit) {
@@ -70,6 +80,19 @@ public final class MeasureCompiler {
         if (measures.isEmpty() && groupBy.isEmpty())
             throw new IllegalArgumentException("spec needs at least one measure or groupBy column");
 
+        Map<String, String> grains = new LinkedHashMap<>();
+        if (body.get("grains") instanceof Map<?, ?> gm)
+            for (Map.Entry<?, ?> e : gm.entrySet()) {
+                String field = safeIdent(str(e.getKey()), "grain column");
+                String grain = str(e.getValue());
+                if (grain == null || !GRAINS.contains(grain))
+                    throw new IllegalArgumentException("unknown time grain '" + grain + "' (one of " + GRAINS + ")");
+                // A grain on a column that is not grouped would silently do nothing — refuse instead.
+                if (!groupBy.contains(field))
+                    throw new IllegalArgumentException("grain column '" + field + "' is not in groupBy");
+                grains.put(field, grain);
+            }
+
         List<Filter> filters = new ArrayList<>();
         if (body.get("filters") instanceof List<?> fs)
             for (Object o : fs)
@@ -85,14 +108,17 @@ public final class MeasureCompiler {
                             "desc".equalsIgnoreCase(str(s.get("dir")))));
 
         int limit = body.get("limit") instanceof Number n ? n.intValue() : defaultLimit;
-        return new Spec(dataset, measures, groupBy, filters, orderBy,
+        return new Spec(dataset, measures, groupBy, grains, filters, orderBy,
                 Math.max(1, Math.min(maxLimit, limit)));
     }
 
     /** Compile the spec to the guarded SELECT (the dataset is referenced by its registered view name). */
     public static String compile(Spec spec) {
         List<String> select = new ArrayList<>();
-        for (String dim : spec.groupBy()) select.add(q(dim));
+        // A bucketed dimension keeps its own name as the alias, so the client reads back the same column
+        // whether or not a grain was applied.
+        for (String dim : spec.groupBy())
+            select.add(dimExpression(dim, spec.grains()) + (isBucketed(dim, spec.grains()) ? " AS " + q(dim) : ""));
         for (Measure m : spec.measures()) select.add(aggExpression(m) + " AS " + q(m.id()));
 
         StringBuilder sql = new StringBuilder("SELECT ")
@@ -105,7 +131,10 @@ public final class MeasureCompiler {
             sql.append(" WHERE ").append(String.join(" AND ", terms));
         }
         if (!spec.measures().isEmpty() && !spec.groupBy().isEmpty())
-            sql.append(" GROUP BY ").append(String.join(", ", spec.groupBy().stream().map(MeasureCompiler::q).toList()));
+            // The full expression, not the alias: a bucketed dimension's alias is the raw column's own name,
+            // so grouping by the alias would be ambiguous with the underlying column.
+            sql.append(" GROUP BY ").append(String.join(", ",
+                    spec.groupBy().stream().map(d -> dimExpression(d, spec.grains())).toList()));
         if (!spec.orderBy().isEmpty()) {
             List<String> terms = new ArrayList<>();
             for (Sort s : spec.orderBy()) terms.add(q(s.field()) + (s.descending() ? " DESC" : " ASC"));
@@ -113,6 +142,24 @@ public final class MeasureCompiler {
         }
         sql.append(" LIMIT ").append(spec.limit());
         return sql.toString();
+    }
+
+    private static boolean isBucketed(String dim, Map<String, String> grains) {
+        return grains != null && grains.containsKey(dim);
+    }
+
+    /**
+     * The grouped expression for one dimension: the quoted column, or — when a grain applies — its bucket
+     * key <b>formatted as the UI's offline {@code bucketValue} formats it</b> ({@code YYYY-MM-DD} for
+     * day/week, the week's Monday since DuckDB's {@code DATE_TRUNC('week', …)} is Monday-based;
+     * {@code YYYY-MM} for month). Formatting to text rather than returning a TIMESTAMP is what makes the
+     * live and offline paths produce the same category labels for the same widget.
+     */
+    private static String dimExpression(String dim, Map<String, String> grains) {
+        String grain = grains == null ? null : grains.get(dim);
+        if (grain == null) return q(dim);
+        String format = "month".equals(grain) ? "%Y-%m" : "%Y-%m-%d";
+        return "STRFTIME(DATE_TRUNC('" + grain + "', " + q(dim) + "), '" + format + "')";
     }
 
     /** The SQL aggregate for a measure — the same set as the UI's aggExpression(). */

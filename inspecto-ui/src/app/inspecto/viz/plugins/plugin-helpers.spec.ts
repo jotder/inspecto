@@ -20,6 +20,20 @@ describe('buildXyQuery', () => {
             agg: 'sum',
             field: 'duration_s',
         });
+        expect(spec.grains).toBeUndefined();
+    });
+
+    it("carries a temporal channel's grain onto the spec; auto carries nothing", () => {
+        const withGrain = buildXyQuery(
+            {
+                x: [{ field: 'event_time', grain: 'month' }],
+                series: [{ field: 'cell_id', grain: 'auto' }],
+                y: [{ field: 'duration_s', agg: 'sum' }],
+            },
+            CTX,
+        );
+        // The spec is the one source of truth: offline bucketing and the wire's `grains` both read it.
+        expect(withGrain.grains).toEqual({ event_time: 'month' });
     });
 });
 

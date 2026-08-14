@@ -260,6 +260,15 @@ describe('biQueryBody', () => {
         ).toBeNull();
     });
 
+    it("carries a grouped column's time grain to the wire, and drops one that is not grouped", () => {
+        // Without this the server groups by the un-truncated timestamp while the offline preview buckets,
+        // so the same widget is right in a demo and wrong live.
+        expect(biQueryBody(spec({ grains: { tariff: 'month' } }), COLS)?.grains).toEqual({ tariff: 'month' });
+        // A stale grain left on a channel whose field has changed would 422 the whole widget.
+        expect(biQueryBody(spec({ grains: { other: 'day' } }), COLS)?.grains).toBeUndefined();
+        expect(biQueryBody(spec(), COLS)?.grains).toBeUndefined();
+    });
+
     it('is null for a named-measure expression and for an empty projection', () => {
         expect(biQueryBody(spec({ measures: [{ id: 'm', expression: 'SUM(x)', label: 'm' }] }), COLS)).toBeNull();
         expect(biQueryBody(spec({ measures: [], groupBy: [] }), COLS)).toBeNull();
