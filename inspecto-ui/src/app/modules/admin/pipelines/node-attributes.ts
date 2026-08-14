@@ -216,6 +216,35 @@ const NODE_ATTRIBUTES: Record<string, AttributeSpec[]> = {
             placeholder: 'event_ts DESC',
         },
     ],
+    // File-grain marker dedup (→ processing.duplicate_check + dirs.markers) — the marker-file
+    // duplicate Guarantee the LOCAL poll path applies. All three keys are lift/lower-proven;
+    // unspecced (free-form editor only) until 2026-08-14. Defaults mirror the parser's (.processed / 90).
+    'transform.dedup.marker': [
+        {
+            key: 'marker_extension',
+            label: 'Marker extension',
+            type: 'string',
+            tier: 'optional',
+            help: 'Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped.',
+            placeholder: '.processed',
+        },
+        {
+            key: 'retention_days',
+            label: 'Marker retention (days)',
+            type: 'number',
+            tier: 'optional',
+            min: 1,
+            help: 'Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90.',
+            placeholder: '90',
+        },
+        {
+            key: 'markers_dir',
+            label: 'Markers directory',
+            type: 'string',
+            tier: 'advanced',
+            help: 'Where marker files land (dirs.markers); blank = the space convention.',
+        },
+    ],
     // Group-by rollup (→ processing.summarize) — authoring-only until the branch-aware executor arms it.
     'transform.summarize': [
         {

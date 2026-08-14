@@ -172,6 +172,25 @@ public final class NodeAttributes {
                     .help("Which duplicate wins — SQL ordering over the typed columns; blank = input order."));
 
     /**
+     * {@code transform.dedup.marker} (file-grain, → {@code processing.duplicate_check} +
+     * {@code dirs.markers}) — the marker-file duplicate Guarantee the LOCAL poll path applies. All
+     * three keys are proven by the lift/lower round-trip ({@code PipelineLift.dedupMarkerNode} emits
+     * them; {@code PipelineEditable.lower} and {@code PipelineCompiler} read them back). Unspecced
+     * until 2026-08-14, so the only way to edit a stream's dedup retention was the free-form
+     * key/value editor. Defaults mirror the parser's ({@code PipelineConfigParser}: {@code .processed}
+     * / 90) — the UI scaffold no longer writes its own.
+     */
+    public static final List<NodeAttribute> TRANSFORM_DEDUP_MARKER = List.of(
+            NodeAttribute.of("marker_extension", "Marker extension", "string", "optional")
+                    .placeholder(".processed")
+                    .help("Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped."),
+            NodeAttribute.of("retention_days", "Marker retention (days)", "number", "optional").min(1)
+                    .placeholder("90")
+                    .help("Stale markers older than this are cleaned up (MarkerManager); blank = the engine default of 90."),
+            NodeAttribute.of("markers_dir", "Markers directory", "string", "advanced")
+                    .help("Where marker files land (dirs.markers); blank = the space convention."));
+
+    /**
      * {@code transform.summarize} (→ {@code processing.summarize}) — the group-by rollup, authoring-only
      * until the branch-aware executor arms it. Keys proven by {@code NodeConfigNameContractTest}.
      */
@@ -197,7 +216,7 @@ public final class NodeAttributes {
 
     private static Map<String, List<NodeAttribute>> byType() {
         for (List<NodeAttribute> table : List.of(COLLECTOR, OUTPUT, SINK_PERSISTENT, TRANSFORM_FILTER,
-                TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
+                TRANSFORM_ROUTE, TRANSFORM_DEDUP, TRANSFORM_DEDUP_MARKER, TRANSFORM_SUMMARIZE, TRANSFORM_JOIN))
             for (NodeAttribute a : table) a.validate();   // whole-spec checks, once the builders are done
         Map<String, List<NodeAttribute>> m = new LinkedHashMap<>();
         // The acquisition node authors the WHOLE collector block, duplicate__* included — fingerprint
@@ -206,6 +225,7 @@ public final class NodeAttributes {
         m.put(BuiltinNodeType.TRANSFORM_FILTER.type(), TRANSFORM_FILTER);
         m.put(BuiltinNodeType.TRANSFORM_ROUTE.type(), TRANSFORM_ROUTE);
         m.put(BuiltinNodeType.TRANSFORM_DEDUP.type(), TRANSFORM_DEDUP);
+        m.put(BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(), TRANSFORM_DEDUP_MARKER);
         m.put(BuiltinNodeType.TRANSFORM_SUMMARIZE.type(), TRANSFORM_SUMMARIZE);
         m.put(BuiltinNodeType.TRANSFORM_JOIN.type(), TRANSFORM_JOIN);
         m.put(BuiltinNodeType.SINK_PERSISTENT.type(), SINK_PERSISTENT);
