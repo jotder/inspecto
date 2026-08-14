@@ -11,6 +11,7 @@ lives in the engine modules extracted below the [core](../modules/engine.md) in 
 * [DuckDB](duckdb.md) - Appender-based bulk ingest (~75×), thread auto-derivation, reserved-word quoting.
 * [Output & sinks](output-sinks.md) - `OutputFormat`, partitioned vs single-file writers, quarantine outcomes.
 * [Transforms & seams](transforms-seams.md) - `TransformCompiler` and the `BatchIngestStrategy` seam.
+* [Pipeline test run (run-to-here)](pipeline-test-run.md) - the scratch-only run over REAL inbox files: why the containment is the call graph rather than config, the `QuarantineManager` source-file trap, the connection-relative `files` jail, and the sample-vs-full row-count grains (2026-08-14).
 * [Parsing & grammar](parsing-grammar.md) - the three frontends / one backend model, CSV knobs, delimited grammar, plugin ingesters.
 * [Parser plugins](parser-plugins.md) - the self-describing `ParserPlugin` SPI + `GET /parsers`: served grammar schemas, tree-capable preview, ServiceLoader discovery (2026-07-30).
 * [Stage-1 architecture](stage1-architecture.md) - the deep design of the batch ETL core (moved from `docs/architecture.md`).

@@ -266,10 +266,11 @@ former root reference docs** (each index lists them):
   correction). **Step 5 — a bounded test run over real inbox files — is the one gap left**, and is a
   backend job (`PipelineDryRun` is synthetic-only; no stop-at-node primitive; the run-to-here route is
   reserved but unregistered). **Step 5 re-grounded + sliced 2026-08-14** (5a real files / 5b stop-at-node
-  / 5c route+ungate): every premise verified accurate, sized **multi-shift**, and the real difficulty
-  identified as **suppressing the ingest path's side effects**, not reading the files. Read the plan's
-  "Step 5 — re-grounded" section before starting — it names the approach to avoid and the containment
-  5c cannot ship without. Gaps tracked in [`BACKLOG.md`](BACKLOG.md) §Pipelines.
+  / 5c route+ungate). ✅ **5a and 5c SHIPPED 2026-08-14** — a user can now test a pipeline against their
+  own data, and run-to-here works against a real server. Durable as-built moved to
+  [`okf/backend/engine/pipeline-test-run.md`](okf/backend/engine/pipeline-test-run.md); the plan **stays
+  in-flight** because **5b (the stop-at-node cutoff) is still open** — until it lands the whole graph
+  runs and both server and mock say so in `warnings`. Gaps tracked in [`BACKLOG.md`](BACKLOG.md) §Pipelines.
 
 - ~~`superpower/sinks-config-format-plan.md`~~ — **SHIPPED end-to-end 2026-08-02 (all 4 slices, `0cdc9dff`
   + `79dcb3e6`), plan archived** to
