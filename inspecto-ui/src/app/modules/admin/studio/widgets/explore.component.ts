@@ -21,13 +21,13 @@ import {
     recommend,
 } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
+import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import { Widget, WidgetOptions, buildWidget } from './widget-types';
 import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
 import { WidgetOptionsDialog } from './widget-options.dialog';
@@ -63,6 +63,7 @@ export class ExploreComponent implements OnInit {
     private widgetsApi = inject(WidgetsService);
     private componentsApi = inject(ComponentsService);
     private datasetResult = inject(DatasetResultService);
+    private datasetRows = inject(DatasetRowsService);
     private dialog = inject(MatDialog);
     private router = inject(Router);
     private toastr = inject(ToastrService);
@@ -95,12 +96,15 @@ export class ExploreComponent implements OnInit {
     readonly fields = computed<VizField[]>(() => {
         const rows = this.rows();
         const ds = this.dataset();
+        // Cardinality drives Show-Me, so prefer the count the store itself derived; only fall back to
+        // counting the loaded page, which is a page and can undercount.
+        const served = new Map((this.page()?.columns ?? []).map((c) => [c.name, c.cardinality]));
         const columns: VizField[] = (ds?.columns ?? []).map((c) => ({
             name: c.name,
             type: c.type,
             role: c.role,
             label: c.label,
-            cardinality: c.role === 'dimension' ? distinctCount(rows, c.name) : undefined,
+            cardinality: c.role === 'dimension' ? (served.get(c.name) ?? distinctCount(rows, c.name)) : undefined,
         }));
         // Named measures join the field list as ready-made aggregates (expression carried verbatim).
         const measures: VizField[] = (ds?.measures ?? []).map((m) => ({
@@ -123,7 +127,9 @@ export class ExploreComponent implements OnInit {
     readonly viewId = signal<string>('');
     readonly savedViews = signal<{ id: string; name: string }[]>([]);
 
-    private readonly rows = computed(() => SAMPLE_SOURCES[this.dataset()?.sourceName ?? ''] ?? []);
+    /** The picked Dataset's rows — one page from the rows seam (the real store live, samples offline). */
+    private readonly page = signal<DatasetRows | null>(null);
+    private readonly rows = computed(() => this.page()?.rows ?? []);
     private readonly colMetas = computed<ColumnMeta[]>(() =>
         (this.dataset()?.columns ?? []).map((c) => ({ name: c.name, type: c.type })),
     );
@@ -149,8 +155,10 @@ export class ExploreComponent implements OnInit {
     onSelectDataset(id: string): void {
         this.selectedId.set(id);
         this.datasetsApi.get(id).subscribe({
-            next: (d) => {
+            next: async (d) => {
                 this.dataset.set(d);
+                // Show-Me reads the field cardinalities, so the page has to land before recommending.
+                await this.loadPage(d);
                 const top = this.recommended()[0]?.meta.type ?? 'table';
                 this.setVizType(top);
             },
@@ -223,12 +231,20 @@ export class ExploreComponent implements OnInit {
             return; // view-bound: no dataset to fetch, no query to run
         }
         this.datasetsApi.get(w.datasetId).subscribe({
-            next: (d) => {
+            next: async (d) => {
                 this.dataset.set(d);
+                await this.loadPage(d);
                 this.run();
             },
             error: () => undefined,
         });
+    }
+
+    /** Load the picked dataset's page; a store that cannot be read says so rather than rendering blank. */
+    private async loadPage(ds: Dataset): Promise<void> {
+        const page = await this.datasetRows.rows(ds);
+        this.page.set(page);
+        if (page.error) this.toastr.warning(page.error);
     }
 
     private run(): void {

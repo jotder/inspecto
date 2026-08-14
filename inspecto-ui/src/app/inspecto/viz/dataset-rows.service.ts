@@ -158,7 +158,11 @@ function sampleRows(ds: RowSourceRef): DatasetRows {
 
 /** Map a `/db/*` result to the seam's shape — DuckDB type names become Query Core {@link ColumnType}s. */
 function fromDbResult(res: DbResult, declared: ColumnMeta[]): DatasetRows {
-    const served = res.columns.map((c) => ({ name: c.name, type: dbColumnType(c.type) }));
+    const served = res.columns.map((c) => ({
+        name: c.name,
+        type: dbColumnType(c.type),
+        cardinality: c.cardinality ?? undefined,
+    }));
     return {
         rows: res.rows,
         // The server describes what it actually returned; a declared list can be stale or narrower.

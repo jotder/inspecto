@@ -74,6 +74,32 @@ describe('DatasetResultService', () => {
         expect(p1).not.toBe(p2);
     });
 
+    it('offline: rows supplied as a thunk are awaited and run over', async () => {
+        const { svc } = setup();
+        environment.mockStudio = true;
+        try {
+            const res = await svc.run(spec(), () => Promise.resolve(ROWS), COLS);
+            expect(res.ok).toBe(true);
+            expect(res.rows).toEqual([{ tariff: 'gold', sum_duration_s: 30 }]);
+        } finally {
+            environment.mockStudio = false;
+        }
+    });
+
+    it('live: a rows thunk is NEVER invoked — the server run must not pay for rows it discards', async () => {
+        const biRun = vi.fn(() => of({ rows: [] }));
+        const { svc } = setup(biRun);
+        const rows = vi.fn(() => Promise.resolve(ROWS));
+        environment.mockStudio = false;
+        try {
+            await svc.run(spec(), rows, COLS);
+            expect(rows).not.toHaveBeenCalled();
+            expect(biRun).toHaveBeenCalled();
+        } finally {
+            environment.mockStudio = false;
+        }
+    });
+
     it('mock mode (mockStudio=true) stays offline — the BI endpoint is never called', async () => {
         const { svc, biRun } = setup();
         environment.mockStudio = true; // explicit, like every live-branch test below — never rely on the default

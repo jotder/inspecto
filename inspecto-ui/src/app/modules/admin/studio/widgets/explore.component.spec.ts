@@ -9,6 +9,8 @@ import { ToastrService } from 'ngx-toastr';
 import { ComponentsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
+import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import { runSpec } from 'app/inspecto/viz/query-spec';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
@@ -52,6 +54,22 @@ function create() {
             },
             // Pass-through to the offline runSpec (no cache, no HttpClient) — byte-identical M1 behaviour.
             { provide: DatasetResultService, useValue: { run: runSpec, clear: () => undefined } },
+            // The rows seam, stubbed at its offline answer: the store's sample page, and the server-derived
+            // cardinality it would carry live for a dimension column.
+            {
+                provide: DatasetRowsService,
+                useValue: {
+                    rows: () =>
+                        Promise.resolve({
+                            rows: SAMPLE_SOURCES['cdr'],
+                            columns: [
+                                { name: 'tariff', type: 'string', cardinality: 3 },
+                                { name: 'duration_s', type: 'number' },
+                            ],
+                            truncated: false,
+                        }),
+                },
+            },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             {
                 provide: ToastrService,
@@ -70,14 +88,18 @@ describe('ExploreComponent', () => {
         expect(fixture.componentInstance.datasets()).toHaveLength(1);
     });
 
-    it('selecting a dataset picks a recommended viz and auto-assigns channels', () => {
-        const c = create().componentInstance;
+    it('selecting a dataset picks a recommended viz and auto-assigns channels', async () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
         c.onSelectDataset('cdr_sample');
+        await fixture.whenStable(); // the rows page lands before Show-Me reads the field cardinalities
         expect(c.dataset()?.id).toBe('cdr_sample');
         expect(c.vizType()).toBeTruthy();
         // a measure field got mapped onto some channel
         const mapped = Object.values(c.controls()).some((vals) => vals?.some((v) => v.field === 'duration_s'));
         expect(mapped).toBe(true);
+        // A dimension's cardinality comes from the seam (the store derives it), not from counting the page.
+        expect(c.fields().find((f) => f.name === 'tariff')?.cardinality).toBe(3);
     });
 
     it('selecting a view-bound plugin swaps the field mapper for the saved-view picker', () => {

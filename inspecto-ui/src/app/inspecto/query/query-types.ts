@@ -11,6 +11,11 @@ export type ColumnType = 'number' | 'string' | 'date' | 'boolean';
 export interface ColumnMeta {
     name: string;
     type: ColumnType;
+    /**
+     * Distinct-value count, when the source knows one — `/db/*` derives it server-side for dimension
+     * columns. Absent offline (and for measures), where a consumer that needs it counts over the rows.
+     */
+    cardinality?: number;
 }
 
 /** Comparison operators; which apply to a column depends on its type (see `OPERATORS`). */

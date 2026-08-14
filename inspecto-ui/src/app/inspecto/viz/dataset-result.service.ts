@@ -18,17 +18,23 @@ import { runSpec } from './query-spec';
  * builder) never change. A spec that cannot cross the wire faithfully (a named-measure SQL expression, an
  * OR filter branch) fails honestly instead of silently dropping terms.
  */
+/**
+ * The rows a spec runs over offline. A **thunk** when producing them costs something (a page from
+ * {@link DatasetRowsService}): the live branch never reads the rows, so it must never pay for them.
+ */
+export type SpecRows = Record<string, unknown>[] | (() => Promise<Record<string, unknown>[]>);
+
 @Injectable({ providedIn: 'root' })
 export class DatasetResultService {
     private bi = inject(BiQueryService);
     private cache = new Map<string, Promise<SqlRunResult>>();
 
     /** Run `spec` — an identical spec already in flight or resolved is reused, not re-run. */
-    run(spec: QuerySpec, rows: Record<string, unknown>[], cols: ColumnMeta[] = []): Promise<SqlRunResult> {
+    run(spec: QuerySpec, rows: SpecRows, cols: ColumnMeta[] = []): Promise<SqlRunResult> {
         const key = hashSpec(spec);
         const cached = this.cache.get(key);
         if (cached) return cached;
-        const promise = environment.mockStudio ? runSpec(spec, rows, cols) : this.runRemote(spec, cols);
+        const promise = environment.mockStudio ? this.runOffline(spec, rows, cols) : this.runRemote(spec, cols);
         this.cache.set(key, promise);
         // A failed run shouldn't stick forever — drop it so the next call retries instead of replaying the error.
         promise.catch(() => this.cache.delete(key));
@@ -38,6 +44,11 @@ export class DatasetResultService {
     /** Drop all cached results — call when the data a spec would read over has changed. */
     clear(): void {
         this.cache.clear();
+    }
+
+    /** M1: run the spec in-browser. Rows supplied lazily are only ever fetched here. */
+    private async runOffline(spec: QuerySpec, rows: SpecRows, cols: ColumnMeta[]): Promise<SqlRunResult> {
+        return runSpec(spec, typeof rows === 'function' ? await rows() : rows, cols);
     }
 
     /** M2: execute the spec server-side. Never throws — errors come back as `{ok:false}` results. */

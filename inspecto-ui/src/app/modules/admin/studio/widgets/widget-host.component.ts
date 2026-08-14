@@ -17,12 +17,12 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
 import { VizPlugin, VizProps, bucketRows, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import { Widget } from './widget-types';
 import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 
 /** A drilled-down click: filter `field = value` on whatever consumes this widget's data (a dashboard). */
 export interface DrillEvent {
@@ -108,6 +108,7 @@ export class WidgetHostComponent {
     private widgetsApi = inject(WidgetsService);
     private datasetsApi = inject(DatasetsService);
     private datasetResult = inject(DatasetResultService);
+    private datasetRows = inject(DatasetRowsService);
     private elementRef = inject(ElementRef<HTMLElement>);
 
     /** Self-fetch mode: only an id (the standalone route). */
@@ -170,9 +171,11 @@ export class WidgetHostComponent {
                 filters: this.filter(),
             });
             const x = widget.controls.x?.[0];
-            const rows = x
-                ? bucketRows(SAMPLE_SOURCES[dataset.sourceName] ?? [], x.field, x.grain)
-                : (SAMPLE_SOURCES[dataset.sourceName] ?? []);
+            // Lazily: only the offline branch reads rows, so a live tile never pays for a page it discards.
+            const rows = async () => {
+                const page = await this.datasetRows.rows(dataset);
+                return x ? bucketRows(page.rows, x.field, x.grain) : page.rows;
+            };
             this.datasetResult
                 .run(spec, rows, this.colMetas())
                 .then((res) => {
