@@ -521,10 +521,28 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   ⛔ **`SafetyPolicy.defaultPolicy()` has NO working-directory fallback**, though its Javadoc claimed one
   until 2026-08-14: an unset/blank `assist.safety.roots` yields an **empty** root list and
   `PathJail.requireUnderAny` **throws** on that, so every jailed ref fails rather than quietly jailing to
-  the CWD. Fail-closed and deliberate — configuring the roots is a deployment step, not a tuning knob. **3. two root
-  sources for "the" jail** — `-Dassist.write.root` (→403, `WriteGates`) vs `-Dassist.safety.roots`
-  (→422, `PathJail`/`ConfigSafetyValidator`); `PathJail`'s own Javadoc argues against a second root
-  source while `WriteGates` is one. **4. symlinks split the codebase cleanly in two** — everything on
+  the CWD. Fail-closed and deliberate — configuring the roots is a deployment step, not a tuning knob. **3. the jail's two root sources are
+  not two locations — one DERIVES and one does not** (re-scoped 2026-08-14; ⛔ the earlier framing
+  "add a boot check that the write root sits inside the safety roots" is **superseded** — it detects the
+  misconfiguration instead of removing it, and cannot cover a space created after boot). Grounding: there
+  are not really nine directory roots. A space owns **one base with four derived axes** (`config/`,
+  `data/`, `audit/`, `duckdb/` — `SpaceLayoutContract`), and `ControlApi.writeRoot():839` /
+  `dataRoot():845` already resolve **per space** from `currentContext().root()`; `-Dassist.write.root`,
+  `data.dir`, `events.dir` and `jobs.audit.dir` are **legacy single-tenant fallbacks** that predate
+  `SpaceRoot`, not independent knobs. ⛔ `assist.safety.roots` is the one that must stay separate and
+  must NOT be merged away: it is a **policy list, not a location** — it says where configs may *point*,
+  and it is plural precisely so an out-of-tree destination (`backup_dir: /mnt/backups`) is *declared*
+  rather than the check weakened. The real defect is that **the write root is per-space and dynamic while
+  the policy list is global and static**: create a space and forget to extend `assist.safety.roots`, and
+  writes into its `config/` pass the 403 gate (it *is* that space's own config dir) while every
+  schema/grammar ref inside it is refused at load, because the space base was never an allowed root. The
+  write half derives; the policy half does not. **Proposed shape:** make the allowed roots the **union of
+  every discovered space base plus whatever the operator declares**, so a space is never registered twice
+  and the declared list goes back to meaning only what it is for — destinations outside the layout. The
+  fail-closed empty-list posture stays for a genuinely unconfigured single-tenant deployment. ⚠ Two
+  things to pin before building: whether a space created **at runtime** extends the roots immediately or
+  at next boot, and whether the legacy flat space keeps property-only behaviour. ⚠ This widens the
+  default root set, so it is a **security-posture decision, not a cleanup** — needs an operator yes. **4. symlinks split the codebase cleanly in two** — everything on
   `PathJail` re-checks, nothing else does; this is a *consequence* of the above, not separate work.
   ⚠ Two things to decide, not assume: `PathJail:151` returns **true** when the filesystem will not answer
   (containment granted on the structural check alone) — deliberate fail-open or oversight? And
