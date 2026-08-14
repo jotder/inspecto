@@ -152,7 +152,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   level. Route-level contracts live in the module that **serves** them, so a catalog change needs a
   reactor-wide run. Two mechanical traps make module-scoped runs worse than useless here:
   **(a)** `-pl inspecto` alone fails with `NoClassDefFoundError: com.gamma.notify.MailAccess` — it
-  resolves siblings from stale installed jars, so it needs `-am`; **(b)** with `-am` **and** `-Dtest=`,
+  resolves siblings from stale installed jars, so it needs `-am`. ⚠ **That trap also has a SILENT form,
+  which is the dangerous one** (hit 2026-08-14): when the stale jar is merely *old* rather than
+  incompatible, everything compiles and runs, and the module simply tests the sibling's **previous
+  behaviour** — a route test asserting a newly-added 422 reported `200` and looked exactly like a broken
+  fix. One command settles it before you debug anything:
+  `unzip -p ~/.m2/repository/com/gamma/inspector/<artifact>/4.0.0-SNAPSHOT/<artifact>-4.0.0-SNAPSHOT.jar
+  com/gamma/<pkg>/<Class>.class | grep -c <NEW_SYMBOL>` — `0` means the run proved nothing. (Note the
+  groupId path is `com/gamma/inspector/`; the artifactIds were renamed to `inspecto-*`, the groupId was
+  not.) **(b)** with `-am` **and** `-Dtest=`,
   the run dies on the first upstream module with *"No tests matching pattern"* unless you add
   `-Dsurefire.failIfNoSpecifiedTests=false` (`-DfailIfNoTests=false` does **not** cover it — that flag
   is for "no tests at all", not "the filter matched nothing in this module").
