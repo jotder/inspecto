@@ -1111,8 +1111,9 @@ Actionable, phase-aligned, derived from §8 + the §13 corrections. `[ ]` = not 
   `?actor=` attribution), so `GET /jobs` stays config-only while `GET /jobs/{flowId}/runs` still serves the ad-hoc
   history. Response mirrors the jobs trigger: `202 {runId, pipeline, status}` + `Location`. Gates: 503 no
   write root · 404 missing/unsafe flow id · `canOperateRuns`. **Deliberately NOT `…/run`:** that path is the
-  editor's scratch-only run-to-here contract (`POST …/run?to={nodeId}`, `pipelines.service.ts`, mock-only
-  today) and must never fire a production run. Tests: `ControlApiPipelineRunTest` (real HTTP, every gate) +
+  editor's scratch-only run-to-here contract (`POST …/run?to={nodeId}`) and must never fire a production
+  run. **Registered since 2026-08-14** as a `canAuthorWorkbench` *simulate* —
+  [`../engine/pipeline-test-run.md`](../engine/pipeline-test-run.md). Tests: `ControlApiPipelineRunTest` (real HTTP, every gate) +
   2 `JobServiceTest` (lifecycle-without-registration; fail-closed without a flow store).
   **UI consumer for views done (2026-07-18):** `ViewsService` (`inspecto/api/views.service.ts`) wraps
   the three `/views*` endpoints; the pipeline inspector shows a **Preview data** action on `sink.view`

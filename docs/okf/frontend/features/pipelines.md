@@ -132,11 +132,16 @@ first-only toast — an n-problem graph used to mean n save→fix→save cycles.
 
 ### Two editor test affordances are mock-only (2026-08-02)
 
-*Run to here* (inspector) and *Test processor* (node-config dialog) are gated behind
-`environment.mockFlows`, because both 404 against a real backend — for **different reasons**:
+*Test processor* (node-config dialog) is gated behind `environment.mockFlows` because it 404s against a
+real backend. ⚠ *Run to here* **was** gated for a different reason and is **no longer gated** — see below.
 
-- *Run to here* — `POST /pipelines/authored/{id}/run?to=` is reserved-but-unregistered
-  (`PipelineRoutes.java:69`), deliberately: it must never fire a production run. Genuinely absent.
+- *Run to here* — ✅ **works against a real server since 2026-08-14.**
+  `POST /pipelines/authored/{id}/run?to=` is registered (`PipelineRoutes.testRun`,
+  `canAuthorWorkbench`) and `scratchRunAvailable` is now plain `true`. It parses the picked inbox files
+  through the real ingest path into a scratch root — zero production side effects — then previews the
+  graph over the parsed rows. ⚠ The `to=` **cutoff is still unbuilt**: the whole graph runs and the
+  response says so in `warnings`, and the offline mock was deliberately made to match rather than
+  over-promise. Details: [`../../backend/engine/pipeline-test-run.md`](../../backend/engine/pipeline-test-run.md).
 - *Test processor* — the route **does** exist
   (`ComponentRoutes.java:42-44`, `POST /components/{transform|grammar|sink}/{id}/test`). The dialog
   simply addresses it wrongly, sending the node's dotted type (`transform.filter`) and node id
@@ -146,8 +151,9 @@ first-only toast — an n-problem graph used to mean n save→fix→save cycles.
 family, pass the node's registry ref — with one catch that makes it more than a URL change: a node
 carrying inline config binds no registered component, so there is nothing to look up.
 
-Both are kept rather than deleted because `run-to-here.dialog.ts` is the finished UI for the still-open
-"test against real data" work — see [`../../../BACKLOG.md`](../../../BACKLOG.md).
+Keeping *Run to here* gated rather than deleting it is what made 5c a backend-only job: the dialog was
+already the finished UI, so ungating it was a one-line change once the route landed. *Test processor*
+stays gated on the same reasoning — see [`../../../BACKLOG.md`](../../../BACKLOG.md).
 
 Corollary worth keeping: **which connector a source uses is carried by its Connection profile**
 (`collector.connection`), not by the node type — hence one `acquisition`, not a file/database/stream split.

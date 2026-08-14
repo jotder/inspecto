@@ -49,6 +49,9 @@ polling — so `GET /jobs` stays config-only while `GET /jobs/{flowId}/runs` ser
 recorded under the flow id; the chain `BatchEvent` is likewise published under the flow id, so downstream
 `on_pipeline:` consumers key on it, not on a job name). Response mirrors `POST /jobs/{name}/trigger`:
 `202 {runId, pipeline, status}` + `Location`. **Deliberately `…/trigger`, not `…/run`** — `POST …/run?to={nodeId}`
-is the editor's scratch-only run-to-here contract (`pipelines.service.ts`, mock-only today) and must never fire
-a production run. Prefer a persisted `*_job.toon` when a run needs `data_dir`/`batch_id` overrides, a schedule,
+is the editor's scratch-only run-to-here contract and must never fire a production run. **That route is
+registered since 2026-08-14** (`PipelineRoutes.testRun`, `canAuthorWorkbench`): it parses picked inbox files
+through the real ingest path into a scratch root and writes nothing to production — see
+[`../engine/pipeline-test-run.md`](../engine/pipeline-test-run.md). The split of verbs stands: `…/run` is a
+**simulate**, `…/trigger` is the **operate**. Prefer a persisted `*_job.toon` when a run needs `data_dir`/`batch_id` overrides, a schedule,
 or chaining; the ad-hoc route takes no params.
