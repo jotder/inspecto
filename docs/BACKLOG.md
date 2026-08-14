@@ -959,15 +959,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   refuse configs the engine accepts. 9 new adversarial cases in `ConfigSafetyValidatorTest`.
   Waiting-for: a real map-of-objects notion in the spec layer would subsume both this and `checkSink`;
   nothing schedules it. → `okf/backend/config/config-safety.md`
-- **AI drafting has no applicable component kind** (created 2026-07-31 by unification W1a, a deliberate
-  and recorded feature loss). `component_draft` was offered ONLY on the `component-form.dialog` `schema`
-  kind, because of that dialog's kinds only `schema` had a structural `ConfigSpec`. `schema` is no longer a
-  registry component, so the affordance was removed WITH it rather than left answering *"no structural spec
-  for kind"* on every use. **The backend repair loop is untouched and still generic** — nothing was deleted
-  server-side beyond `ConfigSpecs.schemaComponent()`. To restore the button, give a surviving kind
-  (`grammar`/`transform`/`sink`) a structural `ConfigSpec`; the dialog then renders `<inspecto-ai-assist>`
-  again with no further wiring. Related: the guided Schema stage keeps its own derive-from-sample, so a
-  Stream's schema authoring did NOT regress — only the registry pane's. `okf/frontend/features/inline-ai-authoring.md`
+- **AI drafting has no applicable component kind** (created 2026-07-31 by unification W1a). ⚠ **Grounded
+  2026-08-15 — the row's proposed fix does not survive contact with the code, for a REASON BEYOND the
+  original one.** `component-form.dialog` only ever receives `kind ∈ {grammar, transform, sink}`
+  (`components.component.ts:109` routes `schema` to a completely different dialog,
+  `SchemaEditorDialog`) — and **none** of those three has a `ConfigSpecs` entry today
+  (`ConfigSpecs.TYPES` = `pipeline, enrichment, job, schema, meta, alert, expectation, widget,
+  dashboard`). So "give a surviving kind a structural `ConfigSpec`" is not a wiring task — it is
+  **inventing new backend validation** for three shapes that never had it (what would a `transform` or
+  `sink` spec even constrain?), which is a design decision, not "no further wiring."
+  `schema` DOES have a spec and DOES already work with `component_draft` — but `SchemaEditorDialog`
+  (the dialog that actually authors it) is a bespoke `raw.fields[]` grid editor with its OWN
+  deterministic "Suggest from sample" affordance (`POST /config/suggest/schema`, findings translated
+  onto grid cells by field name). Bolting `<inspecto-ai-assist>`'s draft/diff/apply model onto that
+  dialog would be a SECOND, differently-shaped AI surface on the same editor, not a restoration.
+  **No low-risk buildable slice survives** — every path needs either new backend spec design (for
+  grammar/transform/sink) or reworking an editor that already solved its own version of the problem
+  (for schema). Left design-first; the backend repair loop itself is untouched and still generic.
+  `okf/frontend/features/inline-ai-authoring.md`
 - ~~**Config-declared paths resolve unjailed against the server CWD**~~ **CLOSED 2026-08-14 — shipped
   in five slices** (`60ff0c8f` S1+S2, `86c0306f` S3, `3b200b52` S4+S5). As-built:
   [`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md); plan archived to
