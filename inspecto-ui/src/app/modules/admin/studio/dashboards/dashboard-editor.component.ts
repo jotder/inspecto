@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, ElementRef, Input, OnInit, computed, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    ElementRef,
+    Input,
+    OnInit,
+    computed,
+    effect,
+    inject,
+    signal,
+} from '@angular/core';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import {
     AbstractControl,
@@ -19,14 +29,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
 import { getViz } from 'app/inspecto/viz';
-import {
-    Condition,
-    ColumnMeta,
-    ConditionGroup,
-    QueryConditionGroupComponent,
-    emptyGroup,
-    evaluateRows,
-} from 'app/inspecto/query';
+import { Condition, ColumnMeta, ConditionGroup, QueryConditionGroupComponent, emptyGroup } from 'app/inspecto/query';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -40,13 +43,13 @@ import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { concatMap, from, tap } from 'rxjs';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
+import { DatasetRowsService, RowSourceRef } from 'app/inspecto/viz/dataset-rows.service';
 import { Dashboard, DashboardTile, buildDashboard } from './dashboard-types';
 import { DashboardsService } from './dashboards.service';
 import { ShareDashboardDialog } from './share-dashboard.dialog';
 import { DashboardTileComponent } from './dashboard-tile.component';
 import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
-import { SAMPLE_SOURCES } from 'app/inspecto/mock/sample-sources';
 import '../widgets/widget.kind'; // register widget kind + viz plugins (tiles call getViz)
 import './dashboard.kind'; // register the dashboard kind
 
@@ -99,6 +102,7 @@ export class DashboardEditorComponent implements OnInit {
     private dashboardsApi = inject(DashboardsService);
     private widgetsApi = inject(WidgetsService);
     private datasetsApi = inject(DatasetsService);
+    private datasetRows = inject(DatasetRowsService);
     private router = inject(Router);
     private elementRef = inject<ElementRef<HTMLElement>>(ElementRef);
     private toastr = inject(ToastrService);
@@ -159,42 +163,70 @@ export class DashboardEditorComponent implements OnInit {
         return [...seen.values()];
     });
 
-    /** Distinct sample values per exposed field (from the tiles' datasets' sample rows) — the quick-filter
-     *  pickers' choices. Capped so a high-cardinality column doesn't flood the select. */
-    readonly exposedValues = computed<Record<string, string[]>>(() => {
-        const exposed = this.exposedFields();
-        if (!exposed.length) return {};
+    /** Value suggestions per exposed field — the quick-filter pickers' choices, read off one PAGE of each
+     *  tiled dataset (so they are offers, not the column's full domain) and capped so a high-cardinality
+     *  column doesn't flood the select. */
+    readonly exposedValues = signal<Record<string, string[]>>({});
+
+    /** The drill-through drawer's contents — the open tile's rows with the live cross-filter applied. */
+    readonly drillView = signal<DrillView | null>(null);
+
+    constructor() {
+        // Value suggestions: one page per distinct tiled store, re-read when the tiles or the exposed
+        // field list change. The pickers offer what the page holds — never a claim about the column.
+        effect(() => {
+            const exposed = this.exposedFields();
+            const sources = new Map<string, Dataset>();
+            for (const tile of this.tiles()) {
+                const ds = this.datasetOf(tile);
+                if (ds && !sources.has(ds.sourceName)) sources.set(ds.sourceName, ds);
+            }
+            if (!exposed.length || !sources.size) {
+                this.exposedValues.set({});
+                return;
+            }
+            void this.loadExposedValues(exposed, [...sources.values()]);
+        });
+
+        // Drill-through: the open tile's rows. The cross-filter travels IN the request (composed with the
+        // dataset's own model), so the server filters — a page filtered afterwards would be the wrong rows.
+        effect(() => {
+            const index = this.drillTileIndex();
+            const tile = index == null ? undefined : this.tiles()[index];
+            const dataset = tile ? this.datasetOf(tile) : undefined;
+            const filter = this.filter();
+            const title = tile ? (this.widgetOf(tile)?.name ?? dataset?.name ?? '') : '';
+            if (!dataset) {
+                this.drillView.set(null);
+                return;
+            }
+            void this.loadDrillView(dataset, filter, title);
+        });
+    }
+
+    private async loadExposedValues(exposed: string[], datasets: Dataset[]): Promise<void> {
         const out: Record<string, Set<string>> = Object.fromEntries(exposed.map((f) => [f, new Set<string>()]));
-        const seenSources = new Set<string>();
-        for (const tile of this.tiles()) {
-            const source = this.datasetOf(tile)?.sourceName;
-            if (!source || seenSources.has(source)) continue;
-            seenSources.add(source);
-            for (const row of SAMPLE_SOURCES[source] ?? []) {
+        for (const ds of datasets) {
+            const page = await this.datasetRows.rows(ds);
+            for (const row of page.rows) {
                 for (const f of exposed) {
                     const v = row[f];
                     if (v != null && out[f].size < 20) out[f].add(String(v));
                 }
             }
         }
-        return Object.fromEntries(Object.entries(out).map(([f, set]) => [f, [...set].sort()]));
-    });
+        this.exposedValues.set(Object.fromEntries(Object.entries(out).map(([f, set]) => [f, [...set].sort()])));
+    }
 
-    /** The drill-through drawer's contents — the open tile's sample rows with the live cross-filter applied
-     *  (same offline evaluation the query panel previews with). */
-    readonly drillView = computed<{ title: string; sourceName: string; rows: Record<string, unknown>[] } | null>(() => {
-        const index = this.drillTileIndex();
-        if (index == null) return null;
-        const tile = this.tiles()[index];
-        const dataset = tile ? this.datasetOf(tile) : undefined;
-        if (!tile || !dataset) return null;
-        const columns: ColumnMeta[] = dataset.columns.map((c) => ({ name: c.name, type: c.type }));
-        const rows = evaluateRows(
-            { projection: '*', where: this.filter() },
-            { name: dataset.sourceName, rows: SAMPLE_SOURCES[dataset.sourceName] ?? [], columns },
-        );
-        return { title: this.widgetOf(tile)?.name ?? dataset.name, sourceName: dataset.sourceName, rows };
-    });
+    private async loadDrillView(dataset: Dataset, filter: ConditionGroup, title: string): Promise<void> {
+        const page = await this.datasetRows.rows(filtered(dataset, filter));
+        this.drillView.set({
+            title,
+            sourceName: dataset.sourceName,
+            rows: page.rows,
+            truncated: page.truncated,
+        });
+    }
 
     widgetOf(tile: DashboardTile): Widget | undefined {
         return this.widgetsById().get(tile.widgetId);
@@ -209,12 +241,10 @@ export class DashboardEditorComponent implements OnInit {
     }
 
     ngOnInit(): void {
-        this.widgetsApi
-            .list()
-            .subscribe({
-                next: (w) => this.widgets.set(w),
-                error: () => this.toastr.warning('Could not load widgets.'),
-            });
+        this.widgetsApi.list().subscribe({
+            next: (w) => this.widgets.set(w),
+            error: () => this.toastr.warning('Could not load widgets.'),
+        });
         this.datasetsApi.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
         if (this.id) {
             this.editing.set(true);
@@ -402,4 +432,26 @@ export class DashboardEditorComponent implements OnInit {
             },
         });
     }
+}
+
+/** What the drill-through drawer renders — a PAGE of the tile's rows, and whether the store held more. */
+interface DrillView {
+    title: string;
+    sourceName: string;
+    rows: Record<string, unknown>[];
+    truncated: boolean;
+}
+
+/**
+ * The dataset as the drill-through wants to read it: its own model AND the dashboard's cross-filter, so
+ * the filter is applied where the rows are (server-side live), not to a page that was already cut.
+ */
+function filtered(ds: Dataset, filter: ConditionGroup): RowSourceRef {
+    const own = ds.query?.where;
+    const where: ConditionGroup = own ? { kind: 'group', op: 'AND', items: [own, filter] } : filter;
+    return {
+        sourceName: ds.sourceName,
+        columns: ds.columns,
+        query: { projection: ds.query?.projection ?? '*', where },
+    };
 }

@@ -13,6 +13,7 @@ import { DatasetsService } from '../datasets/datasets.service';
 import { Dashboard } from './dashboard-types';
 import { DashboardsService } from './dashboards.service';
 import { DashboardEditorComponent } from './dashboard-editor.component';
+import { DatasetRowsService, RowSourceRef } from 'app/inspecto/viz/dataset-rows.service';
 
 const DS: Dataset = {
     id: 'cdr_sample',
@@ -34,16 +35,32 @@ const WIDGET: Widget = {
     controls: { x: [{ field: 'tariff' }], y: [{ field: 'duration_s', agg: 'sum' }] },
 };
 
+/** Records what the rows seam was asked for, and answers with one page. */
+const rowsCalls: RowSourceRef[] = [];
+function rowsStub(rows: Record<string, unknown>[] = [{ tariff: 'premium' }], truncated = false) {
+    return {
+        provide: DatasetRowsService,
+        useValue: {
+            rows: (ds: RowSourceRef) => {
+                rowsCalls.push(ds);
+                return Promise.resolve({ rows, columns: [], truncated });
+            },
+        },
+    };
+}
+
 function create(
     save = vi.fn((d: Dashboard) => of(d)),
     existing: Dashboard[] = [],
     widgets: Partial<WidgetsService> = {},
+    rowsProvider: unknown = rowsStub(),
 ) {
     TestBed.configureTestingModule({
         imports: [DashboardEditorComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
+            rowsProvider as never,
             { provide: WidgetsService, useValue: { list: () => of([WIDGET]), ...widgets } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
             { provide: DashboardsService, useValue: { get: () => of(null), list: () => of(existing), save } },
@@ -195,6 +212,57 @@ describe('DashboardEditorComponent', () => {
         const fixture = create();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('the drill-through asks the store for the tile rows WITH the cross-filter in the request', async () => {
+        rowsCalls.length = 0;
+        const fixture = create();
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        c.addWidget('bar1');
+        c.onDrill({ field: 'tariff', value: 'premium' });
+        c.drillTileIndex.set(0);
+        fixture.detectChanges(); // effects run on change detection
+        await fixture.whenStable();
+        // The filter must travel in the request: filtering a page that was already cut is the wrong rows.
+        const asked = rowsCalls.at(-1);
+        expect(asked?.sourceName).toBe('cdr');
+        expect(JSON.stringify(asked?.query)).toContain('premium');
+        expect(c.drillView()?.rows).toEqual([{ tariff: 'premium' }]);
+        expect(c.drillView()?.truncated).toBe(false);
+    });
+
+    it('the drill-through reports a truncated page, so the row count cannot read as the whole result', async () => {
+        const fixture = create(
+            vi.fn((d: Dashboard) => of(d)),
+            [],
+            {},
+            rowsStub([{ tariff: 'premium' }], true),
+        );
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        c.addWidget('bar1');
+        c.drillTileIndex.set(0);
+        fixture.detectChanges(); // effects run on change detection
+        await fixture.whenStable();
+        expect(c.drillView()?.truncated).toBe(true);
+    });
+
+    it('exposed-field value suggestions come from the store page, not a hardcoded sample table', async () => {
+        rowsCalls.length = 0;
+        const fixture = create(
+            vi.fn((d: Dashboard) => of(d)),
+            [],
+            {},
+            rowsStub([{ tariff: 'premium' }, { tariff: 'standard' }, { tariff: 'premium' }]),
+        );
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        c.addWidget('bar1');
+        c.exposedFields.set(['tariff']);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(c.exposedValues()).toEqual({ tariff: ['premium', 'standard'] });
     });
 
     it('a drill click adds an equality condition to the cross-filter', () => {

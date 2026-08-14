@@ -6,7 +6,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 
 /**
  * Dashboard **drill-through drawer** — a slide-over showing the underlying rows behind a tile, with the
- * dashboard's live cross-filter already applied (the host evaluates the filter and passes the rows). Reuses
+ * dashboard's live cross-filter already applied (the host resolves the rows through the rows seam). Reuses
  * the standard-tier data table (column chooser / search / CSV export) rather than re-rolling a grid.
  * Presentational; the host owns open/close state and the row evaluation.
  */
@@ -25,7 +25,12 @@ import { DataTableComponent } from 'app/inspecto/data-table';
             <div class="flex items-start justify-between gap-2">
                 <div class="min-w-0">
                     <h2 class="truncate text-xl font-bold">{{ title() }}</h2>
-                    <div class="text-secondary text-sm">{{ rows().length }} row(s) after the dashboard filter</div>
+                    <div class="text-secondary text-sm">
+                        {{ rows().length }} row(s) after the dashboard filter
+                        @if (truncated()) {
+                            <span> — the first page; the store holds more</span>
+                        }
+                    </div>
                 </div>
                 <button mat-icon-button (click)="closed.emit()" matTooltip="Close" aria-label="Close drill-through">
                     <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
@@ -46,5 +51,7 @@ export class DashboardDrillDrawerComponent {
     readonly title = input.required<string>();
     readonly sourceName = input.required<string>();
     readonly rows = input.required<Record<string, unknown>[]>();
+    /** The rows are one PAGE — say so, or the count above reads as the whole filtered result. */
+    readonly truncated = input<boolean>(false);
     readonly closed = output<void>();
 }
