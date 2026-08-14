@@ -442,6 +442,31 @@ covering 6 of the 9 DB-backed stores — **`consignment_outputs` and `file_stage
 not cover.** Both DDLs are portable by construction (`VARCHAR`/`BIGINT`/`INTEGER`, no PK, no upsert), but that
 is reasoned, not proved.
 
+### 5.0 One selection: `-Dinspecto.db` (2026-08-14)
+
+The edition model, stated once: **Personal = embedded DuckDB for everything; Standard = PostgreSQL for
+the operational stores, DuckDB retained as the non-updateable query engine over Parquet.** Business data
+is never in either database — it is always Parquet.
+
+`-Dinspecto.db=duckdb|postgres` (default `duckdb`) plus `-Dinspecto.db.url` / `.user` / `.password` is
+therefore **all a Standard deployment sets**, and `OperationalDb` feeds every family in §5.1 including the
+acquisition ledger. Personal sets nothing at all.
+
+- ⚠ It selects a **connection, never an on/off switch.** Every `*.backend` toggle keeps its own default,
+  so choosing Postgres *moves* stores rather than enabling capabilities nobody asked for.
+- ⚠ **A per-family `*.db.url` still wins** — that is what keeps existing deployments byte-identical, and
+  it is the escape hatch for pointing one store elsewhere. Credentials resolve the same way, per key, so
+  an overridden `status.db.user` does not drag the shared password with it.
+- ⛔ **An unhonourable `postgres` selection now fails at boot** (`SpaceManager.discover` →
+  `OperationalDb.verifySelectable`), naming the missing property or driver. It used to be caught *per
+  store*, logged WARN, and leave that store `null` — so a deployment pointed at Postgres came up
+  "healthy" with job reporting, provenance and Objects **switched off rather than moved**. ⚠ The shipped
+  `inspecto.jar` bundles **no JDBC driver** (`inspecto-engine/pom.xml`: *"runtime stays JDBC-driver-free
+  by design"* — `inspecto/pom.xml` has no `postgresql` dependency and does not depend on
+  `inspecto-connectors`), so Postgres is **not yet deployable out of the box in any edition**; shipping
+  the driver in the Standard bundle is open work, and it would be the first edition seam gating a
+  *runtime dependency* rather than a ServiceLoader SPI.
+
 ### 5.1 Flags (all read in `ServiceStores` unless noted)
 
 | Capability | Backend flag | URL flag | Credentials |
@@ -456,7 +481,8 @@ is reasoned, not proved.
 | Events | `-Devents.backend=parquet` | — | **No Postgres path** |
 
 Point each URL at `jdbc:postgresql://…`; the three ops URLs may share one database/schema (table names
-don't collide).
+don't collide). ⚠ Since 2026-08-14 you normally set **none** of these — §5.0's single `-Dinspecto.db`
+supplies them all; the per-family flags remain as overrides and for back-compat.
 
 ### 5.2 Dialect notes & landmines
 

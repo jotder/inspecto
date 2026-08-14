@@ -474,6 +474,37 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- 🟡 **PG-1 — Postgres for Standard edition: engine done, bundle and UI open** (opened 2026-08-14).
+  Operator's architecture, recorded so it is not re-litigated: **business data is always Parquet, read by
+  DuckDB as a non-updateable query engine; operational/transactional data is DuckDB for Personal and
+  PostgreSQL for Standard.** ⛔ Bottom line: **DuckDB only for Personal, DuckDB + Postgres for Standard.**
+  ~~one connection declaration instead of nine~~ **SHIPPED 2026-08-14** — `OperationalDb`
+  (`-Dinspecto.db=duckdb|postgres` + `.url`/`.user`/`.password`) feeds all ten operational families
+  including the acquisition ledger; a per-family `*.db.url` still wins (back-compat + escape hatch) and
+  the selection deliberately does not touch any `*.backend` default, so it *moves* stores rather than
+  enabling them. ~~a missing driver silently disables stores~~ **SHIPPED 2026-08-14** —
+  `SpaceManager.discover` → `OperationalDb.verifySelectable` fails the boot naming the property or the
+  absent driver; previously each store caught it, logged WARN and returned `null`, so a Postgres-pointed
+  deployment came up "healthy" with job reporting, provenance and Objects **switched off rather than
+  moved**. As-built: `okf/backend/engine/db-layer.md` §5.0.
+  **Open 1 — the Standard bundle does not ship a JDBC driver, so Postgres is not deployable out of the
+  box in ANY edition today.** `inspecto/pom.xml` has no `postgresql` dependency and does not depend on
+  `inspecto-connectors`; `inspecto-engine/pom.xml:130` states the runtime is JDBC-driver-free by design
+  and its own PG dependency is `test` scope. ⚠ Edition profiles today gate **auth/authz only**
+  (`inspecto-security`/`inspecto-policy` via the `Authenticator`/`AccessDecider` SPIs) — so this would be
+  the **first edition seam gating a runtime dependency rather than an SPI**, which is a precedent, not a
+  pom edit. The cheaper alternative is to bundle the driver in every edition and let `-Dinspecto.db`
+  decide, since the property already gates behaviour. **Needs an operator call.**
+  **Open 2 — UI configurability.** ⚠ **Bootstrap problem, not a build task:** the UI is served by the
+  process that needs the operational database, so it cannot configure the thing it depends on, and a
+  live change cannot take effect without a restart. Workable shape: the UI *reads* the current selection,
+  *validates* a proposed connection (a real test-connection round-trip), writes it to server config, and
+  it applies at next restart. ⚠ Also undecided: whether a database password belongs in a server config
+  file at all, or in the existing `secrets.keystore.*`. **Both are decisions, not defaults.**
+  **Context — `-D` is the ONLY configuration surface today.** `serve.sh`/`serve.bat` (embedded in
+  `package.ps1`) translate env vars → `-D` for port, spaces root, tokens, CORS, HTTPS and OIDC only; not
+  one persistence property is wired in. `space.toon`'s manifest carries only
+  `displayName`/`description`/`createdAt` and cannot hold these keys. | `okf/backend/engine/db-layer.md`
 - 🟡 **PATH-2 — path containment is unified for CONFIG paths only; ~15 more implementations sit outside
   it and disagree** (opened 2026-08-14, from an exhaustive sweep). The archived
   [`path-containment-unification`](archived-documents/plans-archive/path-containment-unification.md)

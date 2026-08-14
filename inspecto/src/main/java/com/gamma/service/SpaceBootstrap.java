@@ -34,7 +34,7 @@ final class SpaceBootstrap {
 
         // The space's own acquisition (dedup) ledger — its own DuckDB file when the backend is `db`; the default
         // memory backend yields an isolated in-memory instance. Keyed by space id (the poll path resolves by MDC).
-        String ledgerUrl = System.getProperty("acquire.ledger.db.url", root.acquisitionLedgerDbUrl());
+        String ledgerUrl = OperationalDb.urlFor("acquire.ledger.db.url", root.acquisitionLedgerDbUrl());
         AcquisitionLedgers.register(id.value(), AcquisitionLedgers.build(ledgerUrl));
         // Publish the component-registry root so the static ingest path can load this space's
         // Decision Rules per batch (DecisionRuleApplier).

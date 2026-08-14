@@ -80,6 +80,9 @@ public final class SpaceManager implements AutoCloseable {
 
     /** Boot every space under {@code spacesRoot} (each a dir with a {@code config/} subtree); a bad one is skipped. */
     public static SpaceManager discover(Path spacesRoot) throws IOException {
+        // Before any space opens a store: an unhonourable -Dinspecto.db=postgres is one loud boot error,
+        // not N per-store WARNs that leave the service "healthy" with capabilities silently switched off.
+        OperationalDb.verifySelectable();
         SpaceManager m = new SpaceManager();
         m.spacesRoot = spacesRoot.toAbsolutePath().normalize();   // remembered so runtime create/delete can mint/remove dirs
         if (!Files.isDirectory(spacesRoot)) {
