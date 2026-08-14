@@ -12,21 +12,40 @@ import type { ConfigFinding } from './component-kind';
  * Framework-free — validation returns {@link ConfigFinding}s (never throws), like kind validators.
  */
 
-export type AttributeTier = 'required' | 'optional' | 'advanced';
+/**
+ * Disclosure tiers, as data — the union below is DERIVED from this array so the vocabulary is
+ * enumerable at run time and can be pinned by `attribute-spec.contract.json`.
+ */
+export const ATTRIBUTE_TIERS = ['required', 'optional', 'advanced'] as const;
 
-export type AttributeType =
-    | 'string'
-    | 'identifier' // machine name: letters/digits/_-, no spaces
-    | 'number'
-    | 'boolean'
-    | 'select'
-    | 'autocomplete' // free text + suggestions (suggestions assist, they never constrain the value);
-    //                  the renderer host supplies the suggestion source via its `optionLoaders` input
-    | 'multiline'
-    | 'list'; // string[] edited as removable chips — for config keys the engine reads as a list
-//           (e.g. csv_settings.include_regex). An empty list counts as blank, so a `required`
-//           list must have at least one entry. ⚠ Adding a member here also needs
-//           `FindingsSpec.TYPES` (backend) widened, or the server 422s a spec this can draw.
+export type AttributeTier = (typeof ATTRIBUTE_TIERS)[number];
+
+/**
+ * Renderer-supported control types, as data (see {@link ATTRIBUTE_TIERS}).
+ *
+ * - `identifier` — machine name: letters/digits/_-, no spaces.
+ * - `autocomplete` — free text + suggestions (suggestions assist, they never constrain the value);
+ *   the renderer host supplies the suggestion source via its `optionLoaders` input.
+ * - `list` — `string[]` edited as removable chips, for config keys the engine reads as a list
+ *   (e.g. `csv_settings.include_regex`). An empty list counts as blank, so a `required` list must
+ *   have at least one entry.
+ *
+ * ⚠ Adding a member here also needs `FindingsSpec.TYPES` (backend) widened, or the server 422s a
+ * spec this renderer can actually draw — which is exactly what `attribute-spec.contract.json` and
+ * its two tests now catch instead of leaving it to review.
+ */
+export const ATTRIBUTE_TYPES = [
+    'string',
+    'identifier',
+    'number',
+    'boolean',
+    'select',
+    'autocomplete',
+    'multiline',
+    'list',
+] as const;
+
+export type AttributeType = (typeof ATTRIBUTE_TYPES)[number];
 
 export interface AttributeOption {
     value: string;
@@ -67,6 +86,34 @@ export interface AttributeSpec {
      *  reads BACK is the server's job at the response boundary, never this flag's. */
     secret?: boolean;
 }
+
+/**
+ * Every field of {@link AttributeSpec}, exhaustively — `Record<keyof Required<…>, true>` makes the
+ * compiler reject this object the moment a field is added to the interface without being listed.
+ * That is the point: a new field is a **decision** about whether a `findings-spec` may author it
+ * (`FindingsSpec.SECTION_KEYS`) or whether it stays frontend-only, and the contract file records
+ * which. Silently adding one is how the two sides drift.
+ */
+const ATTRIBUTE_KEY_SET: Record<keyof Required<AttributeSpec>, true> = {
+    key: true,
+    label: true,
+    type: true,
+    tier: true,
+    required: true,
+    default: true,
+    options: true,
+    pattern: true,
+    min: true,
+    max: true,
+    dependsOn: true,
+    help: true,
+    placeholder: true,
+    group: true,
+    secret: true,
+};
+
+/** {@link ATTRIBUTE_KEY_SET} as a list, for the contract test. */
+export const ATTRIBUTE_KEYS: readonly string[] = Object.keys(ATTRIBUTE_KEY_SET);
 
 const IDENTIFIER_RE = /^[A-Za-z][A-Za-z0-9_-]*$/;
 

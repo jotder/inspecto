@@ -1,0 +1,10 @@
+{
+  "_comment": "The AttributeSpec vocabulary shared by the Angular renderer and the backend FindingsSpec (BACKLOG D6 residual). Sorted, because unlike measure-grammar.contract.json no side shows this order to a user; both compare sorted. sectionKeys + frontendOnlyKeys must together be every field of AttributeSpec.",
+  "tiers": [ "advanced", "optional", "required" ],
+  "types": [ "autocomplete", "boolean", "identifier", "list", "multiline", "number", "select", "string" ],
+  "sectionKeys": [
+    "default", "dependsOn", "help", "key", "label", "max", "min",
+    "options", "pattern", "placeholder", "required", "tier", "type"
+  ],
+  "frontendOnlyKeys": [ "group", "secret" ]
+}

@@ -1235,11 +1235,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `findingsSpecOf` for reuse). Also load-bearing: nothing is judged unless the patch **touches a declared
   key**, and `required` is judged against the **merged** bag — otherwise a tag write starts 422ing on an
   incomplete triage form. `autocomplete` options stay suggestions, never a closed set.
-- **D6 — the spec vocabulary is defined by a frontend file.** `AttributeSpec`
-  (`inspecto-ui/.../component-model/attribute-spec.ts`) is the canonical shape the backend `FindingsSpec`
-  mirrors and validates against. Deliberate — the alternative was a third schema plus a lossy mapper — but a
-  new `AttributeType`/`AttributeTier` must be added in **both** places or the backend will 422 a section the
-  renderer could actually draw. The backend validator is what keeps this safe.
+- ~~**D6 — the spec vocabulary is defined by a frontend file.**~~ **CLOSED 2026-08-15 — pinned by a
+  cross-language contract test**, the `MeasureCompiler.AGGS` idiom. `AttributeSpec`
+  (`inspecto-ui/.../component-model/attribute-spec.ts`) is still deliberately the canonical shape — the
+  alternative was a third schema plus a lossy mapper — but the hand-kept mirror is no longer trusted to
+  review: `inspecto-ui/src/app/inspecto/mock/attribute-spec.contract.json` is the one committed artifact,
+  compared by `FindingsSpecContractTest` (Java, against `FindingsSpec.TYPES`/`TIERS` **and** what the
+  parser actually tolerates as a section key) and `attribute-spec.contract.spec.ts` (TS). The union types
+  are now DERIVED from exported `ATTRIBUTE_TYPES`/`ATTRIBUTE_TIERS` arrays so the vocabulary is
+  enumerable at run time — a type-level change only, every consumer is unaffected.
+  ⚠ **Two things grounding turned up.** (1) The drift the row feared is now a *failing build on both
+  sides* — falsified by injecting a bogus `colorpicker` type, which failed 2 Java tests and 1 TS test.
+  (2) A **real, previously unrecorded asymmetry**: `group` and `secret` exist on `AttributeSpec` but are
+  **not** authorable on a findings section (`SECTION_KEYS` lacks them), so authoring `group:` on a
+  findings-spec 422s though the renderer would draw it. Left as-is deliberately — `secret` on a Findings
+  value would be misleading (the value is stored and returned in `attributes` regardless) and `group` is
+  a genuine but unasked-for widening — and now *pinned as deliberate* via the contract's
+  `frontendOnlyKeys`, with `Record<keyof Required<AttributeSpec>, true>` making the compiler refuse any
+  NEW field until it is classified as one or the other.
 - ~~**`NoteTargets` is now misnamed.**~~ **CLOSED 2026-07-27** — renamed to **`com.gamma.ops.AnnotationKinds`**
   and moved out of the note package, since it has been the shared annotation-target vocabulary for notes
   (D10) and tags (D7) since D7 shipped. Purely mechanical: every reference was an import / qualified name /

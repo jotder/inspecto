@@ -95,6 +95,21 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
     vocabulary and served verbatim; `ConfigSpecs` is deliberately untouched, since mapping the two shapes
     (`path` vs `key`, `enumValues` vs `options`, `visibleWhen` vs `dependsOn`, no `tier` at all) would be
     lossy for zero reuse.
+  * ⚠ **That canonical-frontend-shape choice is paid for by a hand-kept backend mirror, so it is pinned by
+    a cross-language contract test** (2026-08-15, the `MeasureCompiler.AGGS` idiom). One committed
+    artifact, `inspecto/mock/attribute-spec.contract.json`, is compared by `FindingsSpecContractTest`
+    (Java) and `attribute-spec.contract.spec.ts` (TS), so neither side moves alone. Drift used to be
+    silent in the worse direction: a type added only in TypeScript makes the server **422 a section the
+    renderer could have drawn**, with an error naming a control the author's own form offers. The unions
+    are DERIVED from exported `ATTRIBUTE_TYPES`/`ATTRIBUTE_TIERS` arrays so the vocabulary is enumerable
+    at run time; `ATTRIBUTE_KEYS` comes from a `Record<keyof Required<AttributeSpec>, true>`, so adding a
+    field to the interface **fails to compile** until it is classified.
+  * ⚠ **`group` and `secret` are frontend-only** — on `AttributeSpec` but absent from
+    `FindingsSpec.SECTION_KEYS`, so authoring `group:` on a findings-spec is a 422 even though the form
+    would render it. Deliberate rather than accidental now: `secret` on a Findings value would be
+    misleading (it is stored and returned in `attributes` regardless), and `group` is an unasked-for
+    widening. The contract's `frontendOnlyKeys` records the pair and the Java side asserts the parser
+    really refuses them.
   * **Validation is fail-closed at authoring time (422)** via a per-kind hook in `ComponentRoutes.writeComponent`:
     unknown `type`/`tier`, a `select` with no `options`, an invalid `pattern`, `min > max`, a `dependsOn`
     naming no sibling, an `objectType` disagreeing with the component id, and **unknown section keys**
