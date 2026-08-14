@@ -598,7 +598,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
   `startsWith`, defended only by a regex + `".."` test — that regex does block absolute refs and
   traversal, so this is narrower than it looks, but `ExpectationEvaluator:99` consumes the **same**
   `physicalRef` with the **identical** `SAFE_REF` pattern *and* adds a containment check. Two readers of
-  one value, disagreeing. ⚠ Nothing pins any of the ~15 — the existing tests (`PathJailTest`,
+  one value, disagreeing.
+  **→ Tier 4 BOTH DECISIONS CLOSED 2026-08-14** (operator delegated). `PathJail`'s fail-open on an
+  unanswerable filesystem is **deliberate and now pinned in a comment**: it skips only the symlink
+  *re*-check (structural `startsWith` already passed), and the null means perms or a race — refusing
+  would turn transient IO noise into a refusal of every legitimate config. And the data-ref symlink hole
+  is **closed**: `DataRef.requireUnder`'s verdict is now `PathJail.contains` (resolution stays against
+  the data root — unify the verdict, never the resolution, third use), with junction-backed tests that
+  actually run on Windows. Remaining under this heading: the *other* non-`PathJail` sites (static
+  serving, archive targets, store `fileFor` helpers) still skip the symlink re-check — untidy, not
+  decided; schedule by value. ⚠ Nothing pins any of the ~15 — the existing tests (`PathJailTest`,
   `ConfigSafetyValidatorTest`, `JobPathContainmentTest`) cover only the unified five. |
   `okf/backend/config/config-safety.md`
   - **Tier 1 (silent-success) SHIPPED 2026-08-14.** `MetadataValidateTask` now emits an *unsafe physical

@@ -9,10 +9,11 @@ import java.util.regex.Pattern;
  * The one answer to "is this a usable relative ref under a space's data root", shared by every reader
  * of a {@code physicalRef}-shaped value.
  *
- * <p>A data ref is <em>not</em> a {@link PathJail} case and must not be routed through it. {@code PathJail}
- * resolves a relative value against the <b>working directory</b> — deliberate and load-bearing for config
- * refs — whereas a data ref is meaningless except relative to the space's data root. The shape rule and the
- * containment rule therefore live here, next to the jail rather than inside it.
+ * <p>A data ref must not be routed through {@link PathJail#require}: the jail <em>resolves</em> a relative
+ * value against the <b>working directory</b> — deliberate and load-bearing for config refs — whereas a data
+ * ref is meaningless except relative to the space's data root. Resolution therefore lives here; the
+ * containment <em>verdict</em> is still the jail's single {@link PathJail#contains} definition (which also
+ * re-checks symlink escape) — unify the verdict, never the resolution.
  *
  * <p>Before this class there were <b>two</b> copies of the shape rule — {@code DatasetRelation} and
  * {@code ExpectationEvaluator}, each with its own {@code SAFE_REF} pattern, one of whose Javadoc admitted
@@ -62,20 +63,22 @@ public final class DataRef {
      * Verdict on the shape <em>and</em> on containment under {@code dataRoot} — the check both readers of a
      * {@code physicalRef} should have been making.
      *
-     * <p>The containment half is redundant given {@link #requireShape} and is kept anyway: it is what stops
-     * the two rules drifting apart again, and it is the assertion that would still hold if the character set
-     * were ever widened.
+     * <p>The containment verdict is {@link PathJail#contains} — resolution stays here (a ref resolves against
+     * the <b>data root</b>, never the working directory), the verdict is the jail's single definition (unify
+     * the verdict, never the resolution). That closes the symlink half of PATH-2 tier 4 for data refs: the
+     * shape rule makes traversal and absolute refs structurally impossible, but it cannot see a link
+     * <em>inside</em> the data root pointing out of it — only the real-path re-check can.
      *
      * @return the resolved, normalised absolute-or-relative path under {@code dataRoot}
-     * @throws IllegalArgumentException if {@code dataRoot} is null, or the ref is unusable or escapes (→ 422)
+     * @throws IllegalArgumentException if {@code dataRoot} is null, or the ref is unusable or escapes
+     *                                  (structurally or through a symlink) (→ 422)
      */
     public static Path requireUnder(Path dataRoot, String ref, String what) {
         if (dataRoot == null)
             throw new IllegalArgumentException("no data root for this space; cannot resolve " + what);
         requireShape(ref, what);
-        Path root = dataRoot.normalize();
-        Path resolved = root.resolve(ref).normalize();
-        if (!resolved.startsWith(root))
+        Path resolved = dataRoot.normalize().resolve(ref).normalize();
+        if (!PathJail.contains(dataRoot, resolved))
             throw new IllegalArgumentException(what + " '" + ref + "' escapes the data root");
         return resolved;
     }

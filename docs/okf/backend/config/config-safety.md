@@ -163,9 +163,19 @@ assertion cannot tell "refused by shape" from "refused by containment" — and s
 in every case, such a test reports the containment half as covered when it never ran. `DataRefTest`
 asserts each exclusion's message individually.
 
-⚠ **Still unfixed under both readers: symlinks.** `normalize()` is purely structural; neither reader
-re-checks symlink escape, and `PathJail` is the only thing in the codebase that does. That is PATH-2
-tier 4, sequenced behind the tier-3 root-set decision.
+**Symlinks under data refs: closed 2026-08-14 (tier 4, data-ref half).** `DataRef.requireUnder`'s
+containment verdict is now `PathJail.contains` — resolution stays DataRef's (a ref resolves against the
+data root, never the CWD), the verdict is the jail's single definition, symlink re-check included. Third
+use of S2's trick: **unify the verdict, never the resolution.** The shape rule cannot see a link *inside*
+the data root pointing out of it (`innocent/stolen` is perfectly ref-shaped); only the real-path re-check
+can, and `DataRefTest` pins both directions (an escaping link is refused, an internal alias is not) via
+`TestLinks`' junction fallback so the tests actually run on Windows. **Pinned in the same pass:
+`PathJail.contains` returning `true` when the filesystem will not answer is DELIBERATE**, not an
+oversight — it skips only the symlink *re*-check (structural `startsWith` has already passed), and the
+null means perms or a race, which says nothing about which way to fail; refusing would turn transient IO
+noise into a refusal of every legitimate config. ⚠ Tier 4's *other* sites (static serving, archive
+extraction targets, the store `fileFor` helpers) still do not re-check symlinks — those are untidy, not
+decided; nothing schedules them.
 
 ⚠ **The store glob is interpolated into SQL, never bound** — DuckDB's table functions take a literal.
 `SqlViews.reader`/`pathList` double `'` → `''` (so a store under `O'Brien` renders a valid literal

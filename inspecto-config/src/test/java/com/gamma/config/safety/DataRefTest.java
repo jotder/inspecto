@@ -81,6 +81,35 @@ class DataRefTest {
                 .getMessage().startsWith("unsafe " + WHAT));
     }
 
+    /**
+     * PATH-2 tier 4, the data-ref half: the shape rule makes traversal and absolute refs structurally
+     * impossible, but it cannot see a link INSIDE the data root pointing out of it — a ref like
+     * {@code innocent/secret.parquet} is perfectly ref-shaped. Only the real-path re-check
+     * ({@link PathJail#contains}, the shared verdict) can refuse it.
+     */
+    @Test
+    void requireUnderRefusesARefThatEscapesThroughASymlink(
+            @org.junit.jupiter.api.io.TempDir Path dataRoot,
+            @org.junit.jupiter.api.io.TempDir Path outside) throws java.io.IOException {
+        Path stash = java.nio.file.Files.createDirectory(outside.resolve("stash"));
+        TestLinks.linkDirectory(dataRoot.resolve("innocent"), stash);
+
+        assertEquals("innocent/stolen", DataRef.requireShape("innocent/stolen", WHAT),
+                "precondition: the ref is perfectly shaped — shape alone cannot catch this");
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> DataRef.requireUnder(dataRoot, "innocent/stolen", WHAT))
+                .getMessage().contains("escapes the data root"));
+    }
+
+    @Test
+    void requireUnderAllowsARefThroughALinkThatStaysInside(
+            @org.junit.jupiter.api.io.TempDir Path dataRoot) throws java.io.IOException {
+        Path real = java.nio.file.Files.createDirectory(dataRoot.resolve("real"));
+        TestLinks.linkDirectory(dataRoot.resolve("alias"), real);
+        assertDoesNotThrow(() -> DataRef.requireUnder(dataRoot, "alias/file.parquet", WHAT),
+                "an internal alias is not an escape — refusing it would break linked store layouts");
+    }
+
     @Test
     void requireUnderRefusesAMissingDataRootDistinctlyFromAnUnusableRef() {
         assertTrue(assertThrows(IllegalArgumentException.class,

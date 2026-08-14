@@ -150,7 +150,11 @@ public final class PathJail {
         // real path never starts with the unresolved base.
         Path real     = realPathOfNearestExisting(abs);
         Path baseReal = realPathOfNearestExisting(base);
-        if (real == null || baseReal == null) return true;   // can't resolve; structural check stands
+        // DELIBERATE (pinned 2026-08-14, PATH-2 tier 4): when the filesystem will not answer, the
+        // structural verdict above stands. This skips only the symlink RE-check — startsWith has already
+        // passed — and the null means perms or a race, which says nothing about which way to fail;
+        // refusing here would turn transient IO noise into a refusal of every legitimate config.
+        if (real == null || baseReal == null) return true;
         return real.startsWith(baseReal);
     }
 
