@@ -94,7 +94,16 @@ duration, and it is what `JobRunLedger`/`DbJobRunStore` persist. Detail goes to 
 (72 construction sites, and a findings list does not belong in a ledger column). The consequence is for
 *tests*: driving the ctx-less `Job.run()` overload discards every finding and can only count them,
 which cannot tell "reported the right thing" from "reported the wrong thing the right number of
-times". Drive `run(ctx)` with `CapturingJobContext` (`inspecto-engine` test sources) instead.
+times". Drive `run(ctx)` with `CapturingJobContext` (`com.gamma.job`, test sources — **one** double for
+every Job test; the consignment copy was collapsed onto it 2026-08-14).
+
+⛔ **Do NOT record audit findings as a Run Artifact.** Considered and rejected 2026-08-14 on visibility
++ stability: the Run Log is *already* queryable per run (`GET /jobs/{name}/runs/{runId}/log` and
+`/logs`, the UI's live-tail panel) and the findings also ride the Signal ledger, so an artifact adds no
+reachability — it adds a **second copy of the same information**, which is the exact failure mode that
+produced the disagreeing-guards bug above. `ArtifactRecorder` is the right home for a *produced
+thing* (`BackupTask`'s zip, `SqlTemplateJob`'s Parquet, `storage_report`'s per-axis sample), not for a
+report the Run Log already carries.
 
 **Why these live here and not in a `ConfigSpec`.** `FieldSpec`/`ConfigSpec` are flat-dotted-path only —
 `FieldType.MAP`/`LIST` assert the container type and never walk into entries, and there is no

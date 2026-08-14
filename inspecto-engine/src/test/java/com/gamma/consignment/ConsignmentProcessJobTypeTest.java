@@ -1,14 +1,10 @@
 package com.gamma.consignment;
 
-import com.gamma.job.ArtifactRecorder;
+import com.gamma.job.CapturingJobContext;
 import com.gamma.job.Job;
 import com.gamma.job.JobConfig;
-import com.gamma.job.JobContext;
 import com.gamma.job.JobResult;
-import com.gamma.job.RunLog;
-import com.gamma.job.TriggerInfo;
 import com.gamma.signal.Severity;
-import com.gamma.signal.SignalEmitter;
 import com.gamma.util.DuckDbUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,45 +67,8 @@ class ConsignmentProcessJobTypeTest {
         }
     }
 
-    // ── a JobContext stub: only what the adapter actually reads ──────────────────
-
-    private static final class FakeJobContext implements JobContext {
-        final Map<String, String> params;
-        final boolean dryRun;
-        final List<String> warnings = new ArrayList<>();
-        final List<Map<String, Object>> signals = new ArrayList<>();
-
-        FakeJobContext(Map<String, String> params, boolean dryRun) {
-            this.params = params;
-            this.dryRun = dryRun;
-        }
-
-        @Override public String runId() { return "run-1"; }
-        @Override public String spaceId() { return "default"; }
-        @Override public TriggerInfo trigger() { return null; }
-        @Override public Map<String, String> config() { return Map.of(); }
-        @Override public Map<String, String> params() { return params; }
-        @Override public ArtifactRecorder artifacts() { return null; }
-        @Override public boolean dryRun() { return dryRun; }
-
-        @Override
-        public RunLog log() {
-            return new RunLog() {
-                @Override public void info(String message, Object... kv) { }
-                @Override public void warn(String message, Object... kv) { warnings.add(message); }
-                @Override public void error(String message, Throwable t, Object... kv) { }
-            };
-        }
-
-        @Override
-        public SignalEmitter signals() {
-            return (type, severity, payload) -> {
-                Map<String, Object> got = new LinkedHashMap<>(payload);
-                got.put("__type", type);
-                signals.add(got);
-            };
-        }
-    }
+    // The JobContext stub lives in com.gamma.job beside JobContext itself — one double, so a Job's
+    // reporting behaviour is asserted the same way everywhere.
 
     // ── harness ──────────────────────────────────────────────────────────────────
 
@@ -162,7 +120,7 @@ class ConsignmentProcessJobTypeTest {
             ConsignmentOutputStores.use(store);
 
             RowCounter processor = new RowCounter();
-            FakeJobContext ctx = new FakeJobContext(params("c1", "row-counter"), false);
+            CapturingJobContext ctx = new CapturingJobContext(params("c1", "row-counter"), false);
             JobResult result = job(processor).run(ctx);
 
             assertTrue(result.success(), result.message());
@@ -184,7 +142,7 @@ class ConsignmentProcessJobTypeTest {
             store.record(List.of(out(f, 3)));
             ConsignmentOutputStores.use(store);
 
-            FakeJobContext ctx = new FakeJobContext(params("c1", "row-counter"), false);
+            CapturingJobContext ctx = new CapturingJobContext(params("c1", "row-counter"), false);
             job(new RowCounter()).run(ctx);
 
             assertEquals(1, ctx.signals.size());
@@ -203,7 +161,7 @@ class ConsignmentProcessJobTypeTest {
             store.record(List.of(out(f, 3)));
             ConsignmentOutputStores.use(store);
 
-            JobResult result = job(new RowCounter()).run(new FakeJobContext(params("c1", "row-counter"), true));
+            JobResult result = job(new RowCounter()).run(new CapturingJobContext(params("c1", "row-counter"), true));
             assertEquals("SKIPPED", result.status());
             assertTrue(result.message().contains("dry run"), result.message());
         }
@@ -217,7 +175,7 @@ class ConsignmentProcessJobTypeTest {
             store.record(List.of(out(f, 999)));   // registry claims 999 detail rows; the file holds 3
             ConsignmentOutputStores.use(store);
 
-            FakeJobContext ctx = new FakeJobContext(params("c1", "row-counter"), false);
+            CapturingJobContext ctx = new CapturingJobContext(params("c1", "row-counter"), false);
             JobResult result = job(new RowCounter()).run(ctx);
 
             assertTrue(result.success(), "a mismatch is a signal for the operator, not a failure");
@@ -232,7 +190,7 @@ class ConsignmentProcessJobTypeTest {
     void failsClearlyWhenNoProcessorIsRegisteredWithThatId(@TempDir Path dir) throws Exception {
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             ConsignmentOutputStores.use(store);
-            JobResult result = job(new RowCounter()).run(new FakeJobContext(params("c1", "nope"), false));
+            JobResult result = job(new RowCounter()).run(new CapturingJobContext(params("c1", "nope"), false));
 
             assertEquals("FAILED", result.status());
             assertTrue(result.message().contains("nope"), result.message());
@@ -242,7 +200,7 @@ class ConsignmentProcessJobTypeTest {
 
     @Test
     void failsClearlyWhenNoConsignmentIdResolved() throws Exception {
-        JobResult result = job(new RowCounter()).run(new FakeJobContext(params(null, "row-counter"), false));
+        JobResult result = job(new RowCounter()).run(new CapturingJobContext(params(null, "row-counter"), false));
         assertEquals("FAILED", result.status());
         assertTrue(result.message().contains("$signal.batchId"), result.message());
     }
@@ -253,7 +211,7 @@ class ConsignmentProcessJobTypeTest {
         assertNull(ConsignmentOutputStores.shared(), "precondition: no registry installed");
 
         RowCounter processor = new RowCounter();
-        FakeJobContext ctx = new FakeJobContext(params("c1", "row-counter"), false);
+        CapturingJobContext ctx = new CapturingJobContext(params("c1", "row-counter"), false);
         JobResult result = job(processor).run(ctx);
 
         assertTrue(result.success(), result.message());
@@ -285,7 +243,7 @@ class ConsignmentProcessJobTypeTest {
             ConsignmentOutputStores.use(store);
 
             JobResult result = job(new DailyCounter(), data.toString())
-                    .run(new FakeJobContext(params("c1", "daily-counter"), false));
+                    .run(new CapturingJobContext(params("c1", "daily-counter"), false));
             assertTrue(result.success(), result.message());
 
             Path expected = data.resolve("_summaries").resolve("cdr").resolve("record_day=2026-07-01")
@@ -312,7 +270,7 @@ class ConsignmentProcessJobTypeTest {
             ConsignmentOutputStores.use(store);
 
             job(new DailyCounter(), data.toString())
-                    .run(new FakeJobContext(params("c1", "daily-counter"), true));
+                    .run(new CapturingJobContext(params("c1", "daily-counter"), true));
 
             assertFalse(Files.exists(data.resolve("_summaries")), "nothing may be written on a dry run");
             assertTrue(store.outputs("c1").isEmpty(), "and nothing registered");
@@ -325,7 +283,7 @@ class ConsignmentProcessJobTypeTest {
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             ConsignmentOutputStores.use(store);
 
-            FakeJobContext ctx = new FakeJobContext(params("c1", "daily-counter"), false);
+            CapturingJobContext ctx = new CapturingJobContext(params("c1", "daily-counter"), false);
             JobResult result = job(new DailyCounter(), null).run(ctx);
 
             assertTrue(result.success(), result.message());

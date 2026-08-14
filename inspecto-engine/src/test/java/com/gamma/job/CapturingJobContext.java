@@ -22,27 +22,27 @@ import java.util.Map;
  * <p>⚠ {@link #artifacts()} returns {@code null} deliberately — no Job under test records artifacts
  * yet, and a stub that silently swallowed them would hide the day one starts.
  */
-final class CapturingJobContext implements JobContext {
+public final class CapturingJobContext implements JobContext {
 
     /** Every {@link RunLog#warn} message, in order. */
-    final List<String> warnings = new ArrayList<>();
+    public final List<String> warnings = new ArrayList<>();
     /** Every emitted Signal's payload, each with its type under {@code __type}. */
-    final List<Map<String, Object>> signals = new ArrayList<>();
+    public final List<Map<String, Object>> signals = new ArrayList<>();
 
     private final Map<String, String> params;
     private final boolean dryRun;
 
-    CapturingJobContext() {
+    public CapturingJobContext() {
         this(Map.of(), false);
     }
 
-    CapturingJobContext(Map<String, String> params, boolean dryRun) {
+    public CapturingJobContext(Map<String, String> params, boolean dryRun) {
         this.params = params;
         this.dryRun = dryRun;
     }
 
     /** True when some warning contains {@code needle} — the usual "did it report X?" assertion. */
-    boolean warned(String needle) {
+    public boolean warned(String needle) {
         return warnings.stream().anyMatch(w -> w.contains(needle));
     }
 

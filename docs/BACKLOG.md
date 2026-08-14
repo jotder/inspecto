@@ -531,9 +531,15 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     every finding, so the first cut of this test could only assert a count — which cannot tell "reported
     the right thing" from "reported the wrong thing the right number of times". Now driven through
     `run(ctx)` with a shared `CapturingJobContext`, asserting the finding text, both offending datasets,
-    that the healthy one contributes nothing, and that the signal fires. ⚠ **Residual:**
-    `ConsignmentProcessJobTypeTest:77` holds a near-identical `FakeJobContext` — a second copy of the
-    same double, worth collapsing onto the shared one.
+    that the healthy one contributes nothing, and that the signal fires. ~~⚠ **Residual:** `ConsignmentProcessJobTypeTest:77` holds a
+    near-identical `FakeJobContext`~~ **collapsed onto the shared double 2026-08-14** — one `JobContext`
+    stub, in `com.gamma.job` beside the interface. ⛔ **Recording findings as a Run Artifact was
+    considered and REJECTED** (visibility + stability): the Run Log is already queryable per run (`GET
+    /jobs/{name}/runs/{runId}/log`, `/logs` — the UI live-tail panel) and the findings also ride the
+    Signal ledger, so an artifact adds no reachability, only a second copy of the same information —
+    the exact failure mode PATH-2 exists to fix. `ArtifactRecorder` is for a *produced thing*, not for
+    a report the Run Log already carries. Retention would not have been the blocker (`runlog_prune`
+    already prunes `auditRoot/artifacts` alongside `auditRoot/runlog`).
 - ~~🔴 BUILD-1 — the offline reactor build is BROKEN~~ **CLOSED 2026-08-06 — NOT A BUILD DEFECT. The
   diagnosis was an artifact of running as the wrong Windows profile.** `mvn -o clean test` completes
   the full **23-module reactor: BUILD SUCCESS, 2799 tests, 0 failures, 0 errors, 6 skipped** (3m32s),
