@@ -137,6 +137,13 @@ public final class ReferenceCompactor {
     private static long stageRetained(Connection conn, Path root, long historyDays) throws Exception {
         String keep;
         if (historyDays < 0) keep = "TRUE";                       // keep-forever: merge files, drop nothing
+        // ⛔ Stays systemDefault(), to match the writer — DECIDED 2026-08-15, do not "finish" the
+        // -Dops.timezone sweep here. BatchIngestStrategy writes __valid_from as `now()::TIMESTAMP`, and
+        // DuckDB bundles ICU (verified loaded), so its session TimeZone is the HOST zone — this literal
+        // and that column are the same wall clock. It is NOT the UTC mismatch it looks like. Moving this
+        // side alone shifts the cutoff by the offset and DROPS live rows that fall outside `keep`. A
+        // future migration must also `SET TimeZone` on the connection: DuckDB follows the host, not
+        // -Dops.timezone.
         else if (historyDays > 0) keep = "__refc_rn = 1 OR __valid_from >= TIMESTAMP '"
                 + LocalDateTime.ofInstant(Instant.now().minus(Duration.ofDays(historyDays)),
                                           ZoneId.systemDefault()).format(TS) + "'";

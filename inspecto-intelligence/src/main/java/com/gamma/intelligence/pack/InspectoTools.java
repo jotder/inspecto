@@ -378,7 +378,14 @@ final class InspectoTools {
         return t >= sinceMs && (untilMs == null || t <= untilMs);
     }
 
-    /** The audit CSV / run-log timestamp format ({@code yyyy-MM-dd HH:mm:ss}, local time) → Instant. */
+    /**
+     * The audit CSV / run-log timestamp format ({@code yyyy-MM-dd HH:mm:ss}, local time) → Instant.
+     *
+     * <p>⛔ Stays {@code systemDefault()}, to match the writer — DECIDED 2026-08-15, do not "finish" the
+     * {@code -Dops.timezone} sweep here. {@code JobService} stamps the job-run ledger's
+     * {@code start_time}/{@code end_time} with {@code LocalDateTime.now()} into a zone-NAIVE string; this
+     * parse is the read half of that pair. Moving this side alone misreads every timestamp already on disk.
+     */
     private static Instant parseAuditTs(String s) {
         if (s == null || s.isBlank()) return null;
         try {

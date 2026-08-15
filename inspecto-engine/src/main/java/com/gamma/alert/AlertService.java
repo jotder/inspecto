@@ -370,6 +370,10 @@ public final class AlertService {
             return ledger.size() <= n ? ledger : ledger.subList(ledger.size() - n, ledger.size());
         }
         Duration span = rule.windowDuration();
+        // ⛔ Stays systemDefault(), to match the writer — DECIDED 2026-08-15, do not "finish" the
+        // -Dops.timezone sweep here. BatchProcessor stamps the batches ledger's start_time/end_time with
+        // LocalDateTime.now() into a zone-NAIVE string; this cutoff is the read half of that pair. Moving
+        // this side alone offsets every alert window by the gap between ops zone and host zone.
         LocalDateTime cutoff = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(nowMs),
                 java.time.ZoneId.systemDefault()).minus(span);
         List<Map<String, String>> out = new ArrayList<>();

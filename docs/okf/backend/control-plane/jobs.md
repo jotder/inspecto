@@ -242,13 +242,25 @@ ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-loc
     harness was dry-running `$today` in a different zone than the real run. That is not a display choice, it
     is a harness that can go green for the wrong date; the whole point of the harness is that a pack green
     here is a pack the engine accepts.
-- ⚠ **Three sites remain on `systemDefault()`, and they are ONE decision, not three:** `AlertService:374`
-  (cutoff vs. the ledger's `end_time`/`start_time`), `ReferenceCompactor:142` (literal vs. the `__valid_from`
-  column), `InspectoTools:385` (parse vs. the audit CSV the platform itself wrote "local time"). Each is the
-  **read half of a write/read pair**, self-consistent today only because both halves use `systemDefault()`.
-  ⛔ **Do not convert a reader alone** — it silently offsets every window by the UTC offset (+05:30 on this
-  box), and in the compactor's case rows fall outside `keep` and are dropped. Pin the **writer's** zone
-  first, then move both halves in one commit, or record "stays `systemDefault()`, to match the writer".
+- ✅ **Three sites stay on `systemDefault()`, to match their writers — DECIDED 2026-08-15. The sweep is
+  CLOSED; this is the end state, not a deferral.** `AlertService:374` (cutoff vs. the ledger's
+  `end_time`/`start_time`, written by `BatchProcessor:298/360/375/386`), `ReferenceCompactor:142` (literal vs.
+  the `__valid_from` column, written by `BatchIngestStrategy:215`), `InspectoTools:385` (parse vs. the audit
+  CSV, written by `JobService:714…1010`). Each is the **read half of a write/read pair** over a **zone-naive**
+  stored string, self-consistent precisely because both halves use `systemDefault()`. The operations zone
+  answers "when does the operator's schedule fire"; **none of these three is an operator-facing clock** — they
+  are internal round-trips over the platform's own timestamps, so there is nothing for `-Dops.timezone` to
+  say about them. ⛔ **Do not convert a reader alone** — it silently offsets every window by the gap between
+  ops and host zone, and in the compactor's case rows fall outside `keep` and are **dropped**. The decision is
+  recorded as a comment at all three sites, because a backlog row cannot reach someone editing the file.
+- ⚠ **`ReferenceCompactor` is NOT the UTC mismatch it looks like** — probed 2026-08-15 against
+  `duckdb_jdbc:1.5.2.1`: the **ICU extension is bundled and auto-loaded**, so DuckDB's session `TimeZone` is
+  the **HOST** zone, not UTC, and `now()::TIMESTAMP` is the same wall clock as `LocalDateTime.now()`. The
+  common "DuckDB defaults to UTC" belief holds only for an ICU-less build. An agent asserted that default as
+  fact and on it called this site a live bug whose fix was to force the reader to UTC — which would have
+  **created** a +05:30 skew and dropped rows. ⚠ DuckDB follows `systemDefault()` but is **blind to
+  `-Dops.timezone`** (nothing issues `SET TimeZone`; `DuckDbUtil` has no setter), so were this pair ever
+  migrated, the connection's zone is a **third** moving part.
 - ⚠ **No `PipelineScheduler` test class exists at all**, and neither original consumer exposes its zone, so
   the guard is at the resolver (`OperationsZoneTest`, 5 tests) plus the module's existing suites. The
   resolver test was **falsified** — stubbing `resolve()` back to `systemDefault()` failed 3 of the 5. Its
