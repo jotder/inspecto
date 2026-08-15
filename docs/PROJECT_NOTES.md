@@ -118,6 +118,21 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
 
 ## 4. Cross-cutting gotchas (the expensive-to-rediscover ones)
 
+- **`git commit` commits the INDEX, and on this shared checkout a shift can hand you a dirty one.**
+  Shifts end without committing, so `git status` may open with work *already staged* — on 2026-08-15 a
+  previous shift's staged `git mv` was silently swallowed into an unrelated `docs:` commit, because
+  `git commit -F-` takes whatever is in the index regardless of what you just added. ⛔ **Run
+  `git diff --cached --stat` immediately before every commit** and confirm the list is exactly what you
+  intend. (Caught on `git show --stat` and unwound before pushing; nothing reached origin.) The same
+  hazard is why staging here is always explicit paths — ⛔ never `git add -A` at the repo root, where the
+  untracked `spaces/**` is real operator CDR data.
+
+- **A find-and-replace-all reporting success is NOT evidence of complete coverage.** Replacing four call
+  sites of `userFor(f)` with the pattern `, userFor(f));` hit only three on 2026-08-15: the fourth was a
+  **ternary arm** ending in `)` with no trailing semicolon, so the pattern never matched it and the tool
+  reported success anyway. The half-applied fix compiled and looked done. **When the surrounding syntax
+  varies across call sites, grep the result and count them** before believing the edit.
+
 - **An `HttpExchange` attribute is per-request by DEFAULT, not by guarantee — derive or clear, never
   trust a stamp.** `sun.net.httpserver.ExchangeImpl` decides *once at class-init* whether each exchange
   gets a private map:
@@ -208,8 +223,13 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   of durable history must tolerate the shapes history actually contains**, so set that flag when the store is
   created, not when a field is first removed.
 
-- **Surefire `-Dtest=A,B` wants commas.** The `+` form silently matches nothing and fails the run with
-  "No tests matching pattern … were executed", which reads like a missing class rather than a bad separator.
+- **Surefire `-Dtest=A,B` wants commas.** The `+` form matches nothing. On its own it at least fails with
+  "No tests matching pattern … were executed", which reads like a missing class rather than a bad separator —
+  but ⛔ **combined with `-Dsurefire.failIfNoSpecifiedTests=false` it reports BUILD SUCCESS having run
+  nothing at all**, and those two flags are habitually passed together. Observed again 2026-08-15 on
+  `-Dtest=ControlApiSystemRoutesTest+OperationalDbTest`: green build, no `Tests run:` line anywhere.
+  **A pass is only a pass if a `Tests run:` line appeared for each class you named** — otherwise run them
+  as separate invocations.
 
 - **TOON schema serialization** — `ConfigCodec.toToon(map)` does **not** emit tabular-array format. A schema
   whose `fields`/`rules` are Java-constructed `List<Map>` round-trips as nested maps, and the TOON parser then
