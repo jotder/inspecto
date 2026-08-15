@@ -92,13 +92,40 @@ allowance, which mirrors the still-supported read path; `bindKindFor('PARSE') ==
 
 | Slice | Work | Verified by |
 |---|---|---|
-| **S1 — Save as template** | Drawer gains a "Save as template" action; the pane emits, the **host** writes via `components.create('grammar', …)` (D5) and the node **keeps** its inline block (D6). Dialog's extract path follows the same new semantics. | A spec asserting the component is created **and** `node.config.parsing` survives with no `use:` set — the exact pair today's `:146` extract spec asserts the opposite of. |
+| **S1 — Save as template** ✅ **SHIPPED 2026-08-15** | Drawer gains a "Save as template" action; the pane emits, the **host** writes via `components.create('grammar', …)` (D5) and the node **keeps** its inline block (D6). Dialog's extract path follows the same new semantics. | A spec asserting the component is created **and** `node.config.parsing` survives with no `use:` set — the exact pair the old `:146` extract spec asserted the opposite of. ✅ |
 | **S2 — Start from a template** | A picker in the drawer listing `components.list('grammar')`; choosing one patches the editor with a **copy**. Read-only fetch, no binding. Must mark the pane dirty (it is an edit) and must not fire on the load-time path. | A spec: pick a template → editor value matches the component → Apply emits an inline block, `use` undefined. |
 | **S3 — Bound nodes migrate on edit** | `isDrawerParse` drops the `use:` exclusion; the host resolves the bound component before opening and seeds the pane; Apply materialises inline and drops `use` (D4). Delete the dialog's bound-edit branch and its specs (`grammar-editor.dialog.spec.ts:116`, `:180`). | A spec on a legacy bound node: opens in the drawer with the resolved block, Apply yields inline + no `use`. |
 | **S4 — Docs** | `docs/GLOSSARY.md` — Grammar component = **template**, ⛔ not a binding target. `okf/frontend/features/grammar-config.md` — rewrite "One store — inline by default, extractable to a component". `okf/backend/pipeline-graph/design.md` — note the `use: grammar/` form is read-supported, never authored. Amend the definition-surface plan's P3a + P3d rows. | `graphify update .`; the P3a/P3d contradiction is gone. |
 
 Order is S1 → S2 → S3 → S4. S3 is last because it is the only one that needs a resolve-on-open step,
 and S1/S2 are independently useful without it.
+
+### S1 as-built (2026-08-15)
+
+- **The one behavioural line** is `persist()`'s tail. It split into `saveAsTemplate()` (create → then
+  `closeInline(block)`, so the node keeps its block and gains no `use:`) and `updateBoundComponent()`
+  (update → close bound, **unchanged on purpose**), over a shared `write()` helper that kept the
+  503/`apiErrorMessage` handling in one place. ⚠ The first attempt edited the shared tail and would have
+  migrated **bound** nodes to inline as a side effect — S3's job, arriving two slices early and silently.
+  Splitting the callers, rather than parameterising the tail, is what made that visible.
+- **New `GrammarTemplateDialog`** modelled on `PipelineTemplateDialog` (same `uniqueNameValidator`,
+  same normalise-before-validate ordering). Its alert states the copy semantics explicitly *because*
+  this reverses the old behaviour — an operator carrying the previous expectation would edit a template
+  and wait for a change that never arrives.
+- **Existing template ids come from `validRefs`**, the set the editor already loads for `use:`
+  validation — no extra HTTP call for the duplicate check.
+- **Vocabulary checked, not assumed:** "template" already means "a reusable blueprint you instantiate"
+  in `GLOSSARY` (Space Template, Rule Template, and `PipelineTemplateDialog`'s pipeline copy), so
+  Grammar Template extends one concept rather than colliding with it. No new word was needed.
+- The pane's `requestSaveAsTemplate()` deliberately does **not** mark itself pristine: a template write
+  neither persists to the node nor consumes unapplied edits, so a dirty pane stays dirty. Pinned.
+- **Verified live** in the offline preview on a palette-fresh `parser.delimited`: the action renders in
+  the drawer, the dialog opens with the copy-semantics alert and the suggested id `delimited_grammar`,
+  the mock store gained `component:grammar/delimited_grammar` with the correct nested content
+  (`{frontend: 'delimited', delimited: {delimiter: ',', has_header: true}}`), and **the drawer stayed
+  open** — under the old behaviour the surface closed and handed back a rebound node.
+- Baselines at this slice: UI `npm run test:ci` **2472 passed / 5 skipped**, 329 files passed (330 total,
+  1 file skipped — pre-existing); `lint:tokens`, `build` and `tsc -p tsconfig.spec.json` all clean.
 
 ---
 

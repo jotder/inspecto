@@ -52,6 +52,7 @@ describe('PipelineEditorComponent', () => {
         remove: ReturnType<typeof vi.fn>;
     };
     let dialog: { open: ReturnType<typeof vi.fn> };
+    let components: { list: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
     let toast: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
 
     beforeEach(() => {
@@ -128,6 +129,7 @@ describe('PipelineEditorComponent', () => {
             remove: vi.fn().mockReturnValue(of({ deleted: true })),
         };
         dialog = { open: vi.fn() };
+        components = { list: vi.fn().mockReturnValue(of([])), create: vi.fn() };
         toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
         TestBed.configureTestingModule({
             imports: [PipelineEditorComponent],
@@ -135,7 +137,7 @@ describe('PipelineEditorComponent', () => {
                 provideNoopAnimations(),
                 { provide: PipelinesService, useValue: api },
                 { provide: ConfigService, useValue: config },
-                { provide: ComponentsService, useValue: { list: vi.fn().mockReturnValue(of([])) } },
+                { provide: ComponentsService, useValue: components },
                 { provide: ToastrService, useValue: toast },
                 { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn().mockResolvedValue(true) } },
                 { provide: MatDialog, useValue: dialog },
@@ -229,6 +231,30 @@ describe('PipelineEditorComponent', () => {
             c.openNodeConfig(node);
             expect(dialog.open).not.toHaveBeenCalled();
             expect(c.definitionNode()?.id).toBe('parse');
+        });
+
+        /** S1: the HOST owns the template write (the pane only emits), and it must leave the node
+         *  completely alone — a template is a copy, never a `use: grammar/<id>` binding. */
+        it('saves a Grammar template without touching the node', () => {
+            const c = make();
+            c.select('demo');
+            const node = { id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+            c.openNodeConfig(node);
+            dialog.open.mockReturnValue({ afterClosed: () => of({ id: 'pipe_delimited' }) });
+            components.create.mockReturnValue(of({ ref: 'grammar/pipe_delimited', name: 'pipe_delimited' }));
+
+            c.saveGrammarAsTemplate({ frontend: 'delimited', delimited: { delimiter: '|' } });
+
+            expect(components.create).toHaveBeenCalledWith('grammar', {
+                id: 'pipe_delimited',
+                frontend: 'delimited',
+                delimited: { delimiter: '|' },
+            });
+            const saved = c.model()!.nodes.find((n) => n.id === 'parse')!;
+            expect(saved.use).toBeUndefined();
+            expect(saved.config!['parsing']).toEqual({ frontend: 'delimited' });
+            expect(c.dirty()).toBe(false); // a template write is not a graph edit
         });
 
         /** The palette seeds `{id, type}` and nothing else — the drawer predicate keys on the type

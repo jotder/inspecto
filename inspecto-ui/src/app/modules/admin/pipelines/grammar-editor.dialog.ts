@@ -9,6 +9,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
+import { Observable } from 'rxjs';
 import {
     apiErrorMessage,
     AuthoredNode,
@@ -40,11 +41,15 @@ export interface GrammarEditorDialogData {
  * only what the editor deliberately does not: the dialog shell, the inline-or-reusable choice, and
  * the persistence.
  *
- * <p>**Inline by default, extractable to a component** (the operator's store decision): a Grammar
- * lives in the node's own `parsing:` block unless someone explicitly promotes it via *Save as
- * reusable Grammar*, which writes a `grammar` component and binds the node with
- * `use: grammar/<id>`. The two are never both populated — extraction MOVES the block out of the node
- * — and the persisted shape is identical either way, so promoting or inlining is never a rewrite.
+ * <p>**Always inline; templates are copies** (operator decision 2026-08-15): a Grammar lives in the
+ * node's own `parsing:` block, full stop. *Save as template…* writes a `grammar` component as a
+ * reusable starting point and leaves the node untouched — no `use:` binding, block still inline.
+ *
+ * <p>⚠ This REVERSES the previous store contract, in which the same action MOVED the block into the
+ * component and bound the node, making a later template edit reach back into every pipeline using it.
+ * The `use: grammar/<id>` form stays **read-supported** (a hand-authored file may use it) but is never
+ * authored; `{@link updateBoundComponent}` is the last writer of one and retires in S3. See
+ * `docs/superpower/grammar-templates-not-bindings-plan.md`.
  *
  * <p>**Plugin Grammars are preview-only here.** A plugin parser also needs per-segment schema files,
  * which only the Onboarding Parsing stage can author; rather than write a config the engine would
@@ -187,7 +192,7 @@ export class GrammarEditorDialog {
         return `${frontend}_grammar`.replace(/[^A-Za-z0-9._-]+/g, '_');
     }
 
-    /** Promote an inline Grammar to a reusable component — the only path that asks for a name. */
+    /** Store the inline Grammar as a reusable template — the only path that asks for a name. */
     extract(): void {
         if (this.pluginBlocked() || !this.editor?.validate()) return;
         this.pendingBlock = this.editor.value();
@@ -206,14 +211,14 @@ export class GrammarEditorDialog {
                 this.nameForm.markAllAsTouched();
                 return;
             }
-            this.persist(String(this.nameForm.getRawValue().name ?? '').trim(), this.pendingBlock!, false);
+            this.saveAsTemplate(String(this.nameForm.getRawValue().name ?? '').trim(), this.pendingBlock!);
             return;
         }
 
         if (this.pluginBlocked() || !this.editor?.validate()) return;
         const block = this.editor.value();
         const bound = this.boundGrammarId();
-        if (bound) this.persist(bound, block, true);
+        if (bound) this.updateBoundComponent(bound, block);
         else this.closeInline(block);
     }
 
@@ -223,19 +228,40 @@ export class GrammarEditorDialog {
         this.ref.close({ node: { ...node, config: { ...(this.data.node.config ?? {}), parsing: block } } });
     }
 
-    private persist(name: string, block: Record<string, unknown>, update: boolean): void {
+    /**
+     * Store the authored Grammar as a reusable **template** — a copy, not a link (2026-08-15).
+     *
+     * ⚠ Until this date the same action MOVED the block into the component and bound the node via
+     * `use: grammar/<id>`, so a later template edit reached back into every pipeline using it. It now
+     * writes the component and leaves the node exactly as it was, inline block and all. See
+     * `docs/superpower/grammar-templates-not-bindings-plan.md`.
+     */
+    private saveAsTemplate(name: string, block: Record<string, unknown>): void {
+        this.write(this.components.create('grammar', { id: name, ...block }), name, () =>
+            this.closeInline(block),
+        );
+    }
+
+    /**
+     * Update the component a bound node references — the last surface that writes a Grammar in place.
+     * Retired in S3, when bound nodes migrate to an inline copy on edit; until then it keeps its
+     * pre-existing binding behaviour so a legacy bound node is not silently rehomed mid-plan.
+     */
+    private updateBoundComponent(name: string, block: Record<string, unknown>): void {
+        this.write(this.components.update('grammar', name, block), name, () => {
+            const config = { ...(this.data.node.config ?? {}) };
+            delete config['parsing'];
+            this.ref.close({ node: { ...this.data.node, use: `grammar/${name}`, config } });
+        });
+    }
+
+    private write(req$: Observable<unknown>, name: string, onDone: () => void): void {
         this.saving.set(true);
-        const req$ = update
-            ? this.components.update('grammar', name, block)
-            : this.components.create('grammar', { id: name, ...block });
         req$.subscribe({
             next: () => {
                 this.saving.set(false);
                 this.toastr.success(`Grammar "${name}" saved`);
-                // One home, never two: the block now lives in the component, so it leaves the node.
-                const config = { ...(this.data.node.config ?? {}) };
-                delete config['parsing'];
-                this.ref.close({ node: { ...this.data.node, use: `grammar/${name}`, config } });
+                onDone();
             },
             error: (e) => {
                 this.saving.set(false);

@@ -143,7 +143,12 @@ describe('GrammarEditorDialog', () => {
         expect(editor.frontend()).toBe('json');
     });
 
-    it('extract asks for a name, writes the component, and MOVES the block off the node', async () => {
+    /**
+     * The inverse of what this case asserted until 2026-08-15, deliberately: saving a template writes
+     * the component and leaves the node ALONE. A template is a copy source, never a binding — see
+     * `docs/superpower/grammar-templates-not-bindings-plan.md`.
+     */
+    it('save-as-template asks for a name, writes the component, and KEEPS the block on the node', async () => {
         const node: AuthoredNode = {
             id: 'parse',
             type: 'parser.dsv',
@@ -162,8 +167,8 @@ describe('GrammarEditorDialog', () => {
             expect.objectContaining({ id: 'delimited_grammar', frontend: 'delimited' }),
         );
         const closed = close.mock.calls[0][0];
-        expect(closed.node.use).toBe('grammar/delimited_grammar');
-        expect(closed.node.config['parsing']).toBeUndefined(); // one home, never two
+        expect(closed.node.use).toBeUndefined(); // a template is a copy, not a link
+        expect(closed.node.config['parsing']).toEqual(expect.objectContaining({ frontend: 'delimited' }));
         expect(closed.node.config['schema_file']).toBe('cdr.toon');
     });
 

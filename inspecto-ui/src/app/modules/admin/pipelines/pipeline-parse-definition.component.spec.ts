@@ -19,13 +19,19 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
     imports: [PipelineParseDefinitionComponent],
     changeDetection: ChangeDetectionStrategy.Eager,
     template: `
-        <app-pipeline-parse-definition [node]="node" (applied)="applied = $event" (dirtyChange)="dirty = $event" />
+        <app-pipeline-parse-definition
+            [node]="node"
+            (applied)="applied = $event"
+            (dirtyChange)="dirty = $event"
+            (saveAsTemplate)="template = $event"
+        />
     `,
 })
 class HostComponent {
     node: AuthoredNode = delimitedNode();
     applied?: AuthoredNode;
     dirty = false;
+    template?: Record<string, unknown>;
 }
 
 function delimitedNode(): AuthoredNode {
@@ -131,6 +137,31 @@ describe('PipelineParseDefinitionComponent', () => {
         pane(fixture).submit();
         fixture.detectChanges();
         expect(fixture.componentInstance.dirty).toBe(false);
+    });
+
+    /**
+     * S1: the pane EMITS the block and never writes it — a `grammar` registry component is a third
+     * entity, so the host owns that write (P2 pure-pane rule).
+     */
+    it('Save as template emits the block, leaves the node alone, and does not consume edits', async () => {
+        const fixture = await create();
+        editor(fixture).schemaForm!.form.patchValue({ delimited__delimiter: ';' });
+        editor(fixture).schemaForm!.form.markAsDirty();
+        fixture.debugElement
+            .query(By.directive(PipelineParseDefinitionComponent))
+            .nativeElement.dispatchEvent(new Event('input', { bubbles: true }));
+        fixture.detectChanges();
+        expect(fixture.componentInstance.dirty).toBe(true);
+
+        pane(fixture).requestSaveAsTemplate();
+        fixture.detectChanges();
+
+        expect(fixture.componentInstance.template).toEqual(
+            expect.objectContaining({ frontend: 'delimited', delimited: expect.objectContaining({ delimiter: ';' }) }),
+        );
+        // Saving a template neither persists to the node nor consumes the unapplied edits.
+        expect(fixture.componentInstance.applied).toBeUndefined();
+        expect(fixture.componentInstance.dirty).toBe(true);
     });
 
     it('has no a11y violations', async () => {

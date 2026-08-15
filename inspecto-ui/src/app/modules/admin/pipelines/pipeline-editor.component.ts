@@ -59,6 +59,7 @@ import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-c
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineSettingsDialog } from './pipeline-settings.dialog';
 import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
+import { GrammarTemplateData, GrammarTemplateDialog, GrammarTemplateResultData } from './grammar-template.dialog';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
@@ -104,6 +105,9 @@ import {
     uniqueNodeId,
     validatePipeline,
 } from './pipeline-graph';
+
+/** The `use:` prefix a Grammar component is referenced by — also how its ref is keyed in `validRefs`. */
+const GRAMMAR_REF_PREFIX = 'grammar/';
 
 /**
  * Pipeline editor (T32, build-side NiFi UX) — author/edit a pipeline on an interactive G6 canvas; Save
@@ -1250,6 +1254,43 @@ export class PipelineEditorComponent implements OnInit {
         this.applyNodePatch(node);
         this.definitionNode.set(node);
         this.definitionDirty.set(false);
+    }
+
+    /**
+     * The Parse pane asked to store its Grammar as a reusable template. The WRITE lives here, not in
+     * the pane: a `grammar` registry component is a third entity (P2 pure-pane rule), and this is the
+     * one definition action that is not an in-memory patch.
+     *
+     * ⚠ The node is deliberately NOT touched — no `use:` binding, and its inline `parsing:` block
+     * stays put. A template is a copy you start from, never a live reference (the behaviour this
+     * replaced did the opposite; see `docs/superpower/grammar-templates-not-bindings-plan.md`).
+     */
+    saveGrammarAsTemplate(block: Record<string, unknown>): void {
+        const node = this.definitionNode();
+        if (!node || !this.canAuthor()) return;
+        const existing = [...this.validRefs()]
+            .filter((r) => r.startsWith(GRAMMAR_REF_PREFIX))
+            .map((r) => r.slice(GRAMMAR_REF_PREFIX.length));
+        this.dialog
+            .open(GrammarTemplateDialog, {
+                width: '32rem',
+                data: {
+                    source: node.name || node.id,
+                    existingNames: existing,
+                    suggested: `${String(block['frontend'] ?? 'delimited')}_grammar`.replace(/[^a-z0-9_]+/g, '_'),
+                } satisfies GrammarTemplateData,
+            })
+            .afterClosed()
+            .subscribe((res?: GrammarTemplateResultData) => {
+                if (!res) return;
+                this.components.create('grammar', { id: res.id, ...block }).subscribe({
+                    next: (c) => {
+                        this.validRefs.update((rs) => new Set([...rs, c.ref ?? `${GRAMMAR_REF_PREFIX}${res.id}`]));
+                        this.toast.success(`Saved Grammar template '${res.id}'`);
+                    },
+                    error: (err) => this.onWriteError(err, 'Could not save the Grammar template'),
+                });
+            });
     }
 
     /** Drawer Discard: recreate the pane from the model — the epoch is what the `@for` tracks. */

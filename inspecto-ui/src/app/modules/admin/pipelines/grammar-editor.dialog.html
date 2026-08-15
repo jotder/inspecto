@@ -1,6 +1,6 @@
 <h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">
     <span class="min-w-0 truncate"
-        >{{ step() === 'name' ? 'Save as reusable Grammar' : 'Edit Grammar · ' + data.node.id }}</span
+        >{{ step() === 'name' ? 'Save as Grammar template' : 'Edit Grammar · ' + data.node.id }}</span
     >
     <span class="flex-1"></span>
     @if (step() === 'config') {
@@ -73,11 +73,11 @@
         </span>
     </div>
     } @else {
-    <!-- Extract step: the id pipelines will reference via `use: grammar/<id>`. -->
+    <!-- Name step: the template's id. A template is a COPY source; this node keeps its own block. -->
     <section aria-label="Name this Grammar" class="space-y-1" [formGroup]="nameForm">
         <div class="text-secondary text-sm">
-            Give this Grammar a unique name to save it as a reusable component. The Step will reference it instead of
-            holding its own copy.
+            Give this Grammar a unique name to store it as a reusable template. This Step keeps its own copy —
+            editing the template later will not change it.
         </div>
         <mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>Name</mat-label>
@@ -104,7 +104,7 @@
     <button type="button" mat-button (click)="requestClose()">Cancel</button>
     @if (step() === 'config' && !boundGrammarId()) {
     <button type="button" mat-stroked-button [disabled]="pluginBlocked() || saving()" (click)="extract()">
-        Save as reusable Grammar…
+        Save as template…
     </button>
     }
     <button type="button" mat-flat-button color="primary" (click)="save()" [disabled]="pluginBlocked() || saving()">

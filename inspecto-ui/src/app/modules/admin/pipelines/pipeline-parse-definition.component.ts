@@ -10,8 +10,10 @@ import {
     output,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthoredNode } from 'app/inspecto/api';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
 
@@ -34,7 +36,14 @@ import { GrammarEditorComponent } from 'app/inspecto/grammar';
     selector: 'app-pipeline-parse-definition',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, GrammarEditorComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatFormFieldModule,
+        MatInputModule,
+        MatTooltipModule,
+        GrammarEditorComponent,
+    ],
     template: `
         <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-1">
             <mat-form-field class="w-full" subscriptSizing="dynamic">
@@ -46,7 +55,18 @@ import { GrammarEditorComponent } from 'app/inspecto/grammar';
                 <input matInput formControlName="description" />
             </mat-form-field>
 
-            <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">Grammar</div>
+            <div class="mb-1 mt-2 flex items-center gap-2">
+                <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
+                <button
+                    class="ml-auto"
+                    mat-stroked-button
+                    type="button"
+                    (click)="requestSaveAsTemplate()"
+                    matTooltip="Store this Grammar as a reusable starting point. It is a copy — this node is unaffected by later edits to it."
+                >
+                    Save as template&hellip;
+                </button>
+            </div>
             <inspecto-grammar-editor
                 [initial]="parsingBlock()"
                 type="delimited"
@@ -66,6 +86,13 @@ export class PipelineParseDefinitionComponent {
     readonly applied = output<AuthoredNode>();
     /** Whether the pane holds edits since creation / the last successful submit. */
     readonly dirtyChange = output<boolean>();
+    /**
+     * The operator asked to store this Grammar as a reusable template. The pane emits the validated
+     * block and nothing else: a `grammar` registry component is a THIRD entity, so writing it is the
+     * host's job, not the pane's (P2 pure-pane rule — only a stage's own companion artifact is a pane
+     * write). The node is deliberately untouched — a template is a copy, never a binding.
+     */
+    readonly saveAsTemplate = output<Record<string, unknown>>();
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
 
@@ -110,6 +137,16 @@ export class PipelineParseDefinitionComponent {
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
+    }
+
+    /**
+     * Validate and hand the block to the host to store as a template. Does NOT mark the pane pristine:
+     * saving a template neither consumes the operator's unapplied edits nor persists them to the node,
+     * so a dirty pane must stay dirty.
+     */
+    requestSaveAsTemplate(): void {
+        if (!this.editor?.validate()) return;
+        this.saveAsTemplate.emit({ ...this.editor.value(), frontend: 'delimited' });
     }
 
     /**
