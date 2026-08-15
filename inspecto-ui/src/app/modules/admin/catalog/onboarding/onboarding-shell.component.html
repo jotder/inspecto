@@ -136,7 +136,12 @@
                         />
                     }
                     @case ('parsing') {
-                        <app-onboarding-parsing-pane />
+                        <app-onboarding-parsing-pane
+                            [config]="state.config()"
+                            [saving]="savingPane()"
+                            (applied)="saveParsing($event)"
+                            (dirtyChange)="paneDirty.set($event)"
+                        />
                     }
                     @case ('schema') {
                         <app-onboarding-schema-mapping-pane />

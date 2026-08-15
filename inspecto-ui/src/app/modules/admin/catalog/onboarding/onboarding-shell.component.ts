@@ -132,16 +132,24 @@ export class OnboardingShellComponent {
         return this.paneDirty() || this.state.isDirty();
     }
 
-    /** Persist the Collection stage. The pane emits the block; the host owns the write (D2). */
-    saveCollector(collector: Record<string, unknown>): void {
+    /** Persist a stage-owned block. The pane emits it; the host owns the write (D2). */
+    private saveStage(patch: Record<string, unknown>, toast: string): void {
         this.savingPane.set(true);
-        this.state.saveBlock({ collector }).subscribe({
+        this.state.saveBlock(patch).subscribe({
             next: () => {
                 this.savingPane.set(false);
-                this.toastr.success('Collection saved');
+                this.toastr.success(toast);
             },
             error: () => this.savingPane.set(false),
         });
+    }
+
+    saveCollector(collector: Record<string, unknown>): void {
+        this.saveStage({ collector }, 'Collection saved');
+    }
+
+    saveParsing(parsing: Record<string, unknown>): void {
+        this.saveStage({ parsing }, 'Parsing saved');
     }
 
     /** Rail click: guarded by the active pane's unsaved changes; the URL is the source of truth. */

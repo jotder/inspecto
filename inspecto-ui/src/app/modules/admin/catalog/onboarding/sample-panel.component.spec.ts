@@ -1,28 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
-import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 
 function create() {
     TestBed.configureTestingModule({
         imports: [OnboardingSamplePanelComponent],
-        providers: [
-            provideNoopAnimations(),
-            DefinitionStateService,
-            OnboardingStateService,
-            { provide: ConfigService, useValue: { read: () => of({ config: {} }) } },
-            { provide: ToastrService, useValue: TOASTR },
-        ],
+        providers: [provideNoopAnimations(), DefinitionStateService, { provide: ToastrService, useValue: TOASTR }],
     });
-    const state = TestBed.inject(OnboardingStateService);
+    const state = TestBed.inject(DefinitionStateService);
     const fixture = TestBed.createComponent(OnboardingSamplePanelComponent);
     fixture.detectChanges();
     return { fixture, state };

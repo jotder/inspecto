@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
-import { OnboardingStateService } from './onboarding-state.service';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 
 /** Session-held sample cap — a preview thread, not a data upload. */
 const MAX_SAMPLE_BYTES = 256 * 1024;
@@ -16,7 +16,8 @@ const RAW_PREVIEW_LINES = 40;
  * stages — raw here, parsed once the Parsing stage tests it, cast/mapped in later phases. It is
  * mounted **at the top of the Parsing stage only** (the stage that consumes it: choose the file,
  * see it, then pick a type and options below) — not in the shell, where it would be dead weight on
- * Collection/Publish. The state it reads is session-held in {@link OnboardingStateService}, so the
+ * Collection/Publish. The state it reads is session-held in the shared {@link DefinitionStateService}
+ * (host-provided — the one sample thread every definition surface shares, D5), so the
  * downstream stages still see the thread without rendering this panel. The header chips summarize
  * the thread (raw → parsed → cast) and the raw preview collapses when the builder is done reading
  * it. The sample is re-capturable (upload or paste) and never becomes part of the config. Capture
@@ -127,7 +128,7 @@ const RAW_PREVIEW_LINES = 40;
     `,
 })
 export class OnboardingSamplePanelComponent {
-    protected readonly state = inject(OnboardingStateService);
+    protected readonly state = inject(DefinitionStateService);
     private toastr = inject(ToastrService);
 
     readonly pasting = signal(false);

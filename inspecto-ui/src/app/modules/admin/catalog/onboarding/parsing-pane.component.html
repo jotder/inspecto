@@ -12,9 +12,9 @@
 
         <inspecto-grammar-editor
             sampleMode="host"
-            [initial]="parsingBlock"
+            [initial]="parsingBlock()"
             [sample]="sampleText()"
-            [configuredIngester]="configuredIngester"
+            [configuredIngester]="configuredIngester()"
             [previewFn]="previewFn"
             (pluginChange)="plugin.set($event)"
             (previewed)="onPreviewed($event)"
@@ -46,10 +46,10 @@
                 mat-flat-button
                 color="primary"
                 type="button"
-                [disabled]="saving() || (!!plugin() && !pluginIngestable()) || !lens.canAuthorWorkbench()"
+                [disabled]="busy() || (!!plugin() && !pluginIngestable()) || !lens.canAuthorWorkbench()"
                 (click)="save()"
             >
-                @if (saving()) {
+                @if (busy()) {
                     <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />
                 }
                 Save parsing

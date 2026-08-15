@@ -1,4 +1,16 @@
-import { ChangeDetectionStrategy, Component, OnDestroy, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    HostListener,
+    OnInit,
+    ViewChild,
+    computed,
+    effect,
+    inject,
+    input,
+    output,
+    signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
@@ -12,13 +24,13 @@ import {
     SpacesService,
     apiErrorMessage,
 } from 'app/inspecto/api';
-import { Observable, catchError, forkJoin, map, of, switchMap, tap, throwError } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, tap, throwError } from 'rxjs';
 import { GrammarEditorComponent, PARSING_FRONTENDS } from 'app/inspecto/grammar';
 import { mergeBlock } from 'app/inspecto/component-model';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingSamplePanelComponent } from './sample-panel.component';
 import { OnboardingSegmentsEditorComponent } from './segments-editor.component';
 import { SegmentDraft, schemaDraftFor, schemaNameFromPath, segmentDraftFrom } from './segment-drafts';
-import { OnboardingStateService } from './onboarding-state.service';
 
 /**
  * Parsing stage — a thin HOST over the shared `<inspecto-grammar-editor>` (2026-08-04). The format
@@ -28,14 +40,22 @@ import { OnboardingStateService } from './onboarding-state.service';
  *
  * <ul>
  *   <li>the cross-stage sample strip and the `parsePreview`/`parseError` state the Sample panel and
- *       the Schema stage read — so a BUILT-IN Test parse must keep feeding them ({@link previewFn});</li>
- *   <li>the stage-nav dirty registry and the workbench lens gate;</li>
- *   <li>the two WRITE paths: a built-in patches the `parsing:` block; an ingestable plugin writes one
- *       schema `.toon` per segment FIRST and only then references them.</li>
+ *       the Schema stage read — the shared {@link DefinitionStateService} thread, so a BUILT-IN Test
+ *       parse must keep feeding it ({@link previewFn});</li>
+ *   <li>the workbench lens gate;</li>
+ *   <li>the plugin write path's FIRST hop: an ingestable plugin writes one schema `.toon` per segment
+ *       before anything may reference them.</li>
  * </ul>
  *
+ * <p>Pure (definition-surface unification D2): it reads the draft from `config` and emits the
+ * `parsing:` block to persist on `applied` — the HOST owns the pipeline write. The one deliberate
+ * asymmetry is the plugin path's per-segment schema toons: those are companion artifacts of THIS
+ * stage (like Enrichment's companion config), so the pane still writes them itself, and only then
+ * emits the block that references them — the pipeline must never name a schema file that does not
+ * exist yet.
+ *
  * <p>The segments editor stays here, projected into the shared editor as `[grammarExtras]`: it is
- * inseparable from that second write path, and the shared editor deliberately has no write path.
+ * inseparable from that write path, and the shared editor deliberately has no write path.
  */
 @Component({
     selector: 'app-onboarding-parsing-pane',
@@ -50,31 +70,51 @@ import { OnboardingStateService } from './onboarding-state.service';
     ],
     templateUrl: './parsing-pane.component.html',
 })
-export class OnboardingParsingPaneComponent implements OnDestroy {
-    protected readonly state = inject(OnboardingStateService);
+export class OnboardingParsingPaneComponent implements OnInit {
     protected readonly lens = inject(LensService);
+    private readonly definition = inject(DefinitionStateService);
     private configApi = inject(ConfigService);
     private parsersApi = inject(ParsersService);
     private toastr = inject(ToastrService);
     private spaces = inject(SpacesService);
 
+    /** The server-held pipeline draft — the block this stage edits plus the context a preview merges over. */
+    readonly config = input<Record<string, unknown> | null>(null);
+    /** Host-owned: a save of the emitted block is in flight. */
+    readonly saving = input(false);
+
+    /** The `parsing:` block to persist. The host writes it. */
+    readonly applied = output<Record<string, unknown>>();
+    /** Whether the pane holds edits against the `config` input it was last seeded with. */
+    readonly dirtyChange = output<boolean>();
+
     @ViewChild(GrammarEditorComponent) grammar?: GrammarEditorComponent;
     @ViewChild(OnboardingSegmentsEditorComponent) segmentsEditor?: OnboardingSegmentsEditorComponent;
 
-    readonly parsingBlock = this.state.block('parsing') ?? {};
+    private blockOf(name: string): Record<string, unknown> {
+        const v = (this.config() ?? {})[name];
+        return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    }
+
+    readonly parsingBlock = computed(() => this.blockOf('parsing'));
 
     /**
      * FQCN this config parses through, from either key the engine accepts (`parsing.plugin.ingester`
      * or legacy `processing.ingester`) — the handle the editor re-selects the served parser by.
      */
-    readonly configuredIngester: string = String(
-        (this.parsingBlock['plugin'] as Record<string, unknown> | undefined)?.['ingester'] ??
-            this.state.block('processing')?.['ingester'] ??
-            '',
-    ).trim();
+    readonly configuredIngester = computed(() =>
+        String(
+            (this.parsingBlock()['plugin'] as Record<string, unknown> | undefined)?.['ingester'] ??
+                this.blockOf('processing')['ingester'] ??
+                '',
+        ).trim(),
+    );
 
-    readonly sampleText = computed(() => this.state.sample()?.text ?? '');
-    readonly saving = signal(false);
+    readonly sampleText = computed(() => this.definition.sample()?.text ?? '');
+    /** The pane's OWN in-flight work — the per-segment schema writes that precede the emit. */
+    readonly writing = signal(false);
+    /** Anything in flight, either side of the seam — what the Save button disables on. */
+    readonly busy = computed(() => this.writing() || this.saving());
 
     /**
      * The editor's selected plugin, mirrored from `(pluginChange)` rather than read off the
@@ -94,16 +134,47 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         this.pluginTree.set(p.kind === 'tree' ? p.nodes : null);
     }
 
-    private readonly dirtyCheck = (): boolean =>
-        (this.grammar?.isDirty() ?? false) || (this.segmentsEditor?.isDirty() ?? false);
+    private lastDirty = false;
 
     constructor() {
-        this.state.registerDirtyCheck(this.dirtyCheck);
+        /**
+         * Re-seeding is how this pane returns to pristine — there is no host→pane method call.
+         * A successful save updates the host's config, which hands back a NEW `config` object and
+         * re-runs this; a FAILED save leaves the object identical, so the pane correctly stays dirty
+         * and the unsaved-changes guard still fires. (The editor's `initial` setter re-seeds off the
+         * computed bindings; this only has to reset the dirty baseline.)
+         */
+        effect(() => {
+            this.config();
+            this.grammar?.markPristine();
+            this.segmentsEditor?.markPristine();
+            this.emitDirty();
+        });
+    }
+
+    ngOnInit(): void {
+        // Inputs are bound by now (never in the constructor) — seed the saved segment keys and read
+        // their columns back.
+        this.initialSegments.set(Object.keys(this.savedSegmentPaths()).map((key) => ({ key, columns: [] })));
         this.loadSavedSegments();
     }
 
-    ngOnDestroy(): void {
-        this.state.unregisterDirtyCheck(this.dirtyCheck);
+    /**
+     * Dirty is derived on interaction, not streamed: the editors expose `isDirty()` as a method with
+     * no output, so re-derive after any input/click inside the pane and report only the transitions —
+     * the same contract as the Collection pane (P2-2).
+     */
+    @HostListener('input')
+    @HostListener('click')
+    onInteraction(): void {
+        this.emitDirty();
+    }
+
+    private emitDirty(): void {
+        const dirty = (this.grammar?.isDirty() ?? false) || (this.segmentsEditor?.isDirty() ?? false);
+        if (dirty === this.lastDirty) return;
+        this.lastDirty = dirty;
+        this.dirtyChange.emit(dirty);
     }
 
     /**
@@ -116,14 +187,14 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     readonly previewFn = (type: string, grammar: Record<string, unknown>, text: string): Observable<ParserPreview> => {
         if (!PARSING_FRONTENDS.some((f) => f.id === type)) return this.parsersApi.preview(type, grammar, text);
 
-        const draft = mergeBlock(this.state.config() ?? {}, { parsing: this.grammar?.value() ?? {} });
-        this.state.parseError.set(null);
+        const draft = mergeBlock(this.config() ?? {}, { parsing: this.grammar?.value() ?? {} });
+        this.definition.parseError.set(null);
         return this.configApi.previewParsing(draft, text).pipe(
             tap((p) => {
-                this.state.parsePreview.set(p);
+                this.definition.parsePreview.set(p);
                 // Re-parsing invalidates any schema cast-check computed against the old rows.
-                this.state.schemaPreview.set(null);
-                this.state.schemaError.set(null);
+                this.definition.schemaPreview.set(null);
+                this.definition.schemaError.set(null);
             }),
             map(
                 (p): ParserPreview => ({
@@ -135,8 +206,8 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
                 }),
             ),
             catchError((e) => {
-                this.state.parsePreview.set(null);
-                this.state.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
+                this.definition.parsePreview.set(null);
+                this.definition.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
                 return throwError(() => e);
             }),
         );
@@ -144,14 +215,16 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
 
     // ── plugin (segments) save ───────────────────────────────────────────────────
 
-    private readonly pipelineName = String((this.state.config() ?? {})['name'] ?? '');
+    private pipelineName(): string {
+        return String((this.config() ?? {})['name'] ?? '');
+    }
 
     private base(): string {
         return this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
     }
     /** One schema toon per segment, named by convention — the Schema stage's `conventionPath` idiom. */
     private schemaNameFor(segmentKey: string): string {
-        return `${this.pipelineName}_${segmentKey}`.replace(/[^A-Za-z0-9_]+/g, '_');
+        return `${this.pipelineName()}_${segmentKey}`.replace(/[^A-Za-z0-9_]+/g, '_');
     }
     private schemaPathFor(segmentKey: string): string {
         return `${this.base()}/config/${this.schemaNameFor(segmentKey)}.toon`;
@@ -159,7 +232,7 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
 
     /** `segment key → schema-toon path` as stored in `parsing.plugin.segments`. */
     private savedSegmentPaths(): Record<string, unknown> {
-        const plugin = this.parsingBlock['plugin'] as Record<string, unknown> | undefined;
+        const plugin = this.parsingBlock()['plugin'] as Record<string, unknown> | undefined;
         const segs = plugin?.['segments'];
         return segs && typeof segs === 'object' ? (segs as Record<string, unknown>) : {};
     }
@@ -171,9 +244,7 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
      * so each one is read back ({@link loadSavedSegments}). Starts at the keys-only shape so the
      * editor renders immediately and degrades to the previous behavior if a read fails.
      */
-    readonly initialSegments = signal<SegmentDraft[]>(
-        Object.keys(this.savedSegmentPaths()).map((key) => ({ key, columns: [] })),
-    );
+    readonly initialSegments = signal<SegmentDraft[]>([]);
     readonly segmentsLoading = signal(false);
 
     /**
@@ -213,10 +284,10 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
     }
 
     /**
-     * Persist an ingestable plugin parser: write each segment's schema toon, then point
-     * `parsing.plugin` at them. Two hops, same as the Schema stage (write the schema, then
-     * reference it) — the pipeline must never name a schema file that does not exist yet, which is
-     * why the block is patched only after every write resolves.
+     * Persist an ingestable plugin parser: write each segment's schema toon, then emit the
+     * `parsing.plugin` block that points at them. Two hops, same as the Schema stage (write the
+     * schema, then reference it) — the pipeline must never name a schema file that does not exist
+     * yet, which is why the block is emitted only after every write resolves.
      */
     private savePlugin(plugin: ParserDef): void {
         const segments = this.segmentsEditor;
@@ -231,39 +302,29 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
         // ingest are driven by the same authored values and cannot drift.
         const ingesterConfig = (grammarEditor.grammar()[plugin.id] ?? {}) as Record<string, unknown>;
 
-        this.saving.set(true);
+        this.writing.set(true);
         const writes = drafts.map((s) =>
             this.configApi.write('schema', schemaDraftFor(s, this.schemaNameFor(s.key)), { overwrite: true }),
         );
-        forkJoin(writes)
-            .pipe(
-                switchMap(() => {
-                    const segmentPaths: Record<string, string> = {};
-                    for (const s of drafts) segmentPaths[s.key] = this.schemaPathFor(s.key);
-                    return this.state.saveBlock({
-                        parsing: {
-                            frontend: 'plugin',
-                            plugin: {
-                                ingester: plugin.ingesterClass,
-                                segments: segmentPaths,
-                                ingester_config: ingesterConfig,
-                            },
-                        },
-                    });
-                }),
-            )
-            .subscribe({
-                next: () => {
-                    this.saving.set(false);
-                    grammarEditor.markPristine();
-                    segments.markPristine();
-                    this.toastr.success(`Parsing saved — ${drafts.length} segment(s)`);
-                },
-                error: (e) => {
-                    this.saving.set(false);
-                    this.toastr.error(apiErrorMessage(e, 'Could not save the segments.'));
-                },
-            });
+        forkJoin(writes).subscribe({
+            next: () => {
+                this.writing.set(false);
+                const segmentPaths: Record<string, string> = {};
+                for (const s of drafts) segmentPaths[s.key] = this.schemaPathFor(s.key);
+                this.applied.emit({
+                    frontend: 'plugin',
+                    plugin: {
+                        ingester: plugin.ingesterClass,
+                        segments: segmentPaths,
+                        ingester_config: ingesterConfig,
+                    },
+                });
+            },
+            error: (e) => {
+                this.writing.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Could not save the segments.'));
+            },
+        });
     }
 
     save(): void {
@@ -276,14 +337,6 @@ export class OnboardingParsingPaneComponent implements OnDestroy {
             return; // a preview-only plugin has nothing honest to save
         }
         if (!grammarEditor.validate()) return;
-        this.saving.set(true);
-        this.state.saveBlock({ parsing: grammarEditor.value() }).subscribe({
-            next: () => {
-                this.saving.set(false);
-                grammarEditor.markPristine();
-                this.toastr.success('Parsing saved');
-            },
-            error: () => this.saving.set(false),
-        });
+        this.applied.emit(grammarEditor.value());
     }
 }
