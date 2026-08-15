@@ -2,6 +2,11 @@ package com.gamma.service;
 
 import com.gamma.acquire.DbAcquisitionLedger;
 import com.gamma.acquire.LedgerEntry;
+import com.gamma.consignment.ConsignmentOutput;
+import com.gamma.consignment.DbConsignmentOutputStore;
+import com.gamma.consignment.DbFileStageStore;
+import com.gamma.consignment.FileStage;
+import com.gamma.consignment.FileStageRecord;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.StatusStore;
@@ -12,8 +17,11 @@ import com.gamma.ops.DbObjectStore;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectType;
 import com.gamma.ops.OperationalObject;
+import com.gamma.ops.AnnotationKinds;
 import com.gamma.ops.link.DbLinkStore;
 import com.gamma.ops.link.ObjectLink;
+import com.gamma.ops.tag.DbTagAssignmentStore;
+import com.gamma.ops.tag.TagAssignment;
 import com.gamma.ops.note.DbNoteStore;
 import com.gamma.ops.note.ObjectNote;
 import com.gamma.ops.note.NoteKind;
@@ -35,7 +43,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * DAT-6 — proves the seven JDBC-backed stores actually run on <b>real PostgreSQL</b>, not just the
+ * DAT-6 — proves the ten JDBC-backed stores actually run on <b>real PostgreSQL</b>, not just the
  * bundled DuckDB. A single embedded Postgres (io.zonky, test-scope only — never shipped) is booted
  * once and every store opens against it, runs {@code initSchema}, and does a write→read round-trip. The
  * stores use distinct table names, so they coexist in one database without collision.
@@ -226,6 +234,75 @@ class PostgresStateStoreTest {
             assertEquals(1, db.files(cfg).size());
             assertEquals("b1", db.lineage(cfg, "b1").get(0).get("consignment_id"), "lineage filter by batch on Postgres");
             assertTrue(db.quarantine(cfg).isEmpty());
+        }
+    }
+
+    /**
+     * ⚠ The three tests below close a coverage gap the postgres-multi-user plan recorded as "8/8, only
+     * `DbTagAssignmentStore` missing". That was mis-sized: the family is <b>ten</b> stores and <b>three</b>
+     * were uncovered here.
+     *
+     * <p>⚠ Two of the three ({@link DbConsignmentOutputStore#record}, {@link DbFileStageStore#record}) are
+     * documented <b>best-effort: a write failure is logged, never thrown</b>, because they index data that
+     * has already committed. That makes a Postgres dialect break in them <b>completely silent</b> — the write
+     * would vanish into a WARN and the batch would report success. So these must assert the READ BACK, never
+     * merely that {@code record} returned.
+     */
+    @Test
+    void tagAssignmentStore_addIsIdempotentAndReadsBack() throws Exception {
+        try (DbTagAssignmentStore store = DbTagAssignmentStore.open(url, null, null)) {
+            TagAssignment first = store.add(
+                    new TagAssignment("urgent", AnnotationKinds.OBJECT, "obj-1", "alice", 1_000L));
+            assertEquals("alice", first.actor(), "the stored edge round-tripped from Postgres");
+
+            // Re-tagging returns the ALREADY-STORED edge — the checked-then-inserted path, not a rewrite.
+            TagAssignment again = store.add(
+                    new TagAssignment("urgent", AnnotationKinds.OBJECT, "obj-1", "bob", 9_000L));
+            assertEquals("alice", again.actor(), "re-tagging must not rewrite who applied it");
+            assertEquals(1_000L, again.createdAt(), "nor when");
+
+            assertEquals(List.of("urgent"), store.tagsOf(AnnotationKinds.OBJECT, "obj-1"),
+                    "SELECT DISTINCT … ORDER BY tag works on Postgres");
+            assertEquals(1, store.forTag("urgent").size(), "forTag read back through Postgres");
+
+            assertTrue(store.remove("urgent", AnnotationKinds.OBJECT, "obj-1"), "delete reports a hit");
+            assertTrue(store.tagsOf(AnnotationKinds.OBJECT, "obj-1").isEmpty(), "and the edge is gone");
+        }
+    }
+
+    @Test
+    void consignmentOutputStore_recordAndQueryRoundTrip() throws Exception {
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open(url)) {
+            store.record(List.of(new ConsignmentOutput("cons-1", "run-1", "cdr", "day=2026-08-15",
+                    "2026-08-15", "/data/cdr/day=2026-08-15/part-0.parquet", 42L, 4096L,
+                    "2026-08-15T00:00:00Z", 1, ConsignmentOutput.State.LIVE)));
+
+            List<ConsignmentOutput> got = store.outputs("cons-1");
+            assertEquals(1, got.size(),
+                    "the row read back — record() swallows SQLException, so only this proves it wrote");
+            assertEquals(42L, got.get(0).rows(), "row_count round-tripped");
+            assertEquals(4096L, got.get(0).bytes(), "bytes round-tripped");
+            assertEquals(ConsignmentOutput.State.LIVE, got.get(0).state());
+            // initSchema runs ALTER TABLE … ADD COLUMN IF NOT EXISTS five times; Postgres must accept it.
+            assertNull(got.get(0).schemaFingerprint(), "an unset additive column reads back NULL, not a throw");
+        }
+    }
+
+    @Test
+    void fileStageStore_recordAndStagesRoundTrip() throws Exception {
+        try (DbFileStageStore store = DbFileStageStore.open(url)) {
+            store.record(List.of(
+                    new FileStageRecord("sftp-src", "2026/08/a.csv", "b1", FileStage.REGISTERED,
+                            "2026-08-15T00:00:00Z"),
+                    new FileStageRecord("sftp-src", "2026/08/a.csv", "b1", FileStage.MANIFESTED,
+                            "2026-08-15T01:00:00Z")));
+
+            List<FileStageRecord> stages = store.stages("sftp-src", "2026/08/a.csv");
+            assertEquals(2, stages.size(),
+                    "both rows read back — record() swallows SQLException, so only this proves it wrote");
+            assertEquals(FileStage.REGISTERED, stages.get(0).stage(), "ORDER BY recorded_at, oldest first");
+            assertEquals(FileStage.MANIFESTED, stages.get(1).stage());
+            assertTrue(store.stages("sftp-src", "nope.csv").isEmpty(), "an unknown file has no stages");
         }
     }
 }
