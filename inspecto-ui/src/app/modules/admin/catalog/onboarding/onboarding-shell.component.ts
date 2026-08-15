@@ -78,6 +78,15 @@ export class OnboardingShellComponent {
 
     readonly exporting = signal(false);
 
+    /**
+     * Unsaved-changes state for panes that have gone pure (D2) and report it as an output. Panes
+     * still on the old contract register a probe with {@link OnboardingStateService} instead, so
+     * {@link dirty} has to consult both while the migration is in flight.
+     */
+    readonly paneDirty = signal(false);
+    /** A pane-initiated save is in flight — the pure panes are told, they no longer own it. */
+    readonly savingPane = signal(false);
+
     /** The `:stage` URL param (null = land on the first incomplete stage once loaded). */
     private readonly stageParam = signal<string | null>(null);
     /** Landing happens ONCE per opened draft — a stage save must never yank the user elsewhere. */
@@ -97,7 +106,12 @@ export class OnboardingShellComponent {
                 this.landed = false;
                 this.state.load(name);
             }
-            if (stage && this.isStage(stage)) this.state.activeStageId.set(stage);
+            if (stage && this.isStage(stage)) {
+                // A pure pane is destroyed on a stage switch and never emits a closing `false`,
+                // so a stale `true` here would make the NEXT stage refuse to leave.
+                if (stage !== this.state.activeStageId()) this.paneDirty.set(false);
+                this.state.activeStageId.set(stage);
+            }
         });
         // No :stage in the URL → land on the first incomplete stage ONCE the draft has loaded
         // (once only — later config saves must not re-run the landing and move the user).
@@ -113,10 +127,27 @@ export class OnboardingShellComponent {
         return this.state.stages().some((s) => s.id === id);
     }
 
+    /** Unsaved changes in the active pane, whichever contract it reports on. */
+    private dirty(): boolean {
+        return this.paneDirty() || this.state.isDirty();
+    }
+
+    /** Persist the Collection stage. The pane emits the block; the host owns the write (D2). */
+    saveCollector(collector: Record<string, unknown>): void {
+        this.savingPane.set(true);
+        this.state.saveBlock({ collector }).subscribe({
+            next: () => {
+                this.savingPane.set(false);
+                this.toastr.success('Collection saved');
+            },
+            error: () => this.savingPane.set(false),
+        });
+    }
+
     /** Rail click: guarded by the active pane's unsaved changes; the URL is the source of truth. */
     async select(stage: OnboardingStage): Promise<void> {
         if (stage.id === this.state.activeStageId()) return;
-        if (this.state.isDirty()) {
+        if (this.dirty()) {
             const ok = await this.confirm.confirm(
                 'This stage has unsaved changes — switch anyway and discard them?',
                 'Unsaved changes',
@@ -128,7 +159,7 @@ export class OnboardingShellComponent {
 
     /** Route CanDeactivate — same guard when leaving the shell entirely. */
     canLeave(): Promise<boolean> | boolean {
-        if (!this.state.isDirty()) return true;
+        if (!this.dirty()) return true;
         return this.confirm.confirm('Leave onboarding and discard the unsaved stage changes?', 'Unsaved changes');
     }
 
@@ -155,7 +186,7 @@ export class OnboardingShellComponent {
     exportConfig(): void {
         const config = this.state.config();
         if (!config || this.exporting()) return;
-        if (this.state.isDirty()) {
+        if (this.dirty()) {
             this.toastr.warning('Save this stage before exporting — an export carries the saved configuration.');
             return;
         }

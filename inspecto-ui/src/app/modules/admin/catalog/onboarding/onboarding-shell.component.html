@@ -127,7 +127,13 @@
             <main class="flex min-w-0 flex-1 flex-col overflow-y-auto p-6 sm:p-8">
                 @switch (activeStage().id) {
                     @case ('collection') {
-                        <app-onboarding-collection-pane />
+                        <app-onboarding-collection-pane
+                            [kind]="state.kind()"
+                            [collector]="state.block('collector')"
+                            [saving]="savingPane()"
+                            (applied)="saveCollector($event)"
+                            (dirtyChange)="paneDirty.set($event)"
+                        />
                     }
                     @case ('parsing') {
                         <app-onboarding-parsing-pane />
