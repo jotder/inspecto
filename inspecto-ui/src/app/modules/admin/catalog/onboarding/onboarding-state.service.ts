@@ -126,9 +126,12 @@ export const REFERENCE_STAGES: OnboardingStage[] = [
 /**
  * Per-onboarding-session state (provided by the shell, one instance per opened draft): the
  * server-held config is THE draft — every stage save is a `POST /config/write overwrite:true`
- * and readiness is recomputed from the blocks, never stored. Session-only extras (the captured
- * sample, the last parse preview, the active pane's dirty check) live here so the stage panes
- * and the sample panel share them without inputs.
+ * and readiness is recomputed from the blocks, never stored.
+ *
+ * <p>It holds no per-pane state: since the panes went pure (D2) they take the draft as an input
+ * and report unsaved changes as an output, so the shell — not this service — is what a pane talks
+ * to. The sample thread lives in the shared {@link DefinitionStateService}, re-exported here only
+ * because stage readiness reads it.
  */
 @Injectable()
 export class OnboardingStateService {
@@ -145,9 +148,9 @@ export class OnboardingStateService {
     readonly activeStageId = signal<OnboardingStageId>('collection');
 
     // ── sample-as-thread ──
-    // Owned by the shared DefinitionStateService (D5) and re-exported here, so the wizard's stage
-    // readiness keeps reading it while the panes migrate onto the shared service pane-by-pane.
-    // These are the SAME signal instances, not copies — there is one thread, not two.
+    // Owned by the shared DefinitionStateService (D5). Every pane now reads the thread from that
+    // service directly; these re-exports remain for the ONE reader that is genuinely the wizard's
+    // own — stage readiness (`stageStatus`). They are the SAME signal instances, not copies.
     readonly sample = this.definition.sample;
     readonly parsePreview = this.definition.parsePreview;
     readonly parseError = this.definition.parseError;
@@ -165,9 +168,6 @@ export class OnboardingStateService {
      *  findings on every stage, not just the active one. A stage with an ERROR-severity finding reads
      *  as `blocked` in {@link stageStatus}. */
     readonly stageFindings = signal<Partial<Record<OnboardingStageId, Finding[]>>>({});
-
-    /** The active pane's unsaved-changes probe (registered on init, cleared on destroy). */
-    private dirtyCheck: (() => boolean) | null = null;
 
     readonly kind = computed<'stream' | 'reference'>(() =>
         String((this.config() ?? {})['produces'] ?? '') === 'reference' ? 'reference' : 'stream',
@@ -380,17 +380,5 @@ export class OnboardingStateService {
 
     clearSample(): void {
         this.definition.clearSample();
-    }
-
-    registerDirtyCheck(fn: () => boolean): void {
-        this.dirtyCheck = fn;
-    }
-
-    unregisterDirtyCheck(fn: () => boolean): void {
-        if (this.dirtyCheck === fn) this.dirtyCheck = null;
-    }
-
-    isDirty(): boolean {
-        return this.dirtyCheck?.() ?? false;
     }
 }

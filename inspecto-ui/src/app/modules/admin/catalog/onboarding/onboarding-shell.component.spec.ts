@@ -6,6 +6,7 @@ import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ComponentDef, ComponentsService, ConfigService, ConnectionsService } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { STREAM_BUNDLE_FORMAT, StreamBundle } from 'app/inspecto/transfer/stream-bundle';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
@@ -216,8 +217,8 @@ describe('OnboardingShellComponent', () => {
      *  the last saved state under the guise of "export what I'm looking at". Refuse instead. */
     it('refuses to export an in-flight draft rather than shipping the last saved state', () => {
         const fixture = create({ name: 'orders_feed' });
-        const state = fixture.debugElement.injector.get(OnboardingStateService);
-        state.registerDirtyCheck(() => true);
+        // The one dirty contract since P2 closed: the active pane reports it as an output.
+        fixture.componentInstance.paneDirty.set(true);
         const transfer = fixture.debugElement.injector.get(StreamTransferService);
         fixture.componentInstance.exportConfig();
 
@@ -306,6 +307,20 @@ describe('OnboardingShellComponent', () => {
             expect(TOASTR.success).toHaveBeenCalledWith('"orders_feed" is offline');
             expect(fixture.components.create).not.toHaveBeenCalled();
         });
+    });
+
+    /** The reason `paneDirty` exists: leaving with unsaved stage edits must ask first. */
+    it('leaves without asking when clean, and confirms when the active pane reports edits', async () => {
+        const fixture = create({ name: 'orders_feed' });
+        const confirm = vi.spyOn(fixture.debugElement.injector.get(InspectoConfirmService), 'confirm');
+
+        expect(await fixture.componentInstance.canLeave()).toBe(true);
+        expect(confirm).not.toHaveBeenCalled();
+
+        fixture.componentInstance.paneDirty.set(true);
+        confirm.mockResolvedValue(false);
+        expect(await fixture.componentInstance.canLeave()).toBe(false);
+        expect(confirm).toHaveBeenCalledWith(expect.stringContaining('discard'), 'Unsaved changes');
     });
 
     it('names an unreadable satellite instead of shipping a silently partial export', () => {

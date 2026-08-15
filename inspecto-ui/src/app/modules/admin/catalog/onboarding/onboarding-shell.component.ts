@@ -40,8 +40,11 @@ function describeDependents(impact: ConfigImpact): string {
  * Parse → Shape → Publish), every stage is jumpable, readiness is computed from the config
  * blocks, and the whole session is resumable because the draft IS the server state (D3).
  * Opening without a stage lands on the first incomplete one. ONE captured sample threads through
- * the stages (§4.3) — session-held in {@link OnboardingStateService}, but the capture UI lives in
- * the Parsing stage, the stage that actually consumes it.
+ * the stages (§4.3) — session-held in the shared {@link DefinitionStateService} this shell
+ * provides, but the capture UI lives in the Parsing stage, the stage that actually consumes it.
+ *
+ * <p>Since D2 every stage pane is PURE: the shell hands it the draft and owns every write, so all
+ * persistence for this surface is in this one class.
  */
 @Component({
     selector: 'app-onboarding-shell',
@@ -80,11 +83,8 @@ export class OnboardingShellComponent {
 
     readonly exporting = signal(false);
 
-    /**
-     * Unsaved-changes state for panes that have gone pure (D2) and report it as an output. Panes
-     * still on the old contract register a probe with {@link OnboardingStateService} instead, so
-     * {@link dirty} has to consult both while the migration is in flight.
-     */
+    /** Unsaved changes in the active stage pane — every pane is pure (D2) and reports it as an
+     *  output, so this signal is the whole contract. */
     readonly paneDirty = signal(false);
     /** A pane-initiated save is in flight — the pure panes are told, they no longer own it. */
     readonly savingPane = signal(false);
@@ -127,11 +127,6 @@ export class OnboardingShellComponent {
 
     private isStage(id: string): id is OnboardingStageId {
         return this.state.stages().some((s) => s.id === id);
-    }
-
-    /** Unsaved changes in the active pane, whichever contract it reports on. */
-    private dirty(): boolean {
-        return this.paneDirty() || this.state.isDirty();
     }
 
     /** Persist a stage-owned block. The pane emits it; the host owns the write (D2). */
@@ -268,7 +263,7 @@ export class OnboardingShellComponent {
     /** Rail click: guarded by the active pane's unsaved changes; the URL is the source of truth. */
     async select(stage: OnboardingStage): Promise<void> {
         if (stage.id === this.state.activeStageId()) return;
-        if (this.dirty()) {
+        if (this.paneDirty()) {
             const ok = await this.confirm.confirm(
                 'This stage has unsaved changes — switch anyway and discard them?',
                 'Unsaved changes',
@@ -280,7 +275,7 @@ export class OnboardingShellComponent {
 
     /** Route CanDeactivate — same guard when leaving the shell entirely. */
     canLeave(): Promise<boolean> | boolean {
-        if (!this.dirty()) return true;
+        if (!this.paneDirty()) return true;
         return this.confirm.confirm('Leave onboarding and discard the unsaved stage changes?', 'Unsaved changes');
     }
 
@@ -307,7 +302,7 @@ export class OnboardingShellComponent {
     exportConfig(): void {
         const config = this.state.config();
         if (!config || this.exporting()) return;
-        if (this.dirty()) {
+        if (this.paneDirty()) {
             this.toastr.warning('Save this stage before exporting — an export carries the saved configuration.');
             return;
         }
