@@ -233,15 +233,32 @@ ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-loc
   would also have made firing depend on **directory scan order**: a space holds any number of
   `*_meta.toon` files and `MetadataGraphService:155` merges them last-non-blank-wins. Full reasoning:
   [`domain-timezone-behaviour-plan.md`](../../../archived-documents/plans-archive/domain-timezone-behaviour-plan.md).
-- ⚠ **Still on `systemDefault()` and deliberately untouched:** `AlertService:374`, `ReferenceCompactor:142`,
-  `EventRoutes:108`, `PackTestHarness:164`, `InspectoTools:385`. The backlog row claimed "two places need a
-  zone"; there are seven. Each of the other five is its own display-vs-data-cut judgement — ⛔ do not sweep
-  them in.
-- ⚠ **No `PipelineScheduler` test class exists at all**, and neither consumer exposes its zone, so the
-  guard is at the resolver (`OperationsZoneTest`, 5 tests) plus the module's existing suites. The resolver
-  test was **falsified** — stubbing `resolve()` back to `systemDefault()` failed 3 of the 5. Its fixtures
-  pin two zones that disagree on the date for a given instant, so it cannot pass by coincidence on a host
-  whose default happens to match (this box's is `Asia/Calcutta`, +05:30).
+- **Two more sites adopted it 2026-08-15**, because neither was a judgement once grounded:
+  - `EventRoutes.epochMillis` — a bare `yyyy-MM-dd[ HH:mm:ss]` bound on `/events` is an **operator's wall
+    clock**, typed into a console beside a schedule that already fires in this zone. ⚠ The resolve happens
+    **outside** the parse's `catch (RuntimeException)`: inside it, a misconfigured `-Dops.timezone` would be
+    caught and returned as a **400 blaming the query the operator just typed**.
+  - `PackTestHarness:164` — its production counterpart `JobService:250` had **already** moved, so the
+    harness was dry-running `$today` in a different zone than the real run. That is not a display choice, it
+    is a harness that can go green for the wrong date; the whole point of the harness is that a pack green
+    here is a pack the engine accepts.
+- ⚠ **Three sites remain on `systemDefault()`, and they are ONE decision, not three:** `AlertService:374`
+  (cutoff vs. the ledger's `end_time`/`start_time`), `ReferenceCompactor:142` (literal vs. the `__valid_from`
+  column), `InspectoTools:385` (parse vs. the audit CSV the platform itself wrote "local time"). Each is the
+  **read half of a write/read pair**, self-consistent today only because both halves use `systemDefault()`.
+  ⛔ **Do not convert a reader alone** — it silently offsets every window by the UTC offset (+05:30 on this
+  box), and in the compactor's case rows fall outside `keep` and are dropped. Pin the **writer's** zone
+  first, then move both halves in one commit, or record "stays `systemDefault()`, to match the writer".
+- ⚠ **No `PipelineScheduler` test class exists at all**, and neither original consumer exposes its zone, so
+  the guard is at the resolver (`OperationsZoneTest`, 5 tests) plus the module's existing suites. The
+  resolver test was **falsified** — stubbing `resolve()` back to `systemDefault()` failed 3 of the 5. Its
+  fixtures pin two zones that disagree on the date for a given instant, so it cannot pass by coincidence on
+  a host whose default happens to match (this box's is `Asia/Calcutta`, +05:30). The two 2026-08-15 adopters
+  DO expose their result, so both are pinned directly: `EventRoutesTimeBoundTest` (4 tests, incl. the
+  "unresolvable zone is not blamed on the query" case) and `PackTestHarnessTest`'s
+  `resolvesDateMacrosInTheOperationsZone`, which runs `$today` under `Pacific/Kiritimati` (+14) and `Etc/GMT+12` — 26 hours apart, so
+  their dates never coincide. ⛔ Every zone in both is **named**; a test asserting `systemDefault()` passes
+  everywhere and proves nothing.
 
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 

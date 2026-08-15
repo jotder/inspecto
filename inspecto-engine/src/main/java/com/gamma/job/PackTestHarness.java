@@ -8,10 +8,10 @@ import com.gamma.ops.ObjectType;
 import com.gamma.ops.OperationalObject;
 import com.gamma.signal.Severity;
 import com.gamma.signal.SignalEmitter;
+import com.gamma.util.OperationsZone;
 
 import java.nio.file.Path;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -161,7 +161,9 @@ public final class PackTestHarness {
         // $upstream artifacts): authored params: → deduce → default, with the real resolver.
         ParameterResolver.Resolution pr = ParameterResolver.resolve(
                 registry.parameters(typeId, cfg), Map.of(), Map.of(), cfg.params(), expressions,
-                new ExpressionContext(runId, Instant.now(), "manual", ZoneId.systemDefault(),
+                // Same zone JobService:250 resolves for a real run — a harness that dry-runs $today in a
+                // different zone than production can report a pass for the wrong date.
+                new ExpressionContext(runId, Instant.now(), "manual", OperationsZone.resolve(),
                         Optional::empty, (j, n) -> Optional.empty(), Map.of()));
         String rejection = rejection(pr);
         if (rejection != null) return outcome("REJECTED", rejection, ctx);

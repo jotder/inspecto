@@ -4,6 +4,7 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventQuery;
 import com.gamma.event.SavedView;
+import com.gamma.util.OperationsZone;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -94,18 +95,27 @@ final class EventRoutes implements RouteModule {
                 .build();
     }
 
-    /** Parse a time bound as epoch millis (all-digits) or a {@code yyyy-MM-dd[ HH:mm:ss]} string; null when blank. */
-    private static Long epochMillis(String s) {
+    /**
+     * Parse a time bound as epoch millis (all-digits) or a {@code yyyy-MM-dd[ HH:mm:ss]} string; null when blank.
+     *
+     * <p>A bare local timestamp is an <b>operator's</b> wall clock — someone typed "from 2026-08-15" into a
+     * console — so it is anchored in the {@linkplain OperationsZone operations zone}, the same zone their
+     * schedule and {@code $today} already resolve in. ⚠ Resolved OUTSIDE the try: a misconfigured
+     * {@code -Dops.timezone} throws, and inside it that would be caught as {@code RuntimeException} and
+     * reported as a 400 blaming the query the operator just typed.
+     */
+    static Long epochMillis(String s) {
         if (s == null || s.isBlank()) return null;
         String t = s.trim();
         if (t.chars().allMatch(Character::isDigit)) {
             try { return Long.parseLong(t); } catch (NumberFormatException ignore) { return null; }
         }
+        java.time.ZoneId zone = OperationsZone.resolve();
         try {
             String norm = (t.length() <= 10 ? t + " 00:00:00" : t.replace('T', ' ')).substring(0, 19);
             return java.time.LocalDateTime.parse(norm,
                             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
-                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+                    .atZone(zone).toInstant().toEpochMilli();
         } catch (RuntimeException e) {
             throw new ApiException(400, "invalid time '" + s + "' (use epoch millis or yyyy-MM-dd[ HH:mm:ss])");
         }

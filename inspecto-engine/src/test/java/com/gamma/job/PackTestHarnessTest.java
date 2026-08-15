@@ -3,12 +3,16 @@ package com.gamma.job;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationAccess;
 import com.gamma.ops.IncidentAccess;
+import com.gamma.util.OperationsZone;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -182,5 +186,34 @@ class PackTestHarnessTest {
 
         assertEquals("FAILED", run.status());
         assertTrue(run.message().contains("kaboom"), run.message());
+    }
+
+    // ── the operations zone ───────────────────────────────────────────────────
+
+    /**
+     * The harness resolves date macros in the same {@link OperationsZone} a real run does
+     * ({@code JobService:250}) — otherwise a pack could go green here against yesterday's partition and
+     * fail in production, which is exactly the class of bug the harness exists to catch.
+     *
+     * <p>⚠ Both zones are named, and the expectation is computed from the named zone rather than
+     * asserted as a literal: pinning {@code systemDefault()} would pass on every box and prove nothing.
+     * The pair is 26 hours apart, so their local dates always differ — the difference is the assertion.
+     */
+    @Test
+    void resolvesDateMacrosInTheOperationsZone() {
+        PackTestHarness harness = PackTestHarness.create().load(notifier("acme.notify"));
+        try {
+            System.setProperty(OperationsZone.PROPERTY, "Pacific/Kiritimati");
+            String east = harness.run("acme.notify", Map.of("subject", "$today")).params().get("subject").toString();
+
+            System.setProperty(OperationsZone.PROPERTY, "Etc/GMT+12");
+            String west = harness.run("acme.notify", Map.of("subject", "$today")).params().get("subject").toString();
+
+            assertEquals(LocalDate.now(ZoneId.of("Pacific/Kiritimati")).toString(), east);
+            assertEquals(LocalDate.now(ZoneId.of("Etc/GMT+12")).toString(), west);
+            assertNotEquals(east, west, "+14 and -12 are 26h apart — their dates never coincide");
+        } finally {
+            System.clearProperty(OperationsZone.PROPERTY);
+        }
     }
 }
