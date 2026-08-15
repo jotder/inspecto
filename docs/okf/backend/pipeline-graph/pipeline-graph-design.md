@@ -1260,10 +1260,24 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   refused `UNSUPPORTED_BINDING`.
 
   ⚠ This matters because the editor's component picker is keyed on a node's **category, not its type**
-  (`bindKindFor`), so it offers `transform/<id>` on *every* transform node — map, filter, join, dedup,
-  summarize, route — and `sink/<id>` on every sink. Before the fix, `lower` read `use:` for the two
+  (`bindKindFor`), so it used to offer `transform/<id>` on *every* transform node — map, filter, join,
+  dedup, summarize, route — and `sink/<id>` on every sink. Before the fix, `lower` read `use:` for the two
   homed kinds and **dropped every other ref in silence**: `PUT /pipelines/{name}/graph` returned
   `200 written:true` while `graph/raw` still showed the node with `{}`.
+
+  **Follow-on (b) — the picker itself, closed 2026-08-15.** `bindKindFor` now answers `grammar` for
+  `PARSE` and `null` for everything else, so the dead-end options are gone; `NEEDS_CONFIG` was split out
+  so "must be configured" no longer derives from "binds a component" (a transform still needs config
+  after losing its picker). The **category/type mismatch itself remains** — the two agree only because
+  `PARSE` holds exactly one type, `parser`, and nothing structural forced that. It is now a tripwire
+  rather than a latent bug: `bind-kinds.contract.json` is written from `PipelineEditable.typesWithUseHome()`
+  by `BindKindHomeContractTest` (Java) and read by `pipeline-graph.contract.spec.ts` (TS), pinning the
+  rule **a picker requires a home**. ⚠ Deliberately **one-way** — a home does not require a picker, since
+  a `connection/` ref has a home but a Connection is not a `ComponentType` (no `GET /components/connection`),
+  so the collector component owns that picker. ⚠ The artifact diff alone is **not** the whole guard: a
+  falsification probe that gave `transform.map` a home left `bindableCategories` unchanged (the other
+  transform types are still homeless) and was caught only by the explicit
+  `neitherTransformNorSinkIsBindable` assertion — a category flips only when **every** type in it is homed.
 
   **Why refuse rather than preserve:** no code path in the engine resolves `transform/<id>` or
   `sink/<id>`, so writing the ref would produce a config that loads and then does nothing. That is the

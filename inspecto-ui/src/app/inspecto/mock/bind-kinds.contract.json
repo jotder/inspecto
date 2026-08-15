@@ -1,0 +1,4 @@
+{
+  "categories" : [ "SOURCE", "PARSE", "TRANSFORM", "SINK", "CONTROL" ],
+  "bindableCategories" : [ "PARSE" ]
+}

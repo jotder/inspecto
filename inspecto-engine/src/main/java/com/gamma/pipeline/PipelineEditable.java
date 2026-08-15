@@ -169,6 +169,17 @@ public final class PipelineEditable {
             BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"));
 
     /**
+     * The node types this flat config has a {@code use:} home for — the authoritative half of the
+     * cross-language bind-kind contract ({@code BindKindHomeContractTest}). Exposed rather than
+     * re-derived because the UI's picker is keyed on a node's CATEGORY while these homes are keyed on
+     * its TYPE; a picker offered for a category holding one homeless type buys the author a failed save,
+     * which is precisely what AUTHOR-1(b) was.
+     */
+    static Set<String> typesWithUseHome() {
+        return USE_HOME.keySet();
+    }
+
+    /**
      * Node type → the {@code use:} prefix that is DERIVED rather than authored, and is therefore dropped
      * in silence on purpose. Same distinction {@link #MAP_DERIVED} draws for config keys: a ref with no
      * home is a <b>loss</b> worth a refusal, a ref the read side put there is not.
