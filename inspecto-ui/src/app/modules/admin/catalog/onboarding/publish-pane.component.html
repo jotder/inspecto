@@ -1,12 +1,12 @@
 <div class="flex max-w-3xl flex-col gap-6">
     <div class="flex flex-col gap-4">
         <p class="text-secondary m-0">How the Stage-1 output is written.</p>
-        <inspecto-schema-form #sf [specs]="attributes" [initial]="initial" (submitted)="save()" />
+        <inspecto-schema-form #sf [specs]="attributes" [initial]="initial()" (submitted)="save()" />
         <div class="flex items-center gap-3">
             <button
                 mat-flat-button
                 color="primary"
-                [disabled]="saving() || !lens.canAuthorWorkbench()"
+                [disabled]="savingOutput() || !lens.canAuthorWorkbench()"
                 (click)="save()"
             >
                 Save output
@@ -19,17 +19,17 @@
     <div class="flex flex-col gap-3">
         <h2 class="m-0 text-lg font-semibold">Go live</h2>
 
-        @if (state.kind() === 'reference') {
+        @if (kind() === 'reference') {
             <inspecto-alert variant="info" icon="heroicons_outline:link">
                 This pipeline publishes a <strong>Reference Dataset</strong> — once live, enrichments can bind it by
-                name (<code>ref: {{ state.normalizedName() }}</code
+                name (<code>ref: {{ pipelineId() }}</code
                 >) instead of a file path.
             </inspecto-alert>
         }
 
-        @if (state.active()) {
+        @if (active()) {
             <inspecto-alert variant="success" icon="heroicons_outline:signal">
-                This {{ state.kind() }} is live — it collects on every poll cycle, and every stage edit takes effect
+                This {{ kind() }} is live — it collects on every poll cycle, and every stage edit takes effect
                 immediately.
             </inspecto-alert>
             <button
@@ -43,13 +43,13 @@
                 }
                 Take offline
             </button>
-        } @else if (state.lifecycle() === 'Ready') {
+        } @else if (lifecycle() === 'Ready') {
             <p class="text-secondary m-0">
                 Every required stage is configured. Going live flips this draft to active — it starts collecting from
                 its inbox on the next poll cycle.
-                @if (state.kind() === 'stream') {
-                    It also registers <strong>{{ state.normalizedName() }}</strong> as a queryable Dataset in the
-                    Catalog (skipped if one already points at this stream's store).
+                @if (kind() === 'stream') {
+                    It also registers <strong>{{ pipelineId() }}</strong> as a queryable Dataset in the Catalog (skipped
+                    if one already points at this stream's store).
                 }
             </p>
             <button
@@ -74,7 +74,7 @@
             </inspecto-alert>
         }
 
-        @if (state.active()) {
+        @if (active()) {
             <div class="flex flex-col gap-2 rounded border p-3">
                 <div class="flex items-center gap-2">
                     <span class="text-secondary text-xs font-semibold uppercase tracking-wider">Activity</span>
@@ -103,7 +103,7 @@
                 } @else {
                     <span class="text-secondary text-sm">Loading…</span>
                 }
-                <a [routerLink]="['/runs', state.name()]" class="text-sm font-medium">View full run history →</a>
+                <a [routerLink]="['/runs', name()]" class="text-sm font-medium">View full run history →</a>
             </div>
         }
     </div>

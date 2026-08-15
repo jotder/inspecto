@@ -5,7 +5,7 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, ConnectionsService } from 'app/inspecto/api';
+import { ComponentDef, ComponentsService, ConfigService, ConnectionsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { STREAM_BUNDLE_FORMAT, StreamBundle } from 'app/inspecto/transfer/stream-bundle';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
@@ -28,7 +28,15 @@ function create(
     params: Record<string, string>,
     api: Partial<ConfigService> = {},
     transfer: Partial<StreamTransferService> = {},
+    opts: { datasets?: ComponentDef[]; components?: Partial<ComponentsService> } = {},
 ) {
+    const components = {
+        list: vi.fn(() => of(opts.datasets ?? [])),
+        create: vi.fn((_t: string, c: Record<string, unknown>) =>
+            of({ type: 'dataset', name: String(c['id']), ref: `dataset/${c['id']}`, content: c } as ComponentDef),
+        ),
+        ...opts.components,
+    };
     TestBed.configureTestingModule({
         imports: [OnboardingShellComponent],
         providers: [
@@ -44,6 +52,7 @@ function create(
                 },
             },
             { provide: ConnectionsService, useValue: { list: () => of([]), test: () => of({}) } },
+            { provide: ComponentsService, useValue: components },
             { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
             { provide: ToastrService, useValue: TOASTR },
             {
@@ -58,7 +67,7 @@ function create(
     });
     const fixture = TestBed.createComponent(OnboardingShellComponent);
     fixture.detectChanges();
-    return fixture;
+    return Object.assign(fixture, { components });
 }
 
 describe('OnboardingShellComponent', () => {
@@ -215,6 +224,88 @@ describe('OnboardingShellComponent', () => {
         expect(transfer.buildExport).not.toHaveBeenCalled();
         expect(transfer.download).not.toHaveBeenCalled();
         expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('Save this stage'));
+    });
+
+    /**
+     * Go-live moved here with the Publish pane's D2 purification: the pane confirms and emits the
+     * flag, the HOST writes it and registers the Dataset that going live implies.
+     */
+    describe('go-live (the write the Publish pane emits)', () => {
+        const liveDraft = (extra: Record<string, unknown> = {}) => ({
+            read: () =>
+                of({
+                    type: 'pipeline',
+                    name: 'orders_feed',
+                    path: 'p',
+                    config: { name: 'orders_feed', ...extra },
+                }),
+            patch: () =>
+                of({
+                    type: 'pipeline',
+                    written: true,
+                    path: 'p',
+                    name: 'orders_feed',
+                    bytes: 1,
+                    overwritten: true,
+                    findings: [],
+                }),
+        });
+
+        it('registers the Dataset over a Stream store on go-live (split S1)', () => {
+            const fixture = create({ name: 'orders_feed' }, liveDraft());
+            fixture.componentInstance.setActive(true);
+            expect(fixture.components.create).toHaveBeenCalledWith('dataset', {
+                id: 'orders_feed',
+                name: 'orders_feed',
+                kind: 'physical',
+                // Names its own store. Omitting this let DatasetsService fall through to a source
+                // name that resolves to no rows, so every consumer read the live dataset as empty.
+                sourceName: 'orders_feed',
+                physicalRef: 'orders_feed',
+                description: expect.stringContaining('orders_feed'),
+            });
+            expect(TOASTR.success).toHaveBeenCalledWith(expect.stringContaining('Dataset "orders_feed" registered'));
+        });
+
+        it('skips registration when a dataset already points at the store, whatever its id', () => {
+            const existing: ComponentDef = {
+                type: 'dataset',
+                name: 'orders_gold',
+                ref: 'dataset/orders_gold',
+                content: { name: 'Orders (gold)', physicalRef: 'orders_feed' },
+            };
+            const fixture = create({ name: 'orders_feed' }, liveDraft(), {}, { datasets: [existing] });
+            fixture.componentInstance.setActive(true);
+            expect(fixture.components.create).not.toHaveBeenCalled();
+        });
+
+        it('a registration failure downgrades to a warning — activation already succeeded', () => {
+            const fixture = create(
+                { name: 'orders_feed' },
+                liveDraft(),
+                {},
+                { components: { create: vi.fn(() => throwError(() => new Error('409'))) } },
+            );
+            fixture.componentInstance.setActive(true);
+            expect(TOASTR.success).toHaveBeenCalledWith('"orders_feed" is live');
+            expect(TOASTR.warning).toHaveBeenCalledWith(expect.stringContaining('could not be registered'));
+        });
+
+        it('a Reference go-live registers no Dataset — its store is consumed by name', () => {
+            const fixture = create({ name: 'orders_feed' }, liveDraft({ produces: 'reference' }));
+            fixture.componentInstance.setActive(true);
+            // Activation DID run — the skip is kind-scoped, not vacuous.
+            expect(fixture.debugElement.injector.get(OnboardingStateService).active()).toBe(true);
+            expect(fixture.components.create).not.toHaveBeenCalled();
+        });
+
+        it('taking a live pipeline offline writes the flag back and registers nothing', () => {
+            const fixture = create({ name: 'orders_feed' }, liveDraft({ active: true }));
+            fixture.componentInstance.setActive(false);
+            expect(fixture.debugElement.injector.get(OnboardingStateService).active()).toBe(false);
+            expect(TOASTR.success).toHaveBeenCalledWith('"orders_feed" is offline');
+            expect(fixture.components.create).not.toHaveBeenCalled();
+        });
     });
 
     it('names an unreadable satellite instead of shipping a silently partial export', () => {

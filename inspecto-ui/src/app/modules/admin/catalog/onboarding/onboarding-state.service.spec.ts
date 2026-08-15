@@ -55,6 +55,23 @@ describe('OnboardingStateService', () => {
         expect(s.stageStatus().parsing).toBe('validated');
     });
 
+    /** What the Publish pane renders as "complete these before going live" — it takes the labels as
+     *  an input, so the exclusion rule (optional stages, and publish itself) is pinned here. */
+    it('names the OTHER required stages still empty, excluding optional ones and publish', () => {
+        const s = create();
+        s.config.set({ name: 'x' });
+        expect(s.blockedStages()).toEqual(['Collection', 'Parsing', 'Schema & Mapping']);
+
+        s.config.set({
+            name: 'x',
+            collector: { connector: 'local' },
+            parsing: { frontend: 'delimited' },
+            processing: { schema_file: 's.toon' },
+        });
+        // Enrichment is optional and Publish is this stage itself — neither may ever block go-live.
+        expect(s.blockedStages()).toEqual([]);
+    });
+
     it('lands a resumed session on the first incomplete stage in data-path order', () => {
         const s = create();
         s.config.set({ name: 'x', collector: { connector: 'local' } });

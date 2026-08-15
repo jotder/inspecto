@@ -176,7 +176,18 @@
                         />
                     }
                     @case ('publish') {
-                        <app-onboarding-publish-pane />
+                        <app-onboarding-publish-pane
+                            [config]="state.config()"
+                            [kind]="state.kind()"
+                            [name]="state.name()"
+                            [pipelineId]="state.normalizedName()"
+                            [lifecycle]="state.lifecycle()"
+                            [blockedOn]="state.blockedStages()"
+                            [saving]="savingPane()"
+                            (applied)="saveOutput($event)"
+                            (activeChange)="setActive($event)"
+                            (dirtyChange)="paneDirty.set($event)"
+                        />
                     }
                     @default {
                         <app-onboarding-placeholder-pane />

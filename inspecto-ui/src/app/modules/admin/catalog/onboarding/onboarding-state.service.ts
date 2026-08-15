@@ -239,6 +239,15 @@ export class OnboardingStateService {
         return complete ? 'Ready' : 'Draft';
     });
 
+    /** The OTHER required stages still empty (mirrors {@link lifecycle}'s own `id !== 'publish'`
+     *  exclusion) — the Publish stage names them so a blocked go-live is never a silent dead end.
+     *  Lives here, not in that pane: it is a fact about the stage model, which is host-side (D5). */
+    readonly blockedStages = computed(() =>
+        this.stages()
+            .filter((s) => !s.optional && s.id !== 'publish' && this.stageStatus()[s.id] === 'empty')
+            .map((s) => s.label),
+    );
+
     /** The first ERROR finding message for a stage (the rail's `blocked` chip tooltip), or null. */
     blockingMessage(id: OnboardingStageId): string | null {
         return (this.stageFindings()[id] ?? []).find((f) => f.severity === 'ERROR')?.message ?? null;
