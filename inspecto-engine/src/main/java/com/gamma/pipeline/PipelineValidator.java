@@ -257,6 +257,13 @@ public final class PipelineValidator {
                 String use = n.use();
                 int slash = use.indexOf('/');
                 String kind = slash < 0 ? use : use.substring(0, slash);
+                // A DERIVED binding is not a ComponentRegistry ref and has no dir to look in: an
+                // enrichment node's `enrichment/<name>` points at a companion registered through
+                // POST /enrichment, and the read side synthesizes it on every graph/raw. Checking it
+                // here reported UNKNOWN_USE_KIND and 422'd an untouched open→save round trip.
+                if (PipelineEditable.isDerivedBinding(n.type(), use)) {
+                    continue;
+                }
                 if (!ComponentRegistry.isComponentType(kind)) {
                     issues.add(new Issue(Severity.ERROR, UNKNOWN_USE_KIND,
                             "Node '" + n.id() + "' has use: '" + use + "' with unrecognized component kind '"

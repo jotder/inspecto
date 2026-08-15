@@ -255,10 +255,16 @@ describe('resolveNodeIcon', () => {
 });
 
 describe('bindKindFor', () => {
-    it('maps a node category to the registry kind it binds', () => {
+    /**
+     * ⛔ Only a kind the server has a `use:` home for may appear here. `transform` and `sink` were
+     * removed once AUTHOR-1(b) made those refs a named refusal: the picker they drove could only ever
+     * hand the author a failed save. Adding one back means giving it a home in
+     * `PipelineEditable.USE_HOME` first.
+     */
+    it('binds a grammar on a parser, and nothing else', () => {
         expect(bindKindFor('PARSE')).toBe('grammar');
-        expect(bindKindFor('TRANSFORM')).toBe('transform');
-        expect(bindKindFor('SINK')).toBe('sink');
+        expect(bindKindFor('TRANSFORM')).toBeNull();
+        expect(bindKindFor('SINK')).toBeNull();
         expect(bindKindFor('SOURCE')).toBeNull();
         expect(bindKindFor('CONTROL')).toBeNull();
     });
@@ -283,6 +289,21 @@ describe('computeNodeStatus', () => {
         expect(computeNodeStatus(n, 'PARSE', refs, noTests)).toBe('configured');
         expect(computeNodeStatus(n, 'PARSE', refs, new Map([['p', 'tested']]))).toBe('tested');
         expect(computeNodeStatus(n, 'PARSE', refs, new Map([['p', 'rejects']]))).toBe('rejects');
+    });
+
+    /**
+     * ⚠ The decoupling guard: a transform/sink still needs configuration after losing its bind kind.
+     * `needsRef` used to be `bindKindFor(cat) != null`, so nulling those kinds would have quietly made
+     * every blank transform 'configured' and dropped its Validate error.
+     */
+    it('still flags a blank transform and sink as unconfigured, though neither binds a component', () => {
+        expect(computeNodeStatus({ id: 'f', type: 'transform.filter' }, 'TRANSFORM', refs, noTests)).toBe(
+            'unconfigured',
+        );
+        expect(computeNodeStatus({ id: 'w', type: 'sink.persistent' }, 'SINK', refs, noTests)).toBe('unconfigured');
+        expect(
+            computeNodeStatus({ id: 'f', type: 'transform.filter', config: { where: 'x > 1' } }, 'TRANSFORM', refs, noTests),
+        ).toBe('configured');
     });
 
     it('treats a source as unconfigured until a connection is bound', () => {

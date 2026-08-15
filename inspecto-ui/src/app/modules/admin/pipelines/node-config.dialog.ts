@@ -161,14 +161,16 @@ export interface NodeConfigResult {
                             <span class="font-mono">{{ form.value.use || '—' }}</span>
                         </p>
                     </div>
-                } @else if (!isEnrichment && !isAcquisition) {
-                    <!-- Acquisition owns "use" through its Connection attribute (see isAcquisition), so
-                         it must not also get a free-text box — two controls writing one field. -->
-                    <mat-form-field class="w-full" subscriptSizing="dynamic">
-                        <mat-label>Use (component ref)</mat-label>
-                        <input matInput formControlName="use" placeholder="transform/my_component" />
-                    </mat-form-field>
                 }
+                <!-- No free-text "Use (component ref)" box, and no picker on a transform/sink.
+                     (⚠ no backticks in this comment: it lives inside a template literal.)
+                     Acquisition owns "use" through its Connection attribute (see isAcquisition) and a
+                     parser through the Grammar editor — neither opens this dialog. That leaves the
+                     kinds the flat config has NO home for, so every ref typed here was refused at save
+                     (UNSUPPORTED_BINDING, AUTHOR-1(b)); its placeholder even advertised the refused
+                     "transform/my_component" shape. The control itself stays, unrendered, so a ref an
+                     existing file already carries is preserved and refused by name rather than silently
+                     stripped here. -->
 
                 <!-- Enrichment (W4b): the node authors the REAL companion config through the shared
                      editor — written via POST /config/write + registered via POST /enrichment (the

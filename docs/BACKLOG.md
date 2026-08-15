@@ -1506,9 +1506,36 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     refuses against a declared `processing.mapping_file` or yields to it (⚠ today it would **silently
     outrank** it); and hand-rolled validation vs first building the missing list-of-objects spec
     primitive (`FieldType` has none — `schemas`/`sinks` are hand-walked in `ConfigSafetyValidator`).
-  - **Follow-on, NOT done (UI):** the picker is still offered on kinds that now hard-refuse. The end
-    state is `bindKindFor` returning null for TRANSFORM/SINK, but that also feeds `pipeline-graph.ts`'s
-    `needsRef` status logic — entangled, design-first. Refusing beats the silent drop meanwhile.
+  - ~~**Follow-on, NOT done (UI):** the picker is still offered on kinds that now hard-refuse.~~
+    **→ ✅ SHIPPED 2026-08-15.** `bindKindFor` answers `grammar` for PARSE and null for everything else,
+    and the free-text "Use (component ref)" box is gone too — it was the same trap in worse form, with a
+    `transform/my_component` placeholder advertising the refused shape. The feared entanglement was real
+    but shallow: `needsRef` was doing two jobs, so "does this node need configuration" split out as
+    `NEEDS_CONFIG` (a pinned test proves a blank transform is still `unconfigured`). The dialog's picker
+    *machinery* stays — the specs exercise it with `bindKind: 'grammar'`/`'schema'`, so it is a live
+    seam for any kind that earns a home, not code this change orphaned.
+  - 🔴 **REGRESSION the same refusal caused, FOUND + FIXED 2026-08-15 (`DERIVED_USE`).** The 08-14
+    refusal ran over **every** lowerable kind, including `enrichment` — and the editor writes
+    `use: enrichment/<name>` onto that node itself every time it saves the companion
+    (`node-config.dialog.ts:714`, W4b). So for one day **every pipeline holding an enrichment node was
+    unsaveable** (`UNSUPPORTED_BINDING(enrich)`, reproduced before fixing). ⚠ And it needed no authoring
+    at all to hit: `PipelineRoutes:1326-1328` **synthesizes** that node, ref included, on every
+    `GET /graph/raw`, so an untouched open→save of any pipeline with a registered companion refused. The
+    ref is DERIVED from the
+    companion — dropped on purpose, precisely as `MAP_DERIVED`'s `schema`/`csv` are — and the same
+    "refusing it would refuse every existing pipeline's save" reasoning that `MAP_DERIVED` already
+    carried applied here and was simply not looked for. ⚠ **The lesson is scope, not vocabulary:** when a
+    new refusal is added to a loop over all kinds, enumerate the kinds it now touches — a widened
+    refusal is a behaviour change for every one of them. Only the kind's own derived prefix is exempt
+    (`transform/x` on an enrichment node still refuses, pinned both languages).
+    🔴 **The engine fix alone was NOT enough, and only an HTTP probe showed it.** `saveGraph` runs
+    `parseAndValidateFlow` → `PipelineValidator.checkWiring` **before** `lower`, and `enrichment` is not
+    a `ComponentRegistry` kind (companions register via `POST /enrichment`), so the round trip still
+    422'd on `UNKNOWN_USE_KIND` — an **older** defect, predating 08-14, that a green
+    `PipelineEditableTest` happily hid. The rule now lives once (`PipelineEditable.isDerivedBinding`) and
+    both gates consult it. ⛔ **Check a new save-path rule against every gate on that path** — one of two
+    sequential gates is no gate at all. Pinned by
+    `ControlApiPipelineCrudTest.anEnrichmentNodesCompanionBindingSavesOverHttp`.
 
   Original row, for provenance: Found
   2026-08-12 driving the UI end-to-end (create → save → open → test). The builder offers a Configure

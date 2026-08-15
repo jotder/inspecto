@@ -129,6 +129,7 @@ public final class PipelineEditable {
      */
     private static String unhomedBinding(PipelineNode n) {
         if (!n.hasUse()) return null;
+        if (isDerivedBinding(n.type(), n.use())) return null;
         List<String> homes = USE_HOME.get(n.type());
         if (homes != null && homes.stream().anyMatch(p -> n.use().startsWith(p))) return null;
         return "the flat pipeline config has no home for a '" + n.use() + "' binding on a '" + n.type()
@@ -166,6 +167,36 @@ public final class PipelineEditable {
     private static final Map<String, List<String>> USE_HOME = Map.of(
             BuiltinNodeType.ACQUISITION.type(), List.of("connection/"),
             BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"));
+
+    /**
+     * Node type → the {@code use:} prefix that is DERIVED rather than authored, and is therefore dropped
+     * in silence on purpose. Same distinction {@link #MAP_DERIVED} draws for config keys: a ref with no
+     * home is a <b>loss</b> worth a refusal, a ref the read side put there is not.
+     *
+     * <p>An enrichment node's binding is written by the editor itself when it saves the companion
+     * ({@code node-config.dialog.ts}, W4b) — the registered {@code *_enrich.toon} is the truth and the
+     * ref merely points at it, which is why lower has "nothing to lower" for the kind (see the class
+     * doc). ⚠ It was swept up by AUTHOR-1(b) on 2026-08-14 and refused for a day: since the editor puts
+     * the ref on the node unconditionally, that made <b>every</b> pipeline holding an enrichment node
+     * unsaveable. A binding the product writes is never an authoring mistake.
+     */
+    private static final Map<String, String> DERIVED_USE = Map.of(
+            BuiltinNodeType.ENRICHMENT.type(), "enrichment/");
+
+    /**
+     * Whether this node's {@code use:} ref is DERIVED rather than authored ({@link #DERIVED_USE}).
+     *
+     * <p>Shared with {@link PipelineValidator#checkWiring}, which asks the same question for a different
+     * reason: such a ref does not name a {@code ComponentRegistry} kind at all (an enrichment companion
+     * is registered through {@code POST /enrichment}, as {@code *_enrich.toon}), so the wiring check
+     * would report {@code UNKNOWN_USE_KIND} for it. ⚠ Extracted rather than copied deliberately: the two
+     * gates run in sequence on the save route — the validator first, the lower second — so a rule spelled
+     * in only one of them is a rule that never takes effect.
+     */
+    static boolean isDerivedBinding(String type, String use) {
+        String derived = DERIVED_USE.get(type);
+        return derived != null && use != null && use.startsWith(derived);
+    }
 
     /**
      * Sink-owned FLAT processing keys (write tuning carried on the persistent sink node). Consignment

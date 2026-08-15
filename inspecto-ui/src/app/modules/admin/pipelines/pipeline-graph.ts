@@ -23,19 +23,30 @@ import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'ap
  * from the existing token palette, never a hardcoded value here).
  */
 
-/** The registry component a node category binds (parser→grammar, transform, sink); null for sources/control. */
+/**
+ * The registry component a node category binds — `grammar` for a parser, null for everything else.
+ *
+ * ⚠ It used to answer `transform` for TRANSFORM and `sink` for SINK, which is what put a component
+ * picker on those nodes. Nothing resolves `transform/<id>` or `sink/<id>` in either language, so since
+ * AUTHOR-1(b) the server REFUSES such a ref (`UNSUPPORTED_BINDING`): every option the picker offered
+ * bought the author a failed save. It is keyed on a node's CATEGORY while the server's homes
+ * (`PipelineEditable.USE_HOME`) are keyed on its TYPE — they agree only because PARSE holds the one
+ * type, `parser`. A new binding here must have a home there first.
+ *
+ * <p>A source's `connection/<name>` is deliberately absent: a Connection is not a `ComponentType` (no
+ * `GET /components/connection` route), so the collector component owns that picker — see
+ * `NodeConfigDialog.isAcquisition`.
+ */
 export function bindKindFor(category: string): ComponentType | null {
-    switch (category) {
-        case 'PARSE':
-            return 'grammar';
-        case 'TRANSFORM':
-            return 'transform';
-        case 'SINK':
-            return 'sink';
-        default:
-            return null;
-    }
+    return category === 'PARSE' ? 'grammar' : null;
 }
+
+/**
+ * Categories whose nodes must be configured somehow — by a ref or inline — to count as authored.
+ * Kept SEPARATE from {@link bindKindFor}: a transform still needs config after losing its picker, and
+ * deriving "needs configuration" from "binds a component" is what coupled the two.
+ */
+const NEEDS_CONFIG = new Set(['SOURCE', 'PARSE', 'TRANSFORM', 'SINK']);
 
 // ── Node status (canvas state) + flow validation (Stages 2 & 4) ──
 
@@ -91,11 +102,10 @@ export function computeNodeStatus(
     checkDangling = true,
 ): NodeStatus {
     const bindKind = bindKindFor(category);
-    const needsRef = bindKind != null || category === 'SOURCE';
     const ref = node.use?.trim();
     const hasInlineConfig = !!node.config && Object.keys(node.config).length > 0;
-    // Unconfigured only when it binds something but is configured neither by a ref nor inline.
-    if (needsRef && !ref && !hasInlineConfig) return 'unconfigured';
+    // Unconfigured only when it needs settings but has neither a ref nor inline config.
+    if (NEEDS_CONFIG.has(category) && !ref && !hasInlineConfig) return 'unconfigured';
     if (checkDangling && ref && bindKind && !validRefs.has(ref)) return 'dangling';
     return tested.get(node.id) ?? 'configured';
 }

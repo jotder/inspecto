@@ -263,6 +263,34 @@ class ControlApiPipelineCrudTest {
         }
     }
 
+    /**
+     * <b>The AUTHOR-1(b) regression, over real HTTP.</b> An enrichment node's {@code use: enrichment/<name>}
+     * is not authored — the editor writes it whenever it saves the companion, and {@code GET /graph/raw}
+     * <b>synthesizes</b> the node with the ref for every registered companion. So an untouched open→save
+     * round trip carries it, and the 2026-08-14 blanket refusal made that round trip 422.
+     *
+     * <p>Verified over HTTP on purpose: the save route runs {@code parseAndValidateFlow} (the
+     * {@code ComponentRegistry} wiring check) <b>before</b> {@code PipelineEditable.lower}, so a fix
+     * proven only at the lower could still be dead behind an earlier gate.
+     */
+    @Test
+    void anEnrichmentNodesCompanionBindingSavesOverHttp(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String b = dir.toString().replace('\\', '/');
+            String flow = """
+                {"active":true,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
+                          {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
+                          {"id":"enrich","type":"enrichment","use":"enrichment/customer_lookup"},
+                          {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],
+                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"enrich"},
+                          {"from":"enrich","rel":"data","to":"out"}]}""".formatted(b);
+
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/enrich_rt/graph", flow);
+            assertEquals(200, r.statusCode(), r.body());
+        }
+    }
+
     /** Two distinct-database sinks are no longer refused — they save as a multi-destination sinks: pipeline. */
     @Test
     void twoDistinctDatabasesSaveAsAMultiSinkPipeline(@TempDir Path dir) throws Exception {

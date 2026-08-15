@@ -345,6 +345,20 @@ describe('mock pipeline-editable — UNSUPPORTED_BINDING', () => {
         expect((config['collector'] as Record<string, unknown>)['connection']).toBe('cdr');
     });
 
+    // \u26a0 The editor writes `use: enrichment/<name>` onto the node itself every time it saves the
+    // companion, so refusing it (2026-08-14 \u2192 15) made every pipeline holding an enrichment node
+    // unsaveable. The ref is DERIVED from the companion, not authored \u2014 dropped, never refused.
+    it('does not refuse an enrichment node\u2019s companion binding', () => {
+        const g = saveable([{ id: 'enrich', type: 'enrichment', use: 'enrichment/customer_lookup' }]);
+        expect('config' in lowerGraph(g as never, {}, true)).toBe(true);
+    });
+
+    it('still refuses an unhomed ref on an enrichment node \u2014 only its own prefix is derived', () => {
+        const refusals = refusalsOf(saveable([{ id: 'enrich', type: 'enrichment', use: 'transform/x' }]));
+        expect(refusals[0].code).toBe('UNSUPPORTED_BINDING');
+        expect(refusals[0].nodeId).toBe('enrich');
+    });
+
     it('does not refuse a plugin parser\u2019s synthesized ingester/ binding', () => {
         const g = saveable();
         g.nodes[1] = { id: 'parse', type: 'parser', use: 'ingester/com.acme.Ingester', config: { ingester: 'com.acme.Ingester' } };

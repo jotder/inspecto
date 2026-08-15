@@ -1253,7 +1253,7 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   old `toConfigMap` behaviour of silently picking the first sink. `strict` = an `active` save or a
   brand-new file; an **inactive draft may be partial** (it overlays only what its present nodes own, so a
   half-built pipeline saves without erasing the rest — the same model Onboarding's stage saves use).
-- **A `use:` ref has a home for two node kinds only** (`PipelineEditable.USE_HOME`, fixed 2026-08-14 —
+- **An AUTHORED `use:` ref has a home for two node kinds only** (`PipelineEditable.USE_HOME`, fixed 2026-08-14 —
   AUTHOR-1): acquisition's `connection/<id>` lands in the collector block, and the parser's
   `grammar/<id>` (authored Grammar) or `ingester/<fqcn>` (a plugin parser's synthesized binding) land in
   `parsing:`/`processing:`. **Every other node kind carries its settings inline**, so a ref on one is
@@ -1281,6 +1281,39 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
 
   The offline mirror (`inspecto-ui/src/app/inspecto/mock/pipeline-editable.ts`) refuses identically, in
   the same commit — a preview that accepts what the backend refuses is the same defect reversed.
+
+  🔴 **A DERIVED ref is not an unhomed one** (`PipelineEditable.DERIVED_USE`, 2026-08-15). The 08-14
+  refusal was applied to every lowerable kind, which swept up **enrichment** — whose
+  `use: enrichment/<name>` the editor writes onto the node itself each time it saves the companion
+  (`node-config.dialog.ts`, W4b) **and `PipelineRoutes` synthesizes on every `GET /graph/raw`** — so an
+  untouched open→save round trip was enough to hit it. Since the companion is the truth and lower has
+  "nothing to lower" for
+  the kind, that ref is *dropped on purpose*, exactly as `MAP_DERIVED`'s `schema`/`csv` are. For one day
+  it was refused instead, which made **every pipeline holding an enrichment node unsaveable**. The rule:
+  a binding the product itself writes can never be an authoring mistake — only the kind's own derived
+  prefix is exempt, so `transform/x` on an enrichment node still refuses.
+
+  🔴 **And the lower was the SECOND gate, not the first.** `saveGraph` runs `parseAndValidateFlow`
+  (→ `PipelineValidator.checkWiring`) *before* `PipelineEditable.lower`, and `enrichment` is not a
+  `ComponentRegistry` kind at all (a companion registers through `POST /enrichment`, not
+  `registry/<dir>/`), so the round trip 422'd on `UNKNOWN_USE_KIND` — an **older** defect that the
+  engine-level fix alone left standing, and that a unit test against `lower` could never have seen.
+  `PipelineEditable.isDerivedBinding` is now the one place the rule is spelled and both gates consult
+  it. ⛔ Whenever a save-path rule is added, check it against **every gate on that path**: a rule spelled
+  in one of two sequential gates is a rule that never takes effect. Pinned over real HTTP by
+  `ControlApiPipelineCrudTest.anEnrichmentNodesCompanionBindingSavesOverHttp` — the unit test passed
+  while the route still refused.
+
+  ✅ **The picker that caused it is gone** (2026-08-15). `bindKindFor` now answers `grammar` for PARSE
+  and null for everything else, so no transform or sink is offered a component whose every option ends
+  in a refused save; the free-text "Use (component ref)" box went with it (its placeholder advertised
+  `transform/my_component` — the refused shape), leaving the control unrendered so a ref an existing
+  file carries is refused **by name** rather than silently stripped in the dialog. ⚠ Note what the two
+  halves of `bindKindFor` were: "which component does this bind" and "does this node need
+  configuration". Only the first is about bindings — the second is now `NEEDS_CONFIG`, or nulling the
+  kinds would have quietly turned every blank transform 'configured' and dropped its Validate error.
+  Acquisition and parser — the only two homed kinds — never open this dialog at all (a drawer and the
+  Grammar editor), which is why every ref it could write was refusable by construction.
 - **Routes** ([`PipelineRoutes`](../../../../inspecto/src/main/java/com/gamma/control/PipelineRoutes.java)):
   `GET /pipelines/{name}/graph/raw` (lift + a synthesized node per registered enrichment companion whose
   `triggers.on_pipeline` names this pipeline) and `PUT /pipelines/{name}/graph` (lower over the existing

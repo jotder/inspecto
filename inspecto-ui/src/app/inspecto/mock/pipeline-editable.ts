@@ -47,6 +47,16 @@ const USE_HOME: Record<string, string[]> = {
 };
 
 /**
+ * Node type → the `use:` prefix that is DERIVED, not authored, and is dropped in silence on purpose
+ * (mirrors `PipelineEditable.DERIVED_USE`). An enrichment node's ref is written by the editor itself
+ * when it saves the companion `*_enrich.toon`, which is the truth; refusing it made every pipeline
+ * holding an enrichment node unsaveable for a day.
+ */
+const DERIVED_USE: Record<string, string> = {
+    enrichment: 'enrichment/',
+};
+
+/**
  * Why this node's `use:` ref cannot be lowered, or `undefined` when it can — the TS mirror of
  * `PipelineEditable.unhomedBinding`.
  *
@@ -59,6 +69,8 @@ const USE_HOME: Record<string, string[]> = {
 function unhomedBinding(n: AuthoredNode): string | undefined {
     const use = n.use?.trim();
     if (!use) return undefined;
+    const derived = DERIVED_USE[n.type];
+    if (derived && use.startsWith(derived)) return undefined;
     const homes = USE_HOME[n.type];
     if (homes?.some((p) => use.startsWith(p))) return undefined;
     return (

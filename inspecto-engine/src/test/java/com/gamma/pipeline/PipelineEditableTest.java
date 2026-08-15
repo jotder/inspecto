@@ -133,6 +133,29 @@ class PipelineEditableTest {
                 new LinkedHashMap<>(), true);
     }
 
+    /**
+     * ⚠ An enrichment node's {@code use: enrichment/<name>} is written by the editor itself
+     * ({@code node-config.dialog.ts:714}, W4b) on every enrichment save — the companion file is the
+     * truth and the ref is DERIVED from it, which is why lower has "nothing to lower" for the kind.
+     * It is not an unhomed authored binding, and refusing it would make every pipeline holding an
+     * enrichment node unsaveable.
+     */
+    @Test
+    void anEnrichmentsCompanionBindingIsNotRefused() {
+        PipelineEditable.lower(graphBinding(
+                bound("enrich", "enrichment", "enrichment/customer_lookup")), new LinkedHashMap<>(), true);
+    }
+
+    /** Only the kind's OWN derived prefix is exempt — the picker's `transform/<id>` still refuses there. */
+    @Test
+    void anUnhomedRefOnAnEnrichmentNodeStillRefuses() {
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(graphBinding(
+                        bound("enrich", "enrichment", "transform/x")), new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
+        assertEquals("enrich", ex.refusals().get(0).nodeId());
+    }
+
     /** A minimal saveable graph whose one transform node carries {@code bound}'s ref. */
     private static PipelineGraph graphBinding(PipelineNode bound) {
         return new PipelineGraph("x", true, List.of(

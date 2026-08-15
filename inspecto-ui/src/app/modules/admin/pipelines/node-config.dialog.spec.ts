@@ -500,19 +500,26 @@ describe('NodeConfigDialog', () => {
         expect(form(fixture).form.contains('format')).toBe(true);
     });
 
-    /** Two controls must never both write `use` — acquisition owns it via the attribute. */
-    it('hides the free-text use box on an acquisition node', async () => {
-        const fixture = await create({
-            node: { id: 'acq', type: 'acquisition' },
-            typeLabel: 'acquisition',
-            categoryLabel: 'Collector',
-            bindKind: null,
+    /**
+     * There is no free-text `use` box at all any more. Two controls must never both write `use`
+     * (acquisition owns it via its Connection attribute) — and for every OTHER kind that reaches this
+     * dialog the flat config has no home for a ref, so anything typed in it was refused at save with
+     * `UNSUPPORTED_BINDING`. Its placeholder advertised the refused `transform/my_component` shape.
+     */
+    // ⚠ One `create()` per test — it configures the TestBed, which cannot be reconfigured once
+    // instantiated, so these are two `it`s rather than a loop inside one.
+    for (const data of [
+        { node: { id: 'acq', type: 'acquisition' }, typeLabel: 'acquisition', categoryLabel: 'Collector' },
+        { node: { id: 'f', type: 'transform.filter' }, typeLabel: 'transform.filter', categoryLabel: 'Transform' },
+    ]) {
+        it(`has no free-text use box on a ${data.node.type} node`, async () => {
+            const fixture = await create({ ...data, bindKind: null });
+            const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label')).map((l) =>
+                (l as HTMLElement).textContent?.trim(),
+            );
+            expect(labels).not.toContain('Use (component ref)');
         });
-        const labels = Array.from(fixture.nativeElement.querySelectorAll('mat-label')).map((l) =>
-            (l as HTMLElement).textContent?.trim(),
-        );
-        expect(labels).not.toContain('Use (component ref)');
-    });
+    }
 
     // ── enrichment nodes (W4b): the dialog authors the REAL companion through the shared editor ──
 
