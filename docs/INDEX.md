@@ -75,6 +75,15 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/grammar-templates-not-bindings-plan.md`](superpower/grammar-templates-not-bindings-plan.md)
+  — **ACCEPTED (operator) 2026-08-15, design recorded, S1–S4 unbuilt.** Retires the live
+  `use: grammar/<id>` binding: a Grammar component becomes a **template** you copy from, never bind to.
+  Grew out of the definition-surface plan's P3a residual #2 and resolves that plan's P3a-vs-P3d
+  contradiction in P3d's favour. ⚠ A considered **reversal of a shipped decision** (grammar-config
+  unification, `ba8b87ce`) at GLOSSARY level. Cheap because **nothing in the repo binds a Grammar** —
+  the sole component is an unreferenced one-line demo fixture, so no migration is owed. Engine
+  deliberately unchanged: the `use: grammar/` form stays read-supported, just never authored.
+
 - ~~`superpower/operational-db-ui-plan.md`~~ — **Stage 1 SHIPPED and ARCHIVED 2026-08-15**
   ([archive copy](archived-documents/plans-archive/operational-db-ui-plan.md), kept for the grounding).
   PG-1 Open 2, the UI half of the operational-database selection. ⚠ **All four clauses of the row's
