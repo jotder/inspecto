@@ -270,19 +270,55 @@ describe('PipelineEditorComponent', () => {
             expect(c.definitionNode()?.id).toBe(node.id);
         });
 
-        /** A grammar-BOUND delimited node stays on the dialog: updating the reusable component is a
-         *  write route of its own, and the drawer's Apply is an in-memory patch only (D2). The plain
-         *  `parser` type stays on the dialog as before. */
-        it('keeps the dialog for a grammar-bound parser.delimited and for the plain parser', () => {
+        /** S3: a bound delimited node now reaches the drawer too, materialised into an inline COPY of
+         *  its component — and Apply drops the binding (D4, editing migrates it). */
+        it('materialises a grammar-bound delimited node into the drawer and migrates it on Apply', () => {
+            const c = make();
+            c.select('demo');
+            c.grammarTemplates.set([
+                { name: 'pipes', ref: 'grammar/pipes', type: 'grammar', content: { delimiter: '|', has_header: false } },
+            ] as never);
+            const node = { id: 'parse', type: 'parser.delimited', use: 'grammar/pipes', config: {} };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+
+            c.openNodeConfig(node);
+
+            expect(dialog.open).not.toHaveBeenCalled();
+            // The drawer shows an inline copy; the MODEL is untouched until Apply.
+            expect(c.definitionNode()!.config!['parsing']).toEqual({ delimited: { delimiter: '|', has_header: false } });
+            expect(c.model()!.nodes.find((n) => n.id === 'parse')!.use).toBe('grammar/pipes');
+
+            c.onDefinitionApplied({ id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } });
+            expect(c.model()!.nodes.find((n) => n.id === 'parse')!.use).toBeUndefined();
+        });
+
+        /** A binding with nothing behind it has no faithful copy to migrate to — seeding the drawer
+         *  with defaults would invent a Grammar, so it stays on the dialog. */
+        it('keeps a DANGLING grammar binding on the dialog', () => {
+            const c = make();
+            c.select('demo');
+            c.grammarTemplates.set([]);
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            const node = { id: 'parse', type: 'parser.delimited', use: 'grammar/missing', config: {} };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+
+            c.openNodeConfig(node);
+
+            expect(dialog.open).toHaveBeenCalledTimes(1);
+            expect(c.definitionNode()).toBeNull();
+        });
+
+        /** ⚠ Since S3 the ONLY parse node left on the dialog is the plain `parser` type — it has no
+         *  drawer pane yet (that is P3d's slice, which then retires the dialog entirely). A bound
+         *  `parser.delimited` no longer belongs here; it has its own migration case above. */
+        it('keeps the dialog for the plain parser type', () => {
             const c = make();
             c.select('demo');
             dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
-            const bound = { id: 'pb', type: 'parser.delimited', use: 'grammar/pipes', config: {} };
             const plain = { id: 'pp', type: 'parser', config: { schema_file: 's.toon' } };
-            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, bound, plain] }));
-            c.openNodeConfig(bound);
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, plain] }));
             c.openNodeConfig(plain);
-            expect(dialog.open).toHaveBeenCalledTimes(2);
+            expect(dialog.open).toHaveBeenCalledTimes(1);
             expect(c.definitionNode()).toBeNull();
         });
 

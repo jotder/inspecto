@@ -1,6 +1,6 @@
 # Grammar templates, not bindings — retire the live `use: grammar/<id>` reference
 
-**Status: ACCEPTED (operator, 2026-08-15) — design recorded, not yet built.** Owner: UI (engine
+**Status: COMPLETE 2026-08-15 — all four slices shipped.** Owner: UI (engine
 unchanged). Created 2026-08-15, out of the definition-surface plan's P3a residual #2.
 
 ---
@@ -94,8 +94,8 @@ allowance, which mirrors the still-supported read path; `bindKindFor('PARSE') ==
 |---|---|---|
 | **S1 — Save as template** ✅ **SHIPPED 2026-08-15** | Drawer gains a "Save as template" action; the pane emits, the **host** writes via `components.create('grammar', …)` (D5) and the node **keeps** its inline block (D6). Dialog's extract path follows the same new semantics. | A spec asserting the component is created **and** `node.config.parsing` survives with no `use:` set — the exact pair the old `:146` extract spec asserted the opposite of. ✅ |
 | **S2 — Start from a template** ✅ **SHIPPED 2026-08-15** | A picker in the drawer listing `components.list('grammar')`; choosing one patches the editor with a **copy**. Read-only fetch, no binding. Must mark the pane dirty (it is an edit) and must not fire on the load-time path. | A spec: pick a template → editor value matches the component → Apply emits an inline block, `use` undefined. ✅ |
-| **S3 — Bound nodes migrate on edit** | `isDrawerParse` drops the `use:` exclusion; the host resolves the bound component before opening and seeds the pane; Apply materialises inline and drops `use` (D4). Delete the dialog's bound-edit branch and its specs (`grammar-editor.dialog.spec.ts:116`, `:180`). | A spec on a legacy bound node: opens in the drawer with the resolved block, Apply yields inline + no `use`. |
-| **S4 — Docs** | `docs/GLOSSARY.md` — Grammar component = **template**, ⛔ not a binding target. `okf/frontend/features/grammar-config.md` — rewrite "One store — inline by default, extractable to a component". `okf/backend/pipeline-graph/design.md` — note the `use: grammar/` form is read-supported, never authored. Amend the definition-surface plan's P3a + P3d rows. | `graphify update .`; the P3a/P3d contradiction is gone. |
+| **S3 — Bound nodes migrate on edit** ✅ **SHIPPED 2026-08-15** | `isDrawerParse` drops the `use:` exclusion; the host resolves the bound component before opening and seeds the pane; Apply materialises inline and drops `use` (D4). Delete the dialog's bound-edit branch and its specs (`grammar-editor.dialog.spec.ts:116`, `:180`). | A spec on a legacy bound node: opens in the drawer with the resolved block, Apply yields inline + no `use`. |
+| **S4 — Docs** ✅ **SHIPPED 2026-08-15** | `docs/GLOSSARY.md` — Grammar component = **template**, ⛔ not a binding target. `okf/frontend/features/grammar-config.md` — rewrite "One store — inline by default, extractable to a component". `okf/backend/pipeline-graph/design.md` — note the `use: grammar/` form is read-supported, never authored. Amend the definition-surface plan's P3a + P3d rows. | `graphify update .`; the P3a/P3d contradiction is gone. |
 
 Order is S1 → S2 → S3 → S4. S3 is last because it is the only one that needs a resolve-on-open step,
 and S1/S2 are independently useful without it.
@@ -180,11 +180,37 @@ not fix in this plan.**
 
 ---
 
+### S3 as-built (2026-08-15)
+
+- **Resolution needed no fetch.** The host already lists `grammar` components for `validRefs` (and, since
+  S2, for the template picker), so `definitionDraft()` resolves the bound component from that list.
+  Open question 1 below is answered: neither `components.get` nor a backend change was required.
+- **A dangling binding stays on the dialog.** `isDrawerParse` now returns true for every
+  `parser.delimited` *whose binding resolves*. With nothing to resolve there is no faithful copy to
+  migrate to, and seeding the drawer with defaults would replace the operator's broken reference with a
+  silently invented Grammar — the same failure class as the S2 bug.
+- **One place drops the `use:`** — the pane's `submit()` destructures it out. The host's draft only
+  injects the resolved `parsing:` block for display, so the model is untouched until Apply. A pure
+  open-and-close changes nothing, and Apply is disabled until something is actually edited: "migrates on
+  edit" is enforced by the dirty gate, not by extra code.
+- **The dialog's bound branch collapsed into the inline one**: `save()` no longer switches on
+  `boundGrammarId`, and `updateBoundComponent` is deleted. `closeInline` already dropped the `use:`, so
+  both cases were one path all along.
+- ⚠ **An overclaim caught in review:** the first draft of the dialog's doc comment said "nothing in the
+  UI writes a `grammar` component in place any more". Grep found `component-form.dialog.ts:252` still
+  does — correctly, because editing a template in the library is the point of a library. Narrowed to "no
+  pipeline-editor surface".
+- The old routing spec "keeps the dialog for a grammar-bound `parser.delimited` **and** for the plain
+  parser" would still have PASSED after this change — its fixture has no grammar components, so the
+  bound node was dangling and hit the dialog for a new reason. Rewritten to assert only the plain
+  `parser`, with the bound and dangling cases pinned separately.
+
+---
+
 ## 6. Open questions
 
-None blocking S1. Two worth answering before S3:
+~~1. Where does the host resolve a bound component from?~~ **Answered in S3**: from the component list the
+host already loads — no extra call, no backend change.
 
-1. Where does the host resolve a bound component from — `components.get('grammar', id)` on open, or a
-   resolved block served alongside the graph? The former needs no backend change and is assumed.
-2. Should materialising a legacy bound node warn ("this node no longer follows the template")? Assumed
-   **no** for now — the node was never following it *live* in any deployed config, since none exist.
+~~2. Should materialising a legacy bound node warn?~~ **No**, as assumed — the node was never following the
+component *live* in any deployed config, since none exist.

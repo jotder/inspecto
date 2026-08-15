@@ -48,8 +48,10 @@ export interface GrammarEditorDialogData {
  * <p>⚠ This REVERSES the previous store contract, in which the same action MOVED the block into the
  * component and bound the node, making a later template edit reach back into every pipeline using it.
  * The `use: grammar/<id>` form stays **read-supported** (a hand-authored file may use it) but is never
- * authored; `{@link updateBoundComponent}` is the last writer of one and retires in S3. See
- * `docs/superpower/grammar-templates-not-bindings-plan.md`.
+ * authored: opening a bound node and saving MIGRATES it to an independent inline copy rather than
+ * writing back to the shared component. **No pipeline-editor surface updates a `grammar` component in
+ * place any more** — only the Components registry page does, which is what editing a template in the
+ * library means. See `docs/superpower/grammar-templates-not-bindings-plan.md`.
  *
  * <p>**Plugin Grammars are preview-only here.** A plugin parser also needs per-segment schema files,
  * which only the Onboarding Parsing stage can author; rather than write a config the engine would
@@ -216,10 +218,9 @@ export class GrammarEditorDialog {
         }
 
         if (this.pluginBlocked() || !this.editor?.validate()) return;
-        const block = this.editor.value();
-        const bound = this.boundGrammarId();
-        if (bound) this.updateBoundComponent(bound, block);
-        else this.closeInline(block);
+        // Always inline — a bound node MIGRATES to an independent copy rather than writing back to the
+        // shared component (D4). `closeInline` already drops the `use:`, so both cases are one path.
+        this.closeInline(this.editor.value());
     }
 
     /** The default: the block lives on the node itself, and any previous binding is dropped. */
@@ -240,19 +241,6 @@ export class GrammarEditorDialog {
         this.write(this.components.create('grammar', { id: name, ...block }), name, () =>
             this.closeInline(block),
         );
-    }
-
-    /**
-     * Update the component a bound node references — the last surface that writes a Grammar in place.
-     * Retired in S3, when bound nodes migrate to an inline copy on edit; until then it keeps its
-     * pre-existing binding behaviour so a legacy bound node is not silently rehomed mid-plan.
-     */
-    private updateBoundComponent(name: string, block: Record<string, unknown>): void {
-        this.write(this.components.update('grammar', name, block), name, () => {
-            const config = { ...(this.data.node.config ?? {}) };
-            delete config['parsing'];
-            this.ref.close({ node: { ...this.data.node, use: `grammar/${name}`, config } });
-        });
     }
 
     private write(req$: Observable<unknown>, name: string, onDone: () => void): void {

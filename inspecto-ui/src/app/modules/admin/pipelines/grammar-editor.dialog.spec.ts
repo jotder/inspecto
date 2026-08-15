@@ -113,7 +113,12 @@ describe('GrammarEditorDialog', () => {
         expect(close.mock.calls[0][0].node.config['schema_file']).toBe('cdr.toon');
     });
 
-    it('a bound node loads the component block and saves straight back to that component', async () => {
+    /**
+     * S3 — the inverse of what this asserted before 2026-08-15. A bound node used to save straight
+     * back to the shared component, changing every pipeline bound to it. It now MIGRATES to an
+     * independent inline copy: nothing in the UI writes a `grammar` component in place any more.
+     */
+    it('a bound node loads the component block and MIGRATES it inline on save', async () => {
         const node: AuthoredNode = { id: 'parse', type: 'parser.dsv', use: 'grammar/cdr_csv' };
         const { c, close, components, editor, fixture } = await create({
             node,
@@ -125,12 +130,10 @@ describe('GrammarEditorDialog', () => {
         expect(editor.frontend()).toBe('json');
 
         c.save();
-        expect(components.update).toHaveBeenCalledWith(
-            'grammar',
-            'cdr_csv',
-            expect.objectContaining({ frontend: 'json' }),
-        );
-        expect(close.mock.calls[0][0].node.use).toBe('grammar/cdr_csv');
+        expect(components.update).not.toHaveBeenCalled();
+        const closed = close.mock.calls[0][0];
+        expect(closed.node.use).toBeUndefined();
+        expect(closed.node.config['parsing']).toEqual(expect.objectContaining({ frontend: 'json' }));
     });
 
     it('reads a pre-unification component: parser_type stands in for frontend', async () => {

@@ -298,8 +298,19 @@ built-ins and custom Java decoders deployed as plugins. Fully transparent — a 
 
 **Grammar** — The authored options that tell a **Parser** how to read one file format (delimiter + header for
 delimited, record element for XML, schema module for ASN.1, …). Each Parser declares its grammar's schema
-(`grammarSchema`, the served `FieldSpec` vocabulary) so the options form renders generically; a Grammar
-persists as the reusable `grammar` component kind and is referenced by parser Steps via `use`.
+(`grammarSchema`, the served `FieldSpec` vocabulary) so the options form renders generically. A Grammar
+lives **inline** on its parse Step, in that Step's own `parsing:` block.
+
+**Grammar Template** *(operator decision 2026-08-15)* — A Grammar saved to the `grammar` component kind as
+a reusable **starting point**. Consistent with every other *Template* in this glossary (Space Template, Rule
+Template): you **copy** from it, you never bind to it. Saving a template leaves the authoring Step's own
+Grammar inline and untouched, and later edits to the template reach nothing that started from it.
+⛔ Never describe a Grammar Template as "linked", "shared" or "referenced" — it is a copy source.
+⚠ This REVERSES the 2026-08-04 store contract, where extracting a Grammar MOVED the block into the
+component and bound the Step via `use: grammar/<id>`. That `use:` form stays **read-supported** in the
+engine (a hand-authored file may still carry it) but is **never authored**, and opening such a Step in the
+editor migrates it to an independent inline copy on save. See
+`superpower/grammar-templates-not-bindings-plan.md`.
 ⛔ not "parser config" / "parse options" in UI copy — one concept, one word. ✅ **UI DONE** (2026-08-04):
 the shared `<inspecto-grammar-editor>` (`inspecto/grammar/`) is the one authoring surface for both the
 Onboarding Parsing stage and the Pipelines `parse` node dialog, renamed `ParserConfigDialog` →

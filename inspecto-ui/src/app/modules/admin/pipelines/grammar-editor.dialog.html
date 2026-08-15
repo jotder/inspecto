@@ -23,18 +23,19 @@
     @if (step() === 'config') {
     <p class="text-secondary mb-3 text-xs">{{ data.typeLabel }} · {{ data.categoryLabel }}</p>
 
-    <!-- WHERE the Grammar lives: on this node alone, or in a reusable component bound by `use:`. -->
+    <!-- Which stored Grammar to START FROM. Every option ends up inline on this Step: a template is a
+         copy source, never a live reference (2026-08-15). -->
     <mat-form-field subscriptSizing="dynamic" class="w-72">
-        <mat-label>Grammar</mat-label>
+        <mat-label>Start from</mat-label>
         <mat-select [value]="boundGrammarId() ?? ''" (selectionChange)="onGrammarChange($event.value)" cdkFocusInitial>
-            <mat-option value="">Inline — this Step only</mat-option>
+            <mat-option value="">This Step's own Grammar</mat-option>
             @for (g of grammars(); track g.name) {
             <mat-option [value]="g.name">{{ g.name }}</mat-option>
             }
         </mat-select>
         <mat-hint>
-            {{ boundGrammarId() ? 'Shared — editing it changes every pipeline that uses it.' : 'Private to this Step.'
-            }}
+            {{ boundGrammarId() ? 'A copy — later edits to the template will not change this Step.' : 'Private to this
+            Step.' }}
         </mat-hint>
     </mat-form-field>
 

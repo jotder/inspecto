@@ -219,7 +219,10 @@ export class PipelineParseDefinitionComponent {
         if (!this.editor?.validate()) return;
         const block = { ...this.editor.value(), frontend: 'delimited' };
         const v = this.form.getRawValue();
-        const n = this.node();
+        // `use` is dropped, never carried: this pane's whole contract is that the node owns its
+        // Grammar inline. A node opened here BOUND to a `grammar/<id>` component is materialised into
+        // an independent copy by Applying (D4) — one place decides that, and it is this one.
+        const { use: _unbound, ...n } = this.node();
         const node: AuthoredNode = {
             ...n,
             name: (v.name ?? '').trim() || n.name,

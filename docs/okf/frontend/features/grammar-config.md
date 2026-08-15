@@ -16,16 +16,22 @@ Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.m
 - the Pipelines editor's **`parse`** node — since 2026-08-15 either the right-dock **Parse drawer** or the
   `GrammarEditorDialog`, split by the rule below — see [Pipelines](pipelines.md).
 
-## Two hosts in the Pipelines editor, split by where the Grammar LIVES (2026-08-15, `489b429c`)
+## Two hosts in the Pipelines editor — and the dialog is nearly gone (2026-08-15)
 
-Definition-surface P3a moved the common case out of the popup: a **`parser.delimited` node whose Grammar is
-inline** defines in the right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor.
-Everything else still opens `GrammarEditorDialog`: a **grammar-BOUND** node (`use: grammar/<id>`) and the
-plain `parser` type.
+Definition-surface P3a moved the common case out of the popup: a **`parser.delimited`** node defines in the
+right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor. Since the
+templates-not-bindings change that includes **grammar-bound** nodes, which the host materialises into an
+inline copy on open (`definitionDraft`) and which migrate for real when the operator Applies.
 
-That split is not cosmetic. The drawer's Apply is an **in-memory patch** (D2 — only the toolbar Save
-persists), while updating a bound Grammar means writing a `grammar` registry component — a write route the
-drawer deliberately does not have. Routing bound nodes into it would quietly drop that write.
+`GrammarEditorDialog` is left with exactly two jobs: the **plain `parser` type** (no drawer pane yet — P3d
+adds one and retires the dialog), and a **dangling** `use: grammar/<id>` whose component does not exist.
+The dangling case is deliberate: with nothing to resolve there is no faithful copy to migrate to, and
+seeding the drawer with defaults would replace the operator's broken reference with a silently invented
+Grammar.
+
+⚠ The earlier framing of this split — that bound nodes stay on the dialog *permanently* because updating a
+bound Grammar is a write route the drawer lacks — is **superseded**. The resolution was to remove the
+binding, not to build the write route.
 
 - **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
   ([per-format node types](../../backend/pipeline-graph/design.md)), so offering a switch could only author
@@ -43,15 +49,34 @@ feature before 2026-08-04: they shared only the renderer layer (`fieldSpecsToAtt
 `ParsersService`, `<app-parser-tree>`, `<inspecto-data-table>`, `<inspecto-schema-form>`), and the gap
 between them held two live defects, both fixed as part of this unification (§ below).
 
-## One store — inline by default, extractable to a component
+## One store — always inline; templates are copies (2026-08-15)
 
-A parse node's Grammar lives in its own top-level **`parsing:`** block by default — carried verbatim
+A parse node's Grammar lives in its own top-level **`parsing:`** block, full stop — carried verbatim
 on the node's config, never key-mapped (a key-by-key translation between `parsing:` and the legacy
 `processing.csv_settings`/`schema_file`/`schemas` keys is lossy in both directions; see "Two
-competing keys" below). An operator who wants to **reuse** a Grammar across pipelines explicitly
-promotes it — "Save as reusable Grammar" — which writes a `grammar` registry component and binds the
-node via `use: grammar/<id>`. Extraction **moves** the block; a node never carries both a `parsing:`
-config and a `use: grammar/*` binding at once.
+competing keys" below). An operator who wants to reuse a Grammar saves it as a **Grammar Template**:
+that writes a `grammar` registry component and **leaves the node's block exactly where it was**.
+"Start from a template" copies a stored Grammar into a node. Copies, never links.
+
+⚠ **This reverses the 2026-08-04 contract**, under which "Save as reusable Grammar" MOVED the block
+into the component and bound the node via `use: grammar/<id>`, so editing the component changed every
+pipeline bound to it. The `use:` form remains **read-supported** — `PipelineConfigParser.resolveGrammarRef`,
+the `PipelineEditable` lift/lower translation and `UNKNOWN_USE_REF` are all unchanged, because a
+hand-authored file may still carry one — but nothing authors it, and **opening a bound node in the
+editor migrates it to an independent inline copy on save**. Rationale and slices:
+[`superpower/grammar-templates-not-bindings-plan.md`](../../../superpower/grammar-templates-not-bindings-plan.md).
+
+🔴 **A Grammar component has TWO shapes, and reading one wrong loses data silently.** It is either the
+**legacy flat** `csv_settings`-style map (`{delimiter, has_header, …}` at top level — every
+pre-2026-08-04 component, and everything the Components registry form still writes) or an
+**extracted `parsing:` block** (`{frontend, delimited: {…}}`). The editor seeds its property sheet by
+flattening the block to `delimited__*` keys, so feeding it a flat component matches **no spec key** and
+the form falls back to its **declared defaults** — a component storing `delimiter: "|"` displayed, and
+would have re-saved, `","`. This was live on the dialog's bound-node path until 2026-08-15. Always read
+component content through **`grammarContentAsParsingBlock()`** (`inspecto/grammar/grammar-block.ts`),
+which lifts legacy top-level csv settings under `delimited:`; `isDelimitedGrammar()` is its companion
+gate and deliberately does NOT reuse the editor's `normalizeFrontend`, which maps anything unrecognised
+to `delimited` and would offer an xlsx/asn1/html component as a delimited starting point.
 
 A Grammar component can itself be either shape now: the legacy **flat** `csv_settings`-style map
 (`{delimiter, has_header, ...}` at top level — how every pre-2026-08-04 component was written), or an

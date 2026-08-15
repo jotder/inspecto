@@ -51,6 +51,14 @@ with format tabs, because each format owns its own grammar shape and complexitie
   to be a silent last-one-wins became authorable once the palette offered two icons).
 * The subtype's `use:` home is `grammar/` **only**, not `ingester/`: a plugin-ingester binding on a node
   whose type says *delimited* is a contradiction, refused rather than half-honoured.
+* ⚠ **`use: grammar/<id>` is read-supported but NEVER authored** (operator decision 2026-08-15). Every
+  engine-side piece of it is deliberately unchanged — `resolveGrammarRef`, the `PipelineEditable`
+  lift/lower translation, `UNKNOWN_USE_REF`, `PARSER_NO_SCHEMA`'s `grammarBound` branch, `USE_HOME`, and
+  the `BindKindHomeContractTest` tripwire — because a hand-authored file may still carry one. What
+  changed is upstream: a Grammar component is now a **Template** the UI copies from, so nothing writes a
+  new binding, and opening a bound node in the editor migrates it to an inline copy. ⛔ Do not "tidy up"
+  the binding read path as dead code — it is the compatibility half of a deliberate split. See
+  [`superpower/grammar-templates-not-bindings-plan.md`](../../../superpower/grammar-templates-not-bindings-plan.md).
 * Grouping by **category, not type string**: `PipelineCompiler.compile` and `PipelineDryRun` ask
   `PipelineNodeTypes.isCategory(t, PARSE)`, mirroring the sink family. A new parse subtype needs no edit
   there — but it *does* need its own `LOWERABLE` and `USE_HOME` entries in `PipelineEditable`.

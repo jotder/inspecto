@@ -43,6 +43,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { DefinitionDrawerComponent } from 'app/inspecto/components/definition-drawer.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
+import { grammarContentAsParsingBlock } from 'app/inspecto/grammar';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
@@ -1228,9 +1229,41 @@ export class PipelineEditorComponent implements OnInit {
 
     // ── definition drawer lifecycle (definition-surface P1) ────────────────────────────────────────
 
-    /** Whether this parse node defines in the drawer: the delimited subtype, holding its Grammar inline. */
+    /**
+     * Whether this parse node defines in the drawer. Since S3 that is EVERY `parser.delimited` node,
+     * bound or not — a bound one is materialised into an inline copy by {@link definitionDraft}.
+     *
+     * The one exception is a **dangling** binding: with nothing to resolve there is no faithful copy
+     * to migrate to, and seeding the drawer with defaults would replace the operator's (broken)
+     * reference with a silently invented Grammar. Those stay on the dialog, which can at least show
+     * the binding.
+     */
     private isDrawerParse(node: AuthoredNode): boolean {
-        return node.type === 'parser.delimited' && !node.use?.startsWith('grammar/');
+        if (node.type !== 'parser.delimited') return false;
+        const id = this.boundGrammarId(node);
+        return id === null || this.grammarTemplates().some((t) => t.name === id);
+    }
+
+    /** The `grammar/<id>` this node binds, or `null` when its Grammar is already inline. */
+    private boundGrammarId(node: AuthoredNode): string | null {
+        return node.use?.startsWith(GRAMMAR_REF_PREFIX) ? node.use.slice(GRAMMAR_REF_PREFIX.length) : null;
+    }
+
+    /**
+     * The node as the drawer should present it: a bound node becomes an inline COPY of its Grammar
+     * component (D4 — editing migrates it). Nothing is written here and the model is untouched; the
+     * migration only lands if the operator edits and Applies, which is exactly "migrates on edit".
+     * The `use:` itself is dropped by the pane on submit, so only one place decides that.
+     */
+    private definitionDraft(node: AuthoredNode): AuthoredNode {
+        const id = this.boundGrammarId(node);
+        if (id === null) return node;
+        const component = this.grammarTemplates().find((t) => t.name === id);
+        if (!component) return node; // dangling — isDrawerParse already kept it off the drawer
+        return {
+            ...node,
+            config: { ...(node.config ?? {}), parsing: grammarContentAsParsingBlock(component.content ?? {}) },
+        };
     }
 
     /** Open a node for definition in the right dock, guarding another node's unapplied edits. */
@@ -1243,7 +1276,7 @@ export class PipelineEditorComponent implements OnInit {
             );
             if (!ok) return;
         }
-        this.definitionNode.set(node);
+        this.definitionNode.set(this.definitionDraft(node));
         this.definitionEpoch.update((e) => e + 1);
         this.definitionDirty.set(false);
         this.rightTab.set('properties');
