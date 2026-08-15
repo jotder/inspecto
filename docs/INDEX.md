@@ -75,6 +75,18 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
+- [`superpower/map-node-config-home-plan.md`](superpower/map-node-config-home-plan.md) —
+  **DESIGN, awaiting operator decision (2026-08-15). Nothing built.** AUTHOR-1 follow-on (a): an
+  authored `transform.map` node's `columns`/`rules` are dropped by `PipelineEditable.lower`, which has
+  no branch for map at all. Proposes a `processing.map` home in the flat file. ⚠ **Not authoring-only**
+  — the graph executor reading those keys (`PipelineJobRunner` → `PipelineExecutor` → `RowShaper`) is
+  armed in production today, so a preserved `columns` changes what the next run projects. ⛔ map must
+  stay OUT of `STEP_KIND` (it would flip byte-identical legacy files into `steps:`), and ⛔ a blanket
+  "map has config ⇒ refuse" would refuse every existing pipeline (the lift-derived `schema` key).
+  Three decisions asked: option 1 vs relocating authoring to the parser node; whether an authored
+  `columns` refuses or yields to `processing.mapping_file`; and hand-rolled validation vs building the
+  missing list-of-objects spec primitive.
+
 - ~~`superpower/consignment-chain-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-13**
   ([archive copy](archived-documents/plans-archive/consignment-chain-plan.md), provenance only).
   S1–S7 all delivered; as-built in [`okf/backend/engine/consignment-status-flow.md`](okf/backend/engine/consignment-status-flow.md)

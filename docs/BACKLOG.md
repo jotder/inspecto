@@ -1484,6 +1484,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     AttributeSpec) and lose it. Narrower than it looks: legacy map nodes carry a lift-derived `schema`
     that lower drops **on purpose**, so a blanket "map has config ⇒ refuse" would refuse every existing
     pipeline's save. Needs a keys-that-are-not-derived rule.
+    **→ DESIGNED 2026-08-15, awaiting an operator decision:
+    [`superpower/map-node-config-home-plan.md`](superpower/map-node-config-home-plan.md).** ⚠ Grounding
+    corrected one more premise: this is **not authoring-only** — the graph executor that reads `columns`
+    (`JobService` → `PipelineJobRunner` → `PipelineExecutor` → `RowShaper`) is armed in **production
+    today**, and is a different thing from the still-unbuilt branch-aware executor, so a preserved
+    `columns` changes what the next real run projects. The plan asks three questions: a new
+    `processing.map` key vs relocating authoring to the parser node; whether an authored `columns`
+    refuses against a declared `processing.mapping_file` or yields to it (⚠ today it would **silently
+    outrank** it); and hand-rolled validation vs first building the missing list-of-objects spec
+    primitive (`FieldType` has none — `schemas`/`sinks` are hand-walked in `ConfigSafetyValidator`).
   - **Follow-on, NOT done (UI):** the picker is still offered on kinds that now hard-refuse. The end
     state is `bindKindFor` returning null for TRANSFORM/SINK, but that also feeds `pipeline-graph.ts`'s
     `needsRef` status logic — entangled, design-first. Refusing beats the silent drop meanwhile.
