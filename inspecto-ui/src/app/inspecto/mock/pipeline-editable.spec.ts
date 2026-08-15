@@ -26,7 +26,7 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
     it('carries the parsing: block onto the parser node', () => {
         const g = liftConfig(parsingBlockConfig());
 
-        const parser = g.nodes.find((n) => n.type === 'parser');
+        const parser = g.nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited');
         expect(parser).toBeDefined();
         expect(parser!.config?.['parsing']).toEqual({
             frontend: 'delimited',
@@ -37,7 +37,7 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
     it('lowers an edited parsing: block back into parsing:, not the legacy key', () => {
         const existing = parsingBlockConfig();
         const g = liftConfig(existing);
-        const parser = g.nodes.find((n) => n.type === 'parser')!;
+        const parser = g.nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited')!;
         (parser.config!['parsing'] as Record<string, Record<string, unknown>>)['delimited']['delimiter'] = ';';
 
         const res = lowerGraph(g, existing, true);
@@ -81,7 +81,7 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
             parsing: { frontend: 'delimited', grammar: 'grammar/pipe_delimited' },
         };
 
-        const parser = liftConfig(existing).nodes.find((n) => n.type === 'parser')!;
+        const parser = liftConfig(existing).nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited')!;
 
         expect(parser.use).toBe('grammar/pipe_delimited');
         expect((parser.config?.['parsing'] as Record<string, unknown> | undefined)?.['grammar']).toBeUndefined();
@@ -89,7 +89,7 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
 
     it('lowers the Grammar binding back into parsing.grammar', () => {
         const g = liftConfig(parsingBlockConfig());
-        g.nodes.find((n) => n.type === 'parser')!.use = 'grammar/pipe_delimited';
+        g.nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited')!.use = 'grammar/pipe_delimited';
 
         const res = lowerGraph(g, parsingBlockConfig(), true);
 
@@ -100,7 +100,7 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
     it('clears the ref when the Grammar is unbound', () => {
         const existing = { ...parsingBlockConfig(), parsing: { frontend: 'delimited', grammar: 'grammar/old' } };
         const g = liftConfig(existing);
-        g.nodes.find((n) => n.type === 'parser')!.use = undefined;
+        g.nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited')!.use = undefined;
 
         const res = lowerGraph(g, existing, true);
 
@@ -113,7 +113,7 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
         delete (existing as Record<string, unknown>)['parsing'];
         delete (existing.processing as Record<string, unknown>)['schema_file'];
         const g = liftConfig(existing);
-        g.nodes.find((n) => n.type === 'parser')!.use = 'grammar/pipe_delimited';
+        g.nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited')!.use = 'grammar/pipe_delimited';
 
         expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
     });
@@ -121,12 +121,103 @@ describe('mock pipeline-editable — the parsing: block is parser-owned', () => 
     it('does not drop a parsing: block it was never given (non-strict merge)', () => {
         const existing = parsingBlockConfig();
         const g = liftConfig(existing);
-        const parser = g.nodes.find((n) => n.type === 'parser')!;
+        const parser = g.nodes.find((n) => n.type === 'parser' || n.type === 'parser.delimited')!;
         delete parser.config!['parsing'];
 
         const res = lowerGraph(g, existing, false);
 
         expect((res as { config: Record<string, unknown> }).config['parsing']).toBeDefined();
+    });
+});
+
+/**
+ * Parity guard for the delimited parser subtype (B6/P3a engine slice, `6bc685cf`). The engine retypes
+ * on an EXPLICIT `parsing.frontend: delimited` only, stamps the frontend onto a palette-fresh node,
+ * and refuses a contradiction / a second parser-family node / an ingester binding on the subtype —
+ * the mock must do exactly the same, in both directions.
+ */
+describe('mock pipeline-editable — the delimited parser subtype (parser.delimited)', () => {
+    const delimitedConfig = () => ({
+        name: 'PD',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        parsing: { frontend: 'delimited', delimited: { delimiter: '|', has_header: false } },
+        processing: { schema_file: 'pd_schema.toon' },
+    });
+
+    it('lifts an explicit frontend: delimited to the subtype and round-trips verbatim', () => {
+        const existing = delimitedConfig();
+        const g = liftConfig(existing);
+
+        expect(g.nodes.find((n) => n.type === 'parser.delimited')).toBeDefined();
+        const res = lowerGraph(g, existing, true);
+        expect((res as { config: Record<string, unknown> }).config).toEqual(delimitedConfig());
+    });
+
+    it('keeps the plain parser type when the file never says the word (delimited is the implicit default)', () => {
+        const existing = delimitedConfig();
+        delete (existing as Record<string, unknown>)['parsing'];
+
+        const g = liftConfig(existing);
+
+        expect(g.nodes.find((n) => n.type === 'parser')).toBeDefined();
+        expect(g.nodes.find((n) => n.type === 'parser.delimited')).toBeUndefined();
+    });
+
+    it('stamps frontend: delimited onto a palette-fresh subtype node', () => {
+        const existing = delimitedConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.delimited')!;
+        parser.config = { parsing: { delimited: { delimiter: ';' } } };
+
+        const res = lowerGraph(g, existing, true);
+
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['frontend']).toBe('delimited');
+    });
+
+    it('refuses a parsing.frontend that contradicts the node type', () => {
+        const existing = delimitedConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.delimited')!;
+        parser.config = { parsing: { frontend: 'json' } };
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+        expect(refusals[0].code).toBe('PARSER_FRONTEND_MISMATCH');
+        expect(refusals[0].nodeId).toBe(parser.id);
+    });
+
+    it('refuses a second parser-family node instead of last-one-wins', () => {
+        const existing = delimitedConfig();
+        const g = liftConfig(existing);
+        g.nodes.push({ id: 'parse2', type: 'parser', name: 'Parser', config: { schema_file: 's.toon' } });
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+        expect(refusals[0].code).toBe('MULTI_PARSER');
+        expect(refusals[0].nodeId).toBe('parse2');
+    });
+
+    it('takes a grammar/ binding but refuses ingester/ on the subtype', () => {
+        const existing = delimitedConfig();
+        const bound = liftConfig(existing);
+        bound.nodes.find((n) => n.type === 'parser.delimited')!.use = 'grammar/pipes';
+        const ok = lowerGraph(bound, existing, true);
+        const parsing = (ok as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['grammar']).toBe('grammar/pipes');
+
+        const contradicted = liftConfig(existing);
+        contradicted.nodes.find((n) => n.type === 'parser.delimited')!.use = 'ingester/com.example.Custom';
+        const res = lowerGraph(contradicted, existing, true);
+        expect('refusals' in res).toBe(true);
+        expect((res as { refusals: { code: string }[] }).refusals[0].code).toBe('UNSUPPORTED_BINDING');
     });
 });
 
@@ -361,7 +452,12 @@ describe('mock pipeline-editable — UNSUPPORTED_BINDING', () => {
 
     it('does not refuse a plugin parser\u2019s synthesized ingester/ binding', () => {
         const g = saveable();
-        g.nodes[1] = { id: 'parse', type: 'parser', use: 'ingester/com.acme.Ingester', config: { ingester: 'com.acme.Ingester' } };
+        g.nodes[1] = {
+            id: 'parse',
+            type: 'parser',
+            use: 'ingester/com.acme.Ingester',
+            config: { ingester: 'com.acme.Ingester' },
+        };
         expect('config' in lowerGraph(g as never, {}, true)).toBe(true);
     });
 });
@@ -413,8 +509,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
 
         const g = liftConfig(bare);
         const map = g.nodes.find((n) => n.type === 'transform.map');
-        expect(map, 'the server emits a derived map node here; the offline graph must not be shorter')
-            .toBeDefined();
+        expect(map, 'the server emits a derived map node here; the offline graph must not be shorter').toBeDefined();
         expect(map!.config ?? {}, 'derived only — nothing was authored to carry').toEqual({});
         expect(
             g.edges.some((e) => e.to === 'map'),
@@ -424,10 +519,7 @@ describe('mock pipeline-editable — the authored map projection (processing.map
         // …and it round-trips to nothing: a derived-only node must not invent a processing.map on save.
         const res = lowerGraph(g, bare, true);
         expect('config' in res, JSON.stringify(res)).toBe(true);
-        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<
-            string,
-            unknown
-        >;
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
         expect(processing['map'], 'a node with no authored keys lowers to no processing.map').toBeUndefined();
     });
 

@@ -64,13 +64,22 @@ export const NODE_TYPES: PipelineNodeType[] = (
             emits: ['data'],
             emitsNamedRoutes: false,
         },
-        // parse — one type; the frontend (delimited / ASN.1 / JSON / …) is CONFIG, not a separate type
+        // parse — a family since B6/P3a: the generic parser plus one type per format, delimited first.
         {
             type: 'parser',
             category: 'PARSE',
             label: 'Parser',
             description:
                 'Reads a landed file into rows; may dispatch by schema/segment (route:*) with an unmatched branch.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
+        {
+            type: 'parser.delimited',
+            category: 'PARSE',
+            label: 'Parser (delimited)',
+            description: 'Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.',
             accepts: ['data'],
             emits: ['data', 'unmatched'],
             emitsNamedRoutes: true,

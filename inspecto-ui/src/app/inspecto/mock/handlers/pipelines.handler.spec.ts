@@ -35,6 +35,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         'acquisition',
         'adapter',
         'parser',
+        'parser.delimited', // B6/P3a: the first per-format parser subtype (engine `6bc685cf`)
         'transform.map',
         'transform.filter',
         'transform.select',
@@ -96,7 +97,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup']);
     });
 
-    it('marks exactly the 12 types the server can lower — a laxer mock is the whole failure mode', () => {
+    it('marks exactly the 13 types the server can lower — a laxer mock is the whole failure mode', () => {
         // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
         // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
         expect(
@@ -108,6 +109,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'enrichment',
             'gap',
             'parser',
+            'parser.delimited',
             'sink.persistent',
             'transform.dedup',
             'transform.dedup.marker',
@@ -117,11 +119,15 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'transform.route',
             'transform.summarize',
         ]);
-        expect(NODE_TYPES.length).toBe(22);
+        expect(NODE_TYPES.length).toBe(23);
     });
 
-    it('only the parser and the router emit operator-named routes', () => {
-        expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type)).toEqual(['parser', 'transform.route']);
+    it('only the parser family and the router emit operator-named routes', () => {
+        expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type)).toEqual([
+            'parser',
+            'parser.delimited',
+            'transform.route',
+        ]);
     });
 });
 
@@ -392,9 +398,10 @@ describe('pipelinesHandler — rename moves the identity itself', () => {
         expect(post('/api/pipelines/nope/rename', { newId: 'x' }, store)?.status).toBe(404);
         expect(post('/api/pipelines/cdr_ingest/rename', {}, store)?.status).toBe(400);
         for (const bad of ['Orders EU', 'orders-eu', '_x', 'x!']) {
-            expect(post('/api/pipelines/cdr_ingest/rename', { newId: bad }, store)?.status, `${bad} must be refused`).toBe(
-                422,
-            );
+            expect(
+                post('/api/pipelines/cdr_ingest/rename', { newId: bad }, store)?.status,
+                `${bad} must be refused`,
+            ).toBe(422);
         }
         expect(post('/api/pipelines/cdr_ingest/rename', { newId: 'cdr_ingest_new' }, store)?.status).toBe(409); // active
     });

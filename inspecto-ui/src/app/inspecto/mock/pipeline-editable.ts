@@ -24,6 +24,7 @@ export interface Refusal {
 export const LOWERABLE = new Set([
     'acquisition',
     'parser',
+    'parser.delimited', // the first per-format parser subtype (B6/P3a — mirrors the engine)
     'gap',
     'transform.dedup.marker',
     'transform.filter',
@@ -44,7 +45,13 @@ export const LOWERABLE = new Set([
 const USE_HOME: Record<string, string[]> = {
     acquisition: ['connection/'],
     parser: ['grammar/', 'ingester/'],
+    // The delimited subtype takes a Grammar but never ingester/ — a plugin ingester binding on a node
+    // whose type SAYS delimited is a contradiction the server refuses (mirrors the engine's USE_HOME).
+    'parser.delimited': ['grammar/'],
 };
+
+/** The parser family: the generic parser plus the per-format subtypes (B6 — delimited first). */
+const isParserType = (t: string): boolean => t === 'parser' || t === 'parser.delimited';
 
 /**
  * Node type → the `use:` prefix that is DERIVED, not authored, and is dropped in silence on purpose
@@ -204,7 +211,21 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         if (Object.keys(stripped).length) parserCfg['parsing'] = stripped;
         else delete parserCfg['parsing'];
     }
-    nodes.push({ id: 'parse', type: 'parser', name: 'Parser', use: parserUse, config: parserCfg });
+    // The per-format parser identity (B6/P3a): a file whose parsing: block says frontend: delimited
+    // EXPLICITLY presents its parser as the delimited subtype. Explicit only — delimited is also the
+    // parser's implicit default, and retyping bare legacy files would flip everything deployed on a
+    // read (mirrors `PipelineEditable.toMap`).
+    const explicitDelimited =
+        String(asMap(config['parsing'])['frontend'] ?? '')
+            .trim()
+            .toLowerCase() === 'delimited';
+    nodes.push({
+        id: 'parse',
+        type: explicitDelimited ? 'parser.delimited' : 'parser',
+        name: explicitDelimited ? 'Parser (delimited)' : 'Parser',
+        use: parserUse,
+        config: parserCfg,
+    });
     edges.push({ from: upstream, rel: 'data', to: 'parse' });
     let sinkUpstream = 'parse';
     if (Object.keys(filterCfg).length) {
@@ -363,8 +384,26 @@ export function lowerGraph(
         const unhomed = unhomedBinding(n);
         if (unhomed) refusals.push({ code: 'UNSUPPORTED_BINDING', nodeId: n.id, message: unhomed });
         if (n.type === 'acquisition') acq = n;
-        else if (n.type === 'parser') parser = n;
-        else if (n.type === 'gap') gap = n;
+        else if (isParserType(n.type)) {
+            // One parse slot in the flat file. With two palette icons a second parser is an authorable
+            // state — refuse, don't last-one-wins (mirrors the engine's MULTI_PARSER).
+            if (parser)
+                refusals.push({
+                    code: 'MULTI_PARSER',
+                    nodeId: n.id,
+                    message: `the flat pipeline config has one parse slot and '${parser.id}' already holds it`,
+                });
+            else parser = n;
+            // A subtype node whose own parsing: block names a DIFFERENT frontend is a contradiction
+            // (mirrors the engine's PARSER_FRONTEND_MISMATCH).
+            const fe = asMap(n.config?.['parsing'])['frontend'];
+            if (n.type === 'parser.delimited' && fe != null && String(fe).trim().toLowerCase() !== 'delimited')
+                refusals.push({
+                    code: 'PARSER_FRONTEND_MISMATCH',
+                    nodeId: n.id,
+                    message: `parsing.frontend '${String(fe)}' contradicts the node's own type 'parser.delimited'`,
+                });
+        } else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
         // The five chain kinds. They briefly refused a second node (MULTI_DEDUP / MULTI_ROUTE /
         // MULTI_SUMMARIZE / MULTI_JOIN, 2026-08-11) while the flat file still had one slot per kind;
@@ -571,6 +610,11 @@ export function lowerGraph(
         // is silently dropped on the way to disk (mirrors PipelineEditable.lower).
         if (parser.use?.startsWith('grammar/')) parsingBlock['grammar'] = parser.use;
         else if (strict) delete parsingBlock['grammar'];
+        // A delimited-subtype node authored fresh from the palette carries no frontend key yet; the
+        // file must say the word the type means, or the next lift loses the identity (mirrors the
+        // engine's frontend stamp).
+        if (parser.type === 'parser.delimited' && parsingBlock['frontend'] == null)
+            parsingBlock['frontend'] = 'delimited';
         if (Object.keys(parsingBlock).length) out['parsing'] = parsingBlock;
         else delete out['parsing'];
     }
