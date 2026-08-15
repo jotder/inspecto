@@ -35,22 +35,38 @@ moved from `docs/flow-graph-design.md`, 2026-07-16).
 
 ## The parser family — per-format node types (2026-08-15, `6bc685cf`)
 
-Parse is a **family**, the way sink already was: the generic `parser` plus one type per format, with
-`parser.delimited` the first (fixed-width / ASN.1 / plugin follow). Decided as B6 — no generic parse node
-with format tabs, because each format owns its own grammar shape and complexities.
+Parse is a **family**, the way sink already was: the generic `parser` plus one type per format —
+`parser.delimited` (P3a) and `parser.fixedwidth` (P3b) so far, with ASN.1 / plugin to follow. Decided as
+B6 — no generic parse node with format tabs, because each format owns its own grammar shape and
+complexities.
 
-* **The lift retypes only on an EXPLICIT `parsing.frontend: delimited`.** Delimited is also the parser's
-  *implicit* default (`PipelineConfigParser` defaults the key), so retyping every bare legacy file would
-  change the node type of everything already deployed on a mere read. A file that never says the word keeps
-  the plain `parser` type until its author opts in.
-* **Lower stamps `frontend: delimited`** onto a palette-fresh subtype node — the file must say the word its
-  type means, or the next lift silently loses the identity. A lifted node already carries it, so the
-  round-trip stays byte-verbatim (the property `PipelineEditableTest` pins).
+* **The lift retypes only on an EXPLICIT `parsing.frontend`.** Delimited is also the parser's *implicit*
+  default (`PipelineConfigParser` defaults the key), so retyping every bare legacy file would change the
+  node type of everything already deployed on a mere read. A file that never says the word keeps the plain
+  `parser` type until its author opts in. ⚠ This caveat is **delimited's alone** — fixed width is never
+  implicit, so every fixed-width config already declares itself and all of them retype.
+* **A subtype answers to every spelling of its frontend, and the set is the source of truth.**
+  `SUBTYPE_FRONTENDS` maps each subtype to its spellings and `subtypeForFrontend` inverts it; both the
+  lift's retype and the lower's mismatch check go through it, so the comparison is by **subtype, not by
+  string**. Fixed width has two (`fixedwidth`, `fixed_width` — `PipelineConfigParser#parseFixedWidth`
+  reads both) and neither contradicts the other. ⛔ **A lifted node keeps the spelling its author wrote**:
+  canonicalising `fixed_width` on a read would rewrite a deployed file on the next save, and the verbatim
+  round-trip is the property `PipelineEditableTest` pins.
+* **Lower stamps the CANONICAL frontend** (the first entry in the subtype's list) onto a palette-fresh
+  node — the file must say the word its type means, or the next lift silently loses the identity. A
+  lifted node already carries one, so the round-trip stays byte-verbatim.
+* ⚠ **A record mode is not a node type.** Binary fixed width (`record: bytes`) lifts to
+  `parser.fixedwidth` like any other — the type spans the format — but its field geometry lives in
+  `processing.ingester_config` and is executed by `FixedWidthRecordIngester`, **not** by the
+  `fixedwidth.fields[]` slices; `ComponentPreview` refuses to preview it and `DuckDbCsvIngester` excludes
+  it from the native path. Operator decision 2026-08-16: it keeps the **dialog**, because the drawer
+  pane's slice table would govern nothing. It needs no `ingester/` use-home either — binary reaches its
+  ingester through the plain `processing.ingester` CLASS key, not a `use:` binding.
 * Two refusals, both named: `PARSER_FRONTEND_MISMATCH` (a `parsing.frontend` contradicting the node's own
   type) and `MULTI_PARSER` (a second parser-family node — the flat file has one parse slot, and what used
   to be a silent last-one-wins became authorable once the palette offered two icons).
-* The subtype's `use:` home is `grammar/` **only**, not `ingester/`: a plugin-ingester binding on a node
-  whose type says *delimited* is a contradiction, refused rather than half-honoured.
+* Every subtype's `use:` home is `grammar/` **only**, not `ingester/`: a plugin-ingester binding on a node
+  whose type already names its format is a contradiction, refused rather than half-honoured.
 * ⚠ **`use: grammar/<id>` is read-supported but NEVER authored** (operator decision 2026-08-15). Every
   engine-side piece of it is deliberately unchanged — `resolveGrammarRef`, the `PipelineEditable`
   lift/lower translation, `UNKNOWN_USE_REF`, `PARSER_NO_SCHEMA`'s `grammarBound` branch, `USE_HOME`, and
@@ -62,13 +78,16 @@ with format tabs, because each format owns its own grammar shape and complexitie
 * Grouping by **category, not type string**: `PipelineCompiler.compile` and `PipelineDryRun` ask
   `PipelineNodeTypes.isCategory(t, PARSE)`, mirroring the sink family. A new parse subtype needs no edit
   there — but it *does* need its own `LOWERABLE` and `USE_HOME` entries in `PipelineEditable`.
-* **No `NodeAttributes` spec is published** for the type on purpose. Its grammar nests two levels
-  (`parsing.delimited.*`) while the `key__nested` spec convention has only ever carried one, and the UI
-  drawer owns the form shape — a best-guess table that looks authoritative is what that class's doc warns
-  against. Consequently `node-attributes.contract.json` / `step-types.contract.json` were byte-unchanged.
-* ⚠ `BindKindHomeContractTest` fired correctly when this landed: `NodeCategory.PARSE` had held exactly one
-  type, and its tripwire asserts the derivation the UI's category-keyed picker depends on. The category
-  stays *bindable* only because the new type arrived **with** a `grammar/` home.
+* **No `NodeAttributes` spec is published** for these types on purpose. Their grammars nest two levels
+  (`parsing.delimited.*`, `parsing.fixedwidth.*`) while the `key__nested` spec convention has only ever
+  carried one, and the UI drawer owns the form shape — a best-guess table that looks authoritative is what
+  that class's doc warns against. Consequently `node-attributes.contract.json` / `step-types.contract.json`
+  stay byte-unchanged as each subtype lands.
+* ⚠ `BindKindHomeContractTest` has fired correctly **twice** — at `parser.delimited` and again at
+  `parser.fixedwidth`. Its tripwire asserts the exact PARSE type list plus the derivation the UI's
+  category-keyed picker depends on. The category stays *bindable* only because each new type arrived
+  **with** a `grammar/` home; one added without one must flip `bindKindFor('PARSE')` to null, and this
+  test is where that shows up first.
 
 UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
 

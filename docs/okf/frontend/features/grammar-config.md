@@ -19,15 +19,25 @@ Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.m
 ## Two hosts in the Pipelines editor — and the dialog is nearly gone (2026-08-15)
 
 Definition-surface P3a moved the common case out of the popup: a **`parser.delimited`** node defines in the
-right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor. Since the
-templates-not-bindings change that includes **grammar-bound** nodes, which the host materialises into an
-inline copy on open (`definitionDraft`) and which migrate for real when the operator Applies.
+right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor; P3b added
+**`parser.fixedwidth`** to the same pane. Since the templates-not-bindings change that includes
+**grammar-bound** nodes, which the host materialises into an inline copy on open (`definitionDraft`) and
+which migrate for real when the operator Applies.
 
-`GrammarEditorDialog` is left with exactly two jobs: the **plain `parser` type** (no drawer pane yet — P3d
-adds one and retires the dialog), and a **dangling** `use: grammar/<id>` whose component does not exist.
-The dangling case is deliberate: with nothing to resolve there is no faithful copy to migrate to, and
-seeding the drawer with defaults would replace the operator's broken reference with a silently invented
-Grammar.
+**One pane serves every per-format subtype.** `PARSE_NODE_FRONTENDS` (exported from the pane) maps node
+type → frontend and is the ONE list deciding both which parse nodes reach the drawer (the host's
+`isDrawerParse`) and which format the editor is then locked to, so the two cannot desync. B6 banned a
+generic parser **node type** with format tabs — not component reuse; the type still locks the format, so
+no tabs appear and each format keeps its own palette entry. A second copy of the pane would only drift.
+A parse type **absent** from that map keeps the dialog.
+
+`GrammarEditorDialog` is left with three jobs: the **plain `parser` type** (no drawer pane yet — P3d adds
+one and retires the dialog), a **dangling** `use: grammar/<id>` whose component does not exist, and
+**binary fixed width**. The dangling case is deliberate: with nothing to resolve there is no faithful copy
+to migrate to, and seeding the drawer with defaults would replace the operator's broken reference with a
+silently invented Grammar. The binary case (`record: bytes`, detected by `isBinaryFixedWidth`) lifts to
+`parser.fixedwidth` like any other but carries its geometry in `processing.ingester_config`, so the pane's
+slice table would govern nothing — operator decision 2026-08-16.
 
 ⚠ The earlier framing of this split — that bound nodes stay on the dialog *permanently* because updating a
 bound Grammar is a write route the drawer lacks — is **superseded**. The resolution was to remove the
@@ -35,8 +45,8 @@ binding, not to build the write route.
 
 - **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
   ([per-format node types](../../backend/pipeline-graph/design.md)), so offering a switch could only author
-  a block the save path refuses with `PARSER_FRONTEND_MISMATCH`. The pane also stamps
-  `frontend: 'delimited'` onto the block it emits.
+  a block the save path refuses with `PARSER_FRONTEND_MISMATCH`. The pane stamps its **derived** frontend
+  (`frontend()`, read off the node type) onto the block it emits, never a literal.
 - The pane follows the P2 pure-pane contract: `[node]` in, `(applied)`/`(dirtyChange)` out, no injected
   state, pristine reached by re-seeding from its own input (a failed host save must leave it dirty).
 - ⚠⚠ **Importing this editor into a host drags `<inspecto-data-table>` in, which injects the REAL
@@ -74,9 +84,16 @@ flattening the block to `delimited__*` keys, so feeding it a flat component matc
 the form falls back to its **declared defaults** — a component storing `delimiter: "|"` displayed, and
 would have re-saved, `","`. This was live on the dialog's bound-node path until 2026-08-15. Always read
 component content through **`grammarContentAsParsingBlock()`** (`inspecto/grammar/grammar-block.ts`),
-which lifts legacy top-level csv settings under `delimited:`; `isDelimitedGrammar()` is its companion
-gate and deliberately does NOT reuse the editor's `normalizeFrontend`, which maps anything unrecognised
+which lifts legacy top-level csv settings under `delimited:`; **`grammarSeedsFrontend(content, frontend)`**
+is its companion gate (generalised from `isDelimitedGrammar` by P3b, since the picker must now filter per
+format) and deliberately does NOT reuse the editor's `normalizeFrontend`, which maps anything unrecognised
 to `delimited` and would offer an xlsx/asn1/html component as a delimited starting point.
+
+⚠ That gate is **asymmetric on purpose**: a component declaring *nothing* qualifies for **delimited only**.
+Undeclared means the legacy flat shape, and delimited is the engine's implicit default — offering such a
+component to a fixed-width node would seed a slice table from a `{delimiter: '|'}` map, inventing a
+Grammar nobody wrote. Each frontend's accepted spellings live in `FRONTEND_ALIASES` (delimited also
+answers to `csv`/`dsv`; fixed width to `fixedwidth`/`fixed_width`).
 
 A Grammar component can itself be either shape now: the legacy **flat** `csv_settings`-style map
 (`{delimiter, has_header, ...}` at top level — how every pre-2026-08-04 component was written), or an
