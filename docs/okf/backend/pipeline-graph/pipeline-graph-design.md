@@ -1289,6 +1289,58 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   authoring writes (`POST /pipelines/authored`, `PUT`, `/nodes`, `/edges`) **retired**; grandfathered
   flows stay readable / runnable / deletable, never newly written (`CapabilityManifest` updated to match).
 
+#### `processing.map` — the authored half of a map node (shipped 2026-08-15, AUTHOR-1 follow-on (a))
+
+The ⛔ above ("a map node *is* author-configurable") described a hole that was still open: `lower` had no
+branch for `transform.map` at all, so a projection typed into the map node's dialog was answered
+`200 written: true` and dropped. The flat file now has a home for it, beside `processing.dedup`/`join`/
+`summarize`:
+
+```toon
+processing:
+  map:
+    columns[2]{name,expr}:
+      amount_major, "amount_minor / 100"
+      event_day,    "CAST(event_time AS DATE)"
+```
+
+- **Authored vs derived is the whole design.** `columns`/`rules` are authored and lower verbatim;
+  `schema` (the legacy schema map `PipelineLift` carries wholesale) and `csv` (moved within the node's
+  reach by `PipelineDryRun`) are **derived** — never lowered, never refused. ⛔ A blanket "map has config
+  ⇒ refuse" would have refused **every existing pipeline's save**, because every lifted map node carries
+  a derived `schema`. Any key outside both sets refuses `UNSUPPORTED_MAP_KEY`.
+- ⚠ **This block executes.** Unlike its three neighbours (authoring-only until a recipe-driven executor),
+  `RowShaper` reads `columns`/`rules` on the graph executor `PipelineJobRunner` already runs in
+  production — so a preserved `columns` changes what the *next* run projects. `PipelineConfig.prepare()`
+  therefore does **not** refuse it on an active pipeline, which would break the case it exists to serve.
+- **The allow-list is pinned, not documented.** `MapNodeKeyContractTest` asserts
+  `PipelineEditable.MAP_AUTHORED ∪ MAP_DERIVED == RowShaper.MAP_NODE_CONFIG_KEYS`, *and* re-derives that
+  constant by scanning the `node.cfg("…")` reads in RowShaper's map-path region — because a constant can
+  be edited without editing the code it claims to describe. A key that becomes executable without joining
+  the allow-list is silently dropped on save: exactly the defect this section closes.
+- **Two more refusals, both for losses the file cannot express.** `MAPPING_CONFLICT` — authored `columns`
+  next to a declared `processing.mapping_file`: `columnsOf` checks `columns` first and never consults the
+  schema, so the authored list would silently outrank a reference the operator declared on purpose. (The
+  alternative — making `mapping_file` authoritative — was rejected as a behaviour change to a live
+  production path; it stays a separate, deliberate decision.) `MULTI_MAP_CONFIG` — a multi-schema graph
+  whose map nodes have drifted apart; one `processing.map` serves them all.
+- ⛔ **Still not a `steps:` kind, and deliberately not mutually exclusive with `steps:`.** A map node sits
+  between parser and sink in *both* spellings, so a chain entry would change when `steps:` is emitted at
+  all (rewriting files that round-trip verbatim today), and removing `map` alongside the singular
+  transform keys during a `steps:` rewrite would delete an authored projection.
+- **Validation is hand-rolled** in `ConfigSafetyValidator` — the third list-of-objects walker beside
+  `processing.schemas` and `sinks`, for the same reason: `FieldType` has scalar `LIST` and untyped `MAP`
+  only, no list-of-objects primitive, so no `FieldSpec` can express the shape. Honest cost: the author
+  gets a 422 with a hand-written message and **no generated form control**. Building that primitive (and
+  migrating all three onto it) stays its own `BACKLOG` item.
+
+*Verified: 6 cases in `PipelineEditableTest` (incl. the rich fixture's verbatim round-trip now carrying a
+`processing.map`), 3 in `MapNodeKeyContractTest`, 6 in the mock's `pipeline-editable.spec.ts`, and
+`PipelineExecutorTest#anAuthoredProcessingMapProjectsThroughTheRealExecutor` — which runs config →
+`PipelineLift` → `PipelineExecutor` over real DuckDB, because a config-format slice is not verified by a
+`fromMap` test. Both new guards were falsified before being trusted (a bogus `node.cfg` read and a
+disabled emit each turned them red).*
+
 **Boundary (why a pipeline can be a grandfathered flow and not a canonical config):** the flat
 `PipelineConfig` cannot represent a graph that uses non-lowerable node types — `transform.derive`,
 `transform.route`, `sink.materialized`/`sink.view`, non-`gap` CONTROL, or a second persistent sink. Such

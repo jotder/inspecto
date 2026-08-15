@@ -266,6 +266,15 @@ public final class PipelineLift {
         String mapId = "map" + suffix;
         Map<String, Object> mapCfg = new LinkedHashMap<>();
         if (schema != null) mapCfg.put("schema", schema);
+        // The authored half (processing.map), so an operator's own projection survives a round-trip
+        // instead of being dropped by lower. `schema` above stays lift-DERIVED — PipelineEditable.lower
+        // drops that one and lowers only these two. One processing.map serves every branch's map node;
+        // lower refuses a graph whose map nodes have drifted apart, since the file cannot express it.
+        PipelineConfig.MapConfig authored = cfg.mapConfig();
+        if (authored != null) {
+            if (!authored.columns().isEmpty()) mapCfg.put("columns", authored.columns());
+            if (!authored.rules().isEmpty())   mapCfg.put("rules",   authored.rules());
+        }
         String mapName = (table != null && !table.isBlank()) ? "Map " + table : "Map";
         nodes.add(new PipelineNode(mapId, BuiltinNodeType.TRANSFORM_MAP.type(), mapName, null, mapCfg, null));
         edges.add(new PipelineEdge(mapUpstream, mapUpstreamRel, mapId));

@@ -203,6 +203,53 @@ class PipelineExecutorTest {
         assertEquals(counts.get("parse|data"), counts.get("f|data") + counts.get("f|dropped"));
     }
 
+    /**
+     * <b>AUTHOR-1(a) §6.5 — an authored {@code processing.map} really projects.</b> ⚠ A config-format
+     * slice is NOT verified by a {@code fromMap} test (the multiplicity plan's durable rule), so this
+     * runs the whole path: a flat config carrying {@code processing.map.columns} → {@code PipelineConfig}
+     * → {@link com.gamma.pipeline.PipelineLift} → {@link PipelineExecutor} over real DuckDB.
+     *
+     * <p>It also pins the precedence the design turned on: the lifted map node carries the schema's
+     * mapping rules too (ID/AMT/EVENT_DATE), and the authored {@code columns} outrank them — which is
+     * exactly why an authored list next to a declared {@code mapping_file} is refused at save time
+     * rather than left to decide a production run in silence.
+     */
+    @Test
+    void anAuthoredProcessingMapProjectsThroughTheRealExecutor() throws Exception {
+        sql("CREATE TABLE parsed AS SELECT * FROM (VALUES ('a',150.0,DATE '2026-08-15')) t(id,amt,event_date)");
+
+        Path schema = dir.resolve("mini.toon");
+        java.nio.file.Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        Map<String, Object> raw = new java.util.LinkedHashMap<>(Map.of(
+                "name", "MAP_ETL",
+                "active", false,
+                "dirs", Map.of("poll", dir.resolve("in").toString(), "database", dir.resolve("db").toString()),
+                "processing", Map.of(
+                        "schema_file", schema.toString(),
+                        "map", Map.of("columns", List.of(
+                                Map.of("name", "id_upper", "expr", "UPPER(id)"),
+                                Map.of("name", "amt_major", "expr", "amt / 100"))))));
+
+        PipelineGraph g = com.gamma.pipeline.PipelineLift.lift(com.gamma.etl.PipelineConfig.fromMap(raw));
+        PipelineNode map = g.nodes().stream().filter(n -> "transform.map".equals(n.type())).findFirst()
+                .orElseThrow(() -> new AssertionError("the lift emits a map node"));
+        assertNotNull(map.cfg("columns"), "processing.map must reach the map node, or nothing below is tested");
+
+        PipelineExecutor.ExecResult res = PipelineExecutor.execute(conn, g, "parse", "parsed", "b1",
+                new BranchCommitCoordinator(new BranchCommitLog(dir.resolve("map_bc.csv").toString())),
+                (s, t) -> { }, () -> { });
+
+        String out = res.sinkInputs().values().iterator().next();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out + "\"")) {
+            assertTrue(rs.next(), "the projected relation has the input row");
+            assertEquals(2, rs.getMetaData().getColumnCount(),
+                    "the authored columns are the projection — not the schema's three mapping rules");
+            assertEquals("A", rs.getString("id_upper"));
+            assertEquals(1.5, rs.getDouble("amt_major"), 1e-9);
+        }
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     /** The PipelineStores produced-store config key (kept local so the test reads cleanly). */

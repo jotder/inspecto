@@ -474,6 +474,14 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
+- 🟢 **MOCK-1 — the offline mock's lift emits no *derived* map node** (opened 2026-08-15, found while
+  shipping `processing.map`). `PipelineLift` puts a `transform.map` node carrying the legacy `schema` on
+  **every** lifted pipeline; `mock/pipeline-editable.ts` emits one only when `processing.map` authors
+  config for it. So the offline editor shows a graph one node shorter than the server's for every
+  pipeline without an authored projection. Not a *leniency* hole — nothing is accepted offline that the
+  server refuses — but it is the same class of divergence, and the mock is contract. ⚠ Fixing it changes
+  the offline topology of every pipeline, so it needs its own slice with the node-count assertions in
+  `pipeline-editable.spec.ts` updated deliberately, not absorbed into an unrelated change.
 - 🟡 **PG-1 — Postgres for Standard edition: engine done, bundle and UI open** (opened 2026-08-14).
   Operator's architecture, recorded so it is not re-litigated: **business data is always Parquet, read by
   DuckDB as a non-updateable query engine; operational/transactional data is DuckDB for Personal and
@@ -1484,8 +1492,12 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
     AttributeSpec) and lose it. Narrower than it looks: legacy map nodes carry a lift-derived `schema`
     that lower drops **on purpose**, so a blanket "map has config ⇒ refuse" would refuse every existing
     pipeline's save. Needs a keys-that-are-not-derived rule.
-    **→ DESIGNED 2026-08-15, awaiting an operator decision:
-    [`superpower/map-node-config-home-plan.md`](superpower/map-node-config-home-plan.md).** ⚠ Grounding
+    **→ ✅ SHIPPED 2026-08-15** (decision: option 1 / refuse the conflict / hand-rolled validation).
+    `processing.map` is the flat home for a map node's authored `columns`/`rules`; `schema` and `csv`
+    stay derived-and-dropped; `UNSUPPORTED_MAP_KEY` / `MAPPING_CONFLICT` / `MULTI_MAP_CONFIG` name the
+    three losses the file cannot express. As-built:
+    `okf/backend/pipeline-graph/pipeline-graph-design.md` §16. Plan archived. The design record below
+    stands as the reasoning. ⚠ Grounding
     corrected one more premise: this is **not authoring-only** — the graph executor that reads `columns`
     (`JobService` → `PipelineJobRunner` → `PipelineExecutor` → `RowShaper`) is armed in **production
     today**, and is a different thing from the still-unbuilt branch-aware executor, so a preserved

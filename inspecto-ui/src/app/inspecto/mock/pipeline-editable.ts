@@ -1,7 +1,7 @@
 /**
  * The mock's editable lift/lower — a faithful TS port of the backend `PipelineEditable` (W5). It
- * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE, UNSUPPORTED_BINDING + the
- * completeness set), or the
+ * MUST refuse exactly what the server refuses (UNSUPPORTED_NODE, UNSUPPORTED_BINDING,
+ * UNSUPPORTED_MAP_KEY, MAPPING_CONFLICT, MULTI_MAP_CONFIG + the completeness set), or the
  * offline preview passes a topology the real backend 422s — the textbook "mock more lenient than the
  * server" hole this project has been bitten by before. Node config is the raw config-file vocabulary
  * end to end, so lift→lower is a verbatim map round-trip.
@@ -72,6 +72,16 @@ function unhomedBinding(n: AuthoredNode): string | undefined {
 type Cfg = Record<string, unknown>;
 const asMap = (v: unknown): Cfg => (v && typeof v === 'object' && !Array.isArray(v) ? { ...(v as Cfg) } : {});
 const isQuarantine = (n: AuthoredNode): boolean => !!n.config?.['dir'] && n.config?.['database'] == null;
+
+/**
+ * A map node's AUTHORED keys — they lower to `processing.map`; mirrors `PipelineEditable.MAP_AUTHORED`,
+ * which is itself pinned against what `RowShaper` executes. `schema` (lift-derived legacy schema) and
+ * `csv` (moved within the map node's reach by the dry run) are DERIVED: never lowered, never refused.
+ * Anything else on a map node refuses — the AUTHOR-1 lesson, that a key with no home must say so rather
+ * than be answered `written: true` and dropped.
+ */
+const MAP_AUTHORED = ['columns', 'rules'];
+const MAP_DERIVED = ['schema', 'csv'];
 
 /** The four PRE-parse row-filter lists — regexes/prefixes over one raw column, anchored on
  *  `filter_target_column`. Distinct from the POST-parse `where` predicate; see node-attributes.ts. */
@@ -191,6 +201,20 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         sinkUpstream = 'filter';
     }
 
+    // Authored map projection (processing.map) sits right after the parse/filter stretch, where the
+    // backend's lift always puts a map node. ⚠ This mock emits one only when the file authors config
+    // for it: the backend also emits a *derived* map node (carrying the legacy `schema`) for every
+    // pipeline, which this mock has never modelled. Lifting the authored half is what keeps the
+    // round-trip lossless — without a node to carry it, a strict save would delete processing.map.
+    const mapCfg = asMap(processing['map']);
+    if (MAP_AUTHORED.some((k) => mapCfg[k] != null)) {
+        const mc: Cfg = {};
+        for (const k of MAP_AUTHORED) if (mapCfg[k] != null) mc[k] = mapCfg[k];
+        nodes.push({ id: 'map', type: 'transform.map', name: 'Map', config: mc });
+        edges.push({ from: sinkUpstream, rel: 'data', to: 'map' });
+        sinkUpstream = 'map';
+    }
+
     // Reference join (processing.join) sits right after the parse/filter stretch — dedup/summarize
     // downstream see the enriched row set (mirrors PipelineLift; authoring-only, like route below).
     const join = asMap(processing['join']);
@@ -300,6 +324,7 @@ export function lowerGraph(
     let primarySink: AuthoredNode | undefined, quarantine: AuthoredNode | undefined;
     // The transform chain in authored order — node order, exactly as PipelineEditable.lower reads it.
     const chain: AuthoredNode[] = [];
+    const mapNodes: AuthoredNode[] = [];
     // Distinct output destinations keyed by database dir (order-preserving). One => the single
     // output:/dirs.database shorthand; more than one => a plural sinks: block (slice 4).
     const destByDatabase = new Map<string, AuthoredNode>();
@@ -325,6 +350,9 @@ export function lowerGraph(
         // to flip together in one commit — a preview that refuses what the backend accepts is the same
         // bug as one that accepts what the backend refuses, just pointing the other way.
         else if (STEP_KIND[n.type]) chain.push(n);
+        // ⛔ transform.map is NOT a chain kind (it would change when steps: is emitted at all) — its
+        // authored half lowers to processing.map instead.
+        else if (n.type === 'transform.map') mapNodes.push(n);
         else if (n.type === 'sink.persistent') {
             if (isQuarantine(n)) quarantine = n;
             else {
@@ -337,6 +365,50 @@ export function lowerGraph(
     }
     // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4);
     // a transform.route node lowers to the route: block below (backend route lowering, S3).
+
+    // The authored half of the map nodes → processing.map, with the three refusals the backend raises
+    // (mirrors PipelineEditable.authoredMapConfig).
+    let mapAuthored: Cfg | undefined;
+    let mapAuthoredBy: string | undefined;
+    for (const n of mapNodes) {
+        for (const k of Object.keys(n.config ?? {}))
+            if (!MAP_AUTHORED.includes(k) && !MAP_DERIVED.includes(k))
+                refusals.push({
+                    code: 'UNSUPPORTED_MAP_KEY',
+                    nodeId: n.id,
+                    message:
+                        `a map node has no home for '${k}' in the flat pipeline config; ` +
+                        `it accepts [${[...MAP_AUTHORED].sort().join(', ')}]`,
+                });
+        const mine: Cfg = {};
+        for (const k of MAP_AUTHORED) if (n.config?.[k] != null) mine[k] = n.config[k];
+        if (!Object.keys(mine).length) continue;
+        if (!mapAuthored) {
+            mapAuthored = mine;
+            mapAuthoredBy = n.id;
+        } else if (JSON.stringify(mapAuthored) !== JSON.stringify(mine)) {
+            refusals.push({
+                code: 'MULTI_MAP_CONFIG',
+                nodeId: n.id,
+                message:
+                    `map nodes '${mapAuthoredBy}' and '${n.id}' carry different authored config, ` +
+                    'and the flat file has one processing.map for all of them',
+            });
+        }
+    }
+    // An authored `columns` silently outranks a declared mapping_file in RowShaper (it checks columns
+    // first and never consults the schema), so the conflict is refused at authoring time instead.
+    const declaresMappingFile = parser
+        ? parser.config?.['mapping_file'] != null
+        : asMap(existing['processing'])['mapping_file'] != null;
+    if (mapAuthored?.['columns'] != null && declaresMappingFile)
+        refusals.push({
+            code: 'MAPPING_CONFLICT',
+            nodeId: mapAuthoredBy,
+            message:
+                'an authored columns list would silently outrank the declared processing.mapping_file; ' +
+                'keep one of the two',
+        });
 
     // One spelling or the other, never both — the server's parser refuses a file carrying steps: next
     // to a singular transform block, so a legacy-shaped chain keeps the singular keys verbatim and only
@@ -442,6 +514,14 @@ export function lowerGraph(
         delete processing['summarize'];
     }
 
+    // authored map projection → processing.map ({columns, rules}). ⚠ Unlike its neighbours above, this
+    // one EXECUTES — the backend's graph executor reads it on the next production run.
+    if (mapAuthored) {
+        processing['map'] = mapAuthored;
+    } else if (strict) {
+        delete processing['map'];
+    }
+
     // route: block — node config verbatim, each branch stamped with the destination database its
     // route:<key> edge feeds (mirrors PipelineEditable.routeSection; edges don't survive the flat file).
     if (routeNode) {
@@ -487,6 +567,9 @@ export function lowerGraph(
         delete processing['join'];
         delete processing['summarize'];
         delete out['route'];
+        // ⛔ processing.map is deliberately NOT deleted here: it is not a chain step and the server's
+        // parser accepts it beside steps:, so deleting it would drop an authored projection whenever a
+        // chain outgrew the singular keys.
         // `where` is the legacy spelling of a filter step and lives inside the parser's own
         // csv_settings block, so it survives the deletions above. The pre-parse include/exclude lists
         // in that block are not chain steps and stay where they are.

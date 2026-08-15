@@ -737,6 +737,39 @@ public final class PipelineConfig {
     }
 
     /**
+     * The authored half of a {@code transform.map} node ({@code processing.map}) — the flat file's home
+     * for a projection an operator typed into the map node's dialog, added so that
+     * {@code PipelineEditable.lower} stops dropping it silently (AUTHOR-1 follow-on (a)).
+     *
+     * <p>⚠ Unlike {@code summarize}/{@code join}/{@code route}, this block is <b>executable today</b>:
+     * {@code RowShaper.columnsOf} honours {@code columns} and {@code mappingSchemaOf} honours
+     * {@code rules} on the graph executor that {@code PipelineJobRunner} already runs in production. So
+     * {@link #prepare()} does <b>not</b> refuse it on an {@code active} pipeline — refusing would break
+     * the very case it exists to serve.
+     *
+     * <p>⛔ It is deliberately <b>not</b> a {@link Step} kind: a map node sits between parser and sink in
+     * every lifted graph, in both the legacy and the {@code steps:} spelling, so giving it a chain entry
+     * would change when {@code steps:} is emitted at all and rewrite files that round-trip verbatim
+     * today. For the same reason it is absent from the parser's {@code steps:}-exclusivity list — a
+     * {@code steps:} file may carry {@code processing.map}.
+     *
+     * @param columns explicit projection entries ({@code [{name, expr}]}); empty when unauthored
+     * @param rules   mapping-component rules, field types undeclared; empty when unauthored
+     */
+    @PublicApi(since = "5.7.0")
+    public record MapConfig(List<Map<String, Object>> columns, List<Map<String, Object>> rules) {
+        public MapConfig {
+            columns = columns == null ? List.of() : List.copyOf(columns);
+            rules   = rules   == null ? List.of() : List.copyOf(rules);
+            if (columns.isEmpty() && rules.isEmpty())
+                throw new IllegalArgumentException("processing.map needs a non-empty columns[] or rules[] list");
+        }
+
+        /** True when neither half carries anything the executor would read. */
+        public boolean isEmpty() { return columns.isEmpty() && rules.isEmpty(); }
+    }
+
+    /**
      * Reference join ({@code processing.join}, ELT amendment §2 D-4: the join is a {@code transform}
      * concern — {@code transform: {join: references/x, on: k}} in the recipe; no separate enrich verb).
      * {@code reference} names the join source: a {@code reference/<id>} registry ref (a
@@ -852,6 +885,9 @@ public final class PipelineConfig {
     /** Reference join ({@code processing.join}); {@code null} when absent. */
     private final Join join;
 
+    /** Authored map projection ({@code processing.map}); {@code null} when absent. */
+    private final MapConfig mapConfig;
+
     /**
      * Other config files this pipeline read at parse time (schema / grammar / segment {@code .toon}s),
      * as given in the file (not absolutised). Used by {@link com.gamma.service.ConfigRegistry} to detect
@@ -953,6 +989,13 @@ public final class PipelineConfig {
      * arming would be dead config. Same posture as {@code route}/{@code summarize}.
      */
     public Join join() { return join; }
+    /**
+     * Authored map projection ({@code processing.map}), or {@code null} when absent. ⚠ Unlike its
+     * neighbours this one <b>executes</b> — {@code PipelineLift} puts it on the map node and
+     * {@code RowShaper} reads it — so {@link #prepare()} deliberately does not refuse it on an active
+     * pipeline. See {@link MapConfig}.
+     */
+    public MapConfig mapConfig() { return mapConfig; }
     /** The schema/grammar/segment files this config referenced at parse time (for change-watching). */
     public List<Path>     referencedFiles() { return referencedFiles; }
 
@@ -1009,6 +1052,7 @@ public final class PipelineConfig {
         this.route = b.route;
         this.summarize = b.summarize;
         this.join = b.join;
+        this.mapConfig = b.mapConfig;
         this.referencedFiles = List.copyOf(b.referencedFiles);
     }
 
@@ -1080,6 +1124,7 @@ public final class PipelineConfig {
         this.route = src.route;
         this.summarize = src.summarize;
         this.join = src.join;
+        this.mapConfig = src.mapConfig;
         this.referencedFiles = src.referencedFiles;
     }
 
@@ -1353,6 +1398,7 @@ public final class PipelineConfig {
         Map<String, Object> route = null;     // route: block verbatim; null ⇒ linear pipeline
         Summarize summarize = null;           // group-by rollup (processing.summarize); null ⇒ none
         Join join = null;                     // reference join (processing.join); null ⇒ none
+        MapConfig mapConfig = null;           // authored map projection (processing.map); null ⇒ none
         final List<Path> referencedFiles = new ArrayList<>();   // schema/grammar/segment files read at parse
         String pollDir       = "";
         String databaseDir   = "";

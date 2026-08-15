@@ -553,6 +553,108 @@ class PipelineEditableTest {
         assertEquals(raw, lowered, "strict lower reproduces the predicate pipeline verbatim");
     }
 
+    // ── AUTHOR-1 (a): the authored half of a transform.map node ─────────────────
+    //
+    // Until this slice `lower` had no branch for transform.map at all: an author typed a projection into
+    // the map node's dialog, got `written: true`, and lost it. The five tests below pin the four halves
+    // of the fix — the authored keys survive, the DERIVED ones still do not, and the three losses the
+    // flat file genuinely cannot represent now say so by name.
+
+    /** An authored {@code columns} list survives graph → file → graph. */
+    @Test
+    void authoredMapColumnsSurviveTheRoundTrip(@TempDir Path dir) throws Exception {
+        List<Map<String, Object>> columns = List.of(
+                Map.of("name", "ID_UPPER", "expr", "UPPER(ID)"),
+                Map.of("name", "AMT_MAJOR", "expr", "AMT / 100"));
+        PipelineGraph g = roundTrip(dir, node("map_authored", "transform.map", Map.of("columns", columns)));
+
+        PipelineNode map = g.nodes().stream()
+                .filter(n -> BuiltinNodeType.TRANSFORM_MAP.type().equals(n.type()))
+                .findFirst().orElseThrow(() -> new AssertionError("the lift always emits a map node"));
+        assertEquals(columns, map.cfg("columns"),
+                "the authored projection comes back on the map node; before this slice it was dropped");
+    }
+
+    /**
+     * ⛔ The other half of the same rule: {@code schema} is put on the map node by the lift, so lowering
+     * it would write a derived block back as authored config — and refusing it would refuse every
+     * existing pipeline's save, since every lifted map node carries one.
+     */
+    @Test
+    void theLiftDerivedSchemaIsStillNotLowered() {
+        Map<String, Object> lowered = assertDoesNotThrow(() -> PipelineEditable.lower(
+                graphWith(node("map", "transform.map",
+                        Map.of("schema", Map.of("mapping", Map.of("rules", List.of()))))),
+                new LinkedHashMap<>(), true));
+        assertNull(section(lowered, "processing").get("map"),
+                "a derived schema is not authored config and must not become processing.map");
+    }
+
+    @Test
+    void anUnknownMapKeyRefusesWithNamedCode() {
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class, () -> PipelineEditable.lower(
+                graphWith(node("map", "transform.map", Map.of("flavour", "vanilla"))),
+                new LinkedHashMap<>(), true));
+        assertEquals(1, ex.refusals().size(), ex.getMessage());
+        assertEquals(PipelineEditable.UNSUPPORTED_MAP_KEY, ex.refusals().get(0).code());
+        assertEquals("map", ex.refusals().get(0).nodeId());
+        assertTrue(ex.refusals().get(0).message().contains("flavour"), ex.refusals().get(0).message());
+    }
+
+    /**
+     * {@code RowShaper.columnsOf} checks {@code columns} first and never consults the schema when it
+     * finds one — so an authored list would silently outrank a {@code mapping_file} the operator
+     * declared on purpose, on the next production run. Refusing at authoring time is decision §2.3(a):
+     * it needs no change to a live execution path.
+     */
+    @Test
+    void authoredColumnsAlongsideADeclaredMappingFileRefuse() {
+        PipelineGraph g = new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser", Map.of("schema_file", "s.toon", "mapping_file", "m.toon")),
+                node("map", "transform.map", Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of());
+
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+        assertEquals(1, ex.refusals().size(), ex.getMessage());
+        assertEquals(PipelineEditable.MAPPING_CONFLICT, ex.refusals().get(0).code());
+        assertEquals("map", ex.refusals().get(0).nodeId());
+    }
+
+    /** One {@code processing.map} serves every branch's map node, so drift cannot be represented. */
+    @Test
+    void mapNodesCarryingDifferentAuthoredConfigRefuse() {
+        PipelineGraph g = graphWith(
+                node("map_a", "transform.map", Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
+                node("map_b", "transform.map", Map.of("columns", List.of(Map.of("name", "B", "expr", "2")))));
+
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(g, new LinkedHashMap<>(), true));
+        assertEquals(1, ex.refusals().size(), ex.getMessage());
+        assertEquals(PipelineEditable.MULTI_MAP_CONFIG, ex.refusals().get(0).code());
+        assertEquals("map_b", ex.refusals().get(0).nodeId());
+    }
+
+    /**
+     * ⛔ A map node is not a chain step, and the parser accepts {@code processing.map} beside
+     * {@code steps:} — so a chain that outgrows the singular keys must not take the authored projection
+     * down with it. (The three singular transform keys around it ARE removed; see the ⚠ in {@code lower}.)
+     */
+    @Test
+    void anAuthoredMapSurvivesAChainThatLowersToSteps() {
+        Map<String, Object> lowered = assertDoesNotThrow(() -> PipelineEditable.lower(
+                graphWith(node("map", "transform.map",
+                                Map.of("columns", List.of(Map.of("name", "A", "expr", "1")))),
+                        node("dd1", "transform.dedup", Map.of("keys", List.of("a"))),
+                        node("dd2", "transform.dedup", Map.of("keys", List.of("b")))),
+                new LinkedHashMap<>(), true));
+
+        assertNotNull(lowered.get("steps"), "two dedups cannot fit the singular key — this is a steps: file");
+        assertNotNull(section(lowered, "processing").get("map"),
+                "processing.map is not a chain step and must survive the steps: rewrite");
+    }
+
     // ── fixtures ────────────────────────────────────────────────────────────────
 
     private static PipelineNode node(String id, String type, Map<String, Object> cfg) {
@@ -743,6 +845,10 @@ class PipelineEditableTest {
                     marker_extension: .processed
                     retention_days: 30
                   schema_file: %2$s
+                  map:
+                    columns[2]{name,expr}:
+                      ID_UPPER, "UPPER(ID)"
+                      EVENT_YEAR, "YEAR(EVENT_DATE)"
                 """.formatted(base, sf.toString().replace('\\', '/'));
         Path p = dir.resolve("editable_rich_pipeline.toon");
         Files.writeString(p, toon);

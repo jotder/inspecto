@@ -10,8 +10,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -142,6 +144,17 @@ public final class ConfigSafetyValidator {
         checkOutput(raw, "output.format", "output.compression", p, out);
         checkDuckLake(raw, out);
 
+        // ── processing.map (the authored half of a transform.map node) ──
+        // The third hand-rolled list-of-objects walker in this file, for the same reason as the other
+        // two: FieldType has scalar LIST and untyped MAP only, no list-of-objects primitive, so a
+        // declared FieldSpec cannot express this shape. (Building that primitive and migrating
+        // schemas/sinks/map onto it is its own BACKLOG item; bundling it here would turn a config-format
+        // addition into a spec-layer refactor under two already-validated shapes.)
+        checkMapEntries(RawConfig.at(raw, "processing.map.columns"), "processing.map.columns",
+                "name", "expr", out);
+        checkMapEntries(RawConfig.at(raw, "processing.map.rules"), "processing.map.rules",
+                "targetColumn", null, out);
+
         // ── sinks (plural destinations) ──
         // Each entry is a {database, format, compression, ducklake} tuple; validate the same path-jail /
         // allow-list surface the single output: has. (Multi-destination ingest is executable; the one
@@ -154,6 +167,44 @@ public final class ConfigSafetyValidator {
                 } else {
                     out.add(Finding.error("sinks[" + i + "]", "each sinks[] entry must be a map"));
                 }
+            }
+        }
+    }
+
+    /**
+     * Shape gate for a {@code processing.map} list-of-objects: every entry is a map carrying a non-blank
+     * {@code idKey}, unique across the list, plus a non-blank {@code exprKey} when one is named.
+     *
+     * <p>Each rejected shape is one the executor would otherwise take and mangle rather than refuse:
+     * {@code RowShaper.columnsOf} accepts any non-empty {@code List<?>} it is handed, and
+     * {@code DataTransformer.dataColumns} reads {@code targetColumn} straight into a column name — so a
+     * missing key becomes a column literally named {@code null}, and a duplicate becomes an ambiguous
+     * SELECT, both at run time and neither at authoring time.
+     */
+    private static void checkMapEntries(Object value, String where, String idKey, String exprKey,
+                                        List<Finding> out) {
+        if (value == null) return;
+        if (!(value instanceof List<?> list)) {
+            out.add(Finding.error(where, where + " must be a list of objects"));
+            return;
+        }
+        Set<String> seen = new HashSet<>();
+        for (int i = 0; i < list.size(); i++) {
+            String prefix = where + "[" + i + "]";
+            if (!(list.get(i) instanceof Map<?, ?> entry)) {
+                out.add(Finding.error(prefix, "each " + where + " entry must be a map"));
+                continue;
+            }
+            Object id = entry.get(idKey);
+            if (id == null || id.toString().isBlank())
+                out.add(Finding.error(prefix + "." + idKey, prefix + " needs a non-blank " + idKey));
+            else if (!seen.add(id.toString()))
+                out.add(Finding.error(prefix + "." + idKey,
+                        "duplicate " + idKey + " '" + id + "' — the later entry would silently win"));
+            if (exprKey != null) {
+                Object expr = entry.get(exprKey);
+                if (expr == null || expr.toString().isBlank())
+                    out.add(Finding.error(prefix + "." + exprKey, prefix + " needs a non-blank " + exprKey));
             }
         }
     }

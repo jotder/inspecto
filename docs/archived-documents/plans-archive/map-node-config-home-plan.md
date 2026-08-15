@@ -1,6 +1,15 @@
 # Plan — a flat-config home for an authored `transform.map` node
 
-**Status: DESIGN, awaiting operator decision. Nothing built.**
+**Status: ✅ SHIPPED and ARCHIVED 2026-08-15 — option 1, §2.3 (a) refuse the conflict, §5a hand-rolled
+validation, all of §6 verified. As-built:
+[`okf/backend/pipeline-graph/pipeline-graph-design.md`](../../okf/backend/pipeline-graph/pipeline-graph-design.md) §16.
+Kept for provenance only — never linked as current.**
+
+**What the build added beyond this design:** a third refusal, `MULTI_MAP_CONFIG` (a multi-schema graph
+whose map nodes drifted apart — one `processing.map` serves them all); `csv` as a *second* derived key
+beside `schema` (`PipelineDryRun` puts it on the map node, so refusing it would break a dry-run graph);
+and the explicit decision that `processing.map` is **not** mutually exclusive with `steps:` — §2.1's
+reasoning implies it, but the parser's exclusivity list is a separate place that had to be left alone.
 Created 2026-08-15 (AUTHOR-1 follow-on (a)). Option 1 of the two the grounding surfaced; option 2
 (relocate authoring to the parser node via a `mapping` component) is recorded in §7 and NOT chosen here.
 
@@ -216,6 +225,8 @@ route authoring to the parser's Mapping reference. That is a UI plan, not a conf
 1. **Option 1 or option 2** (§2 vs §7) — new config key, or relocate authoring to the parser.
 2. If option 1: **§2.3 (a) or (b)** — refuse the conflict, or make `mapping_file` authoritative.
 3. If option 1: **§5a or §5b** — hand-rolled validation now, or build the spec-layer primitive first.
+
+**Operator answered 2026-08-15: option 1 · (a) · 5a — the recommendation, taken as written.**
 
 My recommendation: **option 1, (a), 5a** — the smallest change that makes an authored map node honest,
 with no behaviour change to any live run, and the two larger items (the spec primitive, `mapping_file`

@@ -351,3 +351,109 @@ describe('mock pipeline-editable — UNSUPPORTED_BINDING', () => {
         expect('config' in lowerGraph(g as never, {}, true)).toBe(true);
     });
 });
+
+/**
+ * AUTHOR-1 (a): the authored half of a `transform.map` node. Until this slice both sides answered
+ * `written: true` and dropped it. The mock flips in the SAME commit as the server — it is contract,
+ * not fixture — so these mirror `PipelineEditableTest`'s map cases one for one.
+ */
+describe('mock pipeline-editable — the authored map projection (processing.map)', () => {
+    const columns = [
+        { name: 'id_upper', expr: 'UPPER(id)' },
+        { name: 'amt_major', expr: 'amt / 100' },
+    ];
+    const mapConfig = () => ({
+        name: 'M',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        processing: { schema_file: 'm_schema.toon', map: { columns } },
+    });
+
+    const saveable = (extra: Record<string, unknown>[] = [], parserCfg: Record<string, unknown> = {}) => ({
+        name: 'M',
+        active: true,
+        nodes: [
+            { id: 'src', type: 'acquisition', config: { poll: '/in' } },
+            { id: 'parse', type: 'parser', config: { schema_file: 's.toon', ...parserCfg } },
+            ...extra,
+            { id: 'write', type: 'sink.persistent', config: { database: '/db' } },
+        ],
+        edges: [],
+    });
+    const refusalsOf = (g: ReturnType<typeof saveable>) => {
+        const res = lowerGraph(g as never, {}, true);
+        expect('refusals' in res, 'expected a refusal').toBe(true);
+        return (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
+    };
+
+    it('lifts processing.map onto a map node and lowers it back verbatim', () => {
+        const existing = mapConfig();
+        const g = liftConfig(existing);
+
+        const map = g.nodes.find((n) => n.type === 'transform.map');
+        expect(map, 'an authored projection needs a node to carry it').toBeDefined();
+        expect(map!.config?.['columns']).toEqual(columns);
+
+        const res = lowerGraph(g, existing, true);
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        expect((res as { config: Record<string, unknown> }).config).toEqual(existing);
+    });
+
+    it('does not lower the lift-derived schema as authored config', () => {
+        const res = lowerGraph(
+            saveable([{ id: 'map', type: 'transform.map', config: { schema: { mapping: { rules: [] } } } }]) as never,
+            {},
+            true,
+        );
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<string, unknown>;
+        expect(processing['map']).toBeUndefined();
+    });
+
+    it('refuses a map key that is neither authored nor derived', () => {
+        const refusals = refusalsOf(saveable([{ id: 'map', type: 'transform.map', config: { flavour: 'vanilla' } }]));
+        expect(refusals).toHaveLength(1);
+        expect(refusals[0].code).toBe('UNSUPPORTED_MAP_KEY');
+        expect(refusals[0].nodeId).toBe('map');
+        expect(refusals[0].message).toContain('flavour');
+    });
+
+    it('refuses authored columns alongside a declared mapping_file', () => {
+        const refusals = refusalsOf(
+            saveable([{ id: 'map', type: 'transform.map', config: { columns } }], { mapping_file: 'm.toon' }),
+        );
+        expect(refusals).toHaveLength(1);
+        expect(refusals[0].code).toBe('MAPPING_CONFLICT');
+        expect(refusals[0].nodeId).toBe('map');
+    });
+
+    it('refuses two map nodes whose authored config has drifted apart', () => {
+        const refusals = refusalsOf(
+            saveable([
+                { id: 'map_a', type: 'transform.map', config: { columns } },
+                { id: 'map_b', type: 'transform.map', config: { columns: [{ name: 'x', expr: '1' }] } },
+            ]),
+        );
+        expect(refusals).toHaveLength(1);
+        expect(refusals[0].code).toBe('MULTI_MAP_CONFIG');
+        expect(refusals[0].nodeId).toBe('map_b');
+    });
+
+    it('keeps processing.map when the chain outgrows the singular keys and becomes steps:', () => {
+        const res = lowerGraph(
+            saveable([
+                { id: 'map', type: 'transform.map', config: { columns } },
+                { id: 'dd1', type: 'transform.dedup', config: { keys: ['a'] } },
+                { id: 'dd2', type: 'transform.dedup', config: { keys: ['b'] } },
+            ]) as never,
+            {},
+            true,
+        );
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const config = (res as { config: Record<string, unknown> }).config;
+        expect(config['steps'], 'two dedups cannot fit the singular key').toBeDefined();
+        expect((config['processing'] as Record<string, unknown>)['map']).toEqual({ columns });
+    });
+});

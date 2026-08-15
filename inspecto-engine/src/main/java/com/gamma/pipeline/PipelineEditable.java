@@ -8,6 +8,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * The <b>editable</b> lift/lower pair (W5, plan U-A): the graph editor's round-trip over the
@@ -45,6 +46,30 @@ public final class PipelineEditable {
     public static final String NO_PERSISTENT_SINK = "NO_PERSISTENT_SINK";
     public static final String PARSER_NO_SCHEMA = "PARSER_NO_SCHEMA";
     public static final String UNSUPPORTED_BINDING = "UNSUPPORTED_BINDING";
+    /** A map node carries a key that is neither lift-derived nor executable — see {@link #MAP_AUTHORED}. */
+    public static final String UNSUPPORTED_MAP_KEY = "UNSUPPORTED_MAP_KEY";
+    /** An authored {@code columns} list alongside an explicitly declared {@code processing.mapping_file}. */
+    public static final String MAPPING_CONFLICT = "MAPPING_CONFLICT";
+    /** Two map nodes whose authored config has drifted apart — one {@code processing.map} cannot hold both. */
+    public static final String MULTI_MAP_CONFIG = "MULTI_MAP_CONFIG";
+
+    /**
+     * The map-node config keys an author owns — they lower to {@code processing.map} verbatim and lift
+     * back. ⚠ Load-bearing: this set must equal what {@code RowShaper} actually <b>executes</b>, not what
+     * the (free-form) map dialog can type, and {@code MapNodeKeyContractTest} pins the two together.
+     * A new executable key joins this set in the same change that makes it executable.
+     */
+    static final Set<String> MAP_AUTHORED = Set.of("columns", "rules");
+
+    /**
+     * Map-node config keys that are DERIVED, not authored: they are put on the node by the read side and
+     * are never lowered. {@code schema} is the legacy config's schema map, carried wholesale by
+     * {@link PipelineLift} — ⛔ lowering it would write a derived block back as authored config, and
+     * refusing it would refuse every existing pipeline's save. {@code csv} is the parser's settings,
+     * moved within the map node's reach by {@code PipelineDryRun} so a dry-run graph that comes back
+     * round does not refuse.
+     */
+    static final Set<String> MAP_DERIVED = Set.of("schema", "csv");
 
     /** Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE. */
     private static final Set<String> LOWERABLE = Set.of(
@@ -302,6 +327,9 @@ public final class PipelineEditable {
         // order, which is what the editor sends and what PipelineLift emits; the flat file has no edges,
         // so there is no topology to sort by at this point.
         List<PipelineNode> chain = new ArrayList<>();
+        // Map nodes are NOT chain steps (see STEP_KIND's ⛔) — they are collected separately because the
+        // flat file holds their authored half in processing.map, beside dedup/join/summarize.
+        List<PipelineNode> mapNodes = new ArrayList<>();
         // Distinct output destinations keyed by database dir (order-preserving). One ⇒ the single
         // output:/dirs.database shorthand; more than one ⇒ a plural sinks: block (slice 4).
         LinkedHashMap<String, PipelineNode> destByDatabase = new LinkedHashMap<>();
@@ -331,8 +359,13 @@ public final class PipelineEditable {
                         primarySink = n;
                 }
             }
-            // transform.map + enrichment: derived / companion-persisted — nothing to lower
+            else if (BuiltinNodeType.TRANSFORM_MAP.type().equals(t)) mapNodes.add(n);
+            // enrichment: companion-persisted — nothing to lower
         }
+        // The authored half of the map nodes → processing.map. Until AUTHOR-1(a) this loop skipped
+        // transform.map entirely, so anything typed into its dialog was answered `written: true` and
+        // dropped. Refusals raised here, config returned for the emission below.
+        Map<String, Object> mapAuthored = authoredMapConfig(mapNodes, parser, existing, refusals);
         // >1 distinct database is no longer a refusal — it lowers to a plural sinks: block (slice 4).
         // Row-routing to distinct destinations does NOT come through here: transform.route lowers to its
         // own route: key (with the branch↔sink pairing stamped from the edges), and transform.derive is
@@ -438,6 +471,14 @@ public final class PipelineEditable {
             processing.remove("summarize");
         }
 
+        // authored map projection → processing.map ({columns, rules}). ⚠ Unlike its three neighbours
+        // above this one EXECUTES: the graph executor RowShaper reads it on the next production run.
+        if (mapAuthored != null) {
+            processing.put("map", mapAuthored);
+        } else if (strict) {
+            processing.remove("map");
+        }
+
         if (marker != null) {
             Map<String, Object> dc = new LinkedHashMap<>();
             dc.put("enabled", true);
@@ -490,6 +531,9 @@ public final class PipelineEditable {
             processing.remove("join");
             processing.remove("summarize");
             out.remove("route");
+            // ⛔ processing.map is deliberately NOT removed here. It is not a chain step and the parser
+            // does not refuse it beside steps: — a map node exists in both spellings, so removing it
+            // would delete an authored projection every time a chain grew past the singular keys.
             // `where` is the legacy spelling of a filter step and lives INSIDE the parser's own
             // csv_settings block, so the parser node carries it back in verbatim and it survives the
             // removals above. The pre-parse list keys in that block are not chain steps (they anchor
@@ -669,6 +713,64 @@ public final class PipelineEditable {
     /** Legacy files may spell the block {@code source:}; write back whichever key the file uses. */
     private static String collectorKey(Map<String, Object> raw) {
         return raw.containsKey("source") && !raw.containsKey("collector") ? "source" : "collector";
+    }
+
+    /**
+     * The {@code processing.map} block to write for this graph's map nodes, or {@code null} when they
+     * carry nothing authored. Raises three refusals into {@code refusals}:
+     *
+     * <ul>
+     *   <li>{@link #UNSUPPORTED_MAP_KEY} — a key that is neither {@link #MAP_AUTHORED} nor
+     *       {@link #MAP_DERIVED}. ⛔ A blanket "map has config ⇒ refuse" would refuse every existing
+     *       pipeline, because the lift puts a derived {@code schema} on every map node.</li>
+     *   <li>{@link #MAPPING_CONFLICT} — authored {@code columns} alongside an explicitly declared
+     *       {@code processing.mapping_file}. {@code RowShaper.columnsOf} checks {@code columns} first and
+     *       never consults the schema when it finds one, so the authored list would silently outrank a
+     *       reference the operator declared on purpose. Refusing at authoring time makes the operator
+     *       delete one, and needs no change to a live execution path.</li>
+     *   <li>{@link #MULTI_MAP_CONFIG} — a multi-schema graph whose map nodes have drifted apart. One
+     *       {@code processing.map} serves them all, so keeping the first would discard the rest
+     *       silently — the loss this whole change exists to remove.</li>
+     * </ul>
+     */
+    private static Map<String, Object> authoredMapConfig(List<PipelineNode> mapNodes, PipelineNode parser,
+                                                         Map<String, Object> existing,
+                                                         List<PipelineCompileException.Refusal> refusals) {
+        Map<String, Object> authored = null;
+        String authoredBy = null;
+        for (PipelineNode n : mapNodes) {
+            for (String k : n.config().keySet())
+                if (!MAP_AUTHORED.contains(k) && !MAP_DERIVED.contains(k))
+                    refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_MAP_KEY, n.id(),
+                            "a map node has no home for '" + k + "' in the flat pipeline config; it accepts "
+                                    + new TreeSet<>(MAP_AUTHORED)));
+            Map<String, Object> mine = new LinkedHashMap<>();
+            for (String k : List.of("columns", "rules")) putIfPresent(mine, k, n.cfg(k));
+            if (mine.isEmpty()) continue;
+            if (authored == null) {
+                authored = mine;
+                authoredBy = n.id();
+            } else if (!authored.equals(mine)) {
+                refusals.add(new PipelineCompileException.Refusal(MULTI_MAP_CONFIG, n.id(),
+                        "map nodes '" + authoredBy + "' and '" + n.id() + "' carry different authored config, "
+                                + "and the flat file has one processing.map for all of them"));
+            }
+        }
+        if (authored != null && authored.containsKey("columns") && declaresMappingFile(parser, existing))
+            refusals.add(new PipelineCompileException.Refusal(MAPPING_CONFLICT, authoredBy,
+                    "an authored columns list would silently outrank the declared processing.mapping_file; "
+                            + "keep one of the two"));
+        return authored;
+    }
+
+    /**
+     * Whether the file being written declares {@code processing.mapping_file}. The parser node owns the
+     * key ({@link #PARSER_OWNED}) and its config is what gets written, so it decides — but a lenient save
+     * of a graph with no parser node leaves the existing file's value in place, and that counts too.
+     */
+    private static boolean declaresMappingFile(PipelineNode parser, Map<String, Object> existing) {
+        if (parser != null) return parser.cfg("mapping_file") != null;
+        return existing.get("processing") instanceof Map<?, ?> p && p.get("mapping_file") != null;
     }
 
     /** A quarantine sink is a persistent sink writing unmatched FILES to a dir, not batches to a database. */

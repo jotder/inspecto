@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * <b>T10 — row-shaping SQL assembly.</b> Executes one flow {@code transform.*} node as SQL over a DuckDB
@@ -61,6 +62,17 @@ import java.util.Optional;
 public final class RowShaper {
 
     private RowShaper() {}
+
+    /**
+     * <b>Every node-config key this class reads on a {@code transform.map} node</b> — the executable
+     * vocabulary, as opposed to what the map dialog can type. {@code PipelineEditable} splits it into
+     * authored ({@code columns}, {@code rules} — lowered to {@code processing.map}) and derived
+     * ({@code schema}, {@code csv} — never lowered), and {@code MapNodeKeyContractTest} pins this
+     * constant against both that split and the {@code node.cfg("…")} reads in the map-path methods
+     * below. ⚠ A key that becomes executable here without joining the lowering allow-list is silently
+     * dropped on save — the failure this constant exists to make impossible.
+     */
+    public static final Set<String> MAP_NODE_CONFIG_KEYS = Set.of("columns", "rules", "schema", "csv");
 
     /** A produced relation: the {@link PipelineRel} an outbound edge carries + the DuckDB table holding it. */
     public record Relation(String rel, String table) {}

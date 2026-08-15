@@ -275,6 +275,17 @@ final class PipelineConfigParser {
             b.join = new PipelineConfig.Join(blankToNull(recJoin.get("reference")), on);
         }
 
+        // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──
+        // ⛔ NOT added to the steps: exclusivity list below: a map node sits between parser and sink in
+        // both spellings, so a steps: file may legitimately carry processing.map. See MapConfig's ⛔.
+        Map<String, Object> recMap = (Map<String, Object>) proc.get("map");
+        if (recMap != null) {
+            List<Map<String, Object>> columns = objectList(recMap.get("columns"), "processing.map.columns");
+            List<Map<String, Object>> rules   = objectList(recMap.get("rules"),   "processing.map.rules");
+            if (!columns.isEmpty() || !rules.isEmpty())
+                b.mapConfig = new PipelineConfig.MapConfig(columns, rules);
+        }
+
         // ── route: block (ELT amendment §2.6) — carried VERBATIM; authoring/round-trip only. ──
         // The linear batch path cannot execute a branch tree, so arming is refused in prepare():
         // an active pipeline with route: fails fast rather than silently landing every row in the
@@ -1020,6 +1031,25 @@ final class PipelineConfigParser {
         if (v == null) return null;
         String s = String.valueOf(v).trim();
         return s.isEmpty() ? null : s;
+    }
+
+    /**
+     * A list-of-objects config value as {@code List<Map<String,Object>>} — absent ⇒ empty. Fails fast on
+     * anything that is not a list of maps, because the alternative is the executor seeing a shape it
+     * silently skips: {@code RowShaper.columnsOf} takes any non-empty {@code List<?>} it is handed.
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> objectList(Object value, String where) {
+        if (value == null) return List.of();
+        if (!(value instanceof List<?> list))
+            throw new IllegalArgumentException(where + " must be a list of objects");
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> m))
+                throw new IllegalArgumentException(where + " entries must be objects, got: " + o);
+            out.add((Map<String, Object>) m);
+        }
+        return out;
     }
 
     /** Parse a tri-state boolean: {@code null}/blank ⇒ {@code null} (unset), else parsed. */
