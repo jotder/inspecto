@@ -231,6 +231,19 @@ describe('PipelineEditorComponent', () => {
             expect(c.definitionNode()?.id).toBe('parse');
         });
 
+        /** The palette seeds `{id, type}` and nothing else — the drawer predicate keys on the type
+         *  and the absence of a `grammar/` use, so a config-less fresh drop reaches the drawer too. */
+        it('routes a palette-fresh parser.delimited node to the drawer', () => {
+            const c = make();
+            c.select('demo');
+            c.addFromPalette('parser.delimited');
+            const node = c.model()!.nodes.at(-1)!;
+            expect(node.config).toBeUndefined();
+            c.openNodeConfig(node);
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(c.definitionNode()?.id).toBe(node.id);
+        });
+
         /** A grammar-BOUND delimited node stays on the dialog: updating the reusable component is a
          *  write route of its own, and the drawer's Apply is an in-memory patch only (D2). The plain
          *  `parser` type stays on the dialog as before. */

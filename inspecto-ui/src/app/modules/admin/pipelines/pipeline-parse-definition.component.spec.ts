@@ -100,6 +100,24 @@ describe('PipelineParseDefinitionComponent', () => {
         expect(applied.config!['schema_file']).toBe('cdr_schema.toon');
     });
 
+    /**
+     * The palette seeds a new node as `{id, type}` with no config at all — so the pane must host a
+     * node with no `parsing:` block and still Apply a block the save path accepts. A delimited
+     * Grammar is complete without a schema (`has_header` reads the header row), which is why
+     * PARSER_NO_SCHEMA is satisfied by the block's mere presence.
+     */
+    it('hosts a palette-fresh node with no config and Applies a complete delimited block', async () => {
+        const fixture = await create({ id: 'parser_delimited_1', type: 'parser.delimited' });
+        expect(editor(fixture).value()['delimited']).toEqual({ delimiter: ',', has_header: true });
+
+        pane(fixture).submit();
+
+        const applied = fixture.componentInstance.applied!;
+        const parsing = applied.config!['parsing'] as Record<string, unknown>;
+        expect(parsing['frontend']).toBe('delimited');
+        expect(parsing['delimited']).toEqual({ delimiter: ',', has_header: true });
+    });
+
     it('reports dirty on an edit, and pristine again after Apply', async () => {
         const fixture = await create();
         editor(fixture).schemaForm!.form.patchValue({ delimited__delimiter: ';' });
