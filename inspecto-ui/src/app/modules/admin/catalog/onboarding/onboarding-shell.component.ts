@@ -152,6 +152,17 @@ export class OnboardingShellComponent {
         this.saveStage({ parsing }, 'Parsing saved');
     }
 
+    /** The Schema stage writes its own `<name>_schema` toon, then hands back the block naming it. */
+    saveSchemaFile(processing: Record<string, unknown>): void {
+        this.saveStage({ processing }, 'Schema saved');
+    }
+
+    /** A pane asking to move the operator on (the Schema stage's "Go to Parsing"). Unguarded on
+     *  purpose: the pane only offers it when it has nothing to lose (no parsed sample to work from). */
+    goToStage(stage: OnboardingStageId): void {
+        this.router.navigate(['/catalog', 'onboard', this.state.name(), stage]);
+    }
+
     /** Rail click: guarded by the active pane's unsaved changes; the URL is the source of truth. */
     async select(stage: OnboardingStage): Promise<void> {
         if (stage.id === this.state.activeStageId()) return;

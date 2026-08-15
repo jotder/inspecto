@@ -144,11 +144,25 @@
                         />
                     }
                     @case ('schema') {
-                        <app-onboarding-schema-mapping-pane />
+                        <app-onboarding-schema-mapping-pane
+                            [config]="state.config()"
+                            [kind]="state.kind()"
+                            [saving]="savingPane()"
+                            (applied)="saveSchemaFile($event)"
+                            (dirtyChange)="paneDirty.set($event)"
+                            (jumpToParsing)="goToStage('parsing')"
+                        />
                     }
                     @case ('keys') {
                         <!-- the Reference "Keys & Load" stage authors the same schema artifact -->
-                        <app-onboarding-schema-mapping-pane />
+                        <app-onboarding-schema-mapping-pane
+                            [config]="state.config()"
+                            [kind]="state.kind()"
+                            [saving]="savingPane()"
+                            (applied)="saveSchemaFile($event)"
+                            (dirtyChange)="paneDirty.set($event)"
+                            (jumpToParsing)="goToStage('parsing')"
+                        />
                     }
                     @case ('enrichment') {
                         <app-onboarding-enrichment-pane />

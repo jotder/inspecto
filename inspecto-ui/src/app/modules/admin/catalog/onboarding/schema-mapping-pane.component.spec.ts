@@ -8,7 +8,6 @@ import { ConfigService, ParsingPreview, SchemaPreview, SpacesService } from 'app
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingSchemaMappingPaneComponent } from './schema-mapping-pane.component';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
-import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 const CONVENTION_PATH = 'spaces/demo/config/orders_feed_schema.toon';
@@ -48,6 +47,7 @@ async function create(
     config: Record<string, unknown>,
     api: Partial<ConfigService> = {},
     parsePreview: ParsingPreview | null = delimitedPreview(),
+    kind: 'stream' | 'reference' = 'stream',
 ) {
     TestBed.configureTestingModule({
         imports: [OnboardingSchemaMappingPaneComponent],
@@ -55,12 +55,10 @@ async function create(
             provideNoopAnimations(),
             provideRouter([]),
             DefinitionStateService,
-            OnboardingStateService,
             {
                 provide: ConfigService,
                 useValue: {
                     write: vi.fn((type: string) => of(WRITE_OK(type))), // companion schema file
-                    patch: vi.fn((type: string) => of(WRITE_OK(type))), // pipeline stage save
                     read: vi.fn(() => throwError(() => ({ status: 404 }))),
                     previewSchema: vi.fn(() => of(SCHEMA_PREVIEW)),
                     ...api,
@@ -70,13 +68,19 @@ async function create(
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
-    const state = TestBed.inject(OnboardingStateService);
-    state.config.set(config);
-    if (parsePreview) state.parsePreview.set(parsePreview);
+    const definition = TestBed.inject(DefinitionStateService);
+    if (parsePreview) definition.parsePreview.set(parsePreview);
     await TestBed.compileComponents(); // the shared data-table pulls in @defer-loaded blocks
     const fixture = TestBed.createComponent(OnboardingSchemaMappingPaneComponent);
+    fixture.componentRef.setInput('config', config);
+    fixture.componentRef.setInput('kind', kind);
+    // The pure contract is observed through the outputs — the HOST persists the emitted block.
+    const applied: Record<string, unknown>[] = [];
+    const dirty: boolean[] = [];
+    fixture.componentInstance.applied.subscribe((v) => applied.push(v));
+    fixture.componentInstance.dirtyChange.subscribe((v) => dirty.push(v));
     fixture.detectChanges();
-    return { fixture, state, api: TestBed.inject(ConfigService) };
+    return { fixture, definition, applied, dirty, api: TestBed.inject(ConfigService) };
 }
 
 describe('OnboardingSchemaMappingPaneComponent', () => {
@@ -168,32 +172,66 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
         const previewSchema = vi.fn((_config: Record<string, unknown>, _rows: Record<string, unknown>[]) =>
             of(SCHEMA_PREVIEW),
         );
-        const { fixture, state } = await create({ name: 'orders_feed' }, { previewSchema });
+        const { fixture, definition } = await create({ name: 'orders_feed' }, { previewSchema });
         const c = fixture.componentInstance;
         c.fieldRows.at(1).get('include')?.setValue(false); // drop QUANTITY
         c.testTypes();
         const [content, rows] = previewSchema.mock.calls[0] as [{ raw: { fields: { name: string }[] } }, unknown[]];
         expect(content.raw.fields.map((f) => f.name)).toEqual(['ORDER_ID']);
         expect(rows).toEqual(delimitedPreview().rows);
-        expect(state.schemaPreview()).toEqual(SCHEMA_PREVIEW);
+        expect(definition.schemaPreview()).toEqual(SCHEMA_PREVIEW);
     });
 
-    it('save writes the schema config then links it into the pipeline draft', async () => {
-        // Two persistence paths: the companion schema FILE goes through /config/write; the
-        // pipeline draft's processing.schema_file link is a stage save → /config/patch.
-        const write = vi.fn((type: string, _config: Record<string, unknown>, _opts?: unknown) => of(WRITE_OK(type)));
-        const patch = vi.fn((type: string, _name: string, _patch: Record<string, unknown>) => of(WRITE_OK(type)));
-        const { fixture } = await create({ name: 'orders_feed', dirs: { poll: 'in' } }, { write, patch });
+    it('writes the companion schema config, THEN emits the block naming it', async () => {
+        // Two persistence paths, one of them no longer the pane's: the companion schema FILE goes
+        // through /config/write here; the pipeline draft's processing.schema_file link is emitted
+        // for the HOST to save (D2) — and only after that write lands, so the draft can never name
+        // a file that does not exist.
+        const order: string[] = [];
+        const write = vi.fn((type: string, _config: Record<string, unknown>, _opts?: unknown) => {
+            order.push('write');
+            return of(WRITE_OK(type));
+        });
+        const { fixture, applied } = await create({ name: 'orders_feed', dirs: { poll: 'in' } }, { write });
+        fixture.componentInstance.applied.subscribe(() => order.push('applied'));
         fixture.componentInstance.save();
         expect(write).toHaveBeenCalledTimes(1);
         const [schemaType, schemaDraft] = write.mock.calls[0] as [string, Record<string, unknown>];
         expect(schemaType).toBe('schema');
         expect((schemaDraft['raw'] as Record<string, unknown>)['name']).toBe('orders_feed_schema');
         expect((schemaDraft['mapping'] as Record<string, unknown>)['rules']).toHaveLength(2);
-        expect(patch).toHaveBeenCalledTimes(1);
-        const [pipelineType, , pipelinePatch] = patch.mock.calls[0] as [string, string, Record<string, unknown>];
-        expect(pipelineType).toBe('pipeline');
-        expect((pipelinePatch['processing'] as Record<string, unknown>)['schema_file']).toBe(CONVENTION_PATH);
+        expect(order).toEqual(['write', 'applied']);
+        expect(applied).toEqual([{ schema_file: CONVENTION_PATH }]);
+    });
+
+    it('emits nothing when the companion schema write fails', async () => {
+        TOASTR.error.mockClear();
+        const write = vi.fn(() => throwError(() => ({ status: 500 })));
+        const { fixture, applied } = await create({ name: 'orders_feed' }, { write });
+        fixture.componentInstance.save();
+        expect(applied).toHaveLength(0);
+        expect(TOASTR.error).toHaveBeenCalled();
+        expect(fixture.componentInstance.writing()).toBe(false);
+    });
+
+    it('re-seeding the config input returns the pane to pristine; a failed save leaves it dirty', async () => {
+        const { fixture, dirty } = await create({ name: 'orders_feed' });
+        fixture.componentInstance.fieldRows.at(0).get('name')?.setValue('ORDER_REF');
+        fixture.componentInstance.fieldRows.at(0).get('name')?.markAsDirty();
+        fixture.componentInstance.onInteraction();
+        expect(dirty).toEqual([true]);
+
+        // A FAILED save never advances the host's config — nothing re-seeds, the guard still fires.
+        fixture.detectChanges();
+        expect(dirty).toEqual([true]);
+
+        // A SUCCESSFUL one hands back the newly-persisted draft.
+        fixture.componentRef.setInput('config', {
+            name: 'orders_feed',
+            processing: { schema_file: CONVENTION_PATH },
+        });
+        fixture.detectChanges();
+        expect(dirty).toEqual([true, false]);
     });
 
     it('blocks save on a duplicate field name', async () => {
@@ -207,8 +245,12 @@ describe('OnboardingSchemaMappingPaneComponent', () => {
     });
 
     it('shows the honest full-replace load-policy note when serving the Reference keys stage', async () => {
-        const { fixture, state } = await create({ name: 'region_dim', produces: 'reference' });
-        expect(state.kind()).toBe('reference');
+        const { fixture } = await create(
+            { name: 'region_dim', produces: 'reference' },
+            {},
+            delimitedPreview(),
+            'reference',
+        );
         expect(fixture.nativeElement.textContent).toContain('Load policy: full replace');
     });
 
