@@ -1,5 +1,4 @@
-import { NgComponentOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, Type, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -50,7 +49,12 @@ function describeDependents(impact: ConfigImpact): string {
     changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [DefinitionStateService, OnboardingStateService],
     imports: [
-        NgComponentOutlet,
+        OnboardingCollectionPaneComponent,
+        OnboardingParsingPaneComponent,
+        OnboardingSchemaMappingPaneComponent,
+        OnboardingEnrichmentPaneComponent,
+        OnboardingPublishPaneComponent,
+        OnboardingPlaceholderPaneComponent,
         MatButtonModule,
         MatIconModule,
         MatProgressSpinnerModule,
@@ -82,24 +86,6 @@ export class OnboardingShellComponent {
     readonly activeStage = computed<OnboardingStage>(() => {
         const stages = this.state.stages();
         return stages.find((s) => s.id === this.state.activeStageId()) ?? stages[0];
-    });
-
-    readonly activeComponent = computed<Type<unknown>>(() => {
-        switch (this.activeStage().id) {
-            case 'collection':
-                return OnboardingCollectionPaneComponent;
-            case 'parsing':
-                return OnboardingParsingPaneComponent;
-            case 'schema':
-            case 'keys': // the Reference "Keys & Load" stage authors the same schema artifact
-                return OnboardingSchemaMappingPaneComponent;
-            case 'enrichment':
-                return OnboardingEnrichmentPaneComponent;
-            case 'publish':
-                return OnboardingPublishPaneComponent;
-            default:
-                return OnboardingPlaceholderPaneComponent;
-        }
     });
 
     constructor() {

@@ -64,8 +64,8 @@
         @if (state.active() && lens.canAuthorWorkbench() && !state.writesDisabled()) {
             <inspecto-alert class="mx-6 mt-4 block sm:mx-10" variant="warning" icon="heroicons_outline:signal">
                 This {{ state.kind() }} is <strong>live</strong> — there is no separate publish step, so every stage
-                save below takes effect on the next poll cycle. Take it offline from the Go-live stage first if you
-                want to edit it safely.
+                save below takes effect on the next poll cycle. Take it offline from the Go-live stage first if you want
+                to edit it safely.
             </inspecto-alert>
         }
         @if (!lens.canAuthorWorkbench()) {
@@ -125,7 +125,30 @@
 
             <!-- Active stage pane (the sample strip belongs to Parsing, the stage that uses it) -->
             <main class="flex min-w-0 flex-1 flex-col overflow-y-auto p-6 sm:p-8">
-                <ng-container [ngComponentOutlet]="activeComponent()" />
+                @switch (activeStage().id) {
+                    @case ('collection') {
+                        <app-onboarding-collection-pane />
+                    }
+                    @case ('parsing') {
+                        <app-onboarding-parsing-pane />
+                    }
+                    @case ('schema') {
+                        <app-onboarding-schema-mapping-pane />
+                    }
+                    @case ('keys') {
+                        <!-- the Reference "Keys & Load" stage authors the same schema artifact -->
+                        <app-onboarding-schema-mapping-pane />
+                    }
+                    @case ('enrichment') {
+                        <app-onboarding-enrichment-pane />
+                    }
+                    @case ('publish') {
+                        <app-onboarding-publish-pane />
+                    }
+                    @default {
+                        <app-onboarding-placeholder-pane />
+                    }
+                }
             </main>
         </div>
     }
