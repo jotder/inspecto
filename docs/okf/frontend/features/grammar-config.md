@@ -13,7 +13,30 @@ Two screens author how raw bytes become rows — a **Grammar** (`docs/GLOSSARY.m
 "parser config" / "parse options", banned synonyms) — and they are now **one** feature:
 
 - Onboarding's **Parsing** stage (`/catalog/onboard/<name>/parsing`) — see [Onboarding](onboarding.md);
-- the Pipelines editor's **`parse`** node dialog (`GrammarEditorDialog`) — see [Pipelines](pipelines.md).
+- the Pipelines editor's **`parse`** node — since 2026-08-15 either the right-dock **Parse drawer** or the
+  `GrammarEditorDialog`, split by the rule below — see [Pipelines](pipelines.md).
+
+## Two hosts in the Pipelines editor, split by where the Grammar LIVES (2026-08-15, `489b429c`)
+
+Definition-surface P3a moved the common case out of the popup: a **`parser.delimited` node whose Grammar is
+inline** defines in the right-dock drawer (`<app-pipeline-parse-definition>`), over this same shared editor.
+Everything else still opens `GrammarEditorDialog`: a **grammar-BOUND** node (`use: grammar/<id>`) and the
+plain `parser` type.
+
+That split is not cosmetic. The drawer's Apply is an **in-memory patch** (D2 — only the toolbar Save
+persists), while updating a bound Grammar means writing a `grammar` registry component — a write route the
+drawer deliberately does not have. Routing bound nodes into it would quietly drop that write.
+
+- **`[lockType]`** hides the format picker: for a per-format node the format *is* the node's type
+  ([per-format node types](../../backend/pipeline-graph/design.md)), so offering a switch could only author
+  a block the save path refuses with `PARSER_FRONTEND_MISMATCH`. The pane also stamps
+  `frontend: 'delimited'` onto the block it emits.
+- The pane follows the P2 pure-pane contract: `[node]` in, `(applied)`/`(dirtyChange)` out, no injected
+  state, pristine reached by re-seeding from its own input (a failed host save must leave it dirty).
+- ⚠⚠ **Importing this editor into a host drags `<inspecto-data-table>` in, which injects the REAL
+  `MatDialog`.** A spec's plain `{provide: MatDialog, useValue}` is then **silently ignored** and every
+  `dialog.open` dies inside Material with `Cannot read properties of undefined (reading 'push')` — ten green
+  tests in `pipeline-editor.component.spec.ts` broke exactly this way. Use `TestBed.overrideProvider`.
 
 Unlike [Collector configuration](collector-config.md), these two surfaces were **not** already one
 feature before 2026-08-04: they shared only the renderer layer (`fieldSpecsToAttributes`,

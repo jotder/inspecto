@@ -33,6 +33,37 @@ moved from `docs/flow-graph-design.md`, 2026-07-16).
   `BuiltinNodeType` enum values, then layered with `ServiceLoader<PipelineNodeType>` providers (an edition can
   override a built-in). `catalog()` feeds the UI palette + the validator's wiring check.
 
+## The parser family — per-format node types (2026-08-15, `6bc685cf`)
+
+Parse is a **family**, the way sink already was: the generic `parser` plus one type per format, with
+`parser.delimited` the first (fixed-width / ASN.1 / plugin follow). Decided as B6 — no generic parse node
+with format tabs, because each format owns its own grammar shape and complexities.
+
+* **The lift retypes only on an EXPLICIT `parsing.frontend: delimited`.** Delimited is also the parser's
+  *implicit* default (`PipelineConfigParser` defaults the key), so retyping every bare legacy file would
+  change the node type of everything already deployed on a mere read. A file that never says the word keeps
+  the plain `parser` type until its author opts in.
+* **Lower stamps `frontend: delimited`** onto a palette-fresh subtype node — the file must say the word its
+  type means, or the next lift silently loses the identity. A lifted node already carries it, so the
+  round-trip stays byte-verbatim (the property `PipelineEditableTest` pins).
+* Two refusals, both named: `PARSER_FRONTEND_MISMATCH` (a `parsing.frontend` contradicting the node's own
+  type) and `MULTI_PARSER` (a second parser-family node — the flat file has one parse slot, and what used
+  to be a silent last-one-wins became authorable once the palette offered two icons).
+* The subtype's `use:` home is `grammar/` **only**, not `ingester/`: a plugin-ingester binding on a node
+  whose type says *delimited* is a contradiction, refused rather than half-honoured.
+* Grouping by **category, not type string**: `PipelineCompiler.compile` and `PipelineDryRun` ask
+  `PipelineNodeTypes.isCategory(t, PARSE)`, mirroring the sink family. A new parse subtype needs no edit
+  there — but it *does* need its own `LOWERABLE` and `USE_HOME` entries in `PipelineEditable`.
+* **No `NodeAttributes` spec is published** for the type on purpose. Its grammar nests two levels
+  (`parsing.delimited.*`) while the `key__nested` spec convention has only ever carried one, and the UI
+  drawer owns the form shape — a best-guess table that looks authoritative is what that class's doc warns
+  against. Consequently `node-attributes.contract.json` / `step-types.contract.json` were byte-unchanged.
+* ⚠ `BindKindHomeContractTest` fired correctly when this landed: `NodeCategory.PARSE` had held exactly one
+  type, and its tripwire asserts the derivation the UI's category-keyed picker depends on. The category
+  stays *bindable* only because the new type arrived **with** a `grammar/` home.
+
+UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
+
 Supporting: `PipelineCodec` (graph ↔ TOON map), `PipelineStore` (persists authored `*_flow.toon`), `PipelineCompiler`
 (round-trips a *lifted* graph back to a `PipelineConfig` map — authored plain-map nodes are not
 round-trippable this way).

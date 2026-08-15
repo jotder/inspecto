@@ -16,7 +16,9 @@ double-click=configure, plain drag=move, **Shift+drag=draw edge** (two-click Con
 editor keeps a persistent `Graph` and mutates in place (see the G6 patterns in the
 [architecture](../architecture.md)).
 
-**`GrammarEditorDialog`** (`grammar-editor.dialog.ts`, renamed from `ParserConfigDialog` 2026-08-04)
+**`GrammarEditorDialog`** (`grammar-editor.dialog.ts`, renamed from `ParserConfigDialog` 2026-08-04;
+since 2026-08-15 it serves only grammar-BOUND and plain-`parser` nodes — an inline `parser.delimited`
+defines in the right-dock Parse drawer instead, see [Grammar configuration](grammar-config.md))
 configures PARSE nodes: a thin host over the shared `<inspecto-grammar-editor>` — see
 [Grammar configuration](grammar-config.md) for the full account, shared with Onboarding's Parsing
 stage. A Grammar lives **inline** on the node's own `parsing:` config by default; "Save as reusable
@@ -93,7 +95,9 @@ height-bounded; the split handle must stay mounted while collapsed; the G6 host 
 ## The node-type vocabulary is the engine's, and only the engine's (2026-07-31)
 
 The palette is a **faithful port of the backend enum `BuiltinNodeType`** — what
-`GET /pipelines/node-types` actually serves: `acquisition`/`adapter` (SOURCE), `parser` (PARSE), the
+`GET /pipelines/node-types` actually serves: `acquisition`/`adapter` (SOURCE), `parser` **and
+`parser.delimited`** (PARSE — a family since 2026-08-15, see
+[per-format node types](../../backend/pipeline-graph/design.md)), the
 `transform.*` family + `enrichment` (TRANSFORM), `sink.persistent|materialized|view` (SINK), and
 `alert`/`gap`/`event` (**CONTROL**). Edge `rel`s are `PipelineRel` constants (`data` is the default
 downstream edge; `success`/`failure` are **sink**-emitted; `dropped`/`invalid`/`duplicate` are the diverted
