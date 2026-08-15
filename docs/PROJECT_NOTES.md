@@ -255,6 +255,15 @@ local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/superpower/agent-k
   `mvn -o dependency:build-classpath -pl inspecto -am` (9 modules today) rather than globbing `*/target/classes`,
   and put the module `target/classes` **ahead** of the `.m2` jars so fresh code shadows the stale installed
   `inspecto-*` artifacts (that ordering also silences the duplicate-`logback.xml` warning).
+- **PowerShell splits an unquoted `-Dfoo.bar=baz` native argument AT THE DOT.** A token starting with `-`
+  is parsed as a parameter name, which ends at the `.`, so `-Dmdep.includeScope=runtime` reaches the
+  process as **two** arguments (`-Dmdep` and `.includeScope=runtime`). Maven then reports the tail as an
+  *unknown lifecycle phase*, which reads like a broken POM rather than a quoting bug — it killed
+  `tools/run-backend.ps1` on 2026-08-15 (`ad6eb73c`). ⚠ **Quote every `-D` argument, including the ones
+  containing no variable**: the ones with `$vars` are usually already quoted for interpolation and so
+  survive, which is exactly why the bug hides — six unquoted `-D` JVM properties sat latent in the same
+  script's launch step, invisible only because it died earlier. Prove it in one line, don't reason about
+  it: `pwsh -NoProfile -Command 'function Show { $args | % { "[$_]" } }; Show -Da.b=c "-Dd.e=f"'`.
 - **Two pure-Node CI guards run BEFORE the Maven build** in `ci.yml`, so either can fail a green-code push:
   `tools/check-vocabulary.mjs` (banned synonyms in user-facing docs, **plus banned KEYS in the committed
   TOON config corpus** since 2026-08-04 — it reads `git ls-files`, not the working tree, so local matches
