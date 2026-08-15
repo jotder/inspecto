@@ -12,6 +12,7 @@ import com.gamma.metrics.MetricRegistry;
 import com.gamma.etl.BatchEventBus;
 import com.gamma.util.Scheduler;
 import com.gamma.util.CronExpression;
+import com.gamma.util.OperationsZone;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
@@ -84,6 +85,9 @@ public final class JobService implements AutoCloseable {
     private final BatchEventBus bus;
     private final Scheduler scheduler;
     private final ReportRunner reports;
+    /** The {@link OperationsZone} — governs cron firing AND the {@code $today} family, deliberately one
+     *  zone for both: a job that fires at 00:30 ops-local and resolves {@code $today} in another zone is
+     *  an off-by-one-day generator. Reaches the macros through {@link ExpressionContext}. */
     private final ZoneId zone;
     /** Run journal (T26/T27): the durable {@code jobs_runs.csv} audit, the in-memory history the Control
      *  API serves, and the optional DuckDB run projection. */
@@ -243,7 +247,7 @@ public final class JobService implements AutoCloseable {
         this.bus       = bus;
         this.scheduler = scheduler;
         this.reports   = reports;
-        this.zone      = ZoneId.systemDefault();
+        this.zone      = OperationsZone.resolve();
         this.auditDir  = auditDir;
         this.ledger    = new JobRunLedger(auditDir, jobRunStore);
         this.pipelineStore = pipelineStore;

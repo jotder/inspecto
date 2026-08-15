@@ -10,6 +10,7 @@ import com.gamma.inspector.MultiCollectorProcessor;
 import com.gamma.pipeline.PipelineTrigger;
 import com.gamma.pipeline.exec.TriggerCoalescer;
 import com.gamma.util.CronExpression;
+import com.gamma.util.OperationsZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,8 +114,8 @@ final class PipelineScheduler {
     /** Per-pipeline coalescer for {@code event}-triggered flows: an upstream-commit storm collapses to one
      *  non-overlapping run (the in-process run-guard debounce, lifted to the flow grain). */
     private final Map<String, TriggerCoalescer> eventCoalescers = new ConcurrentHashMap<>();
-    /** Zone for evaluating {@code cron} triggers (mirrors {@link com.gamma.job.JobService}). */
-    private final ZoneId triggerZone = ZoneId.systemDefault();
+    /** Zone for evaluating {@code cron} triggers — the operations zone (mirrors {@link com.gamma.job.JobService}). */
+    private final ZoneId triggerZone = OperationsZone.resolve();
     /** Epoch the scheduler started — the cron "last fire" baseline before a pipeline has ever run. */
     private final long serviceStartMs = System.currentTimeMillis();
     /** The {@code maxConcurrentRuns} budget, held for the scheduler's lifetime rather than minted per cycle —

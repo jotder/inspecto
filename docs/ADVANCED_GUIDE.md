@@ -406,6 +406,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | `jobs.backend` | `none` | `duckdb`/`jdbc:…` enables `DbJobRunStore` |
 | `jobs.db.url` | `jdbc:duckdb:jobs_report.duckdb` | job-run DB URL |
 | `jobs.audit.dir` | `jobs_audit` | dir for `jobs_runs.csv` |
+| `ops.timezone` | (unset → JVM default) | **operations zone** — governs cron firing (`PipelineScheduler`, `JobService`) *and* the `$today`/`$yesterday`/`$day(-1)` macros. ⚠ Not `meta.domain.timezone` (that describes the **data**'s zone); set-but-unresolvable **throws at startup** rather than falling back |
 | `status.backend` | `file` | `db` → `DbStatusStore` |
 | `status.db.url` | `jdbc:duckdb:inspecto-status.db` | status DB URL (migrates legacy `ucc-status.db`) |
 | `status.db.user` / `status.db.password` | (unset) | status DB creds |

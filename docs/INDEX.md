@@ -75,15 +75,17 @@ former root reference docs** (each index lists them):
 
 ## In-flight plans (`superpower/` — plans live here ONLY while active)
 
-- [`superpower/domain-timezone-behaviour-plan.md`](superpower/domain-timezone-behaviour-plan.md) —
-  **DESIGN ONLY, nothing built; 3 questions open (§5).** The `meta.domain.timezone` behaviour half
-  (cron firing + the `$today` date macros), whose validation half shipped 2026-08-14. ⚠ **Grounding
-  refutes the BACKLOG row's framing:** the row conflates the **data** zone (what the timestamps mean —
-  a domain note, whose real consumer is the consignment §5.6 event-time cut) with the **operations**
-  zone (what the operator's schedule is expressed in), and `domain.timezone` is merged
-  **last-non-blank-wins across every `*_meta.toon` in a space**, so promoting it would make cron firing
-  depend on file scan order. The recommendation splits the two, which also **dissolves the migration
-  blocker** the row was gated on — an ops key that defaults to `systemDefault()` shifts nothing.
+- ~~`superpower/domain-timezone-behaviour-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-15**
+  ([archive copy](archived-documents/plans-archive/domain-timezone-behaviour-plan.md), kept for the
+  grounding in §1-§2). The `meta.domain.timezone` behaviour half, whose validation half shipped
+  2026-08-14. ⚠ **Grounding refuted the BACKLOG row's framing:** it conflated the **data** zone (what
+  the timestamps mean — a domain note, whose real consumer is the consignment §5.6 event-time cut) with
+  the **operations** zone (what the operator's schedule is expressed in), and `domain.timezone` is
+  merged **last-non-blank-wins across every `*_meta.toon` in a space**, so promoting it would have made
+  cron firing depend on file scan order. All 3 questions answered as recommended: the split shipped as
+  `-Dops.timezone` (`OperationsZone`), which **dissolved the migration blocker** the row was gated on —
+  unset ⇒ `systemDefault()`, so no existing schedule moved. As-built:
+  [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md) *The operations zone*.
 - ~~`superpower/map-node-config-home-plan.md`~~ — **SHIPPED and ARCHIVED 2026-08-15**
   ([archive copy](archived-documents/plans-archive/map-node-config-home-plan.md), provenance only).
   AUTHOR-1 follow-on (a): a map node's authored `columns`/`rules` now have a flat home at

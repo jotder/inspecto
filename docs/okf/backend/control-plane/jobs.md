@@ -211,6 +211,38 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   `"<min>..<max>"` string that `SqlParamScanner` substitutes as one SQL literal and nothing split. See
   [`consignment-addressing.md`](../engine/consignment-addressing.md).
 
+### The operations zone (`-Dops.timezone`, shipped 2026-08-15)
+
+`com.gamma.util.OperationsZone` resolves the one zone that governs **both** cron firing
+(`PipelineScheduler:117` → the `cronDue` comparison at `:373-375`; `JobService:246` → `scheduler.cron`,
+next-fire and `ZonedDateTime.now`) **and** the `$today`/`$yesterday`/`$day(-1)` family
+(`JobService` → `ExpressionContext.zone` → `BuiltinExpressions.fireDate` = `LocalDate.ofInstant(fireTime,
+ctx.zone())`). One zone for both deliberately: a job that fires at 00:30 ops-local and then resolves
+`$today` in another zone is an off-by-one-day generator.
+
+- **Unset ⇒ `ZoneId.systemDefault()`**, byte-identical to the behaviour before it existed. That is the
+  whole reason this shipped without operator migration: no existing schedule moves until someone opts in.
+- **Set-but-unresolvable throws at startup**, naming the property *and* the offending value. ⛔ No silent
+  fallback — that would run every schedule in the wrong zone while the operator believed otherwise, and a
+  typo is indistinguishable from intent. (It can say the value; the descriptive key's `CrossFieldRule`
+  cannot, since a rule's description is static.)
+- 🔴 **It is NOT `meta.domain.timezone`, and that distinction is the whole design.** That key describes
+  what zone the **data's** timestamps are in — a catalog annotation whose real consumer is the consignment
+  event-time cut (§5.6/§10.1) — while this one is what the **operator's schedule** is expressed in. They
+  routinely differ (data in UTC, a 06:00 `Asia/Kolkata` run). Wiring the catalog note into the scheduler
+  would also have made firing depend on **directory scan order**: a space holds any number of
+  `*_meta.toon` files and `MetadataGraphService:155` merges them last-non-blank-wins. Full reasoning:
+  [`domain-timezone-behaviour-plan.md`](../../../archived-documents/plans-archive/domain-timezone-behaviour-plan.md).
+- ⚠ **Still on `systemDefault()` and deliberately untouched:** `AlertService:374`, `ReferenceCompactor:142`,
+  `EventRoutes:108`, `PackTestHarness:164`, `InspectoTools:385`. The backlog row claimed "two places need a
+  zone"; there are seven. Each of the other five is its own display-vs-data-cut judgement — ⛔ do not sweep
+  them in.
+- ⚠ **No `PipelineScheduler` test class exists at all**, and neither consumer exposes its zone, so the
+  guard is at the resolver (`OperationsZoneTest`, 5 tests) plus the module's existing suites. The resolver
+  test was **falsified** — stubbing `resolve()` back to `systemDefault()` failed 3 of the 5. Its fixtures
+  pin two zones that disagree on the date for a given instant, so it cannot pass by coincidence on a host
+  whose default happens to match (this box's is `Asia/Calcutta`, +05:30).
+
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:
