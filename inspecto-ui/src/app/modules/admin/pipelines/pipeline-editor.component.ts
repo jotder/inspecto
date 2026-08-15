@@ -22,6 +22,7 @@ import { ToastrService } from 'ngx-toastr';
 import {
     AuthoredPipeline,
     AuthoredNode,
+    ComponentDef,
     ComponentsService,
     ConfigService,
     PipelineRefusal,
@@ -270,6 +271,8 @@ export class PipelineEditorComponent implements OnInit {
     // ── canvas status (Stage 2) + validation/activation (Stage 4) ──
     /** Known registry refs (`grammar/x`, `transform/y`, …) — drives dangling detection once loaded. */
     private readonly validRefs = signal<Set<string>>(new Set());
+    /** Stored Grammar components, offered by the Parse drawer as starting points (copies, not binds). */
+    readonly grammarTemplates = signal<ComponentDef[]>([]);
     private readonly refsLoaded = signal(false);
     /** Per-node test outcome from the last run-to-here (`tested` / `rejects`). */
     private readonly testedStatus = signal<Map<string, TestOutcome>>(new Map());
@@ -641,6 +644,9 @@ export class PipelineEditorComponent implements OnInit {
             this.components.list(k).subscribe({
                 next: (list) => {
                     for (const c of list) refs.add(c.ref);
+                    // The same fetch feeds the Parse drawer's "Start from a template" picker — the
+                    // pane is pure, so the host supplies the list rather than the pane fetching it.
+                    if (k === 'grammar') this.grammarTemplates.set(list);
                     done();
                 },
                 error: () => done(),

@@ -1,0 +1,59 @@
+/**
+ * A stored **Grammar component's content** read as a `parsing:`-shaped block — the one place that
+ * knows a Grammar component can be either of two shapes.
+ *
+ * A component is either the **legacy flat** `csv_settings`-style map (`{delimiter, has_header, …}` at
+ * top level — how every pre-2026-08-04 component was written, and how the Components page still
+ * writes one) or an **extracted `parsing:` block** (`{frontend, delimited: {…}}`). The engine already
+ * resolves both, discriminating on a nested `delimited`/`plugin` root
+ * (`PipelineConfigParser`); this is the UI's half of that same rule.
+ *
+ * ⚠ **Load-bearing.** `<inspecto-grammar-editor>` seeds its property sheet by flattening the block to
+ * `delimited__delimiter`-style keys, so a legacy flat `{delimiter: '|'}` matches NO spec key and the
+ * form falls back to its declared defaults — the stored `|` silently becomes `,`. Feeding raw
+ * component content to the editor loses the operator's settings while looking like it worked.
+ */
+
+/** Keys that live under the `delimited:` sub-block but sat at top level in a legacy component. */
+const CSV_SETTINGS_KEYS = ['delimiter', 'has_header', 'skip_header_lines', 'null_strings', 'quote', 'escape'];
+
+/** The sub-block roots whose presence proves the content is already `parsing:`-shaped. */
+const PARSING_ROOTS = ['delimited', 'fixedwidth', 'json', 'text_regex', 'plugin'];
+
+/**
+ * Normalise a Grammar component's stored content into a `parsing:`-shaped block the editor can seed
+ * from. Legacy `parser_type` becomes `frontend` (no engine code ever read `parser_type`), and legacy
+ * top-level csv settings move under `delimited:`. Already-nested content passes through untouched.
+ */
+export function grammarContentAsParsingBlock(content: Record<string, unknown>): Record<string, unknown> {
+    const { parser_type: legacyType, ...block } = content ?? {};
+    if (block['frontend'] === undefined && typeof legacyType === 'string') block['frontend'] = legacyType;
+
+    // Already nested ⇒ nothing to lift. Only a flat component needs the csv settings rehomed.
+    if (PARSING_ROOTS.some((r) => block[r] !== null && typeof block[r] === 'object')) return block;
+
+    const delimited: Record<string, unknown> = {};
+    for (const k of CSV_SETTINGS_KEYS) {
+        if (block[k] === undefined) continue;
+        delimited[k] = block[k];
+        delete block[k];
+    }
+    if (Object.keys(delimited).length > 0) block['delimited'] = delimited;
+    return block;
+}
+
+/**
+ * Whether this component can seed a **delimited** node — the picker must not offer a Grammar that
+ * names another frontend, because a `parser.delimited` node's format IS its type and the save path
+ * refuses a contradicting block with `PARSER_FRONTEND_MISMATCH`.
+ *
+ * ⚠ Deliberately NOT `normalizeFrontend`, which maps anything unrecognised to `delimited` — that
+ * would offer an `xlsx`/`html` component as if it were delimited. A component qualifies only when it
+ * declares delimited explicitly or declares nothing at all (the legacy flat shape).
+ */
+export function isDelimitedGrammar(content: Record<string, unknown>): boolean {
+    const declared = content?.['frontend'] ?? content?.['parser_type'];
+    if (declared === undefined || declared === null || declared === '') return true;
+    const f = String(declared).trim().toLowerCase();
+    return f === 'delimited' || f === 'csv' || f === 'dsv';
+}

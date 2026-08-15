@@ -93,7 +93,7 @@ allowance, which mirrors the still-supported read path; `bindKindFor('PARSE') ==
 | Slice | Work | Verified by |
 |---|---|---|
 | **S1 — Save as template** ✅ **SHIPPED 2026-08-15** | Drawer gains a "Save as template" action; the pane emits, the **host** writes via `components.create('grammar', …)` (D5) and the node **keeps** its inline block (D6). Dialog's extract path follows the same new semantics. | A spec asserting the component is created **and** `node.config.parsing` survives with no `use:` set — the exact pair the old `:146` extract spec asserted the opposite of. ✅ |
-| **S2 — Start from a template** | A picker in the drawer listing `components.list('grammar')`; choosing one patches the editor with a **copy**. Read-only fetch, no binding. Must mark the pane dirty (it is an edit) and must not fire on the load-time path. | A spec: pick a template → editor value matches the component → Apply emits an inline block, `use` undefined. |
+| **S2 — Start from a template** ✅ **SHIPPED 2026-08-15** | A picker in the drawer listing `components.list('grammar')`; choosing one patches the editor with a **copy**. Read-only fetch, no binding. Must mark the pane dirty (it is an edit) and must not fire on the load-time path. | A spec: pick a template → editor value matches the component → Apply emits an inline block, `use` undefined. ✅ |
 | **S3 — Bound nodes migrate on edit** | `isDrawerParse` drops the `use:` exclusion; the host resolves the bound component before opening and seeds the pane; Apply materialises inline and drops `use` (D4). Delete the dialog's bound-edit branch and its specs (`grammar-editor.dialog.spec.ts:116`, `:180`). | A spec on a legacy bound node: opens in the drawer with the resolved block, Apply yields inline + no `use`. |
 | **S4 — Docs** | `docs/GLOSSARY.md` — Grammar component = **template**, ⛔ not a binding target. `okf/frontend/features/grammar-config.md` — rewrite "One store — inline by default, extractable to a component". `okf/backend/pipeline-graph/design.md` — note the `use: grammar/` form is read-supported, never authored. Amend the definition-surface plan's P3a + P3d rows. | `graphify update .`; the P3a/P3d contradiction is gone. |
 
@@ -127,16 +127,56 @@ and S1/S2 are independently useful without it.
 - Baselines at this slice: UI `npm run test:ci` **2472 passed / 5 skipped**, 329 files passed (330 total,
   1 file skipped — pre-existing); `lint:tokens`, `build` and `tsc -p tsconfig.spec.json` all clean.
 
+### S2 as-built (2026-08-15) — and the silent-data-loss bug it uncovered
+
+🔴 **Grounding the picker found a live defect, not just a gap.** A Grammar component can be **legacy
+flat** (`{delimiter: '|', has_header: false}` — the shape the Components page still writes, and the
+shape of `pipe_delimited.toon`, the only real component in the repo) or nested `parsing:`-shaped. The
+editor seeds by flattening the block to `delimited__*` keys, so a flat component matches **no spec key**
+and the property sheet falls back to its **declared defaults**. Measured with a throwaway probe before
+any fix:
+
+| Stored content | Editor produced |
+|---|---|
+| `{delimiter: '\|', has_header: false}` (flat) | `{delimited: {delimiter: ',', has_header: true}}` ← **stored values lost** |
+| `{frontend, delimited: {delimiter: '\|', …}}` (nested) | correct |
+
+This was **already live in the dialog's bound-node path** — selecting an existing flat Grammar showed,
+and would have re-saved, `delimiter: ','`. It failed silently and looked like a successful load. Fixed
+by a shared `grammarContentAsParsingBlock()` (`inspecto/grammar/grammar-block.ts`) that lifts legacy
+top-level csv settings under `delimited:`; the dialog's local `grammarBlock` is now an alias of it, so
+both surfaces are fixed at once. The new dialog regression test was **falsified** against the old code
+(it fails with exactly `{delimiter: ',', has_header: true}`).
+
+- **`isDelimitedGrammar()` filters the picker**, and deliberately does NOT reuse the editor's
+  `normalizeFrontend` — that maps anything unrecognised to `delimited`, which would offer an
+  `xlsx`/`html`/`asn1` component as a delimited starting point. A component qualifies only if it
+  declares delimited explicitly or declares nothing (the legacy flat shape).
+- **The pane stayed pure**: templates arrive as an `[templates]` input, fed by the `components.list`
+  call the host already makes for `validRefs`. No service injected into the pane.
+- ⚠ **The pristine-on-reseed trap fired here** (P2 rule (a), inverted): a picked template re-seeds
+  `[initial]`, which marks the editor **pristine** — so `editor.isDirty()` reads false immediately
+  after a real change and the drawer's Apply would stay disabled. Tracked with a pane-owned
+  `templateDirty` flag instead of inferred from the editor, cleared on Apply and on a node swap.
+- **Verified live** in the offline preview: the picker offered **3 of the store's 10** Grammars (the
+  xml/asn1/xlsx/fixedwidth/json/html/parquet ones correctly withheld); picking the legacy flat
+  `pipe_delimited` put **`|`** in the Delimiter field, not the `,` default; the unapplied badge lit on
+  the pick and cleared on Apply, which was enabled throughout.
+- Baselines: UI `npm run test:ci` **2478 passed / 5 skipped**, 329 files passed (330 total, 1 skipped —
+  pre-existing); `lint:tokens`, `build`, `tsc -p tsconfig.spec.json` clean.
+
 ---
 
 ## 5. Known gap, deliberately not fixed here
 
 The Components page's grammar form (`component-form.dialog.ts:212-223`) builds **DSV-only** content —
-`delimiter`, `has_header`, `skip_header_lines`, `quote`, `escape`, `encoding`. It cannot author
-`frontend`, a plugin/ingester, or segment structure. That gap predates this plan, but it gets more
-visible once the Components page *is* the template library: a template saved from the drawer may carry
-keys the registry form silently cannot round-trip. **→ log to `docs/BACKLOG.md`; do not fix in this
-plan.**
+`delimiter`, `has_header`, `skip_header_lines`, `quote`, `escape`, `encoding`, all at top level (the
+legacy flat shape). It cannot author `frontend`, a plugin/ingester, or segment structure. That gap
+predates this plan, but it gets more visible once the Components page *is* the template library: a
+template saved from the drawer carries the nested shape, and re-editing it on the Components page would
+flatten it back. S2's normaliser makes flat content **readable** everywhere, so nothing is lost today —
+but the registry form is still the wrong editor for a modern Grammar. **→ log to `docs/BACKLOG.md`; do
+not fix in this plan.**
 
 ---
 

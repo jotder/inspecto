@@ -23,7 +23,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
-import { GrammarEditorComponent } from 'app/inspecto/grammar';
+import { GrammarEditorComponent, grammarContentAsParsingBlock } from 'app/inspecto/grammar';
 import { MappingEditorDialog } from 'app/modules/admin/components/mapping-editor.dialog';
 import { SchemaEditorData, SchemaEditorDialog } from 'app/modules/admin/components/schema-editor.dialog';
 import { NodeConfigResult } from './node-config.dialog';
@@ -282,12 +282,12 @@ function nodeParsingBlock(node: AuthoredNode): Record<string, unknown> {
 }
 
 /**
- * A Grammar component's content AS a `parsing:` block. Components authored before the unification
- * carry a UI-only `parser_type` instead of `frontend` (no engine code has ever read it) — map it
- * across on read so an existing Grammar still opens on the right frontend.
+ * A Grammar component's content AS a `parsing:` block — now the shared
+ * {@link grammarContentAsParsingBlock}.
+ *
+ * ⚠ This local version mapped `parser_type` → `frontend` but left a **legacy flat** component's
+ * top-level csv settings where they were, so `{delimiter: '|'}` matched no `delimited__*` spec key
+ * and the property sheet fell back to its defaults — selecting an existing flat Grammar silently
+ * showed (and would have re-saved) `delimiter: ','`. Proven with a probe before the fix.
  */
-function grammarBlock(content: Record<string, unknown>): Record<string, unknown> {
-    const { parser_type: legacyType, ...block } = content;
-    if (block['frontend'] === undefined && typeof legacyType === 'string') block['frontend'] = legacyType;
-    return block;
-}
+const grammarBlock = grammarContentAsParsingBlock;

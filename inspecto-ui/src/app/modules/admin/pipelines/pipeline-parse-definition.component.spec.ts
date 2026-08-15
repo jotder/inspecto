@@ -4,7 +4,7 @@ import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthoredNode, ParsersService } from 'app/inspecto/api';
+import { AuthoredNode, ComponentDef, ParsersService } from 'app/inspecto/api';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
@@ -21,6 +21,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
     template: `
         <app-pipeline-parse-definition
             [node]="node"
+            [templates]="templates"
             (applied)="applied = $event"
             (dirtyChange)="dirty = $event"
             (saveAsTemplate)="template = $event"
@@ -29,6 +30,7 @@ import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.co
 })
 class HostComponent {
     node: AuthoredNode = delimitedNode();
+    templates: ComponentDef[] = [];
     applied?: AuthoredNode;
     dirty = false;
     template?: Record<string, unknown>;
@@ -46,7 +48,7 @@ function delimitedNode(): AuthoredNode {
     };
 }
 
-async function create(node: AuthoredNode = delimitedNode()) {
+async function create(node: AuthoredNode = delimitedNode(), templates: ComponentDef[] = []) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -60,6 +62,7 @@ async function create(node: AuthoredNode = delimitedNode()) {
     await TestBed.compileComponents();
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.node = node;
+    fixture.componentInstance.templates = templates;
     fixture.detectChanges();
     return fixture;
 }
@@ -162,6 +165,69 @@ describe('PipelineParseDefinitionComponent', () => {
         // Saving a template neither persists to the node nor consumes the unapplied edits.
         expect(fixture.componentInstance.applied).toBeUndefined();
         expect(fixture.componentInstance.dirty).toBe(true);
+    });
+
+    describe('start from a template (S2)', () => {
+        const TEMPLATES = [
+            { name: 'pipe_delimited', ref: 'grammar/pipe_delimited', type: 'grammar', content: { delimiter: '|', has_header: false } },
+            { name: 'nested_tsv', ref: 'grammar/nested_tsv', type: 'grammar', content: { frontend: 'delimited', delimited: { delimiter: '\t' } } },
+            { name: 'invoice_xml', ref: 'grammar/invoice_xml', type: 'grammar', content: { parser_type: 'xml', record_xpath: '//x' } },
+            { name: 'mainframe_fixed', ref: 'grammar/mainframe_fixed', type: 'grammar', content: { frontend: 'fixedwidth' } },
+        ] as unknown as ComponentDef[];
+
+        /** A component naming another frontend could only author a PARSER_FRONTEND_MISMATCH block. */
+        it('offers only delimited-compatible templates', async () => {
+            const fixture = await create(delimitedNode(), TEMPLATES);
+            expect(pane(fixture).delimitedTemplates().map((t) => t.name)).toEqual(['pipe_delimited', 'nested_tsv']);
+        });
+
+        /**
+         * ⚠ The regression this slice exists to prevent: a LEGACY FLAT component's keys sit at top
+         * level, match no `delimited__*` spec key, and seed the form's DEFAULTS — so picking
+         * `pipe_delimited` used to silently yield `delimiter: ','`. Probed before the fix.
+         */
+        it('copies a legacy flat template without losing its stored settings', async () => {
+            const fixture = await create(delimitedNode(), TEMPLATES);
+            pane(fixture).applyTemplate('pipe_delimited');
+            fixture.detectChanges();
+
+            expect(editor(fixture).value()['delimited']).toEqual({ delimiter: '|', has_header: false });
+        });
+
+        it('copies an already-nested template unchanged', async () => {
+            const fixture = await create(delimitedNode(), TEMPLATES);
+            pane(fixture).applyTemplate('nested_tsv');
+            fixture.detectChanges();
+
+            expect((editor(fixture).value()['delimited'] as Record<string, unknown>)['delimiter']).toBe('\t');
+        });
+
+        /**
+         * Re-seeding `[initial]` marks the editor PRISTINE, so the pick must be tracked by the pane —
+         * otherwise a real change leaves Apply disabled.
+         */
+        it('reports dirty after a pick, and Applies the copy inline with no binding', async () => {
+            const fixture = await create(delimitedNode(), TEMPLATES);
+            pane(fixture).applyTemplate('pipe_delimited');
+            fixture.detectChanges();
+            expect(fixture.componentInstance.dirty).toBe(true);
+
+            pane(fixture).submit();
+            fixture.detectChanges();
+
+            const applied = fixture.componentInstance.applied!;
+            expect(applied.use).toBeUndefined(); // a copy, never a binding
+            expect((applied.config!['parsing'] as Record<string, unknown>)['delimited']).toEqual({
+                delimiter: '|',
+                has_header: false,
+            });
+            expect(fixture.componentInstance.dirty).toBe(false);
+        });
+
+        it('hides the picker when no delimited template exists', async () => {
+            const fixture = await create(delimitedNode(), [TEMPLATES[2]]);
+            expect(fixture.nativeElement.querySelector('mat-select')).toBeNull();
+        });
     });
 
     it('has no a11y violations', async () => {

@@ -144,6 +144,23 @@ describe('GrammarEditorDialog', () => {
     });
 
     /**
+     * ⚠ Regression: a LEGACY FLAT component keeps its csv settings at top level, where they match no
+     * `delimited__*` spec key — so the property sheet fell back to its DEFAULTS and this dialog showed
+     * (and would have re-saved) `delimiter: ','` for a component storing `|`. Silent data loss that
+     * looked like a successful load.
+     */
+    it('reads a legacy FLAT component without losing its stored csv settings', async () => {
+        const node: AuthoredNode = { id: 'parse', type: 'parser.dsv', use: 'grammar/flat' };
+        const { editor, fixture } = await create({
+            node,
+            grammars: [saved('flat', { delimiter: '|', has_header: false })],
+        });
+        fixture.detectChanges();
+        expect(editor.frontend()).toBe('delimited');
+        expect(editor.value()['delimited']).toEqual({ delimiter: '|', has_header: false });
+    });
+
+    /**
      * The inverse of what this case asserted until 2026-08-15, deliberately: saving a template writes
      * the component and leaves the node ALONE. A template is a copy source, never a binding — see
      * `docs/superpower/grammar-templates-not-bindings-plan.md`.

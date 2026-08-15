@@ -8,14 +8,16 @@ import {
     inject,
     input,
     output,
+    signal,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { AuthoredNode } from 'app/inspecto/api';
-import { GrammarEditorComponent } from 'app/inspecto/grammar';
+import { AuthoredNode, ComponentDef } from 'app/inspecto/api';
+import { GrammarEditorComponent, grammarContentAsParsingBlock, isDelimitedGrammar } from 'app/inspecto/grammar';
 
 /**
  * The **Parse definition pane** (definition-surface P3a) — the delimited path of the parse node,
@@ -41,6 +43,7 @@ import { GrammarEditorComponent } from 'app/inspecto/grammar';
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
+        MatSelectModule,
         MatTooltipModule,
         GrammarEditorComponent,
     ],
@@ -57,6 +60,16 @@ import { GrammarEditorComponent } from 'app/inspecto/grammar';
 
             <div class="mb-1 mt-2 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
+                @if (delimitedTemplates().length) {
+                    <mat-form-field class="w-56" subscriptSizing="dynamic">
+                        <mat-label>Start from a template</mat-label>
+                        <mat-select [value]="pickedTemplate()" (selectionChange)="applyTemplate($event.value)">
+                            @for (t of delimitedTemplates(); track t.name) {
+                                <mat-option [value]="t.name">{{ t.name }}</mat-option>
+                            }
+                        </mat-select>
+                    </mat-form-field>
+                }
                 <button
                     class="ml-auto"
                     mat-stroked-button
@@ -68,7 +81,7 @@ import { GrammarEditorComponent } from 'app/inspecto/grammar';
                 </button>
             </div>
             <inspecto-grammar-editor
-                [initial]="parsingBlock()"
+                [initial]="seedBlock()"
                 type="delimited"
                 [lockType]="true"
                 (submitted)="submit()"
@@ -81,6 +94,11 @@ export class PipelineParseDefinitionComponent {
 
     /** The `parser.delimited` node being defined (identity fixed; config/name/description editable). */
     readonly node = input.required<AuthoredNode>();
+    /**
+     * Stored Grammar components offered as starting points. Passed IN rather than fetched: the pane
+     * stays pure (P2 — `[node]` in, outputs out, no injected state) and the host already lists them.
+     */
+    readonly templates = input<ComponentDef[]>([]);
 
     /** The edited node, rebuilt by {@link submit} — the host applies it to the in-memory model. */
     readonly applied = output<AuthoredNode>();
@@ -107,7 +125,28 @@ export class PipelineParseDefinitionComponent {
         return p && typeof p === 'object' && !Array.isArray(p) ? { ...(p as Record<string, unknown>) } : {};
     });
 
+    /** The template the operator started from, if any — its block replaces the node's until Apply. */
+    readonly pickedTemplate = signal<string | null>(null);
+    private readonly templateBlock = signal<Record<string, unknown> | null>(null);
+
+    /** What the editor is seeded from: a picked template's copy, else the node's own block. */
+    readonly seedBlock = computed<Record<string, unknown>>(() => this.templateBlock() ?? this.parsingBlock());
+
+    /**
+     * Only Grammars that can seed a DELIMITED node. A component naming another frontend would author
+     * a block the save path refuses with `PARSER_FRONTEND_MISMATCH`, so it is not offered at all.
+     */
+    readonly delimitedTemplates = computed<ComponentDef[]>(() =>
+        this.templates().filter((t) => isDelimitedGrammar(t.content ?? {})),
+    );
+
     private lastDirty = false;
+    /**
+     * A picked template is an EDIT, but re-seeding `[initial]` marks the editor pristine — so
+     * `editor.isDirty()` reads false right after the pick and the drawer's Apply would stay disabled
+     * on a real change. Tracked here instead of inferred from the editor.
+     */
+    private templateDirty = false;
 
     constructor() {
         // Seed from the node input. The host recreates this component per node (and on Discard), so
@@ -117,6 +156,11 @@ export class PipelineParseDefinitionComponent {
             const n = this.node();
             this.form.patchValue({ name: n.name ?? '', description: n.description ?? '' });
             this.form.markAsPristine();
+            // A different node (or a Discard-driven re-seed) makes any template pick stale — the
+            // seed must fall back to the node's own block, or the previous node's template lingers.
+            this.pickedTemplate.set(null);
+            this.templateBlock.set(null);
+            this.templateDirty = false;
             this.emitDirty();
         });
     }
@@ -132,8 +176,25 @@ export class PipelineParseDefinitionComponent {
         this.emitDirty();
     }
 
+    /**
+     * Start from a stored Grammar: its content is COPIED into the editor. No binding is created and
+     * the template is never written back — this node owns the copy from here on.
+     *
+     * ⚠ The content is normalised first: a legacy flat component (`{delimiter: '|'}`) matches no
+     * `delimited__*` spec key, so seeding it raw shows the form's DEFAULTS and silently loses the
+     * stored settings.
+     */
+    applyTemplate(name: string): void {
+        const t = this.delimitedTemplates().find((x) => x.name === name);
+        if (!t) return;
+        this.pickedTemplate.set(name);
+        this.templateBlock.set(grammarContentAsParsingBlock(t.content ?? {}));
+        this.templateDirty = true;
+        this.emitDirty();
+    }
+
     private emitDirty(): void {
-        const dirty = this.form.dirty || (this.editor?.isDirty() ?? false);
+        const dirty = this.form.dirty || this.templateDirty || (this.editor?.isDirty() ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -167,6 +228,7 @@ export class PipelineParseDefinitionComponent {
         };
         this.form.markAsPristine();
         this.editor.markPristine();
+        this.templateDirty = false; // Apply consumed the pick, same as any other edit
         this.emitDirty();
         this.applied.emit(node);
     }
