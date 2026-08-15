@@ -52,6 +52,7 @@ import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.co
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
+import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
@@ -131,6 +132,7 @@ import {
         InspectoAlertComponent,
         DefinitionDrawerComponent,
         PipelineCollectionDefinitionComponent,
+        PipelineParseDefinitionComponent,
         PipelineDryRunPanelComponent,
         PipelineEditorGraphComponent,
         PipelineInspectorComponent,
@@ -301,6 +303,7 @@ export class PipelineEditorComponent implements OnInit {
     /** Unapplied edits inside the drawer — reported by the pane, drives the badge + close guards. */
     readonly definitionDirty = signal(false);
     @ViewChild(PipelineCollectionDefinitionComponent) private definitionPane?: PipelineCollectionDefinitionComponent;
+    @ViewChild(PipelineParseDefinitionComponent) private parseDefinitionPane?: PipelineParseDefinitionComponent;
 
     /** Served specs for the drawer's node type (`undefined` until the catalog resolves — the pane falls back). */
     definitionAttributes(): AttributeSpec[] | undefined {
@@ -1177,10 +1180,12 @@ export class PipelineEditorComponent implements OnInit {
 
     openNodeConfig(node: AuthoredNode): void {
         if (!this.canAuthor()) return; // read-only (Business lens or View mode): no-op — double-click/Configure can't mutate
-        // Definition-surface P1: the collector path opens in the right-dock definition drawer, not a
-        // popup — the first slice of the one-host plan. Every other kind keeps its dialog until its
-        // own slice lands (P3a–P3d, P4).
-        if (node.type === 'acquisition') {
+        // Definition-surface P1/P3a: the collector path and the delimited-parser path open in the
+        // right-dock definition drawer, not a popup. Every other kind keeps its dialog until its own
+        // slice lands (P3b–P3d, P4). A grammar-BOUND parser node stays on the dialog even when it is
+        // delimited: updating a reusable Grammar component is its own write route, which the dialog
+        // owns — the drawer's Apply is an in-memory patch only (D2).
+        if (node.type === 'acquisition' || this.isDrawerParse(node)) {
             void this.openDefinition(node);
             return;
         }
@@ -1213,6 +1218,11 @@ export class PipelineEditorComponent implements OnInit {
 
     // ── definition drawer lifecycle (definition-surface P1) ────────────────────────────────────────
 
+    /** Whether this parse node defines in the drawer: the delimited subtype, holding its Grammar inline. */
+    private isDrawerParse(node: AuthoredNode): boolean {
+        return node.type === 'parser.delimited' && !node.use?.startsWith('grammar/');
+    }
+
     /** Open a node for definition in the right dock, guarding another node's unapplied edits. */
     async openDefinition(node: AuthoredNode): Promise<void> {
         const open = this.definitionNode();
@@ -1232,7 +1242,7 @@ export class PipelineEditorComponent implements OnInit {
 
     /** Drawer Apply: ask the pane to rebuild the node (it emits `applied` → {@link onDefinitionApplied}). */
     applyDefinition(): void {
-        this.definitionPane?.submit();
+        (this.definitionPane ?? this.parseDefinitionPane)?.submit();
     }
 
     /** The pane's rebuilt node — an in-memory patch (D2), persisted only by the toolbar Save. */

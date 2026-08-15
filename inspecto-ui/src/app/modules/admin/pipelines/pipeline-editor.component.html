@@ -506,19 +506,34 @@
                                 <inspecto-definition-drawer
                                     class="block h-full"
                                     [title]="dn.name || dn.id"
-                                    kindLabel="Collector"
-                                    icon="heroicons_outline:inbox-arrow-down"
+                                    [kindLabel]="dn.type === 'acquisition' ? 'Collector' : 'Parser'"
+                                    [icon]="
+                                        dn.type === 'acquisition'
+                                            ? 'heroicons_outline:inbox-arrow-down'
+                                            : 'heroicons_outline:document-text'
+                                    "
                                     [dirty]="definitionDirty()"
                                     (apply)="applyDefinition()"
                                     (discard)="discardDefinition()"
                                     (closed)="closeDefinition()"
                                 >
-                                    <app-pipeline-collection-definition
-                                        [node]="dn"
-                                        [attributes]="definitionAttributes()"
-                                        (applied)="onDefinitionApplied($event)"
-                                        (dirtyChange)="definitionDirty.set($event)"
-                                    />
+                                    @switch (dn.type) {
+                                        @case ('acquisition') {
+                                            <app-pipeline-collection-definition
+                                                [node]="dn"
+                                                [attributes]="definitionAttributes()"
+                                                (applied)="onDefinitionApplied($event)"
+                                                (dirtyChange)="definitionDirty.set($event)"
+                                            />
+                                        }
+                                        @case ('parser.delimited') {
+                                            <app-pipeline-parse-definition
+                                                [node]="dn"
+                                                (applied)="onDefinitionApplied($event)"
+                                                (dirtyChange)="definitionDirty.set($event)"
+                                            />
+                                        }
+                                    }
                                 </inspecto-definition-drawer>
                             }
                         } @else if (rightTab() === 'properties') {

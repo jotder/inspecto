@@ -92,18 +92,16 @@ describe('PipelineEditorComponent', () => {
                 .mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),
-            saveAsTemplate: vi
-                .fn()
-                .mockReturnValue(
-                    of({
-                        written: true,
-                        path: 'demo_copy_pipeline.toon',
-                        id: 'demo_copy',
-                        source: 'demo',
-                        template: true,
-                        notes: [],
-                    }),
-                ),
+            saveAsTemplate: vi.fn().mockReturnValue(
+                of({
+                    written: true,
+                    path: 'demo_copy_pipeline.toon',
+                    id: 'demo_copy',
+                    source: 'demo',
+                    template: true,
+                    notes: [],
+                }),
+            ),
             label: vi
                 .fn()
                 .mockReturnValue(
@@ -143,6 +141,11 @@ describe('PipelineEditorComponent', () => {
                 { provide: MatDialog, useValue: dialog },
             ],
         });
+        // ⚠ Must be an OVERRIDE, not just the provider above: since P3a the editor imports the Parse
+        // definition pane → the shared Grammar editor → `<inspecto-data-table>`, which injects the
+        // REAL MatDialog. A plain `provide` is then silently ignored and every dialog.open in this
+        // suite dies inside Material with "Cannot read properties of undefined (reading 'push')".
+        TestBed.overrideProvider(MatDialog, { useValue: dialog });
     });
 
     /** Build the component, run ngOnInit, and inject a canvas double (no live G6). */
@@ -215,6 +218,33 @@ describe('PipelineEditorComponent', () => {
             c.discardDefinition();
             expect(c.definitionEpoch()).toBe(before + 1);
             expect(c.definitionDirty()).toBe(false);
+        });
+
+        /** P3a: the delimited parser defines in the drawer too — when its Grammar lives inline. */
+        it('routes an inline parser.delimited node to the drawer, not the grammar dialog', () => {
+            const c = make();
+            c.select('demo');
+            const node = { id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+            c.openNodeConfig(node);
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(c.definitionNode()?.id).toBe('parse');
+        });
+
+        /** A grammar-BOUND delimited node stays on the dialog: updating the reusable component is a
+         *  write route of its own, and the drawer's Apply is an in-memory patch only (D2). The plain
+         *  `parser` type stays on the dialog as before. */
+        it('keeps the dialog for a grammar-bound parser.delimited and for the plain parser', () => {
+            const c = make();
+            c.select('demo');
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            const bound = { id: 'pb', type: 'parser.delimited', use: 'grammar/pipes', config: {} };
+            const plain = { id: 'pp', type: 'parser', config: { schema_file: 's.toon' } };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, bound, plain] }));
+            c.openNodeConfig(bound);
+            c.openNodeConfig(plain);
+            expect(dialog.open).toHaveBeenCalledTimes(2);
+            expect(c.definitionNode()).toBeNull();
         });
 
         it('switching tabs guards unapplied drawer edits and closes the drawer', async () => {

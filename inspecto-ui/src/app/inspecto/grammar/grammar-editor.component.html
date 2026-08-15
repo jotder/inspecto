@@ -8,8 +8,8 @@
     </inspecto-alert>
 }
 
-<!-- ── file format ─────────────────────────────────────────────────────────── -->
-<div class="mt-2">
+<!-- ── file format (hidden when the host locks it — a per-format node's type IS the format) ── -->
+<div class="mt-2" [class.hidden]="lockType">
     <div class="mb-1 text-xs font-semibold uppercase opacity-70">File format</div>
     <mat-button-toggle-group
         [value]="activeType()"

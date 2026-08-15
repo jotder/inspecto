@@ -122,6 +122,13 @@ export class GrammarEditorComponent {
     }
 
     /**
+     * Hide the format picker: for a per-format parser node (B6, `parser.delimited` first) the format
+     * IS the node's type, so offering a switch here would author a block the save path refuses with
+     * PARSER_FRONTEND_MISMATCH. Hosts that lock the type also seed it via `[type]`.
+     */
+    @Input() lockType = false;
+
+    /**
      * Optional preview override. Onboarding parses BUILT-INS through `POST /config/preview/parsing`
      * so the result feeds the sample thread and the Schema stage; without an override the editor uses
      * the stateless `POST /parsers/{id}/preview`, which is all a dialog needs.
