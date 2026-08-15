@@ -43,6 +43,15 @@ packs.
   on serving the old data indefinitely. This bit the W2/U-D node-type rename (2026-07-31): without the
   v20→v21 bump, existing sessions would have kept authoring pipelines with node types the backend has never
   had. The version comment should say *why* it moved, so the next bump can tell which data it invalidated.
+* ⚠ **Contract parity covers graph TOPOLOGY, not just refusals** (MOCK-1, 2026-08-15). The mock's
+  `pipeline-editable.ts` lift emitted a `transform.map` node only for an authored `processing.map`, while
+  `PipelineLift.branch` emits one on **every** path — only its config is conditional. So the offline editor
+  drew a graph one node shorter than the server's for most pipelines, and one node shorter **per branch**
+  for a selector/segments pipeline. It was never a *leniency* hole (nothing was accepted offline that the
+  server refuses), which is why the usual refusal-parity checks all passed.
+  🔴 **The whole UI suite passed with a zero delta both before and after the fix** — nothing pinned the
+  derived node at all. Treat a green suite across a topology change as evidence that the topology is
+  *unpinned*, not that it is right; the guard has to be added with the fix.
 * The Pro [data-table](../design-system/data-table.md) SQL editor runs SQL **in-browser** via AlaSQL (no
   backend) — independent of the mock layer.
 * ⚠ **`MockHandler` is synchronous, and that is load-bearing.** Its return type was widened to

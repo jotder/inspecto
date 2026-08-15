@@ -213,19 +213,29 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         sinkUpstream = 'filter';
     }
 
-    // Authored map projection (processing.map) sits right after the parse/filter stretch, where the
-    // backend's lift always puts a map node. ⚠ This mock emits one only when the file authors config
-    // for it: the backend also emits a *derived* map node (carrying the legacy `schema`) for every
-    // pipeline, which this mock has never modelled. Lifting the authored half is what keeps the
-    // round-trip lossless — without a node to carry it, a strict save would delete processing.map.
+    // The map projection sits right after the parse/filter stretch. ⚠ UNCONDITIONAL, mirroring
+    // `PipelineLift.branch`, which pushes a `transform.map` node on every path through `lift()` — the
+    // config is what varies there, never the node's existence (MOCK-1). Emitting it only when
+    // `processing.map` authored something made the offline editor draw a graph one node SHORTER than the
+    // server's for every pipeline without an authored projection, i.e. for most of them.
+    //
+    // ⚠ Two deliberate remaining differences, both benign and neither a node-count difference:
+    //   • the backend's derived node also carries the resolved `schema` key. This mock never resolves
+    //     schemas (they stay on the parser node), so the node is emitted with empty config. `schema` is
+    //     MAP_DERIVED, so `lowerGraph` drops it either way — carrying it would change nothing on save.
+    //   • the backend emits one map node PER BRANCH for a selector/segments pipeline. This mock builds a
+    //     single linear chain throughout and models no branch expansion at all, so per-branch parity is
+    //     out of scope here rather than newly missing.
+    //
+    // The lower side already tolerates this: a map node contributing no authored key is skipped when
+    // building `processing.map` (see the `continue` in the mapNodes loop), so a derived-only node
+    // round-trips to nothing and cannot invent a `processing.map` on save.
     const mapCfg = asMap(processing['map']);
-    if (MAP_AUTHORED.some((k) => mapCfg[k] != null)) {
-        const mc: Cfg = {};
-        for (const k of MAP_AUTHORED) if (mapCfg[k] != null) mc[k] = mapCfg[k];
-        nodes.push({ id: 'map', type: 'transform.map', name: 'Map', config: mc });
-        edges.push({ from: sinkUpstream, rel: 'data', to: 'map' });
-        sinkUpstream = 'map';
-    }
+    const mc: Cfg = {};
+    for (const k of MAP_AUTHORED) if (mapCfg[k] != null) mc[k] = mapCfg[k];
+    nodes.push({ id: 'map', type: 'transform.map', name: 'Map', config: mc });
+    edges.push({ from: sinkUpstream, rel: 'data', to: 'map' });
+    sinkUpstream = 'map';
 
     // Reference join (processing.join) sits right after the parse/filter stretch — dedup/summarize
     // downstream see the enriched row set (mirrors PipelineLift; authoring-only, like route below).

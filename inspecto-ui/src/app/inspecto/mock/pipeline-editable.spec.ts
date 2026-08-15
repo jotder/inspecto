@@ -402,6 +402,35 @@ describe('mock pipeline-editable — the authored map projection (processing.map
         return (res as { refusals: { code: string; nodeId?: string; message: string }[] }).refusals;
     };
 
+    // MOCK-1: the backend's `PipelineLift.branch` emits a map node on EVERY path — only its config is
+    // conditional. The mock used to emit one only for an authored projection, so the offline editor drew a
+    // graph one node shorter than the server's for most pipelines. ⚠ When that was fixed the entire UI
+    // suite still passed with a ZERO delta: nothing anywhere pinned the derived node, which is precisely
+    // why the drift survived. This is that missing guard — without it the fix silently regresses.
+    it('lifts a map node even when nothing authored processing.map, and lowers it to nothing', () => {
+        const bare = mapConfig() as Record<string, unknown>;
+        (bare['processing'] as Record<string, unknown>) = { schema_file: 'm_schema.toon' };
+
+        const g = liftConfig(bare);
+        const map = g.nodes.find((n) => n.type === 'transform.map');
+        expect(map, 'the server emits a derived map node here; the offline graph must not be shorter')
+            .toBeDefined();
+        expect(map!.config ?? {}, 'derived only — nothing was authored to carry').toEqual({});
+        expect(
+            g.edges.some((e) => e.to === 'map'),
+            'the derived node must be wired into the chain, not left orphaned',
+        ).toBe(true);
+
+        // …and it round-trips to nothing: a derived-only node must not invent a processing.map on save.
+        const res = lowerGraph(g, bare, true);
+        expect('config' in res, JSON.stringify(res)).toBe(true);
+        const processing = (res as { config: Record<string, unknown> }).config['processing'] as Record<
+            string,
+            unknown
+        >;
+        expect(processing['map'], 'a node with no authored keys lowers to no processing.map').toBeUndefined();
+    });
+
     it('lifts processing.map onto a map node and lowers it back verbatim', () => {
         const existing = mapConfig();
         const g = liftConfig(existing);

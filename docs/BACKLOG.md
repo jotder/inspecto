@@ -474,14 +474,24 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 [`okf/backend/modules/reactor.md`](okf/backend/modules/reactor.md).
 
 **Open:**
-- 🟢 **MOCK-1 — the offline mock's lift emits no *derived* map node** (opened 2026-08-15, found while
-  shipping `processing.map`). `PipelineLift` puts a `transform.map` node carrying the legacy `schema` on
-  **every** lifted pipeline; `mock/pipeline-editable.ts` emits one only when `processing.map` authors
-  config for it. So the offline editor shows a graph one node shorter than the server's for every
-  pipeline without an authored projection. Not a *leniency* hole — nothing is accepted offline that the
-  server refuses — but it is the same class of divergence, and the mock is contract. ⚠ Fixing it changes
-  the offline topology of every pipeline, so it needs its own slice with the node-count assertions in
-  `pipeline-editable.spec.ts` updated deliberately, not absorbed into an unrelated change.
+- ~~🟢 **MOCK-1 — the offline mock's lift emits no *derived* map node**~~ **✅ SHIPPED 2026-08-15** (opened
+  the same day while shipping `processing.map`). `PipelineLift.branch` puts a `transform.map` node on
+  **every** path through `lift()` — only its config is conditional — while `mock/pipeline-editable.ts`
+  emitted one only when `processing.map` authored config, so the offline editor drew a graph one node
+  shorter than the server's for most pipelines. The mock's lift now emits it unconditionally; the lower
+  side already tolerated it (a node contributing no authored key is skipped when building
+  `processing.map`), so a derived-only node round-trips to nothing and cannot invent a key on save.
+  🔴 **The fix passed the ENTIRE UI suite with a ZERO delta — 2433/5, unchanged.** Nothing anywhere pinned
+  the derived node, which is exactly why the drift survived unnoticed; a green suite was evidence of the
+  gap, not of correctness. The guard added with it
+  (`lifts a map node even when nothing authored processing.map, and lowers it to nothing`) was falsified
+  by restoring the old condition. ⚠ **Two of this row's own claims were wrong:** (i) "the node-count
+  assertions in `pipeline-editable.spec.ts` [must be] updated deliberately" — **there were none**; all four
+  `toHaveLength` calls in that spec assert *refusal* counts and were unaffected. (ii) "one node shorter" is
+  the common case only — the server emits one map node **per branch**, so a selector/segments pipeline with
+  N routes diverges by N. ⚠ Deliberately still unmodelled: the derived `schema` key (the mock never
+  resolves schemas, and `schema` is MAP_DERIVED so it is dropped on lower either way) and per-branch
+  expansion (this mock builds a single linear chain throughout — out of scope, not newly missing).
 - ✅ **PG-1 — Postgres for Standard edition: COMPLETE** (opened 2026-08-14, closed 2026-08-15 — engine,
   bundle *and* UI all shipped; ⛔ nothing here is owed, see Open 2 below before proposing a Save button).
   Operator's architecture, recorded so it is not re-litigated: **business data is always Parquet, read by
@@ -1380,10 +1390,16 @@ archived**; the 16-module reactor as-built + the extraction playbook live in
 - **MNT-14 archived-Incident retention sweep — ✅ COMPLETE 2026-07-27, plan archived.** All five gaps
   closed; as-built in [`okf/backend/control-plane/jobs.md`](okf/backend/control-plane/jobs.md)
   (`incident_purge`). Residual open items only:
-  - **Operator-facing retention docs** — the runbook (`docs/ops/backup-restore-runbook.md`) does not yet
-    carry a retention section. ⚠ It must state the G3 stance explicitly: **the append-only event trail
-    survives a purge, so "purge" never means "all trace removed"**. That is the first question a legal/DPA
-    reviewer asks, and the code says it while the operator docs still don't.
+  - ~~**Operator-facing retention docs** — the runbook (`docs/ops/backup-restore-runbook.md`) does not yet
+    carry a retention section~~ **→ ✅ DONE 2026-07-27, verified 2026-08-15. This residual was stale: the
+    work landed, just not in the file this row predicted.**
+    [`okf/backend/build-run/operations-reference.md`](okf/backend/build-run/operations-reference.md) §*Retention
+    & purging* carries the what-each-task-forgets table, the worked `incident_purge` TOON, the dry-run-first +
+    legal-hold procedure, and the G3 stance verbatim for a legal/DPA reader (§564-567: *"A purge is not 'all
+    trace removed' … This is a stated decision (MNT-14 G3), not a gap."*). `backup-restore-runbook.md` keeps
+    only **backup-file** retention (`min_keep`), which is a different subject and correctly separate.
+    ⚠ **Pattern, third instance today:** a residual names the file the author *expected* the fix to land in;
+    the fix lands elsewhere and the row is never revisited. **Grep the claim, not the path.**
   - **No UI surface and no shipped Job instance** — the task exists and is reachable by config, but nothing
     schedules it and the Scheduler UI has no retention affordance. Deliberate: an operator should opt into a
     destructive sweep, and the MNT-13 nightly-chain template is the natural host when someone wants one.
