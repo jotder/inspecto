@@ -1,7 +1,16 @@
 # Plan — the `meta.domain.timezone` behaviour half
 
-**Status:** design only, **nothing built**. Written 2026-08-15 by grounding the BACKLOG §4 *Job framework*
-row (D6, reclassified 2026-08-04). **⚠ The row's framing is refuted below — read §2 before §5.**
+**Status: ✅ SHIPPED and ARCHIVED 2026-08-15 — all three §5 questions answered as recommended**
+(split the concept · service/JVM-wide key · one zone for firing and the macros). As-built:
+[`okf/backend/control-plane/jobs.md`](../../okf/backend/control-plane/jobs.md) *The operations zone*.
+This file is kept for the reasoning in §1-§2 — the grounding that refuted the row — not as current
+documentation. Written 2026-08-15 by grounding the BACKLOG §4 *Job framework* row (D6, reclassified
+2026-08-04). **⚠ The row's framing is refuted below — read §2 before §5.**
+
+**What shipped:** `com.gamma.util.OperationsZone` (`-Dops.timezone`, unset ⇒ `systemDefault()`,
+set-but-unresolvable throws), read by `PipelineScheduler:117` and `JobService:246`. Two assignments
+changed; every downstream read already went through those fields. §4's "out of scope" five
+`systemDefault()` sites remain untouched and are now a BACKLOG row of their own.
 
 The validation half shipped 2026-08-14 (`ConfigSpecs.meta()`'s `domain-timezone-resolvable` ERROR rule).
 This plan covers only the remaining half: **making a configured zone govern cron firing and the
