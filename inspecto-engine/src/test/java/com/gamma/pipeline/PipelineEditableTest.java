@@ -561,6 +561,98 @@ class PipelineEditableTest {
         assertEquals(PipelineEditable.UNSUPPORTED_BINDING, ex.refusals().get(0).code());
     }
 
+    // ── P3b: the fixed-width parser subtype ─────────────────────────────────────────
+
+    /** An explicit {@code frontend: fixedwidth} file round-trips verbatim through the subtype. */
+    @Test
+    void explicitFixedWidthFrontendRoundTripsVerbatimThroughTheSubtype(@TempDir Path dir) throws Exception {
+        Path toon = writeFixedWidthPipeline(dir, "fixedwidth", "");
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        nodeOfType(editable, "parser.fixedwidth");   // the retype happened
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+        assertEquals(raw, lowered, "strict lower over the original file reproduces it verbatim");
+    }
+
+    /**
+     * The parser accepts TWO spellings of this frontend ({@code PipelineConfigParser#parseFixedWidth}),
+     * so both must retype — and a lifted file keeps the spelling its author wrote. Canonicalising
+     * {@code fixed_width} → {@code fixedwidth} on a read would rewrite a deployed file on save, which
+     * is exactly the "nothing already deployed changes shape" rule P3a set.
+     */
+    @Test
+    void theAlternateFixedWidthSpellingRetypesAndIsNotCanonicalised(@TempDir Path dir) throws Exception {
+        Path toon = writeFixedWidthPipeline(dir, "fixed_width", "");
+        Map<String, Object> raw = decode(toon);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+
+        Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
+        nodeOfType(editable, "parser.fixedwidth");
+        Map<String, Object> lowered = PipelineEditable.lower(PipelineCodec.fromMap(editable), raw, true);
+
+        assertEquals(raw, lowered);
+        assertEquals("fixed_width", section(lowered, "parsing").get("frontend"),
+                "the author's spelling survives — a read must not rewrite a deployed file");
+    }
+
+    /**
+     * Binary fixed-width ({@code record: bytes}) lifts to the subtype too — the node TYPE spans the
+     * format even though its layout comes from {@code processing.ingester_config} and only the
+     * text mode can be authored in the drawer (operator decision, P3b).
+     */
+    @Test
+    void aBinaryFixedWidthConfigAlsoLiftsToTheSubtype(@TempDir Path dir) throws Exception {
+        Path toon = writeFixedWidthPipeline(dir, "fixedwidth", """
+                    record: bytes
+                    record_length: 24
+                """);
+        nodeOfType(PipelineEditable.toMap(PipelineConfig.load(toon.toString()), decode(toon)),
+                "parser.fixedwidth");
+    }
+
+    /** A fixed-width node authored fresh from the palette gets the CANONICAL spelling stamped in. */
+    @Test
+    void aNewFixedWidthParserNodeIsStampedWithItsCanonicalFrontend() {
+        Map<String, Object> lowered = PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                node("acq", "acquisition", Map.of("poll", "in")),
+                node("parse", "parser.fixedwidth", Map.of("parsing", Map.of(
+                        "fixedwidth", Map.of("fields", List.of(Map.of("name", "ID", "start", 0, "length", 6)))))),
+                node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                new LinkedHashMap<>(), true);
+
+        Map<?, ?> parsing = (Map<?, ?>) lowered.get("parsing");
+        assertEquals("fixedwidth", parsing.get("frontend"),
+                "the file must say the word the type means, or the next lift loses the identity");
+    }
+
+    /**
+     * The contradiction check compares by SUBTYPE, not by string: {@code fixed_width} on a
+     * {@code parser.fixedwidth} node is the same format and must NOT refuse, while a genuinely
+     * different frontend still does.
+     */
+    @Test
+    void eitherFixedWidthSpellingIsAcceptedButAForeignFrontendRefuses() {
+        for (String spelling : List.of("fixedwidth", "fixed_width"))
+            assertDoesNotThrow(() -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                    node("acq", "acquisition", Map.of("poll", "in")),
+                    node("parse", "parser.fixedwidth", Map.of("parsing", Map.of("frontend", spelling))),
+                    node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                    new LinkedHashMap<>(), true),
+                    "'" + spelling + "' names this very format — it cannot contradict its own node");
+
+        PipelineCompileException ex = assertThrows(PipelineCompileException.class,
+                () -> PipelineEditable.lower(new PipelineGraph("x", true, List.of(
+                        node("acq", "acquisition", Map.of("poll", "in")),
+                        node("parse", "parser.fixedwidth", Map.of("parsing", Map.of("frontend", "delimited"))),
+                        node("sink", "sink.persistent", Map.of("database", "db"))), List.of()),
+                        new LinkedHashMap<>(), true));
+        assertEquals(PipelineEditable.PARSER_FRONTEND_MISMATCH, ex.refusals().get(0).code());
+        assertEquals("parse", ex.refusals().get(0).nodeId());
+    }
+
     /** Two distinct databases now lower to a plural sinks: block (slice 4), not a MULTI_SINK refusal. */
     @Test
     void twoDistinctDatabasesLowerToASinksList() {
@@ -825,6 +917,57 @@ class PipelineEditableTest {
                   schema_file: %2$s
                 """.formatted(base, sf.toString().replace('\\', '/'));
         Path p = dir.resolve("parsing_block_pipeline.toon");
+        Files.writeString(p, toon);
+        return p;
+    }
+
+    /**
+     * The fixed-width twin of {@link #writeParsingBlockPipeline}. {@code frontend} is the spelling under
+     * test (both {@code fixedwidth} and {@code fixed_width} are accepted by the parser) and
+     * {@code extraFw} is appended inside the {@code fixedwidth:} block, already indented to it — the
+     * binary case adds {@code record}/{@code record_length} there.
+     *
+     * <p>⚠ The two {@code raw.fields[].selector}s must index declared slices or the load fails in
+     * {@code PipelineConfigParser#validateFixedWidthSelectors} — keep the slice count ≥ the selectors.
+     */
+    private static Path writeFixedWidthPipeline(Path dir, String frontend, String extraFw) throws Exception {
+        Path sf = dir.resolve("fw_schema.toon");
+        Files.writeString(sf, """
+                partitionKey: EVENT_DATE
+                raw:
+                  name: fw_data
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    ID, "0", VARCHAR
+                    EVENT_DATE, "1", DATE
+                mapping:
+                  canonicalName: fw_data
+                  rawName: fw_data
+                  rules[2]{targetColumn,sourceExpression,transformType}:
+                    ID, ID, DIRECT
+                    EVENT_DATE, EVENT_DATE, DIRECT
+                """);
+        String base = dir.toString().replace('\\', '/');
+        String toon = """
+                name: FIXED_WIDTH
+                active: true
+                dirs:
+                  poll: %1$s/inbox
+                  database: %1$s/db
+                output:
+                  format: CSV
+                collector:
+                  connector: local
+                parsing:
+                  frontend: %3$s
+                  fixedwidth:
+                %4$s    fields[2]{name,start,length}:
+                      ID, 0, 6
+                      EVENT_DATE, 6, 10
+                processing:
+                  schema_file: %2$s
+                """.formatted(base, sf.toString().replace('\\', '/'), frontend, extraFw);
+        Path p = dir.resolve("fixed_width_pipeline.toon");
         Files.writeString(p, toon);
         return p;
     }

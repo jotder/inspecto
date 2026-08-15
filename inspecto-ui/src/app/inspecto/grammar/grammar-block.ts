@@ -42,18 +42,26 @@ export function grammarContentAsParsingBlock(content: Record<string, unknown>): 
     return block;
 }
 
+/** Every spelling that names each per-format frontend a node type can be locked to. */
+const FRONTEND_ALIASES: Record<string, readonly string[]> = {
+    delimited: ['delimited', 'csv', 'dsv'],
+    fixedwidth: ['fixedwidth', 'fixed_width'],
+};
+
 /**
- * Whether this component can seed a **delimited** node — the picker must not offer a Grammar that
- * names another frontend, because a `parser.delimited` node's format IS its type and the save path
+ * Whether this component can seed a node of the given **frontend** — the picker must not offer a
+ * Grammar that names another one, because a per-format node's format IS its type and the save path
  * refuses a contradicting block with `PARSER_FRONTEND_MISMATCH`.
  *
  * ⚠ Deliberately NOT `normalizeFrontend`, which maps anything unrecognised to `delimited` — that
  * would offer an `xlsx`/`html` component as if it were delimited. A component qualifies only when it
- * declares delimited explicitly or declares nothing at all (the legacy flat shape).
+ * declares the frontend explicitly, or — for delimited ONLY — declares nothing at all: an undeclared
+ * component is the legacy flat shape, and delimited is the engine's implicit default. Offering such a
+ * component as fixed-width would seed a slice table from a `{delimiter}` map.
  */
-export function isDelimitedGrammar(content: Record<string, unknown>): boolean {
+export function grammarSeedsFrontend(content: Record<string, unknown>, frontend: string): boolean {
     const declared = content?.['frontend'] ?? content?.['parser_type'];
-    if (declared === undefined || declared === null || declared === '') return true;
+    if (declared === undefined || declared === null || declared === '') return frontend === 'delimited';
     const f = String(declared).trim().toLowerCase();
-    return f === 'delimited' || f === 'csv' || f === 'dsv';
+    return (FRONTEND_ALIASES[frontend] ?? [frontend]).includes(f);
 }

@@ -36,6 +36,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         'adapter',
         'parser',
         'parser.delimited', // B6/P3a: the first per-format parser subtype (engine `6bc685cf`)
+        'parser.fixedwidth', // P3b: the second — spans both record modes; the drawer serves text only
         'transform.map',
         'transform.filter',
         'transform.select',
@@ -97,7 +98,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
         expect(dedups).toEqual(['transform.dedup.marker', 'transform.dedup']);
     });
 
-    it('marks exactly the 13 types the server can lower — a laxer mock is the whole failure mode', () => {
+    it('marks exactly the 14 types the server can lower — a laxer mock is the whole failure mode', () => {
         // Must equal PipelineEditable.LOWERABLE. If the server's set changes, this test is the
         // tripwire: a mock that offers more than the backend accepts sends the user into a 422.
         expect(
@@ -110,6 +111,7 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'gap',
             'parser',
             'parser.delimited',
+            'parser.fixedwidth',
             'sink.persistent',
             'transform.dedup',
             'transform.dedup.marker',
@@ -119,13 +121,14 @@ describe('pipelinesHandler — the palette mirrors the backend BuiltinNodeType e
             'transform.route',
             'transform.summarize',
         ]);
-        expect(NODE_TYPES.length).toBe(23);
+        expect(NODE_TYPES.length).toBe(24);
     });
 
     it('only the parser family and the router emit operator-named routes', () => {
         expect(NODE_TYPES.filter((t) => t.emitsNamedRoutes).map((t) => t.type)).toEqual([
             'parser',
             'parser.delimited',
+            'parser.fixedwidth',
             'transform.route',
         ]);
     });

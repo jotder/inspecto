@@ -84,6 +84,15 @@ export const NODE_TYPES: PipelineNodeType[] = (
             emits: ['data', 'unmatched'],
             emitsNamedRoutes: true,
         },
+        {
+            type: 'parser.fixedwidth',
+            category: 'PARSE',
+            label: 'Parser (fixed width)',
+            description: 'Reads a fixed-width landed file into rows; positional slices carved from each record.',
+            accepts: ['data'],
+            emits: ['data', 'unmatched'],
+            emitsNamedRoutes: true,
+        },
         // transform family
         {
             type: 'transform.map',

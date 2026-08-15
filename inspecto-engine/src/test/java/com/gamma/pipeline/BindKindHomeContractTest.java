@@ -106,14 +106,17 @@ class BindKindHomeContractTest {
                         t.type() + " gained a use: home — the UI picker rule must be revisited, not just this test");
     }
 
-    /** PARSE is bindable only while EVERY type in it is homed. The tripwire fired once, correctly, when
-     *  {@code parser.delimited} landed (P3a) — it arrived WITH a {@code grammar/} home, so the category
-     *  stays bindable and this pins the whole family. A parse type added without a home must flip
-     *  {@code bindKindFor('PARSE')} to null, and this test is where that shows up first. */
+    /** PARSE is bindable only while EVERY type in it is homed. The tripwire has fired twice, correctly:
+     *  {@code parser.delimited} (P3a) and {@code parser.fixedwidth} (P3b) each arrived WITH a
+     *  {@code grammar/} home, so the category stays bindable and this pins the whole family. A parse
+     *  type added without a home must flip {@code bindKindFor('PARSE')} to null, and this test is where
+     *  that shows up first. */
     @Test
     void parseIsBindableAndEveryParseTypeIsHomed() {
         assertTrue(bindableCategories().contains(NodeCategory.PARSE.name()));
-        assertEquals(List.of(BuiltinNodeType.PARSER, BuiltinNodeType.PARSER_DELIMITED),
+        assertEquals(
+                List.of(BuiltinNodeType.PARSER, BuiltinNodeType.PARSER_DELIMITED,
+                        BuiltinNodeType.PARSER_FIXEDWIDTH),
                 types(NodeCategory.PARSE));
         for (BuiltinNodeType t : types(NodeCategory.PARSE))
             assertTrue(PipelineEditable.typesWithUseHome().contains(t.type()),

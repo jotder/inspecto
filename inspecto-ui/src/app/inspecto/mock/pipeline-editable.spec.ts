@@ -222,6 +222,84 @@ describe('mock pipeline-editable — the delimited parser subtype (parser.delimi
 });
 
 /**
+ * Parity guard for the fixed-width parser subtype (P3b). Mirrors `PipelineEditableTest`'s P3b block.
+ * The two differences from delimited are the whole point: this frontend answers to TWO spellings
+ * (`fixedwidth` / `fixed_width`, both read by `PipelineConfigParser#parseFixedWidth`), and it is
+ * never implicit — so every fixed-width file retypes, binary included.
+ */
+describe('mock pipeline-editable — the fixed-width parser subtype (parser.fixedwidth)', () => {
+    const fixedWidthConfig = (frontend = 'fixedwidth', extraFw: Record<string, unknown> = {}) => ({
+        name: 'FW',
+        active: true,
+        dirs: { poll: '/in', database: '/db' },
+        output: { format: 'CSV' },
+        collector: { connector: 'local' },
+        parsing: {
+            frontend,
+            fixedwidth: { ...extraFw, fields: [{ name: 'ID', start: 0, length: 6 }] },
+        },
+        processing: { schema_file: 'fw_schema.toon' },
+    });
+
+    it('lifts an explicit frontend: fixedwidth to the subtype and round-trips verbatim', () => {
+        const existing = fixedWidthConfig();
+        const g = liftConfig(existing);
+
+        expect(g.nodes.find((n) => n.type === 'parser.fixedwidth')).toBeDefined();
+        const res = lowerGraph(g, existing, true);
+        expect((res as { config: Record<string, unknown> }).config).toEqual(fixedWidthConfig());
+    });
+
+    it('lifts the alternate fixed_width spelling too, and does not canonicalise it on the way back', () => {
+        const existing = fixedWidthConfig('fixed_width');
+        const g = liftConfig(existing);
+
+        expect(g.nodes.find((n) => n.type === 'parser.fixedwidth')).toBeDefined();
+        const res = lowerGraph(g, existing, true);
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['frontend']).toBe('fixed_width');
+    });
+
+    it('lifts a binary (record: bytes) config to the subtype as well', () => {
+        const g = liftConfig(fixedWidthConfig('fixedwidth', { record: 'bytes', record_length: 24 }));
+        expect(g.nodes.find((n) => n.type === 'parser.fixedwidth')).toBeDefined();
+    });
+
+    it('stamps the CANONICAL frontend onto a palette-fresh subtype node', () => {
+        const existing = fixedWidthConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.fixedwidth')!;
+        parser.config = { parsing: { fixedwidth: { fields: [{ name: 'ID', start: 0, length: 6 }] } } };
+
+        const res = lowerGraph(g, existing, true);
+
+        const parsing = (res as { config: Record<string, unknown> }).config['parsing'] as Record<string, unknown>;
+        expect(parsing['frontend']).toBe('fixedwidth');
+    });
+
+    it('accepts EITHER spelling on the node but refuses a foreign frontend', () => {
+        for (const spelling of ['fixedwidth', 'fixed_width']) {
+            const existing = fixedWidthConfig();
+            const g = liftConfig(existing);
+            g.nodes.find((n) => n.type === 'parser.fixedwidth')!.config = { parsing: { frontend: spelling } };
+            expect('refusals' in lowerGraph(g, existing, true)).toBe(false);
+        }
+
+        const existing = fixedWidthConfig();
+        const g = liftConfig(existing);
+        const parser = g.nodes.find((n) => n.type === 'parser.fixedwidth')!;
+        parser.config = { parsing: { frontend: 'delimited' } };
+
+        const res = lowerGraph(g, existing, true);
+
+        expect('refusals' in res).toBe(true);
+        const refusals = (res as { refusals: { code: string; nodeId?: string }[] }).refusals;
+        expect(refusals[0].code).toBe('PARSER_FRONTEND_MISMATCH');
+        expect(refusals[0].nodeId).toBe(parser.id);
+    });
+});
+
+/**
  * Parity guard for the processing-key transform nodes the server lowers (PipelineEditable.LOWERABLE):
  * transform.dedup → processing.dedup {keys, order_by}, transform.join → processing.join
  * {reference, on}, transform.summarize → processing.summarize {group_by, measures}. The mock used to

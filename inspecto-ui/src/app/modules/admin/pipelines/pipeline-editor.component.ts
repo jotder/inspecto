@@ -54,7 +54,7 @@ import { PipelineGuaranteesPanelComponent } from './pipeline-guarantees-panel.co
 import { PipelineStepCardsComponent } from './pipeline-step-cards.component';
 import { NodeConfigDialog, NodeConfigResult } from './node-config.dialog';
 import { PipelineCollectionDefinitionComponent } from './pipeline-collection-definition.component';
-import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
+import { PARSE_NODE_FRONTENDS, PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
 import { GrammarEditorDialog } from './grammar-editor.dialog';
 import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
@@ -1230,18 +1230,36 @@ export class PipelineEditorComponent implements OnInit {
     // ── definition drawer lifecycle (definition-surface P1) ────────────────────────────────────────
 
     /**
-     * Whether this parse node defines in the drawer. Since S3 that is EVERY `parser.delimited` node,
-     * bound or not — a bound one is materialised into an inline copy by {@link definitionDraft}.
+     * Whether this parse node defines in the drawer. Since S3 that is EVERY per-format parse node
+     * ({@link PARSE_NODE_FRONTENDS}), bound or not — a bound one is materialised into an inline copy
+     * by {@link definitionDraft}.
      *
-     * The one exception is a **dangling** binding: with nothing to resolve there is no faithful copy
-     * to migrate to, and seeding the drawer with defaults would replace the operator's (broken)
-     * reference with a silently invented Grammar. Those stay on the dialog, which can at least show
-     * the binding.
+     * Two exceptions stay on the dialog:
+     * <ul>
+     *   <li>a **dangling** binding — with nothing to resolve there is no faithful copy to migrate to,
+     *       and seeding the drawer with defaults would replace the operator's (broken) reference with
+     *       a silently invented Grammar. The dialog can at least show the binding;</li>
+     *   <li>**binary** fixed-width ({@link isBinaryFixedWidth}) — see below.</li>
+     * </ul>
      */
     private isDrawerParse(node: AuthoredNode): boolean {
-        if (node.type !== 'parser.delimited') return false;
+        if (!(node.type in PARSE_NODE_FRONTENDS)) return false;
+        if (this.isBinaryFixedWidth(node)) return false;
         const id = this.boundGrammarId(node);
         return id === null || this.grammarTemplates().some((t) => t.name === id);
+    }
+
+    /**
+     * A `record: bytes` fixed-width node. It lifts to `parser.fixedwidth` like any other — the node
+     * TYPE spans the format (P3b operator decision) — but its field geometry lives in
+     * `processing.ingester_config` and is executed by `FixedWidthRecordIngester`, not by the
+     * `fixedwidth.fields[]` slices this pane authors. Routing it to the drawer would show a slice
+     * table that governs nothing, so it keeps the dialog until a binary pane exists.
+     */
+    private isBinaryFixedWidth(node: AuthoredNode): boolean {
+        const parsing = node.config?.['parsing'] as Record<string, unknown> | undefined;
+        const fw = parsing?.['fixedwidth'] as Record<string, unknown> | undefined;
+        return String(fw?.['record'] ?? '').trim().toLowerCase() === 'bytes';
     }
 
     /** The `grammar/<id>` this node binds, or `null` when its Grammar is already inline. */

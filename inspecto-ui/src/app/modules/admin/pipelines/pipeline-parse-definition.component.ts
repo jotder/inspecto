@@ -17,14 +17,38 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthoredNode, ComponentDef } from 'app/inspecto/api';
-import { GrammarEditorComponent, grammarContentAsParsingBlock, isDelimitedGrammar } from 'app/inspecto/grammar';
+import {
+    GrammarEditorComponent,
+    ParsingFrontend,
+    grammarContentAsParsingBlock,
+    grammarSeedsFrontend,
+} from 'app/inspecto/grammar';
 
 /**
- * The **Parse definition pane** (definition-surface P3a) — the delimited path of the parse node,
- * re-hosted inside `<inspecto-definition-drawer>` instead of `grammar-editor.dialog`. Renders
- * name/description plus the shared `<inspecto-grammar-editor>` locked to the delimited format:
- * a `parser.delimited` node's format IS its type (B6), so the picker would only author a block the
- * save path refuses with PARSER_FRONTEND_MISMATCH.
+ * The per-format parse node types the drawer serves → the frontend each one means. This is the ONE
+ * list that decides both which parse nodes reach the drawer (the host's `isDrawerParse`) and which
+ * format the editor is then locked to, so the two can never disagree.
+ *
+ * ⛔ A parse type absent here keeps the dialog. `parser` (the generic reader) has no single format to
+ * lock, and binary fixed-width — which lifts to `parser.fixedwidth` all the same — carries its layout
+ * in `processing.ingester_config`, which this pane cannot author (P3b operator decision).
+ */
+export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend> = {
+    'parser.delimited': 'delimited',
+    'parser.fixedwidth': 'fixedwidth',
+};
+
+/**
+ * The **Parse definition pane** (definition-surface P3a; fixed width added by P3b) — the per-format
+ * path of the parse node, re-hosted inside `<inspecto-definition-drawer>` instead of
+ * `grammar-editor.dialog`. Renders name/description plus the shared `<inspecto-grammar-editor>`
+ * locked to the node's own format: a per-format node's format IS its type (B6), so the picker would
+ * only author a block the save path refuses with PARSER_FRONTEND_MISMATCH.
+ *
+ * <p>**One pane serves every per-format subtype**, keyed on {@link frontend}. B6 banned a generic
+ * parser NODE TYPE with format tabs — not component reuse; the type still locks the format, so no
+ * tabs appear and each format stays its own palette entry. A second copy of this file would only
+ * drift.
  *
  * <p>**Pure** (D2): {@link submit} rebuilds the node with the Grammar in its inline `parsing:` home
  * and emits it — the host patches its in-memory model and the toolbar Save persists. Grammar-BOUND
@@ -60,11 +84,11 @@ import { GrammarEditorComponent, grammarContentAsParsingBlock, isDelimitedGramma
 
             <div class="mb-1 mt-2 flex items-center gap-2">
                 <span class="text-xs font-semibold uppercase opacity-70">Grammar</span>
-                @if (delimitedTemplates().length) {
+                @if (seedableTemplates().length) {
                     <mat-form-field class="w-56" subscriptSizing="dynamic">
                         <mat-label>Start from a template</mat-label>
                         <mat-select [value]="pickedTemplate()" (selectionChange)="applyTemplate($event.value)">
-                            @for (t of delimitedTemplates(); track t.name) {
+                            @for (t of seedableTemplates(); track t.name) {
                                 <mat-option [value]="t.name">{{ t.name }}</mat-option>
                             }
                         </mat-select>
@@ -82,7 +106,7 @@ import { GrammarEditorComponent, grammarContentAsParsingBlock, isDelimitedGramma
             </div>
             <inspecto-grammar-editor
                 [initial]="seedBlock()"
-                type="delimited"
+                [type]="frontend()"
                 [lockType]="true"
                 (submitted)="submit()"
             />
@@ -92,8 +116,14 @@ import { GrammarEditorComponent, grammarContentAsParsingBlock, isDelimitedGramma
 export class PipelineParseDefinitionComponent {
     private fb = inject(FormBuilder);
 
-    /** The `parser.delimited` node being defined (identity fixed; config/name/description editable). */
+    /** The per-format parse node being defined (identity fixed; config/name/description editable). */
     readonly node = input.required<AuthoredNode>();
+
+    /**
+     * The format this node's type means — the editor is locked to it and only templates naming it are
+     * offered. Derived from the node type rather than passed in, so the host cannot desync the two.
+     */
+    readonly frontend = computed<ParsingFrontend>(() => PARSE_NODE_FRONTENDS[this.node().type] ?? 'delimited');
     /**
      * Stored Grammar components offered as starting points. Passed IN rather than fetched: the pane
      * stays pure (P2 — `[node]` in, outputs out, no injected state) and the host already lists them.
@@ -133,11 +163,11 @@ export class PipelineParseDefinitionComponent {
     readonly seedBlock = computed<Record<string, unknown>>(() => this.templateBlock() ?? this.parsingBlock());
 
     /**
-     * Only Grammars that can seed a DELIMITED node. A component naming another frontend would author
+     * Only Grammars that can seed THIS node's format. A component naming another frontend would author
      * a block the save path refuses with `PARSER_FRONTEND_MISMATCH`, so it is not offered at all.
      */
-    readonly delimitedTemplates = computed<ComponentDef[]>(() =>
-        this.templates().filter((t) => isDelimitedGrammar(t.content ?? {})),
+    readonly seedableTemplates = computed<ComponentDef[]>(() =>
+        this.templates().filter((t) => grammarSeedsFrontend(t.content ?? {}, this.frontend())),
     );
 
     private lastDirty = false;
@@ -185,7 +215,7 @@ export class PipelineParseDefinitionComponent {
      * stored settings.
      */
     applyTemplate(name: string): void {
-        const t = this.delimitedTemplates().find((x) => x.name === name);
+        const t = this.seedableTemplates().find((x) => x.name === name);
         if (!t) return;
         this.pickedTemplate.set(name);
         this.templateBlock.set(grammarContentAsParsingBlock(t.content ?? {}));
@@ -207,7 +237,7 @@ export class PipelineParseDefinitionComponent {
      */
     requestSaveAsTemplate(): void {
         if (!this.editor?.validate()) return;
-        this.saveAsTemplate.emit({ ...this.editor.value(), frontend: 'delimited' });
+        this.saveAsTemplate.emit({ ...this.editor.value(), frontend: this.frontend() });
     }
 
     /**
@@ -217,7 +247,7 @@ export class PipelineParseDefinitionComponent {
      */
     submit(): void {
         if (!this.editor?.validate()) return;
-        const block = { ...this.editor.value(), frontend: 'delimited' };
+        const block = { ...this.editor.value(), frontend: this.frontend() };
         const v = this.form.getRawValue();
         // `use` is dropped, never carried: this pane's whole contract is that the node owns its
         // Grammar inline. A node opened here BOUND to a `grammar/<id>` component is materialised into

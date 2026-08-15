@@ -83,7 +83,8 @@ public final class PipelineEditable {
     /** Node types the flat config has a home for; everything else refuses with UNSUPPORTED_NODE. */
     private static final Set<String> LOWERABLE = Set.of(
             BuiltinNodeType.ACQUISITION.type(), BuiltinNodeType.PARSER.type(),
-            BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.GAP.type(),
+            BuiltinNodeType.PARSER_DELIMITED.type(), BuiltinNodeType.PARSER_FIXEDWIDTH.type(),
+            BuiltinNodeType.GAP.type(),
             BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type(),
             BuiltinNodeType.TRANSFORM_DEDUP.type(),   // record-grain dedup → processing.dedup (ELT P2)
             BuiltinNodeType.TRANSFORM_ROUTE.type(),   // route: block — authoring-only until the executor lands
@@ -166,9 +167,29 @@ public final class PipelineEditable {
     /** The registry-reference prefix a Grammar-bound parser node carries on {@code use:}. */
     static final String GRAMMAR_REF_PREFIX = "grammar/";
 
-    /** The parser family: the generic parser plus the per-format subtypes (B6 — delimited first). */
+    /** The parser family: the generic parser plus the per-format subtypes (B6 — delimited, fixed width). */
     static boolean isParserType(String t) {
-        return BuiltinNodeType.PARSER.type().equals(t) || BuiltinNodeType.PARSER_DELIMITED.type().equals(t);
+        return BuiltinNodeType.PARSER.type().equals(t)
+                || BuiltinNodeType.PARSER_DELIMITED.type().equals(t)
+                || BuiltinNodeType.PARSER_FIXEDWIDTH.type().equals(t);
+    }
+
+    /**
+     * A per-format parser subtype → every {@code parsing.frontend} spelling that IS that format.
+     * Fixed width has two accepted spellings ({@code PipelineConfigParser#parseFixedWidth} reads both),
+     * so a node typed {@code parser.fixedwidth} must not be called a contradiction for carrying either;
+     * the first entry is the canonical one {@link #lower} stamps back.
+     */
+    private static final Map<String, List<String>> SUBTYPE_FRONTENDS = Map.of(
+            BuiltinNodeType.PARSER_DELIMITED.type(), List.of("delimited"),
+            BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of("fixedwidth", "fixed_width"));
+
+    /** The node subtype a {@code parsing.frontend} value names, or {@code null} for none/unknown. */
+    private static String subtypeForFrontend(String frontend) {
+        String f = frontend.trim().toLowerCase();
+        return SUBTYPE_FRONTENDS.entrySet().stream()
+                .filter(e -> e.getValue().contains(f))
+                .map(Map.Entry::getKey).findFirst().orElse(null);
     }
 
     /**
@@ -182,9 +203,12 @@ public final class PipelineEditable {
     private static final Map<String, List<String>> USE_HOME = Map.of(
             BuiltinNodeType.ACQUISITION.type(), List.of("connection/"),
             BuiltinNodeType.PARSER.type(), List.of(GRAMMAR_REF_PREFIX, "ingester/"),
-            // The delimited subtype takes a Grammar but never ingester/ — a plugin ingester binding on a
-            // node whose type SAYS delimited is a contradiction, refused rather than half-honoured.
-            BuiltinNodeType.PARSER_DELIMITED.type(), List.of(GRAMMAR_REF_PREFIX));
+            // A per-format subtype takes a Grammar but never ingester/ — a plugin ingester binding on a
+            // node whose type SAYS its format is a contradiction, refused rather than half-honoured.
+            // (Binary fixed-width reaches FixedWidthRecordIngester through the plain
+            // processing.ingester CLASS key, not a use: binding, so it needs no home here.)
+            BuiltinNodeType.PARSER_DELIMITED.type(), List.of(GRAMMAR_REF_PREFIX),
+            BuiltinNodeType.PARSER_FIXEDWIDTH.type(), List.of(GRAMMAR_REF_PREFIX));
 
     /**
      * The node types this flat config has a {@code use:} home for — the authoritative half of the
@@ -263,15 +287,18 @@ public final class PipelineEditable {
         for (PipelineNode n : g.nodes()) {
             Map<String, Object> nm = new LinkedHashMap<>();
             nm.put("id", n.id());
-            // The per-format parser identity (B6): a file whose parsing: block says frontend: delimited
-            // EXPLICITLY presents its parser as the delimited subtype. Explicit only — delimited is also
-            // the parser's implicit default, but retyping every bare legacy file would flip the node type
-            // of everything deployed on a read; a file that never says the word keeps the plain type.
+            // The per-format parser identity (B6): a file whose parsing: block NAMES its frontend
+            // presents its parser as that subtype. Explicit only — delimited is also the parser's
+            // implicit default, but retyping every bare legacy file would flip the node type of
+            // everything deployed on a read; a file that never says the word keeps the plain type.
+            // (Fixed width is never implicit, so for it "explicit" costs nothing — a fixed-width
+            // config always says so, and both accepted spellings retype. Binary fixed-width retypes
+            // too: the node TYPE spans the format, and only the DRAWER is text-only.)
             String type = n.type();
             if (BuiltinNodeType.PARSER.type().equals(type)
                     && section(raw, "parsing").get("frontend") instanceof String f
-                    && "delimited".equalsIgnoreCase(f.trim()))
-                type = BuiltinNodeType.PARSER_DELIMITED.type();
+                    && subtypeForFrontend(f) != null)
+                type = subtypeForFrontend(f);
             nm.put("type", type);
             if (n.hasName()) nm.put("name", n.name());
             if (n.description() != null && !n.description().isBlank()) nm.put("description", n.description());
@@ -421,13 +448,15 @@ public final class PipelineEditable {
                                 + "' already holds it"));
                 else parser = n;
                 // A subtype node whose own parsing: block names a DIFFERENT frontend is a contradiction
-                // the file could only resolve by silently ignoring one of the two spellings.
-                if (BuiltinNodeType.PARSER_DELIMITED.type().equals(t)
+                // the file could only resolve by silently ignoring one of the two spellings. Compared
+                // by SUBTYPE, not by string: fixed width answers to two spellings and neither
+                // contradicts the other.
+                if (SUBTYPE_FRONTENDS.containsKey(t)
                         && n.cfg("parsing") instanceof Map<?, ?> pb && pb.get("frontend") != null
-                        && !"delimited".equalsIgnoreCase(String.valueOf(pb.get("frontend")).trim()))
+                        && !t.equals(subtypeForFrontend(String.valueOf(pb.get("frontend")))))
                     refusals.add(new PipelineCompileException.Refusal(PARSER_FRONTEND_MISMATCH, n.id(),
                             "parsing.frontend '" + pb.get("frontend")
-                                    + "' contradicts the node's own type 'parser.delimited'"));
+                                    + "' contradicts the node's own type '" + t + "'"));
             }
             else if (BuiltinNodeType.GAP.type().equals(t)) gap = n;
             else if (BuiltinNodeType.TRANSFORM_DEDUP_MARKER.type().equals(t)) marker = n;
@@ -590,13 +619,14 @@ public final class PipelineEditable {
             if (parser.use() != null && parser.use().startsWith(GRAMMAR_REF_PREFIX))
                 parsingBlock.put("grammar", parser.use());
             else if (strict) parsingBlock.remove("grammar");   // unbound in the editor ⇒ unbound on disk
-            // A delimited-subtype node authored fresh from the palette carries no frontend key yet; the
+            // A per-format subtype node authored fresh from the palette carries no frontend key yet; the
             // file must say the word the type means, or a later read would lift it back as a plain
             // parser and the identity would quietly evaporate. A lifted node already carries it (that is
-            // what made it this type), so the round-trip stays verbatim.
-            if (BuiltinNodeType.PARSER_DELIMITED.type().equals(parser.type())
-                    && parsingBlock.get("frontend") == null)
-                parsingBlock.put("frontend", "delimited");
+            // what made it this type), so the round-trip stays verbatim — including a `fixed_width`
+            // spelling, which is left alone rather than canonicalised.
+            List<String> frontends = SUBTYPE_FRONTENDS.get(parser.type());
+            if (frontends != null && parsingBlock.get("frontend") == null)
+                parsingBlock.put("frontend", frontends.getFirst());
             if (!parsingBlock.isEmpty()) out.put("parsing", parsingBlock);
             else out.remove("parsing");
             if (!filters.isEmpty()) {

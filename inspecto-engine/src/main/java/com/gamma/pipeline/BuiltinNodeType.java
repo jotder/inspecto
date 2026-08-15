@@ -46,6 +46,16 @@ public enum BuiltinNodeType implements PipelineNodeType {
     PARSER_DELIMITED("parser.delimited", NodeCategory.PARSE, "Parser (delimited)",
             "Reads a delimited (CSV-like) landed file into rows; the delimited grammar is its config.",
             Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
+    // Fixed width (P3b). Unlike delimited, this frontend is NEVER implicit — a config is fixed-width
+    // only by saying so — so the "explicit only" caveat above is moot here and every fixed-width file
+    // lifts. Both spellings the parser accepts (`fixedwidth` / `fixed_width`, see
+    // PipelineConfigParser#parseFixedWidth) name this type; `fixedwidth` is what we write back.
+    // Covers BOTH record modes: `record: line` (native read_csv+substring) and `record: bytes`
+    // (binary, layout from processing.ingester_config via FixedWidthRecordIngester). The drawer
+    // serves only the text mode — binary keeps the dialog — but the node TYPE spans the format.
+    PARSER_FIXEDWIDTH("parser.fixedwidth", NodeCategory.PARSE, "Parser (fixed width)",
+            "Reads a fixed-width landed file into rows; positional slices carved from each record.",
+            Set.of(PipelineRel.DATA), Set.of(PipelineRel.DATA, PipelineRel.UNMATCHED), true),
 
     // ── transform family (§3.4 + §15) ─────────────────────────────────────────────
     TRANSFORM_MAP("transform.map", NodeCategory.TRANSFORM, "Map",

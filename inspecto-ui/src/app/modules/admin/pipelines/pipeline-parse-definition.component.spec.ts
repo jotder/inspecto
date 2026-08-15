@@ -48,6 +48,22 @@ function delimitedNode(): AuthoredNode {
     };
 }
 
+/** The P3b twin: same pane, different node type — the format is read off the type, not passed in. */
+function fixedWidthNode(): AuthoredNode {
+    return {
+        id: 'parse',
+        type: 'parser.fixedwidth',
+        name: 'Parser (fixed width)',
+        config: {
+            schema_file: 'cdr_schema.toon',
+            parsing: {
+                frontend: 'fixedwidth',
+                fixedwidth: { fields: [{ name: 'ID', start: 0, length: 6 }] },
+            },
+        },
+    };
+}
+
 async function create(node: AuthoredNode = delimitedNode(), templates: ComponentDef[] = []) {
     TestBed.configureTestingModule({
         imports: [HostComponent],
@@ -178,7 +194,28 @@ describe('PipelineParseDefinitionComponent', () => {
         /** A component naming another frontend could only author a PARSER_FRONTEND_MISMATCH block. */
         it('offers only delimited-compatible templates', async () => {
             const fixture = await create(delimitedNode(), TEMPLATES);
-            expect(pane(fixture).delimitedTemplates().map((t) => t.name)).toEqual(['pipe_delimited', 'nested_tsv']);
+            expect(pane(fixture).seedableTemplates().map((t) => t.name)).toEqual(['pipe_delimited', 'nested_tsv']);
+        });
+
+        /**
+         * The mirror image (P3b): the same pane on a fixed-width node offers the DISJOINT set. Note
+         * `pipe_delimited` — an undeclared legacy flat component — is offered to delimited but NOT
+         * here: undeclared means the engine's implicit default, and seeding a slice table from a
+         * `{delimiter: '|'}` map would invent a Grammar the operator never wrote.
+         */
+        it('offers only fixed-width-compatible templates on a fixed-width node', async () => {
+            const fixture = await create(fixedWidthNode(), TEMPLATES);
+            expect(pane(fixture).seedableTemplates().map((t) => t.name)).toEqual(['mainframe_fixed']);
+        });
+
+        /** The editor is locked to the format the node's TYPE means — never a picker.
+         *  ⚠ One `create()` per test: `TestBed.configureTestingModule` throws once instantiated. */
+        it('derives the locked frontend from a delimited node type', async () => {
+            expect(pane(await create(delimitedNode(), TEMPLATES)).frontend()).toBe('delimited');
+        });
+
+        it('derives the locked frontend from a fixed-width node type', async () => {
+            expect(pane(await create(fixedWidthNode(), TEMPLATES)).frontend()).toBe('fixedwidth');
         });
 
         /**

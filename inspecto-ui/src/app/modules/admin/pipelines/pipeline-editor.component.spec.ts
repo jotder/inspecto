@@ -233,6 +233,44 @@ describe('PipelineEditorComponent', () => {
             expect(c.definitionNode()?.id).toBe('parse');
         });
 
+        /** P3b: the same routing for the second per-format subtype — one predicate, one pane. */
+        it('routes an inline parser.fixedwidth node to the drawer, not the grammar dialog', () => {
+            const c = make();
+            c.select('demo');
+            const node = {
+                id: 'parse',
+                type: 'parser.fixedwidth',
+                config: { parsing: { frontend: 'fixedwidth', fixedwidth: { fields: [] } } },
+            };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+            c.openNodeConfig(node);
+            expect(dialog.open).not.toHaveBeenCalled();
+            expect(c.definitionNode()?.id).toBe('parse');
+        });
+
+        /**
+         * P3b operator decision: a BINARY fixed-width node lifts to `parser.fixedwidth` like any other,
+         * but its geometry lives in `processing.ingester_config` and is executed by
+         * `FixedWidthRecordIngester` — the pane's `fixedwidth.fields[]` slice table would govern
+         * nothing. It keeps the dialog. ⚠ Same node TYPE as the case above; only `record` differs.
+         */
+        it('keeps a BINARY (record: bytes) fixed-width node on the dialog', () => {
+            const c = make();
+            c.select('demo');
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            const node = {
+                id: 'parse',
+                type: 'parser.fixedwidth',
+                config: {
+                    parsing: { frontend: 'fixedwidth', fixedwidth: { record: 'bytes', record_length: 24 } },
+                },
+            };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+            c.openNodeConfig(node);
+            expect(dialog.open).toHaveBeenCalledTimes(1);
+            expect(c.definitionNode()).toBeNull();
+        });
+
         /** S1: the HOST owns the template write (the pane only emits), and it must leave the node
          *  completely alone — a template is a copy, never a `use: grammar/<id>` binding. */
         it('saves a Grammar template without touching the node', () => {

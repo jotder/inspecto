@@ -25,6 +25,7 @@ export const LOWERABLE = new Set([
     'acquisition',
     'parser',
     'parser.delimited', // the first per-format parser subtype (B6/P3a — mirrors the engine)
+    'parser.fixedwidth', // the second (P3b) — spans both record modes, drawer serves text only
     'gap',
     'transform.dedup.marker',
     'transform.filter',
@@ -45,13 +46,39 @@ export const LOWERABLE = new Set([
 const USE_HOME: Record<string, string[]> = {
     acquisition: ['connection/'],
     parser: ['grammar/', 'ingester/'],
-    // The delimited subtype takes a Grammar but never ingester/ — a plugin ingester binding on a node
-    // whose type SAYS delimited is a contradiction the server refuses (mirrors the engine's USE_HOME).
+    // A per-format subtype takes a Grammar but never ingester/ — a plugin ingester binding on a node
+    // whose type SAYS its format is a contradiction the server refuses (mirrors the engine's USE_HOME).
+    // (Binary fixed-width reaches its ingester through the plain `processing.ingester` CLASS key, not a
+    // use: binding, so it needs no home here.)
     'parser.delimited': ['grammar/'],
+    'parser.fixedwidth': ['grammar/'],
 };
 
-/** The parser family: the generic parser plus the per-format subtypes (B6 — delimited first). */
-const isParserType = (t: string): boolean => t === 'parser' || t === 'parser.delimited';
+/**
+ * A per-format parser subtype → every `parsing.frontend` spelling that IS that format (mirrors
+ * `PipelineEditable.SUBTYPE_FRONTENDS`). Fixed width answers to two spellings, so neither
+ * contradicts a node typed for it; the first entry is the canonical one `lower` stamps back.
+ */
+const SUBTYPE_FRONTENDS: Record<string, string[]> = {
+    'parser.delimited': ['delimited'],
+    'parser.fixedwidth': ['fixedwidth', 'fixed_width'],
+};
+
+/** Display label per subtype — mirrors each `BuiltinNodeType`'s own label. */
+const PARSER_SUBTYPE_LABELS: Record<string, string> = {
+    'parser.delimited': 'Parser (delimited)',
+    'parser.fixedwidth': 'Parser (fixed width)',
+};
+
+/** The node subtype a `parsing.frontend` value names, or `null` for none/unknown. */
+const subtypeForFrontend = (frontend: string): string | null => {
+    const f = frontend.trim().toLowerCase();
+    return Object.entries(SUBTYPE_FRONTENDS).find(([, v]) => v.includes(f))?.[0] ?? null;
+};
+
+/** The parser family: the generic parser plus the per-format subtypes (B6 — delimited, fixed width). */
+const isParserType = (t: string): boolean =>
+    t === 'parser' || t === 'parser.delimited' || t === 'parser.fixedwidth';
 
 /**
  * Node type → the `use:` prefix that is DERIVED, not authored, and is dropped in silence on purpose
@@ -211,18 +238,16 @@ export function liftConfig(config: Cfg): AuthoredPipeline {
         if (Object.keys(stripped).length) parserCfg['parsing'] = stripped;
         else delete parserCfg['parsing'];
     }
-    // The per-format parser identity (B6/P3a): a file whose parsing: block says frontend: delimited
-    // EXPLICITLY presents its parser as the delimited subtype. Explicit only — delimited is also the
-    // parser's implicit default, and retyping bare legacy files would flip everything deployed on a
-    // read (mirrors `PipelineEditable.toMap`).
-    const explicitDelimited =
-        String(asMap(config['parsing'])['frontend'] ?? '')
-            .trim()
-            .toLowerCase() === 'delimited';
+    // The per-format parser identity (B6/P3a): a file whose parsing: block NAMES its frontend presents
+    // its parser as that subtype. Explicit only — delimited is also the parser's implicit default, and
+    // retyping bare legacy files would flip everything deployed on a read (mirrors
+    // `PipelineEditable.toMap`). Fixed width is never implicit, so for it every file retypes — binary
+    // included: the node TYPE spans the format and only the drawer is text-only.
+    const subtype = subtypeForFrontend(String(asMap(config['parsing'])['frontend'] ?? ''));
     nodes.push({
         id: 'parse',
-        type: explicitDelimited ? 'parser.delimited' : 'parser',
-        name: explicitDelimited ? 'Parser (delimited)' : 'Parser',
+        type: subtype ?? 'parser',
+        name: subtype ? PARSER_SUBTYPE_LABELS[subtype] : 'Parser',
         use: parserUse,
         config: parserCfg,
     });
@@ -395,13 +420,14 @@ export function lowerGraph(
                 });
             else parser = n;
             // A subtype node whose own parsing: block names a DIFFERENT frontend is a contradiction
-            // (mirrors the engine's PARSER_FRONTEND_MISMATCH).
+            // (mirrors the engine's PARSER_FRONTEND_MISMATCH). Compared by SUBTYPE, not by string:
+            // fixed width answers to two spellings and neither contradicts the other.
             const fe = asMap(n.config?.['parsing'])['frontend'];
-            if (n.type === 'parser.delimited' && fe != null && String(fe).trim().toLowerCase() !== 'delimited')
+            if (SUBTYPE_FRONTENDS[n.type] && fe != null && subtypeForFrontend(String(fe)) !== n.type)
                 refusals.push({
                     code: 'PARSER_FRONTEND_MISMATCH',
                     nodeId: n.id,
-                    message: `parsing.frontend '${String(fe)}' contradicts the node's own type 'parser.delimited'`,
+                    message: `parsing.frontend '${String(fe)}' contradicts the node's own type '${n.type}'`,
                 });
         } else if (n.type === 'gap') gap = n;
         else if (n.type === 'transform.dedup.marker') marker = n;
@@ -610,11 +636,12 @@ export function lowerGraph(
         // is silently dropped on the way to disk (mirrors PipelineEditable.lower).
         if (parser.use?.startsWith('grammar/')) parsingBlock['grammar'] = parser.use;
         else if (strict) delete parsingBlock['grammar'];
-        // A delimited-subtype node authored fresh from the palette carries no frontend key yet; the
+        // A per-format subtype node authored fresh from the palette carries no frontend key yet; the
         // file must say the word the type means, or the next lift loses the identity (mirrors the
-        // engine's frontend stamp).
-        if (parser.type === 'parser.delimited' && parsingBlock['frontend'] == null)
-            parsingBlock['frontend'] = 'delimited';
+        // engine's frontend stamp). A lifted node keeps the spelling its author wrote — including
+        // `fixed_width`, which is left alone rather than canonicalised.
+        const frontends = SUBTYPE_FRONTENDS[parser.type];
+        if (frontends && parsingBlock['frontend'] == null) parsingBlock['frontend'] = frontends[0];
         if (Object.keys(parsingBlock).length) out['parsing'] = parsingBlock;
         else delete out['parsing'];
     }
