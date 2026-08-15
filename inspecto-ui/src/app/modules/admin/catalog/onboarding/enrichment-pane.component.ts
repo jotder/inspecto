@@ -1,11 +1,13 @@
 import {
     ChangeDetectionStrategy,
     Component,
-    OnDestroy,
+    HostListener,
     OnInit,
     computed,
     effect,
     inject,
+    input,
+    output,
     signal,
     viewChild,
 } from '@angular/core';
@@ -27,7 +29,6 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
-import { OnboardingStateService } from './onboarding-state.service';
 
 /**
  * Enrichment stage (optional, Streams) — authors the companion `EnrichmentConfig`
@@ -35,9 +36,15 @@ import { OnboardingStateService } from './onboarding-state.service';
  * adopters — the Pipelines `enrichment` node dialog is the other). This host derives everything
  * the guided flow can know instead of asking: input = this pipeline's Stage-1 output, trigger =
  * `on_pipeline` with the engine's normalized id (what `BatchEvent.pipeline()` carries), output =
- * the space's `enriched/` convention. Saves write the config AND re-register it
- * (`POST /enrichment`) — enrichments do not hot-reload by mtime, so registration is what makes a
- * save apply to the running service.
+ * the space's `enriched/` convention.
+ *
+ * <p>Pure (definition-surface unification D2): unlike the block-authoring stages this one has no
+ * pipeline block at all — its whole deliverable IS the companion, and the companion is what the
+ * HOST holds and what stage readiness reads. So the pane emits the finished draft on `applied` and
+ * the host owns both hops of the write (`POST /config/write type=enrichment` THEN `POST
+ * /enrichment` — enrichments do not hot-reload by mtime, so registration is what makes a save apply
+ * to the running service). The pane returns to pristine when the host hands the very draft it
+ * emitted back on `enrichment`; a failed save never does, so the unsaved-changes guard still fires.
  */
 @Component({
     selector: 'app-onboarding-enrichment-pane',
@@ -55,11 +62,10 @@ import { OnboardingStateService } from './onboarding-state.service';
     ],
     templateUrl: './enrichment-pane.component.html',
 })
-export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
+export class OnboardingEnrichmentPaneComponent implements OnInit {
     /** Rows of the Stage-1 output sampled to seed the `input` view in a preview. */
     private static readonly SAMPLE_LIMIT = 200;
 
-    protected readonly state = inject(OnboardingStateService);
     protected readonly lens = inject(LensService);
     private configApi = inject(ConfigService);
     private catalogApi = inject(CatalogService);
@@ -70,8 +76,23 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
     /** The shared editor (rendered only once the author opts in — the stage is optional). */
     private readonly editor = viewChild(EnrichmentEditorComponent);
 
-    readonly started = signal(this.state.enrichmentConfig() !== null);
-    readonly saving = signal(false);
+    /** The server-held pipeline draft — the `dirs`/`output` blocks the wiring is derived from. */
+    readonly config = input<Record<string, unknown> | null>(null);
+    /** The server-held companion `EnrichmentConfig`, or null when none is authored yet. */
+    readonly enrichment = input<Record<string, unknown> | null>(null);
+    /** Companion identity (`<pipeline>_enrich`) — the host owns the naming convention. */
+    readonly enrichName = input('');
+    /** The engine's normalized pipeline id — what `BatchEvent.pipeline()` carries. */
+    readonly pipelineId = input('');
+    /** Host-owned: a save of the emitted draft is in flight. */
+    readonly saving = input(false);
+
+    /** The finished companion draft to persist AND register. The host writes it. */
+    readonly applied = output<Record<string, unknown>>();
+    /** Whether the pane holds edits against the `enrichment` input it was last seeded with. */
+    readonly dirtyChange = output<boolean>();
+
+    readonly started = signal(false);
     // ── transform preview (stateless dry-run over a sample of the Stage-1 output) ──
     readonly previewing = signal(false);
     readonly previewResult = signal<EnrichmentPreview | null>(null);
@@ -82,24 +103,53 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
 
     private readonly dirtyCheck = (): boolean => this.editor()?.isDirty() ?? false;
 
+    /** The draft this pane emitted and is waiting to see handed back — the save-succeeded signal. */
+    private pendingDraft: Record<string, unknown> | null = null;
+    private lastDirty = false;
+
     constructor() {
-        this.state.registerDirtyCheck(this.dirtyCheck);
         // Hydrate from the server-held companion — including when its (async) read lands after
         // this pane mounted (and when the editor itself mounts a tick after `started` flips).
         // Never clobber unsaved edits.
         effect(() => {
-            const cfg = this.state.enrichmentConfig();
+            const cfg = this.enrichment();
             if (!cfg) return;
             this.started.set(true);
             const editor = this.editor();
-            if (editor && !this.dirtyCheck()) editor.hydrate(cfg);
+            if (!editor) return;
+            if (cfg === this.pendingDraft) {
+                // Our OWN save came back from the host: the emitted value is the new baseline.
+                // Re-hydrating instead would rebuild the form from a value it already holds.
+                this.pendingDraft = null;
+                editor.markSaved();
+            } else if (!this.dirtyCheck()) {
+                editor.hydrate(cfg);
+            }
+            this.emitDirty();
         });
+    }
+
+    /**
+     * Dirty is derived on interaction, not streamed — the same contract as the Collection (P2-2),
+     * Parsing (P2-3) and Schema (P2-4) panes.
+     */
+    @HostListener('input')
+    @HostListener('click')
+    onInteraction(): void {
+        this.emitDirty();
+    }
+
+    private emitDirty(): void {
+        const dirty = this.dirtyCheck();
+        if (dirty === this.lastDirty) return;
+        this.lastDirty = dirty;
+        this.dirtyChange.emit(dirty);
     }
 
     ngOnInit(): void {
         this.catalogApi.references().subscribe({
             next: (nodes) => {
-                const self = this.state.normalizedName();
+                const self = this.pipelineId();
                 this.referenceOptions.set(
                     nodes
                         .filter((n) => typeof n.attrs?.['pipeline'] === 'string' && n.attrs['pipeline'] !== self)
@@ -108,10 +158,6 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
             },
             error: () => this.referenceOptions.set([]),
         });
-    }
-
-    ngOnDestroy(): void {
-        this.state.unregisterDirtyCheck(this.dirtyCheck);
     }
 
     start(): void {
@@ -124,12 +170,17 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         return this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.';
     }
 
+    private blockOf(name: string): Record<string, unknown> {
+        const v = (this.config() ?? {})[name];
+        return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    }
+
     /** Input = this pipeline's Stage-1 output (kept verbatim on resume — the file is the truth). */
     inputBlock(): Record<string, unknown> {
-        const existing = this.state.enrichmentConfig();
+        const existing = this.enrichment();
         if (existing?.['input']) return existing['input'] as Record<string, unknown>;
-        const dirs = this.state.block('dirs') ?? {};
-        const output = this.state.block('output') ?? {};
+        const dirs = this.blockOf('dirs');
+        const output = this.blockOf('output');
         return {
             database: String(dirs['database'] ?? ''),
             format: String(output['format'] ?? 'PARQUET').toUpperCase(),
@@ -138,10 +189,10 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
     }
 
     outputBlock(): Record<string, unknown> {
-        const existing = this.state.enrichmentConfig();
+        const existing = this.enrichment();
         if (existing?.['output']) return existing['output'] as Record<string, unknown>;
         return {
-            database: `${this.base()}/data/enriched/${this.state.enrichName()}`,
+            database: `${this.base()}/data/enriched/${this.enrichName()}`,
             format: 'PARQUET',
             partitions: ['year', 'month', 'day'],
         };
@@ -152,11 +203,11 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         const parts = this.editor()?.build();
         if (!parts) return null;
         const draft: Record<string, unknown> = {
-            name: this.state.enrichName(),
+            name: this.enrichName(),
             input: this.inputBlock(),
             output: this.outputBlock(),
             transform: parts.transform,
-            triggers: { on_pipeline: this.state.normalizedName() },
+            triggers: { on_pipeline: this.pipelineId() },
         };
         if (Object.keys(parts.references).length > 0) draft['references'] = parts.references;
         return draft;
@@ -172,21 +223,17 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         if (!draft) return;
         this.previewing.set(true);
         this.previewError.set(null);
-        this.db
-            .table({ name: this.state.normalizedName(), limit: OnboardingEnrichmentPaneComponent.SAMPLE_LIMIT })
-            .subscribe({
-                next: (res) => this.runPreview(draft, res.rows),
-                error: () => this.runPreview(draft, []),
-            });
+        this.db.table({ name: this.pipelineId(), limit: OnboardingEnrichmentPaneComponent.SAMPLE_LIMIT }).subscribe({
+            next: (res) => this.runPreview(draft, res.rows),
+            error: () => this.runPreview(draft, []),
+        });
     }
 
     private runPreview(draft: Record<string, unknown>, sampleRows: Record<string, unknown>[]): void {
         if (sampleRows.length === 0) {
             this.previewing.set(false);
             this.previewResult.set(null);
-            this.toastr.warning(
-                `No data in "${this.state.normalizedName()}" yet to preview against — run the stream first.`,
-            );
+            this.toastr.warning(`No data in "${this.pipelineId()}" yet to preview against — run the stream first.`);
             return;
         }
         this.configApi.previewEnrichment(draft, sampleRows).subscribe({
@@ -206,38 +253,9 @@ export class OnboardingEnrichmentPaneComponent implements OnInit, OnDestroy {
         if (!this.lens.canAuthorWorkbench()) return;
         const draft = this.buildDraft();
         if (draft === null) return;
-
-        this.saving.set(true);
-        this.configApi.write('enrichment', draft, { overwrite: true }).subscribe({
-            next: (written) => {
-                // Register every save: enrichments do NOT hot-reload by mtime (unlike the pipeline).
-                this.configApi.registerEnrichment(written.path).subscribe({
-                    next: () => {
-                        this.saving.set(false);
-                        this.finishSave(draft);
-                        this.toastr.success('Enrichment saved — runs after every committed batch');
-                    },
-                    error: (e) => {
-                        this.saving.set(false);
-                        this.finishSave(draft);
-                        this.toastr.warning(
-                            apiErrorMessage(
-                                e,
-                                'Saved, but registering failed — it will load on the next service restart.',
-                            ),
-                        );
-                    },
-                });
-            },
-            error: (e) => {
-                this.saving.set(false);
-                this.toastr.error(apiErrorMessage(e, 'Could not save the enrichment.'));
-            },
-        });
-    }
-
-    private finishSave(draft: Record<string, unknown>): void {
-        this.state.enrichmentConfig.set(draft);
-        this.editor()?.markSaved();
+        // Remembered by IDENTITY: the pane goes pristine only when the host hands back THIS object,
+        // which is exactly "the save landed" — a failure hands back nothing and it stays dirty.
+        this.pendingDraft = draft;
+        this.applied.emit(draft);
     }
 }

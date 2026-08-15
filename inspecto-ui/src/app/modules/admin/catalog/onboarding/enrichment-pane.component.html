@@ -29,7 +29,7 @@
         <div class="text-secondary flex flex-col gap-1 rounded border p-3 text-sm">
             <span class="text-xs font-semibold uppercase tracking-wider">Wiring (derived)</span>
             <span
-                >Trigger — after every committed batch of <code>{{ state.normalizedName() }}</code></span
+                >Trigger — after every committed batch of <code>{{ pipelineId() }}</code></span
             >
             <span
                 >Input — <code>{{ inputBlock()['database'] }}</code> ({{ inputBlock()['format'] }})</span

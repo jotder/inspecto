@@ -10,8 +10,6 @@ import { CatalogService, ConfigService, DbBrowserService, MetadataNode, SpacesSe
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingEnrichmentPaneComponent } from './enrichment-pane.component';
-import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
-import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 const WRITE_OK = (type: string, name: string) => ({
@@ -58,8 +56,6 @@ async function create(
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            DefinitionStateService,
-            OnboardingStateService,
             {
                 provide: ConfigService,
                 useValue: {
@@ -81,15 +77,27 @@ async function create(
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
-    const state = TestBed.inject(OnboardingStateService);
-    state.name.set(String(config['name'] ?? ''));
-    state.config.set(config);
-    if (opts.enrichment !== undefined) state.enrichmentConfig.set(opts.enrichment);
     await TestBed.compileComponents(); // the shared data-table pulls in @defer-loaded blocks
     const fixture = TestBed.createComponent(OnboardingEnrichmentPaneComponent);
+    const name = String(config['name'] ?? '');
+    fixture.componentRef.setInput('config', config);
+    fixture.componentRef.setInput('enrichment', opts.enrichment ?? null);
+    // The naming conventions stay the HOST's — the pane is told, it does not derive them.
+    fixture.componentRef.setInput('enrichName', `${name}_enrich`);
+    fixture.componentRef.setInput('pipelineId', name);
+    // The pure contract is observed through the outputs — the HOST writes AND registers.
+    const applied: Record<string, unknown>[] = [];
+    const dirty: boolean[] = [];
+    fixture.componentInstance.applied.subscribe((v) => applied.push(v));
+    fixture.componentInstance.dirtyChange.subscribe((v) => dirty.push(v));
     fixture.detectChanges();
     fixture.detectChanges(); // second pass: the shared editor mounts, then the hydrate effect sees it
-    return { fixture, state, api: TestBed.inject(ConfigService), table };
+    /** What the host does after a successful write+register: hand the draft back. */
+    const hostSaved = (draft: Record<string, unknown>): void => {
+        fixture.componentRef.setInput('enrichment', draft);
+        fixture.detectChanges();
+    };
+    return { fixture, applied, dirty, hostSaved, api: TestBed.inject(ConfigService), table };
 }
 
 /** The shared editor hosted by the pane (W4b) — starts the stage first when needed. */
@@ -150,21 +158,17 @@ describe('OnboardingEnrichmentPaneComponent', () => {
     });
 
     it('hydrates when the companion read lands after the pane mounted', async () => {
-        const { fixture, state } = await create(PIPELINE);
+        const { fixture } = await create(PIPELINE);
         expect(fixture.componentInstance.started()).toBe(false);
-        state.enrichmentConfig.set({ name: 'orders_feed_enrich', transform: 'SELECT 1 FROM input' });
+        fixture.componentRef.setInput('enrichment', { name: 'orders_feed_enrich', transform: 'SELECT 1 FROM input' });
         fixture.detectChanges(); // started flips, the editor mounts
         fixture.detectChanges(); // the hydrate effect sees the mounted editor
         expect(fixture.componentInstance.started()).toBe(true);
         expect(editor(fixture).sql()).toBe('SELECT 1 FROM input');
     });
 
-    it('save writes the companion with derived wiring, then hot-registers it', async () => {
-        const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
-            of(WRITE_OK(type, String(cfg['name'] ?? 'x'))),
-        );
-        const registerEnrichment = vi.fn((_path: string) => of(REGISTER_OK));
-        const { fixture, state } = await create(PIPELINE, { api: { write, registerEnrichment } });
+    it('emits the whole companion draft with the derived wiring, instead of writing it', async () => {
+        const { fixture, applied } = await create(PIPELINE);
         const c = fixture.componentInstance;
         const ed = editor(fixture);
         ed.addReference();
@@ -173,8 +177,8 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         ed.onSqlChange('SELECT i.*, r.zone FROM input i LEFT JOIN region_dim r ON i.REGION = r.region');
         c.save();
 
-        const [type, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
-        expect(type).toBe('enrichment');
+        expect(applied).toHaveLength(1);
+        const draft = applied[0];
         expect(draft['name']).toBe('orders_feed_enrich');
         expect(draft['references']).toEqual({ region_dim: { ref: 'region_dim' } });
         expect((draft['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders_feed');
@@ -182,25 +186,43 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         expect((draft['output'] as Record<string, unknown>)['database']).toBe(
             'spaces/demo/data/enriched/orders_feed_enrich',
         );
-        expect(registerEnrichment).toHaveBeenCalledWith('orders_feed_enrich.toon');
-        expect(state.enrichmentConfig()).toEqual(draft);
-        expect(TOASTR.success).toHaveBeenCalled();
     });
 
-    it('keeps the save but warns when registration fails', async () => {
-        const registerEnrichment = vi.fn((_path: string) => throwError(() => ({ status: 503 })));
-        const { fixture, state } = await create(PIPELINE, { api: { registerEnrichment } });
-        editor(fixture).onSqlChange('SELECT * FROM input');
+    it('goes pristine only when the host hands the emitted draft back', async () => {
+        const { fixture, applied, dirty, hostSaved } = await create(PIPELINE);
+        const ed = editor(fixture);
+        // NOT the editor's own default SQL — that would leave it pristine and prove nothing.
+        ed.onSqlChange('SELECT ID FROM input');
+        fixture.componentInstance.onInteraction();
+        expect(dirty).toEqual([true]);
+
         fixture.componentInstance.save();
-        expect(state.enrichmentConfig()).not.toBeNull();
-        expect(TOASTR.warning).toHaveBeenCalled();
+        // A FAILED save hands nothing back — the editor must still read as dirty, or the
+        // unsaved-changes guard would let the operator walk away from unsaved SQL.
+        fixture.detectChanges();
+        expect(ed.isDirty()).toBe(true);
+        expect(dirty).toEqual([true]);
+
+        hostSaved(applied[0]);
+        expect(ed.isDirty()).toBe(false);
+        expect(dirty).toEqual([true, false]);
+    });
+
+    it('a companion arriving from elsewhere re-hydrates rather than resetting the baseline', async () => {
+        const { fixture, dirty, hostSaved } = await create(PIPELINE);
+        editor(fixture).onSqlChange('SELECT ID FROM input');
+        fixture.componentInstance.onInteraction();
+        expect(dirty).toEqual([true]);
+
+        // NOT the draft this pane emitted (it never saved) — an unrelated value must not be
+        // mistaken for "our save landed", and must not clobber the unsaved edit either.
+        hostSaved({ name: 'orders_feed_enrich', transform: 'SELECT 99 FROM input' });
+        expect(editor(fixture).sql()).toBe('SELECT ID FROM input');
+        expect(dirty).toEqual([true]);
     });
 
     it('blocks save on a duplicate reference alias', async () => {
-        const write = vi.fn((type: string, cfg: Record<string, unknown>, _opts?: unknown) =>
-            of(WRITE_OK(type, String(cfg['name'] ?? 'x'))),
-        );
-        const { fixture } = await create(PIPELINE, { api: { write } });
+        const { fixture, applied } = await create(PIPELINE);
         const ed = editor(fixture);
         ed.addReference();
         ed.addReference();
@@ -209,8 +231,16 @@ describe('OnboardingEnrichmentPaneComponent', () => {
         ed.referenceRows.at(1).get('name')?.setValue('dupe');
         ed.referenceRows.at(1).get('ref')?.setValue('b');
         fixture.componentInstance.save();
-        expect(write).not.toHaveBeenCalled();
+        expect(applied).toHaveLength(0);
         expect(TOASTR.warning).toHaveBeenCalled();
+    });
+
+    it('does not emit at all without the workbench lens', async () => {
+        const { fixture, applied } = await create(PIPELINE);
+        editor(fixture).onSqlChange('SELECT * FROM input');
+        vi.spyOn(fixture.componentInstance['lens'], 'canAuthorWorkbench').mockReturnValue(false);
+        fixture.componentInstance.save();
+        expect(applied).toHaveLength(0);
     });
 
     it('preview samples the stream output and runs the draft transform over it', async () => {

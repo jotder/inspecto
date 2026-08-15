@@ -165,7 +165,15 @@
                         />
                     }
                     @case ('enrichment') {
-                        <app-onboarding-enrichment-pane />
+                        <app-onboarding-enrichment-pane
+                            [config]="state.config()"
+                            [enrichment]="state.enrichmentConfig()"
+                            [enrichName]="state.enrichName()"
+                            [pipelineId]="state.normalizedName()"
+                            [saving]="savingPane()"
+                            (applied)="saveEnrichment($event)"
+                            (dirtyChange)="paneDirty.set($event)"
+                        />
                     }
                     @case ('publish') {
                         <app-onboarding-publish-pane />

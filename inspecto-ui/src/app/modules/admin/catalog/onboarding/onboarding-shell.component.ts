@@ -7,7 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
-import { ConfigImpact, LensService, apiErrorMessage } from 'app/inspecto/api';
+import { ConfigImpact, ConfigService, LensService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -72,6 +72,7 @@ export class OnboardingShellComponent {
     private route = inject(ActivatedRoute);
     private router = inject(Router);
     private confirm = inject(InspectoConfirmService);
+    private configApi = inject(ConfigService);
     private toastr = inject(ToastrService);
     private destroyRef = inject(DestroyRef);
     private transfer = inject(StreamTransferService);
@@ -155,6 +156,42 @@ export class OnboardingShellComponent {
     /** The Schema stage writes its own `<name>_schema` toon, then hands back the block naming it. */
     saveSchemaFile(processing: Record<string, unknown>): void {
         this.saveStage({ processing }, 'Schema saved');
+    }
+
+    /**
+     * Persist the Enrichment stage's companion config. Two hops, always both: the write, then the
+     * REGISTER — enrichments do not hot-reload by mtime, so an unregistered save would look applied
+     * and do nothing until the service restarts. A failed registration is a warning, not a failure:
+     * the config IS on disk, so the draft advances either way, which is also what returns the pane
+     * to pristine (it recognises the object it emitted).
+     */
+    saveEnrichment(draft: Record<string, unknown>): void {
+        this.savingPane.set(true);
+        this.configApi.write('enrichment', draft, { overwrite: true }).subscribe({
+            next: (written) => {
+                this.configApi.registerEnrichment(written.path).subscribe({
+                    next: () => {
+                        this.savingPane.set(false);
+                        this.state.enrichmentConfig.set(draft);
+                        this.toastr.success('Enrichment saved — runs after every committed batch');
+                    },
+                    error: (e) => {
+                        this.savingPane.set(false);
+                        this.state.enrichmentConfig.set(draft);
+                        this.toastr.warning(
+                            apiErrorMessage(
+                                e,
+                                'Saved, but registering failed — it will load on the next service restart.',
+                            ),
+                        );
+                    },
+                });
+            },
+            error: (e) => {
+                this.savingPane.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Could not save the enrichment.'));
+            },
+        });
     }
 
     /** A pane asking to move the operator on (the Schema stage's "Go to Parsing"). Unguarded on
