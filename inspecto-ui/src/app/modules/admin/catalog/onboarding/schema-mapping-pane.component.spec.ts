@@ -7,6 +7,7 @@ import { ToastrService } from 'ngx-toastr';
 import { ConfigService, ParsingPreview, SchemaPreview, SpacesService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingSchemaMappingPaneComponent } from './schema-mapping-pane.component';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -53,6 +54,7 @@ async function create(
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
+            DefinitionStateService,
             OnboardingStateService,
             {
                 provide: ConfigService,

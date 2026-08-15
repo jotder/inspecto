@@ -3,6 +3,7 @@ import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { ConfigService } from 'app/inspecto/api';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -10,6 +11,7 @@ const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn
 function create(configApi: Partial<ConfigService> = {}) {
     TestBed.configureTestingModule({
         providers: [
+            DefinitionStateService,
             OnboardingStateService,
             {
                 provide: ConfigService,

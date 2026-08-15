@@ -8,10 +8,9 @@ import {
     ConfigService,
     ConfigWriteResult,
     Finding,
-    ParsingPreview,
-    SchemaPreview,
 } from 'app/inspecto/api';
 import { mergeBlock, nullifyDeletes } from 'app/inspecto/component-model';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 
 /** Stage ids across both kinds — a Stream uses schema/enrichment, a Reference keys. */
 export type OnboardingStageId = 'collection' | 'parsing' | 'schema' | 'enrichment' | 'keys' | 'publish';
@@ -135,6 +134,7 @@ export const REFERENCE_STAGES: OnboardingStage[] = [
 export class OnboardingStateService {
     private configApi = inject(ConfigService);
     private toastr = inject(ToastrService);
+    private definition = inject(DefinitionStateService);
 
     readonly name = signal('');
     readonly loading = signal(false);
@@ -144,12 +144,15 @@ export class OnboardingStateService {
     readonly config = signal<Record<string, unknown> | null>(null);
     readonly activeStageId = signal<OnboardingStageId>('collection');
 
-    // ── sample-as-thread (session-held, re-capturable; v1 keeps it out of the config) ──
-    readonly sample = signal<{ name: string; text: string } | null>(null);
-    readonly parsePreview = signal<ParsingPreview | null>(null);
-    readonly parseError = signal<string | null>(null);
-    readonly schemaPreview = signal<SchemaPreview | null>(null);
-    readonly schemaError = signal<string | null>(null);
+    // ── sample-as-thread ──
+    // Owned by the shared DefinitionStateService (D5) and re-exported here, so the wizard's stage
+    // readiness keeps reading it while the panes migrate onto the shared service pane-by-pane.
+    // These are the SAME signal instances, not copies — there is one thread, not two.
+    readonly sample = this.definition.sample;
+    readonly parsePreview = this.definition.parsePreview;
+    readonly parseError = this.definition.parseError;
+    readonly schemaPreview = this.definition.schemaPreview;
+    readonly schemaError = this.definition.schemaError;
     /** The companion `EnrichmentConfig` (Streams only, `<name>_enrich`) — server-held like the
      *  draft itself; null = none authored yet (the stage is optional). */
     readonly enrichmentConfig = signal<Record<string, unknown> | null>(null);
@@ -363,20 +366,11 @@ export class OnboardingStateService {
     }
 
     captureSample(name: string, text: string): void {
-        this.sample.set({ name, text });
-        // A new sample invalidates every downstream test result — the thread restarts at raw.
-        this.parsePreview.set(null);
-        this.parseError.set(null);
-        this.schemaPreview.set(null);
-        this.schemaError.set(null);
+        this.definition.captureSample(name, text);
     }
 
     clearSample(): void {
-        this.sample.set(null);
-        this.parsePreview.set(null);
-        this.parseError.set(null);
-        this.schemaPreview.set(null);
-        this.schemaError.set(null);
+        this.definition.clearSample();
     }
 
     registerDirtyCheck(fn: () => boolean): void {

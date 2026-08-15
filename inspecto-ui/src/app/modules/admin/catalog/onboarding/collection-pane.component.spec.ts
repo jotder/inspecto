@@ -7,6 +7,7 @@ import { ToastrService } from 'ngx-toastr';
 import { ConfigService, ConnectionsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingCollectionPaneComponent } from './collection-pane.component';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -30,6 +31,7 @@ function create(
         imports: [OnboardingCollectionPaneComponent],
         providers: [
             provideNoopAnimations(),
+            DefinitionStateService,
             OnboardingStateService,
             { provide: ConfigService, useValue: { patch } },
             {

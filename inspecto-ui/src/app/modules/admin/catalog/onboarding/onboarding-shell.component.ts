@@ -21,6 +21,7 @@ import { OnboardingParsingPaneComponent } from './parsing-pane.component';
 import { OnboardingPlaceholderPaneComponent } from './placeholder-pane.component';
 import { OnboardingPublishPaneComponent } from './publish-pane.component';
 import { OnboardingSchemaMappingPaneComponent } from './schema-mapping-pane.component';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStage, OnboardingStageId, OnboardingStateService } from './onboarding-state.service';
 
 /**
@@ -47,7 +48,7 @@ function describeDependents(impact: ConfigImpact): string {
     selector: 'app-onboarding-shell',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    providers: [OnboardingStateService],
+    providers: [DefinitionStateService, OnboardingStateService],
     imports: [
         NgComponentOutlet,
         MatButtonModule,

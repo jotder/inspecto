@@ -8,6 +8,7 @@ import { ComponentDef, ComponentsService, ConfigService, InboxStatus, RunsServic
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingPublishPaneComponent } from './publish-pane.component';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -55,6 +56,7 @@ function create(
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
+            DefinitionStateService,
             OnboardingStateService,
             { provide: ConfigService, useValue: { patch, ...opts.api } },
             { provide: RunsService, useValue: { pending: vi.fn(() => of(PENDING)), ...opts.runsApi } },

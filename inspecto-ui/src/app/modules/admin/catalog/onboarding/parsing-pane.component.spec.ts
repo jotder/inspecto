@@ -7,6 +7,7 @@ import { ConfigService, ParserDef, ParsersService, ParsingPreview } from 'app/in
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingParsingPaneComponent } from './parsing-pane.component';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -87,6 +88,7 @@ async function create(
         imports: [OnboardingParsingPaneComponent],
         providers: [
             provideNoopAnimations(),
+            DefinitionStateService,
             OnboardingStateService,
             {
                 provide: ConfigService,

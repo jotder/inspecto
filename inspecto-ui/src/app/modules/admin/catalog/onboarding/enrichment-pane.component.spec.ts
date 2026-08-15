@@ -10,6 +10,7 @@ import { CatalogService, ConfigService, DbBrowserService, MetadataNode, SpacesSe
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { OnboardingEnrichmentPaneComponent } from './enrichment-pane.component';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { OnboardingStateService } from './onboarding-state.service';
 
 const TOASTR = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
@@ -57,6 +58,7 @@ async function create(
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
+            DefinitionStateService,
             OnboardingStateService,
             {
                 provide: ConfigService,
